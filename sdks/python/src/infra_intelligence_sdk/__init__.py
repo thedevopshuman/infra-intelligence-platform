@@ -4,6 +4,7 @@ from .client import Client
 from .errors import ApiError
 from .models import (
     Evidence,
+    EvaluationScenario,
     InvestigationReport,
     InvestigationRequest,
     ResourceCollectionRequest,
@@ -18,6 +19,7 @@ __all__ = [
     "ApiError",
     "Client",
     "Evidence",
+    "EvaluationScenario",
     "InvestigationReport",
     "InvestigationRequest",
     "ResourceCollectionRequest",

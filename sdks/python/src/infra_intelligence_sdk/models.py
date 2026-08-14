@@ -266,3 +266,27 @@ class InvestigationReport:
         """Return a JSON-serializable copy of the envelope."""
 
         return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class EvaluationScenario:
+    """Replayable incident fixtures and their offline scoring oracle."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "EvaluationScenario":
+        """Create an evaluation scenario after envelope checks."""
+
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="EvaluationScenario",
+                label="evaluation scenario",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-serializable copy of the envelope."""
+
+        return dict(self.payload)

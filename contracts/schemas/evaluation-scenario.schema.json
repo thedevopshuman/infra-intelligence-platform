@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:evaluation-scenario:v1alpha1",
+  "title": "Infrastructure Intelligence Evaluation Scenario",
+  "description": "A versioned, replayable incident fixture and scoring oracle for bounded agent evaluation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "EvaluationScenario"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "displayName", "tenantId", "createdAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,127}$"},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"},
+        "displayName": {"type": "string", "minLength": 1, "maxLength": 256},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "createdAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "tags",
+        "fixtures",
+        "request",
+        "expectations",
+        "scoring"
+      ],
+      "properties": {
+        "description": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{1,63}$"}
+        },
+        "fixtures": {"$ref": "#/$defs/fixtures"},
+        "request": {"$ref": "urn:iip:contracts:investigation-request:v1alpha1"},
+        "expectations": {"$ref": "#/$defs/expectations"},
+        "scoring": {"$ref": "#/$defs/scoring"}
+      }
+    }
+  },
+  "$defs": {
+    "fixtures": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["graph", "timelines", "alert", "evidence"],
+      "properties": {
+        "graph": {"$ref": "#/$defs/graph"},
+        "timelines": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "allOf": [
+              {"$ref": "urn:iip:contracts:resource-timeline:v1alpha1"},
+              {
+                "properties": {
+                  "spec": {
+                    "properties": {
+                      "page": {
+                        "properties": {"hasMore": {"const": false}}
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "alert": {"$ref": "urn:iip:contracts:event:v1alpha1"},
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1000,
+          "items": {"$ref": "urn:iip:contracts:evidence:v1alpha1"}
+        }
+      }
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rootResourceUids", "resources"],
+      "properties": {
+        "rootResourceUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}
+        },
+        "resources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1000,
+          "items": {"$ref": "urn:iip:contracts:resource:v1alpha1"}
+        }
+      }
+    },
+    "expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "rootCauseClass",
+        "affectedResourceUids",
+        "requiredEvidenceIds",
+        "forbiddenEvidenceTypes",
+        "redHerringEvidenceIds"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": ["conclusive", "inconclusive", "failed", "cancelled"]
+        },
+        "rootCauseClass": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._/-]{2,127}$"
+        },
+        "affectedResourceUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}
+        },
+        "requiredEvidenceIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"}
+        },
+        "forbiddenEvidenceTypes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{2,127}$"}
+        },
+        "redHerringEvidenceIds": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"}
+        }
+      }
+    },
+    "scoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passScore", "hardGates", "weights"],
+      "properties": {
+        "passScore": {"type": "integer", "minimum": 1, "maximum": 100},
+        "hardGates": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["root-cause", "required-evidence", "forbidden-evidence", "budget"]
+          }
+        },
+        "weights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rootCause",
+            "requiredEvidence",
+            "forbiddenEvidence",
+            "redHerringResistance",
+            "unsupportedCertainty",
+            "budgetCompliance"
+          ],
+          "properties": {
+            "rootCause": {"type": "integer", "minimum": 0, "maximum": 100},
+            "requiredEvidence": {"type": "integer", "minimum": 0, "maximum": 100},
+            "forbiddenEvidence": {"type": "integer", "minimum": 0, "maximum": 100},
+            "redHerringResistance": {"type": "integer", "minimum": 0, "maximum": 100},
+            "unsupportedCertainty": {"type": "integer", "minimum": 0, "maximum": 100},
+            "budgetCompliance": {"type": "integer", "minimum": 0, "maximum": 100}
+          }
+        }
+      }
+    }
+  }
+}

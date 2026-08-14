@@ -38,9 +38,11 @@ REQUIRED_PATHS = (
     "contracts/schemas/evidence.schema.json",
     "contracts/schemas/investigation-request.schema.json",
     "contracts/schemas/investigation-report.schema.json",
+    "contracts/schemas/evaluation-scenario.schema.json",
     "contracts/examples/evidence.json",
     "contracts/examples/investigation-request.json",
     "contracts/examples/investigation-report.json",
+    "contracts/examples/evaluation-scenario.json",
     "contracts/examples/resource-collection-request.json",
     "contracts/examples/resource-collection-result.json",
     "contracts/examples/resource-neighborhood.json",
@@ -49,6 +51,7 @@ REQUIRED_PATHS = (
     "contracts/examples/error.json",
     "docs/specifications/evidence-contract.md",
     "docs/specifications/investigation-contract.md",
+    "docs/specifications/evaluation-scenario-contract.md",
     "docs/specifications/resource-collection-contract.md",
     "docs/specifications/resource-query-contract.md",
     "requirements/verify.in",
@@ -325,6 +328,221 @@ def validate_resource_query_examples(
             fail(errors, "resource timeline items exceed its page limit")
 
 
+def validate_evaluation_scenario(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check replay and scoring invariants spanning scenario fixture contracts."""
+
+    from iip.domain.models import PlatformEvent, Resource
+
+    path = ROOT / "contracts" / "examples" / "evaluation-scenario.json"
+    scenario = documents.get(path)
+    if not isinstance(scenario, dict):
+        return
+    metadata = scenario.get("metadata")
+    spec = scenario.get("spec")
+    if not isinstance(metadata, dict) or not isinstance(spec, dict):
+        return
+    tenant_id = metadata.get("tenantId")
+    fixtures = spec.get("fixtures")
+    request = spec.get("request")
+    expectations = spec.get("expectations")
+    scoring = spec.get("scoring")
+    if not all(
+        isinstance(item, dict)
+        for item in (fixtures, request, expectations, scoring)
+    ):
+        return
+
+    graph = fixtures.get("graph")
+    if not isinstance(graph, dict):
+        return
+    parsed_resources = {}
+    resources = graph.get("resources", [])
+    if isinstance(resources, list):
+        for payload in resources:
+            if not isinstance(payload, dict):
+                continue
+            resource = Resource.from_dict(payload)
+            uid = resource.identity.uid
+            if uid in parsed_resources:
+                fail(errors, "evaluation scenario graph resource UIDs must be unique")
+            parsed_resources[uid] = resource
+            if resource.identity.tenant_id != tenant_id:
+                fail(errors, "evaluation scenario graph resources must share its tenant")
+    graph_uids = set(parsed_resources)
+    roots = set(graph.get("rootResourceUids", []))
+    if not roots.issubset(graph_uids):
+        fail(errors, "evaluation scenario graph roots must resolve in its resources")
+    for resource in parsed_resources.values():
+        for relationship in resource.relationships:
+            target = relationship.get("target")
+            if (
+                isinstance(target, str)
+                and re.fullmatch(r"res_[a-f0-9]{32}", target)
+                and target not in graph_uids
+            ):
+                fail(errors, "evaluation scenario platform relationship targets must resolve")
+
+    timelines = fixtures.get("timelines", [])
+    if isinstance(timelines, list):
+        for timeline in timelines:
+            if not isinstance(timeline, dict):
+                continue
+            timeline_metadata = timeline.get("metadata")
+            timeline_spec = timeline.get("spec")
+            if not isinstance(timeline_metadata, dict) or not isinstance(
+                timeline_spec, dict
+            ):
+                continue
+            page = timeline_spec.get("page")
+            if not isinstance(page, dict) or page.get("hasMore") is not False:
+                fail(errors, "evaluation scenario timelines must be complete terminal pages")
+            uid = timeline_metadata.get("resourceUid")
+            if timeline_metadata.get("tenantId") != tenant_id or uid not in graph_uids:
+                fail(errors, "evaluation scenario timelines must resolve in its tenant graph")
+            offsets = []
+            recorded_times = []
+            latest_accepted = None
+            items = timeline_spec.get("items", [])
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if not isinstance(item, dict) or not isinstance(
+                    item.get("resource"), dict
+                ):
+                    continue
+                resource = Resource.from_dict(item["resource"])
+                offsets.append(item.get("offset"))
+                recorded_times.append(parse_timestamp(item.get("recordedAt")))
+                if (
+                    resource.identity.tenant_id != tenant_id
+                    or resource.identity.uid != uid
+                ):
+                    fail(errors, "evaluation scenario timeline items must match its resource")
+                if item.get("observationHash") != PlatformEvent.canonical_hash(
+                    resource.to_dict()
+                ):
+                    fail(errors, "evaluation scenario timeline observation hash is invalid")
+                if item.get("disposition") == "accepted":
+                    latest_accepted = resource
+            if offsets != sorted(offsets):
+                fail(errors, "evaluation scenario timeline offsets must be ascending")
+            if any(value is None for value in recorded_times) or recorded_times != sorted(
+                recorded_times
+            ):
+                fail(errors, "evaluation scenario recorded times must be ascending")
+            current = parsed_resources.get(uid)
+            if (
+                current is not None
+                and latest_accepted is not None
+                and current.to_dict() != latest_accepted.to_dict()
+            ):
+                fail(errors, "evaluation scenario current graph must match latest accepted history")
+
+    alert = fixtures.get("alert")
+    alert_event = PlatformEvent.from_dict(alert) if isinstance(alert, dict) else None
+    if alert_event is not None and (
+        alert_event.tenant_id != tenant_id or alert_event.subject not in graph_uids
+    ):
+        fail(errors, "evaluation scenario alert must resolve in its tenant graph")
+
+    request_metadata = request.get("metadata")
+    request_spec = request.get("spec")
+    if not isinstance(request_metadata, dict) or not isinstance(request_spec, dict):
+        return
+    if request_metadata.get("tenantId") != tenant_id:
+        fail(errors, "evaluation scenario request must share its tenant")
+    request_scope = request_spec.get("scope")
+    request_uids = set()
+    range_start = range_end = None
+    if isinstance(request_scope, dict):
+        request_uids = set(request_scope.get("resourceUids", []))
+        time_range = request_scope.get("timeRange")
+        if isinstance(time_range, dict):
+            range_start = parse_timestamp(time_range.get("start"))
+            range_end = parse_timestamp(time_range.get("end"))
+    if not request_uids.issubset(graph_uids) or not roots.issubset(request_uids):
+        fail(errors, "evaluation scenario request scope must resolve graph roots")
+    requested_at = parse_timestamp(request_metadata.get("requestedAt"))
+    alert_time = parse_timestamp(alert.get("time")) if isinstance(alert, dict) else None
+    if (
+        None in (range_start, range_end, alert_time, requested_at)
+        or not range_start <= alert_time <= requested_at <= range_end
+    ):
+        fail(errors, "evaluation scenario alert and request must fall within scope time")
+    trigger = request_spec.get("trigger")
+    if isinstance(trigger, dict) and isinstance(alert, dict):
+        expected_reference = f"urn:iip:event:{alert.get('id')}"
+        if (
+            trigger.get("type") != "alert"
+            or trigger.get("source") != alert.get("source")
+            or trigger.get("reference") != expected_reference
+            or request_metadata.get("correlationId") != alert.get("correlationid")
+        ):
+            fail(errors, "evaluation scenario request trigger must identify its alert")
+
+    evidence_by_id = {}
+    evidence_types = set()
+    evidence_items = fixtures.get("evidence", [])
+    if isinstance(evidence_items, list):
+        for evidence in evidence_items:
+            if not isinstance(evidence, dict):
+                continue
+            evidence_metadata = evidence.get("metadata")
+            evidence_spec = evidence.get("spec")
+            if not isinstance(evidence_metadata, dict) or not isinstance(
+                evidence_spec, dict
+            ):
+                continue
+            evidence_id = evidence_metadata.get("id")
+            if evidence_id in evidence_by_id:
+                fail(errors, "evaluation scenario evidence IDs must be unique")
+            evidence_by_id[evidence_id] = evidence
+            evidence_types.add(evidence_spec.get("type"))
+            if evidence_metadata.get("tenantId") != tenant_id:
+                fail(errors, "evaluation scenario evidence must share its tenant")
+            if not set(evidence_spec.get("resourceRefs", [])).issubset(graph_uids):
+                fail(errors, "evaluation scenario evidence resources must resolve")
+            times = (
+                parse_timestamp(evidence_spec.get("observedAt")),
+                parse_timestamp(evidence_spec.get("retrievedAt")),
+                parse_timestamp(evidence_metadata.get("recordedAt")),
+            )
+            if None in times or not times[0] <= times[1] <= times[2]:
+                fail(errors, "evaluation scenario evidence times must be monotonic")
+            if (
+                range_start is not None
+                and range_end is not None
+                and times[0] is not None
+                and not range_start <= times[0] <= range_end
+            ):
+                fail(errors, "evaluation scenario evidence observations must fit scope time")
+
+    required = set(expectations.get("requiredEvidenceIds", []))
+    red_herrings = set(expectations.get("redHerringEvidenceIds", []))
+    fixture_evidence_ids = set(evidence_by_id)
+    if not required.union(red_herrings).issubset(fixture_evidence_ids):
+        fail(errors, "evaluation scenario expected evidence IDs must resolve")
+    if required.intersection(red_herrings):
+        fail(errors, "evaluation scenario required evidence and red herrings must be disjoint")
+    affected = set(expectations.get("affectedResourceUids", []))
+    if not affected.issubset(graph_uids):
+        fail(errors, "evaluation scenario affected resources must resolve")
+    forbidden_types = set(expectations.get("forbiddenEvidenceTypes", []))
+    requested_evidence_types = set(request_spec.get("evidenceTypes", []))
+    if forbidden_types.intersection(evidence_types) or forbidden_types.intersection(
+        requested_evidence_types
+    ):
+        fail(errors, "evaluation scenario forbidden evidence must not be exposed")
+    if not evidence_types.issubset(requested_evidence_types):
+        fail(errors, "evaluation scenario fixture evidence must fit the request upper bound")
+
+    weights = scoring.get("weights")
+    if isinstance(weights, dict) and sum(weights.values()) != 100:
+        fail(errors, "evaluation scenario scoring weights must sum to 100")
+
+
 def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> None:
     from iip.domain.models import ContractError, Resource
 
@@ -377,6 +595,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("evidence.json", "Evidence"),
         ("investigation-request.json", "InvestigationRequest"),
         ("investigation-report.json", "InvestigationReport"),
+        ("evaluation-scenario.json", "EvaluationScenario"),
         ("resource-collection-request.json", "ResourceCollectionRequest"),
         ("resource-collection-result.json", "ResourceCollectionResult"),
         ("resource-neighborhood.json", "ResourceNeighborhood"),
@@ -388,6 +607,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
 
     validate_collection_examples(documents, errors)
     validate_resource_query_examples(documents, errors)
+    validate_evaluation_scenario(documents, errors)
 
     plugin_example = documents.get(example_dir / "plugin-manifest.json")
     plugin_package = documents.get(ROOT / "plugins/examples/kubernetes-observer/plugin.json")

@@ -11,6 +11,8 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 `Evidence`, `InvestigationRequest`, and `InvestigationReport` expose the corresponding `v1alpha1` public envelopes without importing server implementation classes. Their presence does not imply an executable API endpoint; transport methods are added only with an implemented surface.
 
+`EvaluationScenario` exposes the offline, replayable scenario envelope used by evaluation tooling. It carries fixtures and a scoring oracle but grants no runtime access or authority.
+
 `ResourceObservationCursor` represents optional source ordering, replay checkpoint, and reconciliation metadata carried inside a resource observation.
 
 `ResourceCollectionRequest` and `ResourceCollectionResult` expose the bounded public interface used by resource-observer plugins. These lightweight envelope types do not import the server kernel or imply that the future plugin handshake is implemented.

@@ -23,6 +23,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Event contract](specifications/event-contract.md)
 - [Evidence contract](specifications/evidence-contract.md)
 - [Investigation request and report contracts](specifications/investigation-contract.md)
+- [Evaluation scenario contract](specifications/evaluation-scenario-contract.md)
 - [Agent contract](specifications/agent-contract.md)
 - [Plugin contract](specifications/plugin-contract.md)
 

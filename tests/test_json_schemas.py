@@ -134,6 +134,24 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("depth" in error for error in errors))
 
+    def test_evaluation_scenario_rejects_unknown_hard_gate(self) -> None:
+        scenario = document("contracts/examples/evaluation-scenario.json")
+        scenario["spec"]["scoring"]["hardGates"].append("narrative-quality")
+
+        errors = self.validate("evaluation-scenario.schema.json", scenario)
+
+        self.assertTrue(any("hardGates" in error for error in errors))
+
+    def test_evaluation_scenario_requires_complete_timelines(self) -> None:
+        scenario = document("contracts/examples/evaluation-scenario.json")
+        page = scenario["spec"]["fixtures"]["timelines"][0]["spec"]["page"]
+        page["hasMore"] = True
+        page["nextCursor"] = "p1.more"
+
+        errors = self.validate("evaluation-scenario.schema.json", scenario)
+
+        self.assertTrue(any("hasMore" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

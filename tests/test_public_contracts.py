@@ -8,6 +8,7 @@ from pathlib import Path
 
 from infra_intelligence_sdk import (
     Evidence,
+    EvaluationScenario,
     InvestigationReport,
     InvestigationRequest,
     ResourceCollectionRequest,
@@ -42,6 +43,7 @@ class PublicContractSdkTests(unittest.TestCase):
             example("resource-neighborhood.json")
         )
         timeline = ResourceTimeline.from_dict(example("resource-timeline.json"))
+        scenario = EvaluationScenario.from_dict(example("evaluation-scenario.json"))
 
         self.assertEqual(evidence.to_dict()["kind"], "Evidence")
         self.assertEqual(request.to_dict()["kind"], "InvestigationRequest")
@@ -50,6 +52,7 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(collection_result.to_dict()["kind"], "ResourceCollectionResult")
         self.assertEqual(neighborhood.to_dict()["kind"], "ResourceNeighborhood")
         self.assertEqual(timeline.to_dict()["kind"], "ResourceTimeline")
+        self.assertEqual(scenario.to_dict()["kind"], "EvaluationScenario")
 
     def test_sdk_models_reject_crossed_contract_kinds(self) -> None:
         with self.assertRaisesRegex(ValueError, "kind must be Evidence"):
@@ -58,12 +61,19 @@ class PublicContractSdkTests(unittest.TestCase):
             InvestigationRequest.from_dict(example("evidence.json"))
         with self.assertRaisesRegex(ValueError, "kind must be InvestigationReport"):
             InvestigationReport.from_dict(example("investigation-request.json"))
+        with self.assertRaisesRegex(ValueError, "kind must be EvaluationScenario"):
+            EvaluationScenario.from_dict(example("evidence.json"))
 
     def test_sdk_models_reject_unknown_versions(self) -> None:
         payload = example("investigation-request.json")
         payload["apiVersion"] = "iip.platform/v2"
         with self.assertRaisesRegex(ValueError, "unsupported investigation request apiVersion"):
             InvestigationRequest.from_dict(payload)
+
+        scenario = example("evaluation-scenario.json")
+        scenario["apiVersion"] = "iip.platform/v2"
+        with self.assertRaisesRegex(ValueError, "unsupported evaluation scenario apiVersion"):
+            EvaluationScenario.from_dict(scenario)
 
 
 class PublicContractRepositoryValidationTests(unittest.TestCase):
@@ -127,6 +137,79 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn(
             "investigation report outcome and terminalReason are inconsistent",
+            self.errors,
+        )
+
+    def test_scenario_rejects_unresolved_required_evidence(self) -> None:
+        path = ROOT / "contracts" / "examples" / "evaluation-scenario.json"
+        scenario = copy.deepcopy(self.documents[path])
+        scenario["spec"]["expectations"]["requiredEvidenceIds"].append(
+            "evd_00000000000000000000000000000000"
+        )
+        self.documents[path] = scenario
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "evaluation scenario expected evidence IDs must resolve",
+            self.errors,
+        )
+
+    def test_scenario_rejects_cross_tenant_evidence(self) -> None:
+        path = ROOT / "contracts" / "examples" / "evaluation-scenario.json"
+        scenario = copy.deepcopy(self.documents[path])
+        scenario["spec"]["fixtures"]["evidence"][0]["metadata"][
+            "tenantId"
+        ] = "another-tenant"
+        self.documents[path] = scenario
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "evaluation scenario evidence must share its tenant",
+            self.errors,
+        )
+
+    def test_scenario_rejects_current_graph_history_drift(self) -> None:
+        path = ROOT / "contracts" / "examples" / "evaluation-scenario.json"
+        scenario = copy.deepcopy(self.documents[path])
+        scenario["spec"]["fixtures"]["graph"]["resources"][0]["spec"][
+            "attributes"
+        ]["availableReplicas"] = 1
+        self.documents[path] = scenario
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "evaluation scenario current graph must match latest accepted history",
+            self.errors,
+        )
+
+    def test_scenario_rejects_scoring_weights_above_100(self) -> None:
+        path = ROOT / "contracts" / "examples" / "evaluation-scenario.json"
+        scenario = copy.deepcopy(self.documents[path])
+        scenario["spec"]["scoring"]["weights"]["rootCause"] = 36
+        self.documents[path] = scenario
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "evaluation scenario scoring weights must sum to 100",
+            self.errors,
+        )
+
+    def test_scenario_rejects_forbidden_evidence_in_request_scope(self) -> None:
+        path = ROOT / "contracts" / "examples" / "evaluation-scenario.json"
+        scenario = copy.deepcopy(self.documents[path])
+        scenario["spec"]["request"]["spec"]["evidenceTypes"].append(
+            "kubernetes.secret"
+        )
+        self.documents[path] = scenario
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "evaluation scenario forbidden evidence must not be exposed",
             self.errors,
         )
 

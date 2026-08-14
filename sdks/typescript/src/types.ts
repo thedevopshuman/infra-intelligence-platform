@@ -347,6 +347,61 @@ export interface InvestigationReport {
   };
 }
 
+export interface EvaluationScenarioExpectations {
+  outcome: "conclusive" | "inconclusive" | "failed" | "cancelled";
+  rootCauseClass: string;
+  affectedResourceUids: ResourceUid[];
+  requiredEvidenceIds: EvidenceId[];
+  forbiddenEvidenceTypes: string[];
+  redHerringEvidenceIds: EvidenceId[];
+}
+
+export interface EvaluationScenarioScoring {
+  passScore: number;
+  hardGates: (
+    | "root-cause"
+    | "required-evidence"
+    | "forbidden-evidence"
+    | "budget"
+  )[];
+  weights: {
+    rootCause: number;
+    requiredEvidence: number;
+    forbiddenEvidence: number;
+    redHerringResistance: number;
+    unsupportedCertainty: number;
+    budgetCompliance: number;
+  };
+}
+
+export interface EvaluationScenario {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "EvaluationScenario";
+  metadata: {
+    id: string;
+    version: string;
+    displayName: string;
+    tenantId: string;
+    createdAt: string;
+  };
+  spec: {
+    description: string;
+    tags: string[];
+    fixtures: {
+      graph: {
+        rootResourceUids: ResourceUid[];
+        resources: ResourceObservation[];
+      };
+      timelines: ResourceTimeline[];
+      alert: PlatformEvent;
+      evidence: Evidence[];
+    };
+    request: InvestigationRequest;
+    expectations: EvaluationScenarioExpectations;
+    scoring: EvaluationScenarioScoring;
+  };
+}
+
 export interface ApiErrorBody {
   error: { code: string };
 }

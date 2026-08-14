@@ -42,5 +42,4 @@ Agents cannot approve their own proposals. An `execute` authority manifest still
 
 ## Evaluation
 
-An agent release is promoted with scenario results covering root-cause class, required evidence, red herrings, unsupported certainty, tool efficiency, latency, cost, policy compliance, and stability across repeated runs.
-
+An agent release is promoted with versioned [evaluation scenario](evaluation-scenario-contract.md) results covering root-cause class, required and forbidden evidence, red herrings, unsupported certainty, tool efficiency, latency, cost, policy compliance, and stability across repeated runs.

@@ -8,13 +8,21 @@
 - Helm 3 or newer
 - Optional: Kubernetes cluster and `kubectl` for deployment experiments
 
+Install the pinned verification-only Python dependencies:
+
+```bash
+python3 -m pip install --requirement requirements/verify.txt
+```
+
+Application and SDK runtime packages remain dependency-free. The verification environment pins `jsonschema` and its format checkers separately so contract validation cannot silently change with a developer's global environment.
+
 ## Verify
 
 ```bash
 make verify
 ```
 
-This validates JSON documents and internal links, enforces Python package directions, runs unit tests, lints the chart, and renders Kubernetes templates.
+This validates JSON documents and internal links, enforces Python package directions, checks every contract schema and example with the pinned Draft 2020-12 validator, runs unit tests, lints the chart, and renders Kubernetes templates.
 
 ## Run the reference API
 
@@ -51,4 +59,3 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_HTTP_PORT` | `8080` | Reference API port |
 
 Future secrets must be logical references resolved by the deployment/runtime, never committed environment files.
-

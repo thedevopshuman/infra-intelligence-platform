@@ -37,6 +37,9 @@ REQUIRED_PATHS = (
     "contracts/examples/investigation-report.json",
     "docs/specifications/evidence-contract.md",
     "docs/specifications/investigation-contract.md",
+    "requirements/verify.in",
+    "requirements/verify.txt",
+    "scripts/validate_schemas.py",
     "api/openapi/control-plane.openapi.json",
     "deploy/helm/infra-intelligence/Chart.yaml",
 )

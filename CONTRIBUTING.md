@@ -4,6 +4,8 @@ This repository is in foundation stage. Prefer small vertical slices that preser
 
 ## Workflow
 
+Install verification dependencies once with `make install-verify-deps`.
+
 1. Link the change to a roadmap outcome or write a short decision record.
 2. Change the public contract first when observable behavior changes.
 3. Add focused tests for the domain rule or boundary.
@@ -15,4 +17,3 @@ Use conventional commit prefixes (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`
 ## Compatibility
 
 Contracts are `v1alpha1`: they may evolve, but changes must remain explicit. Prefer additive fields. Breaking changes require a new schema identifier, API version, examples, SDK updates, and migration notes.
-

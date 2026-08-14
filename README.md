@@ -19,6 +19,7 @@ This repository is at **foundation / v0.1**. It contains the living product and 
 The reference kernel deliberately uses only the Python standard library.
 
 ```bash
+python3 -m pip install --requirement requirements/verify.txt
 make verify
 make run
 ```
@@ -64,4 +65,3 @@ Accepted foundations live in [`docs/decisions`](docs/decisions/README.md). Open 
 ## Licensing
 
 No open-source license has been selected yet. Until that decision is recorded, do not assume permission to redistribute this repository. See the [open-source and commercial boundary](docs/product/open-source-boundary.md).
-

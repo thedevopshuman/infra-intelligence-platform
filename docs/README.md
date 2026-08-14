@@ -15,6 +15,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Investigation lifecycle](architecture/investigation-lifecycle.md)
 - [Security, tenancy, and authority](architecture/security-tenancy.md)
 - [PostgreSQL resource and event substrate](architecture/postgresql-resource-event-substrate.md)
+- [Evidence collection pipeline](architecture/evidence-collection-pipeline.md)
 
 ## Specifications
 

@@ -360,13 +360,13 @@ class AllowTenantPolicy:
         self,
         actor: ActorContext,
         action: str,
-        resource: Mapping[str, str],
+        resource: Mapping[str, object],
     ) -> PolicyDecision:
         if not actor.actor_id or actor.actor_id == "anonymous":
             return PolicyDecision(False, "actor.anonymous")
         if resource.get("tenantId") != actor.tenant_id:
             return PolicyDecision(False, "tenant.scope_mismatch")
-        if action not in ("resource:ingest", "resource:read"):
+        if action not in ("evidence:collect", "resource:ingest", "resource:read"):
             return PolicyDecision(False, "action.unsupported")
         return PolicyDecision(True, "development.allow")
 

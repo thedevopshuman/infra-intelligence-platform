@@ -22,6 +22,7 @@ REQUIRED_PATHS = (
     "AGENTS.md",
     "docs/product/constitution.md",
     "docs/architecture/overview.md",
+    "docs/architecture/evidence-collection-pipeline.md",
     "docs/research/opensre-reference-analysis.md",
     "docs/research/brand/README.md",
     "docs/roadmap/initial-roadmap.md",
@@ -57,6 +58,9 @@ REQUIRED_PATHS = (
     "requirements/verify.in",
     "requirements/verify.txt",
     "scripts/validate_schemas.py",
+    "src/iip/application/collect_evidence.py",
+    "src/iip/adapters/evidence.py",
+    "tests/test_evidence_collection.py",
     "api/openapi/control-plane.openapi.json",
     "deploy/helm/infra-intelligence/Chart.yaml",
 )

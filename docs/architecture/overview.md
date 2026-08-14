@@ -91,6 +91,8 @@ flowchart TB
 
 Collector plugins cross the extension boundary through bounded resource collection request/result contracts. A complete batch returns an explicit scope digest and candidate checkpoint; only the trusted ingestion workflow may commit that checkpoint after every resource observation and event is durable. Partial, failed, and cancelled reconciliation passes never imply deletion.
 
+Evidence providers cross a separate application-owned boundary. The [reference collection pipeline](evidence-collection-pipeline.md) authorizes an exact tenant, integration, evidence type, and resource scope before a provider runs, then validates and redacts provider output before hashing and atomic persistence. Providers do not receive ambient credentials through the application contract.
+
 ## Storage responsibilities
 
 The logical boundaries remain product-neutral. [ADR 0004](../decisions/0004-postgresql-observation-store-and-outbox.md) selects PostgreSQL for the initial resource/observation, event-log, checkpoint, and outbox substrate while leaving other stores and later transport specialization open:

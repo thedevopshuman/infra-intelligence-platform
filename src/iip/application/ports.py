@@ -82,6 +82,39 @@ class SourceCheckpoint:
     committed_at: str
 
 
+@dataclass(frozen=True)
+class EvidenceProviderRequest:
+    """Credential-free, bounded request passed across a provider boundary."""
+
+    tenant_id: str
+    actor_id: str
+    evidence_type: str
+    integration_id: str
+    resource_uids: tuple[str, ...]
+    locator: str
+    query: Optional[str]
+    max_bytes: int
+    deadline: str
+
+
+@dataclass(frozen=True)
+class RawEvidenceArtifact:
+    """Untrusted artifact returned by an evidence provider."""
+
+    content: bytes
+    media_type: str
+    observed_at: str
+    summary: str
+
+
+@dataclass(frozen=True)
+class EvidenceRedactionResult:
+    """Decoded artifact bytes after mandatory redaction inspection."""
+
+    content: bytes
+    methods: tuple[str, ...]
+
+
 class ResourceRepository(Protocol):
     def get(self, tenant_id: str, uid: str) -> Optional[Resource]:
         """Return a resource only from the requested tenant scope."""
@@ -188,9 +221,60 @@ class PolicyDecisionPoint(Protocol):
         self,
         actor: ActorContext,
         action: str,
-        resource: Mapping[str, str],
+        resource: Mapping[str, object],
     ) -> PolicyDecision:
         """Decide one action without granting authority beyond this request."""
+
+
+class EvidenceProvider(Protocol):
+    def fetch(self, request: EvidenceProviderRequest) -> RawEvidenceArtifact:
+        """Retrieve one bounded artifact without exposing adapter credentials."""
+
+
+class EvidenceRedactor(Protocol):
+    def redact(
+        self,
+        content: bytes,
+        *,
+        media_type: str,
+        evidence_type: str,
+    ) -> EvidenceRedactionResult:
+        """Inspect and redact decoded provider output before persistence."""
+
+
+class EvidenceStore(Protocol):
+    def commit(
+        self,
+        actor: ActorContext,
+        evidence_id: str,
+        document: Mapping[str, object],
+        decoded_content: bytes,
+    ) -> None:
+        """Atomically persist immutable evidence metadata and artifact bytes."""
+
+    def get(
+        self,
+        actor: ActorContext,
+        evidence_id: str,
+    ) -> Optional[Mapping[str, object]]:
+        """Return metadata only from the actor's explicit tenant scope."""
+
+    def read_artifact(
+        self,
+        actor: ActorContext,
+        evidence_id: str,
+    ) -> Optional[bytes]:
+        """Return bytes only from the actor's explicit tenant scope."""
+
+
+class EvidenceIdGenerator(Protocol):
+    def new_id(self) -> str:
+        """Return one opaque platform Evidence identifier."""
+
+
+class Clock(Protocol):
+    def now(self) -> str:
+        """Return the current time as an RFC 3339 timestamp."""
 
 
 class AgentExecutor(Protocol):

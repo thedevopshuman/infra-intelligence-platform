@@ -4,7 +4,7 @@
 
 Infrastructure Intelligence Platform (IIP) is an architecture-first foundation for building a vendor-neutral control plane that understands infrastructure as a resource graph and event timeline, then lets governed agents investigate and act with evidence.
 
-This repository is at **foundation / early Phase 1**. It contains the living product and architecture record, versioned contracts, an executable reference kernel with in-memory and PostgreSQL profiles, starter SDK boundaries, a runnable Kubernetes observer conformance example, a deterministic incident evaluation scenario, and Kubernetes packaging. It is not yet a production system.
+This repository is at **foundation / early Phase 1**. It contains the living product and architecture record, versioned contracts, an executable reference kernel with in-memory and PostgreSQL resource profiles, an in-memory evidence collection boundary with redaction and content hashing, starter SDK boundaries, a runnable Kubernetes observer conformance example, a deterministic incident evaluation scenario, and Kubernetes packaging. It is not yet a production system.
 
 ## Start here
 

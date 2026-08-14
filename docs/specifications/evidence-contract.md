@@ -49,3 +49,9 @@ In addition to JSON Schema validation:
 - the stored artifact must match both `contentHash` and `sizeBytes` after decoding;
 - `applied` redaction requires at least one method; and
 - locators, queries, summaries, and handling metadata must pass secret and size checks.
+
+## Reference collection boundary
+
+The Phase 1 kernel implements these invariants through the [evidence collection pipeline](../architecture/evidence-collection-pipeline.md). The application authorizes the exact tenant, integration, evidence type, and resource scope before invoking a provider. Provider requests are credential-free and bounded by a deadline and decoded byte limit. Provider output is validated and redacted before the platform generates the content hash or calls the atomic evidence-store port.
+
+The generated document remains this public Evidence contract, so no SDK type or OpenAPI change is required for the internal collection boundary. A future public collection or retrieval operation must add its request/response contract, authenticated surface, sensitivity-aware authorization, SDK operations, and OpenAPI description together.

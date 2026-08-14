@@ -4,6 +4,14 @@
   "metadata": {
     "tenantId": "local",
     "observedAt": "2026-08-14T10:30:00Z",
+    "observation": {
+      "sourceId": "kubernetes-local",
+      "streamId": "obs_0f4e8c2a6b1d4975a3c9e7f102d468ab",
+      "sequence": 42,
+      "mode": "incremental",
+      "resourceVersion": "398712",
+      "checkpoint": "kubernetes:cluster-local:resource-version:398712"
+    },
     "labels": {
       "environment": "development",
       "team": "platform"
@@ -32,4 +40,3 @@
     "lifecycle": "active"
   }
 }
-

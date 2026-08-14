@@ -13,6 +13,8 @@ from iip.application.ingest_resource import (
     AuthorizationError,
     IngestResourceCommand,
     InvalidInputError,
+    ObservationConflictError,
+    StaleObservationError,
 )
 from iip.application.ports import ActorContext
 from iip.bootstrap import Runtime, build_local_runtime
@@ -59,6 +61,16 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": "contract.invalid"}})
         except AuthorizationError:
             self._json(HTTPStatus.FORBIDDEN, {"error": {"code": "policy.denied"}})
+        except StaleObservationError:
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"error": {"code": "resource.observation.stale"}},
+            )
+        except ObservationConflictError:
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"error": {"code": "resource.observation.conflict"}},
+            )
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
             self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": "request.invalid_json"}})
 

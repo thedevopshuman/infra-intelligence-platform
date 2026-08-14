@@ -163,6 +163,13 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
 
                 if event_data.get("observationHash") != PlatformEvent.canonical_hash(expected_hash):
                     fail(errors, "event example observationHash must match the resource example")
+                if event_data.get("observation") != expected_hash["metadata"].get(
+                    "observation"
+                ):
+                    fail(
+                        errors,
+                        "event example observation cursor must match the resource example",
+                    )
 
     versioned_examples = (
         ("agent-manifest.json", "Agent"),

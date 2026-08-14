@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Any, Dict, Mapping, Optional
 
 
@@ -37,6 +39,11 @@ def _timestamp(value: Any, field_name: str) -> str:
     return text
 
 
+def _parsed_timestamp(value: str) -> datetime:
+    candidate = value[:-1] + "+00:00" if value.endswith("Z") else value
+    return datetime.fromisoformat(candidate)
+
+
 @dataclass(frozen=True)
 class ResourceIdentity:
     """Tenant-scoped identity for one external infrastructure object."""
@@ -62,11 +69,108 @@ class ResourceIdentity:
 
 
 @dataclass(frozen=True)
+class ObservationCursor:
+    """Source-defined ordering and replay position for one observation."""
+
+    source_id: str
+    stream_id: str
+    sequence: int
+    mode: str
+    resource_version: Optional[str] = None
+    checkpoint: Optional[str] = None
+    snapshot_id: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.source_id, str) or not re.fullmatch(
+            r"[a-z][a-z0-9._-]{2,127}", self.source_id
+        ):
+            raise ContractError("metadata.observation.sourceId is invalid")
+        if not isinstance(self.stream_id, str) or not re.fullmatch(
+            r"obs_[a-f0-9]{32}", self.stream_id
+        ):
+            raise ContractError("metadata.observation.streamId is invalid")
+        if isinstance(self.sequence, bool) or not isinstance(self.sequence, int):
+            raise ContractError("metadata.observation.sequence must be an integer")
+        if self.sequence < 0 or self.sequence > 9_007_199_254_740_991:
+            raise ContractError("metadata.observation.sequence is out of range")
+        if self.mode not in ("incremental", "reconciliation"):
+            raise ContractError("metadata.observation.mode is invalid")
+        if self.resource_version is not None:
+            _required_string(
+                self.resource_version,
+                "metadata.observation.resourceVersion",
+            )
+        if self.checkpoint is not None:
+            _required_string(self.checkpoint, "metadata.observation.checkpoint")
+        if self.mode == "reconciliation":
+            if not isinstance(self.snapshot_id, str) or not re.fullmatch(
+                r"snap_[a-f0-9]{32}", self.snapshot_id
+            ):
+                raise ContractError(
+                    "metadata.observation.snapshotId is required for reconciliation"
+                )
+        elif self.snapshot_id is not None:
+            raise ContractError(
+                "metadata.observation.snapshotId is prohibited for incremental observations"
+            )
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ObservationCursor":
+        """Parse the public observation cursor."""
+
+        source_id = _required_string(
+            payload.get("sourceId"),
+            "metadata.observation.sourceId",
+        )
+        stream_id = _required_string(
+            payload.get("streamId"),
+            "metadata.observation.streamId",
+        )
+        mode = _required_string(payload.get("mode"), "metadata.observation.mode")
+        return cls(
+            source_id=source_id,
+            stream_id=stream_id,
+            sequence=payload.get("sequence"),
+            mode=mode,
+            resource_version=payload.get("resourceVersion"),
+            checkpoint=payload.get("checkpoint"),
+            snapshot_id=payload.get("snapshotId"),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize the cursor without inventing provider ordering semantics."""
+
+        result: Dict[str, Any] = {
+            "sourceId": self.source_id,
+            "streamId": self.stream_id,
+            "sequence": self.sequence,
+            "mode": self.mode,
+        }
+        if self.resource_version is not None:
+            result["resourceVersion"] = self.resource_version
+        if self.checkpoint is not None:
+            result["checkpoint"] = self.checkpoint
+        if self.snapshot_id is not None:
+            result["snapshotId"] = self.snapshot_id
+        return result
+
+
+class ObservationDisposition(str, Enum):
+    """Result of comparing an incoming observation with the latest projection."""
+
+    ACCEPTED = "accepted"
+    DUPLICATE = "duplicate"
+    STALE = "stale"
+    CONFLICT = "conflict"
+
+
+@dataclass(frozen=True)
 class Resource:
     """Canonical resource observation accepted at the ingestion boundary."""
 
     identity: ResourceIdentity
     observed_at: str
+    observation: Optional[ObservationCursor] = None
     display_name: Optional[str] = None
     labels: Mapping[str, str] = field(default_factory=dict)
     attributes: Mapping[str, Any] = field(default_factory=dict)
@@ -88,6 +192,12 @@ class Resource:
         status = _mapping(payload.get("status", {}), "status")
         labels = _mapping(metadata.get("labels", {}), "metadata.labels")
         attributes = _mapping(spec.get("attributes", {}), "spec.attributes")
+        observation_payload = metadata.get("observation")
+        observation = None
+        if observation_payload is not None:
+            observation = ObservationCursor.from_dict(
+                _mapping(observation_payload, "metadata.observation")
+            )
         relationships = spec.get("relationships", [])
         if not isinstance(relationships, list) or not all(
             isinstance(item, Mapping) for item in relationships
@@ -109,15 +219,22 @@ class Resource:
         if display_name is not None:
             display_name = _required_string(display_name, "spec.displayName")
 
+        lifecycle = str(status.get("lifecycle", "active"))
+        if lifecycle == "deleted" and (attributes or relationships):
+            raise ContractError(
+                "deleted resources must not contain attributes or relationships"
+            )
+
         return cls(
             identity=identity,
             observed_at=_timestamp(metadata.get("observedAt"), "metadata.observedAt"),
+            observation=observation,
             display_name=display_name,
             labels={str(key): str(value) for key, value in labels.items()},
             attributes=dict(attributes),
             relationships=tuple(dict(item) for item in relationships),
             health=str(status.get("health", "unknown")),
-            lifecycle=str(status.get("lifecycle", "active")),
+            lifecycle=lifecycle,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -133,18 +250,63 @@ class Resource:
         if self.display_name is not None:
             spec["displayName"] = self.display_name
 
+        metadata: Dict[str, Any] = {
+            "uid": self.identity.uid,
+            "tenantId": self.identity.tenant_id,
+            "observedAt": self.observed_at,
+            "labels": dict(self.labels),
+        }
+        if self.observation is not None:
+            metadata["observation"] = self.observation.to_dict()
+
         return {
             "apiVersion": "iip.platform/v1alpha1",
             "kind": "Resource",
-            "metadata": {
-                "uid": self.identity.uid,
-                "tenantId": self.identity.tenant_id,
-                "observedAt": self.observed_at,
-                "labels": dict(self.labels),
-            },
+            "metadata": metadata,
             "spec": spec,
             "status": {"health": self.health, "lifecycle": self.lifecycle},
         }
+
+
+def classify_resource_observation(
+    current: Resource,
+    incoming: Resource,
+) -> ObservationDisposition:
+    """Classify whether an incoming observation may replace the latest projection."""
+
+    if current.identity != incoming.identity:
+        raise ContractError("cannot compare observations for different resources")
+
+    current_hash = PlatformEvent.canonical_hash(current.to_dict())
+    incoming_hash = PlatformEvent.canonical_hash(incoming.to_dict())
+    if current_hash == incoming_hash:
+        return ObservationDisposition.DUPLICATE
+
+    current_cursor = current.observation
+    incoming_cursor = incoming.observation
+    if current_cursor is None and incoming_cursor is None:
+        current_time = _parsed_timestamp(current.observed_at)
+        incoming_time = _parsed_timestamp(incoming.observed_at)
+        if incoming_time > current_time:
+            return ObservationDisposition.ACCEPTED
+        if incoming_time < current_time:
+            return ObservationDisposition.STALE
+        return ObservationDisposition.CONFLICT
+    if current_cursor is None:
+        return ObservationDisposition.ACCEPTED
+    if incoming_cursor is None:
+        return ObservationDisposition.STALE
+    if current_cursor.source_id != incoming_cursor.source_id:
+        return ObservationDisposition.CONFLICT
+    if current_cursor.stream_id != incoming_cursor.stream_id:
+        if incoming_cursor.mode == "reconciliation":
+            return ObservationDisposition.ACCEPTED
+        return ObservationDisposition.CONFLICT
+    if incoming_cursor.sequence > current_cursor.sequence:
+        return ObservationDisposition.ACCEPTED
+    if incoming_cursor.sequence < current_cursor.sequence:
+        return ObservationDisposition.STALE
+    return ObservationDisposition.CONFLICT
 
 
 @dataclass(frozen=True)
@@ -193,4 +355,3 @@ class PlatformEvent:
         """Return a UTC RFC 3339 timestamp."""
 
         return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-

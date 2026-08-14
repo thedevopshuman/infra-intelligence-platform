@@ -12,7 +12,12 @@ from iip.application.ports import (
     PolicyDecisionPoint,
     ResourceRepository,
 )
-from iip.domain.models import ContractError, PlatformEvent, Resource
+from iip.domain.models import (
+    ContractError,
+    ObservationDisposition,
+    PlatformEvent,
+    Resource,
+)
 
 
 class AuthorizationError(PermissionError):
@@ -21,6 +26,14 @@ class AuthorizationError(PermissionError):
 
 class InvalidInputError(ValueError):
     """Raised when a use-case input violates the public contract or request scope."""
+
+
+class StaleObservationError(RuntimeError):
+    """Raised when an older observation cannot replace the latest projection."""
+
+
+class ObservationConflictError(RuntimeError):
+    """Raised when ordering metadata conflicts with the latest projection."""
 
 
 @dataclass(frozen=True)
@@ -55,15 +68,42 @@ class ResourceIngestionService:
         except ContractError as exc:
             raise InvalidInputError("resource input is invalid") from exc
 
+        policy_resource = {
+            "tenantId": resource.identity.tenant_id,
+            "uid": resource.identity.uid,
+        }
+        if resource.observation is not None:
+            policy_resource.update(
+                {
+                    "sourceId": resource.observation.source_id,
+                    "streamId": resource.observation.stream_id,
+                    "mode": resource.observation.mode,
+                }
+            )
+
         decision = self._policy.decide(
             actor=command.actor,
             action="resource:ingest",
-            resource={"tenantId": resource.identity.tenant_id, "uid": resource.identity.uid},
+            resource=policy_resource,
         )
         if not decision.allowed:
             raise AuthorizationError(decision.reason_code)
 
-        stored = self._repository.upsert(resource)
+        write = self._repository.upsert(resource)
+        if write.disposition == ObservationDisposition.STALE:
+            raise StaleObservationError("resource.observation.stale")
+        if write.disposition == ObservationDisposition.CONFLICT:
+            raise ObservationConflictError("resource.observation.conflict")
+        stored = write.resource
+        if write.disposition == ObservationDisposition.DUPLICATE:
+            return stored
+
+        event_data: dict[str, Any] = {
+            "resourceUid": stored.identity.uid,
+            "observationHash": PlatformEvent.canonical_hash(stored.to_dict()),
+        }
+        if stored.observation is not None:
+            event_data["observation"] = stored.observation.to_dict()
         event = PlatformEvent(
             event_id=str(uuid.uuid4()),
             event_type="io.iip.resource.observed.v1",
@@ -72,10 +112,7 @@ class ResourceIngestionService:
             subject=resource.identity.uid,
             tenant_id=resource.identity.tenant_id,
             correlation_id=command.correlation_id,
-            data={
-                "resource": stored.to_dict(),
-                "observationHash": PlatformEvent.canonical_hash(stored.to_dict()),
-            },
+            data=event_data,
         )
         self._events.publish(event)
         return stored

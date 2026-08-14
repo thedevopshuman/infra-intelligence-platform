@@ -18,6 +18,20 @@ export interface ResourceRelationship {
   attributes?: Record<string, unknown>;
 }
 
+export interface ResourceObservationCursorBase {
+  sourceId: string;
+  streamId: `obs_${string}`;
+  sequence: number;
+  resourceVersion?: string;
+  checkpoint?: string;
+}
+
+export type ResourceObservationCursor = ResourceObservationCursorBase &
+  (
+    | { mode: "incremental"; snapshotId?: never }
+    | { mode: "reconciliation"; snapshotId: `snap_${string}` }
+  );
+
 export interface ResourceObservation {
   apiVersion: "iip.platform/v1alpha1";
   kind: "Resource";
@@ -25,6 +39,7 @@ export interface ResourceObservation {
     uid?: ResourceUid;
     tenantId: string;
     observedAt: string;
+    observation?: ResourceObservationCursor;
     labels?: Record<string, string>;
   };
   spec: {

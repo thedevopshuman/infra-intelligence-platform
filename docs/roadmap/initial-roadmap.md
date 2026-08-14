@@ -126,7 +126,7 @@ All working material stays under `docs/research/brand/` until accepted.
 
 1. **Completed:** Add evidence and investigation schemas plus examples.
 2. **Completed:** Build schema validation in CI using a pinned validator.
-3. Specify observation version/checkpoint and stale-write semantics.
+3. **Completed:** Specify observation version/checkpoint and stale-write semantics.
 4. Implement PostgreSQL-backed resource repository behind the existing port.
 5. Implement an outbox so resource updates and events are atomic.
 6. Create Kubernetes collector plugin skeleton and conformance fixture.

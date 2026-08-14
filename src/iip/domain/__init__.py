@@ -1,6 +1,19 @@
 """Stable domain concepts with no infrastructure dependencies."""
 
-from .models import PlatformEvent, Resource, ResourceIdentity
+from .models import (
+    ObservationCursor,
+    ObservationDisposition,
+    PlatformEvent,
+    Resource,
+    ResourceIdentity,
+    classify_resource_observation,
+)
 
-__all__ = ["PlatformEvent", "Resource", "ResourceIdentity"]
-
+__all__ = [
+    "ObservationCursor",
+    "ObservationDisposition",
+    "PlatformEvent",
+    "Resource",
+    "ResourceIdentity",
+    "classify_resource_observation",
+]

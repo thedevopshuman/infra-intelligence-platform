@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Mapping, Optional, Protocol
 
-from iip.domain.models import PlatformEvent, Resource
+from iip.domain.models import ObservationDisposition, PlatformEvent, Resource
 
 
 @dataclass(frozen=True)
@@ -25,9 +25,17 @@ class PolicyDecision:
     reason_code: str
 
 
+@dataclass(frozen=True)
+class ResourceWriteResult:
+    """Outcome of applying one observation to the latest resource projection."""
+
+    resource: Resource
+    disposition: ObservationDisposition
+
+
 class ResourceRepository(Protocol):
-    def upsert(self, resource: Resource) -> Resource:
-        """Persist the latest observation and return its canonical form."""
+    def upsert(self, resource: Resource) -> ResourceWriteResult:
+        """Apply ordering rules and return the current canonical projection."""
 
     def get(self, tenant_id: str, uid: str) -> Optional[Resource]:
         """Return a resource only from the requested tenant scope."""
@@ -59,4 +67,3 @@ class AgentExecutor(Protocol):
 class PluginCatalog(Protocol):
     def resolve(self, plugin_id: str, version: str) -> Mapping[str, object]:
         """Resolve an installed plugin manifest by immutable identity."""
-

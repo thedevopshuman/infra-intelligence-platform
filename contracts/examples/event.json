@@ -10,6 +10,14 @@
   "correlationid": "incident-2026-08-14-api",
   "data": {
     "resourceUid": "res_e0ae9225a316fce4c97df5c23057b97a",
-    "observationHash": "42b6c2c1b57704ac7fa468780e2637543e08d7c5cb2f0b3ace7da11ad2c1147a"
+    "observationHash": "9062a9611ca8400b1dd0c31bd2b8e4f26e40d9234d8c7da148296753849c7c3c",
+    "observation": {
+      "sourceId": "kubernetes-local",
+      "streamId": "obs_0f4e8c2a6b1d4975a3c9e7f102d468ab",
+      "sequence": 42,
+      "mode": "incremental",
+      "resourceVersion": "398712",
+      "checkpoint": "kubernetes:cluster-local:resource-version:398712"
+    }
   }
 }

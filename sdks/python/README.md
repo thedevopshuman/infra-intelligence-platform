@@ -10,3 +10,5 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 ```
 
 `Evidence`, `InvestigationRequest`, and `InvestigationReport` expose the corresponding `v1alpha1` public envelopes without importing server implementation classes. Their presence does not imply an executable API endpoint; transport methods are added only with an implemented surface.
+
+`ResourceObservationCursor` represents optional source ordering, replay checkpoint, and reconciliation metadata carried inside a resource observation.

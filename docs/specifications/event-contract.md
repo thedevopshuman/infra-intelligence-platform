@@ -25,6 +25,8 @@ The platform targets at-least-once ingestion. Consumers deduplicate by `(tenanti
 
 Events are immutable. A correction creates a new event that references the prior event through its data and causation chain. Large evidence is stored separately and referenced by locator plus content hash.
 
+`io.iip.resource.observed.v1` data includes the canonical resource UID, observation hash, and source ordering cursor when supplied. Duplicate retries do not emit another observed event. Stale or conflicting observations fail before publication and use stable external error codes rather than masquerading as accepted changes.
+
 ## Initial taxonomy
 
 - `io.iip.resource.observed.v1`
@@ -38,4 +40,3 @@ Events are immutable. A correction creates a new event that references the prior
 - `io.iip.plugin.failed.v1`
 
 Event type versions change only for incompatible `data` semantics. Additive optional data fields remain within the major version.
-

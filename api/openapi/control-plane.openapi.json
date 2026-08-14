@@ -44,7 +44,8 @@
         "responses": {
           "202": {"description": "Observation accepted", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/resource.schema.json"}}}},
           "400": {"$ref": "#/components/responses/InvalidRequest"},
-          "403": {"$ref": "#/components/responses/PolicyDenied"}
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "409": {"$ref": "#/components/responses/ObservationConflict"}
         }
       }
     }
@@ -65,7 +66,19 @@
     },
     "responses": {
       "InvalidRequest": {"description": "Contract validation failed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
-      "PolicyDenied": {"description": "Policy denied the scoped action", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+      "PolicyDenied": {"description": "Policy denied the scoped action", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "ObservationConflict": {
+        "description": "Observation is stale or conflicts with the current source stream",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/Error"},
+            "examples": {
+              "stale": {"value": {"error": {"code": "resource.observation.stale"}}},
+              "conflict": {"value": {"error": {"code": "resource.observation.conflict"}}}
+            }
+          }
+        }
+      }
     }
   }
 }

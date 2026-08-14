@@ -3,10 +3,72 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Mapping
+from typing import Any, Dict, Mapping, Optional
 
 
 API_VERSION = "iip.platform/v1alpha1"
+
+
+@dataclass(frozen=True)
+class ResourceObservationCursor:
+    """Source ordering metadata carried by a resource observation."""
+
+    source_id: str
+    stream_id: str
+    sequence: int
+    mode: str
+    resource_version: Optional[str] = None
+    checkpoint: Optional[str] = None
+    snapshot_id: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ResourceObservationCursor":
+        """Parse the public cursor without importing server domain models."""
+
+        source_id = payload.get("sourceId")
+        stream_id = payload.get("streamId")
+        sequence = payload.get("sequence")
+        mode = payload.get("mode")
+        if not isinstance(source_id, str) or not source_id:
+            raise ValueError("observation sourceId must be a non-empty string")
+        if not isinstance(stream_id, str) or not stream_id.startswith("obs_"):
+            raise ValueError("observation streamId is invalid")
+        if isinstance(sequence, bool) or not isinstance(sequence, int):
+            raise ValueError("observation sequence must be an integer")
+        if mode not in ("incremental", "reconciliation"):
+            raise ValueError("observation mode is invalid")
+        snapshot_id = payload.get("snapshotId")
+        if mode == "reconciliation" and not isinstance(snapshot_id, str):
+            raise ValueError("reconciliation observation requires snapshotId")
+        if mode == "incremental" and snapshot_id is not None:
+            raise ValueError("incremental observation prohibits snapshotId")
+
+        return cls(
+            source_id=source_id,
+            stream_id=stream_id,
+            sequence=sequence,
+            mode=mode,
+            resource_version=payload.get("resourceVersion"),
+            checkpoint=payload.get("checkpoint"),
+            snapshot_id=snapshot_id,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return the JSON representation used inside resource metadata."""
+
+        result: Dict[str, Any] = {
+            "sourceId": self.source_id,
+            "streamId": self.stream_id,
+            "sequence": self.sequence,
+            "mode": self.mode,
+        }
+        if self.resource_version is not None:
+            result["resourceVersion"] = self.resource_version
+        if self.checkpoint is not None:
+            result["checkpoint"] = self.checkpoint
+        if self.snapshot_id is not None:
+            result["snapshotId"] = self.snapshot_id
+        return result
 
 
 def _validate_envelope(

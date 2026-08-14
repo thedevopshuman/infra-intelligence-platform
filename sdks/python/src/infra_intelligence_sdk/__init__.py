@@ -2,7 +2,13 @@
 
 from .client import Client
 from .errors import ApiError
-from .models import Evidence, InvestigationReport, InvestigationRequest, ResourceObservation
+from .models import (
+    Evidence,
+    InvestigationReport,
+    InvestigationRequest,
+    ResourceObservation,
+    ResourceObservationCursor,
+)
 
 __all__ = [
     "ApiError",
@@ -11,5 +17,6 @@ __all__ = [
     "InvestigationReport",
     "InvestigationRequest",
     "ResourceObservation",
+    "ResourceObservationCursor",
 ]
 __version__ = "0.1.0"

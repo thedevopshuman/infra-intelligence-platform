@@ -69,6 +69,22 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("ambientCredentials" in error for error in errors))
 
+    def test_reconciliation_observation_requires_snapshot_id(self) -> None:
+        resource = document("contracts/examples/resource.json")
+        resource["metadata"]["observation"]["mode"] = "reconciliation"
+
+        errors = self.validate("resource.schema.json", resource)
+
+        self.assertTrue(any("snapshotId" in error for error in errors))
+
+    def test_deleted_resource_rejects_mutable_state(self) -> None:
+        resource = document("contracts/examples/resource.json")
+        resource["status"]["lifecycle"] = "deleted"
+
+        errors = self.validate("resource.schema.json", resource)
+
+        self.assertTrue(any("attributes" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

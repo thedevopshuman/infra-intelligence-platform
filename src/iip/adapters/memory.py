@@ -5,8 +5,13 @@ from __future__ import annotations
 from threading import RLock
 from typing import Dict, Iterable, Mapping, Optional
 
-from iip.application.ports import ActorContext, PolicyDecision
-from iip.domain.models import PlatformEvent, Resource
+from iip.application.ports import ActorContext, PolicyDecision, ResourceWriteResult
+from iip.domain.models import (
+    ObservationDisposition,
+    PlatformEvent,
+    Resource,
+    classify_resource_observation,
+)
 
 
 class InMemoryResourceRepository:
@@ -16,11 +21,19 @@ class InMemoryResourceRepository:
         self._items: Dict[tuple[str, str], Resource] = {}
         self._lock = RLock()
 
-    def upsert(self, resource: Resource) -> Resource:
+    def upsert(self, resource: Resource) -> ResourceWriteResult:
         key = (resource.identity.tenant_id, resource.identity.uid)
         with self._lock:
-            self._items[key] = resource
-        return resource
+            current = self._items.get(key)
+            if current is None:
+                self._items[key] = resource
+                return ResourceWriteResult(resource, ObservationDisposition.ACCEPTED)
+
+            disposition = classify_resource_observation(current, resource)
+            if disposition == ObservationDisposition.ACCEPTED:
+                self._items[key] = resource
+                return ResourceWriteResult(resource, disposition)
+            return ResourceWriteResult(current, disposition)
 
     def get(self, tenant_id: str, uid: str) -> Optional[Resource]:
         with self._lock:
@@ -61,4 +74,3 @@ class AllowTenantPolicy:
         if action != "resource:ingest":
             return PolicyDecision(False, "action.unsupported")
         return PolicyDecision(True, "development.allow")
-

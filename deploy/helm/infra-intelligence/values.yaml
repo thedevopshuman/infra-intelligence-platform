@@ -41,6 +41,11 @@ config:
   httpHost: 0.0.0.0
   httpPort: 8080
 
+database:
+  existingSecret: ""
+  secretKey: database-url
+  autoMigrate: false
+
 resources:
   requests:
     cpu: 50m

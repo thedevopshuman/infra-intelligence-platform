@@ -6,8 +6,7 @@ from pathlib import Path
 
 from iip.adapters.memory import (
     AllowTenantPolicy,
-    InMemoryEventPublisher,
-    InMemoryResourceRepository,
+    InMemoryResourceStore,
 )
 from iip.application.ingest_resource import (
     AuthorizationError,
@@ -18,7 +17,13 @@ from iip.application.ingest_resource import (
     StaleObservationError,
 )
 from iip.application.ports import ActorContext
-from iip.domain.models import ContractError, ObservationCursor, Resource, ResourceIdentity
+from iip.domain.models import (
+    ContractError,
+    ObservationCursor,
+    PlatformEvent,
+    Resource,
+    ResourceIdentity,
+)
 from infra_intelligence_sdk import ResourceObservation, ResourceObservationCursor
 
 
@@ -55,14 +60,22 @@ class ResourceIdentityTests(unittest.TestCase):
                 mode="reconciliation",
             )
 
+    def test_platform_event_round_trips_structured_cloudevent(self) -> None:
+        payload = json.loads(
+            (ROOT / "contracts/examples/event.json").read_text(encoding="utf-8")
+        )
+
+        event = PlatformEvent.from_dict(payload)
+
+        self.assertEqual(event.to_dict(), payload)
+
 
 class ResourceIngestionTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.repository = InMemoryResourceRepository()
-        self.events = InMemoryEventPublisher()
+        self.repository = InMemoryResourceStore()
+        self.events = self.repository
         self.service = ResourceIngestionService(
             self.repository,
-            self.events,
             AllowTenantPolicy(),
         )
 
@@ -94,7 +107,7 @@ class ResourceIngestionTests(unittest.TestCase):
                 )
             )
         self.assertEqual(list(self.repository.list("local")), [])
-        self.assertEqual(self.events.events, [])
+        self.assertEqual(self.events.events, ())
 
     def test_anonymous_actor_is_denied(self) -> None:
         with self.assertRaises(AuthorizationError):
@@ -126,6 +139,58 @@ class ResourceIngestionTests(unittest.TestCase):
 
         self.assertEqual(retry, first)
         self.assertEqual(len(self.events.events), 1)
+        self.assertEqual(len(tuple(self.repository.history("local", first.identity.uid))), 1)
+
+    def test_checkpoint_advances_only_at_an_explicit_safe_boundary(self) -> None:
+        command = IngestResourceCommand(
+            actor=ActorContext("developer", "local"),
+            payload=resource_payload(),
+            checkpoint_ready=True,
+        )
+
+        stored = self.service.execute(command)
+        checkpoint = self.repository.get_checkpoint("local", "kubernetes-local")
+
+        self.assertIsNotNone(checkpoint)
+        self.assertEqual(checkpoint.sequence, stored.observation.sequence)
+        self.assertEqual(checkpoint.checkpoint, stored.observation.checkpoint)
+
+    def test_ordinary_ingestion_does_not_infer_checkpoint_completion(self) -> None:
+        self.service.execute(
+            IngestResourceCommand(
+                actor=ActorContext("developer", "local"),
+                payload=resource_payload(),
+            )
+        )
+
+        self.assertIsNone(
+            self.repository.get_checkpoint("local", "kubernetes-local")
+        )
+
+    def test_outbox_claims_and_acknowledgements_are_tenant_scoped(self) -> None:
+        self.service.execute(
+            IngestResourceCommand(
+                actor=ActorContext("developer", "local"),
+                payload=resource_payload(),
+            )
+        )
+
+        self.assertEqual(
+            tuple(self.repository.claim_outbox("another-tenant", "worker-1")),
+            (),
+        )
+        claimed = tuple(self.repository.claim_outbox("local", "worker-1"))
+        self.assertEqual(len(claimed), 1)
+        self.assertFalse(
+            self.repository.acknowledge_outbox(
+                "another-tenant", "worker-1", claimed[0].message_id
+            )
+        )
+        self.assertTrue(
+            self.repository.acknowledge_outbox(
+                "local", "worker-1", claimed[0].message_id
+            )
+        )
 
     def test_stale_sequence_cannot_replace_latest_projection(self) -> None:
         latest = resource_payload()
@@ -148,6 +213,11 @@ class ResourceIngestionTests(unittest.TestCase):
         self.assertIsNotNone(stored)
         self.assertEqual(stored.attributes["availableReplicas"], 2)
         self.assertEqual(len(self.events.events), 1)
+        history = tuple(self.repository.history("local", stored.identity.uid))
+        self.assertEqual(
+            [item.disposition.value for item in history],
+            ["accepted", "stale"],
+        )
 
     def test_same_sequence_with_different_content_is_conflict(self) -> None:
         current = resource_payload()

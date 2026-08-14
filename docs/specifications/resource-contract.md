@@ -62,7 +62,7 @@ The reference API returns stable conflict errors for stale or conflicting writes
 
 ## Checkpoint and reconciliation semantics
 
-A checkpoint advances only after every resource mutation represented by that cursor and its corresponding event are durable. With a transactional outbox, resource projection, immutable observation, outbox event, and checkpoint update share one transaction. A crash before commit replays safely; a crash after commit resumes after the checkpoint.
+A checkpoint advances only after every resource mutation represented by that cursor and its corresponding event are durable. With a transactional outbox, resource projection, immutable observation, outbox event, and an explicitly safe checkpoint update share one transaction. A crash before commit replays safely; a crash after commit resumes after the checkpoint. The reference HTTP surface never infers checkpoint safety from the payload; trusted collector workflow context must mark the cursor as a completed commit boundary.
 
 Reconciliation observations share a `snapshotId`. Missing resources are not tombstoned until the source emits a successful completion marker for the entire declared scope. A partial, cancelled, expired, or failed snapshot never implies deletion. Checkpoint persistence and completion markers belong to the ingestion workflow and are not inferred from the last resource received.
 

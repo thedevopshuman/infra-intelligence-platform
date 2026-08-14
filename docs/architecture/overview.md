@@ -91,12 +91,12 @@ flowchart TB
 
 ## Storage responsibilities
 
-The architecture defines logical stores without selecting products yet:
+The logical boundaries remain product-neutral. [ADR 0004](../decisions/0004-postgresql-observation-store-and-outbox.md) selects PostgreSQL for the initial resource/observation, event-log, checkpoint, and outbox substrate while leaving other stores and later transport specialization open:
 
 | Store | Responsibility | Required semantics |
 | --- | --- | --- |
-| Resource graph | Latest resource view, typed edges, observations | Tenant partitioning; idempotent upsert; time-aware provenance |
-| Event log | Immutable ordered facts | At-least-once ingestion; deduplication by source + ID; replay |
+| Resource graph | PostgreSQL latest view and observations; indexed relationship rows next | Tenant partitioning; idempotent upsert; time-aware provenance |
+| Event log | PostgreSQL immutable log and transactional outbox initially | At-least-once ingestion; deduplication by source + ID; replay |
 | Evidence store | Retrieved artifacts and content hashes | Immutable versions; retention policy; redaction metadata |
 | Workflow store | Durable state, approvals, idempotency | Crash-safe transitions; optimistic concurrency |
 | Registry | Versioned agent/plugin manifests | Immutable releases; signatures and compatibility metadata |
@@ -107,7 +107,7 @@ The architecture defines logical stores without selecting products yet:
 
 Start as a modular control-plane service plus asynchronous workers. Preserve logical boundaries in packages and contracts before splitting into network services. Split only when scaling, isolation, or independent failure domains justify the operational cost.
 
-The initial Helm chart deploys the reference API. Planned components are ingestion workers, correlator, workflow worker, plugin runner, and backing stores. Data-plane collectors may run in customer clusters and send normalized observations through authenticated, tenant-scoped channels.
+The initial Helm chart deploys the reference API and accepts an existing Secret reference for PostgreSQL configuration. Planned components are ingestion and outbox workers, correlator, workflow worker, plugin runner, and backing stores. Data-plane collectors may run in customer clusters and send normalized observations through authenticated, tenant-scoped channels.
 
 ## Cross-cutting invariants
 
@@ -118,4 +118,3 @@ The initial Helm chart deploys the reference API. Planned components are ingesti
 - Tool output is untrusted and cannot directly modify policy or authority.
 - Secrets are referenced by logical name and resolved at execution time; they never enter contracts or prompts.
 - Derived indexes and summaries are rebuildable from authoritative data and provenance.
-

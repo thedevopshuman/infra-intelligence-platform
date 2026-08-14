@@ -114,8 +114,8 @@ All working material stays under `docs/research/brand/` until accepted.
 
 | Decision | Latest responsible phase | Evaluation criteria |
 | --- | --- | --- |
-| Graph/observation store | Phase 1 start | Temporal queries, tenant isolation, operations, portability, cost |
-| Durable event transport | Phase 1 start | Replay, partitioning, ordering, local development, managed options |
+| Graph/observation store | **Accepted: ADR 0004** | PostgreSQL 16–18 initially; revisit from measured temporal/graph workload |
+| Durable event transport | **Accepted: ADR 0004** | PostgreSQL event log and outbox initially; external broker remains replaceable |
 | Workflow engine | Phase 3 end | Durable timers, approvals, retries, audit, self-hosting burden |
 | Policy engine | Phase 3 end | Explainability, data isolation, bundle/version lifecycle, ecosystem |
 | Plugin runtime | Phase 4 end | Isolation, language support, streaming, operational cost, signing |
@@ -127,8 +127,8 @@ All working material stays under `docs/research/brand/` until accepted.
 1. **Completed:** Add evidence and investigation schemas plus examples.
 2. **Completed:** Build schema validation in CI using a pinned validator.
 3. **Completed:** Specify observation version/checkpoint and stale-write semantics.
-4. Implement PostgreSQL-backed resource repository behind the existing port.
-5. Implement an outbox so resource updates and events are atomic.
+4. **Completed:** Implement PostgreSQL-backed resource repository behind the application port.
+5. **Completed:** Implement an outbox so resource updates and events are atomic.
 6. Create Kubernetes collector plugin skeleton and conformance fixture.
 7. Add graph neighborhood and resource timeline API queries.
 8. Define the evaluation scenario contract and one known Kubernetes failure.

@@ -7,4 +7,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0001](0001-modular-contract-first-foundation.md) | Accepted | Modular, contract-first foundation |
 | [0002](0002-cloudevents-envelope.md) | Accepted | CloudEvents-compatible event envelope |
 | [0003](0003-neutral-project-name.md) | Accepted | Neutral placeholder naming |
-
+| [0004](0004-postgresql-observation-store-and-outbox.md) | Accepted | PostgreSQL observation/event store and transactional outbox |

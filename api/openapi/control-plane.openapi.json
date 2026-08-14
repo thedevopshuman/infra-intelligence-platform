@@ -27,7 +27,8 @@
           "200": {
             "description": "Tenant-scoped resources",
             "content": {"application/json": {"schema": {"type": "object", "required": ["items"], "properties": {"items": {"type": "array", "items": {"$ref": "../../contracts/schemas/resource.schema.json"}}}}}}
-          }
+          },
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
         }
       },
       "post": {
@@ -45,7 +46,8 @@
           "202": {"description": "Observation accepted", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/resource.schema.json"}}}},
           "400": {"$ref": "#/components/responses/InvalidRequest"},
           "403": {"$ref": "#/components/responses/PolicyDenied"},
-          "409": {"$ref": "#/components/responses/ObservationConflict"}
+          "409": {"$ref": "#/components/responses/ObservationConflict"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
         }
       }
     }
@@ -67,6 +69,15 @@
     "responses": {
       "InvalidRequest": {"description": "Contract validation failed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "PolicyDenied": {"description": "Policy denied the scoped action", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "StorageUnavailable": {
+        "description": "The authoritative store is temporarily unavailable",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/Error"},
+            "example": {"error": {"code": "storage.unavailable"}}
+          }
+        }
+      },
       "ObservationConflict": {
         "description": "Observation is stale or conflicts with the current source stream",
         "content": {

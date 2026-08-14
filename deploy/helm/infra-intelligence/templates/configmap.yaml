@@ -7,4 +7,4 @@ metadata:
 data:
   IIP_HTTP_HOST: {{ .Values.config.httpHost | quote }}
   IIP_HTTP_PORT: {{ .Values.config.httpPort | quote }}
-
+  IIP_DATABASE_AUTO_MIGRATE: {{ .Values.database.autoMigrate | quote }}

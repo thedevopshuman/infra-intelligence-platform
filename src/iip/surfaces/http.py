@@ -16,8 +16,8 @@ from iip.application.ingest_resource import (
     ObservationConflictError,
     StaleObservationError,
 )
-from iip.application.ports import ActorContext
-from iip.bootstrap import Runtime, build_local_runtime
+from iip.application.ports import ActorContext, PersistenceError
+from iip.bootstrap import Runtime, build_runtime_from_env
 
 
 class ApiHandler(BaseHTTPRequestHandler):
@@ -33,8 +33,17 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if path == "/v1/resources":
             tenant_id = self.headers.get("x-iip-tenant-id", "local")
-            items = [resource.to_dict() for resource in self.runtime.resources.list(tenant_id)]
-            self._json(HTTPStatus.OK, {"items": items})
+            try:
+                items = [
+                    resource.to_dict()
+                    for resource in self.runtime.resources.list(tenant_id)
+                ]
+                self._json(HTTPStatus.OK, {"items": items})
+            except PersistenceError:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"error": {"code": "storage.unavailable"}},
+                )
             return
         self._json(HTTPStatus.NOT_FOUND, {"error": {"code": "route.not_found"}})
 
@@ -71,6 +80,11 @@ class ApiHandler(BaseHTTPRequestHandler):
                 HTTPStatus.CONFLICT,
                 {"error": {"code": "resource.observation.conflict"}},
             )
+        except PersistenceError:
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "storage.unavailable"}},
+            )
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
             self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": "request.invalid_json"}})
 
@@ -100,7 +114,7 @@ def main() -> None:
 
     host = os.environ.get("IIP_HTTP_HOST", "0.0.0.0")
     port = int(os.environ.get("IIP_HTTP_PORT", "8080"))
-    ApiHandler.runtime = build_local_runtime()
+    ApiHandler.runtime = build_runtime_from_env()
     server = ThreadingHTTPServer((host, port), ApiHandler)
     print(f"IIP reference API listening on http://{host}:{port}")
     try:

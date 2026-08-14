@@ -8,6 +8,7 @@ venv/
 node_modules/
 dist/
 build/
+*.egg-info/
 coverage/
 .coverage
 .DS_Store
@@ -16,4 +17,3 @@ coverage/
 !.env.example
 *.log
 *.tgz
-

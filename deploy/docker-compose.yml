@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    environment:
+      POSTGRES_DB: iip
+      POSTGRES_USER: iip
+      POSTGRES_PASSWORD: ${IIP_POSTGRES_PASSWORD:?set IIP_POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iip -d iip"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_AUTO_MIGRATE: "true"
+      PGPASSWORD: ${IIP_POSTGRES_PASSWORD:?set IIP_POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres-data:

@@ -1,2 +1,4 @@
 # Runtime for standards-compliant JSON Schema and format validation.
 jsonschema[format-nongpl]==4.25.1
+# Runtime PostgreSQL adapter and integration-test driver.
+psycopg[binary]==3.3.4

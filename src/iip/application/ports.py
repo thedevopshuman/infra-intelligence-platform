@@ -8,6 +8,10 @@ from typing import Iterable, Mapping, Optional, Protocol
 from iip.domain.models import ObservationDisposition, PlatformEvent, Resource
 
 
+class PersistenceError(RuntimeError):
+    """Provider-neutral durable-store failure with a stable external code."""
+
+
 @dataclass(frozen=True)
 class ActorContext:
     """Authenticated actor and tenant scope supplied by a surface."""
@@ -33,15 +37,118 @@ class ResourceWriteResult:
     disposition: ObservationDisposition
 
 
-class ResourceRepository(Protocol):
-    def upsert(self, resource: Resource) -> ResourceWriteResult:
-        """Apply ordering rules and return the current canonical projection."""
+@dataclass(frozen=True)
+class ResourceObservationRecord:
+    """Immutable resource observation retained for tenant-scoped history."""
 
+    offset: int
+    resource: Resource
+    disposition: ObservationDisposition
+    observation_hash: str
+    recorded_at: str
+
+
+@dataclass(frozen=True)
+class StoredEvent:
+    """One durable event and its monotonic storage offset."""
+
+    offset: int
+    event: PlatformEvent
+
+
+@dataclass(frozen=True)
+class OutboxMessage:
+    """Leased event delivery returned to one explicitly named worker."""
+
+    message_id: int
+    event: PlatformEvent
+    attempts: int
+
+
+@dataclass(frozen=True)
+class SourceCheckpoint:
+    """Last explicitly committed cursor for a tenant-scoped source."""
+
+    tenant_id: str
+    source_id: str
+    stream_id: str
+    sequence: int
+    checkpoint: str
+    committed_at: str
+
+
+class ResourceRepository(Protocol):
     def get(self, tenant_id: str, uid: str) -> Optional[Resource]:
         """Return a resource only from the requested tenant scope."""
 
     def list(self, tenant_id: str) -> Iterable[Resource]:
         """List resources visible in the requested tenant scope."""
+
+    def history(self, tenant_id: str, uid: str) -> Iterable[ResourceObservationRecord]:
+        """Return immutable observations only from the requested tenant scope."""
+
+
+class ResourceObservationStore(ResourceRepository, Protocol):
+    def apply(
+        self,
+        resource: Resource,
+        event: PlatformEvent,
+        *,
+        checkpoint_ready: bool = False,
+    ) -> ResourceWriteResult:
+        """Atomically apply one observation and its accepted-event side effects.
+
+        Implementations persist the projection, immutable observation, event, and
+        outbox entry together. A checkpoint is included only when the trusted
+        caller confirms that every mutation represented by the cursor is durable.
+        """
+
+
+class EventLog(Protocol):
+    def list_events(
+        self,
+        tenant_id: str,
+        *,
+        after_offset: int = 0,
+        limit: int = 100,
+    ) -> Iterable[StoredEvent]:
+        """Replay tenant-scoped events after an exclusive storage offset."""
+
+
+class EventOutbox(Protocol):
+    def claim_outbox(
+        self,
+        tenant_id: str,
+        worker_id: str,
+        *,
+        limit: int = 100,
+        lease_seconds: int = 30,
+    ) -> Iterable[OutboxMessage]:
+        """Lease available messages within one explicit tenant scope."""
+
+    def acknowledge_outbox(
+        self,
+        tenant_id: str,
+        worker_id: str,
+        message_id: int,
+    ) -> bool:
+        """Mark a message delivered only when the named worker holds its lease."""
+
+    def release_outbox(
+        self,
+        tenant_id: str,
+        worker_id: str,
+        message_id: int,
+        error_code: str,
+        *,
+        retry_after_seconds: int = 0,
+    ) -> bool:
+        """Release a leased message using a stable, non-sensitive error code."""
+
+
+class SourceCheckpointRepository(Protocol):
+    def get_checkpoint(self, tenant_id: str, source_id: str) -> Optional[SourceCheckpoint]:
+        """Return the committed cursor for exactly one tenant and source."""
 
 
 class EventPublisher(Protocol):

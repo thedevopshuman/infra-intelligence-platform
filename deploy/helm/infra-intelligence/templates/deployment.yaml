@@ -39,6 +39,14 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "infra-intelligence.fullname" . }}
+          {{- if .Values.database.existingSecret }}
+          env:
+            - name: IIP_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret | quote }}
+                  key: {{ .Values.database.secretKey | quote }}
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.config.httpPort }}
@@ -79,4 +87,3 @@ spec:
       topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-

@@ -323,6 +323,33 @@ class PlatformEvent:
     correlation_id: Optional[str] = None
     causation_id: Optional[str] = None
 
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PlatformEvent":
+        """Parse the public structured CloudEvents envelope."""
+
+        if payload.get("specversion") != "1.0":
+            raise ContractError("specversion must be 1.0")
+        content_type = payload.get("datacontenttype", "application/json")
+        if content_type != "application/json":
+            raise ContractError("datacontenttype must be application/json")
+        correlation_id = payload.get("correlationid")
+        causation_id = payload.get("causationid")
+        if correlation_id is not None:
+            correlation_id = _required_string(correlation_id, "correlationid")
+        if causation_id is not None:
+            causation_id = _required_string(causation_id, "causationid")
+        return cls(
+            event_id=_required_string(payload.get("id"), "id"),
+            event_type=_required_string(payload.get("type"), "type"),
+            source=_required_string(payload.get("source"), "source"),
+            time=_timestamp(payload.get("time"), "time"),
+            subject=_required_string(payload.get("subject"), "subject"),
+            tenant_id=_required_string(payload.get("tenantid"), "tenantid"),
+            data=dict(_mapping(payload.get("data"), "data")),
+            correlation_id=correlation_id,
+            causation_id=causation_id,
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize this event using the structured CloudEvents JSON shape."""
 

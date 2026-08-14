@@ -8,9 +8,8 @@ from typing import Any, Mapping, Optional
 
 from iip.application.ports import (
     ActorContext,
-    EventPublisher,
     PolicyDecisionPoint,
-    ResourceRepository,
+    ResourceObservationStore,
 )
 from iip.domain.models import (
     ContractError,
@@ -43,6 +42,7 @@ class IngestResourceCommand:
     actor: ActorContext
     payload: Mapping[str, Any]
     correlation_id: Optional[str] = None
+    checkpoint_ready: bool = False
 
 
 class ResourceIngestionService:
@@ -50,12 +50,10 @@ class ResourceIngestionService:
 
     def __init__(
         self,
-        repository: ResourceRepository,
-        events: EventPublisher,
+        store: ResourceObservationStore,
         policy: PolicyDecisionPoint,
     ) -> None:
-        self._repository = repository
-        self._events = events
+        self._store = store
         self._policy = policy
 
     def execute(self, command: IngestResourceCommand) -> Resource:
@@ -89,21 +87,18 @@ class ResourceIngestionService:
         if not decision.allowed:
             raise AuthorizationError(decision.reason_code)
 
-        write = self._repository.upsert(resource)
-        if write.disposition == ObservationDisposition.STALE:
-            raise StaleObservationError("resource.observation.stale")
-        if write.disposition == ObservationDisposition.CONFLICT:
-            raise ObservationConflictError("resource.observation.conflict")
-        stored = write.resource
-        if write.disposition == ObservationDisposition.DUPLICATE:
-            return stored
+        if command.checkpoint_ready and (
+            resource.observation is None or resource.observation.checkpoint is None
+        ):
+            raise InvalidInputError("checkpoint-ready ingestion requires a checkpoint cursor")
 
+        observation_hash = PlatformEvent.canonical_hash(resource.to_dict())
         event_data: dict[str, Any] = {
-            "resourceUid": stored.identity.uid,
-            "observationHash": PlatformEvent.canonical_hash(stored.to_dict()),
+            "resourceUid": resource.identity.uid,
+            "observationHash": observation_hash,
         }
-        if stored.observation is not None:
-            event_data["observation"] = stored.observation.to_dict()
+        if resource.observation is not None:
+            event_data["observation"] = resource.observation.to_dict()
         event = PlatformEvent(
             event_id=str(uuid.uuid4()),
             event_type="io.iip.resource.observed.v1",
@@ -114,5 +109,13 @@ class ResourceIngestionService:
             correlation_id=command.correlation_id,
             data=event_data,
         )
-        self._events.publish(event)
-        return stored
+        write = self._store.apply(
+            resource,
+            event,
+            checkpoint_ready=command.checkpoint_ready,
+        )
+        if write.disposition == ObservationDisposition.STALE:
+            raise StaleObservationError("resource.observation.stale")
+        if write.disposition == ObservationDisposition.CONFLICT:
+            raise ObservationConflictError("resource.observation.conflict")
+        return write.resource

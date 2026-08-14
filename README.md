@@ -4,7 +4,7 @@
 
 Infrastructure Intelligence Platform (IIP) is an architecture-first foundation for building a vendor-neutral control plane that understands infrastructure as a resource graph and event timeline, then lets governed agents investigate and act with evidence.
 
-This repository is at **foundation / v0.1**. It contains the living product and architecture record, versioned contracts, a small executable reference kernel, starter SDK boundaries, a plugin example, and Kubernetes packaging. It is not yet a production system.
+This repository is at **foundation / early Phase 1**. It contains the living product and architecture record, versioned contracts, an executable reference kernel with in-memory and PostgreSQL profiles, starter SDK boundaries, a plugin example, and Kubernetes packaging. It is not yet a production system.
 
 ## Start here
 
@@ -16,11 +16,13 @@ This repository is at **foundation / v0.1**. It contains the living product and 
 
 ## Local quick start
 
-The reference kernel deliberately uses only the Python standard library.
+Use Python 3.11 or newer. Verification dependencies and the PostgreSQL driver are pinned for reproducible local and CI behavior.
 
 ```bash
 python3 -m pip install --requirement requirements/verify.txt
 make verify
+# With Docker Desktop running:
+make test-postgres
 make run
 ```
 
@@ -33,7 +35,7 @@ curl -X POST http://localhost:8080/v1/resources \
   --data @contracts/examples/resource.json
 ```
 
-The API is a narrow vertical slice: validate a resource observation, authorize ingestion, upsert it, and emit a CloudEvents-compatible event. It exists to prove package boundaries, not to define the final storage or transport stack.
+The API is a narrow vertical slice: validate and authorize a resource observation, apply ordering, and atomically retain its projection, history, event, and outbox record in the PostgreSQL profile. The default local profile remains in memory.
 
 ## Repository map
 
@@ -60,7 +62,7 @@ The API is a narrow vertical slice: validate a resource observation, authorize i
 
 ## Current decisions and open questions
 
-Accepted foundations live in [`docs/decisions`](docs/decisions/README.md). Open questions—graph store, durable event transport, identity provider, model runtime, and licensing—are explicit roadmap decisions, not hidden assumptions.
+Accepted foundations live in [`docs/decisions`](docs/decisions/README.md). PostgreSQL plus a transactional outbox is accepted for the initial resource/event substrate. Identity provider, later broker specialization, model runtime, workflow/policy engines, and licensing remain explicit roadmap decisions.
 
 ## Licensing
 

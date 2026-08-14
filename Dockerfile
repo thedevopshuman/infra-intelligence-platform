@@ -10,10 +10,10 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
 
-RUN addgroup --system --gid 10001 iip \
+RUN python -m pip install --no-cache-dir . \
+    && addgroup --system --gid 10001 iip \
     && adduser --system --uid 10001 --ingroup iip --home /nonexistent --no-create-home iip
 
 USER 10001:10001
 EXPOSE 8080
 CMD ["python", "-m", "iip.surfaces.http"]
-

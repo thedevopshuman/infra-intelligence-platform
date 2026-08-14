@@ -1,0 +1,13 @@
+services:
+  postgres-test:
+    image: postgres:18.4-alpine
+    environment:
+      POSTGRES_DB: iip_test
+      POSTGRES_HOST_AUTH_METHOD: trust
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d iip_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    ports:
+      - "127.0.0.1:55432:5432"

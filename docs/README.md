@@ -20,6 +20,8 @@ The documentation tree is the product and engineering system of record. A change
 - [Contracts index](specifications/README.md)
 - [Resource contract](specifications/resource-contract.md)
 - [Event contract](specifications/event-contract.md)
+- [Evidence contract](specifications/evidence-contract.md)
+- [Investigation request and report contracts](specifications/investigation-contract.md)
 - [Agent contract](specifications/agent-contract.md)
 - [Plugin contract](specifications/plugin-contract.md)
 
@@ -38,4 +40,3 @@ The documentation tree is the product and engineering system of record. A change
 ## Document status
 
 Every normative page carries a status. `Draft` is open for change, `Accepted` is the current rule, and `Superseded` must link to its replacement. Dates use ISO 8601. Decision records are append-only once accepted; later decisions supersede rather than silently rewrite them.
-

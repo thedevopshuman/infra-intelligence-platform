@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:investigation-report:v1alpha1",
+  "title": "Infrastructure Intelligence Investigation Report",
+  "description": "The immutable terminal result of one bounded investigation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "InvestigationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "createdAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "createdAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requestDigest",
+        "outcome",
+        "terminalReason",
+        "startedAt",
+        "completedAt",
+        "scope",
+        "summary",
+        "hypotheses",
+        "unknowns",
+        "evidenceIds",
+        "recommendations",
+        "toolCallLedgerRef",
+        "policySnapshotRef",
+        "usage"
+      ],
+      "properties": {
+        "requestDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "outcome": {"type": "string", "enum": ["conclusive", "inconclusive", "failed", "cancelled"]},
+        "terminalReason": {
+          "type": "string",
+          "enum": [
+            "sufficient-evidence",
+            "insufficient-evidence",
+            "budget-exhausted",
+            "deadline-exceeded",
+            "cancelled",
+            "policy-denied",
+            "runtime-error",
+            "no-applicable-agent"
+          ]
+        },
+        "startedAt": {"type": "string", "format": "date-time"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "scope": {"$ref": "#/$defs/scope"},
+        "agent": {"$ref": "#/$defs/agent"},
+        "summary": {"type": "string", "minLength": 1, "maxLength": 8192},
+        "hypotheses": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/hypothesis"}},
+        "unknowns": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/unknown"}},
+        "evidenceIds": {
+          "type": "array",
+          "maxItems": 1024,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"}
+        },
+        "recommendations": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/recommendation"}},
+        "toolCallLedgerRef": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048},
+        "policySnapshotRef": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048},
+        "usage": {"$ref": "#/$defs/usage"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"spec": {"properties": {"outcome": {"const": "conclusive"}}}}},
+      "then": {
+        "properties": {
+          "spec": {
+            "required": ["agent"],
+            "properties": {
+              "terminalReason": {"const": "sufficient-evidence"},
+              "hypotheses": {"minItems": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"spec": {"properties": {"outcome": {"const": "inconclusive"}}}}},
+      "then": {
+        "properties": {
+          "spec": {
+            "required": ["agent"],
+            "properties": {
+              "terminalReason": {
+                "enum": ["insufficient-evidence", "budget-exhausted", "deadline-exceeded"]
+              },
+              "unknowns": {"minItems": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"spec": {"properties": {"outcome": {"const": "failed"}}}}},
+      "then": {
+        "properties": {
+          "spec": {
+            "properties": {
+              "terminalReason": {"enum": ["policy-denied", "runtime-error", "no-applicable-agent"]}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"spec": {"properties": {"outcome": {"const": "cancelled"}}}}},
+      "then": {
+        "properties": {
+          "spec": {"properties": {"terminalReason": {"const": "cancelled"}}}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resourceUids", "timeRange"],
+      "properties": {
+        "resourceUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}
+        },
+        "timeRange": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end"],
+          "properties": {
+            "start": {"type": "string", "format": "date-time"},
+            "end": {"type": "string", "format": "date-time"}
+          }
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "manifestDigest", "modelClass"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"},
+        "manifestDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "modelClass": {"type": "string", "enum": ["fast", "reasoning", "local", "policy-selected"]}
+      }
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "rank",
+        "statement",
+        "confidence",
+        "disposition",
+        "supportingEvidenceIds",
+        "contradictingEvidenceIds"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^hyp_[a-f0-9]{16}$"},
+        "rank": {"type": "integer", "minimum": 1, "maximum": 64},
+        "statement": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "disposition": {"type": "string", "enum": ["leading", "alternative", "rejected"]},
+        "supportingEvidenceIds": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"}
+        },
+        "contradictingEvidenceIds": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"}
+        }
+      }
+    },
+    "unknown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "impact", "requestedEvidenceTypes"],
+      "properties": {
+        "statement": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "impact": {"type": "string", "enum": ["low", "medium", "high"]},
+        "requestedEvidenceTypes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{2,127}$"}
+        }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "description", "priority", "evidenceIds"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^rec_[a-f0-9]{16}$"},
+        "type": {"type": "string", "enum": ["next-check", "monitor", "escalate"]},
+        "description": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "priority": {"type": "string", "enum": ["low", "normal", "high", "critical"]},
+        "evidenceIds": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"}
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["toolCalls", "iterations", "modelTokens", "wallTimeSeconds", "costUsd", "evidenceItems"],
+      "properties": {
+        "toolCalls": {"type": "integer", "minimum": 0},
+        "iterations": {"type": "integer", "minimum": 0},
+        "modelTokens": {"type": "integer", "minimum": 0},
+        "wallTimeSeconds": {"type": "number", "minimum": 0},
+        "costUsd": {"type": "number", "minimum": 0},
+        "evidenceItems": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationReport",
+  "metadata": {
+    "id": "inv_71c9e4a2b8d04f65a3c7e9b102d4f608",
+    "tenantId": "local",
+    "createdAt": "2026-08-14T10:34:12Z"
+  },
+  "spec": {
+    "requestDigest": "sha256:b180154d11d8bc0e95da47226e321649c99f81131efa0cab7a826b99fd134ee3",
+    "outcome": "conclusive",
+    "terminalReason": "sufficient-evidence",
+    "startedAt": "2026-08-14T10:30:06Z",
+    "completedAt": "2026-08-14T10:34:12Z",
+    "scope": {
+      "resourceUids": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+      "timeRange": {
+        "start": "2026-08-14T10:00:00Z",
+        "end": "2026-08-14T10:30:02Z"
+      }
+    },
+    "agent": {
+      "id": "incident-investigator",
+      "version": "0.1.0",
+      "manifestDigest": "sha256:945d044faebb171ddd447da9c0746e68a36caa231a033101e715523ceca145e6",
+      "modelClass": "policy-selected"
+    },
+    "summary": "The latest rollout left one api replica unavailable; current Kubernetes status supports rollout health as the leading cause of the replica mismatch.",
+    "hypotheses": [
+      {
+        "id": "hyp_2f8a4c6e1b3d5079",
+        "rank": 1,
+        "statement": "The latest rollout has not produced three available api replicas.",
+        "confidence": 0.82,
+        "disposition": "leading",
+        "supportingEvidenceIds": ["evd_4d9f6a2b7c8e1035a1b2c3d4e5f60718"],
+        "contradictingEvidenceIds": []
+      }
+    ],
+    "unknowns": [
+      {
+        "statement": "The pod-level reason for the unavailable replica has not yet been collected.",
+        "impact": "medium",
+        "requestedEvidenceTypes": ["kubernetes.pod-log", "kubernetes.pod-status"]
+      }
+    ],
+    "evidenceIds": ["evd_4d9f6a2b7c8e1035a1b2c3d4e5f60718"],
+    "recommendations": [
+      {
+        "id": "rec_8e6c4a2f0b1d3957",
+        "type": "next-check",
+        "description": "Inspect the unavailable replica's pod status and recent logs before proposing a rollout change.",
+        "priority": "high",
+        "evidenceIds": ["evd_4d9f6a2b7c8e1035a1b2c3d4e5f60718"]
+      }
+    ],
+    "toolCallLedgerRef": "ledger://local/investigations/inv_71c9e4a2b8d04f65a3c7e9b102d4f608/tool-calls",
+    "policySnapshotRef": "policy://local/snapshots/investigation-read-20260814",
+    "usage": {
+      "toolCalls": 6,
+      "iterations": 3,
+      "modelTokens": 18420,
+      "wallTimeSeconds": 246,
+      "costUsd": 0.41,
+      "evidenceItems": 1
+    }
+  }
+}

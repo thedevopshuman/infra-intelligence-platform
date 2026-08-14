@@ -28,7 +28,7 @@ Exit gate: `make verify` passes and a new contributor can trace resource ingress
 Deliverables:
 
 - choose and document authoritative graph/observation store and event transport;
-- formalize evidence, pagination, error, and integration-config contracts;
+- formalize evidence, investigation request/report, pagination, error, and integration-config contracts;
 - Kubernetes collector plugin for cluster, namespace, workload, pod, service, ingress, config, and ownership relationships;
 - idempotent ingestion, source checkpoints, deduplication, reconciliation, deletion/tombstone semantics;
 - event projection and query API for resource history and neighborhood;
@@ -43,7 +43,7 @@ Exit gate: a seeded cluster can be rebuilt from observations/events; graph corre
 
 Deliverables:
 
-- evidence and investigation request/report contracts;
+- durable evidence storage and investigation request/report APIs against the Phase 1 contracts;
 - providers for Kubernetes events/status, deployment changes, logs, metrics, and repository/runbook context;
 - bounded agent runtime with tool caps, duplicate cache, context/cost/time budgets, cancellation, and terminal reasons;
 - correlation between alert, affected resource neighborhood, and recent changes;
@@ -134,4 +134,3 @@ All working material stays under `docs/research/brand/` until accepted.
 8. Define the evaluation scenario contract and one known Kubernetes failure.
 9. Implement evidence provider ports and content hashing/redaction metadata.
 10. Add authentication middleware that derives tenant/actor context and removes development header trust.
-

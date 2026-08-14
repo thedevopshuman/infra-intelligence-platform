@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:investigation-request:v1alpha1",
+  "title": "Infrastructure Intelligence Investigation Request",
+  "description": "A tenant- and actor-scoped request for one bounded investigation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "InvestigationRequest"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "actorId", "requestedAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "actorId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "requestedAt": {"type": "string", "format": "date-time"},
+        "correlationId": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question", "trigger", "scope", "budgets", "maxAuthority"],
+      "properties": {
+        "question": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "trigger": {"$ref": "#/$defs/trigger"},
+        "scope": {"$ref": "#/$defs/scope"},
+        "agentSelector": {"$ref": "#/$defs/agentSelector"},
+        "evidenceTypes": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{2,127}$"}
+        },
+        "allowedTools": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{2,127}$"}
+        },
+        "budgets": {"$ref": "#/$defs/budgets"},
+        "maxAuthority": {"type": "string", "enum": ["read", "propose"]},
+        "priority": {"type": "string", "enum": ["low", "normal", "high", "critical"]}
+      }
+    }
+  },
+  "$defs": {
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "source", "summary"],
+      "properties": {
+        "type": {"type": "string", "enum": ["user", "alert", "event", "scheduled"]},
+        "source": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048},
+        "reference": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048},
+        "summary": {"type": "string", "minLength": 1, "maxLength": 2048}
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resourceUids", "timeRange"],
+      "properties": {
+        "resourceUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}
+        },
+        "timeRange": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end"],
+          "properties": {
+            "start": {"type": "string", "format": "date-time"},
+            "end": {"type": "string", "format": "date-time"}
+          }
+        }
+      }
+    },
+    "agentSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"}
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxToolCalls",
+        "maxWallTimeSeconds",
+        "maxModelTokens",
+        "maxCostUsd",
+        "maxEvidenceItems",
+        "maxIterations"
+      ],
+      "properties": {
+        "maxToolCalls": {"type": "integer", "minimum": 0, "maximum": 200},
+        "maxWallTimeSeconds": {"type": "integer", "minimum": 1, "maximum": 3600},
+        "maxModelTokens": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "maxCostUsd": {"type": "number", "minimum": 0, "maximum": 1000},
+        "maxEvidenceItems": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "maxIterations": {"type": "integer", "minimum": 1, "maximum": 100}
+      }
+    }
+  }
+}

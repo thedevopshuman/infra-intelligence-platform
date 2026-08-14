@@ -1,0 +1,38 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "Evidence",
+  "metadata": {
+    "id": "evd_4d9f6a2b7c8e1035a1b2c3d4e5f60718",
+    "tenantId": "local",
+    "recordedAt": "2026-08-14T10:30:06Z"
+  },
+  "spec": {
+    "type": "kubernetes.event",
+    "source": {
+      "provider": "kubernetes",
+      "integrationId": "kubernetes-local",
+      "locator": "kubernetes://cluster-local/namespaces/default/events/api-20260814"
+    },
+    "observedAt": "2026-08-14T10:29:54Z",
+    "retrievedAt": "2026-08-14T10:30:05Z",
+    "resourceRefs": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+    "query": "namespace=default, involvedObject.name=api",
+    "summary": "The api Deployment has two available replicas against three desired replicas after its latest rollout.",
+    "artifact": {
+      "mediaType": "application/json",
+      "contentHash": "sha256:14f58f90e9d10c9b58a89927b0d4f11b7c622134395b01a57b0a63b98ee116b5",
+      "sizeBytes": 846,
+      "storageRef": "evidence://local/evd_4d9f6a2b7c8e1035a1b2c3d4e5f60718/artifact",
+      "encoding": "identity"
+    },
+    "handling": {
+      "redaction": {
+        "status": "applied",
+        "methods": ["identifier-masking", "secret-pattern"]
+      },
+      "sensitivity": "internal",
+      "retentionClass": "standard",
+      "expiresAt": "2026-09-13T10:30:06Z"
+    }
+  }
+}

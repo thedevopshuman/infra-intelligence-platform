@@ -12,3 +12,4 @@ const client = new InfrastructureIntelligenceClient({
 });
 ```
 
+The package also exports `Evidence`, `InvestigationRequest`, and `InvestigationReport` as transport-independent `v1alpha1` contract types. Client methods follow only when the corresponding API surface is executable.

@@ -2,8 +2,14 @@
 
 from .client import Client
 from .errors import ApiError
-from .models import ResourceObservation
+from .models import Evidence, InvestigationReport, InvestigationRequest, ResourceObservation
 
-__all__ = ["ApiError", "Client", "ResourceObservation"]
+__all__ = [
+    "ApiError",
+    "Client",
+    "Evidence",
+    "InvestigationReport",
+    "InvestigationRequest",
+    "ResourceObservation",
+]
 __version__ = "0.1.0"
-

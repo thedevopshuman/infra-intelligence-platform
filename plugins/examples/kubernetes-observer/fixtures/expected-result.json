@@ -1,0 +1,426 @@
+{
+    "apiVersion": "iip.platform/v1alpha1",
+    "kind": "ResourceCollectionResult",
+    "metadata": {
+        "createdAt": "2026-08-14T11:00:00Z",
+        "requestId": "col_93a5e9b2b1374f579cc2fe869a052e9a",
+        "sourceId": "kubernetes-local",
+        "tenantId": "local"
+    },
+    "spec": {
+        "completion": {
+            "checkpoint": "kubernetes:cluster-local:resource-version:5000",
+            "nextSequence": 109,
+            "resourceCount": 9,
+            "scopeDigest": "sha256:c606751c52a1d350c9bacd31dc59d32b50a7e3d23050db44b13eff7a14ffe687",
+            "snapshotId": "snap_e2e1a36ffea4490588f0abcf234fc956",
+            "status": "complete"
+        },
+        "observations": [
+            {
+                "apiVersion": "iip.platform/v1alpha1",
+                "kind": "Resource",
+                "metadata": {
+                    "labels": {
+                        "app": "api",
+                        "team": "platform"
+                    },
+                    "observation": {
+                        "mode": "reconciliation",
+                        "resourceVersion": "4901",
+                        "sequence": 100,
+                        "snapshotId": "snap_e2e1a36ffea4490588f0abcf234fc956",
+                        "sourceId": "kubernetes-local",
+                        "streamId": "obs_d38f1533112c45148680f81d08aa293f"
+                    },
+                    "observedAt": "2026-08-14T11:00:00Z",
+                    "tenantId": "local",
+                    "uid": "res_e0ae9225a316fce4c97df5c23057b97a"
+                },
+                "spec": {
+                    "attributes": {
+                        "availableReplicas": 1,
+                        "namespace": "default",
+                        "readyReplicas": 1,
+                        "replicas": 2
+                    },
+                    "displayName": "api",
+                    "externalId": "cluster-local/default/api",
+                    "provider": "kubernetes",
+                    "relationships": [
+                        {
+                            "direction": "outbound",
+                            "target": "res_cebfc9b13747f19d1f8f43309f2730c9",
+                            "type": "owns"
+                        }
+                    ],
+                    "type": "apps/deployment"
+                },
+                "status": {
+                    "health": "degraded",
+                    "lifecycle": "active"
+                }
+            },
+            {
+                "apiVersion": "iip.platform/v1alpha1",
+                "kind": "Resource",
+                "metadata": {
+                    "labels": {
+                        "app": "api"
+                    },
+                    "observation": {
+                        "mode": "reconciliation",
+                        "resourceVersion": "4902",
+                        "sequence": 101,
+                        "snapshotId": "snap_e2e1a36ffea4490588f0abcf234fc956",
+                        "sourceId": "kubernetes-local",
+                        "streamId": "obs_d38f1533112c45148680f81d08aa293f"
+                    },
+                    "observedAt": "2026-08-14T11:00:00Z",
+                    "tenantId": "local",
+                    "uid": "res_cebfc9b13747f19d1f8f43309f2730c9"
+                },
+                "spec": {
+                    "attributes": {
+                        "availableReplicas": 1,
+                        "namespace": "default",
+                        "readyReplicas": 1,
+                        "replicas": 2
+                    },
+                    "displayName": "api-7c9d4",
+                    "externalId": "cluster-local/default/api-7c9d4",
+                    "provider": "kubernetes",
+                    "relationships": [
+                        {
+                            "direction": "outbound",
+                            "target": "res_6e90f286fc58e916e1efb9d367d33453",
+                            "type": "owns"
+                        }
+                    ],
+                    "type": "apps/replicaset"
+                },
+                "status": {
+                    "health": "degraded",
+                    "lifecycle": "active"
+                }
+            },
+            {
+                "apiVersion": "iip.platform/v1alpha1",
+                "kind": "Resource",
+                "metadata": {
+                    "observation": {
+                        "mode": "reconciliation",
+                        "resourceVersion": "5000",
+                        "sequence": 102,
+                        "snapshotId": "snap_e2e1a36ffea4490588f0abcf234fc956",
+                        "sourceId": "kubernetes-local",
+                        "streamId": "obs_d38f1533112c45148680f81d08aa293f"
+                    },
+                    "observedAt": "2026-08-14T11:00:00Z",
+                    "tenantId": "local",
+                    "uid": "res_a65baf56d8ea8220a64ca3d69ed6dd3f"
+                },
+                "spec": {
+                    "attributes": {
+                        "clusterId": "cluster-local"
+                    },
+                    "displayName": "cluster-local",
+                    "externalId": "cluster-local",
+                    "provider": "kubernetes",
+                    "relationships": [
+                        {
+                            "direction": "outbound",
+                            "target": "res_244cef2706015e2d5fd2af34fc3e0d43",
+                            "type": "contains"
+                        },
+                        {
+                            "direction": "outbound",
+                            "target": "res_703ecc697f134cddf2d02d8bc891a431",
+                            "type": "contains"
+                        }
+                    ],
+                    "type": "core/cluster"
+                },
+                "status": {
+                    "health": "unknown",
+                    "lifecycle": "active"
+                }
+            },
+            {
+                "apiVersion": "iip.platform/v1alpha1",
+                "kind": "Resource",
+                "metadata": {
+                    "observation": {
+                        "mode": "reconciliation",
+                        "resourceVersion": "4906",
+                        "sequence": 103,
+                        "snapshotId": "snap_e2e1a36ffea4490588f0abcf234fc956",
+                        "sourceId": "kubernetes-local",
+                        "streamId": "obs_d38f1533112c45148680f81d08aa293f"
+                    },
+                    "observedAt": "2026-08-14T11:00:00Z",
+                    "tenantId": "local",
+                    "uid": "res_5477f364177c277615a6f449e25c4831"
+                },
+                "spec": {
+                    "attributes": {
+                        "immutable": false,
+                        "keys": [
+                            "DATABASE_PASSWORD",
+                            "LOG_LEVEL"
+                        ],
+                        "namespace": "default"
+                    },
+                    "displayName": "api-settings",
+                    "externalId": "cluster-local/default/api-settings",
+                    "provider": "kubernetes",
+                    "relationships": [],
+                    "type": "core/configmap"
+                },
+                "status": {
+                    "health": "unknown",
+                    "lifecycle": "active"
+                }
+            },
+            {
+                "apiVersion": "iip.platform/v1alpha1",
+                "kind": "Resource",
+                "metadata": {
+                    "labels": {
+                        "environment": "development"
+                    },
+                    "observation": {
+                        "mode": "reconciliation",
+                        "resourceVersion": "4900",
+                        "sequence": 104,
+                        "snapshotId": "snap_e2e1a36ffea4490588f0abcf234fc956",
+                        "sourceId": "kubernetes-local",
+                        "streamId": "obs_d38f1533112c45148680f81d08aa293f"
+                    },
+                    "observedAt": "2026-08-14T11:00:00Z",
+                    "tenantId": "local",
+                    "uid": "res_703ecc697f134cddf2d02d8bc891a431"
+                },
+                "spec": {
+                    "attributes": {
+                        "phase": "Active"
+                    },
+                    "displayName": "default",
+                    "externalId": "cluster-local/default",
+                    "provider": "kubernetes",
+                    "relationships": [
+                        {
+                            "direction": "outbound",
+                            "target": "res_1e682250957ac6a133d8e40c988e6a72",
+                            "type": "contains"
+                        },
+                        {
+                            "direction": "outbound",
+                            "target": "res_5477f364177c277615a6f449e25c4831",
+                            "type": "contains"
+                        },
+                        {
+                            "direction": "outbound",
+                            "target": "res_6e90f286fc58e916e1efb9d367d33453",
+                            "type": "contains"
+                        },
+                        {
+                            "direction": "outbound",
+                            "target": "res_cebfc9b13747f19d1f8f43309f2730c9",
+                            "type": "contains"
+                        },
+                        {
+                            "direction": "outbound",
+                            "target": "res_e0a1713627cba1f758bb6ad0f321ed02",
+                            "type": "contains"
+                        },
+                        {
+                            "direction": "outbound",
+                            "target": "res_e0ae9225a316fce4c97df5c23057b97a",
+                            "type": "contains"
+                        }
+                    ],
+                    "type": "core/namespace"
+                },
+                "status": {
+                    "health": "healthy",
+                    "lifecycle": "active"
+                }
+            },
+            {
+                "apiVersion": "iip.platform/v1alpha1",
+                "kind": "Resource",
+                "metadata": {
+                    "observation": {
+                        "mode": "reconciliation",
+                        "resourceVersion": "4901",
+                        "sequence": 105,
+                        "snapshotId": "snap_e2e1a36ffea4490588f0abcf234fc956",
+                        "sourceId": "kubernetes-local",
+                        "streamId": "obs_d38f1533112c45148680f81d08aa293f"
+                    },
+                    "observedAt": "2026-08-14T11:00:00Z",
+                    "tenantId": "local",
+                    "uid": "res_244cef2706015e2d5fd2af34fc3e0d43"
+                },
+                "spec": {
+                    "attributes": {
+                        "architecture": "arm64",
+                        "kubeletVersion": "v1.34.0",
+                        "operatingSystem": "linux",
+                        "unschedulable": false
+                    },
+                    "displayName": "node-a",
+                    "externalId": "cluster-local/node-a",
+                    "provider": "kubernetes",
+                    "relationships": [],
+                    "type": "core/node"
+                },
+                "status": {
+                    "health": "healthy",
+                    "lifecycle": "active"
+                }
+            },
+            {
+                "apiVersion": "iip.platform/v1alpha1",
+                "kind": "Resource",
+                "metadata": {
+                    "labels": {
+                        "app": "api",
+                        "team": "platform"
+                    },
+                    "observation": {
+                        "mode": "reconciliation",
+                        "resourceVersion": "4903",
+                        "sequence": 106,
+                        "snapshotId": "snap_e2e1a36ffea4490588f0abcf234fc956",
+                        "sourceId": "kubernetes-local",
+                        "streamId": "obs_d38f1533112c45148680f81d08aa293f"
+                    },
+                    "observedAt": "2026-08-14T11:00:00Z",
+                    "tenantId": "local",
+                    "uid": "res_6e90f286fc58e916e1efb9d367d33453"
+                },
+                "spec": {
+                    "attributes": {
+                        "containerCount": 1,
+                        "namespace": "default",
+                        "nodeName": "node-a",
+                        "phase": "Running",
+                        "readyContainers": 1
+                    },
+                    "displayName": "api-7c9d4-2bz9k",
+                    "externalId": "cluster-local/default/api-7c9d4-2bz9k",
+                    "provider": "kubernetes",
+                    "relationships": [
+                        {
+                            "direction": "outbound",
+                            "target": "res_5477f364177c277615a6f449e25c4831",
+                            "type": "reads_from"
+                        },
+                        {
+                            "direction": "outbound",
+                            "target": "res_244cef2706015e2d5fd2af34fc3e0d43",
+                            "type": "runs_on"
+                        }
+                    ],
+                    "type": "core/pod"
+                },
+                "status": {
+                    "health": "healthy",
+                    "lifecycle": "active"
+                }
+            },
+            {
+                "apiVersion": "iip.platform/v1alpha1",
+                "kind": "Resource",
+                "metadata": {
+                    "labels": {
+                        "app": "api"
+                    },
+                    "observation": {
+                        "mode": "reconciliation",
+                        "resourceVersion": "4904",
+                        "sequence": 107,
+                        "snapshotId": "snap_e2e1a36ffea4490588f0abcf234fc956",
+                        "sourceId": "kubernetes-local",
+                        "streamId": "obs_d38f1533112c45148680f81d08aa293f"
+                    },
+                    "observedAt": "2026-08-14T11:00:00Z",
+                    "tenantId": "local",
+                    "uid": "res_1e682250957ac6a133d8e40c988e6a72"
+                },
+                "spec": {
+                    "attributes": {
+                        "namespace": "default",
+                        "ports": [
+                            {
+                                "name": "http",
+                                "port": 80,
+                                "protocol": "TCP",
+                                "targetPort": 8080
+                            }
+                        ],
+                        "serviceType": "ClusterIP"
+                    },
+                    "displayName": "api",
+                    "externalId": "cluster-local/default/api",
+                    "provider": "kubernetes",
+                    "relationships": [
+                        {
+                            "direction": "outbound",
+                            "target": "res_6e90f286fc58e916e1efb9d367d33453",
+                            "type": "routes_to"
+                        }
+                    ],
+                    "type": "core/service"
+                },
+                "status": {
+                    "health": "unknown",
+                    "lifecycle": "active"
+                }
+            },
+            {
+                "apiVersion": "iip.platform/v1alpha1",
+                "kind": "Resource",
+                "metadata": {
+                    "observation": {
+                        "mode": "reconciliation",
+                        "resourceVersion": "4905",
+                        "sequence": 108,
+                        "snapshotId": "snap_e2e1a36ffea4490588f0abcf234fc956",
+                        "sourceId": "kubernetes-local",
+                        "streamId": "obs_d38f1533112c45148680f81d08aa293f"
+                    },
+                    "observedAt": "2026-08-14T11:00:00Z",
+                    "tenantId": "local",
+                    "uid": "res_e0a1713627cba1f758bb6ad0f321ed02"
+                },
+                "spec": {
+                    "attributes": {
+                        "hosts": [
+                            "api.example.test"
+                        ],
+                        "ingressClassName": "nginx",
+                        "namespace": "default"
+                    },
+                    "displayName": "api",
+                    "externalId": "cluster-local/default/api",
+                    "provider": "kubernetes",
+                    "relationships": [
+                        {
+                            "direction": "outbound",
+                            "target": "res_1e682250957ac6a133d8e40c988e6a72",
+                            "type": "routes_to"
+                        }
+                    ],
+                    "type": "networking.k8s.io/ingress"
+                },
+                "status": {
+                    "health": "unknown",
+                    "lifecycle": "active"
+                }
+            }
+        ]
+    }
+}

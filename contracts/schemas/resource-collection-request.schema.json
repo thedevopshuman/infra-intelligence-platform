@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:resource-collection-request:v1alpha1",
+  "title": "Infrastructure Intelligence Resource Collection Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "ResourceCollectionRequest"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "tenantId", "actorId", "requestedAt"],
+      "properties": {
+        "requestId": {"type": "string", "pattern": "^col_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "actorId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "requestedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "streamId", "mode", "startSequence", "scope", "limits", "deadline"],
+      "properties": {
+        "sourceId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "streamId": {"type": "string", "pattern": "^obs_[a-f0-9]{32}$"},
+        "mode": {"type": "string", "enum": ["incremental", "reconciliation"]},
+        "snapshotId": {"type": "string", "pattern": "^snap_[a-f0-9]{32}$"},
+        "startSequence": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "scope": {"$ref": "#/$defs/scope"},
+        "limits": {"$ref": "#/$defs/limits"},
+        "deadline": {"type": "string", "format": "date-time"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"mode": {"const": "reconciliation"}}},
+          "then": {"required": ["snapshotId"]}
+        },
+        {
+          "if": {"properties": {"mode": {"const": "incremental"}}},
+          "then": {"not": {"required": ["snapshotId"]}}
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "integrationId", "rootExternalId"],
+      "properties": {
+        "provider": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+        "integrationId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "rootExternalId": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "parameters": {
+          "type": "object",
+          "maxProperties": 32,
+          "additionalProperties": true
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxResources", "maxOutputBytes"],
+      "properties": {
+        "maxResources": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "maxOutputBytes": {"type": "integer", "minimum": 1024, "maximum": 16777216}
+      }
+    }
+  }
+}

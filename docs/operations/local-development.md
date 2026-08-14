@@ -33,6 +33,10 @@ make test-postgres
 
 This starts an ephemeral PostgreSQL 18.4 container bound to `127.0.0.1:55432`, runs only the PostgreSQL integration suite, and removes its container and volume on exit.
 
+Keep deterministic contract, SDK, kernel, and observer-conformance tests in the normal `make verify` gate. Docker Desktop supplies external dependencies for integration tests; it is not required to validate pure normalization behavior. This split keeps feedback fast while still exercising PostgreSQL against the real engine.
+
+Docker Desktop Kubernetes can become the local live-collector integration environment after the Kubernetes API client and host credential broker are implemented. The current observer intentionally runs from an offline list fixture, so enabling a cluster does not expand its authority or turn the fixture CLI into a production plugin runtime.
+
 ## Run the reference API
 
 ```bash

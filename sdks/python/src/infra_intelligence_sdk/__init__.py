@@ -6,6 +6,8 @@ from .models import (
     Evidence,
     InvestigationReport,
     InvestigationRequest,
+    ResourceCollectionRequest,
+    ResourceCollectionResult,
     ResourceObservation,
     ResourceObservationCursor,
 )
@@ -16,6 +18,8 @@ __all__ = [
     "Evidence",
     "InvestigationReport",
     "InvestigationRequest",
+    "ResourceCollectionRequest",
+    "ResourceCollectionResult",
     "ResourceObservation",
     "ResourceObservationCursor",
 ]

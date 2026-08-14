@@ -32,6 +32,8 @@ flowchart TD
 
 The reference code under `src/iip` proves these directions. Future languages or services keep the same ownership even when process boundaries change.
 
+The Kubernetes observer under `plugins/examples/` is the first executable proof of the plugin boundary. It imports only the public Python SDK, consumes versioned resource collection contracts, and uses an offline provider fixture. The repository validator applies the same no-server-internals rule to all Python plugin packages.
+
 ## Placement decisions
 
 - A provider-specific API call belongs in `adapters/<provider>` or a plugin.
@@ -53,4 +55,3 @@ deploy/operators/     collectors or operators deployed into target environments
 ```
 
 Do not create empty service forests. The roadmap defines when a process boundary becomes necessary.
-

@@ -11,6 +11,8 @@ The platform exposes contracts at three levels:
 | Contract | Documentation | Schema | Example |
 | --- | --- | --- | --- |
 | Resource | [resource-contract.md](resource-contract.md) | `contracts/schemas/resource.schema.json` | `contracts/examples/resource.json` |
+| Resource collection request | [resource-collection-contract.md](resource-collection-contract.md) | `contracts/schemas/resource-collection-request.schema.json` | `contracts/examples/resource-collection-request.json` |
+| Resource collection result | [resource-collection-contract.md](resource-collection-contract.md) | `contracts/schemas/resource-collection-result.schema.json` | `contracts/examples/resource-collection-result.json` |
 | Event | [event-contract.md](event-contract.md) | `contracts/schemas/event.schema.json` | `contracts/examples/event.json` |
 | Evidence | [evidence-contract.md](evidence-contract.md) | `contracts/schemas/evidence.schema.json` | `contracts/examples/evidence.json` |
 | Investigation request | [investigation-contract.md](investigation-contract.md) | `contracts/schemas/investigation-request.schema.json` | `contracts/examples/investigation-request.json` |

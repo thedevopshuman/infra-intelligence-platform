@@ -107,6 +107,54 @@ class ResourceObservation:
 
 
 @dataclass(frozen=True)
+class ResourceCollectionRequest:
+    """Bounded, tenant-scoped request passed to a resource observer."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ResourceCollectionRequest":
+        """Create a collection request after versioned-envelope checks."""
+
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="ResourceCollectionRequest",
+                label="resource collection request",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-serializable copy of the envelope."""
+
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class ResourceCollectionResult:
+    """Batch of canonical observations and its explicit completion state."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ResourceCollectionResult":
+        """Create a collection result after versioned-envelope checks."""
+
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="ResourceCollectionResult",
+                label="resource collection result",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-serializable copy of the envelope."""
+
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class Evidence:
     """Public metadata and provenance for one immutable evidence artifact."""
 

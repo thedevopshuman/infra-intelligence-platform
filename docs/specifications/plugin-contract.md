@@ -29,6 +29,8 @@ Permissions are declarative upper bounds:
 
 Install policy and request policy may narrow these. Runtime discovery cannot expand them.
 
+`spec.interfaces` is an additive `v1alpha1` declaration that maps an advertised capability and method to public input/output schema identifiers. Every declared interface capability must also appear in `spec.capabilities`; a host may reject undeclared methods. The Kubernetes example declares `resource-observer.collect` using the [resource collection request/result contracts](resource-collection-contract.md). Transport negotiation and runtime method framing remain part of the pending handshake.
+
 ## Handshake
 
 The planned protocol handshake exchanges protocol version, plugin identity and digest, capabilities, method schemas, health, and cancellation support. The host provides request-scoped tenant/actor context, deadlines, trace context, and capability tokens. Unknown methods or incompatible schema versions fail closed.
@@ -40,4 +42,3 @@ Default execution is out-of-process through `stdio`, authenticated HTTP/gRPC, or
 ## Compatibility
 
 Plugin versions are immutable. Patch releases fix behavior without contract change; minor releases add backward-compatible capabilities; major releases may break plugin-specific methods. Plugin protocol changes have their own compatibility range independent of plugin semantic version.
-

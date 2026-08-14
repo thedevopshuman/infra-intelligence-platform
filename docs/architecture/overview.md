@@ -89,6 +89,8 @@ flowchart TB
 8. Proposed mutations enter a workflow. Policy and approval decide whether an action may execute.
 9. Every decision, tool call, approval, execution, and result produces audit events.
 
+Collector plugins cross the extension boundary through bounded resource collection request/result contracts. A complete batch returns an explicit scope digest and candidate checkpoint; only the trusted ingestion workflow may commit that checkpoint after every resource observation and event is durable. Partial, failed, and cancelled reconciliation passes never imply deletion.
+
 ## Storage responsibilities
 
 The logical boundaries remain product-neutral. [ADR 0004](../decisions/0004-postgresql-observation-store-and-outbox.md) selects PostgreSQL for the initial resource/observation, event-log, checkpoint, and outbox substrate while leaving other stores and later transport specialization open:

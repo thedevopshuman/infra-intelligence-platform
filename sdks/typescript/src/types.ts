@@ -56,6 +56,72 @@ export interface ResourceObservation {
   };
 }
 
+export interface ResourceCollectionScope {
+  provider: string;
+  integrationId: string;
+  rootExternalId: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface ResourceCollectionRequestBase {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ResourceCollectionRequest";
+  metadata: {
+    requestId: `col_${string}`;
+    tenantId: string;
+    actorId: string;
+    requestedAt: string;
+  };
+}
+
+export type ResourceCollectionRequest = ResourceCollectionRequestBase & {
+  spec: {
+    sourceId: string;
+    streamId: `obs_${string}`;
+    startSequence: number;
+    scope: ResourceCollectionScope;
+    limits: {
+      maxResources: number;
+      maxOutputBytes: number;
+    };
+    deadline: string;
+  } &
+    (
+      | { mode: "incremental"; snapshotId?: never }
+      | { mode: "reconciliation"; snapshotId: `snap_${string}` }
+    );
+};
+
+export type ResourceCollectionCompletion = {
+  resourceCount: number;
+  nextSequence: number;
+  snapshotId?: `snap_${string}`;
+  scopeDigest: Sha256Digest;
+} &
+  (
+    | { status: "complete"; checkpoint: string; reasonCode?: never }
+    | {
+        status: "partial" | "failed" | "cancelled";
+        reasonCode: string;
+        checkpoint?: never;
+      }
+  );
+
+export interface ResourceCollectionResult {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ResourceCollectionResult";
+  metadata: {
+    requestId: `col_${string}`;
+    tenantId: string;
+    sourceId: string;
+    createdAt: string;
+  };
+  spec: {
+    observations: ResourceObservation[];
+    completion: ResourceCollectionCompletion;
+  };
+}
+
 export interface PlatformEvent<TData extends Record<string, unknown> = Record<string, unknown>> {
   specversion: "1.0";
   id: string;

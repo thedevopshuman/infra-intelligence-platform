@@ -129,7 +129,7 @@ All working material stays under `docs/research/brand/` until accepted.
 3. **Completed:** Specify observation version/checkpoint and stale-write semantics.
 4. **Completed:** Implement PostgreSQL-backed resource repository behind the application port.
 5. **Completed:** Implement an outbox so resource updates and events are atomic.
-6. Create Kubernetes collector plugin skeleton and conformance fixture.
+6. **Completed:** Create Kubernetes collector plugin skeleton and conformance fixture.
 7. Add graph neighborhood and resource timeline API queries.
 8. Define the evaluation scenario contract and one known Kubernetes failure.
 9. Implement evidence provider ports and content hashing/redaction metadata.

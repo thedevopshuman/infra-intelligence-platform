@@ -85,6 +85,31 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("attributes" in error for error in errors))
 
+    def test_reconciliation_collection_request_requires_snapshot_id(self) -> None:
+        request = document("contracts/examples/resource-collection-request.json")
+        request["spec"]["mode"] = "reconciliation"
+
+        errors = self.validate("resource-collection-request.schema.json", request)
+
+        self.assertTrue(any("snapshotId" in error for error in errors))
+
+    def test_incomplete_collection_result_cannot_advance_checkpoint(self) -> None:
+        result = document("contracts/examples/resource-collection-result.json")
+        result["spec"]["completion"]["status"] = "partial"
+        result["spec"]["completion"]["reasonCode"] = "collector.output-limited"
+
+        errors = self.validate("resource-collection-result.schema.json", result)
+
+        self.assertTrue(any("checkpoint" in error for error in errors))
+
+    def test_complete_collection_result_rejects_reason_code(self) -> None:
+        result = document("contracts/examples/resource-collection-result.json")
+        result["spec"]["completion"]["reasonCode"] = "collector.provider-error"
+
+        errors = self.validate("resource-collection-result.schema.json", result)
+
+        self.assertTrue(any("reasonCode" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

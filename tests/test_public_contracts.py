@@ -6,7 +6,13 @@ import sys
 import unittest
 from pathlib import Path
 
-from infra_intelligence_sdk import Evidence, InvestigationReport, InvestigationRequest
+from infra_intelligence_sdk import (
+    Evidence,
+    InvestigationReport,
+    InvestigationRequest,
+    ResourceCollectionRequest,
+    ResourceCollectionResult,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,10 +30,18 @@ class PublicContractSdkTests(unittest.TestCase):
         evidence = Evidence.from_dict(example("evidence.json"))
         request = InvestigationRequest.from_dict(example("investigation-request.json"))
         report = InvestigationReport.from_dict(example("investigation-report.json"))
+        collection_request = ResourceCollectionRequest.from_dict(
+            example("resource-collection-request.json")
+        )
+        collection_result = ResourceCollectionResult.from_dict(
+            example("resource-collection-result.json")
+        )
 
         self.assertEqual(evidence.to_dict()["kind"], "Evidence")
         self.assertEqual(request.to_dict()["kind"], "InvestigationRequest")
         self.assertEqual(report.to_dict()["kind"], "InvestigationReport")
+        self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")
+        self.assertEqual(collection_result.to_dict()["kind"], "ResourceCollectionResult")
 
     def test_sdk_models_reject_crossed_contract_kinds(self) -> None:
         with self.assertRaisesRegex(ValueError, "kind must be Evidence"):

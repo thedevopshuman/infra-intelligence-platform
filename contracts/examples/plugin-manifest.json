@@ -14,20 +14,46 @@
       "transport": "stdio",
       "target": "python -m kubernetes_observer"
     },
-    "capabilities": ["resource-observer", "event-source", "evidence-provider"],
+    "capabilities": ["resource-observer"],
+    "interfaces": [
+      {
+        "capability": "resource-observer",
+        "method": "collect",
+        "inputSchema": "urn:iip:contracts:resource-collection-request:v1alpha1",
+        "outputSchema": "urn:iip:contracts:resource-collection-result:v1alpha1"
+      }
+    ],
     "permissions": {
       "network": ["kubernetes.default.svc:443"],
-      "secrets": ["kubernetes.service-account-token"],
-      "resources": ["kubernetes:read:*"],
+      "secrets": ["kubernetes.projected-service-account-token"],
+      "resources": [
+        "kubernetes:read:namespaces",
+        "kubernetes:read:nodes",
+        "kubernetes:read:pods",
+        "kubernetes:read:services",
+        "kubernetes:read:configmaps",
+        "kubernetes:read:deployments.apps",
+        "kubernetes:read:replicasets.apps",
+        "kubernetes:read:statefulsets.apps",
+        "kubernetes:read:daemonsets.apps",
+        "kubernetes:read:ingresses.networking.k8s.io"
+      ],
       "actions": []
     },
     "configSchema": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "namespaces": {"type": "array", "items": {"type": "string"}}
-      }
+        "clusterId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "namespaces": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 63}
+        }
+      },
+      "required": ["clusterId", "namespaces"]
     }
   }
 }
-

@@ -45,6 +45,24 @@
             "enum": ["resource-observer", "event-source", "evidence-provider", "action-provider", "surface"]
           }
         },
+        "interfaces": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["capability", "method", "inputSchema", "outputSchema"],
+            "properties": {
+              "capability": {
+                "type": "string",
+                "enum": ["resource-observer", "event-source", "evidence-provider", "action-provider", "surface"]
+              },
+              "method": {"type": "string", "pattern": "^[a-z][a-z0-9.-]{1,63}$"},
+              "inputSchema": {"type": "string", "format": "uri-reference", "minLength": 1},
+              "outputSchema": {"type": "string", "format": "uri-reference", "minLength": 1}
+            }
+          }
+        },
         "permissions": {
           "type": "object",
           "additionalProperties": false,
@@ -61,4 +79,3 @@
     }
   }
 }
-

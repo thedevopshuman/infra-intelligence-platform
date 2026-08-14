@@ -7,11 +7,12 @@ import json
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import List, Mapping, Sequence, Tuple
+from typing import List, Mapping, Optional, Sequence, Tuple
 
 try:
     from jsonschema import Draft202012Validator, FormatChecker
     from jsonschema.exceptions import SchemaError
+    from referencing import Registry, Resource as ReferencingResource
 except ModuleNotFoundError:
     print(
         "ERROR: JSON Schema verification dependencies are missing; "
@@ -34,6 +35,8 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "investigation-report.schema.json": ("investigation-report.json",),
     "investigation-request.schema.json": ("investigation-request.json",),
     "plugin-manifest.schema.json": ("plugin-manifest.json",),
+    "resource-collection-request.schema.json": ("resource-collection-request.json",),
+    "resource-collection-result.schema.json": ("resource-collection-result.json",),
     "resource.schema.json": ("resource.json",),
 }
 
@@ -80,13 +83,30 @@ def json_location(parts: Sequence[object]) -> str:
     return location
 
 
+def contract_registry() -> Registry[object]:
+    """Build a registry so schemas can reference other public contracts by ID."""
+
+    resources = []
+    for path in sorted(SCHEMA_DIR.glob("*.schema.json")):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        identifier = document.get("$id")
+        if isinstance(identifier, str):
+            resources.append((identifier, ReferencingResource.from_contents(document)))
+    return Registry().with_resources(resources)
+
+
 def instance_validation_errors(
     schema: Mapping[str, object],
     instance: object,
     *,
     label: str,
+    registry: Optional[Registry[object]] = None,
 ) -> List[str]:
-    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    validator = Draft202012Validator(
+        schema,
+        format_checker=FormatChecker(),
+        registry=registry or contract_registry(),
+    )
     return [
         f"{label} {json_location(error.absolute_path)}: {error.message}"
         for error in sorted(
@@ -122,6 +142,7 @@ def validate_repository() -> List[str]:
     if errors:
         return errors
 
+    registry = contract_registry()
     for schema_name, example_names in SCHEMA_EXAMPLES.items():
         schema_path = SCHEMA_DIR / schema_name
         schema_document = load_json(schema_path, errors)
@@ -146,6 +167,7 @@ def validate_repository() -> List[str]:
                     schema_document,
                     example_document,
                     label=str(example_path.relative_to(ROOT)),
+                    registry=registry,
                 )
             )
     return errors

@@ -26,6 +26,8 @@ REQUIRED_PATHS = (
     "docs/research/brand/README.md",
     "docs/roadmap/initial-roadmap.md",
     "contracts/schemas/resource.schema.json",
+    "contracts/schemas/resource-collection-request.schema.json",
+    "contracts/schemas/resource-collection-result.schema.json",
     "contracts/schemas/event.schema.json",
     "contracts/schemas/agent-manifest.schema.json",
     "contracts/schemas/plugin-manifest.schema.json",
@@ -35,8 +37,11 @@ REQUIRED_PATHS = (
     "contracts/examples/evidence.json",
     "contracts/examples/investigation-request.json",
     "contracts/examples/investigation-report.json",
+    "contracts/examples/resource-collection-request.json",
+    "contracts/examples/resource-collection-result.json",
     "docs/specifications/evidence-contract.md",
     "docs/specifications/investigation-contract.md",
+    "docs/specifications/resource-collection-contract.md",
     "requirements/verify.in",
     "requirements/verify.txt",
     "scripts/validate_schemas.py",
@@ -125,6 +130,99 @@ def validate_versioned_envelope(
         fail(errors, f"{filename} must contain metadata and spec objects")
 
 
+def validate_collection_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check collection semantics that cannot be expressed in JSON Schema."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    request = documents.get(example_dir / "resource-collection-request.json")
+    result = documents.get(example_dir / "resource-collection-result.json")
+    if not isinstance(request, dict) or not isinstance(result, dict):
+        return
+    request_metadata = request.get("metadata")
+    request_spec = request.get("spec")
+    result_metadata = result.get("metadata")
+    result_spec = result.get("spec")
+    if not all(
+        isinstance(item, dict)
+        for item in (request_metadata, request_spec, result_metadata, result_spec)
+    ):
+        return
+
+    for field in ("requestId", "tenantId"):
+        if result_metadata.get(field) != request_metadata.get(field):
+            fail(errors, f"resource collection result {field} must match its request")
+    if result_metadata.get("sourceId") != request_spec.get("sourceId"):
+        fail(errors, "resource collection result sourceId must match its request")
+
+    requested_at = parse_timestamp(request_metadata.get("requestedAt"))
+    deadline = parse_timestamp(request_spec.get("deadline"))
+    created_at = parse_timestamp(result_metadata.get("createdAt"))
+    if (
+        requested_at is None
+        or deadline is None
+        or created_at is None
+        or not requested_at <= created_at <= deadline
+    ):
+        fail(errors, "resource collection timestamps must be requested <= created <= deadline")
+
+    scope = request_spec.get("scope")
+    completion = result_spec.get("completion")
+    observations = result_spec.get("observations")
+    limits = request_spec.get("limits")
+    if not isinstance(scope, dict) or not isinstance(completion, dict):
+        return
+    if not isinstance(observations, list) or not isinstance(limits, dict):
+        return
+    if completion.get("scopeDigest") != canonical_digest(scope):
+        fail(errors, "resource collection result scopeDigest must match its request scope")
+    if completion.get("resourceCount") != len(observations):
+        fail(errors, "resource collection resourceCount must equal its observation count")
+    start_sequence = request_spec.get("startSequence")
+    if isinstance(start_sequence, int):
+        if completion.get("nextSequence") != start_sequence + len(observations):
+            fail(errors, "resource collection nextSequence must follow its observation count")
+
+    if len(observations) > limits.get("maxResources", -1):
+        fail(errors, "resource collection result exceeds maxResources")
+    encoded_result = json.dumps(
+        result, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8")
+    if len(encoded_result) > limits.get("maxOutputBytes", -1):
+        fail(errors, "resource collection result exceeds maxOutputBytes")
+
+    for index, observation in enumerate(observations):
+        if not isinstance(observation, dict):
+            continue
+        metadata = observation.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+        cursor = metadata.get("observation")
+        if metadata.get("tenantId") != request_metadata.get("tenantId"):
+            fail(errors, "resource collection observation tenant must match its request")
+        if not isinstance(cursor, dict):
+            fail(errors, "resource collection observation must contain a cursor")
+            continue
+        expected = start_sequence + index if isinstance(start_sequence, int) else None
+        if cursor.get("sequence") != expected:
+            fail(errors, "resource collection observation sequences must be contiguous")
+        for request_field, cursor_field in (
+            ("sourceId", "sourceId"),
+            ("streamId", "streamId"),
+            ("mode", "mode"),
+        ):
+            if cursor.get(cursor_field) != request_spec.get(request_field):
+                fail(errors, f"resource collection observation {cursor_field} must match its request")
+        if cursor.get("snapshotId") != request_spec.get("snapshotId"):
+            fail(errors, "resource collection observation snapshotId must match its request")
+        if "checkpoint" in cursor:
+            fail(errors, "resource collection observations cannot advance a batch checkpoint")
+
+    if completion.get("snapshotId") != request_spec.get("snapshotId"):
+        fail(errors, "resource collection completion snapshotId must match its request")
+
+
 def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> None:
     from iip.domain.models import ContractError, Resource
 
@@ -177,15 +275,31 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("evidence.json", "Evidence"),
         ("investigation-request.json", "InvestigationRequest"),
         ("investigation-report.json", "InvestigationReport"),
+        ("resource-collection-request.json", "ResourceCollectionRequest"),
+        ("resource-collection-result.json", "ResourceCollectionResult"),
     )
     for name, kind in versioned_examples:
         manifest = documents.get(example_dir / name)
         validate_versioned_envelope(manifest, filename=name, kind=kind, errors=errors)
 
+    validate_collection_examples(documents, errors)
+
     plugin_example = documents.get(example_dir / "plugin-manifest.json")
     plugin_package = documents.get(ROOT / "plugins/examples/kubernetes-observer/plugin.json")
     if plugin_example != plugin_package:
         fail(errors, "plugin package manifest has drifted from the canonical contract example")
+    if isinstance(plugin_example, dict):
+        plugin_spec = plugin_example.get("spec")
+        if isinstance(plugin_spec, dict):
+            capabilities = set(plugin_spec.get("capabilities", []))
+            interfaces = plugin_spec.get("interfaces", [])
+            if isinstance(interfaces, list):
+                for interface in interfaces:
+                    if (
+                        isinstance(interface, dict)
+                        and interface.get("capability") not in capabilities
+                    ):
+                        fail(errors, "plugin interface must advertise its capability")
 
     evidence = documents.get(example_dir / "evidence.json")
     request = documents.get(example_dir / "investigation-request.json")
@@ -441,6 +555,15 @@ def validate_python_boundaries(errors: List[str]) -> None:
         for module in iter_imports(tree):
             if module == "iip" or module.startswith("iip."):
                 fail(errors, f"SDK imports server internals in {path.relative_to(ROOT)}: {module}")
+
+    for path in sorted((ROOT / "plugins").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for module in iter_imports(tree):
+            if module == "iip" or module.startswith("iip."):
+                fail(
+                    errors,
+                    f"plugin imports server internals in {path.relative_to(ROOT)}: {module}",
+                )
 
 
 def validate_markdown_links(errors: List[str]) -> None:

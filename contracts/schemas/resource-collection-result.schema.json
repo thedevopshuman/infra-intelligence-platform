@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:resource-collection-result:v1alpha1",
+  "title": "Infrastructure Intelligence Resource Collection Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "ResourceCollectionResult"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "tenantId", "sourceId", "createdAt"],
+      "properties": {
+        "requestId": {"type": "string", "pattern": "^col_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "sourceId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "createdAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observations", "completion"],
+      "properties": {
+        "observations": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {"$ref": "urn:iip:contracts:resource:v1alpha1"}
+        },
+        "completion": {"$ref": "#/$defs/completion"}
+      }
+    }
+  },
+  "$defs": {
+    "completion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "resourceCount", "nextSequence", "scopeDigest"],
+      "properties": {
+        "status": {"type": "string", "enum": ["complete", "partial", "failed", "cancelled"]},
+        "resourceCount": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "nextSequence": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "snapshotId": {"type": "string", "pattern": "^snap_[a-f0-9]{32}$"},
+        "checkpoint": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "scopeDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "reasonCode": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$", "maxLength": 128}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "complete"}}},
+          "then": {
+            "required": ["checkpoint"],
+            "not": {"required": ["reasonCode"]}
+          },
+          "else": {
+            "required": ["reasonCode"],
+            "not": {"required": ["checkpoint"]}
+          }
+        }
+      ]
+    }
+  }
+}

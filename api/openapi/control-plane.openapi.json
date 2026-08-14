@@ -3,7 +3,7 @@
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
     "version": "0.1.0",
-    "description": "Foundation-stage API. Resource ingestion is executable; evidence and investigation components are published contract-first without implying executable endpoints."
+    "description": "Foundation-stage API. Resource ingestion is executable; resource collection, evidence, and investigation components are published contract-first without implying executable control-plane endpoints."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "paths": {
@@ -60,6 +60,8 @@
     },
     "schemas": {
       "Resource": {"$ref": "../../contracts/schemas/resource.schema.json"},
+      "ResourceCollectionRequest": {"$ref": "../../contracts/schemas/resource-collection-request.schema.json"},
+      "ResourceCollectionResult": {"$ref": "../../contracts/schemas/resource-collection-result.schema.json"},
       "Event": {"$ref": "../../contracts/schemas/event.schema.json"},
       "Evidence": {"$ref": "../../contracts/schemas/evidence.schema.json"},
       "InvestigationRequest": {"$ref": "../../contracts/schemas/investigation-request.schema.json"},

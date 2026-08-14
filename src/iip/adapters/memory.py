@@ -282,6 +282,24 @@ class InMemoryResourceStore:
         with self._lock:
             return self._checkpoints.get((tenant_id, source_id))
 
+    def commit_checkpoint(self, checkpoint: SourceCheckpoint, *, mode: str) -> None:
+        if mode not in ("incremental", "reconciliation"):
+            raise ValueError("checkpoint mode is invalid")
+        key = (checkpoint.tenant_id, checkpoint.source_id)
+        with self._lock:
+            current = self._checkpoints.get(key)
+            if current is not None and current.stream_id == checkpoint.stream_id:
+                if checkpoint.sequence < current.sequence:
+                    raise ValueError("checkpoint sequence cannot move backwards")
+                if (
+                    checkpoint.sequence == current.sequence
+                    and checkpoint.checkpoint != current.checkpoint
+                ):
+                    raise ValueError("checkpoint content conflicts at the same sequence")
+            elif current is not None and mode != "reconciliation":
+                raise ValueError("checkpoint stream reset requires reconciliation")
+            self._checkpoints[key] = checkpoint
+
     def _next_checkpoint(self, resource: Resource) -> SourceCheckpoint:
         cursor = resource.observation
         assert cursor is not None and cursor.checkpoint is not None
@@ -366,7 +384,15 @@ class AllowTenantPolicy:
             return PolicyDecision(False, "actor.anonymous")
         if resource.get("tenantId") != actor.tenant_id:
             return PolicyDecision(False, "tenant.scope_mismatch")
-        if action not in ("evidence:collect", "resource:ingest", "resource:read"):
+        if action not in (
+            "action:approve",
+            "action:execute",
+            "action:propose",
+            "evidence:collect",
+            "plugin:open-session",
+            "resource:ingest",
+            "resource:read",
+        ):
             return PolicyDecision(False, "action.unsupported")
         return PolicyDecision(True, "development.allow")
 

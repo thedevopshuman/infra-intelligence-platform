@@ -9,7 +9,7 @@ client = Client("http://localhost:8080", bearer_token=token)
 accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 ```
 
-`Evidence`, `InvestigationRequest`, and `InvestigationReport` expose the corresponding `v1alpha1` public envelopes without importing server implementation classes. Their presence does not imply an executable API endpoint; transport methods are added only with an implemented surface.
+`Evidence`, `InvestigationRequest`, and `InvestigationReport` expose the corresponding `v1alpha1` public envelopes without importing server implementation classes. `run_investigation`, `get_investigation`, and `get_evidence` use the executable reference API.
 
 `EvaluationScenario` exposes the offline, replayable scenario envelope used by evaluation tooling. It carries fixtures and a scoring oracle but grants no runtime access or authority.
 
@@ -19,4 +19,4 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 `Client.get_resource_neighborhood` and `Client.get_resource_timeline` return the corresponding paginated public envelopes. Pass `spec.page.nextCursor` back unchanged to continue; the cursor is query- and tenant-bound and does not grant authority.
 
-Version 0.2 removes the development-only `tenant_id` and `actor_id` constructor arguments. Supply a Bearer credential instead; the authenticated server derives tenant, actor, and roles from that credential. The SDK never sends identity assertion headers.
+Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. Supply a Bearer credential; the authenticated server derives tenant, actor, and roles from that credential. The SDK never sends identity assertion headers.

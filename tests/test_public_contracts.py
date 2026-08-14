@@ -7,10 +7,15 @@ import unittest
 from pathlib import Path
 
 from infra_intelligence_sdk import (
+    ActionApproval,
+    ActionProposal,
+    ActionResult,
     Evidence,
     EvaluationScenario,
     InvestigationReport,
     InvestigationRequest,
+    IntegrationConfig,
+    PluginSession,
     ResourceCollectionRequest,
     ResourceCollectionResult,
     ResourceNeighborhood,
@@ -44,6 +49,11 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         timeline = ResourceTimeline.from_dict(example("resource-timeline.json"))
         scenario = EvaluationScenario.from_dict(example("evaluation-scenario.json"))
+        integration = IntegrationConfig.from_dict(example("integration-config.json"))
+        proposal = ActionProposal.from_dict(example("action-proposal.json"))
+        approval = ActionApproval.from_dict(example("action-approval.json"))
+        action_result = ActionResult.from_dict(example("action-result.json"))
+        plugin_session = PluginSession.from_dict(example("plugin-session.json"))
 
         self.assertEqual(evidence.to_dict()["kind"], "Evidence")
         self.assertEqual(request.to_dict()["kind"], "InvestigationRequest")
@@ -53,6 +63,11 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(neighborhood.to_dict()["kind"], "ResourceNeighborhood")
         self.assertEqual(timeline.to_dict()["kind"], "ResourceTimeline")
         self.assertEqual(scenario.to_dict()["kind"], "EvaluationScenario")
+        self.assertEqual(integration.to_dict()["kind"], "IntegrationConfig")
+        self.assertEqual(proposal.to_dict()["kind"], "ActionProposal")
+        self.assertEqual(approval.to_dict()["kind"], "ActionApproval")
+        self.assertEqual(action_result.to_dict()["kind"], "ActionResult")
+        self.assertEqual(plugin_session.to_dict()["kind"], "PluginSession")
 
     def test_sdk_models_reject_crossed_contract_kinds(self) -> None:
         with self.assertRaisesRegex(ValueError, "kind must be Evidence"):

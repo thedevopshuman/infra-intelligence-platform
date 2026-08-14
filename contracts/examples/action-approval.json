@@ -1,0 +1,16 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ActionApproval",
+  "metadata": {
+    "id": "apr_66666666666666666666666666666666",
+    "tenantId": "local",
+    "approverId": "on-call-approver",
+    "decidedAt": "2026-08-14T13:02:00Z"
+  },
+  "spec": {
+    "proposalId": "act_55555555555555555555555555555555",
+    "decision": "approved",
+    "rationale": "Dry-run is scoped to the degraded demo Deployment and has no cluster impact.",
+    "policySnapshotRef": "policy://local/snapshots/action-approval-v1"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ActionProposal",
+  "metadata": {
+    "id": "act_55555555555555555555555555555555",
+    "tenantId": "local",
+    "actorId": "incident-investigator",
+    "createdAt": "2026-08-14T13:00:00Z"
+  },
+  "spec": {
+    "investigationId": "inv_71c9e4a2b8d04f65a3c7e9b102d4f608",
+    "actionType": "kubernetes.restart-workload",
+    "targetResourceUid": "res_e0ae9225a316fce4c97df5c23057b97a",
+    "parameters": {"namespace": "iip-demo", "workloadKind": "deployment", "workloadName": "api"},
+    "risk": "low",
+    "reversible": true,
+    "dryRun": true,
+    "idempotencyKey": "incident-71c9-restart-api-001",
+    "expiresAt": "2026-08-14T13:30:00Z",
+    "policyDecision": {
+      "allowed": true,
+      "reasonCode": "policy.action.proposal-allowed",
+      "policySnapshotRef": "policy://local/snapshots/action-proposal-v1"
+    }
+  },
+  "status": "pending-approval"
+}

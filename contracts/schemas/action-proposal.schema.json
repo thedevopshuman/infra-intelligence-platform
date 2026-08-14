@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:action-proposal:v1alpha1",
+  "title": "Infrastructure Intelligence Action Proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec", "status"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "ActionProposal"},
+    "metadata": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "tenantId", "actorId", "createdAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^act_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "actorId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "createdAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object", "additionalProperties": false,
+      "required": ["investigationId", "actionType", "targetResourceUid", "parameters", "risk", "reversible", "dryRun", "idempotencyKey", "expiresAt", "policyDecision"],
+      "properties": {
+        "investigationId": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"},
+        "actionType": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{2,127}$"},
+        "targetResourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
+        "parameters": {"type": "object", "maxProperties": 32, "additionalProperties": true},
+        "risk": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+        "reversible": {"const": true},
+        "dryRun": {"type": "boolean"},
+        "idempotencyKey": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{8,128}$"},
+        "expiresAt": {"type": "string", "format": "date-time"},
+        "policyDecision": {
+          "type": "object", "additionalProperties": false,
+          "required": ["allowed", "reasonCode", "policySnapshotRef"],
+          "properties": {
+            "allowed": {"type": "boolean"},
+            "reasonCode": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$"},
+            "policySnapshotRef": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048}
+          }
+        }
+      }
+    },
+    "status": {"type": "string", "enum": ["pending-approval", "denied", "expired"]}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "denied"}}},
+      "then": {"properties": {"spec": {"properties": {"policyDecision": {"properties": {"allowed": {"const": false}}}}}}},
+      "else": {"properties": {"spec": {"properties": {"policyDecision": {"properties": {"allowed": {"const": true}}}}}}}
+    }
+  ]
+}

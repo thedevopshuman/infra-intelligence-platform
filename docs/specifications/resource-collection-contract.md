@@ -26,6 +26,8 @@ A conforming host validates more than the JSON shape:
 - `scopeDigest` is SHA-256 over canonical JSON for the complete request scope;
 - the serialized result does not exceed `maxOutputBytes` and its observation count does not exceed `maxResources`.
 
+The reference host implements these checks in `ResourceCollectionIngestionService`. It ingests validated observations first and advances `SourceCheckpointRepository` only after every observation and event is durable. Partial results may improve the projection but never advance the checkpoint; replay is therefore safe and idempotent.
+
 Provider errors are mapped to stable `reasonCode` values. Provider exception text, stack traces, credentials, Kubernetes `Secret` objects, ConfigMap values, token-bearing annotations, and other raw sensitive fields must not cross the boundary.
 
 ## Completion and checkpoints

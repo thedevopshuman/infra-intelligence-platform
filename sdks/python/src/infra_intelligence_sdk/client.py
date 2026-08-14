@@ -3,13 +3,26 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Mapping, Optional
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from .errors import ApiError
-from .models import ResourceNeighborhood, ResourceObservation, ResourceTimeline
+from .models import (
+    ActionApproval,
+    ActionProposal,
+    ActionResult,
+    Evidence,
+    InvestigationReport,
+    InvestigationRequest,
+    PluginSession,
+    ResourceCollectionRequest,
+    ResourceCollectionResult,
+    ResourceNeighborhood,
+    ResourceObservation,
+    ResourceTimeline,
+)
 
 
 class Client:
@@ -102,6 +115,88 @@ class Client:
             method="GET",
         )
         return ResourceTimeline.from_dict(self._send(request))
+
+    def ingest_resource_collection(
+        self,
+        request: ResourceCollectionRequest,
+        result: ResourceCollectionResult,
+        correlation_id: Optional[str] = None,
+    ) -> list[ResourceObservation]:
+        """Validate and ingest one observer request/result pair."""
+
+        payload = self._post(
+            "/v1/collections/ingest",
+            {"request": request.to_dict(), "result": result.to_dict()},
+            correlation_id,
+        )
+        items = payload.get("items")
+        if not isinstance(items, list):
+            raise ApiError(200, "response.invalid")
+        return [ResourceObservation.from_dict(item) for item in items]
+
+    def run_investigation(
+        self, request: InvestigationRequest
+    ) -> InvestigationReport:
+        """Run the bounded investigation and return its terminal report."""
+
+        return InvestigationReport.from_dict(
+            self._post("/v1/investigations", request.to_dict())
+        )
+
+    def get_investigation(self, investigation_id: str) -> InvestigationReport:
+        return InvestigationReport.from_dict(
+            self._get(f"/v1/investigations/{quote(investigation_id, safe='')}")
+        )
+
+    def get_evidence(self, evidence_id: str) -> Evidence:
+        return Evidence.from_dict(
+            self._get(f"/v1/evidence/{quote(evidence_id, safe='')}")
+        )
+
+    def propose_action(self, command: Mapping[str, Any]) -> ActionProposal:
+        return ActionProposal.from_dict(self._post("/v1/actions/proposals", command))
+
+    def decide_action(
+        self, proposal_id: str, decision: str, rationale: str
+    ) -> ActionApproval:
+        return ActionApproval.from_dict(
+            self._post(
+                f"/v1/actions/{quote(proposal_id, safe='')}/decision",
+                {"decision": decision, "rationale": rationale},
+            )
+        )
+
+    def execute_action(self, proposal_id: str) -> ActionResult:
+        return ActionResult.from_dict(
+            self._post(f"/v1/actions/{quote(proposal_id, safe='')}/execute", {})
+        )
+
+    def open_plugin_session(self, command: Mapping[str, Any]) -> PluginSession:
+        return PluginSession.from_dict(self._post("/v1/plugin-sessions", command))
+
+    def _get(self, path: str) -> Dict[str, Any]:
+        return self._send(
+            Request(
+                f"{self._base_url}{path}",
+                headers=self._headers(None),
+                method="GET",
+            )
+        )
+
+    def _post(
+        self,
+        path: str,
+        payload: Mapping[str, Any],
+        correlation_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return self._send(
+            Request(
+                f"{self._base_url}{path}",
+                data=json.dumps(payload).encode("utf-8"),
+                headers=self._headers(correlation_id),
+                method="POST",
+            )
+        )
 
     def _headers(self, correlation_id: Optional[str]) -> Dict[str, str]:
         headers = {

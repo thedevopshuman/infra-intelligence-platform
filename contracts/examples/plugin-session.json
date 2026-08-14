@@ -1,0 +1,22 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PluginSession",
+  "metadata": {
+    "id": "psn_77777777777777777777777777777777",
+    "tenantId": "local",
+    "pluginId": "kubernetes-observer",
+    "pluginVersion": "0.1.0",
+    "createdAt": "2026-08-14T12:44:00Z"
+  },
+  "spec": {
+    "manifestDigest": "sha256:6cfa44b1172aec96fd98523cdfb6d26922c7b141c36debb4e0bf02966acd900a",
+    "protocolVersion": "1.0",
+    "grantedCapabilities": ["resource-observer"],
+    "capabilityTokenRef": "capability://local/sessions/psn_77777777777777777777777777777777",
+    "capabilityTokenDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "expiresAt": "2026-08-14T12:49:00Z",
+    "cancellation": {"supported": true, "endpoint": "stdio://control/cancel"},
+    "limits": {"maxRequests": 1, "maxWallTimeSeconds": 60, "maxOutputBytes": 16777216}
+  },
+  "status": "ready"
+}

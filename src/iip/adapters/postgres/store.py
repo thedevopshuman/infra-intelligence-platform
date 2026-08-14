@@ -33,6 +33,7 @@ from iip.domain.models import (
 _MIGRATIONS = (
     "0001_resource_event_substrate.sql",
     "0002_resource_relationship_index.sql",
+    "0003_operational_workflows.sql",
 )
 
 
@@ -462,6 +463,58 @@ class PostgresResourceStore:
             checkpoint=row["checkpoint"],
             committed_at=self._rfc3339(row["committed_at"]),
         )
+
+    @_translate_database_errors
+    def commit_checkpoint(self, checkpoint: SourceCheckpoint, *, mode: str) -> None:
+        """Advance a batch checkpoint after all observations are committed."""
+
+        if mode not in ("incremental", "reconciliation"):
+            raise ValueError("checkpoint mode is invalid")
+        with self._connect() as connection:
+            connection.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"{checkpoint.tenant_id}\x1f{checkpoint.source_id}",),
+            )
+            row = connection.execute(
+                """
+                SELECT stream_id, sequence, checkpoint
+                FROM iip.source_checkpoints
+                WHERE tenant_id = %s AND source_id = %s
+                FOR UPDATE
+                """,
+                (checkpoint.tenant_id, checkpoint.source_id),
+            ).fetchone()
+            if row is not None and row["stream_id"] == checkpoint.stream_id:
+                if checkpoint.sequence < row["sequence"]:
+                    raise ValueError("checkpoint sequence cannot move backwards")
+                if (
+                    checkpoint.sequence == row["sequence"]
+                    and checkpoint.checkpoint != row["checkpoint"]
+                ):
+                    raise ValueError("checkpoint content conflicts at the same sequence")
+            elif row is not None and mode != "reconciliation":
+                raise ValueError("checkpoint stream reset requires reconciliation")
+            connection.execute(
+                """
+                INSERT INTO iip.source_checkpoints (
+                    tenant_id, source_id, stream_id, sequence,
+                    checkpoint, committed_at
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (tenant_id, source_id) DO UPDATE SET
+                    stream_id = EXCLUDED.stream_id,
+                    sequence = EXCLUDED.sequence,
+                    checkpoint = EXCLUDED.checkpoint,
+                    committed_at = EXCLUDED.committed_at
+                """,
+                (
+                    checkpoint.tenant_id,
+                    checkpoint.source_id,
+                    checkpoint.stream_id,
+                    checkpoint.sequence,
+                    checkpoint.checkpoint,
+                    checkpoint.committed_at,
+                ),
+            )
 
     def _connect(self) -> Any:
         return psycopg.connect(self._database_url, row_factory=dict_row)

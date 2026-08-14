@@ -290,3 +290,83 @@ class EvaluationScenario:
         """Return a JSON-serializable copy of the envelope."""
 
         return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class IntegrationConfig:
+    """Credential-free tenant integration configuration."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "IntegrationConfig":
+        return cls(
+            _validate_envelope(
+                payload, kind="IntegrationConfig", label="integration config"
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class ActionProposal:
+    """Immutable proposal for one reversible governed operation."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ActionProposal":
+        return cls(
+            _validate_envelope(payload, kind="ActionProposal", label="action proposal")
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class ActionApproval:
+    """Decision made by an actor distinct from the proposer."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ActionApproval":
+        return cls(
+            _validate_envelope(payload, kind="ActionApproval", label="action approval")
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class ActionResult:
+    """Auditable terminal result of a governed operation."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ActionResult":
+        return cls(_validate_envelope(payload, kind="ActionResult", label="action result"))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class PluginSession:
+    """Bounded host-issued plugin handshake result."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PluginSession":
+        return cls(
+            _validate_envelope(payload, kind="PluginSession", label="plugin session")
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)

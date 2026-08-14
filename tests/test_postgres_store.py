@@ -11,12 +11,20 @@ from unittest.mock import patch
 try:
     import psycopg
 
-    from iip.adapters.postgres import PostgresResourceStore
+    from iip.adapters.postgres import PostgresOperationalStore, PostgresResourceStore
 except ModuleNotFoundError:
     psycopg = None
+    PostgresOperationalStore = None
     PostgresResourceStore = None
 
+from iip.adapters.evidence import (
+    ResourceStateEvidenceProvider,
+    StructuredTextRedactor,
+    SystemClock,
+    UuidEvidenceIdGenerator,
+)
 from iip.adapters.memory import AllowTenantPolicy
+from iip.application.collect_evidence import CollectEvidenceCommand, EvidenceCollectionService
 from iip.application.ingest_resource import (
     IngestResourceCommand,
     ResourceIngestionService,
@@ -309,6 +317,72 @@ class PostgresResourceStoreTests(unittest.TestCase):
         self.assertEqual(tuple(self.store.history("local", resource.identity.uid)), ())
         self.assertEqual(tuple(self.store.list_events("local")), ())
         self.assertIsNone(self.store.get_checkpoint("local", "kubernetes-local"))
+
+
+@unittest.skipUnless(
+    DATABASE_URL
+    and PostgresResourceStore is not None
+    and PostgresOperationalStore is not None,
+    "IIP_TEST_DATABASE_URL and psycopg are required for PostgreSQL integration tests",
+)
+class PostgresOperationalStoreTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        assert DATABASE_URL is not None
+        cls.resources = PostgresResourceStore(DATABASE_URL)
+        cls.resources.migrate()
+        cls.operations = PostgresOperationalStore(DATABASE_URL)
+
+    def setUp(self) -> None:
+        assert DATABASE_URL is not None and psycopg is not None
+        with psycopg.connect(DATABASE_URL) as connection:
+            connection.execute(
+                """
+                TRUNCATE iip.audit_records, iip.plugin_sessions,
+                         iip.action_results, iip.action_approvals,
+                         iip.action_proposals, iip.investigations,
+                         iip.evidence_artifacts, iip.resource_relationships,
+                         iip.source_checkpoints, iip.event_outbox,
+                         iip.event_log, iip.resource_observations,
+                         iip.resource_projections
+                RESTART IDENTITY CASCADE
+                """
+            )
+
+    def test_evidence_metadata_and_artifact_are_durable_and_tenant_scoped(self) -> None:
+        actor = ActorContext("collector", "local")
+        resource = ResourceIngestionService(
+            self.resources, AllowTenantPolicy()
+        ).execute(IngestResourceCommand(actor, resource_payload()))
+        service = EvidenceCollectionService(
+            self.resources,
+            {"resource-state": ResourceStateEvidenceProvider(self.resources)},
+            self.operations,
+            StructuredTextRedactor(),
+            AllowTenantPolicy(),
+            UuidEvidenceIdGenerator(),
+            SystemClock(),
+        )
+        evidence = service.execute(
+            CollectEvidenceCommand(
+                actor=actor,
+                provider="resource-state",
+                integration_id="platform-resource-state",
+                evidence_type="kubernetes.resource-status",
+                resource_uids=(resource.identity.uid,),
+                locator="resource://current",
+                deadline="2099-08-14T13:30:00Z",
+            )
+        )
+        evidence_id = evidence["metadata"]["id"]
+
+        reconnected = PostgresOperationalStore(DATABASE_URL)
+        self.assertEqual(reconnected.get(actor, evidence_id), evidence)
+        self.assertTrue(reconnected.read_artifact(actor, evidence_id))
+        self.assertEqual(len(tuple(reconnected.list(actor))), 1)
+        self.assertIsNone(
+            reconnected.get(ActorContext("other", "another-tenant"), evidence_id)
+        )
 
 
 if __name__ == "__main__":

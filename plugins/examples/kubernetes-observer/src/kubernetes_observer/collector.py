@@ -141,6 +141,21 @@ def _condition(status: Mapping[str, Any], condition_type: str) -> Optional[str]:
     return None
 
 
+def _pod_waiting_reason(status: Mapping[str, Any]) -> Optional[str]:
+    statuses = status.get("containerStatuses", [])
+    if not isinstance(statuses, list):
+        return None
+    for container in statuses:
+        if not isinstance(container, Mapping):
+            continue
+        state = container.get("state")
+        waiting = state.get("waiting") if isinstance(state, Mapping) else None
+        reason = waiting.get("reason") if isinstance(waiting, Mapping) else None
+        if isinstance(reason, str) and reason:
+            return reason[:128]
+    return None
+
+
 def _health_and_lifecycle(
     kind: str, metadata: Mapping[str, Any], spec: Mapping[str, Any], status: Mapping[str, Any]
 ) -> Tuple[str, str]:
@@ -152,6 +167,15 @@ def _health_and_lifecycle(
     if kind == "Pod":
         phase = status.get("phase")
         ready = _condition(status, "Ready")
+        waiting_reason = _pod_waiting_reason(status)
+        if waiting_reason in (
+            "CreateContainerConfigError",
+            "CrashLoopBackOff",
+            "ErrImagePull",
+            "ImagePullBackOff",
+            "RunContainerError",
+        ):
+            return "unhealthy", "creating" if phase == "Pending" else "active"
         if phase == "Running":
             return ("healthy" if ready == "True" else "degraded"), "active"
         if phase == "Failed":
@@ -223,6 +247,9 @@ def _safe_attributes(
             if isinstance(statuses, list)
             else 0
         )
+        waiting_reason = _pod_waiting_reason(status)
+        if waiting_reason is not None:
+            attributes["waitingReason"] = waiting_reason
     elif kind == "Service":
         service_type = spec.get("type")
         if isinstance(service_type, str):

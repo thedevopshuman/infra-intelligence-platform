@@ -4,7 +4,7 @@
 
 Infrastructure Intelligence Platform (IIP) is an architecture-first foundation for building a vendor-neutral control plane that understands infrastructure as a resource graph and event timeline, then lets governed agents investigate and act with evidence.
 
-This repository is at **foundation / early Phase 1**. It contains the living product and architecture record, versioned contracts, an executable reference kernel with in-memory and PostgreSQL resource profiles, an in-memory evidence collection boundary with redaction and content hashing, starter SDK boundaries, a runnable Kubernetes observer conformance example, a deterministic incident evaluation scenario, and Kubernetes packaging. It is not yet a production system.
+This repository now contains an **executable local reference slice across Roadmap Phases 1–5**. It includes live Kubernetes reconciliation, durable PostgreSQL resources/evidence/investigations/actions/audit, deterministic evidence-backed investigation and evaluation, dry-run governed actions, and bounded plugin sessions. The phase exit gates are not all complete: list/watch recovery, reconciliation tombstones, production telemetry/SLOs, live mutation/rollback, isolated signed plugin execution, design-partner operation, and legal/brand decisions remain. It is not yet a production system.
 
 ## Start here
 
@@ -23,6 +23,8 @@ python3 -m pip install --requirement requirements/verify.txt
 make verify
 # With Docker Desktop running:
 make test-postgres
+# With the local kind cluster and explicit kubeconfig:
+IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-live
 # Configure a local Bearer identity as described in docs/operations/local-development.md.
 make run
 ```
@@ -37,7 +39,7 @@ curl -X POST http://localhost:8080/v1/resources \
   --data @contracts/examples/resource.json
 ```
 
-The API is a narrow vertical slice: authenticate a Bearer credential into actor and tenant context, validate and authorize a resource observation, apply ordering, atomically retain its projection, relationship index, history, event, and outbox record in the PostgreSQL profile, then expose tenant-scoped neighborhood and timeline queries. The default local profile remains in memory.
+The API authenticates a Bearer credential into actor, tenant, and role context, validates collection/resource boundaries, exposes graph/timeline queries, runs a bounded evidence-backed investigation, and supports separately governed dry-run action and plugin-session workflows. The default local profile remains in memory; the Docker profile persists operational records in PostgreSQL.
 
 ## Repository map
 
@@ -64,7 +66,7 @@ The API is a narrow vertical slice: authenticate a Bearer credential into actor 
 
 ## Current decisions and open questions
 
-Accepted foundations live in [`docs/decisions`](docs/decisions/README.md). PostgreSQL plus a transactional outbox is accepted for the initial resource/event substrate. Identity provider, later broker specialization, model runtime, workflow/policy engines, and licensing remain explicit roadmap decisions.
+Accepted foundations live in [`docs/decisions`](docs/decisions/README.md). PostgreSQL is accepted as the initial resource/event and operational record substrate, and the deterministic investigator/dry-run action boundary is accepted as the safety baseline. Production identity, model, workflow/policy, credential-broker, plugin-runner, licensing, company, and brand decisions remain explicit roadmap work.
 
 ## Licensing
 

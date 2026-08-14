@@ -93,6 +93,10 @@ Collector plugins cross the extension boundary through bounded resource collecti
 
 Evidence providers cross a separate application-owned boundary. The [reference collection pipeline](evidence-collection-pipeline.md) authorizes an exact tenant, integration, evidence type, and resource scope before a provider runs, then validates and redacts provider output before hashing and atomic persistence. Providers do not receive ambient credentials through the application contract.
 
+The current executable intelligence slice is deterministic and model-free: it collects canonical resource-state evidence, classifies a narrow Kubernetes failure set, and produces the same immutable report contract intended for future bounded agents. The evaluation harness scores machine-readable root-cause classes, evidence use, red-herring resistance, unsupported certainty, and budget compliance. [ADR 0006](../decisions/0006-deterministic-investigation-and-dry-run-actions.md) fixes this as the baseline that future runtimes must improve upon.
+
+Actions cross a stricter workflow boundary. Proposal, approval, and execution are distinct policy checks and immutable records; self-approval is prohibited and duplicate execution returns the prior result. The reference executor is dry-run only. Plugin sessions similarly grant only a declared capability subset, persist only token references/digests, and carry mandatory expiry, cancellation, and resource limits.
+
 ## Storage responsibilities
 
 The logical boundaries remain product-neutral. [ADR 0004](../decisions/0004-postgresql-observation-store-and-outbox.md) selects PostgreSQL for the initial resource/observation, event-log, checkpoint, and outbox substrate while leaving other stores and later transport specialization open:
@@ -101,8 +105,8 @@ The logical boundaries remain product-neutral. [ADR 0004](../decisions/0004-post
 | --- | --- | --- |
 | Resource graph | PostgreSQL latest view, immutable observations, and rebuildable relationship index | Tenant partitioning; idempotent upsert; time-aware provenance |
 | Event log | PostgreSQL immutable log and transactional outbox initially | At-least-once ingestion; deduplication by source + ID; replay |
-| Evidence store | Retrieved artifacts and content hashes | Immutable versions; retention policy; redaction metadata |
-| Workflow store | Durable state, approvals, idempotency | Crash-safe transitions; optimistic concurrency |
+| Evidence store | PostgreSQL metadata and artifact bytes initially | Immutable versions; tenant partitioning; retention policy; redaction metadata |
+| Workflow store | PostgreSQL investigations, approvals, idempotency, and results initially | Crash-safe immutable transitions; duplicate-impact prevention |
 | Registry | Versioned agent/plugin manifests | Immutable releases; signatures and compatibility metadata |
 | Search/index | Derived query acceleration | Rebuildable from authoritative stores |
 | Audit store | Security and decision trail | Append-only; protected retention; exportability |

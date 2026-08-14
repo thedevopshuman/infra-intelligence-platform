@@ -1,0 +1,36 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "IntegrationConfig",
+  "metadata": {
+    "id": "int_44444444444444444444444444444444",
+    "tenantId": "local",
+    "createdAt": "2026-08-14T12:40:00Z"
+  },
+  "spec": {
+    "provider": "kubernetes",
+    "displayName": "Local kind development cluster",
+    "enabled": true,
+    "endpoint": "kubernetes://kind-iip-dev",
+    "credentialRef": "credential://local/kubernetes/kind-iip-dev",
+    "collection": {
+      "sourceId": "kubernetes-local",
+      "rootExternalId": "kind-iip-dev",
+      "mode": "reconciliation",
+      "intervalSeconds": 30,
+      "parameters": {"namespaces": ["iip-demo"]}
+    },
+    "permissions": {
+      "readOnly": true,
+      "resourceTypes": [
+        "kubernetes:read:configmaps",
+        "kubernetes:read:deployments.apps",
+        "kubernetes:read:ingresses.networking.k8s.io",
+        "kubernetes:read:namespaces",
+        "kubernetes:read:nodes",
+        "kubernetes:read:pods",
+        "kubernetes:read:replicasets.apps",
+        "kubernetes:read:services"
+      ]
+    }
+  }
+}

@@ -2,6 +2,10 @@ export type ResourceHealth = "healthy" | "degraded" | "unhealthy" | "unknown";
 export type ResourceUid = `res_${string}`;
 export type EvidenceId = `evd_${string}`;
 export type InvestigationId = `inv_${string}`;
+export type ActionId = `act_${string}`;
+export type ApprovalId = `apr_${string}`;
+export type IntegrationId = `int_${string}`;
+export type PluginSessionId = `psn_${string}`;
 export type Sha256Digest = `sha256:${string}`;
 export type ResourceLifecycle =
   | "active"
@@ -280,6 +284,7 @@ export interface InvestigationHypothesis {
   id: `hyp_${string}`;
   rank: number;
   statement: string;
+  rootCauseClass?: string;
   confidence: number;
   disposition: "leading" | "alternative" | "rejected";
   supportingEvidenceIds: EvidenceId[];
@@ -400,6 +405,109 @@ export interface EvaluationScenario {
     expectations: EvaluationScenarioExpectations;
     scoring: EvaluationScenarioScoring;
   };
+}
+
+export interface IntegrationConfig {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "IntegrationConfig";
+  metadata: { id: IntegrationId; tenantId: string; createdAt: string };
+  spec: {
+    provider: string;
+    displayName: string;
+    enabled: boolean;
+    endpoint?: string;
+    credentialRef: `credential://${string}` | `secret-ref://${string}`;
+    collection: {
+      sourceId: string;
+      rootExternalId: string;
+      mode: "reconciliation";
+      intervalSeconds: number;
+      parameters: Record<string, unknown>;
+    };
+    permissions: { readOnly: true; resourceTypes: string[] };
+  };
+}
+
+export interface ActionProposal {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ActionProposal";
+  metadata: { id: ActionId; tenantId: string; actorId: string; createdAt: string };
+  spec: {
+    investigationId: InvestigationId;
+    actionType: string;
+    targetResourceUid: ResourceUid;
+    parameters: Record<string, unknown>;
+    risk: "low" | "medium" | "high" | "critical";
+    reversible: true;
+    dryRun: boolean;
+    idempotencyKey: string;
+    expiresAt: string;
+    policyDecision: {
+      allowed: boolean;
+      reasonCode: string;
+      policySnapshotRef: string;
+    };
+  };
+  status: "pending-approval" | "denied" | "expired";
+}
+
+export interface ActionApproval {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ActionApproval";
+  metadata: {
+    id: ApprovalId;
+    tenantId: string;
+    approverId: string;
+    decidedAt: string;
+  };
+  spec: {
+    proposalId: ActionId;
+    decision: "approved" | "rejected";
+    rationale: string;
+    policySnapshotRef: string;
+  };
+}
+
+export interface ActionResult {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ActionResult";
+  metadata: { id: ActionId; tenantId: string; completedAt: string };
+  spec: {
+    proposalDigest: Sha256Digest;
+    approvalId: ApprovalId;
+    outcome: "dry-run" | "succeeded" | "failed" | "rolled-back";
+    idempotencyKey: string;
+    execution: { provider: string; operationRef: string };
+    verification: { status: "not-run" | "passed" | "failed"; summary: string };
+    auditRef: string;
+  };
+}
+
+export interface PluginSession {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PluginSession";
+  metadata: {
+    id: PluginSessionId;
+    tenantId: string;
+    pluginId: string;
+    pluginVersion: string;
+    createdAt: string;
+  };
+  spec: {
+    manifestDigest: Sha256Digest;
+    protocolVersion: "1.0";
+    grantedCapabilities: string[];
+    capabilityTokenRef: `capability://${string}`;
+    capabilityTokenDigest: Sha256Digest;
+    expiresAt: string;
+    cancellation: { supported: true; endpoint: string };
+    limits: {
+      maxRequests: number;
+      maxWallTimeSeconds: number;
+      maxOutputBytes: number;
+    };
+  };
+  status: "ready" | "denied";
 }
 
 export interface ApiErrorBody {

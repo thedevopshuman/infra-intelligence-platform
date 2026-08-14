@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.2.0",
-    "description": "Phase 1 reference API. Resource ingestion, current neighborhood queries, and immutable resource timelines are executable; resource collection, evidence, and investigation components remain contract-first where no endpoint is declared."
+    "version": "0.3.0",
+    "description": "Executable local reference API for collection ingestion, resource queries, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -91,6 +91,150 @@
           "503": {"$ref": "#/components/responses/StorageUnavailable"}
         }
       }
+    },
+    "/v1/collections/ingest": {
+      "post": {
+        "operationId": "ingestResourceCollection",
+        "parameters": [{"$ref": "#/components/parameters/CorrelationId"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["request", "result"],
+            "properties": {
+              "request": {"$ref": "../../contracts/schemas/resource-collection-request.schema.json"},
+              "result": {"$ref": "../../contracts/schemas/resource-collection-result.schema.json"}
+            }
+          }}}
+        },
+        "responses": {
+          "202": {"description": "Validated observations are durable and a complete checkpoint is committed"},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "409": {"$ref": "#/components/responses/ObservationConflict"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/evidence/{evidenceId}": {
+      "get": {
+        "operationId": "getEvidence",
+        "parameters": [{"name": "evidenceId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"}}],
+        "responses": {
+          "200": {"description": "Tenant-scoped evidence metadata", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/evidence.schema.json"}}}},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/investigations": {
+      "post": {
+        "operationId": "runInvestigation",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-request.schema.json"}}}},
+        "responses": {
+          "201": {"description": "Immutable terminal investigation report", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "409": {"$ref": "#/components/responses/ObservationConflict"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/investigations/{investigationId}": {
+      "get": {
+        "operationId": "getInvestigation",
+        "parameters": [{"name": "investigationId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"}}],
+        "responses": {
+          "200": {"description": "Tenant-scoped terminal report", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-report.schema.json"}}}},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/actions/proposals": {
+      "post": {
+        "operationId": "proposeAction",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["investigationId", "actionType", "targetResourceUid", "parameters", "idempotencyKey", "expiresAt"], "properties": {"investigationId": {"type": "string"}, "actionType": {"const": "kubernetes.restart-workload"}, "targetResourceUid": {"type": "string"}, "parameters": {"type": "object"}, "idempotencyKey": {"type": "string"}, "expiresAt": {"type": "string", "format": "date-time"}, "dryRun": {"type": "boolean", "default": true}}}}}},
+        "responses": {
+          "201": {"description": "Immutable action proposal", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/action-proposal.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "409": {"$ref": "#/components/responses/ObservationConflict"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/actions/{proposalId}/decision": {
+      "post": {
+        "operationId": "decideAction",
+        "parameters": [{"name": "proposalId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^act_[a-f0-9]{32}$"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["decision", "rationale"], "properties": {"decision": {"type": "string", "enum": ["approved", "rejected"]}, "rationale": {"type": "string"}}}}}},
+        "responses": {
+          "201": {"description": "Immutable approval decision", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/action-approval.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "409": {"$ref": "#/components/responses/ObservationConflict"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/actions/{proposalId}/execute": {
+      "post": {
+        "operationId": "executeAction",
+        "parameters": [{"name": "proposalId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^act_[a-f0-9]{32}$"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "maxProperties": 0}}}},
+        "responses": {
+          "200": {"description": "Idempotent action result", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/action-result.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "409": {"$ref": "#/components/responses/ObservationConflict"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/actions/{proposalId}": {
+      "get": {
+        "operationId": "getAction",
+        "parameters": [{"name": "proposalId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^act_[a-f0-9]{32}$"}}],
+        "responses": {
+          "200": {"description": "Proposal or terminal result"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/plugin-sessions": {
+      "post": {
+        "operationId": "openPluginSession",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["manifest", "requestedCapabilities", "capabilityToken"], "properties": {"manifest": {"$ref": "../../contracts/schemas/plugin-manifest.schema.json"}, "requestedCapabilities": {"type": "array", "items": {"type": "string"}}, "capabilityToken": {"type": "string", "format": "password", "writeOnly": true}, "limits": {"type": "object"}}}}}},
+        "responses": {
+          "201": {"description": "Bounded plugin session metadata", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/plugin-session.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/plugin-sessions/{sessionId}": {
+      "get": {
+        "operationId": "getPluginSession",
+        "parameters": [{"name": "sessionId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^psn_[a-f0-9]{32}$"}}],
+        "responses": {
+          "200": {"description": "Tenant-scoped plugin session", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/plugin-session.schema.json"}}}},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
     }
   },
   "components": {
@@ -118,6 +262,11 @@
       "Evidence": {"$ref": "../../contracts/schemas/evidence.schema.json"},
       "InvestigationRequest": {"$ref": "../../contracts/schemas/investigation-request.schema.json"},
       "InvestigationReport": {"$ref": "../../contracts/schemas/investigation-report.schema.json"},
+      "IntegrationConfig": {"$ref": "../../contracts/schemas/integration-config.schema.json"},
+      "ActionProposal": {"$ref": "../../contracts/schemas/action-proposal.schema.json"},
+      "ActionApproval": {"$ref": "../../contracts/schemas/action-approval.schema.json"},
+      "ActionResult": {"$ref": "../../contracts/schemas/action-result.schema.json"},
+      "PluginSession": {"$ref": "../../contracts/schemas/plugin-session.schema.json"},
       "Error": {"$ref": "../../contracts/schemas/error.schema.json"}
     },
     "responses": {

@@ -1,5 +1,17 @@
 import type {
+  ActionApproval,
+  ActionId,
+  ActionProposal,
+  ActionResult,
   ApiErrorBody,
+  Evidence,
+  EvidenceId,
+  InvestigationId,
+  InvestigationReport,
+  InvestigationRequest,
+  PluginSession,
+  ResourceCollectionRequest,
+  ResourceCollectionResult,
   ResourceNeighborhood,
   ResourceObservation,
   ResourceTimeline,
@@ -90,6 +102,94 @@ export class InfrastructureIntelligenceClient {
       { headers: this.headers() },
     );
     return this.read<ResourceTimeline>(response);
+  }
+
+  async ingestResourceCollection(
+    request: ResourceCollectionRequest,
+    result: ResourceCollectionResult,
+    correlationId?: string,
+  ): Promise<ResourceObservation[]> {
+    const payload = await this.post<{ items: ResourceObservation[] }>(
+      "/v1/collections/ingest",
+      { request, result },
+      correlationId,
+    );
+    return payload.items;
+  }
+
+  async runInvestigation(request: InvestigationRequest): Promise<InvestigationReport> {
+    return this.post<InvestigationReport>("/v1/investigations", request);
+  }
+
+  async getInvestigation(id: InvestigationId): Promise<InvestigationReport> {
+    return this.get<InvestigationReport>(`/v1/investigations/${encodeURIComponent(id)}`);
+  }
+
+  async getEvidence(id: EvidenceId): Promise<Evidence> {
+    return this.get<Evidence>(`/v1/evidence/${encodeURIComponent(id)}`);
+  }
+
+  async proposeAction(command: {
+    investigationId: InvestigationId;
+    actionType: "kubernetes.restart-workload";
+    targetResourceUid: ResourceUid;
+    parameters: Record<string, unknown>;
+    idempotencyKey: string;
+    expiresAt: string;
+    dryRun?: boolean;
+  }): Promise<ActionProposal> {
+    return this.post<ActionProposal>("/v1/actions/proposals", command);
+  }
+
+  async decideAction(
+    proposalId: ActionId,
+    decision: "approved" | "rejected",
+    rationale: string,
+  ): Promise<ActionApproval> {
+    return this.post<ActionApproval>(
+      `/v1/actions/${encodeURIComponent(proposalId)}/decision`,
+      { decision, rationale },
+    );
+  }
+
+  async executeAction(proposalId: ActionId): Promise<ActionResult> {
+    return this.post<ActionResult>(
+      `/v1/actions/${encodeURIComponent(proposalId)}/execute`,
+      {},
+    );
+  }
+
+  async openPluginSession(command: {
+    manifest: Record<string, unknown>;
+    requestedCapabilities: string[];
+    capabilityToken: string;
+    limits?: {
+      maxRequests?: number;
+      maxWallTimeSeconds?: number;
+      maxOutputBytes?: number;
+    };
+  }): Promise<PluginSession> {
+    return this.post<PluginSession>("/v1/plugin-sessions", command);
+  }
+
+  private async get<T>(path: string): Promise<T> {
+    const response = await this.fetcher(`${this.baseUrl}${path}`, {
+      headers: this.headers(),
+    });
+    return this.read<T>(response);
+  }
+
+  private async post<T>(
+    path: string,
+    payload: unknown,
+    correlationId?: string,
+  ): Promise<T> {
+    const response = await this.fetcher(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers: this.headers(correlationId),
+      body: JSON.stringify(payload),
+    });
+    return this.read<T>(response);
   }
 
   private headers(correlationId?: string): Record<string, string> {

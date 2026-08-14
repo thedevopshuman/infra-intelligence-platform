@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-postgres db-migrate helm-lint verify run package-chart
+.PHONY: help install-verify-deps validate validate-schemas test test-postgres test-kubernetes-live db-migrate helm-lint verify run package-chart
 
 PYTHON ?= python3
 HELM ?= helm
@@ -10,6 +10,7 @@ help:
 	@echo "validate-schemas Validate contract examples against JSON Schemas"
 	@echo "test          Run the reference-kernel and SDK tests"
 	@echo "test-postgres Run PostgreSQL integration tests with Docker Desktop"
+	@echo "test-kubernetes-live Run the observer against an explicit local Kubernetes context"
 	@echo "db-migrate    Apply PostgreSQL migrations using IIP_DATABASE_URL"
 	@echo "helm-lint     Lint and render the Helm chart"
 	@echo "verify        Run all local quality gates"
@@ -30,6 +31,9 @@ test:
 
 test-postgres:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_postgres.sh
+
+test-kubernetes-live:
+	IIP_TEST_PYTHON=$(PYTHON) scripts/test_kubernetes_live.sh
 
 db-migrate:
 	PYTHONPATH=src $(PYTHON) -m iip.adapters.postgres

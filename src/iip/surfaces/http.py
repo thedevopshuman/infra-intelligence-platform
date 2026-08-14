@@ -6,15 +6,31 @@ import json
 import os
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Callable, Dict, Mapping, Optional
 from urllib.parse import parse_qs, urlparse
 
+from iip.application.actions import (
+    ActionWorkflowError,
+    DecideActionCommand,
+    ExecuteActionCommand,
+    ProposeActionCommand,
+)
+from iip.application.ingest_collection import IngestCollectionCommand, InvalidCollectionError
 from iip.application.ingest_resource import (
     AuthorizationError,
     IngestResourceCommand,
     InvalidInputError,
     ObservationConflictError,
     StaleObservationError,
+)
+from iip.application.investigate import (
+    InvestigationConflictError,
+    InvalidInvestigationError,
+    RunInvestigationCommand,
+)
+from iip.application.plugin_sessions import (
+    OpenPluginSessionCommand,
+    PluginHandshakeError,
 )
 from iip.application.ports import ActorContext, AuthenticationError, PersistenceError
 from iip.application.query_resources import (
@@ -33,7 +49,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.2"
+    server_version = "IIPReference/0.3"
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         parsed = urlparse(self.path)
@@ -47,7 +63,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             and segments[:2] == ["v1", "resources"]
             and segments[3] in ("neighborhood", "timeline")
         )
-        if path == "/v1/resources" or is_resource_query:
+        if path.startswith("/v1/"):
             try:
                 actor = self._actor()
             except AuthenticationError as exc:
@@ -75,10 +91,51 @@ class ApiHandler(BaseHTTPRequestHandler):
         if is_resource_query:
             self._query_resource(actor, segments[2], segments[3], parsed.query)
             return
+        if len(segments) == 3 and segments[:2] == ["v1", "evidence"]:
+            self._stored_document(
+                lambda: self.runtime.evidence_store.get(actor, segments[2]),
+                "evidence.not_found",
+            )
+            return
+        if len(segments) == 3 and segments[:2] == ["v1", "investigations"]:
+            self._stored_document(
+                lambda: self.runtime.operational_store.get_investigation(
+                    actor, segments[2]
+                ),
+                "investigation.not_found",
+            )
+            return
+        if len(segments) == 3 and segments[:2] == ["v1", "actions"]:
+            self._stored_document(
+                lambda: self._action_document(actor, segments[2]),
+                "action.not_found",
+            )
+            return
+        if len(segments) == 3 and segments[:2] == ["v1", "plugin-sessions"]:
+            self._stored_document(
+                lambda: self.runtime.operational_store.get_plugin_session(
+                    actor, segments[2]
+                ),
+                "plugin.session.not_found",
+            )
+            return
         self._json(HTTPStatus.NOT_FOUND, {"error": {"code": "route.not_found"}})
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
-        if urlparse(self.path).path != "/v1/resources":
+        path = urlparse(self.path).path
+        segments = path.strip("/").split("/")
+        known = (
+            path
+            in (
+                "/v1/resources",
+                "/v1/collections/ingest",
+                "/v1/investigations",
+                "/v1/actions/proposals",
+                "/v1/plugin-sessions",
+            )
+            or (len(segments) == 4 and segments[:2] == ["v1", "actions"] and segments[3] in ("decision", "execute"))
+        )
+        if not known:
             self._json(HTTPStatus.NOT_FOUND, {"error": {"code": "route.not_found"}})
             return
         try:
@@ -88,14 +145,75 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         try:
             payload = self._read_json()
-            resource = self.runtime.ingestion.execute(
-                IngestResourceCommand(
-                    actor=actor,
-                    payload=payload,
-                    correlation_id=self.headers.get("x-correlation-id"),
+            if path == "/v1/resources":
+                document: Mapping[str, object] = self.runtime.ingestion.execute(
+                    IngestResourceCommand(
+                        actor=actor,
+                        payload=payload,
+                        correlation_id=self.headers.get("x-correlation-id"),
+                    )
+                ).to_dict()
+                status = HTTPStatus.ACCEPTED
+            elif path == "/v1/collections/ingest":
+                resources = self.runtime.collection_ingestion.execute(
+                    IngestCollectionCommand(
+                        actor=actor,
+                        request=payload["request"],
+                        result=payload["result"],
+                        correlation_id=self.headers.get("x-correlation-id"),
+                    )
                 )
-            )
-            self._json(HTTPStatus.ACCEPTED, resource.to_dict())
+                document = {"items": [resource.to_dict() for resource in resources]}
+                status = HTTPStatus.ACCEPTED
+            elif path == "/v1/investigations":
+                document = self.runtime.investigations.execute(
+                    RunInvestigationCommand(actor, payload)
+                )
+                status = HTTPStatus.CREATED
+            elif path == "/v1/actions/proposals":
+                document = self.runtime.actions.propose(
+                    ProposeActionCommand(
+                        actor=actor,
+                        investigation_id=payload["investigationId"],
+                        action_type=payload["actionType"],
+                        target_resource_uid=payload["targetResourceUid"],
+                        parameters=payload.get("parameters", {}),
+                        idempotency_key=payload["idempotencyKey"],
+                        expires_at=payload["expiresAt"],
+                        dry_run=payload.get("dryRun", True),
+                    )
+                )
+                status = HTTPStatus.CREATED
+            elif len(segments) == 4 and segments[3] == "decision":
+                document = self.runtime.actions.decide(
+                    DecideActionCommand(
+                        actor=actor,
+                        proposal_id=segments[2],
+                        decision=payload["decision"],
+                        rationale=payload["rationale"],
+                    )
+                )
+                status = HTTPStatus.CREATED
+            elif len(segments) == 4 and segments[3] == "execute":
+                document = self.runtime.actions.execute(
+                    ExecuteActionCommand(actor=actor, proposal_id=segments[2])
+                )
+                status = HTTPStatus.OK
+            else:
+                limits = payload.get("limits", {})
+                document = self.runtime.plugin_sessions.open(
+                    OpenPluginSessionCommand(
+                        actor=actor,
+                        manifest=payload["manifest"],
+                        requested_capabilities=tuple(payload["requestedCapabilities"]),
+                        capability_token=payload["capabilityToken"],
+                        max_requests=limits.get("maxRequests", 1),
+                        max_wall_time_seconds=limits.get("maxWallTimeSeconds", 60),
+                        max_output_bytes=limits.get("maxOutputBytes", 16_777_216),
+                    )
+                )
+                status = HTTPStatus.CREATED
+            self._json(status, dict(document))
         except InvalidInputError:
             self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": "contract.invalid"}})
         except AuthorizationError:
@@ -110,12 +228,30 @@ class ApiHandler(BaseHTTPRequestHandler):
                 HTTPStatus.CONFLICT,
                 {"error": {"code": "resource.observation.conflict"}},
             )
+        except (InvalidCollectionError, InvalidInvestigationError) as exc:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": str(exc)}})
+        except InvestigationConflictError as exc:
+            self._json(HTTPStatus.CONFLICT, {"error": {"code": str(exc)}})
+        except ActionWorkflowError as exc:
+            code = str(exc)
+            status = (
+                HTTPStatus.FORBIDDEN
+                if any(word in code for word in ("denied", "role-required", "not-approved"))
+                else HTTPStatus.CONFLICT
+                if any(word in code for word in ("conflict", "expired"))
+                else HTTPStatus.BAD_REQUEST
+            )
+            self._json(status, {"error": {"code": code}})
+        except PluginHandshakeError as exc:
+            code = str(exc)
+            status = HTTPStatus.FORBIDDEN if code.endswith("policy-denied") else HTTPStatus.BAD_REQUEST
+            self._json(status, {"error": {"code": code}})
         except PersistenceError:
             self._json(
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 {"error": {"code": "storage.unavailable"}},
             )
-        except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+        except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError, ValueError):
             self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": "request.invalid_json"}})
 
     def _query_resource(
@@ -203,6 +339,34 @@ class ApiHandler(BaseHTTPRequestHandler):
         if code not in ("authentication.required", "authentication.invalid"):
             code = "authentication.invalid"
         self._json(HTTPStatus.UNAUTHORIZED, {"error": {"code": code}})
+
+    def _stored_document(
+        self,
+        loader: Callable[[], Optional[Mapping[str, object]]],
+        not_found_code: str,
+    ) -> None:
+        try:
+            document = loader()
+        except PersistenceError:
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "storage.unavailable"}},
+            )
+            return
+        self._json(
+            HTTPStatus.OK if document is not None else HTTPStatus.NOT_FOUND,
+            dict(document)
+            if document is not None
+            else {"error": {"code": not_found_code}},
+        )
+
+    def _action_document(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[Mapping[str, object]]:
+        document = self.runtime.operational_store.get_action_result(actor, proposal_id)
+        if document is not None:
+            return document
+        return self.runtime.operational_store.get_proposal(actor, proposal_id)
 
     @staticmethod
     def _single(

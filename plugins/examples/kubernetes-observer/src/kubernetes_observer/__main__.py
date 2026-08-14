@@ -1,4 +1,4 @@
-"""Fixture-backed command-line entry point for the observer conformance example."""
+"""Fixture and explicit live-cluster entry point for the observer example."""
 
 from __future__ import annotations
 
@@ -9,12 +9,17 @@ from pathlib import Path
 from typing import Sequence
 
 from .collector import collect
+from .live import LiveCollectionError, list_objects
 
 
 def parser() -> argparse.ArgumentParser:
-    result = argparse.ArgumentParser(description="Normalize a Kubernetes list fixture")
+    result = argparse.ArgumentParser(description="Collect and normalize Kubernetes objects")
     result.add_argument("--request", required=True, type=Path)
-    result.add_argument("--objects", required=True, type=Path)
+    source = result.add_mutually_exclusive_group(required=True)
+    source.add_argument("--objects", type=Path)
+    source.add_argument("--live-context")
+    result.add_argument("--kubeconfig", type=Path)
+    result.add_argument("--timeout-seconds", type=int, default=20)
     return result
 
 
@@ -22,8 +27,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
         request = json.loads(args.request.read_text(encoding="utf-8"))
-        objects = json.loads(args.objects.read_text(encoding="utf-8"))
+        if args.objects is not None:
+            if args.kubeconfig is not None:
+                raise ValueError("kubeconfig is only valid with live collection")
+            objects = json.loads(args.objects.read_text(encoding="utf-8"))
+        else:
+            if args.kubeconfig is None:
+                raise ValueError("live collection requires an explicit kubeconfig")
+            objects = list_objects(
+                context=args.live_context,
+                kubeconfig=args.kubeconfig,
+                timeout_seconds=args.timeout_seconds,
+            )
         result = collect(request, objects).to_dict()
+    except LiveCollectionError as exc:
+        print(json.dumps({"error": {"code": str(exc)}}))
+        return 1
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         print(json.dumps({"error": {"code": "collector.request_invalid"}}))
         return 2

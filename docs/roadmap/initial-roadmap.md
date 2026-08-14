@@ -3,6 +3,8 @@
 **Status:** Working plan  
 **Planning horizon:** Foundation through first design partner
 
+**Implementation note (2026-08-14):** The repository contains one executable local reference slice through every phase: live reconciliation collection and checkpoint ingestion (Phase 1), durable evidence and deterministic investigations (Phase 2), repeated-run scoring (Phase 3), separation-of-duties dry-run actions (Phase 4), and bounded plugin handshake metadata (Phase 5). These are implementation units, not completed phase exit gates. Remaining gate work is listed below and external pilot/legal/brand outcomes cannot be completed by repository code alone.
+
 The roadmap is outcome-based. Dates should be added after team size and pilot constraints are known. Each phase ends with evidence that the next risk is worth taking.
 
 ## Phase 0 — foundation (current repository)
@@ -37,6 +39,8 @@ Deliverables:
 
 Exit gate: a seeded cluster can be rebuilt from observations/events; graph correctness and source lag are measurable.
 
+Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, and post-batch checkpoint commit. Remaining: per-type list/watch cursors, `410 Gone` recovery, reconciliation tombstones, full replay/rebuild command, backup/restore measurements, and freshness SLO telemetry.
+
 ## Phase 2 — evidence and investigation vertical slice
 
 **Outcome:** A read-only Kubernetes incident produces a structured, evidence-backed report.
@@ -53,6 +57,8 @@ Deliverables:
 
 Exit gate: target scenarios meet required evidence and root-cause scoring in repeated runs within declared latency and cost.
 
+Reference slice delivered: durable evidence artifacts, authenticated investigation POST/GET API, bounded deterministic agent, resource-state provider, structured root-cause taxonomy, citations, unknowns, recommendations, and zero-model cost ledger. Remaining: Kubernetes events, logs, metrics, repository/runbook providers, cancellation/crash recovery, redaction policy expansion, and a production model-provider decision.
+
 ## Phase 3 — evaluation and operational hardening
 
 **Outcome:** Agent changes can be promoted by measurable reliability rather than demos.
@@ -67,6 +73,8 @@ Deliverables:
 - SLOs for ingestion freshness, query availability, and investigation completion.
 
 Exit gate: releases have comparable scorecards, and failures can be explained from platform telemetry.
+
+Reference slice delivered: deterministic weighted scorer, hard gates, budget checks, red-herring resistance, and repeated-run harness. Remaining: version dashboard, OpenTelemetry export, concurrency/noisy-neighbor/prompt-injection suites, privacy controls, and measured release SLOs.
 
 ## Phase 4 — governed actions and workflows
 
@@ -83,6 +91,8 @@ Deliverables:
 
 Exit gate: duplicate delivery cannot duplicate impact; policy, approval, execution, and verification are fully reconstructable.
 
+Reference slice delivered: versioned proposal/approval/result contracts, durable idempotency, expiry, role separation, current policy checks, audit references, and a no-impact Kubernetes restart dry-run executor. Remaining: a production policy engine, durable retry/timer worker, request-scoped credential broker, approval UI, live server-side dry-run, mutation verification, and tested rollback.
+
 ## Phase 5 — plugin SDK and first design partner
 
 **Outcome:** An external contributor can build and operate a least-privilege integration without platform-internal imports.
@@ -97,6 +107,8 @@ Deliverables:
 - licensing, contributor, trademark, and open/commercial decisions before public launch.
 
 Exit gate: a plugin built only from public docs/SDK passes conformance and runs in a pilot without elevated control-plane credentials.
+
+Reference slice delivered: session contract, declared-capability subset enforcement, token reference/digest handling, expiry/cancellation/limit framing, live observer transport, public SDK types, and conformance tests. Remaining: signed artifacts, digest enforcement, isolated out-of-process runner, OS/network/resource sandboxing, compatibility automation, design-partner deployment, and public governance/legal decisions.
 
 ## Parallel track — company and brand
 

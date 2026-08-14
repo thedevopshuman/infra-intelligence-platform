@@ -9,7 +9,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from threading import RLock
-from typing import Mapping, Optional
+from typing import Iterable, Mapping, Optional
 
 from iip.application.ports import (
     ActorContext,
@@ -98,6 +98,36 @@ class InMemoryEvidenceStore:
             stored = self._items.get((actor.tenant_id, evidence_id))
             return bytes(stored[1]) if stored is not None else None
 
+    def list(
+        self,
+        actor: ActorContext,
+        *,
+        resource_uids: tuple[str, ...] = (),
+        evidence_types: tuple[str, ...] = (),
+        limit: int = 100,
+    ) -> Iterable[Mapping[str, object]]:
+        if not self._valid_actor(actor) or not 1 <= limit <= 1000:
+            return ()
+        requested_resources = set(resource_uids)
+        requested_types = set(evidence_types)
+        with self._lock:
+            documents = []
+            for (tenant_id, _), (document, _) in sorted(self._items.items()):
+                if tenant_id != actor.tenant_id:
+                    continue
+                spec = document.get("spec")
+                if not isinstance(spec, Mapping):
+                    continue
+                refs = spec.get("resourceRefs", [])
+                if requested_resources and not requested_resources.intersection(refs):
+                    continue
+                if requested_types and spec.get("type") not in requested_types:
+                    continue
+                documents.append(copy.deepcopy(document))
+                if len(documents) == limit:
+                    break
+            return tuple(documents)
+
     @staticmethod
     def _valid_actor(actor: ActorContext) -> bool:
         return bool(
@@ -132,6 +162,35 @@ class StaticEvidenceProvider:
             return self._artifacts[request.locator]
         except KeyError:
             raise LookupError("evidence.provider.not-found") from None
+
+
+class ResourceStateEvidenceProvider:
+    """Render canonical resource projections as safe, deterministic JSON evidence."""
+
+    def __init__(self, resources: object) -> None:
+        self._resources = resources
+
+    def fetch(self, request: EvidenceProviderRequest) -> RawEvidenceArtifact:
+        if request.locator != "resource://current":
+            raise LookupError("evidence.provider.not-found")
+        get_many = getattr(self._resources, "get_many")
+        resources = tuple(get_many(request.tenant_id, request.resource_uids))
+        if len(resources) != len(request.resource_uids):
+            raise LookupError("evidence.provider.not-found")
+        documents = [resource.to_dict() for resource in resources]
+        content = json.dumps(
+            {"resources": documents},
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        observed_at = max(resource.observed_at for resource in resources)
+        return RawEvidenceArtifact(
+            content=content,
+            media_type="application/json",
+            observed_at=observed_at,
+            summary=f"Current canonical status for {len(resources)} scoped resource(s).",
+        )
 
 
 class StructuredTextRedactor:

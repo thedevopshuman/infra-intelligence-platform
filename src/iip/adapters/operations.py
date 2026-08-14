@@ -1,0 +1,173 @@
+"""Thread-safe operational document adapters for the local runtime."""
+
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+from threading import RLock
+from typing import Mapping, Optional
+
+from iip.application.ports import ActorContext, PersistenceError
+
+
+class InMemoryOperationalStore:
+    """Tenant-partitioned investigations, actions, sessions, and audit records."""
+
+    def __init__(self) -> None:
+        self._investigations: dict[
+            tuple[str, str], tuple[dict[str, object], dict[str, object]]
+        ] = {}
+        self._proposals: dict[tuple[str, str], dict[str, object]] = {}
+        self._proposal_keys: dict[tuple[str, str], str] = {}
+        self._approvals: dict[tuple[str, str], dict[str, object]] = {}
+        self._results: dict[tuple[str, str], dict[str, object]] = {}
+        self._sessions: dict[tuple[str, str], dict[str, object]] = {}
+        self._audit: list[tuple[str, str, dict[str, object]]] = []
+        self._lock = RLock()
+
+    def commit_investigation(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        request: Mapping[str, object],
+        report: Mapping[str, object],
+    ) -> None:
+        self._assert_tenant(actor, request)
+        self._assert_tenant(actor, report)
+        key = (actor.tenant_id, investigation_id)
+        value = (copy.deepcopy(dict(request)), copy.deepcopy(dict(report)))
+        with self._lock:
+            current = self._investigations.get(key)
+            if current is not None and current != value:
+                raise PersistenceError("storage.conflict")
+            self._investigations[key] = value
+
+    def get_investigation(
+        self, actor: ActorContext, investigation_id: str
+    ) -> Optional[Mapping[str, object]]:
+        with self._lock:
+            value = self._investigations.get((actor.tenant_id, investigation_id))
+            return copy.deepcopy(value[1]) if value is not None else None
+
+    def get_investigation_request(
+        self, actor: ActorContext, investigation_id: str
+    ) -> Optional[Mapping[str, object]]:
+        with self._lock:
+            value = self._investigations.get((actor.tenant_id, investigation_id))
+            return copy.deepcopy(value[0]) if value is not None else None
+
+    def get_proposal_by_key(
+        self, actor: ActorContext, idempotency_key: str
+    ) -> Optional[Mapping[str, object]]:
+        with self._lock:
+            proposal_id = self._proposal_keys.get((actor.tenant_id, idempotency_key))
+            value = self._proposals.get((actor.tenant_id, proposal_id or ""))
+            return copy.deepcopy(value) if value is not None else None
+
+    def get_proposal(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[Mapping[str, object]]:
+        with self._lock:
+            value = self._proposals.get((actor.tenant_id, proposal_id))
+            return copy.deepcopy(value) if value is not None else None
+
+    def commit_proposal(
+        self, actor: ActorContext, document: Mapping[str, object]
+    ) -> None:
+        self._assert_tenant(actor, document)
+        metadata = document["metadata"]
+        spec = document["spec"]
+        assert isinstance(metadata, Mapping) and isinstance(spec, Mapping)
+        key = (actor.tenant_id, str(metadata["id"]))
+        idempotency = (actor.tenant_id, str(spec["idempotencyKey"]))
+        value = copy.deepcopy(dict(document))
+        with self._lock:
+            existing_id = self._proposal_keys.get(idempotency)
+            if existing_id is not None and existing_id != key[1]:
+                raise PersistenceError("storage.conflict")
+            current = self._proposals.get(key)
+            if current is not None and current != value:
+                raise PersistenceError("storage.conflict")
+            self._proposals[key] = value
+            self._proposal_keys[idempotency] = key[1]
+
+    def get_approval(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[Mapping[str, object]]:
+        with self._lock:
+            value = self._approvals.get((actor.tenant_id, proposal_id))
+            return copy.deepcopy(value) if value is not None else None
+
+    def commit_approval(
+        self, actor: ActorContext, document: Mapping[str, object]
+    ) -> None:
+        self._assert_tenant(actor, document)
+        spec = document["spec"]
+        assert isinstance(spec, Mapping)
+        key = (actor.tenant_id, str(spec["proposalId"]))
+        value = copy.deepcopy(dict(document))
+        with self._lock:
+            current = self._approvals.get(key)
+            if current is not None and current != value:
+                raise PersistenceError("storage.conflict")
+            self._approvals[key] = value
+
+    def get_action_result(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[Mapping[str, object]]:
+        with self._lock:
+            value = self._results.get((actor.tenant_id, proposal_id))
+            return copy.deepcopy(value) if value is not None else None
+
+    def commit_action_result(
+        self, actor: ActorContext, document: Mapping[str, object]
+    ) -> None:
+        self._assert_tenant(actor, document)
+        metadata = document["metadata"]
+        assert isinstance(metadata, Mapping)
+        key = (actor.tenant_id, str(metadata["id"]))
+        value = copy.deepcopy(dict(document))
+        with self._lock:
+            current = self._results.get(key)
+            if current is not None and current != value:
+                raise PersistenceError("storage.conflict")
+            self._results[key] = value
+
+    def commit_plugin_session(
+        self, actor: ActorContext, document: Mapping[str, object]
+    ) -> None:
+        self._assert_tenant(actor, document)
+        metadata = document["metadata"]
+        assert isinstance(metadata, Mapping)
+        key = (actor.tenant_id, str(metadata["id"]))
+        with self._lock:
+            if key in self._sessions:
+                raise PersistenceError("storage.conflict")
+            self._sessions[key] = copy.deepcopy(dict(document))
+
+    def get_plugin_session(
+        self, actor: ActorContext, session_id: str
+    ) -> Optional[Mapping[str, object]]:
+        with self._lock:
+            value = self._sessions.get((actor.tenant_id, session_id))
+            return copy.deepcopy(value) if value is not None else None
+
+    def append_audit(
+        self,
+        actor: ActorContext,
+        category: str,
+        document: Mapping[str, object],
+    ) -> str:
+        encoded = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
+        digest = hashlib.sha256(encoded).hexdigest()[:32]
+        reference = f"audit://{actor.tenant_id}/{category}/{digest}"
+        with self._lock:
+            self._audit.append((actor.tenant_id, category, copy.deepcopy(dict(document))))
+        return reference
+
+    @staticmethod
+    def _assert_tenant(actor: ActorContext, document: Mapping[str, object]) -> None:
+        metadata = document.get("metadata")
+        if not isinstance(metadata, Mapping) or metadata.get("tenantId") != actor.tenant_id:
+            raise PersistenceError("storage.input-invalid")

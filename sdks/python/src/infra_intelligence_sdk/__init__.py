@@ -3,10 +3,15 @@
 from .client import Client
 from .errors import ApiError
 from .models import (
+    ActionApproval,
+    ActionProposal,
+    ActionResult,
     Evidence,
     EvaluationScenario,
     InvestigationReport,
     InvestigationRequest,
+    IntegrationConfig,
+    PluginSession,
     ResourceCollectionRequest,
     ResourceCollectionResult,
     ResourceNeighborhood,
@@ -16,12 +21,17 @@ from .models import (
 )
 
 __all__ = [
+    "ActionApproval",
+    "ActionProposal",
+    "ActionResult",
     "ApiError",
     "Client",
     "Evidence",
     "EvaluationScenario",
     "InvestigationReport",
     "InvestigationRequest",
+    "IntegrationConfig",
+    "PluginSession",
     "ResourceCollectionRequest",
     "ResourceCollectionResult",
     "ResourceNeighborhood",
@@ -29,4 +39,4 @@ __all__ = [
     "ResourceObservationCursor",
     "ResourceTimeline",
 ]
-__version__ = "0.2.0"
+__version__ = "0.3.0"

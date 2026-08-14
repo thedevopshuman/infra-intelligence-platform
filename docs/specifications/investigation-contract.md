@@ -45,6 +45,8 @@ Every terminal path returns a report, including policy denial, cancellation, run
 
 Every evidence ID cited by a hypothesis or recommendation must also appear in the report-level `evidenceIds` set and resolve to evidence in the same tenant. Contradicting evidence remains visible. A material claim without supporting evidence must be expressed as an unknown or evidence gap rather than as a confident conclusion.
 
+`hypotheses[].rootCauseClass` is an optional machine-readable taxonomy key used by deterministic evaluation. Narrative text remains explanatory, but scorecards never infer a class from prose.
+
 Reports carry references, summaries, and hashes—not raw logs, metrics, traces, credentials, prompts, provider exceptions, or tool output. A missing or expired artifact does not erase the historical citation; the presentation layer marks it unavailable.
 
 ## Authority and lifecycle boundary

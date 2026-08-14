@@ -31,6 +31,7 @@
         "id": "hyp_2f8a4c6e1b3d5079",
         "rank": 1,
         "statement": "The latest rollout has not produced three available api replicas.",
+        "rootCauseClass": "kubernetes.rollout.unavailable-replicas",
         "confidence": 0.82,
         "disposition": "leading",
         "supportingEvidenceIds": ["evd_4d9f6a2b7c8e1035a1b2c3d4e5f60718"],

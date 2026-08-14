@@ -4,9 +4,22 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Any
 
+from iip.adapters.actions import KubernetesRestartDryRunExecutor
 from iip.adapters.auth import DenyAllAuthenticator, HashedBearerAuthenticator
+from iip.adapters.evidence import (
+    InMemoryEvidenceStore,
+    ResourceStateEvidenceProvider,
+    StructuredTextRedactor,
+    SystemClock,
+    UuidEvidenceIdGenerator,
+)
 from iip.adapters.memory import AllowTenantPolicy, InMemoryResourceStore
+from iip.adapters.operations import InMemoryOperationalStore
+from iip.application.actions import GovernedActionService
+from iip.application.collect_evidence import EvidenceCollectionService
+from iip.application.ingest_collection import ResourceCollectionIngestionService
 from iip.application.ports import (
     AuthenticationConfigurationError,
     Authenticator,
@@ -15,7 +28,9 @@ from iip.application.ports import (
     ResourceRepository,
     SourceCheckpointRepository,
 )
+from iip.application.investigate import DeterministicInvestigationService
 from iip.application.ingest_resource import ResourceIngestionService
+from iip.application.plugin_sessions import PluginSessionService
 from iip.application.query_resources import ResourceQueryService
 
 
@@ -29,24 +44,75 @@ class Runtime:
     outbox: EventOutbox
     checkpoints: SourceCheckpointRepository
     ingestion: ResourceIngestionService
+    collection_ingestion: ResourceCollectionIngestionService
     queries: ResourceQueryService
+    evidence: EvidenceCollectionService
+    investigations: DeterministicInvestigationService
+    actions: GovernedActionService
+    plugin_sessions: PluginSessionService
+    operational_store: Any
+    evidence_store: Any
 
 
 def build_local_runtime(authenticator: Authenticator | None = None) -> Runtime:
     """Build the dependency graph for local execution."""
 
     store = InMemoryResourceStore()
+    operational = InMemoryOperationalStore()
+    evidence_store = InMemoryEvidenceStore()
+    return _compose_runtime(
+        store,
+        operational,
+        evidence_store,
+        authenticator or DenyAllAuthenticator(),
+    )
+
+
+def _compose_runtime(
+    store: Any,
+    operational: Any,
+    evidence_store: Any,
+    authenticator: Authenticator,
+) -> Runtime:
+    """Compose use cases from ports without leaking adapters into their owners."""
+
     policy = AllowTenantPolicy()
+    clock = SystemClock()
     ingestion = ResourceIngestionService(store, policy)
     queries = ResourceQueryService(store, policy)
+    evidence = EvidenceCollectionService(
+        store,
+        {"resource-state": ResourceStateEvidenceProvider(store)},
+        evidence_store,
+        StructuredTextRedactor(),
+        policy,
+        UuidEvidenceIdGenerator(),
+        clock,
+    )
     return Runtime(
-        authenticator=authenticator or DenyAllAuthenticator(),
+        authenticator=authenticator,
         resources=store,
         event_log=store,
         outbox=store,
         checkpoints=store,
         ingestion=ingestion,
+        collection_ingestion=ResourceCollectionIngestionService(ingestion, store),
         queries=queries,
+        evidence=evidence,
+        investigations=DeterministicInvestigationService(
+            store, evidence, operational, clock
+        ),
+        actions=GovernedActionService(
+            store,
+            policy,
+            operational,
+            KubernetesRestartDryRunExecutor(),
+            operational,
+            clock,
+        ),
+        plugin_sessions=PluginSessionService(policy, operational, clock),
+        operational_store=operational,
+        evidence_store=evidence_store,
     )
 
 
@@ -58,22 +124,17 @@ def build_postgres_runtime(
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
-    from iip.adapters.postgres import PostgresResourceStore
+    from iip.adapters.postgres import PostgresOperationalStore, PostgresResourceStore
 
     store = PostgresResourceStore(database_url)
     if migrate:
         store.migrate()
-    policy = AllowTenantPolicy()
-    ingestion = ResourceIngestionService(store, policy)
-    queries = ResourceQueryService(store, policy)
-    return Runtime(
-        authenticator=authenticator or DenyAllAuthenticator(),
-        resources=store,
-        event_log=store,
-        outbox=store,
-        checkpoints=store,
-        ingestion=ingestion,
-        queries=queries,
+    operational = PostgresOperationalStore(database_url)
+    return _compose_runtime(
+        store,
+        operational,
+        operational,
+        authenticator or DenyAllAuthenticator(),
     )
 
 

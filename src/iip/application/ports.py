@@ -218,6 +218,9 @@ class SourceCheckpointRepository(Protocol):
     def get_checkpoint(self, tenant_id: str, source_id: str) -> Optional[SourceCheckpoint]:
         """Return the committed cursor for exactly one tenant and source."""
 
+    def commit_checkpoint(self, checkpoint: SourceCheckpoint, *, mode: str) -> None:
+        """Advance a source cursor only after its full batch is durable."""
+
 
 class EventPublisher(Protocol):
     def publish(self, event: PlatformEvent) -> None:
@@ -278,6 +281,118 @@ class EvidenceStore(Protocol):
         evidence_id: str,
     ) -> Optional[bytes]:
         """Return bytes only from the actor's explicit tenant scope."""
+
+    def list(
+        self,
+        actor: ActorContext,
+        *,
+        resource_uids: tuple[str, ...] = (),
+        evidence_types: tuple[str, ...] = (),
+        limit: int = 100,
+    ) -> Iterable[Mapping[str, object]]:
+        """List bounded evidence metadata within one explicit tenant scope."""
+
+
+class InvestigationRepository(Protocol):
+    def commit_investigation(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        request: Mapping[str, object],
+        report: Mapping[str, object],
+    ) -> None:
+        """Atomically persist an immutable request and its terminal report."""
+
+    def get_investigation(
+        self, actor: ActorContext, investigation_id: str
+    ) -> Optional[Mapping[str, object]]:
+        """Return one report only from the actor's tenant scope."""
+
+    def get_investigation_request(
+        self, actor: ActorContext, investigation_id: str
+    ) -> Optional[Mapping[str, object]]:
+        """Return the immutable input paired with a stored report."""
+
+
+class ActionRepository(Protocol):
+    def get_proposal_by_key(
+        self, actor: ActorContext, idempotency_key: str
+    ) -> Optional[Mapping[str, object]]:
+        """Resolve a proposal by tenant-scoped idempotency key."""
+
+    def get_proposal(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[Mapping[str, object]]:
+        """Resolve one tenant-scoped proposal."""
+
+    def commit_proposal(
+        self, actor: ActorContext, document: Mapping[str, object]
+    ) -> None:
+        """Persist one immutable proposal."""
+
+    def get_approval(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[Mapping[str, object]]:
+        """Resolve the decision for one proposal."""
+
+    def commit_approval(
+        self, actor: ActorContext, document: Mapping[str, object]
+    ) -> None:
+        """Persist one immutable approval decision."""
+
+    def get_action_result(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[Mapping[str, object]]:
+        """Resolve an idempotent terminal action result."""
+
+    def commit_action_result(
+        self, actor: ActorContext, document: Mapping[str, object]
+    ) -> None:
+        """Persist a terminal action result once."""
+
+
+@dataclass(frozen=True)
+class ActionExecutionOutcome:
+    """Provider-neutral result returned by a request-scoped executor."""
+
+    outcome: str
+    provider: str
+    operation_ref: str
+    verification_status: str
+    verification_summary: str
+
+
+class ActionExecutor(Protocol):
+    def execute(
+        self,
+        actor: ActorContext,
+        proposal: Mapping[str, object],
+        *,
+        approval_id: str,
+    ) -> ActionExecutionOutcome:
+        """Execute exactly one approved, idempotent, request-scoped operation."""
+
+
+class PluginSessionRepository(Protocol):
+    def commit_plugin_session(
+        self, actor: ActorContext, document: Mapping[str, object]
+    ) -> None:
+        """Persist a bounded session document without raw token material."""
+
+    def get_plugin_session(
+        self, actor: ActorContext, session_id: str
+    ) -> Optional[Mapping[str, object]]:
+        """Resolve one tenant-scoped plugin session."""
+
+
+class AuditSink(Protocol):
+    def append_audit(
+        self,
+        actor: ActorContext,
+        category: str,
+        document: Mapping[str, object],
+    ) -> str:
+        """Append an immutable record and return its provider-neutral reference."""
 
 
 class EvidenceIdGenerator(Protocol):

@@ -3,10 +3,13 @@ from __future__ import annotations
 import copy
 import io
 import json
+import subprocess
 import sys
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +21,7 @@ import validate_schemas  # noqa: E402
 from iip.domain.models import Resource  # noqa: E402
 from kubernetes_observer import collect  # noqa: E402
 from kubernetes_observer.__main__ import main as observer_main  # noqa: E402
+from kubernetes_observer.live import LiveCollectionError, list_objects  # noqa: E402
 
 
 def fixture(name: str) -> dict:
@@ -199,6 +203,73 @@ class KubernetesObserverConformanceTests(unittest.TestCase):
 
         self.assertEqual(status, 0)
         self.assertEqual(json.loads(output.getvalue()), self.expected)
+
+    def test_live_transport_requires_explicit_configuration_and_builds_checkpoint(self) -> None:
+        provider_document = {"apiVersion": "v1", "kind": "List", "metadata": {}, "items": []}
+        with TemporaryDirectory() as directory:
+            kubeconfig = Path(directory) / "config"
+            kubeconfig.write_text("development fixture", encoding="utf-8")
+            completed = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=json.dumps(provider_document), stderr=""
+            )
+            with patch("kubernetes_observer.live.subprocess.run", return_value=completed) as run:
+                result = list_objects(context="kind-iip-dev", kubeconfig=kubeconfig)
+
+        self.assertRegex(
+            result["metadata"]["resourceVersion"],
+            r"^composite-sha256:[a-f0-9]{64}$",
+        )
+        command = run.call_args.args[0]
+        self.assertIn("--context", command)
+        self.assertIn("kind-iip-dev", command)
+        self.assertIn("--kubeconfig", command)
+
+    def test_live_transport_maps_provider_errors_to_stable_code(self) -> None:
+        with TemporaryDirectory() as directory:
+            kubeconfig = Path(directory) / "config"
+            kubeconfig.write_text("development fixture", encoding="utf-8")
+            completed = subprocess.CompletedProcess(
+                args=[], returncode=1, stdout="", stderr="credential text must not escape"
+            )
+            with patch("kubernetes_observer.live.subprocess.run", return_value=completed):
+                with self.assertRaisesRegex(
+                    LiveCollectionError, "collector.live.provider_error"
+                ):
+                    list_objects(context="kind-iip-dev", kubeconfig=kubeconfig)
+
+    def test_image_pull_failure_is_normalized_without_provider_message_text(self) -> None:
+        objects = copy.deepcopy(self.objects)
+        pod = next(item for item in objects["items"] if item.get("kind") == "Pod")
+        pod["status"] = {
+            "phase": "Pending",
+            "containerStatuses": [
+                {
+                    "name": "api",
+                    "ready": False,
+                    "state": {
+                        "waiting": {
+                            "reason": "ImagePullBackOff",
+                            "message": "provider-specific registry credential text",
+                        }
+                    },
+                }
+            ],
+        }
+
+        result = self.result(objects=objects)
+        normalized = next(
+            item
+            for item in result["spec"]["observations"]
+            if item["spec"]["type"] == "core/pod"
+            and item["spec"]["displayName"] == pod["metadata"]["name"]
+        )
+
+        self.assertEqual(normalized["status"]["health"], "unhealthy")
+        self.assertEqual(
+            normalized["spec"]["attributes"]["waitingReason"],
+            "ImagePullBackOff",
+        )
+        self.assertNotIn("provider-specific", json.dumps(normalized))
 
     def test_rbac_is_read_only_and_excludes_secrets(self) -> None:
         rbac = (PLUGIN / "deploy" / "rbac.yaml").read_text(encoding="utf-8")

@@ -7,7 +7,7 @@
 - Python 3.11 or newer
 - Helm 3 or newer
 - Optional: Docker Desktop for PostgreSQL integration tests and the durable local stack
-- Optional: Kubernetes cluster and `kubectl` for deployment experiments
+- Optional: Docker Desktop, kind, and `kubectl` for live Kubernetes collection tests
 
 Install the pinned verification-only Python dependencies:
 
@@ -35,7 +35,16 @@ This starts an ephemeral PostgreSQL 18.4 container bound to `127.0.0.1:55432`, r
 
 Keep deterministic contract, SDK, kernel, and observer-conformance tests in the normal `make verify` gate. Docker Desktop supplies external dependencies for integration tests; it is not required to validate pure normalization behavior. This split keeps feedback fast while still exercising PostgreSQL against the real engine.
 
-Docker Desktop Kubernetes can become the local live-collector integration environment after the Kubernetes API client and host credential broker are implemented. The current observer intentionally runs from an offline list fixture, so enabling a cluster does not expand its authority or turn the fixture CLI into a production plugin runtime.
+The observer has an explicit `kubectl` development transport. It requires a named context and kubeconfig path, runs a bounded reconciliation list, and normalizes the same public contract as the offline fixture. The aggregate list uses a composite reconciliation checkpoint and is not a resumable watch implementation.
+
+Create the isolated cluster and run the live test:
+
+```bash
+kind create cluster --name iip-dev --wait 120s
+IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-live
+```
+
+The target seeds `deploy/kubernetes/dev/seed-incident.yaml`, whose intentionally nonexistent image produces a real `ErrImagePull`/`ImagePullBackOff`. It verifies that the observer returns a complete canonical graph and an unhealthy Pod with only the safe waiting reason. This local transport does not replace the future credential broker or isolated plugin runner.
 
 ## Run the reference API
 
@@ -98,5 +107,7 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_DATABASE_URL` | unset | Select the PostgreSQL profile when set |
 | `IIP_DATABASE_AUTO_MIGRATE` | `false` | Apply packaged migrations at startup; local Compose only |
 | `IIP_TEST_DATABASE_URL` | unset | Enable PostgreSQL integration tests against an explicit test database |
+| `IIP_KUBECONFIG` | required by live test | Explicit kubeconfig path; the observer never chooses an implicit current context |
+| `IIP_KUBE_CONTEXT` | `kind-iip-dev` | Explicit local context used only by `test-kubernetes-live` |
 
 Future secrets must be logical references resolved by the deployment/runtime, never committed environment files.

@@ -29,6 +29,9 @@ EXPECTED_JSONSCHEMA_VERSION = "4.25.1"
 REQUIRED_FORMATS = frozenset({"date-time", "uri-reference"})
 
 SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
+    "action-approval.schema.json": ("action-approval.json",),
+    "action-proposal.schema.json": ("action-proposal.json",),
+    "action-result.schema.json": ("action-result.json",),
     "agent-manifest.schema.json": ("agent-manifest.json",),
     "evaluation-scenario.schema.json": ("evaluation-scenario.json",),
     "event.schema.json": ("event.json",),
@@ -36,7 +39,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "evidence.schema.json": ("evidence.json",),
     "investigation-report.schema.json": ("investigation-report.json",),
     "investigation-request.schema.json": ("investigation-request.json",),
+    "integration-config.schema.json": ("integration-config.json",),
     "plugin-manifest.schema.json": ("plugin-manifest.json",),
+    "plugin-session.schema.json": ("plugin-session.json",),
     "page-info.schema.json": ("page-info.json",),
     "resource-collection-request.schema.json": ("resource-collection-request.json",),
     "resource-collection-result.schema.json": ("resource-collection-result.json",),

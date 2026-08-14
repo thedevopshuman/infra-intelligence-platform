@@ -28,7 +28,13 @@ REQUIRED_PATHS = (
     "docs/research/brand/README.md",
     "docs/roadmap/initial-roadmap.md",
     "docs/decisions/0005-credential-derived-request-identity.md",
+    "docs/decisions/0006-deterministic-investigation-and-dry-run-actions.md",
     "contracts/schemas/resource.schema.json",
+    "contracts/schemas/integration-config.schema.json",
+    "contracts/schemas/action-proposal.schema.json",
+    "contracts/schemas/action-approval.schema.json",
+    "contracts/schemas/action-result.schema.json",
+    "contracts/schemas/plugin-session.schema.json",
     "contracts/schemas/resource-collection-request.schema.json",
     "contracts/schemas/resource-collection-result.schema.json",
     "contracts/schemas/resource-neighborhood.schema.json",
@@ -43,6 +49,11 @@ REQUIRED_PATHS = (
     "contracts/schemas/investigation-report.schema.json",
     "contracts/schemas/evaluation-scenario.schema.json",
     "contracts/examples/evidence.json",
+    "contracts/examples/integration-config.json",
+    "contracts/examples/action-proposal.json",
+    "contracts/examples/action-approval.json",
+    "contracts/examples/action-result.json",
+    "contracts/examples/plugin-session.json",
     "contracts/examples/investigation-request.json",
     "contracts/examples/investigation-report.json",
     "contracts/examples/evaluation-scenario.json",
@@ -53,6 +64,9 @@ REQUIRED_PATHS = (
     "contracts/examples/page-info.json",
     "contracts/examples/error.json",
     "docs/specifications/evidence-contract.md",
+    "docs/specifications/integration-config-contract.md",
+    "docs/specifications/action-contract.md",
+    "docs/specifications/plugin-session-contract.md",
     "docs/specifications/investigation-contract.md",
     "docs/specifications/evaluation-scenario-contract.md",
     "docs/specifications/resource-collection-contract.md",
@@ -65,6 +79,9 @@ REQUIRED_PATHS = (
     "src/iip/adapters/evidence.py",
     "tests/test_evidence_collection.py",
     "tests/test_authentication.py",
+    "tests/test_operational_workflows.py",
+    "scripts/test_kubernetes_live.sh",
+    "scripts/run_reference_workflow.py",
     "api/openapi/control-plane.openapi.json",
     "deploy/helm/infra-intelligence/Chart.yaml",
 )
@@ -659,8 +676,13 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
                     )
 
     versioned_examples = (
+        ("action-approval.json", "ActionApproval"),
+        ("action-proposal.json", "ActionProposal"),
+        ("action-result.json", "ActionResult"),
         ("agent-manifest.json", "Agent"),
+        ("integration-config.json", "IntegrationConfig"),
         ("plugin-manifest.json", "Plugin"),
+        ("plugin-session.json", "PluginSession"),
         ("evidence.json", "Evidence"),
         ("investigation-request.json", "InvestigationRequest"),
         ("investigation-report.json", "InvestigationReport"),
@@ -694,6 +716,67 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
                         and interface.get("capability") not in capabilities
                     ):
                         fail(errors, "plugin interface must advertise its capability")
+
+    action_proposal = documents.get(example_dir / "action-proposal.json")
+    action_approval = documents.get(example_dir / "action-approval.json")
+    action_result = documents.get(example_dir / "action-result.json")
+    plugin_session = documents.get(example_dir / "plugin-session.json")
+    if all(
+        isinstance(item, dict)
+        for item in (action_proposal, action_approval, action_result)
+    ):
+        proposal_metadata = action_proposal["metadata"]
+        proposal_spec = action_proposal["spec"]
+        approval_metadata = action_approval["metadata"]
+        approval_spec = action_approval["spec"]
+        result_metadata = action_result["metadata"]
+        result_spec = action_result["spec"]
+        if len(
+            {
+                proposal_metadata.get("tenantId"),
+                approval_metadata.get("tenantId"),
+                result_metadata.get("tenantId"),
+            }
+        ) != 1:
+            fail(errors, "action examples must share a tenant")
+        if approval_spec.get("proposalId") != proposal_metadata.get("id"):
+            fail(errors, "action approval must identify its proposal")
+        if result_metadata.get("id") != proposal_metadata.get("id"):
+            fail(errors, "action result must identify its proposal")
+        if result_spec.get("approvalId") != approval_metadata.get("id"):
+            fail(errors, "action result must identify its approval")
+        if result_spec.get("idempotencyKey") != proposal_spec.get("idempotencyKey"):
+            fail(errors, "action result must retain its proposal idempotency key")
+        if result_spec.get("proposalDigest") != canonical_digest(action_proposal):
+            fail(errors, "action result proposalDigest must match its proposal")
+        if proposal_metadata.get("actorId") == approval_metadata.get("approverId"):
+            fail(errors, "action proposal and approval actors must be distinct")
+        proposal_time = parse_timestamp(proposal_metadata.get("createdAt"))
+        approval_time = parse_timestamp(approval_metadata.get("decidedAt"))
+        result_time = parse_timestamp(result_metadata.get("completedAt"))
+        expiry_time = parse_timestamp(proposal_spec.get("expiresAt"))
+        if (
+            None in (proposal_time, approval_time, result_time, expiry_time)
+            or not proposal_time <= approval_time <= result_time <= expiry_time
+        ):
+            fail(errors, "action example timestamps must be created <= approved <= completed <= expiry")
+
+    if isinstance(plugin_example, dict) and isinstance(plugin_session, dict):
+        manifest_metadata = plugin_example.get("metadata", {})
+        manifest_spec = plugin_example.get("spec", {})
+        session_metadata = plugin_session.get("metadata", {})
+        session_spec = plugin_session.get("spec", {})
+        if (
+            session_metadata.get("pluginId") != manifest_metadata.get("id")
+            or session_metadata.get("pluginVersion") != manifest_metadata.get("version")
+        ):
+            fail(errors, "plugin session must identify its manifest")
+        if session_spec.get("manifestDigest") != canonical_digest(plugin_example):
+            fail(errors, "plugin session manifestDigest must match its manifest")
+        if not set(session_spec.get("grantedCapabilities", [])).issubset(
+            set(manifest_spec.get("capabilities", []))
+        ):
+            fail(errors, "plugin session cannot grant undeclared capabilities")
 
     evidence = documents.get(example_dir / "evidence.json")
     request = documents.get(example_dir / "investigation-request.json")

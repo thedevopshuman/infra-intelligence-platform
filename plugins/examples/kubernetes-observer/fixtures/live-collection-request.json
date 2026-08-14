@@ -1,0 +1,30 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ResourceCollectionRequest",
+  "metadata": {
+    "requestId": "col_44444444444444444444444444444444",
+    "tenantId": "local",
+    "actorId": "kubernetes-observer",
+    "requestedAt": "2026-08-14T12:45:00Z"
+  },
+  "spec": {
+    "sourceId": "kubernetes-local",
+    "streamId": "obs_44444444444444444444444444444444",
+    "mode": "reconciliation",
+    "snapshotId": "snap_44444444444444444444444444444444",
+    "startSequence": 0,
+    "scope": {
+      "provider": "kubernetes",
+      "integrationId": "kubernetes-local",
+      "rootExternalId": "kind-iip-dev",
+      "parameters": {
+        "namespaces": ["iip-demo"]
+      }
+    },
+    "limits": {
+      "maxResources": 1000,
+      "maxOutputBytes": 16777216
+    },
+    "deadline": "2099-08-14T12:50:00Z"
+  }
+}

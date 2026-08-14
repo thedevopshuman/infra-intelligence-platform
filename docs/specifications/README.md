@@ -10,7 +10,7 @@ The platform exposes contracts at three levels:
 
 | Contract | Documentation | Schema | Example |
 | --- | --- | --- | --- |
-| Resource | [resource-contract.md](resource-contract.md) | `contracts/schemas/resource.schema.json` | `contracts/examples/resource.json` |
+| Resource | [resource-contract.md](resource-contract.md) | `contracts/schemas/resource.schema.json` | `contracts/examples/resource.json`, `contracts/examples/resource-tombstone.json` |
 | Resource collection request | [resource-collection-contract.md](resource-collection-contract.md) | `contracts/schemas/resource-collection-request.schema.json` | `contracts/examples/resource-collection-request.json` |
 | Resource collection result | [resource-collection-contract.md](resource-collection-contract.md) | `contracts/schemas/resource-collection-result.schema.json` | `contracts/examples/resource-collection-result.json` |
 | Resource neighborhood | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/resource-neighborhood.schema.json` | `contracts/examples/resource-neighborhood.json` |

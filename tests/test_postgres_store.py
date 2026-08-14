@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import os
 import unittest
@@ -25,6 +26,10 @@ from iip.adapters.evidence import (
 )
 from iip.adapters.memory import AllowTenantPolicy
 from iip.application.collect_evidence import CollectEvidenceCommand, EvidenceCollectionService
+from iip.application.ingest_collection import (
+    IngestCollectionCommand,
+    ResourceCollectionIngestionService,
+)
 from iip.application.ingest_resource import (
     IngestResourceCommand,
     ResourceIngestionService,
@@ -40,6 +45,55 @@ DATABASE_URL = os.environ.get("IIP_TEST_DATABASE_URL")
 
 def resource_payload() -> dict:
     return json.loads((ROOT / "contracts/examples/resource.json").read_text(encoding="utf-8"))
+
+
+def reconciliation_pair(
+    *,
+    request_id: str,
+    snapshot_id: str,
+    start_sequence: int,
+    observations: list[dict],
+    checkpoint: str,
+) -> tuple[dict, dict]:
+    request = json.loads(
+        (ROOT / "contracts/examples/resource-collection-request.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    result = json.loads(
+        (ROOT / "contracts/examples/resource-collection-result.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    request["metadata"].update(
+        {"requestId": request_id, "actorId": "collector"}
+    )
+    request["spec"].update(
+        {
+            "mode": "reconciliation",
+            "snapshotId": snapshot_id,
+            "startSequence": start_sequence,
+        }
+    )
+    result["metadata"]["requestId"] = request_id
+    result["spec"]["observations"] = copy.deepcopy(observations)
+    for index, observation in enumerate(result["spec"]["observations"]):
+        observation["metadata"]["observation"].update(
+            {
+                "mode": "reconciliation",
+                "snapshotId": snapshot_id,
+                "sequence": start_sequence + index,
+            }
+        )
+    result["spec"]["completion"] = {
+        "status": "complete",
+        "resourceCount": len(observations),
+        "nextSequence": start_sequence + len(observations),
+        "snapshotId": snapshot_id,
+        "checkpoint": checkpoint,
+        "scopeDigest": result["spec"]["completion"]["scopeDigest"],
+    }
+    return request, result
 
 
 @unittest.skipUnless(
@@ -79,13 +133,67 @@ class PostgresResourceStoreTests(unittest.TestCase):
             connection.execute(
                 """
                 TRUNCATE iip.resource_relationships,
-                         iip.source_checkpoints, iip.event_outbox,
+                         iip.source_reconciliations, iip.source_checkpoints,
+                         iip.event_outbox,
                          iip.event_log, iip.resource_observations,
                          iip.resource_projections
                 RESTART IDENTITY CASCADE
                 """
             )
         self.service = ResourceIngestionService(self.store, AllowTenantPolicy())
+
+    def test_reconciliation_membership_and_tombstone_are_durable(self) -> None:
+        actor = ActorContext("collector", "local")
+        collection = ResourceCollectionIngestionService(
+            self.service,
+            self.store,
+            self.store,
+            self.store,
+        )
+        public_result = json.loads(
+            (ROOT / "contracts/examples/resource-collection-result.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        first_request, first_result = reconciliation_pair(
+            request_id="col_11111111111111111111111111111111",
+            snapshot_id="snap_11111111111111111111111111111111",
+            start_sequence=42,
+            observations=public_result["spec"]["observations"],
+            checkpoint="kubernetes:cluster-local:snapshot:first",
+        )
+        active = collection.execute(
+            IngestCollectionCommand(actor, first_request, first_result)
+        )[0]
+        second_request, second_result = reconciliation_pair(
+            request_id="col_22222222222222222222222222222222",
+            snapshot_id="snap_22222222222222222222222222222222",
+            start_sequence=43,
+            observations=[],
+            checkpoint="kubernetes:cluster-local:snapshot:second",
+        )
+
+        tombstone = collection.execute(
+            IngestCollectionCommand(actor, second_request, second_result)
+        )[0]
+        replay = collection.execute(
+            IngestCollectionCommand(actor, second_request, second_result)
+        )[0]
+
+        self.assertEqual(tombstone, replay)
+        self.assertEqual(tombstone.lifecycle, "deleted")
+        reconnected = PostgresResourceStore(DATABASE_URL)
+        self.assertEqual(
+            reconnected.get("local", active.identity.uid).lifecycle,
+            "deleted",
+        )
+        snapshot = reconnected.get_reconciliation("local", "kubernetes-local")
+        self.assertEqual(snapshot.tombstoned_uids, (active.identity.uid,))
+        self.assertEqual(
+            reconnected.get_checkpoint("local", "kubernetes-local").sequence,
+            43,
+        )
+        self.assertEqual(len(tuple(reconnected.list_events("local"))), 2)
 
     def test_projection_history_event_outbox_and_checkpoint_commit_together(self) -> None:
         command = IngestResourceCommand(
@@ -342,7 +450,8 @@ class PostgresOperationalStoreTests(unittest.TestCase):
                          iip.action_results, iip.action_approvals,
                          iip.action_proposals, iip.investigations,
                          iip.evidence_artifacts, iip.resource_relationships,
-                         iip.source_checkpoints, iip.event_outbox,
+                         iip.source_reconciliations, iip.source_checkpoints,
+                         iip.event_outbox,
                          iip.event_log, iip.resource_observations,
                          iip.resource_projections
                 RESTART IDENTITY CASCADE

@@ -89,7 +89,7 @@ flowchart TB
 8. Proposed mutations enter a workflow. Policy and approval decide whether an action may execute.
 9. Every decision, tool call, approval, execution, and result produces audit events.
 
-Collector plugins cross the extension boundary through bounded resource collection request/result contracts. A complete batch returns an explicit scope digest and candidate checkpoint; only the trusted ingestion workflow may commit that checkpoint after every resource observation and event is durable. Partial, failed, and cancelled reconciliation passes never imply deletion.
+Collector plugins cross the extension boundary through bounded resource collection request/result contracts. A complete batch returns an explicit scope digest and candidate checkpoint; only the trusted ingestion workflow may commit that checkpoint after every resource observation and event is durable. The host stores the last complete source membership and generates deterministic tombstones for resources missing from the next complete snapshot. Membership and the checkpoint commit together after those tombstones are durable. Partial, failed, cancelled, or scope-drifted reconciliation passes never imply deletion. [ADR 0007](../decisions/0007-reconciliation-membership-and-tombstones.md) records the authority and ordering rules.
 
 Evidence providers cross a separate application-owned boundary. The [reference collection pipeline](evidence-collection-pipeline.md) authorizes an exact tenant, integration, evidence type, and resource scope before a provider runs, then validates and redacts provider output before hashing and atomic persistence. Providers do not receive ambient credentials through the application contract.
 

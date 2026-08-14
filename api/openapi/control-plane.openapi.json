@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "Executable local reference API for collection ingestion, resource queries, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -109,7 +109,15 @@
           }}}
         },
         "responses": {
-          "202": {"description": "Validated observations are durable and a complete checkpoint is committed"},
+          "202": {
+            "description": "Validated observations and any complete-snapshot tombstones are durable; reconciliation membership and its checkpoint are committed",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["items"],
+              "properties": {"items": {"type": "array", "items": {"$ref": "../../contracts/schemas/resource.schema.json"}}}
+            }}}
+          },
           "400": {"$ref": "#/components/responses/InvalidRequest"},
           "401": {"$ref": "#/components/responses/Unauthorized"},
           "403": {"$ref": "#/components/responses/PolicyDenied"},

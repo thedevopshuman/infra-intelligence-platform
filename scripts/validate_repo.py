@@ -29,6 +29,7 @@ REQUIRED_PATHS = (
     "docs/roadmap/initial-roadmap.md",
     "docs/decisions/0005-credential-derived-request-identity.md",
     "docs/decisions/0006-deterministic-investigation-and-dry-run-actions.md",
+    "docs/decisions/0007-reconciliation-membership-and-tombstones.md",
     "contracts/schemas/resource.schema.json",
     "contracts/schemas/integration-config.schema.json",
     "contracts/schemas/action-proposal.schema.json",
@@ -59,6 +60,7 @@ REQUIRED_PATHS = (
     "contracts/examples/evaluation-scenario.json",
     "contracts/examples/resource-collection-request.json",
     "contracts/examples/resource-collection-result.json",
+    "contracts/examples/resource-tombstone.json",
     "contracts/examples/resource-neighborhood.json",
     "contracts/examples/resource-timeline.json",
     "contracts/examples/page-info.json",
@@ -645,6 +647,21 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
                 fail(errors, "resource round trip lost deterministic identity")
         except ContractError as exc:
             fail(errors, f"resource example violates domain contract: {exc}")
+
+    tombstone_document = documents.get(example_dir / "resource-tombstone.json")
+    if not isinstance(tombstone_document, dict):
+        fail(errors, "resource tombstone example must be an object")
+    else:
+        try:
+            tombstone = Resource.from_dict(tombstone_document)
+            if (
+                tombstone.lifecycle != "deleted"
+                or tombstone.attributes
+                or tombstone.relationships
+            ):
+                fail(errors, "resource tombstone must omit mutable state")
+        except ContractError as exc:
+            fail(errors, f"resource tombstone violates domain contract: {exc}")
 
     event = documents.get(example_dir / "event.json")
     if not isinstance(event, dict):

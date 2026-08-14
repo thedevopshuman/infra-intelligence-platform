@@ -15,7 +15,7 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 `ResourceObservationCursor` represents optional source ordering, replay checkpoint, and reconciliation metadata carried inside a resource observation.
 
-`ResourceCollectionRequest` and `ResourceCollectionResult` expose the bounded public interface used by resource-observer plugins. These lightweight envelope types do not import the server kernel or imply that the future plugin handshake is implemented.
+`ResourceCollectionRequest` and `ResourceCollectionResult` expose the bounded public interface used by resource-observer plugins. A complete reconciliation response from `ingest_resource_collection` may include host-generated deleted Resource observations after the plugin observations. These lightweight envelope types do not import the server kernel.
 
 `Client.get_resource_neighborhood` and `Client.get_resource_timeline` return the corresponding paginated public envelopes. Pass `spec.page.nextCursor` back unchanged to continue; the cursor is query- and tenant-bound and does not grant authority.
 

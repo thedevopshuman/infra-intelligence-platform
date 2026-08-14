@@ -15,7 +15,11 @@ from iip.application.actions import (
     ExecuteActionCommand,
     ProposeActionCommand,
 )
-from iip.application.ingest_collection import IngestCollectionCommand, InvalidCollectionError
+from iip.application.ingest_collection import (
+    CollectionConflictError,
+    IngestCollectionCommand,
+    InvalidCollectionError,
+)
 from iip.application.ingest_resource import (
     AuthorizationError,
     IngestResourceCommand,
@@ -49,7 +53,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.3"
+    server_version = "IIPReference/0.3.1"
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         parsed = urlparse(self.path)
@@ -230,6 +234,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
         except (InvalidCollectionError, InvalidInvestigationError) as exc:
             self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": str(exc)}})
+        except CollectionConflictError as exc:
+            self._json(HTTPStatus.CONFLICT, {"error": {"code": str(exc)}})
         except InvestigationConflictError as exc:
             self._json(HTTPStatus.CONFLICT, {"error": {"code": str(exc)}})
         except ActionWorkflowError as exc:

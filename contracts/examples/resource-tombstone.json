@@ -1,0 +1,26 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "Resource",
+  "metadata": {
+    "uid": "res_e0ae9225a316fce4c97df5c23057b97a",
+    "tenantId": "local",
+    "observedAt": "2026-08-14T10:35:00Z",
+    "observation": {
+      "sourceId": "kubernetes-local",
+      "streamId": "obs_0f4e8c2a6b1d4975a3c9e7f102d468ab",
+      "sequence": 43,
+      "mode": "reconciliation",
+      "snapshotId": "snap_7b2c9d4e6f1048a1b3d5e7f9012a4c6e"
+    }
+  },
+  "spec": {
+    "provider": "kubernetes",
+    "type": "apps/deployment",
+    "externalId": "cluster-local/default/api",
+    "attributes": {},
+    "relationships": []
+  },
+  "status": {
+    "lifecycle": "deleted"
+  }
+}

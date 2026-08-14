@@ -9,12 +9,23 @@ from datetime import datetime
 from typing import Any, Mapping
 
 from iip.application.ingest_resource import IngestResourceCommand, ResourceIngestionService
-from iip.application.ports import ActorContext, SourceCheckpoint, SourceCheckpointRepository
-from iip.domain.models import Resource
+from iip.application.ports import (
+    ActorContext,
+    ReconciliationRepository,
+    ReconciliationSnapshot,
+    ResourceRepository,
+    SourceCheckpoint,
+    SourceCheckpointRepository,
+)
+from iip.domain.models import ContractError, Resource
 
 
 class InvalidCollectionError(ValueError):
     """A request/result pair violated host-enforced collection invariants."""
+
+
+class CollectionConflictError(RuntimeError):
+    """A valid collection conflicts with committed source state."""
 
 
 @dataclass(frozen=True)
@@ -33,10 +44,14 @@ class ResourceCollectionIngestionService:
     def __init__(
         self,
         ingestion: ResourceIngestionService,
+        resources: ResourceRepository,
         checkpoints: SourceCheckpointRepository,
+        reconciliations: ReconciliationRepository,
     ) -> None:
         self._ingestion = ingestion
+        self._resources = resources
         self._checkpoints = checkpoints
+        self._reconciliations = reconciliations
 
     def execute(self, command: IngestCollectionCommand) -> tuple[Resource, ...]:
         request_metadata, request_spec, result_metadata, result_spec = self._validate(
@@ -44,6 +59,64 @@ class ResourceCollectionIngestionService:
         )
         observations = result_spec["observations"]
         completion = result_spec["completion"]
+        try:
+            parsed_observations = tuple(Resource.from_dict(item) for item in observations)
+        except ContractError:
+            raise InvalidCollectionError("collection.observation.invalid") from None
+
+        mode = request_spec["mode"]
+        result_digest = self._canonical_digest(command.result)
+        previous = None
+        present_uids: tuple[str, ...] = ()
+        missing_uids: tuple[str, ...] = ()
+        missing_resources: dict[str, Resource] = {}
+        if mode == "reconciliation" and completion["status"] == "complete":
+            present_uids = tuple(
+                sorted(resource.identity.uid for resource in parsed_observations)
+            )
+            if len(present_uids) != len(set(present_uids)):
+                raise InvalidCollectionError(
+                    "collection.reconciliation.duplicate-resource"
+                )
+            previous = self._reconciliations.get_reconciliation(
+                command.actor.tenant_id, request_spec["sourceId"]
+            )
+            if previous is not None and previous.snapshot_id == request_spec["snapshotId"]:
+                if previous.result_digest != result_digest:
+                    raise CollectionConflictError("collection.snapshot.conflict")
+                checkpoint = self._checkpoints.get_checkpoint(
+                    command.actor.tenant_id, request_spec["sourceId"]
+                )
+                if (
+                    checkpoint is None
+                    or checkpoint.stream_id != previous.stream_id
+                    or checkpoint.sequence != previous.sequence
+                    or checkpoint.checkpoint != previous.checkpoint
+                ):
+                    raise CollectionConflictError("collection.snapshot.stale")
+                return self._replayed_resources(
+                    command.actor.tenant_id,
+                    parsed_observations,
+                    previous.tombstoned_uids,
+                )
+            if previous is not None and previous.scope_digest != completion["scopeDigest"]:
+                raise CollectionConflictError("collection.scope.changed")
+            missing_uids = tuple(
+                sorted(set(previous.resource_uids).difference(present_uids))
+                if previous is not None
+                else ()
+            )
+            last_sequence = completion["nextSequence"] + len(missing_uids) - 1
+            if last_sequence > 9_007_199_254_740_991:
+                raise InvalidCollectionError("collection.sequence.exhausted")
+            for resource_uid in missing_uids:
+                current = self._resources.get(command.actor.tenant_id, resource_uid)
+                if current is None:
+                    raise InvalidCollectionError(
+                        "collection.reconciliation.state-missing"
+                    )
+                missing_resources[resource_uid] = current
+
         accepted = []
         for payload in observations:
             accepted.append(
@@ -57,22 +130,151 @@ class ResourceCollectionIngestionService:
             )
 
         if completion["status"] == "complete":
-            # For an empty initial snapshot there is no observation sequence to
-            # attach. Sequence zero is the neutral persisted floor; callers use
-            # result.nextSequence as their next requested sequence.
-            sequence = max(request_spec["startSequence"], completion["nextSequence"] - 1)
-            self._checkpoints.commit_checkpoint(
-                SourceCheckpoint(
+            if mode == "reconciliation":
+                assert previous is None or isinstance(previous, ReconciliationSnapshot)
+                last_sequence = completion["nextSequence"] + len(missing_uids) - 1
+                for offset, resource_uid in enumerate(missing_uids):
+                    current = missing_resources[resource_uid]
+                    if current.lifecycle == "deleted":
+                        accepted.append(current)
+                        continue
+                    accepted.append(
+                        self._ingestion.execute(
+                            IngestResourceCommand(
+                                actor=command.actor,
+                                payload=self._tombstone(
+                                    current,
+                                    observed_at=result_metadata["createdAt"],
+                                    source_id=request_spec["sourceId"],
+                                    stream_id=request_spec["streamId"],
+                                    snapshot_id=request_spec["snapshotId"],
+                                    sequence=completion["nextSequence"] + offset,
+                                ),
+                                correlation_id=command.correlation_id,
+                            )
+                        )
+                    )
+                # For an empty initial snapshot there is no observation sequence
+                # to attach. startSequence is the neutral persisted floor.
+                sequence = max(request_spec["startSequence"], last_sequence)
+                checkpoint = self._checkpoint(
+                    request_metadata, request_spec, result_metadata, completion, sequence
+                )
+                snapshot = ReconciliationSnapshot(
                     tenant_id=request_metadata["tenantId"],
                     source_id=request_spec["sourceId"],
                     stream_id=request_spec["streamId"],
+                    snapshot_id=request_spec["snapshotId"],
+                    scope_digest=completion["scopeDigest"],
                     sequence=sequence,
                     checkpoint=completion["checkpoint"],
+                    result_digest=result_digest,
+                    resource_uids=present_uids,
+                    tombstoned_uids=missing_uids,
                     committed_at=result_metadata["createdAt"],
-                ),
-                mode=request_spec["mode"],
-            )
+                )
+                try:
+                    self._reconciliations.commit_reconciliation(snapshot, checkpoint)
+                except ValueError:
+                    raise CollectionConflictError(
+                        "collection.checkpoint.conflict"
+                    ) from None
+            else:
+                sequence = max(
+                    request_spec["startSequence"], completion["nextSequence"] - 1
+                )
+                try:
+                    self._checkpoints.commit_checkpoint(
+                        self._checkpoint(
+                            request_metadata,
+                            request_spec,
+                            result_metadata,
+                            completion,
+                            sequence,
+                        ),
+                        mode=mode,
+                    )
+                except ValueError:
+                    raise CollectionConflictError(
+                        "collection.checkpoint.conflict"
+                    ) from None
         return tuple(accepted)
+
+    @staticmethod
+    def _canonical_digest(document: Mapping[str, Any]) -> str:
+        encoded = json.dumps(
+            document,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+    @staticmethod
+    def _checkpoint(
+        request_metadata: Mapping[str, Any],
+        request_spec: Mapping[str, Any],
+        result_metadata: Mapping[str, Any],
+        completion: Mapping[str, Any],
+        sequence: int,
+    ) -> SourceCheckpoint:
+        return SourceCheckpoint(
+            tenant_id=request_metadata["tenantId"],
+            source_id=request_spec["sourceId"],
+            stream_id=request_spec["streamId"],
+            sequence=sequence,
+            checkpoint=completion["checkpoint"],
+            committed_at=result_metadata["createdAt"],
+        )
+
+    def _replayed_resources(
+        self,
+        tenant_id: str,
+        observations: tuple[Resource, ...],
+        tombstoned_uids: tuple[str, ...],
+    ) -> tuple[Resource, ...]:
+        resources = []
+        for uid in tuple(item.identity.uid for item in observations) + tombstoned_uids:
+            current = self._resources.get(tenant_id, uid)
+            if current is None:
+                raise InvalidCollectionError("collection.reconciliation.state-missing")
+            resources.append(current)
+        return tuple(resources)
+
+    @staticmethod
+    def _tombstone(
+        resource: Resource,
+        *,
+        observed_at: str,
+        source_id: str,
+        stream_id: str,
+        snapshot_id: str,
+        sequence: int,
+    ) -> dict[str, Any]:
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "Resource",
+            "metadata": {
+                "uid": resource.identity.uid,
+                "tenantId": resource.identity.tenant_id,
+                "observedAt": observed_at,
+                "observation": {
+                    "sourceId": source_id,
+                    "streamId": stream_id,
+                    "sequence": sequence,
+                    "mode": "reconciliation",
+                    "snapshotId": snapshot_id,
+                },
+            },
+            "spec": {
+                "provider": resource.identity.provider,
+                "type": resource.identity.resource_type,
+                "externalId": resource.identity.external_id,
+                "attributes": {},
+                "relationships": [],
+            },
+            "status": {"lifecycle": "deleted"},
+        }
 
     @staticmethod
     def _validate(

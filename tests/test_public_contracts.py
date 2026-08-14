@@ -19,6 +19,7 @@ from infra_intelligence_sdk import (
     ResourceCollectionRequest,
     ResourceCollectionResult,
     ResourceNeighborhood,
+    ResourceObservation,
     ResourceTimeline,
 )
 
@@ -44,6 +45,7 @@ class PublicContractSdkTests(unittest.TestCase):
         collection_result = ResourceCollectionResult.from_dict(
             example("resource-collection-result.json")
         )
+        tombstone = ResourceObservation.from_dict(example("resource-tombstone.json"))
         neighborhood = ResourceNeighborhood.from_dict(
             example("resource-neighborhood.json")
         )
@@ -60,6 +62,7 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(report.to_dict()["kind"], "InvestigationReport")
         self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")
         self.assertEqual(collection_result.to_dict()["kind"], "ResourceCollectionResult")
+        self.assertEqual(tombstone.to_dict()["status"]["lifecycle"], "deleted")
         self.assertEqual(neighborhood.to_dict()["kind"], "ResourceNeighborhood")
         self.assertEqual(timeline.to_dict()["kind"], "ResourceTimeline")
         self.assertEqual(scenario.to_dict()["kind"], "EvaluationScenario")

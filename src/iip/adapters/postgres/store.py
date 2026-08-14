@@ -15,6 +15,7 @@ from psycopg.types.json import Jsonb
 from iip.application.ports import (
     OutboxMessage,
     PersistenceError,
+    ReconciliationSnapshot,
     ResourceObservationRecord,
     ResourceWriteResult,
     SourceCheckpoint,
@@ -34,6 +35,7 @@ _MIGRATIONS = (
     "0001_resource_event_substrate.sql",
     "0002_resource_relationship_index.sql",
     "0003_operational_workflows.sql",
+    "0004_reconciliation_snapshots.sql",
 )
 
 
@@ -465,6 +467,23 @@ class PostgresResourceStore:
         )
 
     @_translate_database_errors
+    def get_reconciliation(
+        self, tenant_id: str, source_id: str
+    ) -> Optional[ReconciliationSnapshot]:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT tenant_id, source_id, stream_id, snapshot_id,
+                       scope_digest, sequence, checkpoint, result_digest,
+                       resource_uids, tombstoned_uids, committed_at
+                FROM iip.source_reconciliations
+                WHERE tenant_id = %s AND source_id = %s
+                """,
+                (tenant_id, source_id),
+            ).fetchone()
+        return self._reconciliation_from_row(row) if row is not None else None
+
+    @_translate_database_errors
     def commit_checkpoint(self, checkpoint: SourceCheckpoint, *, mode: str) -> None:
         """Advance a batch checkpoint after all observations are committed."""
 
@@ -516,8 +535,123 @@ class PostgresResourceStore:
                 ),
             )
 
+    @_translate_database_errors
+    def commit_reconciliation(
+        self,
+        snapshot: ReconciliationSnapshot,
+        checkpoint: SourceCheckpoint,
+    ) -> None:
+        """Atomically commit complete membership and its source checkpoint."""
+
+        self._validate_reconciliation(snapshot, checkpoint)
+        with self._connect() as connection:
+            connection.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"{snapshot.tenant_id}\x1f{snapshot.source_id}",),
+            )
+            current_row = connection.execute(
+                """
+                SELECT tenant_id, source_id, stream_id, snapshot_id,
+                       scope_digest, sequence, checkpoint, result_digest,
+                       resource_uids, tombstoned_uids, committed_at
+                FROM iip.source_reconciliations
+                WHERE tenant_id = %s AND source_id = %s
+                FOR UPDATE
+                """,
+                (snapshot.tenant_id, snapshot.source_id),
+            ).fetchone()
+            if current_row is not None:
+                current = self._reconciliation_from_row(current_row)
+                if current.snapshot_id == snapshot.snapshot_id:
+                    if not self._same_reconciliation(current, snapshot):
+                        raise ValueError("reconciliation snapshot content conflicts")
+                elif current.scope_digest != snapshot.scope_digest:
+                    raise ValueError("reconciliation source scope cannot change")
+
+            checkpoint_row = connection.execute(
+                """
+                SELECT stream_id, sequence, checkpoint
+                FROM iip.source_checkpoints
+                WHERE tenant_id = %s AND source_id = %s
+                FOR UPDATE
+                """,
+                (checkpoint.tenant_id, checkpoint.source_id),
+            ).fetchone()
+            self._validate_checkpoint_row(
+                checkpoint_row, checkpoint, mode="reconciliation"
+            )
+            connection.execute(
+                """
+                INSERT INTO iip.source_reconciliations (
+                    tenant_id, source_id, stream_id, snapshot_id,
+                    scope_digest, sequence, checkpoint, result_digest,
+                    resource_uids, tombstoned_uids, committed_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (tenant_id, source_id) DO UPDATE SET
+                    stream_id = EXCLUDED.stream_id,
+                    snapshot_id = EXCLUDED.snapshot_id,
+                    scope_digest = EXCLUDED.scope_digest,
+                    sequence = EXCLUDED.sequence,
+                    checkpoint = EXCLUDED.checkpoint,
+                    result_digest = EXCLUDED.result_digest,
+                    resource_uids = EXCLUDED.resource_uids,
+                    tombstoned_uids = EXCLUDED.tombstoned_uids,
+                    committed_at = EXCLUDED.committed_at
+                """,
+                (
+                    snapshot.tenant_id,
+                    snapshot.source_id,
+                    snapshot.stream_id,
+                    snapshot.snapshot_id,
+                    snapshot.scope_digest,
+                    snapshot.sequence,
+                    snapshot.checkpoint,
+                    snapshot.result_digest,
+                    list(snapshot.resource_uids),
+                    list(snapshot.tombstoned_uids),
+                    snapshot.committed_at,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO iip.source_checkpoints (
+                    tenant_id, source_id, stream_id, sequence,
+                    checkpoint, committed_at
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (tenant_id, source_id) DO UPDATE SET
+                    stream_id = EXCLUDED.stream_id,
+                    sequence = EXCLUDED.sequence,
+                    checkpoint = EXCLUDED.checkpoint,
+                    committed_at = EXCLUDED.committed_at
+                """,
+                (
+                    checkpoint.tenant_id,
+                    checkpoint.source_id,
+                    checkpoint.stream_id,
+                    checkpoint.sequence,
+                    checkpoint.checkpoint,
+                    checkpoint.committed_at,
+                ),
+            )
+
     def _connect(self) -> Any:
         return psycopg.connect(self._database_url, row_factory=dict_row)
+
+    @classmethod
+    def _reconciliation_from_row(cls, row: Mapping[str, Any]) -> ReconciliationSnapshot:
+        return ReconciliationSnapshot(
+            tenant_id=row["tenant_id"],
+            source_id=row["source_id"],
+            stream_id=row["stream_id"],
+            snapshot_id=row["snapshot_id"],
+            scope_digest=row["scope_digest"],
+            sequence=row["sequence"],
+            checkpoint=row["checkpoint"],
+            result_digest=row["result_digest"],
+            resource_uids=tuple(row["resource_uids"]),
+            tombstoned_uids=tuple(row["tombstoned_uids"]),
+            committed_at=cls._rfc3339(row["committed_at"]),
+        )
 
     @staticmethod
     def _upsert_projection(
@@ -671,6 +805,86 @@ class PostgresResourceStore:
             return
         if cursor.mode != "reconciliation":
             raise ValueError("checkpoint stream reset requires reconciliation")
+
+    @staticmethod
+    def _validate_checkpoint_row(
+        row: Optional[Mapping[str, Any]],
+        checkpoint: SourceCheckpoint,
+        *,
+        mode: str,
+    ) -> None:
+        if row is None:
+            return
+        if row["stream_id"] == checkpoint.stream_id:
+            if checkpoint.sequence < row["sequence"]:
+                raise ValueError("checkpoint sequence cannot move backwards")
+            if (
+                checkpoint.sequence == row["sequence"]
+                and checkpoint.checkpoint != row["checkpoint"]
+            ):
+                raise ValueError("checkpoint content conflicts at the same sequence")
+            return
+        if mode != "reconciliation":
+            raise ValueError("checkpoint stream reset requires reconciliation")
+
+    @staticmethod
+    def _validate_reconciliation(
+        snapshot: ReconciliationSnapshot,
+        checkpoint: SourceCheckpoint,
+    ) -> None:
+        if (
+            snapshot.tenant_id != checkpoint.tenant_id
+            or snapshot.source_id != checkpoint.source_id
+            or snapshot.stream_id != checkpoint.stream_id
+            or snapshot.sequence != checkpoint.sequence
+            or snapshot.checkpoint != checkpoint.checkpoint
+            or snapshot.committed_at != checkpoint.committed_at
+            or snapshot.resource_uids != tuple(sorted(set(snapshot.resource_uids)))
+            or snapshot.tombstoned_uids
+            != tuple(sorted(set(snapshot.tombstoned_uids)))
+            or set(snapshot.resource_uids).intersection(snapshot.tombstoned_uids)
+            or len(snapshot.resource_uids) > 10_000
+            or len(snapshot.tombstoned_uids) > 10_000
+            or snapshot.sequence < 0
+            or snapshot.sequence > 9_007_199_254_740_991
+            or not re.fullmatch(r"snap_[a-f0-9]{32}", snapshot.snapshot_id)
+            or not re.fullmatch(r"sha256:[a-f0-9]{64}", snapshot.scope_digest)
+            or not re.fullmatch(r"sha256:[a-f0-9]{64}", snapshot.result_digest)
+            or any(
+                not re.fullmatch(r"res_[a-f0-9]{32}", uid)
+                for uid in snapshot.resource_uids + snapshot.tombstoned_uids
+            )
+        ):
+            raise ValueError("reconciliation state is invalid")
+
+    @staticmethod
+    def _same_reconciliation(
+        current: ReconciliationSnapshot,
+        incoming: ReconciliationSnapshot,
+    ) -> bool:
+        return (
+            current.tenant_id,
+            current.source_id,
+            current.stream_id,
+            current.snapshot_id,
+            current.scope_digest,
+            current.sequence,
+            current.checkpoint,
+            current.result_digest,
+            current.resource_uids,
+            current.tombstoned_uids,
+        ) == (
+            incoming.tenant_id,
+            incoming.source_id,
+            incoming.stream_id,
+            incoming.snapshot_id,
+            incoming.scope_digest,
+            incoming.sequence,
+            incoming.checkpoint,
+            incoming.result_digest,
+            incoming.resource_uids,
+            incoming.tombstoned_uids,
+        )
 
     @staticmethod
     def _write_checkpoint(connection: Any, resource: Resource) -> None:

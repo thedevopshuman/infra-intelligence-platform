@@ -12,6 +12,7 @@ from iip.application.ports import (
     ActorContext,
     OutboxMessage,
     PolicyDecision,
+    ReconciliationSnapshot,
     ResourceObservationRecord,
     ResourceWriteResult,
     SourceCheckpoint,
@@ -48,6 +49,7 @@ class InMemoryResourceStore:
         self._event_log: list[StoredEvent] = []
         self._outbox: Dict[int, _MemoryOutboxEntry] = {}
         self._checkpoints: Dict[tuple[str, str], SourceCheckpoint] = {}
+        self._reconciliations: Dict[tuple[str, str], ReconciliationSnapshot] = {}
         self._lock = RLock()
 
     @property
@@ -288,16 +290,34 @@ class InMemoryResourceStore:
         key = (checkpoint.tenant_id, checkpoint.source_id)
         with self._lock:
             current = self._checkpoints.get(key)
-            if current is not None and current.stream_id == checkpoint.stream_id:
-                if checkpoint.sequence < current.sequence:
-                    raise ValueError("checkpoint sequence cannot move backwards")
-                if (
-                    checkpoint.sequence == current.sequence
-                    and checkpoint.checkpoint != current.checkpoint
-                ):
-                    raise ValueError("checkpoint content conflicts at the same sequence")
-            elif current is not None and mode != "reconciliation":
-                raise ValueError("checkpoint stream reset requires reconciliation")
+            self._validate_checkpoint_advance(current, checkpoint, mode)
+            self._checkpoints[key] = checkpoint
+
+    def get_reconciliation(
+        self, tenant_id: str, source_id: str
+    ) -> Optional[ReconciliationSnapshot]:
+        with self._lock:
+            return self._reconciliations.get((tenant_id, source_id))
+
+    def commit_reconciliation(
+        self,
+        snapshot: ReconciliationSnapshot,
+        checkpoint: SourceCheckpoint,
+    ) -> None:
+        self._validate_reconciliation(snapshot, checkpoint)
+        key = (snapshot.tenant_id, snapshot.source_id)
+        with self._lock:
+            current_snapshot = self._reconciliations.get(key)
+            if current_snapshot is not None:
+                if current_snapshot.snapshot_id == snapshot.snapshot_id:
+                    if not self._same_reconciliation(current_snapshot, snapshot):
+                        raise ValueError("reconciliation snapshot content conflicts")
+                elif current_snapshot.scope_digest != snapshot.scope_digest:
+                    raise ValueError("reconciliation source scope cannot change")
+            self._validate_checkpoint_advance(
+                self._checkpoints.get(key), checkpoint, "reconciliation"
+            )
+            self._reconciliations[key] = snapshot
             self._checkpoints[key] = checkpoint
 
     def _next_checkpoint(self, resource: Resource) -> SourceCheckpoint:
@@ -323,6 +343,82 @@ class InMemoryResourceStore:
             sequence=cursor.sequence,
             checkpoint=cursor.checkpoint,
             committed_at=PlatformEvent.now(),
+        )
+
+    @staticmethod
+    def _validate_checkpoint_advance(
+        current: Optional[SourceCheckpoint],
+        checkpoint: SourceCheckpoint,
+        mode: str,
+    ) -> None:
+        if current is not None and current.stream_id == checkpoint.stream_id:
+            if checkpoint.sequence < current.sequence:
+                raise ValueError("checkpoint sequence cannot move backwards")
+            if (
+                checkpoint.sequence == current.sequence
+                and checkpoint.checkpoint != current.checkpoint
+            ):
+                raise ValueError("checkpoint content conflicts at the same sequence")
+        elif current is not None and mode != "reconciliation":
+            raise ValueError("checkpoint stream reset requires reconciliation")
+
+    @staticmethod
+    def _validate_reconciliation(
+        snapshot: ReconciliationSnapshot,
+        checkpoint: SourceCheckpoint,
+    ) -> None:
+        if (
+            snapshot.tenant_id != checkpoint.tenant_id
+            or snapshot.source_id != checkpoint.source_id
+            or snapshot.stream_id != checkpoint.stream_id
+            or snapshot.sequence != checkpoint.sequence
+            or snapshot.checkpoint != checkpoint.checkpoint
+            or snapshot.committed_at != checkpoint.committed_at
+            or snapshot.resource_uids != tuple(sorted(set(snapshot.resource_uids)))
+            or snapshot.tombstoned_uids
+            != tuple(sorted(set(snapshot.tombstoned_uids)))
+            or set(snapshot.resource_uids).intersection(snapshot.tombstoned_uids)
+            or len(snapshot.resource_uids) > 10_000
+            or len(snapshot.tombstoned_uids) > 10_000
+            or snapshot.sequence < 0
+            or snapshot.sequence > 9_007_199_254_740_991
+            or not re.fullmatch(r"snap_[a-f0-9]{32}", snapshot.snapshot_id)
+            or not re.fullmatch(r"sha256:[a-f0-9]{64}", snapshot.scope_digest)
+            or not re.fullmatch(r"sha256:[a-f0-9]{64}", snapshot.result_digest)
+            or any(
+                not re.fullmatch(r"res_[a-f0-9]{32}", uid)
+                for uid in snapshot.resource_uids + snapshot.tombstoned_uids
+            )
+        ):
+            raise ValueError("reconciliation state is invalid")
+
+    @staticmethod
+    def _same_reconciliation(
+        current: ReconciliationSnapshot,
+        incoming: ReconciliationSnapshot,
+    ) -> bool:
+        return (
+            current.tenant_id,
+            current.source_id,
+            current.stream_id,
+            current.snapshot_id,
+            current.scope_digest,
+            current.sequence,
+            current.checkpoint,
+            current.result_digest,
+            current.resource_uids,
+            current.tombstoned_uids,
+        ) == (
+            incoming.tenant_id,
+            incoming.source_id,
+            incoming.stream_id,
+            incoming.snapshot_id,
+            incoming.scope_digest,
+            incoming.sequence,
+            incoming.checkpoint,
+            incoming.result_digest,
+            incoming.resource_uids,
+            incoming.tombstoned_uids,
         )
 
     @staticmethod

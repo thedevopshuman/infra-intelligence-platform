@@ -109,6 +109,7 @@ export class InfrastructureIntelligenceClient {
     result: ResourceCollectionResult,
     correlationId?: string,
   ): Promise<ResourceObservation[]> {
+    // Complete reconciliations may append host-generated Resource tombstones.
     const payload = await this.post<{ items: ResourceObservation[] }>(
       "/v1/collections/ingest",
       { request, result },

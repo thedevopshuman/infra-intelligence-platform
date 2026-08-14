@@ -11,6 +11,12 @@ metadata:
 data:
   LOG_LEVEL: info
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reconciliation-probe
+  namespace: iip-demo
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -1,0 +1,21 @@
+CREATE TABLE iip.source_reconciliations (
+    tenant_id text NOT NULL,
+    source_id text NOT NULL,
+    stream_id text NOT NULL,
+    snapshot_id text NOT NULL,
+    scope_digest character(71) NOT NULL,
+    sequence bigint NOT NULL CHECK (sequence >= 0),
+    checkpoint text NOT NULL,
+    result_digest character(71) NOT NULL,
+    resource_uids text[] NOT NULL,
+    tombstoned_uids text[] NOT NULL,
+    committed_at timestamptz NOT NULL,
+    PRIMARY KEY (tenant_id, source_id),
+    CHECK (source_id ~ '^[a-z][a-z0-9._-]{2,127}$'),
+    CHECK (stream_id ~ '^obs_[a-f0-9]{32}$'),
+    CHECK (snapshot_id ~ '^snap_[a-f0-9]{32}$'),
+    CHECK (scope_digest ~ '^sha256:[a-f0-9]{64}$'),
+    CHECK (result_digest ~ '^sha256:[a-f0-9]{64}$'),
+    CHECK (cardinality(resource_uids) <= 10000),
+    CHECK (cardinality(tombstoned_uids) <= 10000)
+);

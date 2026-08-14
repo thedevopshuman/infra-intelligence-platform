@@ -28,13 +28,17 @@ A conforming host validates more than the JSON shape:
 
 The reference host implements these checks in `ResourceCollectionIngestionService`. It ingests validated observations first and advances `SourceCheckpointRepository` only after every observation and event is durable. Partial results may improve the projection but never advance the checkpoint; replay is therefore safe and idempotent.
 
+For the current checkpoint model, one `sourceId` has one active canonical scope. A later complete request with a different `scopeDigest` is rejected before mutation; a distinct scope uses a distinct source identity. This prevents alternating namespace filters from producing false deletions.
+
 Provider errors are mapped to stable `reasonCode` values. Provider exception text, stack traces, credentials, Kubernetes `Secret` objects, ConfigMap values, token-bearing annotations, and other raw sensitive fields must not cross the boundary.
 
 ## Completion and checkpoints
 
 `complete` means the plugin finished the entire declared scope and supplies a credential-free checkpoint. `partial`, `failed`, and `cancelled` require a stable reason code and cannot advance a checkpoint. A result checkpoint is only a candidate: the ingestion workflow commits it after all returned observations and corresponding events are durable.
 
-For reconciliation, only a successful complete result can authorize missing-resource tombstones for the exact `scopeDigest` and `snapshotId`. Zero observations can therefore be a valid complete snapshot, but a partial or failed result can never imply deletion.
+For reconciliation, only a successful complete result can authorize missing-resource tombstones for the exact `scopeDigest` and `snapshotId`. The host compares the new UID set with the last complete membership, sorts missing UIDs, and emits explicit deleted Resource observations after the plugin observations. These host-generated tombstones consume sequences beginning at `completion.nextSequence`; the committed checkpoint sequence includes them even though `completion.resourceCount` counts plugin observations only.
+
+The new membership and checkpoint commit atomically after every tombstone is durable. Zero observations can therefore be a valid complete snapshot that deletes every resource in the prior membership, but a partial or failed result can never imply deletion. An exact retry of the latest result is matched by a canonical digest and does not emit duplicate events; reusing a snapshot ID with different content fails closed. See [ADR 0007](../decisions/0007-reconciliation-membership-and-tombstones.md).
 
 ## Kubernetes list/watch mapping
 

@@ -46,7 +46,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "resource-collection-request.schema.json": ("resource-collection-request.json",),
     "resource-collection-result.schema.json": ("resource-collection-result.json",),
     "resource-neighborhood.schema.json": ("resource-neighborhood.json",),
-    "resource.schema.json": ("resource.json",),
+    "resource.schema.json": ("resource.json", "resource-tombstone.json"),
     "resource-timeline.schema.json": ("resource-timeline.json",),
 }
 

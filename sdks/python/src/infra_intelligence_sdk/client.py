@@ -122,7 +122,7 @@ class Client:
         result: ResourceCollectionResult,
         correlation_id: Optional[str] = None,
     ) -> list[ResourceObservation]:
-        """Validate and ingest one observer request/result pair."""
+        """Ingest a pair and return observations plus host-generated tombstones."""
 
         payload = self._post(
             "/v1/collections/ingest",

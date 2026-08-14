@@ -33,6 +33,8 @@ def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description="Run the IIP cross-phase reference workflow")
     result.add_argument("--request", required=True, type=Path)
     result.add_argument("--result", required=True, type=Path)
+    result.add_argument("--next-request", required=True, type=Path)
+    result.add_argument("--next-result", required=True, type=Path)
     result.add_argument("--plugin-manifest", required=True, type=Path)
     return result
 
@@ -41,6 +43,8 @@ def main() -> int:
     args = parser().parse_args()
     request = load(args.request)
     result = load(args.result)
+    next_request = load(args.next_request)
+    next_result = load(args.next_result)
     manifest = load(args.plugin_manifest)
     actor = ActorContext(
         str(request["metadata"]["actorId"]),
@@ -58,6 +62,12 @@ def main() -> int:
     )
     deployment = next(
         item for item in resources if item.identity.resource_type == "apps/deployment"
+    )
+    reconciliation_probe = next(
+        item
+        for item in resources
+        if item.identity.resource_type == "core/configmap"
+        and item.display_name == "reconciliation-probe"
     )
     investigation_id = "inv_88888888888888888888888888888888"
     investigation_request = {
@@ -176,6 +186,19 @@ def main() -> int:
             secrets.token_urlsafe(32),
         )
     )
+    reconciled = runtime.collection_ingestion.execute(
+        IngestCollectionCommand(
+            actor,
+            next_request,
+            next_result,
+            "live-reference-tombstone",
+        )
+    )
+    probe_tombstone = next(
+        item for item in reconciled if item.identity.uid == reconciliation_probe.identity.uid
+    )
+    if probe_tombstone.lifecycle != "deleted":
+        raise RuntimeError("complete follow-up snapshot did not create a tombstone")
     summary = {
         "actionOutcome": action_result["spec"]["outcome"],
         "collectionResources": len(resources),
@@ -184,6 +207,7 @@ def main() -> int:
         "investigationOutcome": report["spec"]["outcome"],
         "pluginSession": plugin_session["status"],
         "rootCauseClass": root_cause,
+        "tombstones": 1,
     }
     print(json.dumps(summary, separators=(",", ":"), sort_keys=True))
     return 0

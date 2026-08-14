@@ -71,3 +71,5 @@ Reconciliation observations share a `snapshotId`. Missing resources are not tomb
 ## Deletion and tombstones
 
 Deletion is an explicit resource observation with `status.lifecycle: deleted`. A tombstone retains canonical identity and observation provenance while omitting mutable attributes and relationships. It remains queryable in history and closes active graph edges; physical removal is a later retention operation. A resource reappearing with a newer valid observation becomes active again without changing UID.
+
+`contracts/examples/resource-tombstone.json` is the canonical deleted-resource example. During complete reconciliation the trusted host may synthesize this observation for a UID present in the prior complete membership but absent from the new one. Plugin output itself never gains deletion authority from an incomplete result.

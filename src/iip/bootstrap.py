@@ -96,7 +96,12 @@ def _compose_runtime(
         outbox=store,
         checkpoints=store,
         ingestion=ingestion,
-        collection_ingestion=ResourceCollectionIngestionService(ingestion, store),
+        collection_ingestion=ResourceCollectionIngestionService(
+            ingestion,
+            store,
+            store,
+            store,
+        ),
         queries=queries,
         evidence=evidence,
         investigations=DeterministicInvestigationService(

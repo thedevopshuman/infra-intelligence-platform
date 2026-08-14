@@ -91,6 +91,23 @@ class SourceCheckpoint:
 
 
 @dataclass(frozen=True)
+class ReconciliationSnapshot:
+    """Last complete resource membership for one tenant-scoped source."""
+
+    tenant_id: str
+    source_id: str
+    stream_id: str
+    snapshot_id: str
+    scope_digest: str
+    sequence: int
+    checkpoint: str
+    result_digest: str
+    resource_uids: tuple[str, ...]
+    tombstoned_uids: tuple[str, ...]
+    committed_at: str
+
+
+@dataclass(frozen=True)
 class EvidenceProviderRequest:
     """Credential-free, bounded request passed across a provider boundary."""
 
@@ -220,6 +237,20 @@ class SourceCheckpointRepository(Protocol):
 
     def commit_checkpoint(self, checkpoint: SourceCheckpoint, *, mode: str) -> None:
         """Advance a source cursor only after its full batch is durable."""
+
+
+class ReconciliationRepository(Protocol):
+    def get_reconciliation(
+        self, tenant_id: str, source_id: str
+    ) -> Optional[ReconciliationSnapshot]:
+        """Return the last complete membership for exactly one source."""
+
+    def commit_reconciliation(
+        self,
+        snapshot: ReconciliationSnapshot,
+        checkpoint: SourceCheckpoint,
+    ) -> None:
+        """Atomically commit complete membership and its source checkpoint."""
 
 
 class EventPublisher(Protocol):

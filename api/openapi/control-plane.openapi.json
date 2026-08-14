@@ -2,40 +2,41 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Phase 1 reference API. Resource ingestion, current neighborhood queries, and immutable resource timelines are executable; resource collection, evidence, and investigation components remain contract-first where no endpoint is declared."
   },
   "servers": [{"url": "http://localhost:8080"}],
+  "security": [{"bearerAuth": []}],
   "paths": {
     "/healthz": {
       "get": {
         "operationId": "health",
+        "security": [],
         "responses": {"200": {"description": "Process is healthy"}}
       }
     },
     "/readyz": {
       "get": {
         "operationId": "ready",
+        "security": [],
         "responses": {"200": {"description": "Process is ready"}}
       }
     },
     "/v1/resources": {
       "get": {
         "operationId": "listResources",
-        "parameters": [{"$ref": "#/components/parameters/TenantId"}],
         "responses": {
           "200": {
             "description": "Tenant-scoped resources",
             "content": {"application/json": {"schema": {"type": "object", "required": ["items"], "properties": {"items": {"type": "array", "items": {"$ref": "../../contracts/schemas/resource.schema.json"}}}}}}
           },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
           "503": {"$ref": "#/components/responses/StorageUnavailable"}
         }
       },
       "post": {
         "operationId": "ingestResource",
         "parameters": [
-          {"$ref": "#/components/parameters/TenantId"},
-          {"$ref": "#/components/parameters/ActorId"},
           {"$ref": "#/components/parameters/CorrelationId"}
         ],
         "requestBody": {
@@ -45,6 +46,7 @@
         "responses": {
           "202": {"description": "Observation accepted", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/resource.schema.json"}}}},
           "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
           "403": {"$ref": "#/components/responses/PolicyDenied"},
           "409": {"$ref": "#/components/responses/ObservationConflict"},
           "503": {"$ref": "#/components/responses/StorageUnavailable"}
@@ -56,8 +58,6 @@
         "operationId": "getResourceNeighborhood",
         "parameters": [
           {"$ref": "#/components/parameters/ResourceUid"},
-          {"$ref": "#/components/parameters/TenantId"},
-          {"$ref": "#/components/parameters/ActorId"},
           {"name": "depth", "in": "query", "schema": {"type": "integer", "const": 1}, "description": "The v1alpha1 query supports exactly one hop."},
           {"name": "direction", "in": "query", "schema": {"type": "string", "enum": ["incoming", "outgoing", "both"], "default": "both"}},
           {"name": "relationshipType", "in": "query", "style": "form", "explode": true, "schema": {"type": "array", "maxItems": 32, "items": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,63}$"}}},
@@ -67,6 +67,7 @@
         "responses": {
           "200": {"description": "Current tenant-scoped depth-one resource neighborhood", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/resource-neighborhood.schema.json"}}}},
           "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
           "403": {"$ref": "#/components/responses/PolicyDenied"},
           "404": {"$ref": "#/components/responses/ResourceNotFound"},
           "503": {"$ref": "#/components/responses/StorageUnavailable"}
@@ -78,14 +79,13 @@
         "operationId": "getResourceTimeline",
         "parameters": [
           {"$ref": "#/components/parameters/ResourceUid"},
-          {"$ref": "#/components/parameters/TenantId"},
-          {"$ref": "#/components/parameters/ActorId"},
           {"$ref": "#/components/parameters/PageLimit"},
           {"$ref": "#/components/parameters/PageCursor"}
         ],
         "responses": {
           "200": {"description": "Ascending tenant-scoped immutable resource observations", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/resource-timeline.schema.json"}}}},
           "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
           "403": {"$ref": "#/components/responses/PolicyDenied"},
           "404": {"$ref": "#/components/responses/ResourceNotFound"},
           "503": {"$ref": "#/components/responses/StorageUnavailable"}
@@ -94,9 +94,14 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Bearer credential verified by the configured authenticator. Tenant, actor, and roles are derived from the verified identity and are never accepted from identity assertion headers."
+      }
+    },
     "parameters": {
-      "TenantId": {"name": "x-iip-tenant-id", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1}},
-      "ActorId": {"name": "x-iip-actor-id", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1}},
       "CorrelationId": {"name": "x-correlation-id", "in": "header", "required": false, "schema": {"type": "string", "minLength": 1}},
       "ResourceUid": {"name": "resourceUid", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}},
       "PageLimit": {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}},
@@ -116,6 +121,21 @@
       "Error": {"$ref": "../../contracts/schemas/error.schema.json"}
     },
     "responses": {
+      "Unauthorized": {
+        "description": "A valid Bearer credential is required",
+        "headers": {
+          "WWW-Authenticate": {"schema": {"type": "string", "const": "Bearer"}}
+        },
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/Error"},
+            "examples": {
+              "required": {"value": {"error": {"code": "authentication.required"}}},
+              "invalid": {"value": {"error": {"code": "authentication.invalid"}}}
+            }
+          }
+        }
+      },
       "InvalidRequest": {"description": "Contract validation failed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "PolicyDenied": {"description": "Policy denied the scoped action", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "ResourceNotFound": {

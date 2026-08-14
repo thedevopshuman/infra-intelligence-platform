@@ -20,6 +20,7 @@ services:
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
       IIP_DATABASE_AUTO_MIGRATE: "true"
+      IIP_AUTH_IDENTITIES_JSON: ${IIP_AUTH_IDENTITIES_JSON:?set IIP_AUTH_IDENTITIES_JSON}
       PGPASSWORD: ${IIP_POSTGRES_PASSWORD:?set IIP_POSTGRES_PASSWORD}
     depends_on:
       postgres:

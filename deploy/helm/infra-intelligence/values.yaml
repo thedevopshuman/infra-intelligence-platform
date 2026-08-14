@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.1.0"
+  tag: "0.2.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -45,6 +45,10 @@ database:
   existingSecret: ""
   secretKey: database-url
   autoMigrate: false
+
+auth:
+  existingSecret: ""
+  secretKey: identities-json
 
 resources:
   requests:

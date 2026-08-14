@@ -7,8 +7,7 @@ import { InfrastructureIntelligenceClient } from "@iip/sdk";
 
 const client = new InfrastructureIntelligenceClient({
   baseUrl: "http://localhost:8080",
-  tenantId: "local",
-  actorId: "developer",
+  bearerToken: token,
 });
 ```
 
@@ -19,3 +18,5 @@ The package also exports `Evidence`, `InvestigationRequest`, and `InvestigationR
 Resource observer integrations use the exported `ResourceCollectionRequest` and `ResourceCollectionResult` types. They describe capability payloads only; they do not expose server implementation classes or a not-yet-built plugin transport.
 
 `getResourceNeighborhood` and `getResourceTimeline` expose the paginated read models. Treat `nextCursor` as opaque and pass it back only with the same resource, direction, and relationship filters.
+
+Version 0.2 replaces the development-only `tenantId` and `actorId` options with `bearerToken`. The server derives tenant, actor, and roles after credential verification; the SDK does not send caller-controlled identity headers.

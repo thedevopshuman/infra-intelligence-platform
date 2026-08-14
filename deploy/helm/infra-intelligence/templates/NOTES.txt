@@ -3,4 +3,4 @@ The foundation API service is available inside the cluster at:
   http://{{ include "infra-intelligence.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}
 
 This chart is a development skeleton and is not production-ready.
-
+The API fails closed unless auth.existingSecret supplies a valid identities-json verifier configuration.

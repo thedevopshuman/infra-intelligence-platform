@@ -115,7 +115,7 @@ The initial Helm chart deploys the reference API and accepts an existing Secret 
 
 ## Cross-cutting invariants
 
-- Tenant ID is established from authenticated context, not trusted from payload alone.
+- Tenant ID, actor ID, and roles are derived through the [authentication boundary](authentication-boundary.md), not trusted from payloads or identity assertion headers.
 - Source events are immutable; corrections are new events.
 - Resource identity is stable across observations and display-name changes.
 - Side effects carry idempotency keys and emit before/after audit records.

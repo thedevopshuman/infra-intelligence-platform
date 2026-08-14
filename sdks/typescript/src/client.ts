@@ -8,8 +8,7 @@ import type {
 
 export interface ClientOptions {
   baseUrl: string;
-  tenantId: string;
-  actorId: string;
+  bearerToken: string;
   fetch?: typeof globalThis.fetch;
 }
 
@@ -24,14 +23,13 @@ export class PlatformApiError extends Error {
 
 export class InfrastructureIntelligenceClient {
   private readonly baseUrl: string;
-  private readonly tenantId: string;
-  private readonly actorId: string;
+  private readonly bearerToken: string;
   private readonly fetcher: typeof globalThis.fetch;
 
   constructor(options: ClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
-    this.tenantId = options.tenantId;
-    this.actorId = options.actorId;
+    if (!options.bearerToken) throw new Error("bearerToken is required");
+    this.bearerToken = options.bearerToken;
     this.fetcher = options.fetch ?? globalThis.fetch;
   }
 
@@ -97,8 +95,7 @@ export class InfrastructureIntelligenceClient {
   private headers(correlationId?: string): Record<string, string> {
     const headers: Record<string, string> = {
       "content-type": "application/json",
-      "x-iip-tenant-id": this.tenantId,
-      "x-iip-actor-id": this.actorId,
+      authorization: `Bearer ${this.bearerToken}`,
     };
     if (correlationId) headers["x-correlation-id"] = correlationId;
     return headers;

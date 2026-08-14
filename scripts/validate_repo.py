@@ -22,10 +22,12 @@ REQUIRED_PATHS = (
     "AGENTS.md",
     "docs/product/constitution.md",
     "docs/architecture/overview.md",
+    "docs/architecture/authentication-boundary.md",
     "docs/architecture/evidence-collection-pipeline.md",
     "docs/research/opensre-reference-analysis.md",
     "docs/research/brand/README.md",
     "docs/roadmap/initial-roadmap.md",
+    "docs/decisions/0005-credential-derived-request-identity.md",
     "contracts/schemas/resource.schema.json",
     "contracts/schemas/resource-collection-request.schema.json",
     "contracts/schemas/resource-collection-result.schema.json",
@@ -59,8 +61,10 @@ REQUIRED_PATHS = (
     "requirements/verify.txt",
     "scripts/validate_schemas.py",
     "src/iip/application/collect_evidence.py",
+    "src/iip/adapters/auth.py",
     "src/iip/adapters/evidence.py",
     "tests/test_evidence_collection.py",
+    "tests/test_authentication.py",
     "api/openapi/control-plane.openapi.json",
     "deploy/helm/infra-intelligence/Chart.yaml",
 )
@@ -105,6 +109,67 @@ def validate_schema_metadata(documents: Mapping[Path, object], errors: List[str]
             fail(errors, f"duplicate schema $id: {identifier}")
         else:
             identifiers.add(identifier)
+
+
+def validate_authentication_boundary(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Prevent caller-controlled identity from returning to the HTTP boundary."""
+
+    openapi_path = ROOT / "api" / "openapi" / "control-plane.openapi.json"
+    openapi = documents.get(openapi_path)
+    if not isinstance(openapi, dict):
+        fail(errors, "OpenAPI document must be an object")
+        return
+    if openapi.get("security") != [{"bearerAuth": []}]:
+        fail(errors, "OpenAPI protected operations must inherit Bearer authentication")
+    components = openapi.get("components")
+    if not isinstance(components, dict):
+        fail(errors, "OpenAPI components must be an object")
+        return
+    security_schemes = components.get("securitySchemes")
+    bearer = (
+        security_schemes.get("bearerAuth")
+        if isinstance(security_schemes, dict)
+        else None
+    )
+    if not isinstance(bearer, dict) or (
+        bearer.get("type") != "http" or bearer.get("scheme") != "bearer"
+    ):
+        fail(errors, "OpenAPI bearerAuth security scheme is missing or invalid")
+
+    paths = openapi.get("paths")
+    if not isinstance(paths, dict):
+        fail(errors, "OpenAPI paths must be an object")
+        return
+    for public_path in ("/healthz", "/readyz"):
+        item = paths.get(public_path)
+        operation = item.get("get") if isinstance(item, dict) else None
+        if not isinstance(operation, dict) or operation.get("security") != []:
+            fail(errors, f"{public_path} must explicitly remain unauthenticated")
+    for path, item in paths.items():
+        if not path.startswith("/v1") or not isinstance(item, dict):
+            continue
+        for method, operation in item.items():
+            if method not in ("get", "post", "put", "patch", "delete"):
+                continue
+            responses = operation.get("responses") if isinstance(operation, dict) else None
+            if not isinstance(responses, dict) or "401" not in responses:
+                fail(errors, f"OpenAPI {method.upper()} {path} must declare HTTP 401")
+
+    encoded = json.dumps(openapi, sort_keys=True).lower()
+    for header in ("x-iip-tenant-id", "x-iip-actor-id"):
+        if header in encoded:
+            fail(errors, f"OpenAPI must not accept legacy identity header {header}")
+    for relative in (
+        "src/iip/surfaces/http.py",
+        "sdks/python/src/infra_intelligence_sdk/client.py",
+        "sdks/typescript/src/client.ts",
+    ):
+        content = (ROOT / relative).read_text(encoding="utf-8").lower()
+        for header in ("x-iip-tenant-id", "x-iip-actor-id"):
+            if header in content:
+                fail(errors, f"legacy identity header remains in {relative}: {header}")
 
 
 def canonical_digest(document: object) -> str:
@@ -914,6 +979,7 @@ def main() -> int:
     validate_required_paths(errors)
     documents = load_json_documents(errors)
     validate_schema_metadata(documents, errors)
+    validate_authentication_boundary(documents, errors)
     validate_examples(documents, errors)
     validate_python_boundaries(errors)
     validate_markdown_links(errors)

@@ -13,6 +13,8 @@ The authenticated gateway establishes tenant and actor context. Payload tenant f
 
 Cross-tenant operations are a separate privileged use case with explicit policy and audit; they are not implemented by omitting the tenant predicate.
 
+The Phase 1 HTTP surface follows the [authentication boundary](authentication-boundary.md): a replaceable authenticator verifies a Bearer credential and derives actor, tenant, and roles before any protected use case runs. Caller-controlled identity headers are ignored. The hashed opaque-token adapter is restricted to local development and tests; production identity-provider selection remains open.
+
 ## Authority levels
 
 | Level | May do | Default approval |
@@ -47,4 +49,3 @@ Plugins are signed artifacts with immutable version and digest, explicit network
 ## Audit minimum
 
 Record actor, tenant, action, target, request/correlation/causation IDs, manifest and plugin versions, policy input hash and decision, tool input/output hashes, evidence references, approval identity, idempotency key, result, and timestamps. Never record raw secrets.
-

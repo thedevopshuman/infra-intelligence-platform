@@ -8,6 +8,7 @@ from http import HTTPStatus
 from pathlib import Path
 from unittest.mock import patch
 
+from iip.adapters.auth import BearerIdentity, HashedBearerAuthenticator
 from iip.adapters.memory import AllowTenantPolicy, InMemoryResourceStore
 from iip.application.ingest_resource import (
     IngestResourceCommand,
@@ -15,7 +16,7 @@ from iip.application.ingest_resource import (
     ResourceIngestionService,
     StaleObservationError,
 )
-from iip.application.ports import ActorContext
+from iip.application.ports import ActorContext, AuthenticationError
 from iip.application.query_resources import (
     InvalidCursorError,
     InvalidQueryError,
@@ -30,6 +31,8 @@ from infra_intelligence_sdk import Client
 
 
 ROOT = Path(__file__).resolve().parents[1]
+LOCAL_TOKEN = "local-reference-token-0000000000000001"
+OTHER_TOKEN = "other-reference-token-0000000000000001"
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import validate_schemas  # noqa: E402
@@ -267,7 +270,19 @@ class ResourceQueryTests(unittest.TestCase):
 
 class ResourceQueryHttpTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.runtime = build_local_runtime()
+        authenticator = HashedBearerAuthenticator(
+            (
+                BearerIdentity(
+                    HashedBearerAuthenticator.token_sha256(LOCAL_TOKEN),
+                    ActorContext("developer", "local", ("developer",)),
+                ),
+                BearerIdentity(
+                    HashedBearerAuthenticator.token_sha256(OTHER_TOKEN),
+                    ActorContext("other-developer", "another-tenant", ("developer",)),
+                ),
+            )
+        )
+        self.runtime = build_local_runtime(authenticator)
         self.actor = ActorContext("developer", "local")
         target = Resource.from_dict(
             resource_payload("settings", 1, resource_type="core/configmap")
@@ -283,15 +298,19 @@ class ResourceQueryHttpTests(unittest.TestCase):
         self.handler = object.__new__(ApiHandler)
         self.handler.runtime = self.runtime
         self.handler.headers = {
-            "x-iip-tenant-id": "local",
-            "x-iip-actor-id": "developer",
+            "authorization": f"Bearer {LOCAL_TOKEN}",
         }
         self.responses: list[tuple[HTTPStatus, dict]] = []
         self.handler._json = lambda status, payload: self.responses.append((status, payload))
 
     def query(self, kind: str, query: str = "") -> tuple[HTTPStatus, dict]:
         self.responses.clear()
-        self.handler._query_resource(self.root_uid, kind, query)
+        try:
+            actor = self.handler._actor()
+        except AuthenticationError as exc:
+            self.handler._authentication_failed(exc)
+        else:
+            self.handler._query_resource(actor, self.root_uid, kind, query)
         self.assertEqual(len(self.responses), 1)
         return self.responses[0]
 
@@ -329,18 +348,28 @@ class ResourceQueryHttpTests(unittest.TestCase):
         self.assertEqual(status, HTTPStatus.BAD_REQUEST)
         self.assertEqual(payload["error"]["code"], "pagination.cursor_invalid")
 
-        self.handler.headers["x-iip-tenant-id"] = "another-tenant"
+        self.handler.headers = {
+            "authorization": f"Bearer {OTHER_TOKEN}",
+            "x-iip-tenant-id": "local",
+            "x-iip-actor-id": "developer",
+        }
         status, payload = self.query("timeline")
         self.assertEqual(status, HTTPStatus.NOT_FOUND)
         self.assertEqual(payload["error"]["code"], "resource.not_found")
 
         self.handler.headers = {
             "x-iip-tenant-id": "local",
-            "x-iip-actor-id": "anonymous",
+            "x-iip-actor-id": "developer",
+            "authorization": "Bearer invalid-reference-token-00000000000001",
         }
         status, payload = self.query("neighborhood")
-        self.assertEqual(status, HTTPStatus.FORBIDDEN)
-        self.assertEqual(payload["error"]["code"], "policy.denied")
+        self.assertEqual(status, HTTPStatus.UNAUTHORIZED)
+        self.assertEqual(payload["error"]["code"], "authentication.invalid")
+
+        self.handler.headers = {}
+        status, payload = self.query("timeline")
+        self.assertEqual(status, HTTPStatus.UNAUTHORIZED)
+        self.assertEqual(payload["error"]["code"], "authentication.required")
 
     def test_python_sdk_builds_query_urls_and_parses_public_envelopes(self) -> None:
         neighborhood = json.loads(
@@ -367,7 +396,7 @@ class ResourceQueryHttpTests(unittest.TestCase):
             def read(self) -> bytes:
                 return json.dumps(self.payload).encode("utf-8")
 
-        client = Client("https://control.example", "local", "developer")
+        client = Client("https://control.example", LOCAL_TOKEN)
         with patch(
             "infra_intelligence_sdk.client.urlopen",
             side_effect=(Response(neighborhood), Response(timeline)),
@@ -384,9 +413,16 @@ class ResourceQueryHttpTests(unittest.TestCase):
         self.assertEqual(parsed_timeline.to_dict(), timeline)
         first_url = send.call_args_list[0].args[0].full_url
         second_url = send.call_args_list[1].args[0].full_url
+        first_request = send.call_args_list[0].args[0]
         self.assertIn("/neighborhood?", first_url)
         self.assertIn("relationshipType=depends_on", first_url)
         self.assertIn("/timeline?limit=1", second_url)
+        self.assertEqual(
+            first_request.get_header("Authorization"),
+            f"Bearer {LOCAL_TOKEN}",
+        )
+        self.assertIsNone(first_request.get_header("X-iip-tenant-id"))
+        self.assertIsNone(first_request.get_header("X-iip-actor-id"))
 
 
 if __name__ == "__main__":

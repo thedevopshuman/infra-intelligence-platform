@@ -23,6 +23,7 @@ python3 -m pip install --requirement requirements/verify.txt
 make verify
 # With Docker Desktop running:
 make test-postgres
+# Configure a local Bearer identity as described in docs/operations/local-development.md.
 make run
 ```
 
@@ -32,10 +33,11 @@ Then, in another terminal:
 curl http://localhost:8080/healthz
 curl -X POST http://localhost:8080/v1/resources \
   -H 'content-type: application/json' \
+  -H "authorization: Bearer $IIP_DEV_BEARER_TOKEN" \
   --data @contracts/examples/resource.json
 ```
 
-The API is a narrow vertical slice: validate and authorize a resource observation, apply ordering, atomically retain its projection, relationship index, history, event, and outbox record in the PostgreSQL profile, then expose tenant-scoped neighborhood and timeline queries. The default local profile remains in memory.
+The API is a narrow vertical slice: authenticate a Bearer credential into actor and tenant context, validate and authorize a resource observation, apply ordering, atomically retain its projection, relationship index, history, event, and outbox record in the PostgreSQL profile, then expose tenant-scoped neighborhood and timeline queries. The default local profile remains in memory.
 
 ## Repository map
 

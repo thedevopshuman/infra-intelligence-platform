@@ -17,6 +17,14 @@ class PersistenceError(RuntimeError):
     """Provider-neutral durable-store failure with a stable external code."""
 
 
+class AuthenticationError(PermissionError):
+    """Credential authentication failure with a stable external code."""
+
+
+class AuthenticationConfigurationError(RuntimeError):
+    """Fail-closed authentication configuration error."""
+
+
 @dataclass(frozen=True)
 class ActorContext:
     """Authenticated actor and tenant scope supplied by a surface."""
@@ -224,6 +232,11 @@ class PolicyDecisionPoint(Protocol):
         resource: Mapping[str, object],
     ) -> PolicyDecision:
         """Decide one action without granting authority beyond this request."""
+
+
+class Authenticator(Protocol):
+    def authenticate_bearer(self, token: str) -> ActorContext:
+        """Derive actor and tenant context from one presented Bearer credential."""
 
 
 class EvidenceProvider(Protocol):

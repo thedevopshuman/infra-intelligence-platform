@@ -5,7 +5,7 @@ This package contains public transport and model types only. It does not import 
 ```python
 from infra_intelligence_sdk import Client, ResourceObservation
 
-client = Client("http://localhost:8080", tenant_id="local", actor_id="developer")
+client = Client("http://localhost:8080", bearer_token=token)
 accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 ```
 
@@ -18,3 +18,5 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 `ResourceCollectionRequest` and `ResourceCollectionResult` expose the bounded public interface used by resource-observer plugins. These lightweight envelope types do not import the server kernel or imply that the future plugin handshake is implemented.
 
 `Client.get_resource_neighborhood` and `Client.get_resource_timeline` return the corresponding paginated public envelopes. Pass `spec.page.nextCursor` back unchanged to continue; the cursor is query- and tenant-bound and does not grant authority.
+
+Version 0.2 removes the development-only `tenant_id` and `actor_id` constructor arguments. Supply a Bearer credential instead; the authenticated server derives tenant, actor, and roles from that credential. The SDK never sends identity assertion headers.

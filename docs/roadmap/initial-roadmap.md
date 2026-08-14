@@ -133,4 +133,4 @@ All working material stays under `docs/research/brand/` until accepted.
 7. **Completed:** Add graph neighborhood and resource timeline API queries.
 8. **Completed:** Define the evaluation scenario contract and one known Kubernetes failure.
 9. **Completed:** Implement evidence provider ports and content hashing/redaction metadata.
-10. Add authentication middleware that derives tenant/actor context and removes development header trust.
+10. **Completed:** Add authentication middleware that derives tenant/actor context and removes development header trust.

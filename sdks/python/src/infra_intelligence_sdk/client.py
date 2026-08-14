@@ -13,18 +13,18 @@ from .models import ResourceNeighborhood, ResourceObservation, ResourceTimeline
 
 
 class Client:
-    """Tenant- and actor-scoped control-plane client."""
+    """Bearer-authenticated control-plane client."""
 
     def __init__(
         self,
         base_url: str,
-        tenant_id: str,
-        actor_id: str,
+        bearer_token: str,
         timeout_seconds: float = 30.0,
     ) -> None:
         self._base_url = base_url.rstrip("/")
-        self._tenant_id = tenant_id
-        self._actor_id = actor_id
+        if not isinstance(bearer_token, str) or not bearer_token:
+            raise ValueError("bearer_token must be a non-empty string")
+        self._bearer_token = bearer_token
         self._timeout = timeout_seconds
 
     def ingest_resource(
@@ -106,8 +106,7 @@ class Client:
     def _headers(self, correlation_id: Optional[str]) -> Dict[str, str]:
         headers = {
             "content-type": "application/json",
-            "x-iip-tenant-id": self._tenant_id,
-            "x-iip-actor-id": self._actor_id,
+            "authorization": f"Bearer {self._bearer_token}",
         }
         if correlation_id:
             headers["x-correlation-id"] = correlation_id

@@ -39,20 +39,30 @@ Docker Desktop Kubernetes can become the local live-collector integration enviro
 
 ## Run the reference API
 
+Create a high-entropy local Bearer token and configure only its SHA-256 verifier. Keep the token in the current shell; do not commit it, paste it into documentation, or place it in request payloads.
+
+```bash
+export IIP_DEV_BEARER_TOKEN="$(openssl rand -hex 32)"
+IIP_DEV_TOKEN_DIGEST="$(printf '%s' "$IIP_DEV_BEARER_TOKEN" | shasum -a 256 | awk '{print $1}')"
+export IIP_AUTH_IDENTITIES_JSON="{\"identities\":[{\"tokenSha256\":\"sha256:${IIP_DEV_TOKEN_DIGEST}\",\"actorId\":\"local-developer\",\"tenantId\":\"local\",\"roles\":[\"developer\"]}]}"
+```
+
+The verifier configuration is not a raw credential, but it must still be protected because weak tokens could be guessed offline. The generated token has 256 bits of entropy. The API fails closed at startup when authentication configuration is absent or malformed.
+
 ```bash
 make run
 ```
 
-The local surface trusts development-only headers and stores everything in memory. It is intentionally not production-authenticated or durable.
+The local surface stores resources in memory. Its hashed opaque-token authenticator is a local reference boundary, not a production identity provider.
 
 ```bash
 curl -X POST http://localhost:8080/v1/resources \
   -H 'content-type: application/json' \
-  -H 'x-iip-tenant-id: local' \
-  -H 'x-iip-actor-id: developer' \
+  -H "authorization: Bearer $IIP_DEV_BEARER_TOKEN" \
   --data @contracts/examples/resource.json
 
-curl -H 'x-iip-tenant-id: local' http://localhost:8080/v1/resources
+curl -H "authorization: Bearer $IIP_DEV_BEARER_TOKEN" \
+  http://localhost:8080/v1/resources
 ```
 
 ## Run the durable Docker profile
@@ -61,8 +71,11 @@ The Compose profile requires a local-only password supplied at runtime and never
 
 ```bash
 export IIP_POSTGRES_PASSWORD="$(openssl rand -hex 24)"
-docker compose -f deploy/docker-compose.yml up --build
+docker compose -f deploy/docker-compose.yml up --build --detach
+docker compose -f deploy/docker-compose.yml ps
 ```
+
+This is the long-running development stack visible in Docker Desktop: the API plus PostgreSQL and a named database volume. It differs from `make test-postgres`, whose test container and volume are always removed on exit. Stop the development stack with `docker compose -f deploy/docker-compose.yml down`; add `--volumes` only when you intentionally want to delete its local database.
 
 The API migrates the local Compose database on startup. Automatic migration is disabled by default in Helm and should be a separately controlled deployment step outside local development.
 
@@ -81,6 +94,7 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | --- | --- | --- |
 | `IIP_HTTP_HOST` | `0.0.0.0` | Reference API bind address |
 | `IIP_HTTP_PORT` | `8080` | Reference API port |
+| `IIP_AUTH_IDENTITIES_JSON` | required by API startup | Local Bearer-token verifier identities; supply through protected runtime configuration |
 | `IIP_DATABASE_URL` | unset | Select the PostgreSQL profile when set |
 | `IIP_DATABASE_AUTO_MIGRATE` | `false` | Apply packaged migrations at startup; local Compose only |
 | `IIP_TEST_DATABASE_URL` | unset | Enable PostgreSQL integration tests against an explicit test database |

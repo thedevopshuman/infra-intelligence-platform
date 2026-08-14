@@ -16,7 +16,7 @@ from iip.application.ingest_resource import (
     ObservationConflictError,
     StaleObservationError,
 )
-from iip.application.ports import ActorContext, PersistenceError
+from iip.application.ports import ActorContext, AuthenticationError, PersistenceError
 from iip.application.query_resources import (
     InvalidCursorError,
     InvalidQueryError,
@@ -30,10 +30,10 @@ from iip.bootstrap import Runtime, build_runtime_from_env
 
 
 class ApiHandler(BaseHTTPRequestHandler):
-    """Small HTTP adapter; production authentication and persistence are out of scope."""
+    """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.1"
+    server_version = "IIPReference/0.2"
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         parsed = urlparse(self.path)
@@ -41,13 +41,25 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path in ("/healthz", "/readyz"):
             self._json(HTTPStatus.OK, {"status": "ok"})
             return
+        segments = path.strip("/").split("/")
+        is_resource_query = (
+            len(segments) == 4
+            and segments[:2] == ["v1", "resources"]
+            and segments[3] in ("neighborhood", "timeline")
+        )
+        if path == "/v1/resources" or is_resource_query:
+            try:
+                actor = self._actor()
+            except AuthenticationError as exc:
+                self._authentication_failed(exc)
+                return
         if path == "/v1/resources":
             try:
                 if parsed.query:
                     raise InvalidQueryError("request.invalid")
                 items = [
                     resource.to_dict()
-                    for resource in self.runtime.queries.list_resources(self._actor())
+                    for resource in self.runtime.queries.list_resources(actor)
                 ]
                 self._json(HTTPStatus.OK, {"items": items})
             except QueryAuthorizationError:
@@ -60,13 +72,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                     {"error": {"code": "storage.unavailable"}},
                 )
             return
-        segments = path.strip("/").split("/")
-        if (
-            len(segments) == 4
-            and segments[:2] == ["v1", "resources"]
-            and segments[3] in ("neighborhood", "timeline")
-        ):
-            self._query_resource(segments[2], segments[3], parsed.query)
+        if is_resource_query:
+            self._query_resource(actor, segments[2], segments[3], parsed.query)
             return
         self._json(HTTPStatus.NOT_FOUND, {"error": {"code": "route.not_found"}})
 
@@ -75,8 +82,12 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.NOT_FOUND, {"error": {"code": "route.not_found"}})
             return
         try:
-            payload = self._read_json()
             actor = self._actor()
+        except AuthenticationError as exc:
+            self._authentication_failed(exc)
+            return
+        try:
+            payload = self._read_json()
             resource = self.runtime.ingestion.execute(
                 IngestResourceCommand(
                     actor=actor,
@@ -107,7 +118,13 @@ class ApiHandler(BaseHTTPRequestHandler):
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
             self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": "request.invalid_json"}})
 
-    def _query_resource(self, resource_uid: str, query_kind: str, query: str) -> None:
+    def _query_resource(
+        self,
+        actor: ActorContext,
+        resource_uid: str,
+        query_kind: str,
+        query: str,
+    ) -> None:
         try:
             try:
                 parameters = parse_qs(
@@ -124,7 +141,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 if "depth" in parameters and self._single(parameters, "depth") != "1":
                     raise InvalidQueryError("request.invalid")
                 result = self.runtime.queries.neighborhood(
-                    self._actor(),
+                    actor,
                     resource_uid,
                     direction=self._single(parameters, "direction", "both"),
                     relationship_types=parameters.get("relationshipType", []),
@@ -137,7 +154,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 if set(parameters).difference(allowed):
                     raise InvalidQueryError("request.invalid")
                 result = self.runtime.queries.timeline(
-                    self._actor(),
+                    actor,
                     resource_uid,
                     limit=self._limit(parameters),
                     cursor=self._single(parameters, "cursor", None),
@@ -161,11 +178,31 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
 
     def _actor(self) -> ActorContext:
-        return ActorContext(
-            actor_id=self.headers.get("x-iip-actor-id", "local-developer"),
-            tenant_id=self.headers.get("x-iip-tenant-id", "local"),
-            roles=("developer",),
-        )
+        get_all = getattr(self.headers, "get_all", None)
+        if callable(get_all):
+            values = get_all("authorization") or []
+        else:
+            value = self.headers.get("authorization")
+            values = [value] if value is not None else []
+        if not values:
+            raise AuthenticationError("authentication.required")
+        if len(values) != 1 or not isinstance(values[0], str):
+            raise AuthenticationError("authentication.invalid")
+        scheme, separator, token = values[0].partition(" ")
+        if (
+            scheme.lower() != "bearer"
+            or separator != " "
+            or not token
+            or any(character.isspace() for character in token)
+        ):
+            raise AuthenticationError("authentication.invalid")
+        return self.runtime.authenticator.authenticate_bearer(token)
+
+    def _authentication_failed(self, error: AuthenticationError) -> None:
+        code = str(error)
+        if code not in ("authentication.required", "authentication.invalid"):
+            code = "authentication.invalid"
+        self._json(HTTPStatus.UNAUTHORIZED, {"error": {"code": code}})
 
     @staticmethod
     def _single(
@@ -265,6 +302,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         self.send_response(status.value)
         self.send_header("content-type", "application/json")
+        if status == HTTPStatus.UNAUTHORIZED:
+            self.send_header("WWW-Authenticate", "Bearer")
         self.send_header("content-length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)

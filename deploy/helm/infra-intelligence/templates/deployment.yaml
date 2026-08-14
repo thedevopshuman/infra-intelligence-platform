@@ -39,13 +39,22 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "infra-intelligence.fullname" . }}
-          {{- if .Values.database.existingSecret }}
+          {{- if or .Values.database.existingSecret .Values.auth.existingSecret }}
           env:
+            {{- if .Values.database.existingSecret }}
             - name: IIP_DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.database.existingSecret | quote }}
                   key: {{ .Values.database.secretKey | quote }}
+            {{- end }}
+            {{- if .Values.auth.existingSecret }}
+            - name: IIP_AUTH_IDENTITIES_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.existingSecret | quote }}
+                  key: {{ .Values.auth.secretKey | quote }}
+            {{- end }}
           {{- end }}
           ports:
             - name: http

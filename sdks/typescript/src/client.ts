@@ -1,4 +1,10 @@
-import type { ApiErrorBody, ResourceObservation } from "./types.js";
+import type {
+  ApiErrorBody,
+  ResourceNeighborhood,
+  ResourceObservation,
+  ResourceTimeline,
+  ResourceUid,
+} from "./types.js";
 
 export interface ClientOptions {
   baseUrl: string;
@@ -50,6 +56,44 @@ export class InfrastructureIntelligenceClient {
     return result.items;
   }
 
+  async getResourceNeighborhood(
+    resourceUid: ResourceUid,
+    options: {
+      direction?: "incoming" | "outgoing" | "both";
+      relationshipTypes?: string[];
+      limit?: number;
+      cursor?: string;
+    } = {},
+  ): Promise<ResourceNeighborhood> {
+    const query = new URLSearchParams({
+      depth: "1",
+      direction: options.direction ?? "both",
+      limit: String(options.limit ?? 50),
+    });
+    for (const type of options.relationshipTypes ?? []) {
+      query.append("relationshipType", type);
+    }
+    if (options.cursor) query.set("cursor", options.cursor);
+    const response = await this.fetcher(
+      `${this.baseUrl}/v1/resources/${encodeURIComponent(resourceUid)}/neighborhood?${query}`,
+      { headers: this.headers() },
+    );
+    return this.read<ResourceNeighborhood>(response);
+  }
+
+  async getResourceTimeline(
+    resourceUid: ResourceUid,
+    options: { limit?: number; cursor?: string } = {},
+  ): Promise<ResourceTimeline> {
+    const query = new URLSearchParams({ limit: String(options.limit ?? 50) });
+    if (options.cursor) query.set("cursor", options.cursor);
+    const response = await this.fetcher(
+      `${this.baseUrl}/v1/resources/${encodeURIComponent(resourceUid)}/timeline?${query}`,
+      { headers: this.headers() },
+    );
+    return this.read<ResourceTimeline>(response);
+  }
+
   private headers(correlationId?: string): Record<string, string> {
     const headers: Record<string, string> = {
       "content-type": "application/json",
@@ -72,4 +116,3 @@ export class InfrastructureIntelligenceClient {
     return body as T;
   }
 }
-

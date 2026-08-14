@@ -122,6 +122,58 @@ export interface ResourceCollectionResult {
   };
 }
 
+export interface PageInfo {
+  limit: number;
+  hasMore: boolean;
+  nextCursor?: `p1.${string}`;
+}
+
+export interface ResourceGraphEdge {
+  id: `rel_${string}`;
+  observedResourceUid: ResourceUid;
+  type: string;
+  source: string;
+  target: string;
+  attributes: Record<string, unknown>;
+}
+
+export interface ResourceNeighborhood {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ResourceNeighborhood";
+  metadata: {
+    tenantId: string;
+    rootResourceUid: ResourceUid;
+  };
+  spec: {
+    depth: 1;
+    direction: "incoming" | "outgoing" | "both";
+    nodes: ResourceObservation[];
+    edges: ResourceGraphEdge[];
+    page: PageInfo;
+  };
+}
+
+export interface ResourceTimelineItem {
+  offset: number;
+  recordedAt: string;
+  disposition: "accepted" | "stale" | "conflict";
+  observationHash: string;
+  resource: ResourceObservation;
+}
+
+export interface ResourceTimeline {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ResourceTimeline";
+  metadata: {
+    tenantId: string;
+    resourceUid: ResourceUid;
+  };
+  spec: {
+    items: ResourceTimelineItem[];
+    page: PageInfo;
+  };
+}
+
 export interface PlatformEvent<TData extends Record<string, unknown> = Record<string, unknown>> {
   specversion: "1.0";
   id: string;

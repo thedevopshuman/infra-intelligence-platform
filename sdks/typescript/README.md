@@ -15,3 +15,5 @@ const client = new InfrastructureIntelligenceClient({
 The package also exports `Evidence`, `InvestigationRequest`, and `InvestigationReport` as transport-independent `v1alpha1` contract types. Client methods follow only when the corresponding API surface is executable.
 
 Resource observer integrations use the exported `ResourceCollectionRequest` and `ResourceCollectionResult` types. They describe capability payloads only; they do not expose server implementation classes or a not-yet-built plugin transport.
+
+`getResourceNeighborhood` and `getResourceTimeline` expose the paginated read models. Treat `nextCursor` as opaque and pass it back only with the same resource, direction, and relationship filters.

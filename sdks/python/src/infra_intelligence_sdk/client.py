@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 from urllib.error import HTTPError
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from .errors import ApiError
-from .models import ResourceObservation
+from .models import ResourceNeighborhood, ResourceObservation, ResourceTimeline
 
 
 class Client:
@@ -57,6 +58,51 @@ class Client:
             raise ApiError(200, "response.invalid")
         return [ResourceObservation.from_dict(item) for item in items]
 
+    def get_resource_neighborhood(
+        self,
+        resource_uid: str,
+        *,
+        direction: str = "both",
+        relationship_types: Iterable[str] = (),
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> ResourceNeighborhood:
+        """Read one tenant-scoped page of current graph relationships."""
+
+        query: list[tuple[str, str]] = [
+            ("depth", "1"),
+            ("direction", direction),
+            ("limit", str(limit)),
+        ]
+        query.extend(("relationshipType", value) for value in relationship_types)
+        if cursor is not None:
+            query.append(("cursor", cursor))
+        request = Request(
+            f"{self._base_url}/v1/resources/{quote(resource_uid, safe='')}/neighborhood?{urlencode(query)}",
+            headers=self._headers(None),
+            method="GET",
+        )
+        return ResourceNeighborhood.from_dict(self._send(request))
+
+    def get_resource_timeline(
+        self,
+        resource_uid: str,
+        *,
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> ResourceTimeline:
+        """Read one tenant-scoped page of immutable resource observations."""
+
+        query = [("limit", str(limit))]
+        if cursor is not None:
+            query.append(("cursor", cursor))
+        request = Request(
+            f"{self._base_url}/v1/resources/{quote(resource_uid, safe='')}/timeline?{urlencode(query)}",
+            headers=self._headers(None),
+            method="GET",
+        )
+        return ResourceTimeline.from_dict(self._send(request))
+
     def _headers(self, correlation_id: Optional[str]) -> Dict[str, str]:
         headers = {
             "content-type": "application/json",
@@ -81,4 +127,3 @@ class Client:
         if not isinstance(payload, dict):
             raise ApiError(200, "response.invalid")
         return payload
-

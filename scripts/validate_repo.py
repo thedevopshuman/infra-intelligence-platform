@@ -28,6 +28,10 @@ REQUIRED_PATHS = (
     "contracts/schemas/resource.schema.json",
     "contracts/schemas/resource-collection-request.schema.json",
     "contracts/schemas/resource-collection-result.schema.json",
+    "contracts/schemas/resource-neighborhood.schema.json",
+    "contracts/schemas/resource-timeline.schema.json",
+    "contracts/schemas/page-info.schema.json",
+    "contracts/schemas/error.schema.json",
     "contracts/schemas/event.schema.json",
     "contracts/schemas/agent-manifest.schema.json",
     "contracts/schemas/plugin-manifest.schema.json",
@@ -39,9 +43,14 @@ REQUIRED_PATHS = (
     "contracts/examples/investigation-report.json",
     "contracts/examples/resource-collection-request.json",
     "contracts/examples/resource-collection-result.json",
+    "contracts/examples/resource-neighborhood.json",
+    "contracts/examples/resource-timeline.json",
+    "contracts/examples/page-info.json",
+    "contracts/examples/error.json",
     "docs/specifications/evidence-contract.md",
     "docs/specifications/investigation-contract.md",
     "docs/specifications/resource-collection-contract.md",
+    "docs/specifications/resource-query-contract.md",
     "requirements/verify.in",
     "requirements/verify.txt",
     "scripts/validate_schemas.py",
@@ -223,6 +232,99 @@ def validate_collection_examples(
         fail(errors, "resource collection completion snapshotId must match its request")
 
 
+def validate_resource_query_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check graph and timeline semantics spanning their referenced resources."""
+
+    from iip.domain.models import PlatformEvent, Resource, index_resource_relationships
+
+    example_dir = ROOT / "contracts" / "examples"
+    neighborhood = documents.get(example_dir / "resource-neighborhood.json")
+    timeline = documents.get(example_dir / "resource-timeline.json")
+    if not isinstance(neighborhood, dict) or not isinstance(timeline, dict):
+        return
+    neighborhood_metadata = neighborhood.get("metadata")
+    neighborhood_spec = neighborhood.get("spec")
+    timeline_metadata = timeline.get("metadata")
+    timeline_spec = timeline.get("spec")
+    if not all(
+        isinstance(item, dict)
+        for item in (
+            neighborhood_metadata,
+            neighborhood_spec,
+            timeline_metadata,
+            timeline_spec,
+        )
+    ):
+        return
+
+    root_uid = neighborhood_metadata.get("rootResourceUid")
+    tenant_id = neighborhood_metadata.get("tenantId")
+    nodes = neighborhood_spec.get("nodes", [])
+    edges = neighborhood_spec.get("edges", [])
+    page = neighborhood_spec.get("page")
+    parsed_nodes = {}
+    if isinstance(nodes, list):
+        for payload in nodes:
+            if not isinstance(payload, dict):
+                continue
+            resource = Resource.from_dict(payload)
+            parsed_nodes[resource.identity.uid] = resource
+            if resource.identity.tenant_id != tenant_id:
+                fail(errors, "resource neighborhood nodes must share its tenant")
+    if root_uid not in parsed_nodes:
+        fail(errors, "resource neighborhood must contain its root node")
+    if isinstance(page, dict) and isinstance(edges, list):
+        if len(edges) > page.get("limit", -1):
+            fail(errors, "resource neighborhood edges exceed its page limit")
+        for edge in edges:
+            if not isinstance(edge, dict):
+                continue
+            if root_uid not in (edge.get("source"), edge.get("target")):
+                fail(errors, "resource neighborhood edge must touch its root")
+            observed_uid = edge.get("observedResourceUid")
+            observed = parsed_nodes.get(observed_uid)
+            if observed is None:
+                fail(errors, "resource neighborhood edge must include its observed resource")
+                continue
+            indexed = {item.edge_id: item for item in index_resource_relationships(observed)}
+            expected = indexed.get(edge.get("id"))
+            if expected is None or (
+                expected.relationship_type != edge.get("type")
+                or expected.source_ref != edge.get("source")
+                or expected.target_ref != edge.get("target")
+                or dict(expected.attributes) != edge.get("attributes")
+            ):
+                fail(errors, "resource neighborhood edge must match its observed projection")
+
+    timeline_uid = timeline_metadata.get("resourceUid")
+    timeline_tenant = timeline_metadata.get("tenantId")
+    items = timeline_spec.get("items", [])
+    timeline_page = timeline_spec.get("page")
+    offsets = []
+    if isinstance(items, list):
+        for item in items:
+            if not isinstance(item, dict) or not isinstance(item.get("resource"), dict):
+                continue
+            resource = Resource.from_dict(item["resource"])
+            offsets.append(item.get("offset"))
+            if (
+                resource.identity.uid != timeline_uid
+                or resource.identity.tenant_id != timeline_tenant
+            ):
+                fail(errors, "resource timeline items must match its resource and tenant")
+            if item.get("observationHash") != PlatformEvent.canonical_hash(
+                resource.to_dict()
+            ):
+                fail(errors, "resource timeline observationHash must match its resource")
+    if offsets != sorted(offsets):
+        fail(errors, "resource timeline offsets must be ascending")
+    if isinstance(timeline_page, dict) and isinstance(items, list):
+        if len(items) > timeline_page.get("limit", -1):
+            fail(errors, "resource timeline items exceed its page limit")
+
+
 def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> None:
     from iip.domain.models import ContractError, Resource
 
@@ -277,12 +379,15 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("investigation-report.json", "InvestigationReport"),
         ("resource-collection-request.json", "ResourceCollectionRequest"),
         ("resource-collection-result.json", "ResourceCollectionResult"),
+        ("resource-neighborhood.json", "ResourceNeighborhood"),
+        ("resource-timeline.json", "ResourceTimeline"),
     )
     for name, kind in versioned_examples:
         manifest = documents.get(example_dir / name)
         validate_versioned_envelope(manifest, filename=name, kind=kind, errors=errors)
 
     validate_collection_examples(documents, errors)
+    validate_resource_query_examples(documents, errors)
 
     plugin_example = documents.get(example_dir / "plugin-manifest.json")
     plugin_package = documents.get(ROOT / "plugins/examples/kubernetes-observer/plugin.json")

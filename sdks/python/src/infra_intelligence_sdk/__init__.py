@@ -8,8 +8,10 @@ from .models import (
     InvestigationRequest,
     ResourceCollectionRequest,
     ResourceCollectionResult,
+    ResourceNeighborhood,
     ResourceObservation,
     ResourceObservationCursor,
+    ResourceTimeline,
 )
 
 __all__ = [
@@ -20,7 +22,9 @@ __all__ = [
     "InvestigationRequest",
     "ResourceCollectionRequest",
     "ResourceCollectionResult",
+    "ResourceNeighborhood",
     "ResourceObservation",
     "ResourceObservationCursor",
+    "ResourceTimeline",
 ]
 __version__ = "0.1.0"

@@ -13,6 +13,7 @@ from iip.application.ports import (
     SourceCheckpointRepository,
 )
 from iip.application.ingest_resource import ResourceIngestionService
+from iip.application.query_resources import ResourceQueryService
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,7 @@ class Runtime:
     outbox: EventOutbox
     checkpoints: SourceCheckpointRepository
     ingestion: ResourceIngestionService
+    queries: ResourceQueryService
 
 
 def build_local_runtime() -> Runtime:
@@ -32,12 +34,14 @@ def build_local_runtime() -> Runtime:
     store = InMemoryResourceStore()
     policy = AllowTenantPolicy()
     ingestion = ResourceIngestionService(store, policy)
+    queries = ResourceQueryService(store, policy)
     return Runtime(
         resources=store,
         event_log=store,
         outbox=store,
         checkpoints=store,
         ingestion=ingestion,
+        queries=queries,
     )
 
 
@@ -51,12 +55,14 @@ def build_postgres_runtime(database_url: str, *, migrate: bool = False) -> Runti
         store.migrate()
     policy = AllowTenantPolicy()
     ingestion = ResourceIngestionService(store, policy)
+    queries = ResourceQueryService(store, policy)
     return Runtime(
         resources=store,
         event_log=store,
         outbox=store,
         checkpoints=store,
         ingestion=ingestion,
+        queries=queries,
     )
 
 

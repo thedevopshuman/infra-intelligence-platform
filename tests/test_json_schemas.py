@@ -110,6 +110,30 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("reasonCode" in error for error in errors))
 
+    def test_page_with_more_items_requires_next_cursor(self) -> None:
+        page = document("contracts/examples/page-info.json")
+        del page["nextCursor"]
+
+        errors = self.validate("page-info.schema.json", page)
+
+        self.assertTrue(any("nextCursor" in error for error in errors))
+
+    def test_terminal_page_prohibits_next_cursor(self) -> None:
+        page = document("contracts/examples/page-info.json")
+        page["hasMore"] = False
+
+        errors = self.validate("page-info.schema.json", page)
+
+        self.assertTrue(any("nextCursor" in error for error in errors))
+
+    def test_neighborhood_rejects_unbounded_depth(self) -> None:
+        neighborhood = document("contracts/examples/resource-neighborhood.json")
+        neighborhood["spec"]["depth"] = 2
+
+        errors = self.validate("resource-neighborhood.schema.json", neighborhood)
+
+        self.assertTrue(any("depth" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

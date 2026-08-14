@@ -24,11 +24,16 @@ from iip.domain.models import (
     ObservationDisposition,
     PlatformEvent,
     Resource,
+    ResourceRelationshipEdge,
     classify_resource_observation,
+    index_resource_relationships,
 )
 
 
-_MIGRATIONS = ("0001_resource_event_substrate.sql",)
+_MIGRATIONS = (
+    "0001_resource_event_substrate.sql",
+    "0002_resource_relationship_index.sql",
+)
 
 
 def _translate_database_errors(operation: Any) -> Any:
@@ -132,6 +137,7 @@ class PostgresResourceStore:
 
             if disposition == ObservationDisposition.ACCEPTED:
                 self._upsert_projection(connection, resource, observation_hash)
+                self._replace_relationships(connection, resource)
             self._insert_observation(
                 connection,
                 resource,
@@ -183,7 +189,32 @@ class PostgresResourceStore:
         return tuple(Resource.from_dict(row["document"]) for row in rows)
 
     @_translate_database_errors
-    def history(self, tenant_id: str, uid: str) -> Iterable[ResourceObservationRecord]:
+    def get_many(self, tenant_id: str, uids: Iterable[str]) -> Iterable[Resource]:
+        requested = tuple(sorted(set(uids)))
+        if not requested:
+            return ()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT document
+                FROM iip.resource_projections
+                WHERE tenant_id = %s AND resource_uid = ANY(%s)
+                ORDER BY resource_uid
+                """,
+                (tenant_id, list(requested)),
+            ).fetchall()
+        return tuple(Resource.from_dict(row["document"]) for row in rows)
+
+    @_translate_database_errors
+    def history(
+        self,
+        tenant_id: str,
+        uid: str,
+        *,
+        after_offset: int = 0,
+        limit: int = 1000,
+    ) -> Iterable[ResourceObservationRecord]:
+        self._validate_page(after_offset, limit)
         with self._connect() as connection:
             rows = connection.execute(
                 """
@@ -191,9 +222,11 @@ class PostgresResourceStore:
                        observation_hash, recorded_at
                 FROM iip.resource_observations
                 WHERE tenant_id = %s AND resource_uid = %s
+                  AND observation_offset > %s
                 ORDER BY observation_offset
+                LIMIT %s
                 """,
-                (tenant_id, uid),
+                (tenant_id, uid, after_offset, limit),
             ).fetchall()
         return tuple(
             ResourceObservationRecord(
@@ -202,6 +235,63 @@ class PostgresResourceStore:
                 disposition=ObservationDisposition(row["disposition"]),
                 observation_hash=row["observation_hash"],
                 recorded_at=self._rfc3339(row["recorded_at"]),
+            )
+            for row in rows
+        )
+
+    @_translate_database_errors
+    def relationships(
+        self,
+        tenant_id: str,
+        uid: str,
+        *,
+        direction: str = "both",
+        relationship_types: tuple[str, ...] = (),
+        after_edge_id: Optional[str] = None,
+        limit: int = 100,
+    ) -> Iterable[ResourceRelationshipEdge]:
+        self._validate_page(0, limit)
+        if direction not in ("incoming", "outgoing", "both"):
+            raise ValueError("direction is invalid")
+        direction_clause = {
+            "incoming": "target_ref = %s AND target_ref ~ '^res_[a-f0-9]{32}$'",
+            "outgoing": "source_ref = %s AND source_ref ~ '^res_[a-f0-9]{32}$'",
+            "both": "((source_ref = %s AND source_ref ~ '^res_[a-f0-9]{32}$') OR (target_ref = %s AND target_ref ~ '^res_[a-f0-9]{32}$'))",
+        }[direction]
+        parameters: list[Any] = [tenant_id]
+        if direction == "both":
+            parameters.extend((uid, uid))
+        else:
+            parameters.append(uid)
+        filters = [f"({direction_clause})"]
+        if relationship_types:
+            filters.append("relationship_type = ANY(%s)")
+            parameters.append(list(relationship_types))
+        if after_edge_id is not None:
+            filters.append("edge_id > %s")
+            parameters.append(after_edge_id)
+        parameters.append(limit)
+        where = " AND ".join(filters)
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT edge_id, observed_resource_uid, relationship_type,
+                       source_ref, target_ref, attributes
+                FROM iip.resource_relationships
+                WHERE tenant_id = %s AND {where}
+                ORDER BY edge_id
+                LIMIT %s
+                """,
+                parameters,
+            ).fetchall()
+        return tuple(
+            ResourceRelationshipEdge(
+                edge_id=row["edge_id"],
+                observed_resource_uid=row["observed_resource_uid"],
+                relationship_type=row["relationship_type"],
+                source_ref=row["source_ref"],
+                target_ref=row["target_ref"],
+                attributes=dict(row["attributes"]),
             )
             for row in rows
         )
@@ -450,6 +540,38 @@ class PostgresResourceStore:
                 Jsonb(resource.to_dict()),
             ),
         )
+
+    @staticmethod
+    def _replace_relationships(connection: Any, resource: Resource) -> None:
+        tenant_id = resource.identity.tenant_id
+        resource_uid = resource.identity.uid
+        connection.execute(
+            """
+            DELETE FROM iip.resource_relationships
+            WHERE tenant_id = %s AND observed_resource_uid = %s
+            """,
+            (tenant_id, resource_uid),
+        )
+        for edge in index_resource_relationships(resource):
+            connection.execute(
+                """
+                INSERT INTO iip.resource_relationships (
+                    tenant_id, edge_id, observed_resource_uid,
+                    relationship_type, source_ref, target_ref,
+                    attributes, observed_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    tenant_id,
+                    edge.edge_id,
+                    resource_uid,
+                    edge.relationship_type,
+                    edge.source_ref,
+                    edge.target_ref,
+                    Jsonb(dict(edge.attributes)),
+                    resource.observed_at,
+                ),
+            )
 
     @staticmethod
     def _append_event(connection: Any, event: PlatformEvent) -> int:

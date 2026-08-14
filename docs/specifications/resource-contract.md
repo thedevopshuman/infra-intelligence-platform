@@ -32,6 +32,8 @@ Relationships are typed edges from the observed resource to a target provider id
 
 An edge has observation provenance and time in storage even though the compact ingress contract inherits those from the resource observation. Disappearance requires an explicit reconciliation event; absence in one partial observation is not deletion.
 
+The read API canonicalizes direction, retains the asserting resource as provenance, and resolves only same-tenant platform UIDs into graph nodes. See the [resource query contract](resource-query-contract.md).
+
 ## Observation ordering
 
 `metadata.observation` makes source ordering explicit without treating wall-clock time as a sequence. It contains:

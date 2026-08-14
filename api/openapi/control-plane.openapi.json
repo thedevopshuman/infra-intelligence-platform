@@ -3,7 +3,7 @@
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
     "version": "0.1.0",
-    "description": "Foundation-stage API. Resource ingestion is executable; resource collection, evidence, and investigation components are published contract-first without implying executable control-plane endpoints."
+    "description": "Phase 1 reference API. Resource ingestion, current neighborhood queries, and immutable resource timelines are executable; resource collection, evidence, and investigation components remain contract-first where no endpoint is declared."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "paths": {
@@ -50,27 +50,83 @@
           "503": {"$ref": "#/components/responses/StorageUnavailable"}
         }
       }
+    },
+    "/v1/resources/{resourceUid}/neighborhood": {
+      "get": {
+        "operationId": "getResourceNeighborhood",
+        "parameters": [
+          {"$ref": "#/components/parameters/ResourceUid"},
+          {"$ref": "#/components/parameters/TenantId"},
+          {"$ref": "#/components/parameters/ActorId"},
+          {"name": "depth", "in": "query", "schema": {"type": "integer", "const": 1}, "description": "The v1alpha1 query supports exactly one hop."},
+          {"name": "direction", "in": "query", "schema": {"type": "string", "enum": ["incoming", "outgoing", "both"], "default": "both"}},
+          {"name": "relationshipType", "in": "query", "style": "form", "explode": true, "schema": {"type": "array", "maxItems": 32, "items": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,63}$"}}},
+          {"$ref": "#/components/parameters/PageLimit"},
+          {"$ref": "#/components/parameters/PageCursor"}
+        ],
+        "responses": {
+          "200": {"description": "Current tenant-scoped depth-one resource neighborhood", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/resource-neighborhood.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/resources/{resourceUid}/timeline": {
+      "get": {
+        "operationId": "getResourceTimeline",
+        "parameters": [
+          {"$ref": "#/components/parameters/ResourceUid"},
+          {"$ref": "#/components/parameters/TenantId"},
+          {"$ref": "#/components/parameters/ActorId"},
+          {"$ref": "#/components/parameters/PageLimit"},
+          {"$ref": "#/components/parameters/PageCursor"}
+        ],
+        "responses": {
+          "200": {"description": "Ascending tenant-scoped immutable resource observations", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/resource-timeline.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
     }
   },
   "components": {
     "parameters": {
       "TenantId": {"name": "x-iip-tenant-id", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1}},
       "ActorId": {"name": "x-iip-actor-id", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1}},
-      "CorrelationId": {"name": "x-correlation-id", "in": "header", "required": false, "schema": {"type": "string", "minLength": 1}}
+      "CorrelationId": {"name": "x-correlation-id", "in": "header", "required": false, "schema": {"type": "string", "minLength": 1}},
+      "ResourceUid": {"name": "resourceUid", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}},
+      "PageLimit": {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}},
+      "PageCursor": {"name": "cursor", "in": "query", "required": false, "schema": {"type": "string", "pattern": "^p1\\.[A-Za-z0-9_-]+$", "maxLength": 2048}}
     },
     "schemas": {
       "Resource": {"$ref": "../../contracts/schemas/resource.schema.json"},
       "ResourceCollectionRequest": {"$ref": "../../contracts/schemas/resource-collection-request.schema.json"},
       "ResourceCollectionResult": {"$ref": "../../contracts/schemas/resource-collection-result.schema.json"},
+      "ResourceNeighborhood": {"$ref": "../../contracts/schemas/resource-neighborhood.schema.json"},
+      "ResourceTimeline": {"$ref": "../../contracts/schemas/resource-timeline.schema.json"},
+      "PageInfo": {"$ref": "../../contracts/schemas/page-info.schema.json"},
       "Event": {"$ref": "../../contracts/schemas/event.schema.json"},
       "Evidence": {"$ref": "../../contracts/schemas/evidence.schema.json"},
       "InvestigationRequest": {"$ref": "../../contracts/schemas/investigation-request.schema.json"},
       "InvestigationReport": {"$ref": "../../contracts/schemas/investigation-report.schema.json"},
-      "Error": {"type": "object", "required": ["error"], "properties": {"error": {"type": "object", "required": ["code"], "properties": {"code": {"type": "string"}}}}}
+      "Error": {"$ref": "../../contracts/schemas/error.schema.json"}
     },
     "responses": {
       "InvalidRequest": {"description": "Contract validation failed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "PolicyDenied": {"description": "Policy denied the scoped action", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "ResourceNotFound": {
+        "description": "The resource is not visible in the tenant scope",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/Error"},
+            "example": {"error": {"code": "resource.not_found"}}
+          }
+        }
+      },
       "StorageUnavailable": {
         "description": "The authoritative store is temporarily unavailable",
         "content": {

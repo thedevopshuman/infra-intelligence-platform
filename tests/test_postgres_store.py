@@ -70,7 +70,8 @@ class PostgresResourceStoreTests(unittest.TestCase):
         with psycopg.connect(DATABASE_URL) as connection:
             connection.execute(
                 """
-                TRUNCATE iip.source_checkpoints, iip.event_outbox,
+                TRUNCATE iip.resource_relationships,
+                         iip.source_checkpoints, iip.event_outbox,
                          iip.event_log, iip.resource_observations,
                          iip.resource_projections
                 RESTART IDENTITY CASCADE
@@ -178,6 +179,66 @@ class PostgresResourceStoreTests(unittest.TestCase):
             )
         )
 
+    def test_relationship_index_and_timeline_pages_track_latest_projection(self) -> None:
+        target_payload = resource_payload()
+        target_payload["spec"]["type"] = "core/configmap"
+        target_payload["spec"]["externalId"] = "cluster-local/default/settings"
+        target_payload["spec"]["displayName"] = "settings"
+        target_payload["spec"]["relationships"] = []
+        target_payload["metadata"]["observation"]["sequence"] = 41
+        target = self.service.execute(
+            IngestResourceCommand(ActorContext("collector", "local"), target_payload)
+        )
+        source_payload = resource_payload()
+        source_payload["spec"]["relationships"] = [
+            {"type": "depends_on", "target": target.identity.uid}
+        ]
+        source = self.service.execute(
+            IngestResourceCommand(ActorContext("collector", "local"), source_payload)
+        )
+
+        outgoing = tuple(
+            self.store.relationships("local", source.identity.uid, direction="outgoing")
+        )
+        incoming = tuple(
+            self.store.relationships("local", target.identity.uid, direction="incoming")
+        )
+        resolved = tuple(
+            self.store.get_many("local", (source.identity.uid, target.identity.uid))
+        )
+
+        self.assertEqual(outgoing, incoming)
+        self.assertEqual(outgoing[0].relationship_type, "depends_on")
+        self.assertEqual(
+            {item.identity.uid for item in resolved},
+            {source.identity.uid, target.identity.uid},
+        )
+        self.assertEqual(tuple(self.store.relationships("another-tenant", source.identity.uid)), ())
+
+        replacement = resource_payload()
+        replacement["metadata"]["observation"]["sequence"] = 43
+        replacement["spec"]["relationships"] = []
+        self.service.execute(
+            IngestResourceCommand(ActorContext("collector", "local"), replacement)
+        )
+
+        self.assertEqual(
+            tuple(self.store.relationships("local", source.identity.uid, direction="outgoing")),
+            (),
+        )
+        first = tuple(self.store.history("local", source.identity.uid, limit=1))
+        second = tuple(
+            self.store.history(
+                "local",
+                source.identity.uid,
+                after_offset=first[0].offset,
+                limit=1,
+            )
+        )
+        self.assertEqual(len(first), 1)
+        self.assertEqual(len(second), 1)
+        self.assertGreater(second[0].offset, first[0].offset)
+
     def test_concurrent_duplicate_delivery_emits_one_event(self) -> None:
         barrier = Barrier(2)
 
@@ -241,6 +302,10 @@ class PostgresResourceStoreTests(unittest.TestCase):
                 connection.execute("DROP FUNCTION iip.reject_outbox_insert()")
 
         self.assertIsNone(self.store.get("local", resource.identity.uid))
+        self.assertEqual(
+            tuple(self.store.relationships("local", resource.identity.uid)),
+            (),
+        )
         self.assertEqual(tuple(self.store.history("local", resource.identity.uid)), ())
         self.assertEqual(tuple(self.store.list_events("local")), ())
         self.assertIsNone(self.store.get_checkpoint("local", "kubernetes-local"))

@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "pagination.cursor_invalid",
+    "requestId": "request-example-1"
+  }
+}

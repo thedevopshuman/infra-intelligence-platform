@@ -5,7 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Mapping, Optional, Protocol
 
-from iip.domain.models import ObservationDisposition, PlatformEvent, Resource
+from iip.domain.models import (
+    ObservationDisposition,
+    PlatformEvent,
+    Resource,
+    ResourceRelationshipEdge,
+)
 
 
 class PersistenceError(RuntimeError):
@@ -84,8 +89,30 @@ class ResourceRepository(Protocol):
     def list(self, tenant_id: str) -> Iterable[Resource]:
         """List resources visible in the requested tenant scope."""
 
-    def history(self, tenant_id: str, uid: str) -> Iterable[ResourceObservationRecord]:
-        """Return immutable observations only from the requested tenant scope."""
+    def get_many(self, tenant_id: str, uids: Iterable[str]) -> Iterable[Resource]:
+        """Resolve a bounded resource set only within the requested tenant scope."""
+
+    def history(
+        self,
+        tenant_id: str,
+        uid: str,
+        *,
+        after_offset: int = 0,
+        limit: int = 1000,
+    ) -> Iterable[ResourceObservationRecord]:
+        """Page immutable observations only from the requested tenant scope."""
+
+    def relationships(
+        self,
+        tenant_id: str,
+        uid: str,
+        *,
+        direction: str = "both",
+        relationship_types: tuple[str, ...] = (),
+        after_edge_id: Optional[str] = None,
+        limit: int = 100,
+    ) -> Iterable[ResourceRelationshipEdge]:
+        """Page current graph edges touching one tenant-scoped resource."""
 
 
 class ResourceObservationStore(ResourceRepository, Protocol):

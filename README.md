@@ -35,7 +35,7 @@ curl -X POST http://localhost:8080/v1/resources \
   --data @contracts/examples/resource.json
 ```
 
-The API is a narrow vertical slice: validate and authorize a resource observation, apply ordering, and atomically retain its projection, history, event, and outbox record in the PostgreSQL profile. The default local profile remains in memory.
+The API is a narrow vertical slice: validate and authorize a resource observation, apply ordering, atomically retain its projection, relationship index, history, event, and outbox record in the PostgreSQL profile, then expose tenant-scoped neighborhood and timeline queries. The default local profile remains in memory.
 
 ## Repository map
 

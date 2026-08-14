@@ -12,6 +12,8 @@ from infra_intelligence_sdk import (
     InvestigationRequest,
     ResourceCollectionRequest,
     ResourceCollectionResult,
+    ResourceNeighborhood,
+    ResourceTimeline,
 )
 
 
@@ -36,12 +38,18 @@ class PublicContractSdkTests(unittest.TestCase):
         collection_result = ResourceCollectionResult.from_dict(
             example("resource-collection-result.json")
         )
+        neighborhood = ResourceNeighborhood.from_dict(
+            example("resource-neighborhood.json")
+        )
+        timeline = ResourceTimeline.from_dict(example("resource-timeline.json"))
 
         self.assertEqual(evidence.to_dict()["kind"], "Evidence")
         self.assertEqual(request.to_dict()["kind"], "InvestigationRequest")
         self.assertEqual(report.to_dict()["kind"], "InvestigationReport")
         self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")
         self.assertEqual(collection_result.to_dict()["kind"], "ResourceCollectionResult")
+        self.assertEqual(neighborhood.to_dict()["kind"], "ResourceNeighborhood")
+        self.assertEqual(timeline.to_dict()["kind"], "ResourceTimeline")
 
     def test_sdk_models_reject_crossed_contract_kinds(self) -> None:
         with self.assertRaisesRegex(ValueError, "kind must be Evidence"):

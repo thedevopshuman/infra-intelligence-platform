@@ -31,13 +31,17 @@ REQUIRED_FORMATS = frozenset({"date-time", "uri-reference"})
 SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "agent-manifest.schema.json": ("agent-manifest.json",),
     "event.schema.json": ("event.json",),
+    "error.schema.json": ("error.json",),
     "evidence.schema.json": ("evidence.json",),
     "investigation-report.schema.json": ("investigation-report.json",),
     "investigation-request.schema.json": ("investigation-request.json",),
     "plugin-manifest.schema.json": ("plugin-manifest.json",),
+    "page-info.schema.json": ("page-info.json",),
     "resource-collection-request.schema.json": ("resource-collection-request.json",),
     "resource-collection-result.schema.json": ("resource-collection-result.json",),
+    "resource-neighborhood.schema.json": ("resource-neighborhood.json",),
     "resource.schema.json": ("resource.json",),
+    "resource-timeline.schema.json": ("resource-timeline.json",),
 }
 
 

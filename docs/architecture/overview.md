@@ -97,7 +97,7 @@ The logical boundaries remain product-neutral. [ADR 0004](../decisions/0004-post
 
 | Store | Responsibility | Required semantics |
 | --- | --- | --- |
-| Resource graph | PostgreSQL latest view and observations; indexed relationship rows next | Tenant partitioning; idempotent upsert; time-aware provenance |
+| Resource graph | PostgreSQL latest view, immutable observations, and rebuildable relationship index | Tenant partitioning; idempotent upsert; time-aware provenance |
 | Event log | PostgreSQL immutable log and transactional outbox initially | At-least-once ingestion; deduplication by source + ID; replay |
 | Evidence store | Retrieved artifacts and content hashes | Immutable versions; retention policy; redaction metadata |
 | Workflow store | Durable state, approvals, idempotency | Crash-safe transitions; optimistic concurrency |

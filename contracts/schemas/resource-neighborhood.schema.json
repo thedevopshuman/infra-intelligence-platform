@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:resource-neighborhood:v1alpha1",
+  "title": "Infrastructure Intelligence Resource Neighborhood",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "ResourceNeighborhood"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId", "rootResourceUid"],
+      "properties": {
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "rootResourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["depth", "direction", "nodes", "edges", "page"],
+      "properties": {
+        "depth": {"const": 1},
+        "direction": {"type": "string", "enum": ["incoming", "outgoing", "both"]},
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 201,
+          "items": {"$ref": "urn:iip:contracts:resource:v1alpha1"}
+        },
+        "edges": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/edge"}
+        },
+        "page": {"$ref": "urn:iip:contracts:page-info:v1alpha1"}
+      }
+    }
+  },
+  "$defs": {
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "observedResourceUid", "type", "source", "target", "attributes"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^rel_[a-f0-9]{32}$"},
+        "observedResourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
+        "type": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,63}$"},
+        "source": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "target": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "attributes": {"type": "object", "additionalProperties": true}
+      }
+    }
+  }
+}

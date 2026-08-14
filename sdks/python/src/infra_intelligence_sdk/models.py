@@ -155,6 +155,54 @@ class ResourceCollectionResult:
 
 
 @dataclass(frozen=True)
+class ResourceNeighborhood:
+    """Depth-one page of current graph nodes and canonical edges."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ResourceNeighborhood":
+        """Create a neighborhood model after versioned-envelope checks."""
+
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="ResourceNeighborhood",
+                label="resource neighborhood",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-serializable copy of the envelope."""
+
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class ResourceTimeline:
+    """Ascending page of immutable observations for one resource."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ResourceTimeline":
+        """Create a timeline model after versioned-envelope checks."""
+
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="ResourceTimeline",
+                label="resource timeline",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-serializable copy of the envelope."""
+
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class Evidence:
     """Public metadata and provenance for one immutable evidence artifact."""
 

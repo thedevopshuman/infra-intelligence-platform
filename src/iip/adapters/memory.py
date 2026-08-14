@@ -21,7 +21,9 @@ from iip.domain.models import (
     ObservationDisposition,
     PlatformEvent,
     Resource,
+    ResourceRelationshipEdge,
     classify_resource_observation,
+    index_resource_relationships,
 )
 
 
@@ -114,14 +116,68 @@ class InMemoryResourceStore:
                 if item_tenant == tenant_id
             )
 
-    def history(self, tenant_id: str, uid: str) -> Iterable[ResourceObservationRecord]:
+    def get_many(self, tenant_id: str, uids: Iterable[str]) -> Iterable[Resource]:
+        requested = set(uids)
+        with self._lock:
+            return tuple(
+                resource
+                for (item_tenant, uid), resource in sorted(self._items.items())
+                if item_tenant == tenant_id and uid in requested
+            )
+
+    def history(
+        self,
+        tenant_id: str,
+        uid: str,
+        *,
+        after_offset: int = 0,
+        limit: int = 1000,
+    ) -> Iterable[ResourceObservationRecord]:
+        self._validate_page(after_offset, limit)
         with self._lock:
             return tuple(
                 item
                 for item in self._history
                 if item.resource.identity.tenant_id == tenant_id
                 and item.resource.identity.uid == uid
+                and item.offset > after_offset
+            )[:limit]
+
+    def relationships(
+        self,
+        tenant_id: str,
+        uid: str,
+        *,
+        direction: str = "both",
+        relationship_types: tuple[str, ...] = (),
+        after_edge_id: Optional[str] = None,
+        limit: int = 100,
+    ) -> Iterable[ResourceRelationshipEdge]:
+        self._validate_page(0, limit)
+        if direction not in ("incoming", "outgoing", "both"):
+            raise ValueError("direction is invalid")
+        edges = []
+        allowed_types = set(relationship_types)
+        with self._lock:
+            resources = tuple(
+                resource
+                for (item_tenant, _), resource in self._items.items()
+                if item_tenant == tenant_id
             )
+        for resource in resources:
+            for edge in index_resource_relationships(resource):
+                if direction == "incoming" and edge.target_ref != uid:
+                    continue
+                if direction == "outgoing" and edge.source_ref != uid:
+                    continue
+                if direction == "both" and uid not in (edge.source_ref, edge.target_ref):
+                    continue
+                if allowed_types and edge.relationship_type not in allowed_types:
+                    continue
+                if after_edge_id is not None and edge.edge_id <= after_edge_id:
+                    continue
+                edges.append(edge)
+        return tuple(sorted(edges, key=lambda item: item.edge_id))[:limit]
 
     def list_events(
         self,
@@ -310,7 +366,7 @@ class AllowTenantPolicy:
             return PolicyDecision(False, "actor.anonymous")
         if resource.get("tenantId") != actor.tenant_id:
             return PolicyDecision(False, "tenant.scope_mismatch")
-        if action != "resource:ingest":
+        if action not in ("resource:ingest", "resource:read"):
             return PolicyDecision(False, "action.unsupported")
         return PolicyDecision(True, "development.allow")
 

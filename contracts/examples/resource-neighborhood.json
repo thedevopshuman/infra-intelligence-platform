@@ -1,0 +1,71 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ResourceNeighborhood",
+  "metadata": {
+    "tenantId": "local",
+    "rootResourceUid": "res_e0ae9225a316fce4c97df5c23057b97a"
+  },
+  "spec": {
+    "depth": 1,
+    "direction": "outgoing",
+    "nodes": [
+      {
+        "apiVersion": "iip.platform/v1alpha1",
+        "kind": "Resource",
+        "metadata": {
+          "uid": "res_e0ae9225a316fce4c97df5c23057b97a",
+          "tenantId": "local",
+          "observedAt": "2026-08-14T10:30:00Z",
+          "observation": {
+            "sourceId": "kubernetes-local",
+            "streamId": "obs_0f4e8c2a6b1d4975a3c9e7f102d468ab",
+            "sequence": 42,
+            "mode": "incremental",
+            "resourceVersion": "398712",
+            "checkpoint": "kubernetes:cluster-local:resource-version:398712"
+          },
+          "labels": {
+            "environment": "development",
+            "team": "platform"
+          }
+        },
+        "spec": {
+          "provider": "kubernetes",
+          "type": "apps/deployment",
+          "externalId": "cluster-local/default/api",
+          "displayName": "api",
+          "attributes": {
+            "namespace": "default",
+            "replicas": 3,
+            "availableReplicas": 2
+          },
+          "relationships": [
+            {
+              "type": "runs_on",
+              "target": "cluster-local",
+              "direction": "outbound"
+            }
+          ]
+        },
+        "status": {
+          "health": "degraded",
+          "lifecycle": "active"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "rel_2c8da00e1214ac36f1226cdedb7696df",
+        "observedResourceUid": "res_e0ae9225a316fce4c97df5c23057b97a",
+        "type": "runs_on",
+        "source": "res_e0ae9225a316fce4c97df5c23057b97a",
+        "target": "cluster-local",
+        "attributes": {}
+      }
+    ],
+    "page": {
+      "limit": 50,
+      "hasMore": false
+    }
+  }
+}

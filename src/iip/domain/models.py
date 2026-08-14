@@ -203,6 +203,26 @@ class Resource:
             isinstance(item, Mapping) for item in relationships
         ):
             raise ContractError("spec.relationships must be an array of objects")
+        for relationship in relationships:
+            unknown_fields = set(relationship).difference(
+                {"type", "target", "direction", "attributes"}
+            )
+            if unknown_fields:
+                raise ContractError("spec.relationships contains unknown fields")
+            relationship_type = _required_string(
+                relationship.get("type"), "spec.relationships.type"
+            )
+            if not re.fullmatch(r"[a-z][a-z0-9._-]{0,63}", relationship_type):
+                raise ContractError("spec.relationships.type is invalid")
+            target = _required_string(
+                relationship.get("target"), "spec.relationships.target"
+            )
+            if len(target) > 1024:
+                raise ContractError("spec.relationships.target is too long")
+            direction = relationship.get("direction", "outbound")
+            if direction not in ("outbound", "inbound"):
+                raise ContractError("spec.relationships.direction is invalid")
+            _mapping(relationship.get("attributes", {}), "spec.relationships.attributes")
 
         identity = ResourceIdentity(
             tenant_id=_required_string(metadata.get("tenantId"), "metadata.tenantId"),
@@ -266,6 +286,54 @@ class Resource:
             "spec": spec,
             "status": {"health": self.health, "lifecycle": self.lifecycle},
         }
+
+
+@dataclass(frozen=True)
+class ResourceRelationshipEdge:
+    """Canonical orientation of one relationship from a latest resource projection."""
+
+    edge_id: str
+    observed_resource_uid: str
+    relationship_type: str
+    source_ref: str
+    target_ref: str
+    attributes: Mapping[str, Any]
+
+
+def index_resource_relationships(resource: Resource) -> tuple[ResourceRelationshipEdge, ...]:
+    """Create deterministic, de-duplicated graph edges from one resource projection."""
+
+    edges: Dict[str, ResourceRelationshipEdge] = {}
+    observed_uid = resource.identity.uid
+    for relationship in resource.relationships:
+        relationship_type = str(relationship["type"])
+        target = str(relationship["target"])
+        direction = relationship.get("direction", "outbound")
+        attributes = dict(relationship.get("attributes", {}))
+        if direction == "inbound":
+            source_ref, target_ref = target, observed_uid
+        else:
+            source_ref, target_ref = observed_uid, target
+        material = {
+            "attributes": attributes,
+            "observedResourceUid": observed_uid,
+            "source": source_ref,
+            "target": target_ref,
+            "type": relationship_type,
+        }
+        digest = hashlib.sha256(
+            json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()[:32]
+        edge = ResourceRelationshipEdge(
+            edge_id=f"rel_{digest}",
+            observed_resource_uid=observed_uid,
+            relationship_type=relationship_type,
+            source_ref=source_ref,
+            target_ref=target_ref,
+            attributes=attributes,
+        )
+        edges[edge.edge_id] = edge
+    return tuple(edges[key] for key in sorted(edges))
 
 
 def classify_resource_observation(

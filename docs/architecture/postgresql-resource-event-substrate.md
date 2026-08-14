@@ -10,14 +10,30 @@ This page describes the executable Phase 1 persistence slice. Public contracts r
 
 | Table | Authority | Important key |
 | --- | --- | --- |
-| `iip.resource_projections` | Latest accepted canonical resource | `(tenant_id, resource_uid)` |
+| `iip.resource_projections` | Rebuildable latest-resource serving projection | `(tenant_id, resource_uid)` |
 | `iip.resource_relationships` | Rebuildable current-edge query index | `(tenant_id, edge_id)` with source/target indexes |
-| `iip.resource_observations` | Immutable accepted/rejected observation history | Monotonic observation offset plus tenant/resource/hash uniqueness |
+| `iip.resource_observations` | Immutable accepted/rejected history and projection recovery source | Monotonic observation offset plus tenant/resource/hash uniqueness |
 | `iip.event_log` | Immutable accepted platform events and replay offsets | `(tenant_id, event_source, event_id)` |
 | `iip.event_outbox` | At-least-once delivery state for event-log rows | Unique event offset and tenant-scoped lease |
 | `iip.source_checkpoints` | Last explicitly committed collector cursor | `(tenant_id, source_id)` |
 
 Canonical documents are stored as `jsonb`, but frequently enforced identity, tenancy, ordering, lifecycle, and delivery fields are relational columns. The relational columns are not a second public contract; migrations and adapter tests keep them aligned with the canonical document.
+
+## Projection verification and rebuild
+
+[ADR 0008](../decisions/0008-observation-history-projection-rebuild.md) makes immutable accepted observations the recovery authority for the current resource and relationship serving indexes. The maintenance surface defaults to a read-only dry run. It derives the latest accepted document per resource, rebuilds the expected relationship set in memory, and compares a canonical digest with the currently stored projection state.
+
+An apply run requires an explicitly constructed `platform-admin` actor and policy approval. It holds an exclusive tenant maintenance advisory lock, replaces only that tenant's projection and relationship rows in one transaction, and verifies the resulting digest before commit. Normal accepted-observation transactions take the matching shared lock, so ingestion cannot interleave with projection replacement. Observation history, events, outbox state, checkpoints, and reconciliation membership are not changed.
+
+```bash
+export IIP_DATABASE_URL='postgresql://...'
+PYTHONPATH=src python3 -m iip.surfaces.maintenance \
+  rebuild-projections --tenant local --actor local-operator
+
+# Apply only after reviewing driftDetected and the expected digest.
+PYTHONPATH=src python3 -m iip.surfaces.maintenance \
+  rebuild-projections --tenant local --actor local-operator --apply
+```
 
 ## Accepted-observation transaction
 
@@ -51,6 +67,7 @@ The relationship index is derived state. Every accepted projection replacement d
 - Every repository, graph, history, event, outbox, and checkpoint operation requires tenant scope.
 - Composite keys and SQL predicates include the tenant even when another identifier appears globally unique.
 - Cross-tenant administration is not implemented by omitting a predicate; it requires a separate future use case and policy.
+- Projection maintenance requires one explicit tenant, a bounded resource count, the `platform-admin` role, and policy authorization.
 - Psycopg and SQL exceptions are translated at the adapter boundary; public HTTP responses expose only the stable `storage.unavailable` code.
 - Migrations are packaged with the adapter and serialized by a database advisory lock.
 - `IIP_DATABASE_URL` selects the PostgreSQL profile. `IIP_DATABASE_AUTO_MIGRATE` exists for local Compose only and defaults to false in Helm.

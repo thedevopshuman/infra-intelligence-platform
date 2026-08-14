@@ -36,6 +36,10 @@ from iip.application.ingest_resource import (
     StaleObservationError,
 )
 from iip.application.ports import ActorContext, PersistenceError
+from iip.application.rebuild_projections import (
+    ProjectionRebuildService,
+    RebuildProjectionsCommand,
+)
 from iip.domain.models import Resource
 
 
@@ -217,6 +221,87 @@ class PostgresResourceStoreTests(unittest.TestCase):
         self.assertIsNotNone(checkpoint)
         self.assertEqual(checkpoint.sequence, 42)
         self.assertEqual(len(tuple(self.store.claim_outbox("local", "worker-1"))), 1)
+
+    def test_projection_drift_is_detected_and_rebuilt_from_accepted_history(self) -> None:
+        target_payload = resource_payload()
+        target_payload["spec"]["type"] = "core/configmap"
+        target_payload["spec"]["externalId"] = "cluster-local/default/settings"
+        target_payload["spec"]["displayName"] = "settings"
+        target_payload["spec"]["relationships"] = []
+        target_payload["metadata"]["observation"]["sequence"] = 41
+        target = self.service.execute(
+            IngestResourceCommand(ActorContext("collector", "local"), target_payload)
+        )
+        source_payload = resource_payload()
+        source_payload["spec"]["relationships"] = [
+            {"type": "depends_on", "target": target.identity.uid}
+        ]
+        source = self.service.execute(
+            IngestResourceCommand(ActorContext("collector", "local"), source_payload)
+        )
+        maintenance = ProjectionRebuildService(self.store, AllowTenantPolicy())
+        command = RebuildProjectionsCommand(
+            ActorContext("operator", "local", ("platform-admin",)),
+            dry_run=True,
+            max_resources=100,
+        )
+
+        healthy = maintenance.execute(command)
+        self.assertFalse(healthy.drift_detected)
+        self.assertFalse(healthy.rebuild_performed)
+        self.assertEqual(healthy.resource_count, 2)
+        self.assertEqual(healthy.relationship_count, 1)
+        event_count = len(tuple(self.store.list_events("local")))
+        observation_count = len(tuple(self.store.history("local", source.identity.uid)))
+
+        assert DATABASE_URL is not None and psycopg is not None
+        with psycopg.connect(DATABASE_URL) as connection:
+            connection.execute(
+                """
+                UPDATE iip.resource_projections
+                SET document = jsonb_set(
+                    document,
+                    '{status,health}',
+                    to_jsonb('unhealthy'::text)
+                )
+                WHERE tenant_id = %s AND resource_uid = %s
+                """,
+                ("local", source.identity.uid),
+            )
+            connection.execute(
+                "DELETE FROM iip.resource_relationships WHERE tenant_id = %s",
+                ("local",),
+            )
+
+        dry_run = maintenance.execute(command)
+        self.assertTrue(dry_run.drift_detected)
+        self.assertFalse(dry_run.rebuild_performed)
+        self.assertEqual(dry_run.after_digest, dry_run.before_digest)
+        self.assertNotEqual(self.store.get("local", source.identity.uid), source)
+
+        rebuilt = maintenance.execute(
+            RebuildProjectionsCommand(
+                command.actor,
+                dry_run=False,
+                max_resources=100,
+            )
+        )
+        self.assertTrue(rebuilt.drift_detected)
+        self.assertTrue(rebuilt.rebuild_performed)
+        self.assertEqual(rebuilt.after_digest, rebuilt.expected_digest)
+        self.assertEqual(self.store.get("local", source.identity.uid), source)
+        self.assertEqual(
+            len(tuple(self.store.relationships("local", source.identity.uid))),
+            1,
+        )
+        self.assertEqual(len(tuple(self.store.list_events("local"))), event_count)
+        self.assertEqual(
+            len(tuple(self.store.history("local", source.identity.uid))),
+            observation_count,
+        )
+
+        verified = maintenance.execute(command)
+        self.assertFalse(verified.drift_detected)
 
     def test_stale_observation_is_audited_without_side_effects(self) -> None:
         accepted = self.service.execute(

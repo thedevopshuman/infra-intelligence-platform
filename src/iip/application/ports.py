@@ -108,6 +108,22 @@ class ReconciliationSnapshot:
 
 
 @dataclass(frozen=True)
+class ProjectionRebuildResult:
+    """Tenant-scoped projection recovery result with verifiable state digests."""
+
+    tenant_id: str
+    dry_run: bool
+    drift_detected: bool
+    rebuild_performed: bool
+    resource_count: int
+    relationship_count: int
+    latest_observation_offset: int
+    before_digest: str
+    expected_digest: str
+    after_digest: str
+
+
+@dataclass(frozen=True)
 class EvidenceProviderRequest:
     """Credential-free, bounded request passed across a provider boundary."""
 
@@ -251,6 +267,17 @@ class ReconciliationRepository(Protocol):
         checkpoint: SourceCheckpoint,
     ) -> None:
         """Atomically commit complete membership and its source checkpoint."""
+
+
+class ResourceProjectionMaintenance(Protocol):
+    def rebuild_projections(
+        self,
+        tenant_id: str,
+        *,
+        dry_run: bool,
+        max_resources: int,
+    ) -> ProjectionRebuildResult:
+        """Verify or rebuild one tenant from immutable accepted observations."""
 
 
 class EventPublisher(Protocol):

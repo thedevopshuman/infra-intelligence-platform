@@ -486,6 +486,7 @@ class AllowTenantPolicy:
             "action:propose",
             "evidence:collect",
             "plugin:open-session",
+            "resource-projection:rebuild",
             "resource:ingest",
             "resource:read",
         ):

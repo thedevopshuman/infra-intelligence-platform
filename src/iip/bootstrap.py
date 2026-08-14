@@ -32,6 +32,7 @@ from iip.application.investigate import DeterministicInvestigationService
 from iip.application.ingest_resource import ResourceIngestionService
 from iip.application.plugin_sessions import PluginSessionService
 from iip.application.query_resources import ResourceQueryService
+from iip.application.rebuild_projections import ProjectionRebuildService
 
 
 @dataclass(frozen=True)
@@ -141,6 +142,14 @@ def build_postgres_runtime(
         operational,
         authenticator or DenyAllAuthenticator(),
     )
+
+
+def build_projection_maintenance(database_url: str) -> ProjectionRebuildService:
+    """Compose the privileged PostgreSQL projection-recovery use case."""
+
+    from iip.adapters.postgres import PostgresResourceStore
+
+    return ProjectionRebuildService(PostgresResourceStore(database_url), AllowTenantPolicy())
 
 
 def build_runtime_from_env() -> Runtime:

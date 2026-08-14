@@ -90,6 +90,25 @@ This is the long-running development stack visible in Docker Desktop: the API pl
 
 The API migrates the local Compose database on startup. Automatic migration is disabled by default in Helm and should be a separately controlled deployment step outside local development.
 
+### Verify or rebuild resource projections
+
+The PostgreSQL maintenance command verifies one explicit tenant against immutable accepted observation history. It is read-only unless `--apply` is present and prints only stable counts and canonical digests.
+
+```bash
+export IIP_DATABASE_URL='postgresql://postgres:<local-password>@127.0.0.1:5432/iip'
+PYTHONPATH=src python3 -m iip.surfaces.maintenance \
+  rebuild-projections --tenant local --actor local-operator
+```
+
+Review `driftDetected`, `beforeDigest`, and `expectedDigest`. Apply the atomic replacement only when recovery is intended:
+
+```bash
+PYTHONPATH=src python3 -m iip.surfaces.maintenance \
+  rebuild-projections --tenant local --actor local-operator --apply
+```
+
+This command does not alter immutable observations, events, outbox delivery state, checkpoints, or reconciliation membership. It is local operator tooling and does not create a cross-tenant HTTP administration path.
+
 ## Helm
 
 ```bash

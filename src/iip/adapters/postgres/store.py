@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from datetime import datetime, timezone
 from functools import wraps
@@ -15,6 +17,7 @@ from psycopg.types.json import Jsonb
 from iip.application.ports import (
     OutboxMessage,
     PersistenceError,
+    ProjectionRebuildResult,
     ReconciliationSnapshot,
     ResourceObservationRecord,
     ResourceWriteResult,
@@ -22,6 +25,7 @@ from iip.application.ports import (
     StoredEvent,
 )
 from iip.domain.models import (
+    ContractError,
     ObservationDisposition,
     PlatformEvent,
     Resource,
@@ -36,6 +40,7 @@ _MIGRATIONS = (
     "0002_resource_relationship_index.sql",
     "0003_operational_workflows.sql",
     "0004_reconciliation_snapshots.sql",
+    "0005_projection_rebuild_source.sql",
 )
 
 
@@ -114,6 +119,10 @@ class PostgresResourceStore:
 
         with self._connect() as connection:
             connection.execute(
+                "SELECT pg_advisory_xact_lock_shared(hashtextextended(%s, 0))",
+                (f"iip.projection-maintenance\x1f{tenant_id}",),
+            )
+            connection.execute(
                 "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
                 (f"{tenant_id}\x1f{resource_uid}",),
             )
@@ -190,6 +199,104 @@ class PostgresResourceStore:
                 (tenant_id,),
             ).fetchall()
         return tuple(Resource.from_dict(row["document"]) for row in rows)
+
+    @_translate_database_errors
+    def rebuild_projections(
+        self,
+        tenant_id: str,
+        *,
+        dry_run: bool,
+        max_resources: int,
+    ) -> ProjectionRebuildResult:
+        """Verify or atomically rebuild one tenant's derived serving state."""
+
+        if not isinstance(tenant_id, str) or not 1 <= len(tenant_id) <= 128:
+            raise ValueError("tenant_id is invalid")
+        if not isinstance(dry_run, bool):
+            raise ValueError("dry_run must be a boolean")
+        if (
+            isinstance(max_resources, bool)
+            or not isinstance(max_resources, int)
+            or not 1 <= max_resources <= 1_000_000
+        ):
+            raise ValueError("max_resources is invalid")
+
+        with self._connect() as connection:
+            connection.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"iip.projection-maintenance\x1f{tenant_id}",),
+            )
+            rows = connection.execute(
+                """
+                SELECT DISTINCT ON (resource_uid)
+                       observation_offset, resource_uid,
+                       observation_hash, document
+                FROM iip.resource_observations
+                WHERE tenant_id = %s AND disposition = 'accepted'
+                ORDER BY resource_uid, observation_offset DESC
+                LIMIT %s
+                """,
+                (tenant_id, max_resources + 1),
+            ).fetchall()
+            if len(rows) > max_resources:
+                raise PersistenceError("projection.resource_limit_exceeded")
+
+            resources_with_hashes: list[tuple[Resource, str]] = []
+            latest_observation_offset = 0
+            for row in rows:
+                try:
+                    resource = Resource.from_dict(row["document"])
+                except ContractError:
+                    raise PersistenceError("projection.source_invalid") from None
+                document_hash = PlatformEvent.canonical_hash(resource.to_dict())
+                if (
+                    resource.identity.tenant_id != tenant_id
+                    or resource.identity.uid != row["resource_uid"]
+                    or document_hash != row["observation_hash"]
+                ):
+                    raise PersistenceError("projection.source_invalid")
+                resources_with_hashes.append((resource, document_hash))
+                latest_observation_offset = max(
+                    latest_observation_offset,
+                    row["observation_offset"],
+                )
+
+            before_digest = self._stored_projection_digest(connection, tenant_id)
+            expected_digest, relationship_count = self._expected_projection_digest(
+                resources_with_hashes
+            )
+            drift_detected = before_digest != expected_digest
+            rebuild_performed = not dry_run and drift_detected
+
+            if rebuild_performed:
+                connection.execute(
+                    "DELETE FROM iip.resource_relationships WHERE tenant_id = %s",
+                    (tenant_id,),
+                )
+                connection.execute(
+                    "DELETE FROM iip.resource_projections WHERE tenant_id = %s",
+                    (tenant_id,),
+                )
+                for resource, document_hash in resources_with_hashes:
+                    self._upsert_projection(connection, resource, document_hash)
+                    self._replace_relationships(connection, resource)
+
+            after_digest = self._stored_projection_digest(connection, tenant_id)
+            if rebuild_performed and after_digest != expected_digest:
+                raise PersistenceError("projection.rebuild_verification_failed")
+
+        return ProjectionRebuildResult(
+            tenant_id=tenant_id,
+            dry_run=dry_run,
+            drift_detected=drift_detected,
+            rebuild_performed=rebuild_performed,
+            resource_count=len(resources_with_hashes),
+            relationship_count=relationship_count,
+            latest_observation_offset=latest_observation_offset,
+            before_digest=before_digest,
+            expected_digest=expected_digest,
+            after_digest=after_digest,
+        )
 
     @_translate_database_errors
     def get_many(self, tenant_id: str, uids: Iterable[str]) -> Iterable[Resource]:
@@ -697,6 +804,94 @@ class PostgresResourceStore:
                 Jsonb(resource.to_dict()),
             ),
         )
+
+    @staticmethod
+    def _expected_projection_digest(
+        resources_with_hashes: Iterable[tuple[Resource, str]],
+    ) -> tuple[str, int]:
+        resources = []
+        relationships = []
+        for resource, document_hash in resources_with_hashes:
+            resources.append(
+                {
+                    "resourceUid": resource.identity.uid,
+                    "documentHash": document_hash,
+                    "document": resource.to_dict(),
+                }
+            )
+            for edge in index_resource_relationships(resource):
+                relationships.append(
+                    {
+                        "edgeId": edge.edge_id,
+                        "observedResourceUid": edge.observed_resource_uid,
+                        "relationshipType": edge.relationship_type,
+                        "sourceRef": edge.source_ref,
+                        "targetRef": edge.target_ref,
+                        "attributes": dict(edge.attributes),
+                    }
+                )
+        material = {
+            "resources": sorted(resources, key=lambda item: item["resourceUid"]),
+            "relationships": sorted(
+                relationships,
+                key=lambda item: item["edgeId"],
+            ),
+        }
+        return PostgresResourceStore._projection_digest(material), len(relationships)
+
+    @staticmethod
+    def _stored_projection_digest(connection: Any, tenant_id: str) -> str:
+        projection_rows = connection.execute(
+            """
+            SELECT resource_uid, document_hash, document
+            FROM iip.resource_projections
+            WHERE tenant_id = %s
+            ORDER BY resource_uid
+            """,
+            (tenant_id,),
+        ).fetchall()
+        relationship_rows = connection.execute(
+            """
+            SELECT edge_id, observed_resource_uid, relationship_type,
+                   source_ref, target_ref, attributes
+            FROM iip.resource_relationships
+            WHERE tenant_id = %s
+            ORDER BY edge_id
+            """,
+            (tenant_id,),
+        ).fetchall()
+        material = {
+            "resources": [
+                {
+                    "resourceUid": row["resource_uid"],
+                    "documentHash": row["document_hash"],
+                    "document": dict(row["document"]),
+                }
+                for row in projection_rows
+            ],
+            "relationships": [
+                {
+                    "edgeId": row["edge_id"],
+                    "observedResourceUid": row["observed_resource_uid"],
+                    "relationshipType": row["relationship_type"],
+                    "sourceRef": row["source_ref"],
+                    "targetRef": row["target_ref"],
+                    "attributes": dict(row["attributes"]),
+                }
+                for row in relationship_rows
+            ],
+        }
+        return PostgresResourceStore._projection_digest(material)
+
+    @staticmethod
+    def _projection_digest(material: Mapping[str, Any]) -> str:
+        encoded = json.dumps(
+            material,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
     @staticmethod
     def _insert_observation(

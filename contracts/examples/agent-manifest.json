@@ -1,0 +1,36 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "Agent",
+  "metadata": {
+    "id": "incident-investigator",
+    "version": "0.1.0",
+    "displayName": "Incident Investigator",
+    "description": "Builds an evidence-backed explanation for a scoped infrastructure incident."
+  },
+  "spec": {
+    "purpose": "Investigate a scoped incident and produce ranked hypotheses linked to immutable evidence.",
+    "runtime": {
+      "protocol": "native",
+      "entrypoint": "iip.agents.incident:run",
+      "modelClass": "policy-selected"
+    },
+    "inputs": [
+      {"name": "investigation_request", "schema": "urn:iip:contracts:investigation-request:v1alpha1", "required": true}
+    ],
+    "outputs": [
+      {"name": "investigation_report", "schema": "urn:iip:contracts:investigation-report:v1alpha1", "required": true}
+    ],
+    "tools": ["resources/query", "events/search", "evidence/fetch"],
+    "authority": {
+      "level": "propose",
+      "approvalPolicy": "human-before-mutation",
+      "resourceScopes": ["request.resources"]
+    },
+    "budgets": {
+      "maxToolCalls": 24,
+      "maxWallTimeSeconds": 300,
+      "maxCostUsd": 2
+    }
+  }
+}
+

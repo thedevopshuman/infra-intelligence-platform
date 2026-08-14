@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:resource:v1alpha1",
+  "title": "Infrastructure Intelligence Resource",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "Resource"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId", "observedAt"],
+      "properties": {
+        "uid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "observedAt": {"type": "string", "format": "date-time"},
+        "labels": {
+          "type": "object",
+          "additionalProperties": {"type": "string", "maxLength": 256},
+          "maxProperties": 64
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "type", "externalId"],
+      "properties": {
+        "provider": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+        "type": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$"},
+        "externalId": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "displayName": {"type": "string", "minLength": 1, "maxLength": 512},
+        "attributes": {"type": "object", "additionalProperties": true},
+        "relationships": {
+          "type": "array",
+          "maxItems": 512,
+          "items": {"$ref": "#/$defs/relationship"}
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "health": {
+          "type": "string",
+          "enum": ["healthy", "degraded", "unhealthy", "unknown"]
+        },
+        "lifecycle": {
+          "type": "string",
+          "enum": ["active", "creating", "updating", "deleting", "deleted", "unknown"]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "target"],
+      "properties": {
+        "type": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,63}$"},
+        "target": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "direction": {"type": "string", "enum": ["outbound", "inbound"]},
+        "attributes": {"type": "object", "additionalProperties": true}
+      }
+    }
+  }
+}
+

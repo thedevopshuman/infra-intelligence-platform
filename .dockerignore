@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+node_modules
+dist
+docs
+tests
+sdks
+deploy
+

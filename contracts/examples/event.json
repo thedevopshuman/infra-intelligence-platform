@@ -1,0 +1,15 @@
+{
+  "specversion": "1.0",
+  "id": "01J5A3QQ5S4D36W7XK5DBNFGQP",
+  "source": "urn:iip:ingestion:kubernetes",
+  "type": "io.iip.resource.observed.v1",
+  "time": "2026-08-14T10:30:01Z",
+  "subject": "res_e0ae9225a316fce4c97df5c23057b97a",
+  "datacontenttype": "application/json",
+  "tenantid": "local",
+  "correlationid": "incident-2026-08-14-api",
+  "data": {
+    "resourceUid": "res_e0ae9225a316fce4c97df5c23057b97a",
+    "observationHash": "42b6c2c1b57704ac7fa468780e2637543e08d7c5cb2f0b3ace7da11ad2c1147a"
+  }
+}

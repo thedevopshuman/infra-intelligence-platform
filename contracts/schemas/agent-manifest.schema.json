@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:agent-manifest:v1alpha1",
+  "title": "Infrastructure Intelligence Agent Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "Agent"},
+    "metadata": {"$ref": "#/$defs/metadata"},
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["purpose", "runtime", "inputs", "outputs", "tools", "authority"],
+      "properties": {
+        "purpose": {"type": "string", "minLength": 10, "maxLength": 1024},
+        "runtime": {"$ref": "#/$defs/runtime"},
+        "inputs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/ioPort"}},
+        "outputs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/ioPort"}},
+        "tools": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{2,127}$"},
+          "uniqueItems": true
+        },
+        "authority": {"$ref": "#/$defs/authority"},
+        "budgets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxToolCalls": {"type": "integer", "minimum": 0, "maximum": 200},
+            "maxWallTimeSeconds": {"type": "integer", "minimum": 1, "maximum": 3600},
+            "maxCostUsd": {"type": "number", "minimum": 0, "maximum": 1000}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "displayName"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"},
+        "displayName": {"type": "string", "minLength": 1, "maxLength": 128},
+        "description": {"type": "string", "maxLength": 1024}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "entrypoint"],
+      "properties": {
+        "protocol": {"type": "string", "enum": ["native", "mcp", "http"]},
+        "entrypoint": {"type": "string", "minLength": 1, "maxLength": 512},
+        "modelClass": {"type": "string", "enum": ["fast", "reasoning", "local", "policy-selected"]}
+      }
+    },
+    "ioPort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "schema"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$"},
+        "schema": {"type": "string", "minLength": 1, "maxLength": 512},
+        "required": {"type": "boolean", "default": true}
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level"],
+      "properties": {
+        "level": {"type": "string", "enum": ["read", "propose", "approve", "execute"]},
+        "approvalPolicy": {"type": "string", "maxLength": 256},
+        "resourceScopes": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 256},
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}
+

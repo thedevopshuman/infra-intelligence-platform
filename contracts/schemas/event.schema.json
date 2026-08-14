@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:event:v1alpha1",
+  "title": "Infrastructure Intelligence Event",
+  "description": "CloudEvents 1.0 structured JSON event with platform tenancy and trace extensions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["specversion", "id", "source", "type", "time", "subject", "tenantid", "data"],
+  "properties": {
+    "specversion": {"const": "1.0"},
+    "id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "source": {"type": "string", "format": "uri-reference", "minLength": 1},
+    "type": {"type": "string", "pattern": "^io\\.iip\\.[a-z0-9._-]+\\.v[0-9]+$"},
+    "time": {"type": "string", "format": "date-time"},
+    "subject": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "datacontenttype": {"const": "application/json"},
+    "tenantid": {"type": "string", "minLength": 1, "maxLength": 128},
+    "correlationid": {"type": "string", "minLength": 1, "maxLength": 128},
+    "causationid": {"type": "string", "minLength": 1, "maxLength": 128},
+    "traceparent": {"type": "string", "minLength": 1, "maxLength": 256},
+    "data": {"type": "object", "additionalProperties": true}
+  }
+}
+

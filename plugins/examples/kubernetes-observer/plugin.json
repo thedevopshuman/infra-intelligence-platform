@@ -1,0 +1,32 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "Plugin",
+  "metadata": {
+    "id": "kubernetes-observer",
+    "version": "0.1.0",
+    "displayName": "Kubernetes Observer",
+    "publisher": "local-development",
+    "description": "Example read-only resource and event integration."
+  },
+  "spec": {
+    "protocolVersion": "1.0",
+    "entrypoint": {
+      "transport": "stdio",
+      "target": "python -m kubernetes_observer"
+    },
+    "capabilities": ["resource-observer", "event-source", "evidence-provider"],
+    "permissions": {
+      "network": ["kubernetes.default.svc:443"],
+      "secrets": ["kubernetes.service-account-token"],
+      "resources": ["kubernetes:read:*"],
+      "actions": []
+    },
+    "configSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "namespaces": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

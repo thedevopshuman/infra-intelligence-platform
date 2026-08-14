@@ -1,0 +1,6 @@
+The foundation API service is available inside the cluster at:
+
+  http://{{ include "infra-intelligence.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}
+
+This chart is a development skeleton and is not production-ready.
+

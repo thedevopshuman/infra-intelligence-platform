@@ -1,0 +1,121 @@
+# Architecture overview
+
+**Status:** Accepted foundation  
+**Date:** 2026-08-14
+
+## System context
+
+The platform sits above existing infrastructure and operations systems. It does not become the source of credentials or replace provider control planes.
+
+```mermaid
+flowchart LR
+    Humans["Operators and service owners"]
+    Automation["CI/CD, alerts, workflows"]
+    Platform["Infrastructure Intelligence Platform"]
+    Providers["Cloud, Kubernetes, observability, GitOps, data platforms"]
+    Models["Policy-approved model providers"]
+    Destinations["Incident, chat, ticketing, and collaboration systems"]
+
+    Humans --> Platform
+    Automation --> Platform
+    Platform <--> Providers
+    Platform <--> Models
+    Platform --> Destinations
+```
+
+## Logical architecture
+
+```mermaid
+flowchart TB
+    subgraph Surfaces["Surfaces"]
+      UI["Web console"]
+      CLI["CLI and SDKs"]
+      API["API, webhooks, MCP"]
+    end
+
+    subgraph Control["Control plane"]
+      Gateway["Gateway: identity, tenant, rate, policy context"]
+      Workflow["Workflow and approvals"]
+      Registry["Agent and plugin registry"]
+    end
+
+    subgraph Intelligence["Intelligence plane"]
+      Correlator["Correlation and timeline"]
+      Runtime["Bounded agent runtime"]
+      Evidence["Evidence service"]
+      Policy["Policy decision point"]
+    end
+
+    subgraph Knowledge["Knowledge plane"]
+      Graph["Resource graph and observations"]
+      Events["Immutable event log"]
+      Search["Indexes and retrieval"]
+      Audit["Audit and provenance"]
+    end
+
+    subgraph Ecosystem["Extension plane"]
+      Plugins["Sandboxed plugins"]
+      Integrations["Provider adapters"]
+      Tools["Agent tools and actions"]
+    end
+
+    Surfaces --> Gateway
+    Gateway --> Workflow
+    Gateway --> Registry
+    Workflow --> Runtime
+    Runtime --> Correlator
+    Runtime --> Evidence
+    Runtime --> Policy
+    Correlator --> Graph
+    Correlator --> Events
+    Evidence --> Search
+    Workflow --> Audit
+    Integrations --> Graph
+    Integrations --> Events
+    Plugins --> Integrations
+    Plugins --> Tools
+    Tools --> Policy
+```
+
+## Core data flow
+
+1. An integration observes an external object and submits a canonical resource observation.
+2. Identity resolution maps `(tenant, provider, type, external ID)` to a stable platform UID.
+3. The graph stores the latest view and observation provenance; a resource event enters the immutable log.
+4. Correlation attaches events to resources, relationships, deployments, incidents, and investigations.
+5. A surface or rule creates a scoped investigation request.
+6. The runtime selects an agent manifest, resolves allowed tools, applies budgets, and gathers evidence.
+7. The agent emits ranked hypotheses and recommendations with evidence references and uncertainty.
+8. Proposed mutations enter a workflow. Policy and approval decide whether an action may execute.
+9. Every decision, tool call, approval, execution, and result produces audit events.
+
+## Storage responsibilities
+
+The architecture defines logical stores without selecting products yet:
+
+| Store | Responsibility | Required semantics |
+| --- | --- | --- |
+| Resource graph | Latest resource view, typed edges, observations | Tenant partitioning; idempotent upsert; time-aware provenance |
+| Event log | Immutable ordered facts | At-least-once ingestion; deduplication by source + ID; replay |
+| Evidence store | Retrieved artifacts and content hashes | Immutable versions; retention policy; redaction metadata |
+| Workflow store | Durable state, approvals, idempotency | Crash-safe transitions; optimistic concurrency |
+| Registry | Versioned agent/plugin manifests | Immutable releases; signatures and compatibility metadata |
+| Search/index | Derived query acceleration | Rebuildable from authoritative stores |
+| Audit store | Security and decision trail | Append-only; protected retention; exportability |
+
+## Deployment shape
+
+Start as a modular control-plane service plus asynchronous workers. Preserve logical boundaries in packages and contracts before splitting into network services. Split only when scaling, isolation, or independent failure domains justify the operational cost.
+
+The initial Helm chart deploys the reference API. Planned components are ingestion workers, correlator, workflow worker, plugin runner, and backing stores. Data-plane collectors may run in customer clusters and send normalized observations through authenticated, tenant-scoped channels.
+
+## Cross-cutting invariants
+
+- Tenant ID is established from authenticated context, not trusted from payload alone.
+- Source events are immutable; corrections are new events.
+- Resource identity is stable across observations and display-name changes.
+- Side effects carry idempotency keys and emit before/after audit records.
+- Tool output is untrusted and cannot directly modify policy or authority.
+- Secrets are referenced by logical name and resolved at execution time; they never enter contracts or prompts.
+- Derived indexes and summaries are rebuildable from authoritative data and provenance.
+

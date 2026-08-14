@@ -1,0 +1,13 @@
+replicaCount: 1
+
+image:
+  repository: infra-intelligence-platform
+  tag: dev
+  pullPolicy: IfNotPresent
+
+podLabels:
+  iip.platform/environment: development
+
+networkPolicy:
+  enabled: false
+

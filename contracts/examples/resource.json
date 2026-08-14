@@ -1,0 +1,35 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "Resource",
+  "metadata": {
+    "tenantId": "local",
+    "observedAt": "2026-08-14T10:30:00Z",
+    "labels": {
+      "environment": "development",
+      "team": "platform"
+    }
+  },
+  "spec": {
+    "provider": "kubernetes",
+    "type": "apps/deployment",
+    "externalId": "cluster-local/default/api",
+    "displayName": "api",
+    "attributes": {
+      "namespace": "default",
+      "replicas": 3,
+      "availableReplicas": 2
+    },
+    "relationships": [
+      {
+        "type": "runs_on",
+        "target": "cluster-local",
+        "direction": "outbound"
+      }
+    ]
+  },
+  "status": {
+    "health": "degraded",
+    "lifecycle": "active"
+  }
+}
+

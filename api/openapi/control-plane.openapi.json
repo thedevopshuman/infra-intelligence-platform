@@ -1,0 +1,66 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Infrastructure Intelligence Control Plane API",
+    "version": "0.1.0",
+    "description": "Foundation-stage API. Resource ingestion is executable; other platform surfaces will be added contract-first."
+  },
+  "servers": [{"url": "http://localhost:8080"}],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "health",
+        "responses": {"200": {"description": "Process is healthy"}}
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "ready",
+        "responses": {"200": {"description": "Process is ready"}}
+      }
+    },
+    "/v1/resources": {
+      "get": {
+        "operationId": "listResources",
+        "parameters": [{"$ref": "#/components/parameters/TenantId"}],
+        "responses": {
+          "200": {
+            "description": "Tenant-scoped resources",
+            "content": {"application/json": {"schema": {"type": "object", "required": ["items"], "properties": {"items": {"type": "array", "items": {"$ref": "../../contracts/schemas/resource.schema.json"}}}}}}
+          }
+        }
+      },
+      "post": {
+        "operationId": "ingestResource",
+        "parameters": [
+          {"$ref": "#/components/parameters/TenantId"},
+          {"$ref": "#/components/parameters/ActorId"},
+          {"$ref": "#/components/parameters/CorrelationId"}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/resource.schema.json"}}}
+        },
+        "responses": {
+          "202": {"description": "Observation accepted", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/resource.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"}
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "TenantId": {"name": "x-iip-tenant-id", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1}},
+      "ActorId": {"name": "x-iip-actor-id", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1}},
+      "CorrelationId": {"name": "x-correlation-id", "in": "header", "required": false, "schema": {"type": "string", "minLength": 1}}
+    },
+    "schemas": {
+      "Error": {"type": "object", "required": ["error"], "properties": {"error": {"type": "object", "required": ["code"], "properties": {"code": {"type": "string"}}}}}
+    },
+    "responses": {
+      "InvalidRequest": {"description": "Contract validation failed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "PolicyDenied": {"description": "Policy denied the scoped action", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+    }
+  }
+}

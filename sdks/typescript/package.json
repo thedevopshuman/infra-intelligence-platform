@@ -1,0 +1,18 @@
+{
+  "name": "@iip/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript client boundary for the Infrastructure Intelligence Platform",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}
+

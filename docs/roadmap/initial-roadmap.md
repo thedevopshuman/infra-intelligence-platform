@@ -39,7 +39,7 @@ Deliverables:
 
 Exit gate: a seeded cluster can be rebuilt from observations/events; graph correctness and source lag are measurable.
 
-Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, complete-snapshot membership, deterministic tombstones, exact-result replay, atomic reconciliation/checkpoint/provider-cursor commit, per-API-path list/watch resume with `410 Gone` full-reconciliation recovery, and a privileged tenant-scoped projection drift/rebuild command from accepted observation history. Remaining: backup/restore measurements and freshness SLO telemetry.
+Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, complete-snapshot membership, deterministic tombstones, exact-result replay, atomic reconciliation/checkpoint/provider-cursor commit, per-API-path list/watch resume with `410 Gone` full-reconciliation recovery, a privileged tenant-scoped projection drift/rebuild command from accepted observation history, and a measured full-schema PostgreSQL backup/restore experiment with canonical integrity verification. Remaining: freshness SLO telemetry.
 
 ## Phase 2 — evidence and investigation vertical slice
 

@@ -31,6 +31,9 @@ REQUIRED_PATHS = (
     "docs/decisions/0006-deterministic-investigation-and-dry-run-actions.md",
     "docs/decisions/0007-reconciliation-membership-and-tombstones.md",
     "docs/decisions/0009-provider-cursor-sets-and-watch-recovery.md",
+    "docs/decisions/0010-postgresql-backup-restore-verification.md",
+    "docs/operations/postgresql-backup-restore.md",
+    "docs/operations/measurements/postgresql-backup-restore.json",
     "contracts/schemas/resource.schema.json",
     "contracts/schemas/integration-config.schema.json",
     "contracts/schemas/action-proposal.schema.json",
@@ -86,6 +89,7 @@ REQUIRED_PATHS = (
     "tests/test_operational_workflows.py",
     "scripts/test_kubernetes_live.sh",
     "scripts/run_reference_workflow.py",
+    "scripts/backup_restore_experiment.py",
     "api/openapi/control-plane.openapi.json",
     "deploy/helm/infra-intelligence/Chart.yaml",
 )

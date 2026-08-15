@@ -33,6 +33,14 @@ make test-postgres
 
 This starts an ephemeral PostgreSQL 18.4 container bound to `127.0.0.1:55432`, runs only the PostgreSQL integration suite, and removes its container and volume on exit.
 
+Run the separate end-to-end recovery measurement with:
+
+```bash
+make test-backup-restore
+```
+
+It seeds the durable reference workflow, backs up the complete platform schema, restores into a fresh database, verifies every table and sequence plus projection consistency, prints measured local RPO/RTO evidence, and removes its isolated Compose project and volume. See the [backup and restore procedure](postgresql-backup-restore.md) for the measurement semantics and production gaps.
+
 Keep deterministic contract, SDK, kernel, and observer-conformance tests in the normal `make verify` gate. Docker Desktop supplies external dependencies for integration tests; it is not required to validate pure normalization behavior. This split keeps feedback fast while still exercising PostgreSQL against the real engine.
 
 The observer has an explicit `kubectl` development transport. It requires a named context and kubeconfig path, lists each resource API path independently, and normalizes the same public contract as the offline fixture. A complete result includes an aggregate checkpoint plus opaque per-path provider cursors. A later reconciliation request supplies that committed state in `spec.resume`; the observer runs bounded watches and then relists the full scope. Kubernetes `410 Gone` uses the same relist path, so an expired stream can never be mistaken for deletion.

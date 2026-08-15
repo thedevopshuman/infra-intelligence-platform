@@ -1,0 +1,124 @@
+{
+  "apiVersion": "iip.platform/operations/v1alpha1",
+  "kind": "PostgreSQLBackupRestoreMeasurement",
+  "metadata": {
+    "capturedAt": "2026-08-15T04:41:16.874492Z",
+    "environment": "docker-desktop-local",
+    "hostArchitecture": "arm64"
+  },
+  "spec": {
+    "database": {
+      "containerImage": "postgres:18.4-alpine",
+      "engine": "PostgreSQL",
+      "serverVersion": "18.4"
+    },
+    "method": {
+      "backup": "pg_dump-custom-format",
+      "restore": "fresh-database-pg_restore",
+      "scope": "complete-iip-schema",
+      "workload": "quiesced-reference-workflow"
+    },
+    "objectives": {
+      "classification": "local-experiment-guardrail",
+      "maximumRecoveryPointAgeSeconds": 60.0,
+      "maximumRecoveryReadySeconds": 120.0
+    }
+  },
+  "status": {
+    "backup": {
+      "bytes": 39443,
+      "committedRecordLoss": 0,
+      "durationSeconds": 0.134848,
+      "recoveryPoint": "2026-08-15T04:41:16.304693Z",
+      "recoveryPointAgeSeconds": 0.137155
+    },
+    "integrity": {
+      "databaseDigest": "sha256:4def673a5717c78e4149ff9110d8ad82717135c56b576166ba7b70aba1df56e6",
+      "matched": true,
+      "projectionVerification": {
+        "driftDetected": false,
+        "latestObservationOffset": 1,
+        "projectionDigest": "sha256:db3919799277bdf8f2d7d465b1fa651cd72c03197f9d400f02767d8252fda477",
+        "relationshipCount": 1,
+        "resourceCount": 1
+      },
+      "rowCount": 22,
+      "sequenceCount": 4,
+      "tableCount": 15,
+      "tables": {
+        "action_approvals": {
+          "digest": "sha256:69f7002e0276cdabb212297dca6bba1eda3c176f015b224c950485d4e79017f6",
+          "rowCount": 1
+        },
+        "action_proposals": {
+          "digest": "sha256:0589bd83f88bc461d2e7c2dcd594b49f8f415f26d1e32d17ed4681e9bf6b2b26",
+          "rowCount": 1
+        },
+        "action_results": {
+          "digest": "sha256:08775e0fbb003fa83b68f4f8bc6a74525caebb3042eff918b15d887f8f155840",
+          "rowCount": 1
+        },
+        "audit_records": {
+          "digest": "sha256:c004d2faf1f8becba6b458fbf4a6d160871e13548b892e020e9197e722f817d9",
+          "rowCount": 3
+        },
+        "event_log": {
+          "digest": "sha256:9ac587825406fe29c7ea34739d0950d1e3113f7cf571e7094a1da5521d940a29",
+          "rowCount": 1
+        },
+        "event_outbox": {
+          "digest": "sha256:44e4b2c0507ab6bed7d1b7499fcdfc85ccdc33940b55989f0ad7b88da2d61b4a",
+          "rowCount": 1
+        },
+        "evidence_artifacts": {
+          "digest": "sha256:2d8451e3a2d33343976b022ae2b7433aeb7261b0e8596ea87cd4d62188236f61",
+          "rowCount": 1
+        },
+        "investigations": {
+          "digest": "sha256:990c01886b1e52bc8049f3227cb801bf148efbc18eebc1fdd9ed37d9bc29d512",
+          "rowCount": 1
+        },
+        "plugin_sessions": {
+          "digest": "sha256:a13b8e4ca8a95a8d4ce0ac59ad3029e49d862e1928a88fbf80b80576d9b7f544",
+          "rowCount": 1
+        },
+        "resource_observations": {
+          "digest": "sha256:18e4afcdb92a767d1f07e51fe1561c57eb7281c2e6ac6a7fa2ab4fda3831f96e",
+          "rowCount": 1
+        },
+        "resource_projections": {
+          "digest": "sha256:205009b5693369870c61e08f0f6f9be74cee2f8753bca3ed564453d573468a93",
+          "rowCount": 1
+        },
+        "resource_relationships": {
+          "digest": "sha256:f22c7dde41c64837acb70f4ba18d1886ec521aa0616527caf990901a166bfd26",
+          "rowCount": 1
+        },
+        "schema_migrations": {
+          "digest": "sha256:529873cc712ab97dee0dab4d5952eb6e643dbbceb9128bd952d845dda3ea17f1",
+          "rowCount": 6
+        },
+        "source_checkpoints": {
+          "digest": "sha256:152cf3e85474b30e846014f99e06a4b33187835ce0ec1466f6abae11e5021b9f",
+          "rowCount": 1
+        },
+        "source_reconciliations": {
+          "digest": "sha256:037859d60bd34b1128b9f4132aac43dab6e051c860ec31e930f3f3e004489d20",
+          "rowCount": 1
+        }
+      }
+    },
+    "objectivesMet": true,
+    "restore": {
+      "commandDurationSeconds": 0.117969,
+      "recoveryReadySeconds": 0.341428
+    },
+    "seed": {
+      "actionOutcome": "dry-run",
+      "investigationOutcome": "conclusive",
+      "pluginSessionStatus": "ready",
+      "resourceCount": 1,
+      "tenantId": "local"
+    }
+  }
+}

@@ -73,6 +73,12 @@ The relationship index is derived state. Every accepted projection replacement d
 - `IIP_DATABASE_URL` selects the PostgreSQL profile. `IIP_DATABASE_AUTO_MIGRATE` exists for local Compose only and defaults to false in Helm.
 - Production credentials come from an existing Kubernetes Secret or an external secret provider, never chart values committed to this repository.
 
+## Backup and restore verification
+
+[ADR 0010](../decisions/0010-postgresql-backup-restore-verification.md) adds a complete-schema logical backup experiment without declaring a production backup provider. The Docker Desktop target seeds authoritative and derived records through the platform boundaries, takes a quiesced custom-format backup, restores into a fresh database, and compares every `iip` table plus identity-sequence state by canonical digest. Recovery is considered ready only after the tenant projection verifier also proves that restored serving state agrees with immutable accepted observations.
+
+The [operator procedure and recorded measurement](../operations/postgresql-backup-restore.md) distinguish the local experiment's recovery-point age and verified recovery-readiness time from production RPO/RTO commitments. Scheduled encrypted backups, off-host retention, WAL-based point-in-time recovery, and restore authorization remain tied to the future production hosting decision.
+
 ## Verification profiles
 
-`make verify` runs all dependency, contract, unit, SDK, and Helm gates; PostgreSQL tests skip when no database URL is present. `make test-postgres` uses Docker Desktop to start an ephemeral PostgreSQL 18.4 container on localhost, runs the integration suite, and removes the container and volume. CI supplies the same database major version through a service container and therefore runs the integration tests as part of `make verify`.
+`make verify` runs all dependency, contract, unit, SDK, and Helm gates; PostgreSQL tests skip when no database URL is present. `make test-postgres` uses Docker Desktop to start an ephemeral PostgreSQL 18.4 container on localhost, runs the integration suite, and removes the container and volume. `make test-backup-restore` uses a separately named disposable Compose project and emits measured integrity, recovery-point-age, and recovery-readiness evidence. CI supplies the same database major version through a service container and therefore runs the integration tests as part of `make verify`.

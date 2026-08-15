@@ -4,7 +4,7 @@
 
 Infrastructure Intelligence Platform (IIP) is an architecture-first foundation for building a vendor-neutral control plane that understands infrastructure as a resource graph and event timeline, then lets governed agents investigate and act with evidence.
 
-This repository now contains an **executable local reference slice across Roadmap Phases 1–5**. It includes live Kubernetes reconciliation with per-type cursor resume and watch-expiration recovery, durable membership and tombstones, durable PostgreSQL resources/evidence/investigations/actions/audit, tenant-scoped projection verification and rebuild, deterministic evidence-backed investigation and evaluation, dry-run governed actions, and bounded plugin sessions. The phase exit gates are not all complete: backup/restore measurement, production telemetry/SLOs, live mutation/rollback, isolated signed plugin execution, design-partner operation, and legal/brand decisions remain. It is not yet a production system.
+This repository now contains an **executable local reference slice across Roadmap Phases 1–5**. It includes live Kubernetes reconciliation with per-type cursor resume and watch-expiration recovery, durable membership and tombstones, durable PostgreSQL resources/evidence/investigations/actions/audit, tenant-scoped projection verification and rebuild, measured full-schema backup/restore verification, deterministic evidence-backed investigation and evaluation, dry-run governed actions, and bounded plugin sessions. The phase exit gates are not all complete: production telemetry/SLOs, live mutation/rollback, isolated signed plugin execution, design-partner operation, and legal/brand decisions remain. It is not yet a production system.
 
 ## Start here
 
@@ -23,6 +23,7 @@ python3 -m pip install --requirement requirements/verify.txt
 make verify
 # With Docker Desktop running:
 make test-postgres
+make test-backup-restore
 # With the local kind cluster and explicit kubeconfig:
 IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-live
 # Configure a local Bearer identity as described in docs/operations/local-development.md.

@@ -22,6 +22,7 @@ from iip.application.ports import (
     ResourceObservationRecord,
     ResourceWriteResult,
     SourceCheckpoint,
+    SourceIngestionState,
     StoredEvent,
 )
 from iip.domain.models import (
@@ -576,6 +577,84 @@ class PostgresResourceStore:
         )
 
     @_translate_database_errors
+    def get_source_ingestion_state(
+        self, tenant_id: str, source_id: str
+    ) -> Optional[SourceIngestionState]:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT checkpoint.tenant_id,
+                       checkpoint.source_id,
+                       checkpoint.stream_id,
+                       checkpoint.sequence,
+                       checkpoint.committed_at,
+                       latest.observed_at AS latest_observed_at,
+                       latest.recorded_at AS latest_recorded_at,
+                       observations.accepted_observation_count,
+                       pending.pending_event_count,
+                       pending.oldest_pending_event_recorded_at
+                FROM iip.source_checkpoints AS checkpoint
+                LEFT JOIN LATERAL (
+                    SELECT observed_at, recorded_at
+                    FROM iip.resource_observations
+                    WHERE tenant_id = checkpoint.tenant_id
+                      AND observation_source_id = checkpoint.source_id
+                      AND disposition = 'accepted'
+                    ORDER BY observation_offset DESC
+                    LIMIT 1
+                ) AS latest ON true
+                CROSS JOIN LATERAL (
+                    SELECT count(*)::bigint AS accepted_observation_count
+                    FROM iip.resource_observations
+                    WHERE tenant_id = checkpoint.tenant_id
+                      AND observation_source_id = checkpoint.source_id
+                      AND disposition = 'accepted'
+                ) AS observations
+                CROSS JOIN LATERAL (
+                    SELECT count(*)::bigint AS pending_event_count,
+                           min(outbox.created_at) AS oldest_pending_event_recorded_at
+                    FROM iip.event_outbox AS outbox
+                    JOIN iip.event_log AS events
+                      ON events.tenant_id = outbox.tenant_id
+                     AND events.event_offset = outbox.event_offset
+                    WHERE outbox.tenant_id = checkpoint.tenant_id
+                      AND outbox.published_at IS NULL
+                      AND events.document->'data'->'observation'->>'sourceId'
+                          = checkpoint.source_id
+                ) AS pending
+                WHERE checkpoint.tenant_id = %s
+                  AND checkpoint.source_id = %s
+                """,
+                (tenant_id, source_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return SourceIngestionState(
+            tenant_id=row["tenant_id"],
+            source_id=row["source_id"],
+            stream_id=row["stream_id"],
+            checkpoint_sequence=row["sequence"],
+            checkpoint_committed_at=self._rfc3339(row["committed_at"]),
+            latest_observed_at=(
+                self._rfc3339(row["latest_observed_at"])
+                if row["latest_observed_at"] is not None
+                else None
+            ),
+            latest_recorded_at=(
+                self._rfc3339(row["latest_recorded_at"])
+                if row["latest_recorded_at"] is not None
+                else None
+            ),
+            accepted_observation_count=row["accepted_observation_count"],
+            pending_event_count=row["pending_event_count"],
+            oldest_pending_event_recorded_at=(
+                self._rfc3339(row["oldest_pending_event_recorded_at"])
+                if row["oldest_pending_event_recorded_at"] is not None
+                else None
+            ),
+        )
+
+    @_translate_database_errors
     def get_reconciliation(
         self, tenant_id: str, source_id: str
     ) -> Optional[ReconciliationSnapshot]:
@@ -625,6 +704,14 @@ class PostgresResourceStore:
                     raise ValueError("checkpoint content conflicts at the same sequence")
             elif row is not None and mode != "reconciliation":
                 raise ValueError("checkpoint stream reset requires reconciliation")
+            if (
+                row is not None
+                and row["stream_id"] == checkpoint.stream_id
+                and row["sequence"] == checkpoint.sequence
+                and row["checkpoint"] == checkpoint.checkpoint
+                and row["provider_cursors"] == dict(checkpoint.provider_cursors)
+            ):
+                return
             connection.execute(
                 """
                 INSERT INTO iip.source_checkpoints (

@@ -16,6 +16,7 @@ from iip.application.ports import (
     ResourceObservationRecord,
     ResourceWriteResult,
     SourceCheckpoint,
+    SourceIngestionState,
     StoredEvent,
 )
 from iip.domain.models import (
@@ -32,6 +33,7 @@ from iip.domain.models import (
 class _MemoryOutboxEntry:
     message_id: int
     event: PlatformEvent
+    created_at: str
     attempts: int = 0
     claimed_by: Optional[str] = None
     claim_expires_at: Optional[datetime] = None
@@ -86,13 +88,14 @@ class InMemoryResourceStore:
                 checkpoint = self._next_checkpoint(resource)
 
             history_offset = len(self._history) + 1
+            recorded_at = PlatformEvent.now()
             self._history.append(
                 ResourceObservationRecord(
                     offset=history_offset,
                     resource=resource,
                     disposition=disposition,
                     observation_hash=observation_hash,
-                    recorded_at=PlatformEvent.now(),
+                    recorded_at=recorded_at,
                 )
             )
             if disposition != ObservationDisposition.ACCEPTED:
@@ -101,7 +104,9 @@ class InMemoryResourceStore:
             self._items[key] = resource
             event_offset = len(self._event_log) + 1
             self._event_log.append(StoredEvent(event_offset, event))
-            self._outbox[event_offset] = _MemoryOutboxEntry(event_offset, event)
+            self._outbox[event_offset] = _MemoryOutboxEntry(
+                event_offset, event, recorded_at
+            )
             if checkpoint is not None:
                 self._checkpoints[(checkpoint.tenant_id, checkpoint.source_id)] = checkpoint
             return ResourceWriteResult(resource, disposition)
@@ -284,6 +289,49 @@ class InMemoryResourceStore:
         with self._lock:
             return self._checkpoints.get((tenant_id, source_id))
 
+    def get_source_ingestion_state(
+        self, tenant_id: str, source_id: str
+    ) -> Optional[SourceIngestionState]:
+        with self._lock:
+            checkpoint = self._checkpoints.get((tenant_id, source_id))
+            if checkpoint is None:
+                return None
+            observations = [
+                item
+                for item in self._history
+                if item.disposition == ObservationDisposition.ACCEPTED
+                and item.resource.identity.tenant_id == tenant_id
+                and item.resource.observation is not None
+                and item.resource.observation.source_id == source_id
+            ]
+            latest = max(observations, key=lambda item: item.offset, default=None)
+            pending = []
+            for entry in self._outbox.values():
+                observation = entry.event.data.get("observation")
+                if (
+                    entry.event.tenant_id == tenant_id
+                    and not entry.published
+                    and isinstance(observation, Mapping)
+                    and observation.get("sourceId") == source_id
+                ):
+                    pending.append(entry)
+            return SourceIngestionState(
+                tenant_id=tenant_id,
+                source_id=source_id,
+                stream_id=checkpoint.stream_id,
+                checkpoint_sequence=checkpoint.sequence,
+                checkpoint_committed_at=checkpoint.committed_at,
+                latest_observed_at=(
+                    latest.resource.observed_at if latest is not None else None
+                ),
+                latest_recorded_at=latest.recorded_at if latest is not None else None,
+                accepted_observation_count=len(observations),
+                pending_event_count=len(pending),
+                oldest_pending_event_recorded_at=(
+                    min(item.created_at for item in pending) if pending else None
+                ),
+            )
+
     def commit_checkpoint(self, checkpoint: SourceCheckpoint, *, mode: str) -> None:
         if mode not in ("incremental", "reconciliation"):
             raise ValueError("checkpoint mode is invalid")
@@ -291,6 +339,8 @@ class InMemoryResourceStore:
         with self._lock:
             current = self._checkpoints.get(key)
             self._validate_checkpoint_advance(current, checkpoint, mode)
+            if current is not None and self._same_checkpoint(current, checkpoint):
+                return
             self._checkpoints[key] = checkpoint
 
     def get_reconciliation(
@@ -343,6 +393,17 @@ class InMemoryResourceStore:
             sequence=cursor.sequence,
             checkpoint=cursor.checkpoint,
             committed_at=PlatformEvent.now(),
+        )
+
+    @staticmethod
+    def _same_checkpoint(
+        current: SourceCheckpoint, candidate: SourceCheckpoint
+    ) -> bool:
+        return (
+            current.stream_id == candidate.stream_id
+            and current.sequence == candidate.sequence
+            and current.checkpoint == candidate.checkpoint
+            and current.provider_cursors == candidate.provider_cursors
         )
 
     @staticmethod
@@ -488,6 +549,7 @@ class AllowTenantPolicy:
             "action:execute",
             "action:propose",
             "evidence:collect",
+            "ingestion-telemetry:read",
             "plugin:open-session",
             "resource-projection:rebuild",
             "resource:ingest",

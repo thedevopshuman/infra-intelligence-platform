@@ -17,6 +17,8 @@ The documentation tree is the product and engineering system of record. A change
 - [Authentication boundary](architecture/authentication-boundary.md)
 - [PostgreSQL resource and event substrate](architecture/postgresql-resource-event-substrate.md)
 - [Evidence collection pipeline](architecture/evidence-collection-pipeline.md)
+- [Ingestion freshness telemetry](architecture/ingestion-freshness-telemetry.md)
+- [OpenTelemetry portability boundary](architecture/opentelemetry-portability.md)
 
 ## Specifications
 
@@ -25,6 +27,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Event contract](specifications/event-contract.md)
 - [Evidence contract](specifications/evidence-contract.md)
 - [Investigation request and report contracts](specifications/investigation-contract.md)
+- [Ingestion freshness report contract](specifications/ingestion-freshness-contract.md)
 - [Evaluation scenario contract](specifications/evaluation-scenario-contract.md)
 - [Agent contract](specifications/agent-contract.md)
 - [Plugin contract](specifications/plugin-contract.md)

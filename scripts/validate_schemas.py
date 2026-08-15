@@ -39,6 +39,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "evidence.schema.json": ("evidence.json",),
     "investigation-report.schema.json": ("investigation-report.json",),
     "investigation-request.schema.json": ("investigation-request.json",),
+    "ingestion-freshness-report.schema.json": (
+        "ingestion-freshness-report.json",
+    ),
     "integration-config.schema.json": ("integration-config.json",),
     "plugin-manifest.schema.json": ("plugin-manifest.json",),
     "plugin-session.schema.json": ("plugin-session.json",),

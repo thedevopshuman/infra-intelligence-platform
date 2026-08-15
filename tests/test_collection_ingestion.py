@@ -25,6 +25,14 @@ from iip.surfaces.http import ApiHandler
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class FixedClock:
+    def __init__(self) -> None:
+        self.value = "2026-08-14T10:30:05Z"
+
+    def now(self) -> str:
+        return self.value
+
+
 def example(name: str) -> dict:
     return json.loads((ROOT / "contracts" / "examples" / name).read_text())
 
@@ -33,11 +41,13 @@ class ResourceCollectionIngestionTests(unittest.TestCase):
     def setUp(self) -> None:
         self.actor = ActorContext("collector-local", "local")
         self.store = InMemoryResourceStore()
+        self.clock = FixedClock()
         self.service = ResourceCollectionIngestionService(
             ResourceIngestionService(self.store, AllowTenantPolicy()),
             self.store,
             self.store,
             self.store,
+            self.clock,
         )
         self.request = example("resource-collection-request.json")
         self.result = example("resource-collection-result.json")
@@ -105,6 +115,19 @@ class ResourceCollectionIngestionTests(unittest.TestCase):
             dict(checkpoint.provider_cursors),
             self.result["spec"]["completion"]["providerCursors"],
         )
+
+    def test_checkpoint_uses_platform_commit_time_and_retry_cannot_refresh_it(self) -> None:
+        self.execute()
+        committed = self.store.get_checkpoint("local", "kubernetes-local")
+
+        self.assertEqual(committed.committed_at, "2026-08-14T10:30:05Z")
+        self.assertNotEqual(committed.committed_at, self.result["metadata"]["createdAt"])
+
+        self.clock.value = "2026-08-14T10:35:05Z"
+        self.execute()
+
+        replayed = self.store.get_checkpoint("local", "kubernetes-local")
+        self.assertEqual(replayed.committed_at, committed.committed_at)
 
     def test_resume_state_must_match_the_atomically_committed_cursor_set(self) -> None:
         self.execute()

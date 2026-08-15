@@ -19,6 +19,8 @@ Resource observer integrations use the exported `ResourceCollectionRequest`, `Re
 
 `getResourceNeighborhood` and `getResourceTimeline` expose the paginated read models. Treat `nextCursor` as opaque and pass it back only with the same resource, direction, and relationship filters.
 
+`getIngestionFreshness` returns an `IngestionFreshnessReport` for one source in the credential-derived tenant. It carries point-in-time objectives and stable violations without exposing provider cursor state or resource contents.
+
 Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. The server derives tenant, actor, and roles after credential verification; the SDK does not send caller-controlled identity headers.
 
-Version 0.4 adds opaque provider cursor resume fields to the resource-collection boundary.
+Version 0.4 adds opaque provider cursor resume fields and ingestion-freshness telemetry to the public boundary.

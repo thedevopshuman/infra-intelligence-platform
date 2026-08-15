@@ -224,6 +224,26 @@ class ResourceTimeline:
 
 
 @dataclass(frozen=True)
+class IngestionFreshnessReport:
+    """Point-in-time SLI evaluation for one tenant-scoped ingestion source."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "IngestionFreshnessReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="IngestionFreshnessReport",
+                label="ingestion freshness report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class Evidence:
     """Public metadata and provenance for one immutable evidence artifact."""
 

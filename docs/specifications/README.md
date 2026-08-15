@@ -15,6 +15,7 @@ The platform exposes contracts at three levels:
 | Resource collection result | [resource-collection-contract.md](resource-collection-contract.md) | `contracts/schemas/resource-collection-result.schema.json` | `contracts/examples/resource-collection-result.json` |
 | Resource neighborhood | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/resource-neighborhood.schema.json` | `contracts/examples/resource-neighborhood.json` |
 | Resource timeline | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/resource-timeline.schema.json` | `contracts/examples/resource-timeline.json` |
+| Ingestion freshness report | [ingestion-freshness-contract.md](ingestion-freshness-contract.md) | `contracts/schemas/ingestion-freshness-report.schema.json` | `contracts/examples/ingestion-freshness-report.json` |
 | Page information | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/page-info.schema.json` | `contracts/examples/page-info.json` |
 | Error | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/error.schema.json` | `contracts/examples/error.json` |
 | Event | [event-contract.md](event-contract.md) | `contracts/schemas/event.schema.json` | `contracts/examples/event.json` |

@@ -19,6 +19,8 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 `Client.get_resource_neighborhood` and `Client.get_resource_timeline` return the corresponding paginated public envelopes. Pass `spec.page.nextCursor` back unchanged to continue; the cursor is query- and tenant-bound and does not grant authority.
 
+`Client.get_ingestion_freshness` returns an `IngestionFreshnessReport` for one source in the credential-derived tenant. The response exposes applied objectives and stable violations, not provider cursors or resource contents.
+
 Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. Supply a Bearer credential; the authenticated server derives tenant, actor, and roles from that credential. The SDK never sends identity assertion headers.
 
-Version 0.4 adds opaque provider cursor resume fields to the resource-collection boundary.
+Version 0.4 adds opaque provider cursor resume fields and ingestion-freshness telemetry to the public boundary.

@@ -6,6 +6,7 @@ import type {
   ApiErrorBody,
   Evidence,
   EvidenceId,
+  IngestionFreshnessReport,
   InvestigationId,
   InvestigationReport,
   InvestigationRequest,
@@ -102,6 +103,11 @@ export class InfrastructureIntelligenceClient {
       { headers: this.headers() },
     );
     return this.read<ResourceTimeline>(response);
+  }
+
+  async getIngestionFreshness(sourceId: string): Promise<IngestionFreshnessReport> {
+    const query = new URLSearchParams({ sourceId });
+    return this.get<IngestionFreshnessReport>(`/v1/telemetry/ingestion?${query}`);
   }
 
   async ingestResourceCollection(

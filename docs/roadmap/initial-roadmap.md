@@ -39,7 +39,7 @@ Deliverables:
 
 Exit gate: a seeded cluster can be rebuilt from observations/events; graph correctness and source lag are measurable.
 
-Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, complete-snapshot membership, deterministic tombstones, exact-result replay, atomic reconciliation/checkpoint/provider-cursor commit, per-API-path list/watch resume with `410 Gone` full-reconciliation recovery, a privileged tenant-scoped projection drift/rebuild command from accepted observation history, and a measured full-schema PostgreSQL backup/restore experiment with canonical integrity verification. Remaining: freshness SLO telemetry.
+Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, complete-snapshot membership, deterministic tombstones, exact-result replay, atomic reconciliation/checkpoint/provider-cursor commit, per-API-path list/watch resume with `410 Gone` full-reconciliation recovery, a privileged tenant-scoped projection drift/rebuild command from accepted observation history, a measured full-schema PostgreSQL backup/restore experiment with canonical integrity verification, and tenant-scoped point-in-time freshness/source-lag telemetry. The local Phase 1 exit gate is complete; production workload objectives and windowed SLO/export work remain Phase 3 deliverables.
 
 ## Phase 2 — evidence and investigation vertical slice
 
@@ -68,13 +68,13 @@ Deliverables:
 - scenario format containing graph fixture, timeline, alert, expected root-cause class, required/forbidden evidence, and red herrings;
 - deterministic replay and scored repeated-run harness;
 - prompt/tool/model version tracking and regression dashboard;
-- OpenTelemetry traces, metrics, logs, cost ledger, audit records, and privacy controls;
+- OpenTelemetry traces, metrics, logs, cost ledger, audit records, and privacy controls through a configurable OTLP endpoint/Collector;
 - concurrency, crash recovery, cancellation, noisy-neighbor, and prompt-injection tests;
 - SLOs for ingestion freshness, query availability, and investigation completion.
 
 Exit gate: releases have comparable scorecards, and failures can be explained from platform telemetry.
 
-Reference slice delivered: deterministic weighted scorer, hard gates, budget checks, red-herring resistance, and repeated-run harness. Remaining: version dashboard, OpenTelemetry export, concurrency/noisy-neighbor/prompt-injection suites, privacy controls, and measured release SLOs.
+Reference slice delivered: deterministic weighted scorer, hard gates, budget checks, red-herring resistance, and repeated-run harness. The OTLP/Collector portability direction is accepted in ADR 0012. Remaining: runtime exporter/receiver adapters, version dashboard, concurrency/noisy-neighbor/prompt-injection suites, privacy controls, and measured release SLOs.
 
 ## Phase 4 — governed actions and workflows
 

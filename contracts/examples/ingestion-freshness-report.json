@@ -1,0 +1,36 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "IngestionFreshnessReport",
+  "metadata": {
+    "tenantId": "local",
+    "sourceId": "kubernetes-local",
+    "evaluatedAt": "2026-08-14T10:30:10Z"
+  },
+  "spec": {
+    "status": "within-objective",
+    "streamId": "obs_0f4e8c2a6b1d4975a3c9e7f102d468ab",
+    "checkpoint": {
+      "sequence": 42,
+      "committedAt": "2026-08-14T10:30:05Z",
+      "ageSeconds": 5.0
+    },
+    "latestObservation": {
+      "observedAt": "2026-08-14T10:30:00Z",
+      "recordedAt": "2026-08-14T10:30:02Z",
+      "ageSeconds": 10.0,
+      "ingestionDelaySeconds": 2.0
+    },
+    "acceptedObservationCount": 1,
+    "delivery": {
+      "pendingEvents": 0
+    },
+    "objectives": {
+      "maximumCheckpointAgeSeconds": 60.0,
+      "maximumObservationAgeSeconds": 60.0,
+      "maximumIngestionDelaySeconds": 10.0,
+      "maximumPendingEventAgeSeconds": 30.0,
+      "maximumClockSkewSeconds": 5.0
+    },
+    "violations": []
+  }
+}

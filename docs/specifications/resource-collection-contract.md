@@ -28,7 +28,7 @@ A conforming host validates more than the JSON shape:
 - `scopeDigest` is SHA-256 over canonical JSON for the complete request scope;
 - the serialized result does not exceed `maxOutputBytes` and its observation count does not exceed `maxResources`.
 
-The reference host implements these checks in `ResourceCollectionIngestionService`. It ingests validated observations first and advances `SourceCheckpointRepository` only after every observation and event is durable. Partial results may improve the projection but never advance the checkpoint; replay is therefore safe and idempotent.
+The reference host implements these checks in `ResourceCollectionIngestionService`. It ingests validated observations first and advances `SourceCheckpointRepository` only after every observation and event is durable. The checkpoint's `committedAt` is selected from the trusted platform clock at that boundary; result `metadata.createdAt` remains untrusted provider provenance. An exact checkpoint retry is a no-op and cannot refresh `committedAt`. Partial results may improve the projection but never advance the checkpoint; replay is therefore safe and idempotent.
 
 For the current checkpoint model, one `sourceId` has one active canonical scope. A later complete request with a different `scopeDigest` is rejected before mutation; a distinct scope uses a distinct source identity. This prevents alternating namespace filters from producing false deletions.
 

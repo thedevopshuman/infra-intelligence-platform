@@ -190,6 +190,50 @@ export interface ResourceTimeline {
   };
 }
 
+export type IngestionFreshnessViolation =
+  | "checkpoint-age-exceeded"
+  | "observation-age-exceeded"
+  | "ingestion-delay-exceeded"
+  | "pending-event-age-exceeded"
+  | "clock-skew-detected";
+
+export interface IngestionFreshnessReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "IngestionFreshnessReport";
+  metadata: {
+    tenantId: string;
+    sourceId: string;
+    evaluatedAt: string;
+  };
+  spec: {
+    status: "within-objective" | "breached";
+    streamId: `obs_${string}`;
+    checkpoint: {
+      sequence: number;
+      committedAt: string;
+      ageSeconds: number;
+    };
+    latestObservation?: {
+      observedAt: string;
+      recordedAt: string;
+      ageSeconds: number;
+      ingestionDelaySeconds: number;
+    };
+    acceptedObservationCount: number;
+    delivery:
+      | { pendingEvents: 0; oldestPendingEventAgeSeconds?: never }
+      | { pendingEvents: number; oldestPendingEventAgeSeconds: number };
+    objectives: {
+      maximumCheckpointAgeSeconds: number;
+      maximumObservationAgeSeconds: number;
+      maximumIngestionDelaySeconds: number;
+      maximumPendingEventAgeSeconds: number;
+      maximumClockSkewSeconds: number;
+    };
+    violations: IngestionFreshnessViolation[];
+  };
+}
+
 export interface PlatformEvent<TData extends Record<string, unknown> = Record<string, unknown>> {
   specversion: "1.0";
   id: string;

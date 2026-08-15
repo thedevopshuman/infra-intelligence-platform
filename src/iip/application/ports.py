@@ -92,6 +92,22 @@ class SourceCheckpoint:
 
 
 @dataclass(frozen=True)
+class SourceIngestionState:
+    """Tenant/source telemetry facts returned without policy interpretation."""
+
+    tenant_id: str
+    source_id: str
+    stream_id: str
+    checkpoint_sequence: int
+    checkpoint_committed_at: str
+    latest_observed_at: Optional[str]
+    latest_recorded_at: Optional[str]
+    accepted_observation_count: int
+    pending_event_count: int
+    oldest_pending_event_recorded_at: Optional[str]
+
+
+@dataclass(frozen=True)
 class ReconciliationSnapshot:
     """Last complete resource membership for one tenant-scoped source."""
 
@@ -254,6 +270,13 @@ class SourceCheckpointRepository(Protocol):
 
     def commit_checkpoint(self, checkpoint: SourceCheckpoint, *, mode: str) -> None:
         """Advance a source cursor only after its full batch is durable."""
+
+
+class SourceIngestionTelemetryRepository(Protocol):
+    def get_source_ingestion_state(
+        self, tenant_id: str, source_id: str
+    ) -> Optional[SourceIngestionState]:
+        """Return point-in-time telemetry facts for exactly one tenant/source."""
 
 
 class ReconciliationRepository(Protocol):

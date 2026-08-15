@@ -32,6 +32,13 @@ from iip.application.investigate import (
     InvalidInvestigationError,
     RunInvestigationCommand,
 )
+from iip.application.observe_ingestion import (
+    GetIngestionFreshnessCommand,
+    IngestionSourceNotFoundError,
+    IngestionTelemetryAuthorizationError,
+    IngestionTelemetryInputError,
+    IngestionTelemetryStateError,
+)
 from iip.application.plugin_sessions import (
     OpenPluginSessionCommand,
     PluginHandshakeError,
@@ -92,6 +99,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                     {"error": {"code": "storage.unavailable"}},
                 )
             return
+        if path == "/v1/telemetry/ingestion":
+            self._query_ingestion_telemetry(actor, parsed.query)
+            return
         if is_resource_query:
             self._query_resource(actor, segments[2], segments[3], parsed.query)
             return
@@ -124,6 +134,41 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
             return
         self._json(HTTPStatus.NOT_FOUND, {"error": {"code": "route.not_found"}})
+
+    def _query_ingestion_telemetry(
+        self, actor: ActorContext, query: str
+    ) -> None:
+        try:
+            parameters = parse_qs(query, keep_blank_values=True)
+            if set(parameters) != {"sourceId"}:
+                raise IngestionTelemetryInputError("ingestion.source_id.invalid")
+            source_id = self._single(parameters, "sourceId")
+            if source_id is None:
+                raise IngestionTelemetryInputError("ingestion.source_id.invalid")
+            report = self.runtime.ingestion_telemetry.get(
+                GetIngestionFreshnessCommand(actor, source_id)
+            )
+            self._json(HTTPStatus.OK, report.to_dict())
+        except (IngestionTelemetryInputError, InvalidQueryError):
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": "request.invalid"}},
+            )
+        except IngestionTelemetryAuthorizationError:
+            self._json(
+                HTTPStatus.FORBIDDEN,
+                {"error": {"code": "policy.denied"}},
+            )
+        except IngestionSourceNotFoundError:
+            self._json(
+                HTTPStatus.NOT_FOUND,
+                {"error": {"code": "ingestion.source_not_found"}},
+            )
+        except (IngestionTelemetryStateError, PersistenceError):
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "storage.unavailable"}},
+            )
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         path = urlparse(self.path).path

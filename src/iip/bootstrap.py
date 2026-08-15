@@ -30,6 +30,11 @@ from iip.application.ports import (
 )
 from iip.application.investigate import DeterministicInvestigationService
 from iip.application.ingest_resource import ResourceIngestionService
+from iip.application.observe_ingestion import (
+    IngestionFreshnessObjectives,
+    IngestionFreshnessService,
+    IngestionTelemetryInputError,
+)
 from iip.application.plugin_sessions import PluginSessionService
 from iip.application.query_resources import ResourceQueryService
 from iip.application.rebuild_projections import ProjectionRebuildService
@@ -46,6 +51,7 @@ class Runtime:
     checkpoints: SourceCheckpointRepository
     ingestion: ResourceIngestionService
     collection_ingestion: ResourceCollectionIngestionService
+    ingestion_telemetry: IngestionFreshnessService
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
     investigations: DeterministicInvestigationService
@@ -55,7 +61,11 @@ class Runtime:
     evidence_store: Any
 
 
-def build_local_runtime(authenticator: Authenticator | None = None) -> Runtime:
+def build_local_runtime(
+    authenticator: Authenticator | None = None,
+    *,
+    ingestion_objectives: IngestionFreshnessObjectives | None = None,
+) -> Runtime:
     """Build the dependency graph for local execution."""
 
     store = InMemoryResourceStore()
@@ -66,6 +76,7 @@ def build_local_runtime(authenticator: Authenticator | None = None) -> Runtime:
         operational,
         evidence_store,
         authenticator or DenyAllAuthenticator(),
+        ingestion_objectives,
     )
 
 
@@ -74,6 +85,7 @@ def _compose_runtime(
     operational: Any,
     evidence_store: Any,
     authenticator: Authenticator,
+    ingestion_objectives: IngestionFreshnessObjectives | None = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -102,6 +114,13 @@ def _compose_runtime(
             store,
             store,
             store,
+            clock,
+        ),
+        ingestion_telemetry=IngestionFreshnessService(
+            store,
+            policy,
+            clock,
+            ingestion_objectives,
         ),
         queries=queries,
         evidence=evidence,
@@ -127,6 +146,7 @@ def build_postgres_runtime(
     *,
     authenticator: Authenticator | None = None,
     migrate: bool = False,
+    ingestion_objectives: IngestionFreshnessObjectives | None = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -141,6 +161,7 @@ def build_postgres_runtime(
         operational,
         operational,
         authenticator or DenyAllAuthenticator(),
+        ingestion_objectives,
     )
 
 
@@ -161,12 +182,56 @@ def build_runtime_from_env() -> Runtime:
             "authentication.configuration.required"
         )
     authenticator = HashedBearerAuthenticator.from_json(identity_config)
+    objectives = _ingestion_objectives_from_env()
     database_url = os.environ.get("IIP_DATABASE_URL")
     if not database_url:
-        return build_local_runtime(authenticator)
+        return build_local_runtime(
+            authenticator,
+            ingestion_objectives=objectives,
+        )
     auto_migrate = os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower() == "true"
     return build_postgres_runtime(
         database_url,
         authenticator=authenticator,
         migrate=auto_migrate,
+        ingestion_objectives=objectives,
     )
+
+
+def _ingestion_objectives_from_env() -> IngestionFreshnessObjectives:
+    def value(name: str, default: float) -> float:
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        try:
+            return float(raw)
+        except ValueError:
+            raise IngestionTelemetryInputError(
+                "ingestion.objective.invalid"
+            ) from None
+
+    defaults = IngestionFreshnessObjectives()
+    objectives = IngestionFreshnessObjectives(
+        maximum_checkpoint_age_seconds=value(
+            "IIP_INGESTION_MAX_CHECKPOINT_AGE_SECONDS",
+            defaults.maximum_checkpoint_age_seconds,
+        ),
+        maximum_observation_age_seconds=value(
+            "IIP_INGESTION_MAX_OBSERVATION_AGE_SECONDS",
+            defaults.maximum_observation_age_seconds,
+        ),
+        maximum_ingestion_delay_seconds=value(
+            "IIP_INGESTION_MAX_DELAY_SECONDS",
+            defaults.maximum_ingestion_delay_seconds,
+        ),
+        maximum_pending_event_age_seconds=value(
+            "IIP_INGESTION_MAX_PENDING_EVENT_AGE_SECONDS",
+            defaults.maximum_pending_event_age_seconds,
+        ),
+        maximum_clock_skew_seconds=value(
+            "IIP_INGESTION_MAX_CLOCK_SKEW_SECONDS",
+            defaults.maximum_clock_skew_seconds,
+        ),
+    )
+    objectives.validate()
+    return objectives

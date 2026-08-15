@@ -14,6 +14,7 @@ from .models import (
     ActionProposal,
     ActionResult,
     Evidence,
+    IngestionFreshnessReport,
     InvestigationReport,
     InvestigationRequest,
     PluginSession,
@@ -115,6 +116,14 @@ class Client:
             method="GET",
         )
         return ResourceTimeline.from_dict(self._send(request))
+
+    def get_ingestion_freshness(self, source_id: str) -> IngestionFreshnessReport:
+        """Evaluate current freshness and delivery health for one source."""
+
+        query = urlencode({"sourceId": source_id})
+        return IngestionFreshnessReport.from_dict(
+            self._get(f"/v1/telemetry/ingestion?{query}")
+        )
 
     def ingest_resource_collection(
         self,

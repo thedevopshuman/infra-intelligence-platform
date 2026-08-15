@@ -62,6 +62,12 @@ The application query service authorizes `resource:read` before calling tenant-s
 
 The relationship index is derived state. Every accepted projection replacement deletes and recreates only the rows asserted by that resource in the same transaction. Stale and conflicting observations remain visible in the timeline but cannot alter current edges. See the [resource query contract](../specifications/resource-query-contract.md) for pagination and external semantics.
 
+## Ingestion freshness query
+
+The PostgreSQL telemetry adapter reads one tenant/source checkpoint and derives the latest accepted source observation, accepted-observation count, and unpublished source-event count/oldest creation time from existing records. The application layer converts those facts into ages and stable objective violations. No provider cursor, checkpoint value, resource body, or raw error enters the report.
+
+Checkpoint age remains measurable after a complete empty reconciliation. A source is not queryable until it has committed its first checkpoint; future integration-registration work may add an explicit pre-checkpoint state. See the [telemetry architecture](ingestion-freshness-telemetry.md) and [ADR 0011](../decisions/0011-ingestion-freshness-semantics.md).
+
 ## Tenancy and operations
 
 - Every repository, graph, history, event, outbox, and checkpoint operation requires tenant scope.

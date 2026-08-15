@@ -84,6 +84,15 @@ curl -H "authorization: Bearer $IIP_DEV_BEARER_TOKEN" \
   http://localhost:8080/v1/resources
 ```
 
+After a complete collection has committed for a source, inspect its point-in-time freshness and event-delivery backlog:
+
+```bash
+curl -H "authorization: Bearer $IIP_DEV_BEARER_TOKEN" \
+  'http://localhost:8080/v1/telemetry/ingestion?sourceId=kubernetes-local'
+```
+
+The local in-memory process starts empty, so a source returns `ingestion.source_not_found` until collection ingestion commits its first checkpoint. The long-running Docker profile retains that state in PostgreSQL.
+
 ## Run the durable Docker profile
 
 The Compose profile requires a local-only password supplied at runtime and never committed:
@@ -135,6 +144,11 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_AUTH_IDENTITIES_JSON` | required by API startup | Local Bearer-token verifier identities; supply through protected runtime configuration |
 | `IIP_DATABASE_URL` | unset | Select the PostgreSQL profile when set |
 | `IIP_DATABASE_AUTO_MIGRATE` | `false` | Apply packaged migrations at startup; local Compose only |
+| `IIP_INGESTION_MAX_CHECKPOINT_AGE_SECONDS` | `300` | Local maximum age of the last complete committed collection |
+| `IIP_INGESTION_MAX_OBSERVATION_AGE_SECONDS` | `300` | Local maximum age of the latest accepted source observation |
+| `IIP_INGESTION_MAX_DELAY_SECONDS` | `60` | Local maximum provider-observation to platform-recording delay |
+| `IIP_INGESTION_MAX_PENDING_EVENT_AGE_SECONDS` | `60` | Local maximum age of the oldest unpublished source event |
+| `IIP_INGESTION_MAX_CLOCK_SKEW_SECONDS` | `5` | Maximum future timestamp tolerance before a skew violation |
 | `IIP_TEST_DATABASE_URL` | unset | Enable PostgreSQL integration tests against an explicit test database |
 | `IIP_KUBECONFIG` | required by live test | Explicit kubeconfig path; the observer never chooses an implicit current context |
 | `IIP_KUBE_CONTEXT` | `kind-iip-dev` | Explicit local context used only by `test-kubernetes-live` |

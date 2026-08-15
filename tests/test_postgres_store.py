@@ -35,7 +35,7 @@ from iip.application.ingest_resource import (
     ResourceIngestionService,
     StaleObservationError,
 )
-from iip.application.ports import ActorContext, PersistenceError
+from iip.application.ports import ActorContext, PersistenceError, SourceCheckpoint
 from iip.application.rebuild_projections import (
     ProjectionRebuildService,
     RebuildProjectionsCommand,
@@ -156,6 +156,7 @@ class PostgresResourceStoreTests(unittest.TestCase):
             self.store,
             self.store,
             self.store,
+            SystemClock(),
         )
         public_result = json.loads(
             (ROOT / "contracts/examples/resource-collection-result.json").read_text(
@@ -234,6 +235,67 @@ class PostgresResourceStoreTests(unittest.TestCase):
         self.assertIsNotNone(checkpoint)
         self.assertEqual(checkpoint.sequence, 42)
         self.assertEqual(len(tuple(self.store.claim_outbox("local", "worker-1"))), 1)
+
+    def test_ingestion_telemetry_state_is_source_and_tenant_scoped(self) -> None:
+        stored = self.service.execute(
+            IngestResourceCommand(
+                actor=ActorContext("collector", "local"),
+                payload=resource_payload(),
+                checkpoint_ready=True,
+            )
+        )
+
+        state = self.store.get_source_ingestion_state(
+            "local", "kubernetes-local"
+        )
+
+        self.assertIsNotNone(state)
+        self.assertEqual(state.tenant_id, "local")
+        self.assertEqual(state.source_id, "kubernetes-local")
+        self.assertEqual(state.stream_id, stored.observation.stream_id)
+        self.assertEqual(state.checkpoint_sequence, 42)
+        self.assertEqual(state.latest_observed_at, stored.observed_at)
+        self.assertEqual(state.accepted_observation_count, 1)
+        self.assertEqual(state.pending_event_count, 1)
+        self.assertIsNotNone(state.oldest_pending_event_recorded_at)
+        self.assertIsNone(
+            self.store.get_source_ingestion_state(
+                "another-tenant", "kubernetes-local"
+            )
+        )
+
+        original_committed_at = state.checkpoint_committed_at
+        checkpoint = self.store.get_checkpoint("local", "kubernetes-local")
+        self.store.commit_checkpoint(
+            SourceCheckpoint(
+                tenant_id=checkpoint.tenant_id,
+                source_id=checkpoint.source_id,
+                stream_id=checkpoint.stream_id,
+                sequence=checkpoint.sequence,
+                checkpoint=checkpoint.checkpoint,
+                committed_at="2099-01-01T00:00:00Z",
+                provider_cursors=checkpoint.provider_cursors,
+            ),
+            mode="incremental",
+        )
+        self.assertEqual(
+            self.store.get_source_ingestion_state(
+                "local", "kubernetes-local"
+            ).checkpoint_committed_at,
+            original_committed_at,
+        )
+
+        message = tuple(self.store.claim_outbox("local", "telemetry-worker"))[0]
+        self.assertTrue(
+            self.store.acknowledge_outbox(
+                "local", "telemetry-worker", message.message_id
+            )
+        )
+        delivered = self.store.get_source_ingestion_state(
+            "local", "kubernetes-local"
+        )
+        self.assertEqual(delivered.pending_event_count, 0)
+        self.assertIsNone(delivered.oldest_pending_event_recorded_at)
 
     def test_projection_drift_is_detected_and_rebuilt_from_accepted_history(self) -> None:
         target_payload = resource_payload()

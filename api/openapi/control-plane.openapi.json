@@ -3,7 +3,7 @@
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
     "version": "0.4.0",
-    "description": "Executable local reference API for collection ingestion, resource queries, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
+    "description": "Executable local reference API for collection ingestion, freshness telemetry, resource queries, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -88,6 +88,30 @@
           "401": {"$ref": "#/components/responses/Unauthorized"},
           "403": {"$ref": "#/components/responses/PolicyDenied"},
           "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/telemetry/ingestion": {
+      "get": {
+        "operationId": "getIngestionFreshness",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "in": "query",
+            "required": true,
+            "schema": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Point-in-time tenant/source ingestion freshness and delivery-objective evaluation", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/ingestion-freshness-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "404": {
+            "description": "No committed source checkpoint exists in the authenticated tenant",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "ingestion.source_not_found"}}}}
+          },
           "503": {"$ref": "#/components/responses/StorageUnavailable"}
         }
       }
@@ -265,6 +289,7 @@
       "ResourceCollectionResult": {"$ref": "../../contracts/schemas/resource-collection-result.schema.json"},
       "ResourceNeighborhood": {"$ref": "../../contracts/schemas/resource-neighborhood.schema.json"},
       "ResourceTimeline": {"$ref": "../../contracts/schemas/resource-timeline.schema.json"},
+      "IngestionFreshnessReport": {"$ref": "../../contracts/schemas/ingestion-freshness-report.schema.json"},
       "PageInfo": {"$ref": "../../contracts/schemas/page-info.schema.json"},
       "Event": {"$ref": "../../contracts/schemas/event.schema.json"},
       "Evidence": {"$ref": "../../contracts/schemas/evidence.schema.json"},

@@ -11,6 +11,7 @@ from typing import Any, Mapping
 from iip.application.ingest_resource import IngestResourceCommand, ResourceIngestionService
 from iip.application.ports import (
     ActorContext,
+    Clock,
     ReconciliationRepository,
     ReconciliationSnapshot,
     ResourceRepository,
@@ -47,11 +48,13 @@ class ResourceCollectionIngestionService:
         resources: ResourceRepository,
         checkpoints: SourceCheckpointRepository,
         reconciliations: ReconciliationRepository,
+        clock: Clock,
     ) -> None:
         self._ingestion = ingestion
         self._resources = resources
         self._checkpoints = checkpoints
         self._reconciliations = reconciliations
+        self._clock = clock
 
     def execute(self, command: IngestCollectionCommand) -> tuple[Resource, ...]:
         request_metadata, request_spec, result_metadata, result_spec = self._validate(
@@ -147,6 +150,7 @@ class ResourceCollectionIngestionService:
             )
 
         if completion["status"] == "complete":
+            committed_at = self._clock.now()
             if mode == "reconciliation":
                 assert previous is None or isinstance(previous, ReconciliationSnapshot)
                 last_sequence = completion["nextSequence"] + len(missing_uids) - 1
@@ -175,7 +179,11 @@ class ResourceCollectionIngestionService:
                 # to attach. startSequence is the neutral persisted floor.
                 sequence = max(request_spec["startSequence"], last_sequence)
                 checkpoint = self._checkpoint(
-                    request_metadata, request_spec, result_metadata, completion, sequence
+                    request_metadata,
+                    request_spec,
+                    completion,
+                    sequence,
+                    committed_at,
                 )
                 snapshot = ReconciliationSnapshot(
                     tenant_id=request_metadata["tenantId"],
@@ -188,7 +196,7 @@ class ResourceCollectionIngestionService:
                     result_digest=result_digest,
                     resource_uids=present_uids,
                     tombstoned_uids=missing_uids,
-                    committed_at=result_metadata["createdAt"],
+                    committed_at=committed_at,
                 )
                 try:
                     self._reconciliations.commit_reconciliation(snapshot, checkpoint)
@@ -205,9 +213,9 @@ class ResourceCollectionIngestionService:
                         self._checkpoint(
                             request_metadata,
                             request_spec,
-                            result_metadata,
                             completion,
                             sequence,
+                            committed_at,
                         ),
                         mode=mode,
                     )
@@ -231,9 +239,9 @@ class ResourceCollectionIngestionService:
     def _checkpoint(
         request_metadata: Mapping[str, Any],
         request_spec: Mapping[str, Any],
-        result_metadata: Mapping[str, Any],
         completion: Mapping[str, Any],
         sequence: int,
+        committed_at: str,
     ) -> SourceCheckpoint:
         return SourceCheckpoint(
             tenant_id=request_metadata["tenantId"],
@@ -241,7 +249,7 @@ class ResourceCollectionIngestionService:
             stream_id=request_spec["streamId"],
             sequence=sequence,
             checkpoint=completion["checkpoint"],
-            committed_at=result_metadata["createdAt"],
+            committed_at=committed_at,
             provider_cursors=ResourceCollectionIngestionService._provider_cursors(
                 completion.get("providerCursors")
             ),

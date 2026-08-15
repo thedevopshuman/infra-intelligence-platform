@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ingestion-freshness-report:v1alpha1",
+  "title": "Infrastructure Intelligence Ingestion Freshness Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "IngestionFreshnessReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId", "sourceId", "evaluatedAt"],
+      "properties": {
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "sourceId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "evaluatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "streamId",
+        "checkpoint",
+        "acceptedObservationCount",
+        "delivery",
+        "objectives",
+        "violations"
+      ],
+      "properties": {
+        "status": {"type": "string", "enum": ["within-objective", "breached"]},
+        "streamId": {"type": "string", "pattern": "^obs_[a-f0-9]{32}$"},
+        "checkpoint": {"$ref": "#/$defs/checkpoint"},
+        "latestObservation": {"$ref": "#/$defs/latestObservation"},
+        "acceptedObservationCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "delivery": {"$ref": "#/$defs/delivery"},
+        "objectives": {"$ref": "#/$defs/objectives"},
+        "violations": {
+          "type": "array",
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "checkpoint-age-exceeded",
+              "observation-age-exceeded",
+              "ingestion-delay-exceeded",
+              "pending-event-age-exceeded",
+              "clock-skew-detected"
+            ]
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "within-objective"}}},
+          "then": {"properties": {"violations": {"maxItems": 0}}}
+        },
+        {
+          "if": {"properties": {"status": {"const": "breached"}}},
+          "then": {"properties": {"violations": {"minItems": 1}}}
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "seconds": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 315360000
+    },
+    "objectiveSeconds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 315360000
+    },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "committedAt", "ageSeconds"],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "committedAt": {"type": "string", "format": "date-time"},
+        "ageSeconds": {"$ref": "#/$defs/seconds"}
+      }
+    },
+    "latestObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observedAt", "recordedAt", "ageSeconds", "ingestionDelaySeconds"],
+      "properties": {
+        "observedAt": {"type": "string", "format": "date-time"},
+        "recordedAt": {"type": "string", "format": "date-time"},
+        "ageSeconds": {"$ref": "#/$defs/seconds"},
+        "ingestionDelaySeconds": {"$ref": "#/$defs/seconds"}
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pendingEvents"],
+      "properties": {
+        "pendingEvents": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "oldestPendingEventAgeSeconds": {"$ref": "#/$defs/seconds"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"pendingEvents": {"const": 0}}},
+          "then": {"not": {"required": ["oldestPendingEventAgeSeconds"]}},
+          "else": {"required": ["oldestPendingEventAgeSeconds"]}
+        }
+      ]
+    },
+    "objectives": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximumCheckpointAgeSeconds",
+        "maximumObservationAgeSeconds",
+        "maximumIngestionDelaySeconds",
+        "maximumPendingEventAgeSeconds",
+        "maximumClockSkewSeconds"
+      ],
+      "properties": {
+        "maximumCheckpointAgeSeconds": {"$ref": "#/$defs/objectiveSeconds"},
+        "maximumObservationAgeSeconds": {"$ref": "#/$defs/objectiveSeconds"},
+        "maximumIngestionDelaySeconds": {"$ref": "#/$defs/objectiveSeconds"},
+        "maximumPendingEventAgeSeconds": {"$ref": "#/$defs/objectiveSeconds"},
+        "maximumClockSkewSeconds": {"$ref": "#/$defs/objectiveSeconds"}
+      }
+    }
+  }
+}

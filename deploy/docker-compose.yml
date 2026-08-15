@@ -21,12 +21,29 @@ services:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
       IIP_DATABASE_AUTO_MIGRATE: "true"
       IIP_AUTH_IDENTITIES_JSON: ${IIP_AUTH_IDENTITIES_JSON:?set IIP_AUTH_IDENTITIES_JSON}
+      IIP_OTEL_METRICS_ENABLED: ${IIP_OTEL_METRICS_ENABLED:-false}
+      IIP_OTEL_INGESTION_ATTRIBUTE_MODE: ${IIP_OTEL_INGESTION_ATTRIBUTE_MODE:-source}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+      OTEL_METRIC_EXPORT_INTERVAL: ${OTEL_METRIC_EXPORT_INTERVAL:-60000}
+      OTEL_METRIC_EXPORT_TIMEOUT: ${OTEL_METRIC_EXPORT_TIMEOUT:-10000}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-infra-intelligence-api}
       PGPASSWORD: ${IIP_POSTGRES_PASSWORD:?set IIP_POSTGRES_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
       - "8080:8080"
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.158.0
+    profiles: ["telemetry"]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel/collector-test.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:14318:4318"
 
 volumes:
   postgres-data:

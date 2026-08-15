@@ -39,7 +39,7 @@ Deliverables:
 
 Exit gate: a seeded cluster can be rebuilt from observations/events; graph correctness and source lag are measurable.
 
-Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, complete-snapshot membership, deterministic tombstones, exact-result replay, atomic reconciliation/checkpoint/provider-cursor commit, per-API-path list/watch resume with `410 Gone` full-reconciliation recovery, a privileged tenant-scoped projection drift/rebuild command from accepted observation history, a measured full-schema PostgreSQL backup/restore experiment with canonical integrity verification, and tenant-scoped point-in-time freshness/source-lag telemetry. The local Phase 1 exit gate is complete; production workload objectives and windowed SLO/export work remain Phase 3 deliverables.
+Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, complete-snapshot membership, deterministic tombstones, exact-result replay, atomic reconciliation/checkpoint/provider-cursor commit, per-API-path list/watch resume with `410 Gone` full-reconciliation recovery, a privileged tenant-scoped projection drift/rebuild command from accepted observation history, a measured full-schema PostgreSQL backup/restore experiment with canonical integrity verification, tenant-scoped point-in-time freshness/source-lag telemetry, and optional outbound OTLP/HTTP freshness metrics. The local Phase 1 exit gate is complete; automatic sampling, production workload objectives, exporter-delivery health, and windowed SLO work remain Phase 3 deliverables.
 
 ## Phase 2 — evidence and investigation vertical slice
 
@@ -74,7 +74,7 @@ Deliverables:
 
 Exit gate: releases have comparable scorecards, and failures can be explained from platform telemetry.
 
-Reference slice delivered: deterministic weighted scorer, hard gates, budget checks, red-herring resistance, and repeated-run harness. The OTLP/Collector portability direction is accepted in ADR 0012. Remaining: runtime exporter/receiver adapters, version dashboard, concurrency/noisy-neighbor/prompt-injection suites, privacy controls, and measured release SLOs.
+Reference slice delivered: deterministic weighted scorer, hard gates, budget checks, red-herring resistance, repeated-run harness, and an optional OTLP/HTTP exporter for bounded ingestion-freshness metrics. The OTLP/Collector portability direction is accepted in ADR 0012 and the first outbound adapter in ADR 0013. Remaining: automatic signal sampling, traces/logs, inbound telemetry receiver or backend evidence adapters, exporter-delivery health, durable buffering decisions, version dashboard, concurrency/noisy-neighbor/prompt-injection suites, expanded privacy controls, and measured release SLOs.
 
 ## Phase 4 — governed actions and workflows
 

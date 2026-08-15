@@ -37,6 +37,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Architecture decision records](decisions/README.md)
 - [Initial roadmap](roadmap/initial-roadmap.md)
 - [Local development](operations/local-development.md)
+- [OpenTelemetry metrics export](operations/opentelemetry-export.md)
 - [PostgreSQL backup and restore experiment](operations/postgresql-backup-restore.md)
 - [Glossary](glossary.md)
 

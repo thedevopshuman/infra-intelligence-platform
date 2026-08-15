@@ -20,6 +20,8 @@ flowchart LR
     Objectives["Trusted runtime objectives"] --> Service
     Clock["Platform clock"] --> Service
     Service --> Report["IngestionFreshnessReport"]
+    Service --> Sink["Optional measurement sink"]
+    Sink --> OTLP["OTLP/HTTP metrics adapter"]
 ```
 
 The application owns `SourceIngestionTelemetryRepository` and the calculation. The in-memory and PostgreSQL adapters return raw tenant/source facts. The HTTP surface authenticates, parses one `sourceId`, and maps stable errors. SDKs consume only the public report contract.
@@ -44,8 +46,10 @@ Adapter inconsistency and storage failures fail closed as `storage.unavailable`.
 
 ## Export portability
 
-The report is the authoritative product result, not an observability-backend read model. A future telemetry-sink port will map its bounded measurements to OpenTelemetry metrics and send them asynchronously through an OTLP adapter. A customer-controlled Collector can then change the downstream backend without changing freshness semantics or application code. See the [OpenTelemetry portability boundary](opentelemetry-portability.md).
+The report is the authoritative product result, not an observability-backend read model. After a successful evaluation, the application offers the same rounded, bounded values to `IngestionTelemetrySink`. The OpenTelemetry adapter records local synchronous instruments and the official SDK exports them asynchronously over OTLP/HTTP. Recording and export failures cannot change the returned report or roll back platform work.
+
+Export is disabled unless `IIP_OTEL_METRICS_ENABLED=true`. A customer-controlled Collector can route the metrics to a different backend without changing freshness semantics or application code. Attribute policy independently controls whether no resource identity, source ID, or tenant plus source IDs accompany the metrics. See the [OpenTelemetry portability boundary](opentelemetry-portability.md) and [operations guide](../operations/opentelemetry-export.md).
 
 ## Current limit
 
-The report is a point-in-time Phase 1 SLI with local objectives. It proves that source lag is measurable at the API boundary. Aggregated time windows, production SLO/error-budget policy, alert routing, and the runtime OTLP exporter remain Phase 3 work.
+The report is a point-in-time Phase 1 SLI with local objectives. It proves that source lag is measurable at the API boundary. Metrics are emitted only when a caller evaluates freshness; there is no background sampler yet. Aggregated time windows, automatic sampling, production SLO/error-budget policy, alert routing, and exporter-delivery health remain Phase 3 work.

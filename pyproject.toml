@@ -8,7 +8,11 @@ version = "0.4.0"
 description = "Reference kernel for the Infrastructure Intelligence Platform"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["psycopg[binary]==3.3.4"]
+dependencies = [
+  "opentelemetry-exporter-otlp-proto-http==1.44.0",
+  "opentelemetry-sdk==1.44.0",
+  "psycopg[binary]==3.3.4",
+]
 
 [project.scripts]
 iip-api = "iip.surfaces.http:main"

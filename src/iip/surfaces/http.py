@@ -529,15 +529,19 @@ def main() -> None:
 
     host = os.environ.get("IIP_HTTP_HOST", "0.0.0.0")
     port = int(os.environ.get("IIP_HTTP_PORT", "8080"))
-    ApiHandler.runtime = build_runtime_from_env()
-    server = ThreadingHTTPServer((host, port), ApiHandler)
-    print(f"IIP reference API listening on http://{host}:{port}")
+    runtime = build_runtime_from_env()
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("IIP reference API stopped")
+        ApiHandler.runtime = runtime
+        server = ThreadingHTTPServer((host, port), ApiHandler)
+        print(f"IIP reference API listening on http://{host}:{port}")
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("IIP reference API stopped")
+        finally:
+            server.server_close()
     finally:
-        server.server_close()
+        runtime.close()
 
 
 if __name__ == "__main__":

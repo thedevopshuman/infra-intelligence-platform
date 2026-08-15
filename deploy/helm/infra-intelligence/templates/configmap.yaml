@@ -8,3 +8,10 @@ data:
   IIP_HTTP_HOST: {{ .Values.config.httpHost | quote }}
   IIP_HTTP_PORT: {{ .Values.config.httpPort | quote }}
   IIP_DATABASE_AUTO_MIGRATE: {{ .Values.database.autoMigrate | quote }}
+  IIP_OTEL_METRICS_ENABLED: {{ .Values.telemetry.metricsEnabled | quote }}
+  IIP_OTEL_INGESTION_ATTRIBUTE_MODE: {{ .Values.telemetry.attributeMode | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.telemetry.otlpEndpoint | quote }}
+  OTEL_EXPORTER_OTLP_PROTOCOL: {{ .Values.telemetry.protocol | quote }}
+  OTEL_METRIC_EXPORT_INTERVAL: {{ .Values.telemetry.exportIntervalMillis | quote }}
+  OTEL_METRIC_EXPORT_TIMEOUT: {{ .Values.telemetry.exportTimeoutMillis | quote }}
+  OTEL_SERVICE_NAME: {{ .Values.telemetry.serviceName | quote }}

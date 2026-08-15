@@ -34,7 +34,7 @@ Objectives are selected by trusted platform configuration, not request parameter
 
 Every breached objective adds its stable code to `violations`. `within-objective` requires an empty violation list; `breached` requires at least one violation. These Phase 1 defaults are local reference objectives, not production SLO commitments. Production targets require representative volume, deployment topology, and design-partner requirements.
 
-The report is an instantaneous SLI evaluation, not an availability-window calculation. Error-budget windows, percentile aggregation, alert routing, and OpenTelemetry/Prometheus export remain Phase 3 operational-hardening work.
+The report is an instantaneous SLI evaluation, not an availability-window calculation. An optional adapter exports its measurements as OpenTelemetry metrics after successful evaluations, but that export is not part of this public contract and is not an alternate source of truth. Automatic sampling, error-budget windows, percentile aggregation, alert routing, and production export-health controls remain Phase 3 operational-hardening work.
 
 ## API and tenancy
 

@@ -25,6 +25,7 @@ from iip.application.ports import (
     Authenticator,
     EventLog,
     EventOutbox,
+    IngestionTelemetrySink,
     ResourceRepository,
     SourceCheckpointRepository,
 )
@@ -59,12 +60,24 @@ class Runtime:
     plugin_sessions: PluginSessionService
     operational_store: Any
     evidence_store: Any
+    telemetry_runtime: Any = None
+
+    def force_flush_telemetry(self, timeout_millis: int = 10_000) -> bool:
+        if self.telemetry_runtime is None:
+            return True
+        return bool(self.telemetry_runtime.force_flush(timeout_millis))
+
+    def close(self) -> None:
+        if self.telemetry_runtime is not None:
+            self.telemetry_runtime.shutdown()
 
 
 def build_local_runtime(
     authenticator: Authenticator | None = None,
     *,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
+    ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
+    telemetry_runtime: Any = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -77,6 +90,8 @@ def build_local_runtime(
         evidence_store,
         authenticator or DenyAllAuthenticator(),
         ingestion_objectives,
+        ingestion_telemetry_sink,
+        telemetry_runtime,
     )
 
 
@@ -86,6 +101,8 @@ def _compose_runtime(
     evidence_store: Any,
     authenticator: Authenticator,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
+    ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
+    telemetry_runtime: Any = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -121,6 +138,7 @@ def _compose_runtime(
             policy,
             clock,
             ingestion_objectives,
+            ingestion_telemetry_sink,
         ),
         queries=queries,
         evidence=evidence,
@@ -138,6 +156,7 @@ def _compose_runtime(
         plugin_sessions=PluginSessionService(policy, operational, clock),
         operational_store=operational,
         evidence_store=evidence_store,
+        telemetry_runtime=telemetry_runtime,
     )
 
 
@@ -147,6 +166,8 @@ def build_postgres_runtime(
     authenticator: Authenticator | None = None,
     migrate: bool = False,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
+    ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
+    telemetry_runtime: Any = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -162,6 +183,8 @@ def build_postgres_runtime(
         operational,
         authenticator or DenyAllAuthenticator(),
         ingestion_objectives,
+        ingestion_telemetry_sink,
+        telemetry_runtime,
     )
 
 
@@ -183,19 +206,38 @@ def build_runtime_from_env() -> Runtime:
         )
     authenticator = HashedBearerAuthenticator.from_json(identity_config)
     objectives = _ingestion_objectives_from_env()
+    telemetry_runtime = _otel_metrics_runtime_from_env()
     database_url = os.environ.get("IIP_DATABASE_URL")
-    if not database_url:
-        return build_local_runtime(
-            authenticator,
-            ingestion_objectives=objectives,
+    try:
+        if not database_url:
+            return build_local_runtime(
+                authenticator,
+                ingestion_objectives=objectives,
+                ingestion_telemetry_sink=(
+                    telemetry_runtime.sink
+                    if telemetry_runtime is not None
+                    else None
+                ),
+                telemetry_runtime=telemetry_runtime,
+            )
+        auto_migrate = (
+            os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
+            == "true"
         )
-    auto_migrate = os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower() == "true"
-    return build_postgres_runtime(
-        database_url,
-        authenticator=authenticator,
-        migrate=auto_migrate,
-        ingestion_objectives=objectives,
-    )
+        return build_postgres_runtime(
+            database_url,
+            authenticator=authenticator,
+            migrate=auto_migrate,
+            ingestion_objectives=objectives,
+            ingestion_telemetry_sink=(
+                telemetry_runtime.sink if telemetry_runtime is not None else None
+            ),
+            telemetry_runtime=telemetry_runtime,
+        )
+    except Exception:
+        if telemetry_runtime is not None:
+            telemetry_runtime.shutdown()
+        raise
 
 
 def _ingestion_objectives_from_env() -> IngestionFreshnessObjectives:
@@ -235,3 +277,22 @@ def _ingestion_objectives_from_env() -> IngestionFreshnessObjectives:
     )
     objectives.validate()
     return objectives
+
+
+def _otel_metrics_runtime_from_env() -> Any:
+    enabled = os.environ.get("IIP_OTEL_METRICS_ENABLED", "false").lower()
+    if enabled not in ("false", "true"):
+        from iip.adapters.otel import OpenTelemetryConfigurationError
+
+        raise OpenTelemetryConfigurationError("telemetry.configuration.invalid")
+    if enabled == "false":
+        return None
+
+    from iip.adapters.otel import (
+        OtlpMetricsConfiguration,
+        build_otlp_metrics_runtime,
+    )
+
+    return build_otlp_metrics_runtime(
+        OtlpMetricsConfiguration.from_environment(os.environ)
+    )

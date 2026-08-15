@@ -10,6 +10,8 @@ from typing import Optional
 from iip.application.ports import (
     ActorContext,
     Clock,
+    IngestionFreshnessMeasurement,
+    IngestionTelemetrySink,
     PolicyDecisionPoint,
     SourceIngestionState,
     SourceIngestionTelemetryRepository,
@@ -105,11 +107,13 @@ class IngestionFreshnessService:
         policy: PolicyDecisionPoint,
         clock: Clock,
         objectives: IngestionFreshnessObjectives | None = None,
+        telemetry: IngestionTelemetrySink | None = None,
     ) -> None:
         self._repository = repository
         self._policy = policy
         self._clock = clock
         self._objectives = objectives or IngestionFreshnessObjectives()
+        self._telemetry = telemetry
         self._objectives.validate()
 
     def get(self, command: GetIngestionFreshnessCommand) -> IngestionFreshnessReport:
@@ -144,6 +148,8 @@ class IngestionFreshnessService:
             violations.add("checkpoint-age-exceeded")
 
         latest_observation: Optional[dict[str, object]] = None
+        observation_age: Optional[float] = None
+        ingestion_delay: Optional[float] = None
         if state.latest_observed_at is not None:
             assert state.latest_recorded_at is not None
             observed_at = self._parse_time(state.latest_observed_at)
@@ -163,6 +169,7 @@ class IngestionFreshnessService:
             }
 
         delivery: dict[str, object] = {"pendingEvents": state.pending_event_count}
+        pending_age: Optional[float] = None
         if state.oldest_pending_event_recorded_at is not None:
             oldest_pending_at = self._parse_time(
                 state.oldest_pending_event_recorded_at
@@ -188,7 +195,7 @@ class IngestionFreshnessService:
         }
         if latest_observation is not None:
             spec["latestObservation"] = latest_observation
-        return IngestionFreshnessReport(
+        report = IngestionFreshnessReport(
             {
                 "apiVersion": "iip.platform/v1alpha1",
                 "kind": "IngestionFreshnessReport",
@@ -200,6 +207,40 @@ class IngestionFreshnessService:
                 "spec": spec,
             }
         )
+        self._record_telemetry(
+            IngestionFreshnessMeasurement(
+                tenant_id=state.tenant_id,
+                source_id=state.source_id,
+                within_objective=not sorted_violations,
+                checkpoint_age_seconds=self._rounded(checkpoint_age),
+                observation_age_seconds=(
+                    self._rounded(observation_age)
+                    if observation_age is not None
+                    else None
+                ),
+                ingestion_delay_seconds=(
+                    self._rounded(ingestion_delay)
+                    if ingestion_delay is not None
+                    else None
+                ),
+                accepted_observation_count=state.accepted_observation_count,
+                pending_event_count=state.pending_event_count,
+                oldest_pending_event_age_seconds=(
+                    self._rounded(pending_age) if pending_age is not None else None
+                ),
+                violations=tuple(sorted_violations),
+            )
+        )
+        return report
+
+    def _record_telemetry(self, measurement: IngestionFreshnessMeasurement) -> None:
+        if self._telemetry is None:
+            return
+        try:
+            self._telemetry.record_ingestion_freshness(measurement)
+        except Exception:
+            # Observability is intentionally failure-isolated from product behavior.
+            return
 
     @staticmethod
     def _validate_state(

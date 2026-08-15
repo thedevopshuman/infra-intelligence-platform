@@ -19,7 +19,12 @@ from iip.application.observe_ingestion import (
     IngestionTelemetryInputError,
     IngestionTelemetryStateError,
 )
-from iip.application.ports import ActorContext, PolicyDecision, SourceIngestionState
+from iip.application.ports import (
+    ActorContext,
+    IngestionFreshnessMeasurement,
+    PolicyDecision,
+    SourceIngestionState,
+)
 from iip.bootstrap import build_local_runtime
 from iip.surfaces.http import ApiHandler
 from infra_intelligence_sdk import Client, IngestionFreshnessReport
@@ -93,6 +98,7 @@ class IngestionFreshnessServiceTests(unittest.TestCase):
         *,
         policy: RecordingPolicy | None = None,
         evaluated_at: str = "2026-08-14T10:30:10Z",
+        telemetry: object | None = None,
     ) -> tuple[IngestionFreshnessService, StateRepository, RecordingPolicy]:
         repository = StateRepository(state)
         selected_policy = policy or RecordingPolicy()
@@ -109,6 +115,7 @@ class IngestionFreshnessServiceTests(unittest.TestCase):
                 selected_policy,
                 FixedClock(evaluated_at),
                 objectives,
+                telemetry,
             ),
             repository,
             selected_policy,
@@ -234,6 +241,61 @@ class IngestionFreshnessServiceTests(unittest.TestCase):
                     IngestionFreshnessObjectives(
                         maximum_checkpoint_age_seconds=value
                     ).validate()
+
+    def test_successful_evaluation_records_provider_neutral_measurement(self) -> None:
+        class Sink:
+            def __init__(self) -> None:
+                self.measurements: list[IngestionFreshnessMeasurement] = []
+
+            def record_ingestion_freshness(
+                self, measurement: IngestionFreshnessMeasurement
+            ) -> None:
+                self.measurements.append(measurement)
+
+        sink = Sink()
+        service, _, _ = self.service(source_state(), telemetry=sink)
+
+        service.get(
+            GetIngestionFreshnessCommand(
+                ActorContext("operator", "local"), "kubernetes-local"
+            )
+        )
+
+        self.assertEqual(
+            sink.measurements,
+            [
+                IngestionFreshnessMeasurement(
+                    tenant_id="local",
+                    source_id="kubernetes-local",
+                    within_objective=True,
+                    checkpoint_age_seconds=5.0,
+                    observation_age_seconds=10.0,
+                    ingestion_delay_seconds=2.0,
+                    accepted_observation_count=1,
+                    pending_event_count=0,
+                    oldest_pending_event_age_seconds=None,
+                    violations=(),
+                )
+            ],
+        )
+
+    def test_telemetry_sink_failure_cannot_change_report_behavior(self) -> None:
+        class FailingSink:
+            def record_ingestion_freshness(
+                self, measurement: IngestionFreshnessMeasurement
+            ) -> None:
+                del measurement
+                raise RuntimeError("provider detail must not escape")
+
+        service, _, _ = self.service(source_state(), telemetry=FailingSink())
+
+        report = service.get(
+            GetIngestionFreshnessCommand(
+                ActorContext("operator", "local"), "kubernetes-local"
+            )
+        )
+
+        self.assertEqual(report.to_dict(), example("ingestion-freshness-report.json"))
 
 
 class IngestionFreshnessSchemaTests(unittest.TestCase):

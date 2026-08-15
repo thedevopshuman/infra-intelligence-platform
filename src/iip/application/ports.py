@@ -108,6 +108,22 @@ class SourceIngestionState:
 
 
 @dataclass(frozen=True)
+class IngestionFreshnessMeasurement:
+    """Provider-neutral freshness values offered to an observational sink."""
+
+    tenant_id: str
+    source_id: str
+    within_objective: bool
+    checkpoint_age_seconds: float
+    observation_age_seconds: Optional[float]
+    ingestion_delay_seconds: Optional[float]
+    accepted_observation_count: int
+    pending_event_count: int
+    oldest_pending_event_age_seconds: Optional[float]
+    violations: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ReconciliationSnapshot:
     """Last complete resource membership for one tenant-scoped source."""
 
@@ -277,6 +293,13 @@ class SourceIngestionTelemetryRepository(Protocol):
         self, tenant_id: str, source_id: str
     ) -> Optional[SourceIngestionState]:
         """Return point-in-time telemetry facts for exactly one tenant/source."""
+
+
+class IngestionTelemetrySink(Protocol):
+    def record_ingestion_freshness(
+        self, measurement: IngestionFreshnessMeasurement
+    ) -> None:
+        """Record without network I/O or changing the owning use-case result."""
 
 
 class ReconciliationRepository(Protocol):

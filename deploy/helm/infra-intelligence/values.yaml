@@ -50,6 +50,17 @@ auth:
   existingSecret: ""
   secretKey: identities-json
 
+telemetry:
+  metricsEnabled: false
+  otlpEndpoint: ""
+  protocol: http/protobuf
+  attributeMode: source
+  serviceName: infra-intelligence-api
+  exportIntervalMillis: 60000
+  exportTimeoutMillis: 10000
+  existingSecret: ""
+  headersSecretKey: otlp-headers
+
 resources:
   requests:
     cpu: 50m
@@ -70,6 +81,13 @@ networkPolicy:
   enabled: false
   ingressNamespaceSelector:
     kubernetes.io/metadata.name: iip-system
+  otlpEgress:
+    enabled: false
+    port: 4318
+    namespaceSelector:
+      kubernetes.io/metadata.name: observability
+    podSelector:
+      app.kubernetes.io/name: opentelemetry-collector
 
 podDisruptionBudget:
   enabled: false

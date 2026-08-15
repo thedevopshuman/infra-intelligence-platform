@@ -39,7 +39,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "infra-intelligence.fullname" . }}
-          {{- if or .Values.database.existingSecret .Values.auth.existingSecret }}
+          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret }}
           env:
             {{- if .Values.database.existingSecret }}
             - name: IIP_DATABASE_URL
@@ -54,6 +54,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.auth.existingSecret | quote }}
                   key: {{ .Values.auth.secretKey | quote }}
+            {{- end }}
+            {{- if .Values.telemetry.existingSecret }}
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetry.existingSecret | quote }}
+                  key: {{ .Values.telemetry.headersSecretKey | quote }}
             {{- end }}
           {{- end }}
           ports:

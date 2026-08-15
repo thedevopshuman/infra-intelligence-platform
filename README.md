@@ -4,7 +4,7 @@
 
 Infrastructure Intelligence Platform (IIP) is an architecture-first foundation for building a vendor-neutral control plane that understands infrastructure as a resource graph and event timeline, then lets governed agents investigate and act with evidence.
 
-This repository now contains an **executable local reference slice across Roadmap Phases 1–5**. It includes live Kubernetes reconciliation with per-type cursor resume and watch-expiration recovery, durable membership and tombstones, durable PostgreSQL resources/evidence/investigations/actions/audit, tenant-scoped projection verification and rebuild, measured full-schema backup/restore verification, measurable ingestion freshness/source lag, deterministic evidence-backed investigation and evaluation, dry-run governed actions, and bounded plugin sessions. The local Phase 1 exit gate is complete, but the later phase exit gates are not: production telemetry/SLO windows, live mutation/rollback, isolated signed plugin execution, design-partner operation, and legal/brand decisions remain. It is not yet a production system.
+This repository now contains an **executable local reference slice across Roadmap Phases 1–5**. It includes live Kubernetes reconciliation with per-type cursor resume and watch-expiration recovery, durable membership and tombstones, durable PostgreSQL resources/evidence/investigations/actions/audit, tenant-scoped projection verification and rebuild, measured full-schema backup/restore verification, measurable ingestion freshness/source lag with optional OTLP/HTTP metrics export, deterministic evidence-backed investigation and evaluation, dry-run governed actions, and bounded plugin sessions. The local Phase 1 exit gate is complete, but the later phase exit gates are not: production telemetry/SLO windows, inbound customer telemetry evidence, live mutation/rollback, isolated signed plugin execution, design-partner operation, and legal/brand decisions remain. It is not yet a production system.
 
 ## Start here
 
@@ -24,6 +24,7 @@ make verify
 # With Docker Desktop running:
 make test-postgres
 make test-backup-restore
+make test-otel
 # With the local kind cluster and explicit kubeconfig:
 IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-live
 # Configure a local Bearer identity as described in docs/operations/local-development.md.
@@ -67,7 +68,7 @@ The API authenticates a Bearer credential into actor, tenant, and role context, 
 
 ## Current decisions and open questions
 
-Accepted foundations live in [`docs/decisions`](docs/decisions/README.md). PostgreSQL is accepted as the initial resource/event and operational record substrate, the deterministic investigator/dry-run action boundary is accepted as the safety baseline, and OTLP through an OpenTelemetry Collector is the accepted telemetry-portability direction. The runtime OTLP adapters plus production identity, model, workflow/policy, credential-broker, plugin-runner, licensing, company, and brand decisions remain explicit roadmap work.
+Accepted foundations live in [`docs/decisions`](docs/decisions/README.md). PostgreSQL is accepted as the initial resource/event and operational record substrate, the deterministic investigator/dry-run action boundary is accepted as the safety baseline, and OTLP through an OpenTelemetry Collector is the accepted telemetry-portability direction. An optional outbound ingestion-metrics exporter is now executable; inbound telemetry evidence, production export health, production identity, model, workflow/policy, credential-broker, plugin-runner, licensing, company, and brand decisions remain explicit roadmap work.
 
 ## Licensing
 

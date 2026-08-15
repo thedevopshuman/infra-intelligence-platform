@@ -8,8 +8,8 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from .collector import collect
-from .live import LiveCollectionError, list_objects
+from .collector import canonical_digest, collect
+from .live import LiveCollectionError, list_objects, watch_then_list_objects
 
 
 def parser() -> argparse.ArgumentParser:
@@ -34,10 +34,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             if args.kubeconfig is None:
                 raise ValueError("live collection requires an explicit kubeconfig")
-            objects = list_objects(
-                context=args.live_context,
-                kubeconfig=args.kubeconfig,
-                timeout_seconds=args.timeout_seconds,
+            spec = request.get("spec")
+            scope = spec.get("scope") if isinstance(spec, dict) else None
+            parameters = scope.get("parameters") if isinstance(scope, dict) else None
+            namespaces = parameters.get("namespaces") if isinstance(parameters, dict) else None
+            cluster_id = scope.get("rootExternalId") if isinstance(scope, dict) else None
+            if not isinstance(namespaces, list) or not isinstance(cluster_id, str):
+                raise ValueError("live collection requires a supported scope")
+            options = {
+                "context": args.live_context,
+                "kubeconfig": args.kubeconfig,
+                "namespaces": namespaces,
+                "cluster_id": cluster_id,
+                "scope_digest": canonical_digest(scope),
+                "timeout_seconds": args.timeout_seconds,
+            }
+            resume = spec.get("resume")
+            objects = (
+                watch_then_list_objects(resume=resume, **options)
+                if isinstance(resume, dict)
+                else list_objects(**options)
             )
         result = collect(request, objects).to_dict()
     except LiveCollectionError as exc:

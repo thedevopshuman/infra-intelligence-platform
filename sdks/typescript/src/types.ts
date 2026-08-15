@@ -67,6 +67,11 @@ export interface ResourceCollectionScope {
   parameters?: Record<string, unknown>;
 }
 
+export interface ResourceCollectionResume {
+  checkpoint: string;
+  providerCursors: Record<string, string>;
+}
+
 export interface ResourceCollectionRequestBase {
   apiVersion: "iip.platform/v1alpha1";
   kind: "ResourceCollectionRequest";
@@ -89,6 +94,7 @@ export type ResourceCollectionRequest = ResourceCollectionRequestBase & {
       maxOutputBytes: number;
     };
     deadline: string;
+    resume?: ResourceCollectionResume;
   } &
     (
       | { mode: "incremental"; snapshotId?: never }
@@ -103,11 +109,17 @@ export type ResourceCollectionCompletion = {
   scopeDigest: Sha256Digest;
 } &
   (
-    | { status: "complete"; checkpoint: string; reasonCode?: never }
+    | {
+        status: "complete";
+        checkpoint: string;
+        providerCursors?: Record<string, string>;
+        reasonCode?: never;
+      }
     | {
         status: "partial" | "failed" | "cancelled";
         reasonCode: string;
         checkpoint?: never;
+        providerCursors?: never;
       }
   );
 

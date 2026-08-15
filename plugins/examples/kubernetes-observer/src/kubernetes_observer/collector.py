@@ -597,6 +597,27 @@ def collect(
         resource_version = _string(
             list_metadata.get("resourceVersion"), "collector.checkpoint_missing"
         )
+        checkpoint_value = list_metadata.get("checkpoint")
+        provider_cursors_value = list_metadata.get("providerCursors")
+        if (checkpoint_value is None) != (provider_cursors_value is None):
+            raise CollectorError("collector.cursor_state_invalid")
+        provider_cursors: Dict[str, str] = {}
+        if provider_cursors_value is not None:
+            if (
+                not isinstance(checkpoint_value, str)
+                or not 1 <= len(checkpoint_value) <= 2048
+                or not isinstance(provider_cursors_value, Mapping)
+                or not 1 <= len(provider_cursors_value) <= 2048
+                or any(
+                    not isinstance(key, str)
+                    or not 1 <= len(key) <= 256
+                    or not isinstance(value, str)
+                    or not 1 <= len(value) <= 512
+                    for key, value in provider_cursors_value.items()
+                )
+            ):
+                raise CollectorError("collector.cursor_state_invalid")
+            provider_cursors = dict(sorted(provider_cursors_value.items()))
         items = list_document.get("items")
         if not isinstance(items, list):
             raise CollectorError("collector.object_invalid")
@@ -639,9 +660,12 @@ def collect(
             "status": "complete",
             "resourceCount": len(observations),
             "nextSequence": request["startSequence"] + len(observations),
-            "checkpoint": f"kubernetes:{cluster_id}:resource-version:{resource_version}",
+            "checkpoint": checkpoint_value
+            or f"kubernetes:{cluster_id}:resource-version:{resource_version}",
             "scopeDigest": scope_digest,
         }
+        if provider_cursors:
+            completion["providerCursors"] = provider_cursors
         if request.get("snapshotId") is not None:
             completion["snapshotId"] = request["snapshotId"]
         result = {

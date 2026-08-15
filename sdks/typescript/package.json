@@ -1,6 +1,6 @@
 {
   "name": "@iip/sdk",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "description": "TypeScript client boundary for the Infrastructure Intelligence Platform",
   "type": "module",

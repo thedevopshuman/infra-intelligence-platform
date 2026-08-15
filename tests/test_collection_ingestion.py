@@ -101,12 +101,62 @@ class ResourceCollectionIngestionTests(unittest.TestCase):
             checkpoint.sequence,
             self.result["spec"]["completion"]["nextSequence"] - 1,
         )
+        self.assertEqual(
+            dict(checkpoint.provider_cursors),
+            self.result["spec"]["completion"]["providerCursors"],
+        )
+
+    def test_resume_state_must_match_the_atomically_committed_cursor_set(self) -> None:
+        self.execute()
+        current = self.store.get_checkpoint("local", "kubernetes-local")
+        self.assertIsNotNone(current)
+        assert current is not None
+        request, result = self.reconciliation(
+            request_id="col_10101010101010101010101010101010",
+            snapshot_id="snap_10101010101010101010101010101010",
+            start_sequence=current.sequence + 1,
+            observations=[],
+            checkpoint="kubernetes:cursor-set:v1:sha256:" + "1" * 64,
+        )
+        request["spec"]["resume"] = {
+            "checkpoint": current.checkpoint,
+            "providerCursors": dict(current.provider_cursors),
+        }
+        result["spec"]["completion"]["providerCursors"] = {
+            "/apis/apps/v1/namespaces/default/deployments": "398713"
+        }
+
+        self.service.execute(IngestCollectionCommand(self.actor, request, result))
+
+        advanced = self.store.get_checkpoint("local", "kubernetes-local")
+        self.assertIsNotNone(advanced)
+        assert advanced is not None
+        self.assertEqual(
+            dict(advanced.provider_cursors),
+            result["spec"]["completion"]["providerCursors"],
+        )
+        stale_request = copy.deepcopy(request)
+        stale_request["metadata"]["requestId"] = "col_20202020202020202020202020202020"
+        stale_request["spec"]["snapshotId"] = "snap_20202020202020202020202020202020"
+        stale_request["spec"]["startSequence"] = advanced.sequence + 1
+        stale_result = copy.deepcopy(result)
+        stale_result["metadata"]["requestId"] = stale_request["metadata"]["requestId"]
+        stale_result["spec"]["completion"]["snapshotId"] = stale_request["spec"][
+            "snapshotId"
+        ]
+        stale_result["spec"]["completion"]["nextSequence"] = advanced.sequence + 1
+
+        with self.assertRaisesRegex(CollectionConflictError, "collection.resume.stale"):
+            self.service.execute(
+                IngestCollectionCommand(self.actor, stale_request, stale_result)
+            )
 
     def test_incomplete_batch_is_safe_to_ingest_but_cannot_advance_checkpoint(self) -> None:
         self.result["spec"]["completion"].update(
             {"status": "partial", "reasonCode": "collector.deadline-exceeded"}
         )
         del self.result["spec"]["completion"]["checkpoint"]
+        del self.result["spec"]["completion"]["providerCursors"]
 
         self.execute()
 

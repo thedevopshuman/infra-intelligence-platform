@@ -44,6 +44,7 @@
         "nextSequence": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
         "snapshotId": {"type": "string", "pattern": "^snap_[a-f0-9]{32}$"},
         "checkpoint": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "providerCursors": {"$ref": "#/$defs/providerCursors"},
         "scopeDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "reasonCode": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$", "maxLength": 128}
       },
@@ -56,10 +57,22 @@
           },
           "else": {
             "required": ["reasonCode"],
-            "not": {"required": ["checkpoint"]}
+            "not": {
+              "anyOf": [
+                {"required": ["checkpoint"]},
+                {"required": ["providerCursors"]}
+              ]
+            }
           }
         }
       ]
+    },
+    "providerCursors": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 2048,
+      "propertyNames": {"type": "string", "minLength": 1, "maxLength": 256},
+      "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 512}
     }
   }
 }

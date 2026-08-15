@@ -20,7 +20,8 @@ PYTHONPATH=sdks/python/src:plugins/examples/kubernetes-observer/src \
     "$IIP_LIVE_PYTHON" -m kubernetes_observer \
     --request plugins/examples/kubernetes-observer/fixtures/live-collection-request.json \
     --live-context "$IIP_LIVE_CONTEXT" \
-    --kubeconfig "$IIP_LIVE_KUBECONFIG" >"$IIP_LIVE_RESULT"
+    --kubeconfig "$IIP_LIVE_KUBECONFIG" \
+    --timeout-seconds 3 >"$IIP_LIVE_RESULT"
 
 PYTHONPATH=scripts "$IIP_LIVE_PYTHON" - "$IIP_LIVE_RESULT" <<'PY'
 import json
@@ -71,6 +72,10 @@ result = json.loads(result_path.read_text(encoding="utf-8"))
 request["metadata"]["requestId"] = "col_55555555555555555555555555555555"
 request["spec"]["snapshotId"] = "snap_55555555555555555555555555555555"
 request["spec"]["startSequence"] = result["spec"]["completion"]["nextSequence"]
+request["spec"]["resume"] = {
+    "checkpoint": result["spec"]["completion"]["checkpoint"],
+    "providerCursors": result["spec"]["completion"]["providerCursors"],
+}
 output_path.write_text(json.dumps(request), encoding="utf-8")
 PY
 
@@ -81,7 +86,8 @@ PYTHONPATH=sdks/python/src:plugins/examples/kubernetes-observer/src \
     "$IIP_LIVE_PYTHON" -m kubernetes_observer \
     --request "$IIP_LIVE_NEXT_REQUEST" \
     --live-context "$IIP_LIVE_CONTEXT" \
-    --kubeconfig "$IIP_LIVE_KUBECONFIG" >"$IIP_LIVE_NEXT_RESULT"
+    --kubeconfig "$IIP_LIVE_KUBECONFIG" \
+    --timeout-seconds 3 >"$IIP_LIVE_NEXT_RESULT"
 
 PYTHONPATH=src:sdks/python/src "$IIP_LIVE_PYTHON" scripts/run_reference_workflow.py \
     --request plugins/examples/kubernetes-observer/fixtures/live-collection-request.json \

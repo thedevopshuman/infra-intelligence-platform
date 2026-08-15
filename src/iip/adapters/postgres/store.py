@@ -41,6 +41,7 @@ _MIGRATIONS = (
     "0003_operational_workflows.sql",
     "0004_reconciliation_snapshots.sql",
     "0005_projection_rebuild_source.sql",
+    "0006_source_checkpoint_provider_cursors.sql",
 )
 
 
@@ -556,7 +557,7 @@ class PostgresResourceStore:
             row = connection.execute(
                 """
                 SELECT tenant_id, source_id, stream_id, sequence,
-                       checkpoint, committed_at
+                       checkpoint, provider_cursors, committed_at
                 FROM iip.source_checkpoints
                 WHERE tenant_id = %s AND source_id = %s
                 """,
@@ -571,6 +572,7 @@ class PostgresResourceStore:
             sequence=row["sequence"],
             checkpoint=row["checkpoint"],
             committed_at=self._rfc3339(row["committed_at"]),
+            provider_cursors=tuple(sorted(row["provider_cursors"].items())),
         )
 
     @_translate_database_errors
@@ -603,7 +605,7 @@ class PostgresResourceStore:
             )
             row = connection.execute(
                 """
-                SELECT stream_id, sequence, checkpoint
+                SELECT stream_id, sequence, checkpoint, provider_cursors
                 FROM iip.source_checkpoints
                 WHERE tenant_id = %s AND source_id = %s
                 FOR UPDATE
@@ -615,7 +617,10 @@ class PostgresResourceStore:
                     raise ValueError("checkpoint sequence cannot move backwards")
                 if (
                     checkpoint.sequence == row["sequence"]
-                    and checkpoint.checkpoint != row["checkpoint"]
+                    and (
+                        checkpoint.checkpoint != row["checkpoint"]
+                        or dict(checkpoint.provider_cursors) != row["provider_cursors"]
+                    )
                 ):
                     raise ValueError("checkpoint content conflicts at the same sequence")
             elif row is not None and mode != "reconciliation":
@@ -624,12 +629,13 @@ class PostgresResourceStore:
                 """
                 INSERT INTO iip.source_checkpoints (
                     tenant_id, source_id, stream_id, sequence,
-                    checkpoint, committed_at
-                ) VALUES (%s, %s, %s, %s, %s, %s)
+                    checkpoint, provider_cursors, committed_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (tenant_id, source_id) DO UPDATE SET
                     stream_id = EXCLUDED.stream_id,
                     sequence = EXCLUDED.sequence,
                     checkpoint = EXCLUDED.checkpoint,
+                    provider_cursors = EXCLUDED.provider_cursors,
                     committed_at = EXCLUDED.committed_at
                 """,
                 (
@@ -638,6 +644,7 @@ class PostgresResourceStore:
                     checkpoint.stream_id,
                     checkpoint.sequence,
                     checkpoint.checkpoint,
+                    Jsonb(dict(checkpoint.provider_cursors)),
                     checkpoint.committed_at,
                 ),
             )
@@ -677,7 +684,7 @@ class PostgresResourceStore:
 
             checkpoint_row = connection.execute(
                 """
-                SELECT stream_id, sequence, checkpoint
+                SELECT stream_id, sequence, checkpoint, provider_cursors
                 FROM iip.source_checkpoints
                 WHERE tenant_id = %s AND source_id = %s
                 FOR UPDATE
@@ -723,12 +730,13 @@ class PostgresResourceStore:
                 """
                 INSERT INTO iip.source_checkpoints (
                     tenant_id, source_id, stream_id, sequence,
-                    checkpoint, committed_at
-                ) VALUES (%s, %s, %s, %s, %s, %s)
+                    checkpoint, provider_cursors, committed_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (tenant_id, source_id) DO UPDATE SET
                     stream_id = EXCLUDED.stream_id,
                     sequence = EXCLUDED.sequence,
                     checkpoint = EXCLUDED.checkpoint,
+                    provider_cursors = EXCLUDED.provider_cursors,
                     committed_at = EXCLUDED.committed_at
                 """,
                 (
@@ -737,6 +745,7 @@ class PostgresResourceStore:
                     checkpoint.stream_id,
                     checkpoint.sequence,
                     checkpoint.checkpoint,
+                    Jsonb(dict(checkpoint.provider_cursors)),
                     checkpoint.committed_at,
                 ),
             )
@@ -1015,7 +1024,10 @@ class PostgresResourceStore:
                 raise ValueError("checkpoint sequence cannot move backwards")
             if (
                 checkpoint.sequence == row["sequence"]
-                and checkpoint.checkpoint != row["checkpoint"]
+                and (
+                    checkpoint.checkpoint != row["checkpoint"]
+                    or dict(checkpoint.provider_cursors) != row["provider_cursors"]
+                )
             ):
                 raise ValueError("checkpoint content conflicts at the same sequence")
             return
@@ -1088,12 +1100,14 @@ class PostgresResourceStore:
         connection.execute(
             """
             INSERT INTO iip.source_checkpoints (
-                tenant_id, source_id, stream_id, sequence, checkpoint
-            ) VALUES (%s, %s, %s, %s, %s)
+                tenant_id, source_id, stream_id, sequence, checkpoint,
+                provider_cursors
+            ) VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (tenant_id, source_id) DO UPDATE SET
                 stream_id = EXCLUDED.stream_id,
                 sequence = EXCLUDED.sequence,
                 checkpoint = EXCLUDED.checkpoint,
+                provider_cursors = EXCLUDED.provider_cursors,
                 committed_at = clock_timestamp()
             """,
             (
@@ -1102,6 +1116,7 @@ class PostgresResourceStore:
                 cursor.stream_id,
                 cursor.sequence,
                 cursor.checkpoint,
+                Jsonb({}),
             ),
         )
 

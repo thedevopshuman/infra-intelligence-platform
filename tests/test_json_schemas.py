@@ -110,6 +110,26 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("reasonCode" in error for error in errors))
 
+    def test_resume_requires_checkpoint_and_nonempty_provider_cursor_map(self) -> None:
+        request = document("contracts/examples/resource-collection-request.json")
+        request["spec"]["resume"] = {"checkpoint": "opaque"}
+
+        errors = self.validate("resource-collection-request.schema.json", request)
+
+        self.assertTrue(any("providerCursors" in error for error in errors))
+
+    def test_incomplete_collection_result_cannot_return_provider_cursors(self) -> None:
+        result = document("contracts/examples/resource-collection-result.json")
+        completion = result["spec"]["completion"]
+        completion.update(
+            {"status": "failed", "reasonCode": "collector.provider-error"}
+        )
+        del completion["checkpoint"]
+
+        errors = self.validate("resource-collection-result.schema.json", result)
+
+        self.assertTrue(errors)
+
     def test_page_with_more_items_requires_next_cursor(self) -> None:
         page = document("contracts/examples/page-info.json")
         del page["nextCursor"]

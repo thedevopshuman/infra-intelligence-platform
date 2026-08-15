@@ -88,6 +88,7 @@ class SourceCheckpoint:
     sequence: int
     checkpoint: str
     committed_at: str
+    provider_cursors: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)

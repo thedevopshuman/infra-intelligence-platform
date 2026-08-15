@@ -62,6 +62,13 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(report.to_dict()["kind"], "InvestigationReport")
         self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")
         self.assertEqual(collection_result.to_dict()["kind"], "ResourceCollectionResult")
+        self.assertIsNone(collection_request.resume)
+        self.assertEqual(
+            collection_result.provider_cursors,
+            {
+                "/apis/apps/v1/namespaces/default/deployments": "398712"
+            },
+        )
         self.assertEqual(tombstone.to_dict()["status"]["lifecycle"], "deleted")
         self.assertEqual(neighborhood.to_dict()["kind"], "ResourceNeighborhood")
         self.assertEqual(timeline.to_dict()["kind"], "ResourceTimeline")

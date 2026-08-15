@@ -21,7 +21,16 @@ import validate_schemas  # noqa: E402
 from iip.domain.models import Resource  # noqa: E402
 from kubernetes_observer import collect  # noqa: E402
 from kubernetes_observer.__main__ import main as observer_main  # noqa: E402
-from kubernetes_observer.live import LiveCollectionError, list_objects  # noqa: E402
+from kubernetes_observer.live import (  # noqa: E402
+    LiveCollectionError,
+    ResourceStream,
+    WatchExpired,
+    _watch_stream,
+    cursor_checkpoint,
+    list_objects,
+    resource_streams,
+    watch_then_list_objects,
+)
 
 
 def fixture(name: str) -> dict:
@@ -205,7 +214,12 @@ class KubernetesObserverConformanceTests(unittest.TestCase):
         self.assertEqual(json.loads(output.getvalue()), self.expected)
 
     def test_live_transport_requires_explicit_configuration_and_builds_checkpoint(self) -> None:
-        provider_document = {"apiVersion": "v1", "kind": "List", "metadata": {}, "items": []}
+        provider_document = {
+            "apiVersion": "v1",
+            "kind": "List",
+            "metadata": {"resourceVersion": "5000"},
+            "items": [],
+        }
         with TemporaryDirectory() as directory:
             kubeconfig = Path(directory) / "config"
             kubeconfig.write_text("development fixture", encoding="utf-8")
@@ -219,6 +233,8 @@ class KubernetesObserverConformanceTests(unittest.TestCase):
             result["metadata"]["resourceVersion"],
             r"^composite-sha256:[a-f0-9]{64}$",
         )
+        self.assertEqual(len(result["metadata"]["providerCursors"]), 10)
+        self.assertEqual(run.call_count, 10)
         command = run.call_args.args[0]
         self.assertIn("--context", command)
         self.assertIn("kind-iip-dev", command)
@@ -236,6 +252,94 @@ class KubernetesObserverConformanceTests(unittest.TestCase):
                     LiveCollectionError, "collector.live.provider_error"
                 ):
                     list_objects(context="kind-iip-dev", kubeconfig=kubeconfig)
+
+    def test_watch_410_is_classified_without_exposing_provider_text(self) -> None:
+        event = {
+            "type": "ERROR",
+            "object": {
+                "apiVersion": "v1",
+                "kind": "Status",
+                "code": 410,
+                "message": "provider history and credential detail",
+            },
+        }
+        stream = ResourceStream(
+            "pods",
+            "/api/v1/namespaces/default/pods",
+            "v1",
+            "Pod",
+            "default",
+        )
+        with TemporaryDirectory() as directory:
+            kubeconfig = Path(directory) / "config"
+            kubeconfig.write_text("development fixture", encoding="utf-8")
+            responses = (
+                subprocess.CompletedProcess(
+                    args=[], returncode=0, stdout=json.dumps(event), stderr=""
+                ),
+                subprocess.CompletedProcess(
+                    args=[],
+                    returncode=1,
+                    stdout="",
+                    stderr="Error from server (Gone): provider history detail",
+                ),
+            )
+            for completed in responses:
+                with self.subTest(returncode=completed.returncode):
+                    with patch(
+                        "kubernetes_observer.live.subprocess.run",
+                        return_value=completed,
+                    ):
+                        with self.assertRaisesRegex(WatchExpired, stream.key):
+                            _watch_stream(
+                                stream,
+                                "1",
+                                context="kind-iip-dev",
+                                kubeconfig=kubeconfig,
+                                timeout_seconds=1,
+                            )
+
+    def test_resume_cycle_relists_the_full_scope_after_watch_recovery(self) -> None:
+        streams = resource_streams(("default",))
+        cursors = {stream.key: str(index + 1) for index, stream in enumerate(streams)}
+        scope_digest = "sha256:" + "a" * 64
+        resume = {
+            "checkpoint": cursor_checkpoint(
+                cluster_id="cluster-local",
+                scope_digest=scope_digest,
+                provider_cursors=cursors,
+            ),
+            "providerCursors": cursors,
+        }
+        fresh = {"kind": "List", "metadata": {"resourceVersion": "fresh"}, "items": []}
+        with TemporaryDirectory() as directory:
+            kubeconfig = Path(directory) / "config"
+            kubeconfig.write_text("development fixture", encoding="utf-8")
+            def watch_side_effect(stream, cursor, **kwargs):
+                if stream.argument == "pods":
+                    raise WatchExpired(stream.key)
+                return False
+
+            with patch(
+                "kubernetes_observer.live._watch_stream",
+                side_effect=watch_side_effect,
+            ) as watch:
+                with patch(
+                    "kubernetes_observer.live.list_objects", return_value=fresh
+                ) as relist:
+                    result = watch_then_list_objects(
+                        context="kind-iip-dev",
+                        kubeconfig=kubeconfig,
+                        namespaces=("default",),
+                        cluster_id="cluster-local",
+                        scope_digest=scope_digest,
+                        resume=resume,
+                        timeout_seconds=1,
+                    )
+
+        self.assertIs(result, fresh)
+        self.assertEqual(watch.call_count, len(streams))
+        relist.assert_called_once()
 
     def test_image_pull_failure_is_normalized_without_provider_message_text(self) -> None:
         objects = copy.deepcopy(self.objects)

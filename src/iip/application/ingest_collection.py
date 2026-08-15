@@ -59,6 +59,22 @@ class ResourceCollectionIngestionService:
         )
         observations = result_spec["observations"]
         completion = result_spec["completion"]
+        provider_cursors = self._provider_cursors(completion.get("providerCursors"))
+        resume = request_spec.get("resume")
+        if resume is not None:
+            current = self._checkpoints.get_checkpoint(
+                command.actor.tenant_id, request_spec["sourceId"]
+            )
+            if (
+                current is None
+                or current.checkpoint != resume["checkpoint"]
+                or current.provider_cursors
+                != self._provider_cursors(resume["providerCursors"])
+                or request_spec["startSequence"] != current.sequence + 1
+            ):
+                raise CollectionConflictError("collection.resume.stale")
+            if bool(provider_cursors) != bool(current.provider_cursors):
+                raise InvalidCollectionError("collection.cursor-state.invalid")
         try:
             parsed_observations = tuple(Resource.from_dict(item) for item in observations)
         except ContractError:
@@ -92,6 +108,7 @@ class ResourceCollectionIngestionService:
                     or checkpoint.stream_id != previous.stream_id
                     or checkpoint.sequence != previous.sequence
                     or checkpoint.checkpoint != previous.checkpoint
+                    or checkpoint.provider_cursors != provider_cursors
                 ):
                     raise CollectionConflictError("collection.snapshot.stale")
                 return self._replayed_resources(
@@ -225,7 +242,28 @@ class ResourceCollectionIngestionService:
             sequence=sequence,
             checkpoint=completion["checkpoint"],
             committed_at=result_metadata["createdAt"],
+            provider_cursors=ResourceCollectionIngestionService._provider_cursors(
+                completion.get("providerCursors")
+            ),
         )
+
+    @staticmethod
+    def _provider_cursors(value: object) -> tuple[tuple[str, str], ...]:
+        if value is None:
+            return ()
+        if (
+            not isinstance(value, Mapping)
+            or not 1 <= len(value) <= 2048
+            or any(
+                not isinstance(key, str)
+                or not 1 <= len(key) <= 256
+                or not isinstance(cursor, str)
+                or not 1 <= len(cursor) <= 512
+                for key, cursor in value.items()
+            )
+        ):
+            raise InvalidCollectionError("collection.cursor-state.invalid")
+        return tuple(sorted(value.items()))
 
     def _replayed_resources(
         self,
@@ -343,7 +381,7 @@ class ResourceCollectionIngestionService:
         elif status in ("partial", "failed", "cancelled"):
             if not isinstance(completion.get("reasonCode"), str) or completion.get(
                 "checkpoint"
-            ) is not None:
+            ) is not None or completion.get("providerCursors") is not None:
                 raise InvalidCollectionError("collection.completion.invalid")
         else:
             raise InvalidCollectionError("collection.completion.invalid")
@@ -353,6 +391,18 @@ class ResourceCollectionIngestionService:
                 raise InvalidCollectionError("collection.snapshot.mismatch")
         elif completion.get("snapshotId") is not None:
             raise InvalidCollectionError("collection.snapshot.mismatch")
+        resume = request_spec.get("resume")
+        if resume is not None:
+            if not isinstance(resume, Mapping):
+                raise InvalidCollectionError("collection.cursor-state.invalid")
+            if not isinstance(resume.get("checkpoint"), str):
+                raise InvalidCollectionError("collection.cursor-state.invalid")
+            ResourceCollectionIngestionService._provider_cursors(
+                resume.get("providerCursors")
+            )
+        ResourceCollectionIngestionService._provider_cursors(
+            completion.get("providerCursors")
+        )
         try:
             created = datetime.fromisoformat(
                 str(result_metadata["createdAt"]).replace("Z", "+00:00")

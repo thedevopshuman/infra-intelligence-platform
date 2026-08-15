@@ -35,7 +35,7 @@ This starts an ephemeral PostgreSQL 18.4 container bound to `127.0.0.1:55432`, r
 
 Keep deterministic contract, SDK, kernel, and observer-conformance tests in the normal `make verify` gate. Docker Desktop supplies external dependencies for integration tests; it is not required to validate pure normalization behavior. This split keeps feedback fast while still exercising PostgreSQL against the real engine.
 
-The observer has an explicit `kubectl` development transport. It requires a named context and kubeconfig path, runs a bounded reconciliation list, and normalizes the same public contract as the offline fixture. The aggregate list uses a composite reconciliation checkpoint and is not a resumable watch implementation. The workflow stores complete membership; a later complete snapshot can therefore generate explicit tombstones, while partial results never delete resources.
+The observer has an explicit `kubectl` development transport. It requires a named context and kubeconfig path, lists each resource API path independently, and normalizes the same public contract as the offline fixture. A complete result includes an aggregate checkpoint plus opaque per-path provider cursors. A later reconciliation request supplies that committed state in `spec.resume`; the observer runs bounded watches and then relists the full scope. Kubernetes `410 Gone` uses the same relist path, so an expired stream can never be mistaken for deletion.
 
 Create the isolated cluster and run the live test:
 
@@ -46,7 +46,7 @@ IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-live
 
 The kind cluster runs as containers inside Docker Desktop. Docker Desktop's separate built-in Kubernetes feature is not required for this workflow and should normally remain disabled to avoid an unnecessary second context and control plane.
 
-The target seeds `deploy/kubernetes/dev/seed-incident.yaml`, whose intentionally nonexistent image produces a real `ErrImagePull`/`ImagePullBackOff`. It verifies that the observer returns a complete canonical graph and an unhealthy Pod with only the safe waiting reason. It then deletes only the harmless reconciliation-probe ConfigMap, runs a second complete collection, and requires one host-generated tombstone. This local transport does not replace the future credential broker or isolated plugin runner.
+The target seeds `deploy/kubernetes/dev/seed-incident.yaml`, whose intentionally nonexistent image produces a real `ErrImagePull`/`ImagePullBackOff`. It verifies that the observer returns a complete canonical graph and an unhealthy Pod with only the safe waiting reason. It then deletes only the harmless reconciliation-probe ConfigMap, resumes from every committed per-path cursor, relists the complete scope, and requires one host-generated tombstone. This local transport does not replace the future credential broker or isolated plugin runner.
 
 ## Run the reference API
 

@@ -58,6 +58,7 @@ def reconciliation_pair(
     start_sequence: int,
     observations: list[dict],
     checkpoint: str,
+    provider_cursors: dict[str, str] | None = None,
 ) -> tuple[dict, dict]:
     request = json.loads(
         (ROOT / "contracts/examples/resource-collection-request.json").read_text(
@@ -97,6 +98,8 @@ def reconciliation_pair(
         "checkpoint": checkpoint,
         "scopeDigest": result["spec"]["completion"]["scopeDigest"],
     }
+    if provider_cursors is not None:
+        result["spec"]["completion"]["providerCursors"] = provider_cursors
     return request, result
 
 
@@ -165,6 +168,7 @@ class PostgresResourceStoreTests(unittest.TestCase):
             start_sequence=42,
             observations=public_result["spec"]["observations"],
             checkpoint="kubernetes:cluster-local:snapshot:first",
+            provider_cursors={"/api/v1/namespaces/iip-demo/configmaps": "5000"},
         )
         active = collection.execute(
             IngestCollectionCommand(actor, first_request, first_result)
@@ -175,6 +179,7 @@ class PostgresResourceStoreTests(unittest.TestCase):
             start_sequence=43,
             observations=[],
             checkpoint="kubernetes:cluster-local:snapshot:second",
+            provider_cursors={"/api/v1/namespaces/iip-demo/configmaps": "5001"},
         )
 
         tombstone = collection.execute(
@@ -196,6 +201,14 @@ class PostgresResourceStoreTests(unittest.TestCase):
         self.assertEqual(
             reconnected.get_checkpoint("local", "kubernetes-local").sequence,
             43,
+        )
+        self.assertEqual(
+            dict(
+                reconnected.get_checkpoint(
+                    "local", "kubernetes-local"
+                ).provider_cursors
+            ),
+            {"/api/v1/namespaces/iip-demo/configmaps": "5001"},
         )
         self.assertEqual(len(tuple(reconnected.list_events("local"))), 2)
 

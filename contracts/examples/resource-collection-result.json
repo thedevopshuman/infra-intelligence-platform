@@ -50,6 +50,9 @@
       "resourceCount": 1,
       "nextSequence": 43,
       "checkpoint": "kubernetes:cluster-local:resource-version:398712",
+      "providerCursors": {
+        "/apis/apps/v1/namespaces/default/deployments": "398712"
+      },
       "scopeDigest": "sha256:c606751c52a1d350c9bacd31dc59d32b50a7e3d23050db44b13eff7a14ffe687"
     }
   }

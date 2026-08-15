@@ -15,7 +15,7 @@ This page describes the executable Phase 1 persistence slice. Public contracts r
 | `iip.resource_observations` | Immutable accepted/rejected history and projection recovery source | Monotonic observation offset plus tenant/resource/hash uniqueness |
 | `iip.event_log` | Immutable accepted platform events and replay offsets | `(tenant_id, event_source, event_id)` |
 | `iip.event_outbox` | At-least-once delivery state for event-log rows | Unique event offset and tenant-scoped lease |
-| `iip.source_checkpoints` | Last explicitly committed collector cursor | `(tenant_id, source_id)` |
+| `iip.source_checkpoints` | Last explicitly committed aggregate checkpoint and opaque provider cursor map | `(tenant_id, source_id)` |
 
 Canonical documents are stored as `jsonb`, but frequently enforced identity, tenancy, ordering, lifecycle, and delivery fields are relational columns. The relational columns are not a second public contract; migrations and adapter tests keep them aligned with the canonical document.
 
@@ -48,7 +48,7 @@ PYTHONPATH=src python3 -m iip.surfaces.maintenance \
 
 A duplicate returns the projection without another history or event row. A stale or conflicting payload is retained with its disposition and commits no projection, event, outbox, or checkpoint change. Any accepted-path failure rolls back every effect.
 
-The HTTP surface never sets the safe-checkpoint signal. A collector workflow may set it only after all resource mutations represented by that opaque cursor are included. Reconciliation completion markers remain a later workflow unit and are never inferred from the last resource received.
+The HTTP surface never sets the safe-checkpoint signal. A collector workflow may set it only after all resource mutations represented by that opaque cursor are included. Resource-collection resume state must exactly match the current tenant/source checkpoint, and provider cursor maps update in the same transaction as complete reconciliation membership. Reconciliation completion markers are never inferred from the last resource received.
 
 ## Outbox delivery
 

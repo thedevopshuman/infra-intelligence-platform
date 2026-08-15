@@ -129,6 +129,14 @@ class ResourceCollectionRequest:
 
         return dict(self.payload)
 
+    @property
+    def resume(self) -> Optional[Mapping[str, Any]]:
+        """Return the opaque host-committed resume state, when supplied."""
+
+        spec = self.payload.get("spec")
+        value = spec.get("resume") if isinstance(spec, Mapping) else None
+        return dict(value) if isinstance(value, Mapping) else None
+
 
 @dataclass(frozen=True)
 class ResourceCollectionResult:
@@ -152,6 +160,19 @@ class ResourceCollectionResult:
         """Return a JSON-serializable copy of the envelope."""
 
         return dict(self.payload)
+
+    @property
+    def provider_cursors(self) -> Mapping[str, str]:
+        """Return the complete provider cursor map without interpreting it."""
+
+        spec = self.payload.get("spec")
+        completion = spec.get("completion") if isinstance(spec, Mapping) else None
+        value = (
+            completion.get("providerCursors")
+            if isinstance(completion, Mapping)
+            else None
+        )
+        return dict(value) if isinstance(value, Mapping) else {}
 
 
 @dataclass(frozen=True)

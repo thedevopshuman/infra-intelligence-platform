@@ -356,7 +356,10 @@ class InMemoryResourceStore:
                 raise ValueError("checkpoint sequence cannot move backwards")
             if (
                 checkpoint.sequence == current.sequence
-                and checkpoint.checkpoint != current.checkpoint
+                and (
+                    checkpoint.checkpoint != current.checkpoint
+                    or checkpoint.provider_cursors != current.provider_cursors
+                )
             ):
                 raise ValueError("checkpoint content conflicts at the same sequence")
         elif current is not None and mode != "reconciliation":

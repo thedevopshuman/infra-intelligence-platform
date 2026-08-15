@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.3.1",
+    "version": "0.4.0",
     "description": "Executable local reference API for collection ingestion, resource queries, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -110,7 +110,7 @@
         },
         "responses": {
           "202": {
-            "description": "Validated observations and any complete-snapshot tombstones are durable; reconciliation membership and its checkpoint are committed",
+            "description": "Validated observations and any complete-snapshot tombstones are durable; reconciliation membership, aggregate checkpoint, and opaque provider cursor state are committed",
             "content": {"application/json": {"schema": {
               "type": "object",
               "additionalProperties": false,

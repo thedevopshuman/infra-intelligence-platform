@@ -2,7 +2,7 @@
 
 This package is a runnable, read-only resource-observer example. It consumes the public resource collection request contract, normalizes a Kubernetes `List` document, and returns the public collection result contract without importing server internals.
 
-The fixture CLI proves normalization, ordering, tenancy propagation, bounded output, reconciliation completion, and secret omission. An explicit `kubectl` development transport also exercises the normalizer against a real cluster. Watch transport, capability-token verification, cancellation, and process isolation remain host/runtime work.
+The fixture CLI proves normalization, ordering, tenancy propagation, bounded output, reconciliation completion, and secret omission. An explicit `kubectl` development transport lists each resource type independently, returns a provider cursor map, resumes bounded watches from host-committed state, and recovers expired watches through a fresh full reconciliation. Capability-token verification, cancellation propagation, and process isolation remain host/runtime work.
 
 ## Run the conformance fixture
 
@@ -37,7 +37,9 @@ The fixture covers cluster, namespace, node, Deployment, ReplicaSet, Pod, Servic
 
 ## Live adapter boundary
 
-A production adapter should issue list/watch operations per Kubernetes resource type and persist each provider cursor. The development transport uses kubectl's multi-resource aggregate list; because that response has no single watchable `resourceVersion`, it reports a deterministic `composite-sha256` reconciliation checkpoint. That composite must never be used as a Kubernetes watch cursor. Kubernetes can return `410 Gone` when a requested version is no longer available; that condition starts a fresh list/reconciliation pass rather than guessing a cursor. Watch bookmarks are useful but do not arrive on a guaranteed schedule. See the Kubernetes [API concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/) documentation.
+The development transport issues one list for Namespace, one for Node, and one per configured namespace for every namespaced type. The complete result returns each list `resourceVersion` in `providerCursors` and binds the map to a deterministic aggregate checkpoint. Copy both fields into the next reconciliation request's `spec.resume`; the host accepts them only after the previous snapshot is durable.
+
+The observer resumes every API-path watch from its own cursor. A change, watch timeout, or Kubernetes `410 Gone` closes the cycle with a fresh full list before any snapshot is returned. Expiration discards the whole prior cursor set rather than guessing a later cursor or treating one resource type as empty. Watch bookmarks are accepted but are not expected on a guaranteed schedule. See the Kubernetes [API concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes) documentation and [ADR 0009](../../../docs/decisions/0009-provider-cursor-sets-and-watch-recovery.md).
 
 `deploy/rbac.yaml` is a least-privilege example for the declared resource set. It intentionally excludes Secrets and mutation verbs. The ServiceAccount disables automatic token mounting. A real runner must explicitly request a short-lived projected token or receive a request-scoped credential from the host broker; see the Kubernetes [ServiceAccount token](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/) guidance. The RBAC binding is illustrative and must be narrowed to the configured namespaces during installation.
 

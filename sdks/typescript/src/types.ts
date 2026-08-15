@@ -288,6 +288,87 @@ export interface Evidence {
   };
 }
 
+export type TelemetryAggregation =
+  | "avg"
+  | "min"
+  | "max"
+  | "sum"
+  | "count"
+  | "rate"
+  | "p50"
+  | "p95"
+  | "p99";
+
+export interface TelemetryEvidenceRequest {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "TelemetryEvidenceRequest";
+  metadata: {
+    requestId: `teq_${string}`;
+    tenantId: string;
+    actorId: string;
+    requestedAt: string;
+  };
+  spec: {
+    integrationId: string;
+    resourceRefs: ResourceUid[];
+    signal: "metrics";
+    timeRange: { start: string; end: string };
+    query: {
+      metric: string;
+      filters: {
+        attribute: string;
+        operator: "eq" | "neq";
+        value: string;
+      }[];
+      aggregation: {
+        function: TelemetryAggregation;
+        stepSeconds: number;
+      };
+      groupBy: string[];
+    };
+    limits: {
+      maxSeries: number;
+      maxDataPoints: number;
+      maxBytes: number;
+    };
+    deadline: string;
+  };
+}
+
+export type TelemetryEvidenceWarning =
+  | "backend-partial"
+  | "series-limit"
+  | "data-point-limit"
+  | "resolution-adjusted";
+
+export interface TelemetryEvidenceResult {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "TelemetryEvidenceResult";
+  metadata: {
+    requestId: `teq_${string}`;
+    tenantId: string;
+    integrationId: string;
+    createdAt: string;
+  };
+  spec: {
+    signal: "metrics";
+    requestDigest: Sha256Digest;
+    timeRange: { start: string; end: string };
+    status: "complete" | "partial" | "no-data";
+    series: {
+      metric: string;
+      unit: string;
+      attributes: Record<string, string>;
+      points: { timestamp: string; value: number }[];
+    }[];
+    summary: {
+      seriesCount: number;
+      dataPointCount: number;
+    };
+    warnings: TelemetryEvidenceWarning[];
+  };
+}
+
 export interface InvestigationScope {
   resourceUids: ResourceUid[];
   timeRange: {

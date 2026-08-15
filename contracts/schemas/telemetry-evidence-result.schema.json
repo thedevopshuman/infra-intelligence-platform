@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:telemetry-evidence-result:v1alpha1",
+  "title": "Infrastructure Intelligence Telemetry Evidence Result",
+  "description": "Normalized bounded metric series stored as an immutable Evidence artifact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "TelemetryEvidenceResult"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "tenantId", "integrationId", "createdAt"],
+      "properties": {
+        "requestId": {"type": "string", "pattern": "^teq_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "pattern": "^[a-zA-Z0-9._-]{1,128}$"},
+        "integrationId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "createdAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signal",
+        "requestDigest",
+        "timeRange",
+        "status",
+        "series",
+        "summary",
+        "warnings"
+      ],
+      "properties": {
+        "signal": {"const": "metrics"},
+        "requestDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "timeRange": {"$ref": "#/$defs/timeRange"},
+        "status": {"type": "string", "enum": ["complete", "partial", "no-data"]},
+        "series": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/series"}
+        },
+        "summary": {"$ref": "#/$defs/summary"},
+        "warnings": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "backend-partial",
+              "series-limit",
+              "data-point-limit",
+              "resolution-adjusted"
+            ]
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "complete"}}},
+          "then": {
+            "properties": {
+              "series": {"minItems": 1},
+              "warnings": {"maxItems": 0}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"status": {"const": "partial"}}},
+          "then": {"properties": {"warnings": {"minItems": 1}}}
+        },
+        {
+          "if": {"properties": {"status": {"const": "no-data"}}},
+          "then": {
+            "properties": {
+              "series": {"maxItems": 0},
+              "warnings": {"maxItems": 0},
+              "summary": {
+                "properties": {
+                  "seriesCount": {"const": 0},
+                  "dataPointCount": {"const": 0}
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "timeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"}
+      }
+    },
+    "series": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric", "unit", "attributes", "points"],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "pattern": "^[A-Za-z_:][A-Za-z0-9_.:/-]{0,255}$"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        },
+        "attributes": {
+          "type": "object",
+          "maxProperties": 16,
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_.:/-]{0,127}$"},
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+          }
+        },
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2000,
+          "items": {"$ref": "#/$defs/point"}
+        }
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timestamp", "value"],
+      "properties": {
+        "timestamp": {"type": "string", "format": "date-time"},
+        "value": {"type": "number"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seriesCount", "dataPointCount"],
+      "properties": {
+        "seriesCount": {"type": "integer", "minimum": 0, "maximum": 100},
+        "dataPointCount": {"type": "integer", "minimum": 0, "maximum": 10000}
+      }
+    }
+  }
+}

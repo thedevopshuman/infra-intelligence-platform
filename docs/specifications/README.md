@@ -20,6 +20,8 @@ The platform exposes contracts at three levels:
 | Error | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/error.schema.json` | `contracts/examples/error.json` |
 | Event | [event-contract.md](event-contract.md) | `contracts/schemas/event.schema.json` | `contracts/examples/event.json` |
 | Evidence | [evidence-contract.md](evidence-contract.md) | `contracts/schemas/evidence.schema.json` | `contracts/examples/evidence.json` |
+| Telemetry evidence request | [telemetry-evidence-contract.md](telemetry-evidence-contract.md) | `contracts/schemas/telemetry-evidence-request.schema.json` | `contracts/examples/telemetry-evidence-request.json` |
+| Telemetry evidence result | [telemetry-evidence-contract.md](telemetry-evidence-contract.md) | `contracts/schemas/telemetry-evidence-result.schema.json` | `contracts/examples/telemetry-evidence-result.json` |
 | Investigation request | [investigation-contract.md](investigation-contract.md) | `contracts/schemas/investigation-request.schema.json` | `contracts/examples/investigation-request.json` |
 | Investigation report | [investigation-contract.md](investigation-contract.md) | `contracts/schemas/investigation-report.schema.json` | `contracts/examples/investigation-report.json` |
 | Evaluation scenario | [evaluation-scenario-contract.md](evaluation-scenario-contract.md) | `contracts/schemas/evaluation-scenario.schema.json` | `contracts/examples/evaluation-scenario.json` |

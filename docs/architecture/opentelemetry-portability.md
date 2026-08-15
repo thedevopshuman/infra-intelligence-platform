@@ -39,9 +39,11 @@ The adapter uses the [standard exporter endpoint configuration](https://opentele
 
 Export is disabled by default, asynchronous, and observational. Endpoint unavailability does not roll back ingestion, block an investigation, or change report results. The reference adapter has bounded timeouts, SDK retry behavior, local recording-failure counting, and controlled dimensions. It does not yet provide automatic sampling, a durable queue, an export-loss SLI, or complete exporter health; those are required before production enablement.
 
-## Inbound customer telemetry
+## Customer telemetry evidence
 
-An OTLP receiver can accept a customer-selected stream and convert it into bounded, immutable telemetry evidence. OTLP is a push/export protocol, not a historical query protocol. When an investigation must query data already retained in a customer backend, a backend adapter implements the application evidence-provider port; the kernel still depends only on normalized evidence contracts.
+OTLP is a push/export protocol, not a historical query protocol. The first executable customer-telemetry boundary therefore addresses data already retained in a backend. `TelemetryEvidenceRequest` expresses one bounded metric selector, `TelemetryMetricsBackend` hides the vendor query/API, and the application validates a `TelemetryEvidenceResult` before storing it through the immutable Evidence pipeline. [ADR 0014](../decisions/0014-backend-neutral-telemetry-evidence-query.md) records the decision. The default no-data backend proves the boundary without claiming a configured customer system.
+
+An OTLP receiver can later accept a customer-selected stream and convert it into the same bounded, immutable telemetry evidence shape. It remains separate because channel authentication, tenant binding, admission control, and retention authority differ from a request/response backend query.
 
 The first runtime implementation must define a receiver profile rather than accepting every signal and attribute. It will bound signal types, time range, request size, cardinality, sampling, and retention. Logs, span attributes, resource attributes, and collector output are untrusted input and pass through validation, redaction, hashing, and provenance controls before becoming evidence.
 
@@ -55,11 +57,11 @@ The first runtime implementation must define a receiver profile rather than acce
 
 ## Pending implementation decisions
 
-- whether inbound signals are retained by IIP, queried from the customer's backend, or use a hybrid policy;
-- the first supported signal and evidence query/result contracts;
+- whether pushed signals are retained by IIP, forwarded to customer storage, or use a hybrid policy;
+- the first production `TelemetryMetricsBackend` adapter and request-scoped credential flow;
 - receiver topology and authentication for self-hosted, customer-hosted, and managed deployments;
 - retention, sampling, cardinality budgets, and regional/data-residency controls;
 - queue durability and the division of retry, batching, and delivery-health ownership between the official SDK and a sidecar/customer Collector;
 - the cadence and ownership of automatic freshness evaluation and production SLO windows.
 
-Inbound decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, and SLO decisions belong to the Phase 3 operational-hardening gate. The current Phase 1 freshness API and optional outbound metric projection are deliberately useful before they are selected.
+Receiver and production-backend decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, and SLO decisions belong to the Phase 3 operational-hardening gate. The current freshness API, outbound metric projection, and normalized historical-query boundary are deliberately useful before they are selected.

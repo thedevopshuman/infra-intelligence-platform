@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:telemetry-evidence-request:v1alpha1",
+  "title": "Infrastructure Intelligence Telemetry Evidence Request",
+  "description": "A tenant- and actor-scoped bounded request for normalized metric evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "TelemetryEvidenceRequest"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "tenantId", "actorId", "requestedAt"],
+      "properties": {
+        "requestId": {"type": "string", "pattern": "^teq_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "pattern": "^[a-zA-Z0-9._-]{1,128}$"},
+        "actorId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "requestedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "integrationId",
+        "resourceRefs",
+        "signal",
+        "timeRange",
+        "query",
+        "limits",
+        "deadline"
+      ],
+      "properties": {
+        "integrationId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "resourceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}
+        },
+        "signal": {"const": "metrics"},
+        "timeRange": {"$ref": "#/$defs/timeRange"},
+        "query": {"$ref": "#/$defs/query"},
+        "limits": {"$ref": "#/$defs/limits"},
+        "deadline": {"type": "string", "format": "date-time"}
+      }
+    }
+  },
+  "$defs": {
+    "timeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"}
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric", "filters", "aggregation", "groupBy"],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "pattern": "^[A-Za-z_:][A-Za-z0-9_.:/-]{0,255}$"
+        },
+        "filters": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {"$ref": "#/$defs/filter"}
+        },
+        "aggregation": {"$ref": "#/$defs/aggregation"},
+        "groupBy": {
+          "type": "array",
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/attributeName"}
+        }
+      }
+    },
+    "filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute", "operator", "value"],
+      "properties": {
+        "attribute": {"$ref": "#/$defs/attributeName"},
+        "operator": {"type": "string", "enum": ["eq", "neq"]},
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        }
+      }
+    },
+    "attributeName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.:/-]{0,127}$"
+    },
+    "aggregation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["function", "stepSeconds"],
+      "properties": {
+        "function": {
+          "type": "string",
+          "enum": ["avg", "min", "max", "sum", "count", "rate", "p50", "p95", "p99"]
+        },
+        "stepSeconds": {"type": "integer", "minimum": 1, "maximum": 86400}
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxSeries", "maxDataPoints", "maxBytes"],
+      "properties": {
+        "maxSeries": {"type": "integer", "minimum": 1, "maximum": 100},
+        "maxDataPoints": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "maxBytes": {"type": "integer", "minimum": 1, "maximum": 16777216}
+      }
+    }
+  }
+}

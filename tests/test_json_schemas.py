@@ -172,6 +172,30 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("hasMore" in error for error in errors))
 
+    def test_telemetry_request_rejects_vendor_query_language(self) -> None:
+        request = document("contracts/examples/telemetry-evidence-request.json")
+        request["spec"]["query"]["promql"] = "up"
+
+        errors = self.validate("telemetry-evidence-request.schema.json", request)
+
+        self.assertTrue(any("promql" in error for error in errors))
+
+    def test_no_data_telemetry_result_cannot_contain_series(self) -> None:
+        result = document("contracts/examples/telemetry-evidence-result.json")
+        result["spec"]["status"] = "no-data"
+
+        errors = self.validate("telemetry-evidence-result.schema.json", result)
+
+        self.assertTrue(any("series" in error for error in errors))
+
+    def test_partial_telemetry_result_requires_stable_warning(self) -> None:
+        result = document("contracts/examples/telemetry-evidence-result.json")
+        result["spec"]["status"] = "partial"
+
+        errors = self.validate("telemetry-evidence-result.schema.json", result)
+
+        self.assertTrue(any("warnings" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

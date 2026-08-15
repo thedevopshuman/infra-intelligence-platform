@@ -15,6 +15,13 @@ from iip.application.actions import (
     ExecuteActionCommand,
     ProposeActionCommand,
 )
+from iip.application.collect_evidence import (
+    EvidenceAuthorizationError,
+    EvidenceDeadlineExceededError,
+    EvidenceProviderUnavailableError,
+    EvidenceRedactionError,
+    InvalidEvidenceRequestError,
+)
 from iip.application.ingest_collection import (
     CollectionConflictError,
     IngestCollectionCommand,
@@ -52,6 +59,10 @@ from iip.application.query_resources import (
     ResourceNeighborhoodResult,
     ResourceNotFoundError,
     ResourceTimelineResult,
+)
+from iip.application.telemetry_evidence import (
+    CollectTelemetryEvidenceCommand,
+    InvalidTelemetryEvidenceRequestError,
 )
 from iip.bootstrap import Runtime, build_runtime_from_env
 
@@ -178,6 +189,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             in (
                 "/v1/resources",
                 "/v1/collections/ingest",
+                "/v1/evidence/telemetry/queries",
                 "/v1/investigations",
                 "/v1/actions/proposals",
                 "/v1/plugin-sessions",
@@ -214,6 +226,11 @@ class ApiHandler(BaseHTTPRequestHandler):
                 )
                 document = {"items": [resource.to_dict() for resource in resources]}
                 status = HTTPStatus.ACCEPTED
+            elif path == "/v1/evidence/telemetry/queries":
+                document = self.runtime.telemetry_evidence.execute(
+                    CollectTelemetryEvidenceCommand(actor, payload)
+                )
+                status = HTTPStatus.CREATED
             elif path == "/v1/investigations":
                 document = self.runtime.investigations.execute(
                     RunInvestigationCommand(actor, payload)
@@ -281,6 +298,23 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": str(exc)}})
         except CollectionConflictError as exc:
             self._json(HTTPStatus.CONFLICT, {"error": {"code": str(exc)}})
+        except (InvalidTelemetryEvidenceRequestError, InvalidEvidenceRequestError):
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": "telemetry.request.invalid"}},
+            )
+        except EvidenceAuthorizationError:
+            self._json(HTTPStatus.FORBIDDEN, {"error": {"code": "policy.denied"}})
+        except EvidenceDeadlineExceededError:
+            self._json(
+                HTTPStatus.REQUEST_TIMEOUT,
+                {"error": {"code": "evidence.deadline.exceeded"}},
+            )
+        except (EvidenceProviderUnavailableError, EvidenceRedactionError):
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "evidence.provider.unavailable"}},
+            )
         except InvestigationConflictError as exc:
             self._json(HTTPStatus.CONFLICT, {"error": {"code": str(exc)}})
         except ActionWorkflowError as exc:

@@ -4,7 +4,7 @@
 
 The API can export bounded ingestion-freshness metrics over OTLP/HTTP protobuf to an OpenTelemetry Collector or compatible endpoint. Export is optional and disabled by default. The public `IngestionFreshnessReport` and its underlying PostgreSQL/in-memory facts remain authoritative.
 
-This path exports IIP's own operational measurements. It does not receive customer workload telemetry and does not query historical metrics from a customer's backend. Those are separate evidence-provider/receiver units described in the [portability boundary](../architecture/opentelemetry-portability.md).
+This path exports IIP's own operational measurements. It does not receive customer workload telemetry or query historical metrics. Historical queries now use the separate [telemetry evidence contract](../specifications/telemetry-evidence-contract.md) and replaceable backend port; OTLP reception remains pending. The [portability boundary](../architecture/opentelemetry-portability.md) keeps all three flows distinct.
 
 ## Metric catalog
 

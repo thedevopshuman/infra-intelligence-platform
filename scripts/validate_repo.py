@@ -37,6 +37,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0011-ingestion-freshness-semantics.md",
     "docs/decisions/0012-opentelemetry-portability-boundary.md",
     "docs/decisions/0013-otlp-http-ingestion-metrics-export.md",
+    "docs/decisions/0014-backend-neutral-telemetry-evidence-query.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/postgresql-backup-restore.md",
     "docs/operations/measurements/postgresql-backup-restore.json",
@@ -56,11 +57,15 @@ REQUIRED_PATHS = (
     "contracts/schemas/agent-manifest.schema.json",
     "contracts/schemas/plugin-manifest.schema.json",
     "contracts/schemas/evidence.schema.json",
+    "contracts/schemas/telemetry-evidence-request.schema.json",
+    "contracts/schemas/telemetry-evidence-result.schema.json",
     "contracts/schemas/investigation-request.schema.json",
     "contracts/schemas/investigation-report.schema.json",
     "contracts/schemas/ingestion-freshness-report.schema.json",
     "contracts/schemas/evaluation-scenario.schema.json",
     "contracts/examples/evidence.json",
+    "contracts/examples/telemetry-evidence-request.json",
+    "contracts/examples/telemetry-evidence-result.json",
     "contracts/examples/integration-config.json",
     "contracts/examples/action-proposal.json",
     "contracts/examples/action-approval.json",
@@ -78,6 +83,7 @@ REQUIRED_PATHS = (
     "contracts/examples/page-info.json",
     "contracts/examples/error.json",
     "docs/specifications/evidence-contract.md",
+    "docs/specifications/telemetry-evidence-contract.md",
     "docs/specifications/integration-config-contract.md",
     "docs/specifications/action-contract.md",
     "docs/specifications/plugin-session-contract.md",
@@ -90,12 +96,14 @@ REQUIRED_PATHS = (
     "requirements/verify.txt",
     "scripts/validate_schemas.py",
     "src/iip/application/collect_evidence.py",
+    "src/iip/application/telemetry_evidence.py",
     "src/iip/application/observe_ingestion.py",
     "src/iip/adapters/auth.py",
     "src/iip/adapters/evidence.py",
     "src/iip/adapters/otel.py",
     "src/iip/adapters/postgres/migrations/0006_source_checkpoint_provider_cursors.sql",
     "tests/test_evidence_collection.py",
+    "tests/test_telemetry_evidence.py",
     "tests/test_ingestion_freshness.py",
     "tests/test_authentication.py",
     "tests/test_operational_workflows.py",
@@ -654,6 +662,97 @@ def validate_evaluation_scenario(
         fail(errors, "evaluation scenario scoring weights must sum to 100")
 
 
+def validate_telemetry_evidence_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check request/result invariants that JSON Schema cannot express."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    request = documents.get(example_dir / "telemetry-evidence-request.json")
+    result = documents.get(example_dir / "telemetry-evidence-result.json")
+    if not isinstance(request, dict) or not isinstance(result, dict):
+        return
+    request_metadata = request.get("metadata")
+    request_spec = request.get("spec")
+    result_metadata = result.get("metadata")
+    result_spec = result.get("spec")
+    if not all(
+        isinstance(item, dict)
+        for item in (request_metadata, request_spec, result_metadata, result_spec)
+    ):
+        return
+
+    for field in ("requestId", "tenantId"):
+        if result_metadata.get(field) != request_metadata.get(field):
+            fail(errors, f"telemetry evidence result {field} must match its request")
+    if result_metadata.get("integrationId") != request_spec.get("integrationId"):
+        fail(errors, "telemetry evidence result integrationId must match its request")
+    if result_spec.get("requestDigest") != canonical_digest(request):
+        fail(errors, "telemetry evidence result digest must match its request")
+    if result_spec.get("timeRange") != request_spec.get("timeRange"):
+        fail(errors, "telemetry evidence result timeRange must match its request")
+
+    time_range = request_spec.get("timeRange")
+    start = end = None
+    if isinstance(time_range, dict):
+        start = parse_timestamp(time_range.get("start"))
+        end = parse_timestamp(time_range.get("end"))
+    requested_at = parse_timestamp(request_metadata.get("requestedAt"))
+    created_at = parse_timestamp(result_metadata.get("createdAt"))
+    deadline = parse_timestamp(request_spec.get("deadline"))
+    if (
+        None in (start, end, requested_at, created_at, deadline)
+        or not start < end <= requested_at <= created_at <= deadline
+    ):
+        fail(errors, "telemetry evidence example times must be monotonic")
+
+    series = result_spec.get("series")
+    summary = result_spec.get("summary")
+    request_query = request_spec.get("query")
+    limits = request_spec.get("limits")
+    if not isinstance(series, list) or not isinstance(summary, dict):
+        return
+    point_count = 0
+    for item in series:
+        if not isinstance(item, dict):
+            continue
+        if isinstance(request_query, dict) and item.get("metric") != request_query.get(
+            "metric"
+        ):
+            fail(errors, "telemetry evidence series metric must match its request")
+        timestamps = []
+        points = item.get("points", [])
+        if isinstance(points, list):
+            point_count += len(points)
+            for point in points:
+                timestamp = (
+                    parse_timestamp(point.get("timestamp"))
+                    if isinstance(point, dict)
+                    else None
+                )
+                timestamps.append(timestamp)
+                if (
+                    timestamp is None
+                    or start is None
+                    or end is None
+                    or not start <= timestamp <= end
+                ):
+                    fail(errors, "telemetry evidence point must fit its request range")
+            if any(value is None for value in timestamps) or timestamps != sorted(
+                timestamps
+            ) or len(set(timestamps)) != len(timestamps):
+                fail(errors, "telemetry evidence points must be strictly ascending")
+    if summary.get("seriesCount") != len(series) or summary.get(
+        "dataPointCount"
+    ) != point_count:
+        fail(errors, "telemetry evidence summary must match its series")
+    if isinstance(limits, dict) and (
+        len(series) > limits.get("maxSeries", -1)
+        or point_count > limits.get("maxDataPoints", -1)
+    ):
+        fail(errors, "telemetry evidence result must fit request limits")
+
+
 def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> None:
     from iip.domain.models import ContractError, Resource
 
@@ -724,6 +823,8 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("plugin-manifest.json", "Plugin"),
         ("plugin-session.json", "PluginSession"),
         ("evidence.json", "Evidence"),
+        ("telemetry-evidence-request.json", "TelemetryEvidenceRequest"),
+        ("telemetry-evidence-result.json", "TelemetryEvidenceResult"),
         ("investigation-request.json", "InvestigationRequest"),
         ("investigation-report.json", "InvestigationReport"),
         ("ingestion-freshness-report.json", "IngestionFreshnessReport"),
@@ -739,6 +840,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
 
     validate_collection_examples(documents, errors)
     validate_resource_query_examples(documents, errors)
+    validate_telemetry_evidence_examples(documents, errors)
     validate_evaluation_scenario(documents, errors)
 
     plugin_example = documents.get(example_dir / "plugin-manifest.json")

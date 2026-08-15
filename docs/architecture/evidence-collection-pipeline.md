@@ -1,6 +1,6 @@
 # Evidence collection pipeline
 
-**Status:** Accepted Phase 1 reference boundary
+**Status:** Accepted Phase 2 reference boundary
 **Date:** 2026-08-14
 
 The reference kernel implements the boundary that turns untrusted provider output into an immutable Evidence envelope and artifact. It establishes application ports and security ordering before durable evidence storage or an HTTP surface is introduced.
@@ -45,6 +45,8 @@ The application layer owns these provider-neutral ports:
 - `EvidenceIdGenerator` creates opaque identifiers independent of content; and
 - `Clock` makes deadline and provenance behavior deterministic in tests.
 
+Metric evidence adds `TelemetryMetricsBackend`, whose request contains only normalized selectors, authenticated scope, and explicit limits. `TelemetryMetricsEvidenceProvider` validates all backend output and renders the public `TelemetryEvidenceResult` JSON before the generic evidence pipeline redacts, hashes, and commits it. A concrete backend never controls Evidence identity, tenant scope, policy, retention, or content hashes.
+
 The local adapter package supplies an in-memory evidence store, UUID identifier generator, UTC system clock, deterministic static provider, and structured-text redactor. JSON secret-bearing fields and common credential patterns are redacted. UTF-8 text receives pattern redaction. Unsupported binary formats fail closed instead of being persisted without inspection.
 
 ## Security and failure behavior
@@ -60,8 +62,8 @@ The local adapter package supplies an in-memory evidence store, UUID identifier 
 
 The reference byte limit is 16 MiB even though the public contract permits a larger storage-level maximum. Providers can receive smaller per-request limits.
 
-## Deliberate Phase 1 limits
+## Current limits
 
-This slice is not yet a production evidence service. The default store is process-local and has no retention worker, encryption integration, sensitivity-aware read use case, PostgreSQL implementation, backup path, or artifact streaming. The redactor is a conservative reference for JSON and UTF-8 text, not a general data-loss-prevention system. There is no evidence endpoint in OpenAPI and no SDK operation in this unit; adding one requires authenticated tenant/actor middleware and an authorization-checked read or collection surface.
+The local store remains process-local, while the PostgreSQL profile durably stores evidence metadata and artifact bytes and is covered by the full-schema backup/restore experiment. Authenticated HTTP and SDK boundaries expose tenant-scoped evidence metadata retrieval and bounded metric-evidence collection; artifact bytes remain internal.
 
-Durable storage, request-scoped credential brokering, additional media inspectors, and investigation-driven provider orchestration remain Phase 2 work.
+This is not yet a production evidence service. There is no retention worker, encryption/KMS integration, sensitivity-specific artifact-read surface, artifact streaming, request-scoped credential broker, production metric backend adapter, or OTLP receiver. The redactor is a conservative reference for JSON and UTF-8 text, not a general data-loss-prevention system. Additional media inspectors and investigation-driven telemetry provider selection remain Phase 2 work.

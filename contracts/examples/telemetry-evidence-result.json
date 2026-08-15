@@ -1,0 +1,39 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "TelemetryEvidenceResult",
+  "metadata": {
+    "requestId": "teq_8f5e2a7c1d9046b3a1c7e9f204d6b830",
+    "tenantId": "local",
+    "integrationId": "observability-local",
+    "createdAt": "2026-08-14T10:30:04Z"
+  },
+  "spec": {
+    "signal": "metrics",
+    "requestDigest": "sha256:7b4f9e620671e7bdd9552e3cf8c065287bd147e600985daf822102e245e36594",
+    "timeRange": {
+      "start": "2026-08-14T10:25:00Z",
+      "end": "2026-08-14T10:30:00Z"
+    },
+    "status": "complete",
+    "series": [
+      {
+        "metric": "k8s.pod.container.restarts",
+        "unit": "1",
+        "attributes": {
+          "k8s.namespace.name": "default",
+          "k8s.pod.name": "api-7d9f5c6b9f-x2k4m"
+        },
+        "points": [
+          {"timestamp": "2026-08-14T10:28:00Z", "value": 0},
+          {"timestamp": "2026-08-14T10:29:00Z", "value": 1},
+          {"timestamp": "2026-08-14T10:30:00Z", "value": 2}
+        ]
+      }
+    ],
+    "summary": {
+      "seriesCount": 1,
+      "dataPointCount": 3
+    },
+    "warnings": []
+  }
+}

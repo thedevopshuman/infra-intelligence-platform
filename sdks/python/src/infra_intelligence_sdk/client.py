@@ -23,6 +23,7 @@ from .models import (
     ResourceNeighborhood,
     ResourceObservation,
     ResourceTimeline,
+    TelemetryEvidenceRequest,
 )
 
 
@@ -160,6 +161,15 @@ class Client:
     def get_evidence(self, evidence_id: str) -> Evidence:
         return Evidence.from_dict(
             self._get(f"/v1/evidence/{quote(evidence_id, safe='')}")
+        )
+
+    def collect_telemetry_evidence(
+        self, request: TelemetryEvidenceRequest
+    ) -> Evidence:
+        """Collect normalized metric evidence through the configured backend."""
+
+        return Evidence.from_dict(
+            self._post("/v1/evidence/telemetry/queries", request.to_dict())
         )
 
     def propose_action(self, command: Mapping[str, Any]) -> ActionProposal:

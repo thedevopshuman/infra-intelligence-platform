@@ -262,6 +262,46 @@ class Evidence:
 
 
 @dataclass(frozen=True)
+class TelemetryEvidenceRequest:
+    """Bounded backend-neutral request for tenant-scoped metric evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "TelemetryEvidenceRequest":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="TelemetryEvidenceRequest",
+                label="telemetry evidence request",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class TelemetryEvidenceResult:
+    """Normalized metric series stored as an immutable evidence artifact."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "TelemetryEvidenceResult":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="TelemetryEvidenceResult",
+                label="telemetry evidence result",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class InvestigationRequest:
     """Bounded, tenant- and actor-scoped investigation input."""
 

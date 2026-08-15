@@ -26,6 +26,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Resource contract](specifications/resource-contract.md)
 - [Event contract](specifications/event-contract.md)
 - [Evidence contract](specifications/evidence-contract.md)
+- [Telemetry evidence request and result contracts](specifications/telemetry-evidence-contract.md)
 - [Investigation request and report contracts](specifications/investigation-contract.md)
 - [Ingestion freshness report contract](specifications/ingestion-freshness-contract.md)
 - [Evaluation scenario contract](specifications/evaluation-scenario-contract.md)

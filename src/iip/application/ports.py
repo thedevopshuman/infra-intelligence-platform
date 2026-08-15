@@ -189,6 +189,56 @@ class EvidenceRedactionResult:
     methods: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class TelemetryMetricsQuery:
+    """Credential-free normalized metric query passed to a backend adapter."""
+
+    tenant_id: str
+    actor_id: str
+    request_id: str
+    integration_id: str
+    resource_uids: tuple[str, ...]
+    start: str
+    end: str
+    metric: str
+    filters: tuple[tuple[str, str, str], ...]
+    aggregation: str
+    step_seconds: int
+    group_by: tuple[str, ...]
+    max_series: int
+    max_data_points: int
+    max_bytes: int
+    deadline: str
+
+
+@dataclass(frozen=True)
+class TelemetryMetricPoint:
+    """One untrusted backend metric value at an explicit instant."""
+
+    timestamp: str
+    value: float
+
+
+@dataclass(frozen=True)
+class TelemetryMetricSeries:
+    """One untrusted metric series returned by a backend adapter."""
+
+    metric: str
+    unit: str
+    attributes: tuple[tuple[str, str], ...]
+    points: tuple[TelemetryMetricPoint, ...]
+
+
+@dataclass(frozen=True)
+class TelemetryMetricsResult:
+    """Untrusted bounded result returned by a telemetry backend adapter."""
+
+    executed_at: str
+    status: str
+    series: tuple[TelemetryMetricSeries, ...]
+    warnings: tuple[str, ...] = ()
+
+
 class ResourceRepository(Protocol):
     def get(self, tenant_id: str, uid: str) -> Optional[Resource]:
         """Return a resource only from the requested tenant scope."""
@@ -350,6 +400,11 @@ class Authenticator(Protocol):
 class EvidenceProvider(Protocol):
     def fetch(self, request: EvidenceProviderRequest) -> RawEvidenceArtifact:
         """Retrieve one bounded artifact without exposing adapter credentials."""
+
+
+class TelemetryMetricsBackend(Protocol):
+    def query_metrics(self, request: TelemetryMetricsQuery) -> TelemetryMetricsResult:
+        """Query one configured backend without exposing credentials or vendor types."""
 
 
 class EvidenceRedactor(Protocol):

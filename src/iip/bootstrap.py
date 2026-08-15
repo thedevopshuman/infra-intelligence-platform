@@ -10,6 +10,7 @@ from iip.adapters.actions import KubernetesRestartDryRunExecutor
 from iip.adapters.auth import DenyAllAuthenticator, HashedBearerAuthenticator
 from iip.adapters.evidence import (
     InMemoryEvidenceStore,
+    NoDataTelemetryMetricsBackend,
     ResourceStateEvidenceProvider,
     StructuredTextRedactor,
     SystemClock,
@@ -28,6 +29,7 @@ from iip.application.ports import (
     IngestionTelemetrySink,
     ResourceRepository,
     SourceCheckpointRepository,
+    TelemetryMetricsBackend,
 )
 from iip.application.investigate import DeterministicInvestigationService
 from iip.application.ingest_resource import ResourceIngestionService
@@ -39,6 +41,10 @@ from iip.application.observe_ingestion import (
 from iip.application.plugin_sessions import PluginSessionService
 from iip.application.query_resources import ResourceQueryService
 from iip.application.rebuild_projections import ProjectionRebuildService
+from iip.application.telemetry_evidence import (
+    TelemetryEvidenceService,
+    TelemetryMetricsEvidenceProvider,
+)
 
 
 @dataclass(frozen=True)
@@ -55,6 +61,7 @@ class Runtime:
     ingestion_telemetry: IngestionFreshnessService
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
+    telemetry_evidence: TelemetryEvidenceService
     investigations: DeterministicInvestigationService
     actions: GovernedActionService
     plugin_sessions: PluginSessionService
@@ -77,6 +84,7 @@ def build_local_runtime(
     *,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
+    telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
     telemetry_runtime: Any = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
@@ -91,6 +99,7 @@ def build_local_runtime(
         authenticator or DenyAllAuthenticator(),
         ingestion_objectives,
         ingestion_telemetry_sink,
+        telemetry_metrics_backend,
         telemetry_runtime,
     )
 
@@ -102,6 +111,7 @@ def _compose_runtime(
     authenticator: Authenticator,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
+    telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
     telemetry_runtime: Any = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
@@ -110,9 +120,18 @@ def _compose_runtime(
     clock = SystemClock()
     ingestion = ResourceIngestionService(store, policy)
     queries = ResourceQueryService(store, policy)
+    metrics_backend = (
+        telemetry_metrics_backend
+        if telemetry_metrics_backend is not None
+        else NoDataTelemetryMetricsBackend(clock)
+    )
+    telemetry_provider = TelemetryMetricsEvidenceProvider(metrics_backend)
     evidence = EvidenceCollectionService(
         store,
-        {"resource-state": ResourceStateEvidenceProvider(store)},
+        {
+            "resource-state": ResourceStateEvidenceProvider(store),
+            "telemetry-query": telemetry_provider,
+        },
         evidence_store,
         StructuredTextRedactor(),
         policy,
@@ -142,6 +161,7 @@ def _compose_runtime(
         ),
         queries=queries,
         evidence=evidence,
+        telemetry_evidence=TelemetryEvidenceService(evidence, clock),
         investigations=DeterministicInvestigationService(
             store, evidence, operational, clock
         ),
@@ -167,6 +187,7 @@ def build_postgres_runtime(
     migrate: bool = False,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
+    telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
     telemetry_runtime: Any = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
@@ -184,6 +205,7 @@ def build_postgres_runtime(
         authenticator or DenyAllAuthenticator(),
         ingestion_objectives,
         ingestion_telemetry_sink,
+        telemetry_metrics_backend,
         telemetry_runtime,
     )
 

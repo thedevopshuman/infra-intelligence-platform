@@ -22,6 +22,8 @@ from infra_intelligence_sdk import (
     ResourceNeighborhood,
     ResourceObservation,
     ResourceTimeline,
+    TelemetryEvidenceRequest,
+    TelemetryEvidenceResult,
 )
 
 
@@ -60,6 +62,12 @@ class PublicContractSdkTests(unittest.TestCase):
         approval = ActionApproval.from_dict(example("action-approval.json"))
         action_result = ActionResult.from_dict(example("action-result.json"))
         plugin_session = PluginSession.from_dict(example("plugin-session.json"))
+        telemetry_request = TelemetryEvidenceRequest.from_dict(
+            example("telemetry-evidence-request.json")
+        )
+        telemetry_result = TelemetryEvidenceResult.from_dict(
+            example("telemetry-evidence-result.json")
+        )
 
         self.assertEqual(evidence.to_dict()["kind"], "Evidence")
         self.assertEqual(request.to_dict()["kind"], "InvestigationRequest")
@@ -83,6 +91,12 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(approval.to_dict()["kind"], "ActionApproval")
         self.assertEqual(action_result.to_dict()["kind"], "ActionResult")
         self.assertEqual(plugin_session.to_dict()["kind"], "PluginSession")
+        self.assertEqual(
+            telemetry_request.to_dict()["kind"], "TelemetryEvidenceRequest"
+        )
+        self.assertEqual(
+            telemetry_result.to_dict()["kind"], "TelemetryEvidenceResult"
+        )
 
     def test_sdk_models_reject_crossed_contract_kinds(self) -> None:
         with self.assertRaisesRegex(ValueError, "kind must be Evidence"):
@@ -97,6 +111,18 @@ class PublicContractSdkTests(unittest.TestCase):
             ValueError, "kind must be IngestionFreshnessReport"
         ):
             IngestionFreshnessReport.from_dict(example("investigation-report.json"))
+        with self.assertRaisesRegex(
+            ValueError, "kind must be TelemetryEvidenceRequest"
+        ):
+            TelemetryEvidenceRequest.from_dict(
+                example("telemetry-evidence-result.json")
+            )
+        with self.assertRaisesRegex(
+            ValueError, "kind must be TelemetryEvidenceResult"
+        ):
+            TelemetryEvidenceResult.from_dict(
+                example("telemetry-evidence-request.json")
+            )
 
     def test_sdk_models_reject_unknown_versions(self) -> None:
         payload = example("investigation-request.json")
@@ -244,6 +270,32 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn(
             "evaluation scenario forbidden evidence must not be exposed",
+            self.errors,
+        )
+
+    def test_telemetry_result_rejects_modified_request_digest(self) -> None:
+        path = ROOT / "contracts" / "examples" / "telemetry-evidence-request.json"
+        request = copy.deepcopy(self.documents[path])
+        request["spec"]["query"]["metric"] = "another.metric"
+        self.documents[path] = request
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "telemetry evidence result digest must match its request",
+            self.errors,
+        )
+
+    def test_telemetry_result_rejects_incorrect_summary(self) -> None:
+        path = ROOT / "contracts" / "examples" / "telemetry-evidence-result.json"
+        result = copy.deepcopy(self.documents[path])
+        result["spec"]["summary"]["dataPointCount"] = 2
+        self.documents[path] = result
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "telemetry evidence summary must match its series",
             self.errors,
         )
 

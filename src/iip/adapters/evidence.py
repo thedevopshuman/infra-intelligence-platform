@@ -17,6 +17,8 @@ from iip.application.ports import (
     EvidenceRedactionResult,
     PersistenceError,
     RawEvidenceArtifact,
+    TelemetryMetricsQuery,
+    TelemetryMetricsResult,
 )
 
 
@@ -190,6 +192,22 @@ class ResourceStateEvidenceProvider:
             media_type="application/json",
             observed_at=observed_at,
             summary=f"Current canonical status for {len(resources)} scoped resource(s).",
+        )
+
+
+class NoDataTelemetryMetricsBackend:
+    """Safe local backend that proves query plumbing without inventing metrics."""
+
+    def __init__(self, clock: object) -> None:
+        self._clock = clock
+
+    def query_metrics(self, request: TelemetryMetricsQuery) -> TelemetryMetricsResult:
+        del request
+        now = getattr(self._clock, "now")()
+        return TelemetryMetricsResult(
+            executed_at=now,
+            status="no-data",
+            series=(),
         )
 
 

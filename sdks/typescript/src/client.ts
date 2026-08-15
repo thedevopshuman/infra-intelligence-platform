@@ -17,6 +17,7 @@ import type {
   ResourceObservation,
   ResourceTimeline,
   ResourceUid,
+  TelemetryEvidenceRequest,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -134,6 +135,10 @@ export class InfrastructureIntelligenceClient {
 
   async getEvidence(id: EvidenceId): Promise<Evidence> {
     return this.get<Evidence>(`/v1/evidence/${encodeURIComponent(id)}`);
+  }
+
+  async collectTelemetryEvidence(request: TelemetryEvidenceRequest): Promise<Evidence> {
+    return this.post<Evidence>("/v1/evidence/telemetry/queries", request);
   }
 
   async proposeAction(command: {

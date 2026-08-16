@@ -53,6 +53,7 @@ from iip.application.log_evidence import (
     TelemetryLogsEvidenceProvider,
 )
 from iip.application.investigate import DeterministicInvestigationService
+from iip.application.investigation_lifecycle import InvestigationLifecycleService
 from iip.application.kubernetes_event_evidence import (
     KubernetesEventEvidenceService,
     KubernetesEventsEvidenceProvider,
@@ -98,6 +99,7 @@ class Runtime:
     otlp_metrics_ingestion: OtlpMetricsIngestionService | None
     otlp_logs_ingestion: OtlpLogsIngestionService | None
     investigations: DeterministicInvestigationService
+    investigation_lifecycle: InvestigationLifecycleService
     actions: GovernedActionService
     plugin_sessions: PluginSessionService
     operational_store: Any
@@ -267,6 +269,7 @@ def _compose_runtime(
             logs=log_evidence,
             evidence_store=evidence_store,
         ),
+        investigation_lifecycle=InvestigationLifecycleService(operational, clock),
         actions=GovernedActionService(
             store,
             policy,

@@ -114,34 +114,102 @@ class PostgresOperationalStore:
         except psycopg.Error:
             raise PersistenceError("storage.unavailable") from None
 
-    def commit_investigation(
+    def start_investigation(
         self,
         actor: ActorContext,
         investigation_id: str,
         request: Mapping[str, object],
-        report: Mapping[str, object],
+        status: Mapping[str, object],
     ) -> None:
         self._assert_tenant(actor, request)
-        self._assert_tenant(actor, report)
+        self._assert_tenant(actor, status)
+        status_spec = status.get("spec")
+        if not isinstance(status_spec, Mapping):
+            raise PersistenceError("storage.input-invalid")
         try:
             with self._connect() as connection:
                 connection.execute(
                     """
                     INSERT INTO iip.investigations (
                         tenant_id, investigation_id, request_digest,
-                        request_document, report_document
-                    ) VALUES (%s, %s, %s, %s, %s)
+                        request_document, report_document, state,
+                        status_document, lease_expires_at
+                    ) VALUES (%s, %s, %s, %s, NULL, 'running', %s, %s)
                     """,
                     (
                         actor.tenant_id,
                         investigation_id,
                         canonical_digest(request),
                         Jsonb(dict(request)),
-                        Jsonb(dict(report)),
+                        Jsonb(dict(status)),
+                        status_spec["leaseExpiresAt"],
                     ),
                 )
         except psycopg.errors.UniqueViolation:
             raise PersistenceError("storage.conflict") from None
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def commit_investigation(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        request: Mapping[str, object],
+        report: Mapping[str, object],
+        status: Mapping[str, object],
+    ) -> None:
+        self._assert_tenant(actor, request)
+        self._assert_tenant(actor, report)
+        self._assert_tenant(actor, status)
+        status_spec = status.get("spec")
+        report_spec = report.get("spec")
+        if not isinstance(status_spec, Mapping) or not isinstance(
+            report_spec, Mapping
+        ):
+            raise PersistenceError("storage.input-invalid")
+        request_digest = canonical_digest(request)
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    UPDATE iip.investigations
+                    SET report_document = %s,
+                        status_document = %s,
+                        state = %s,
+                        lease_expires_at = NULL
+                    WHERE tenant_id = %s
+                      AND investigation_id = %s
+                      AND request_digest = %s
+                      AND report_document IS NULL
+                      AND (state = 'running' OR %s = 'cancelled')
+                    RETURNING investigation_id
+                    """,
+                    (
+                        Jsonb(dict(report)),
+                        Jsonb(dict(status)),
+                        status_spec["state"],
+                        actor.tenant_id,
+                        investigation_id,
+                        request_digest,
+                        report_spec.get("outcome"),
+                    ),
+                ).fetchone()
+                if row is None:
+                    existing = connection.execute(
+                        """
+                        SELECT request_digest, report_document, status_document
+                        FROM iip.investigations
+                        WHERE tenant_id = %s AND investigation_id = %s
+                        """,
+                        (actor.tenant_id, investigation_id),
+                    ).fetchone()
+                    if (
+                        existing is None
+                        or existing["request_digest"] != request_digest
+                        or dict(existing["report_document"] or {}) != dict(report)
+                        or dict(existing["status_document"] or {}) != dict(status)
+                    ):
+                        raise PersistenceError("storage.conflict")
         except psycopg.Error:
             raise PersistenceError("storage.unavailable") from None
 
@@ -160,6 +228,51 @@ class PostgresOperationalStore:
             "SELECT request_document AS document FROM iip.investigations WHERE tenant_id = %s AND investigation_id = %s",
             (actor.tenant_id, investigation_id),
         )
+
+    def get_investigation_status(
+        self, actor: ActorContext, investigation_id: str
+    ) -> Optional[Mapping[str, object]]:
+        return self._one_document(
+            "SELECT status_document AS document FROM iip.investigations WHERE tenant_id = %s AND investigation_id = %s",
+            (actor.tenant_id, investigation_id),
+        )
+
+    def request_investigation_cancellation(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        status: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self._assert_tenant(actor, status)
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    UPDATE iip.investigations
+                    SET status_document = %s, state = 'cancellation-requested'
+                    WHERE tenant_id = %s
+                      AND investigation_id = %s
+                      AND state = 'running'
+                    RETURNING status_document AS document
+                    """,
+                    (Jsonb(dict(status)), actor.tenant_id, investigation_id),
+                ).fetchone()
+                if row is None:
+                    row = connection.execute(
+                        """
+                        SELECT status_document AS document
+                        FROM iip.investigations
+                        WHERE tenant_id = %s AND investigation_id = %s
+                        """,
+                        (actor.tenant_id, investigation_id),
+                    ).fetchone()
+            if row is None:
+                raise PersistenceError("storage.not-found")
+            return dict(row["document"])
+        except PersistenceError:
+            raise
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
 
     def get_proposal_by_key(
         self, actor: ActorContext, idempotency_key: str
@@ -276,7 +389,11 @@ class PostgresOperationalStore:
         try:
             with self._connect() as connection:
                 row = connection.execute(statement, parameters).fetchone()
-            return dict(row["document"]) if row is not None else None
+            return (
+                dict(row["document"])
+                if row is not None and row["document"] is not None
+                else None
+            )
         except psycopg.Error:
             raise PersistenceError("storage.unavailable") from None
 

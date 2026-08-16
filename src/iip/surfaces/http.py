@@ -55,8 +55,15 @@ from iip.application.ingest_otlp_logs import (
 )
 from iip.application.investigate import (
     InvestigationConflictError,
+    InvestigationInProgressError,
     InvalidInvestigationError,
     RunInvestigationCommand,
+)
+from iip.application.investigation_lifecycle import (
+    CancelInvestigationCommand,
+    GetInvestigationStatusCommand,
+    InvalidInvestigationCancellationError,
+    InvestigationLifecycleNotFoundError,
 )
 from iip.application.kubernetes_event_evidence import (
     CollectKubernetesEventEvidenceCommand,
@@ -102,7 +109,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.8.0"
+    server_version = "IIPReference/0.9.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -186,6 +193,27 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "investigation.not_found",
             )
             return
+        if (
+            len(segments) == 4
+            and segments[:2] == ["v1", "investigations"]
+            and segments[3] == "status"
+        ):
+            try:
+                document = self.runtime.investigation_lifecycle.get(
+                    GetInvestigationStatusCommand(actor, segments[2])
+                )
+                self._json(HTTPStatus.OK, dict(document))
+            except InvestigationLifecycleNotFoundError:
+                self._json(
+                    HTTPStatus.NOT_FOUND,
+                    {"error": {"code": "investigation.not_found"}},
+                )
+            except PersistenceError:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"error": {"code": "storage.unavailable"}},
+                )
+            return
         if len(segments) == 3 and segments[:2] == ["v1", "actions"]:
             self._stored_document(
                 lambda: self._action_document(actor, segments[2]),
@@ -261,6 +289,11 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "/v1/plugin-sessions",
             )
             or (len(segments) == 4 and segments[:2] == ["v1", "actions"] and segments[3] in ("decision", "execute"))
+            or (
+                len(segments) == 4
+                and segments[:2] == ["v1", "investigations"]
+                and segments[3] == "cancel"
+            )
         )
         if not known:
             self._json(HTTPStatus.NOT_FOUND, {"error": {"code": "route.not_found"}})
@@ -322,6 +355,19 @@ class ApiHandler(BaseHTTPRequestHandler):
                     RunInvestigationCommand(actor, payload)
                 )
                 status = HTTPStatus.CREATED
+            elif len(segments) == 4 and segments[3] == "cancel":
+                cancellation_spec = payload.get("spec")
+                if (
+                    not isinstance(cancellation_spec, Mapping)
+                    or cancellation_spec.get("investigationId") != segments[2]
+                ):
+                    raise InvalidInvestigationCancellationError(
+                        "investigation.cancellation.invalid"
+                    )
+                document = self.runtime.investigation_lifecycle.cancel(
+                    CancelInvestigationCommand(actor, payload)
+                )
+                status = HTTPStatus.ACCEPTED
             elif path == "/v1/actions/proposals":
                 document = self.runtime.actions.propose(
                     ProposeActionCommand(
@@ -384,6 +430,13 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": str(exc)}})
         except CollectionConflictError as exc:
             self._json(HTTPStatus.CONFLICT, {"error": {"code": str(exc)}})
+        except InvalidInvestigationCancellationError as exc:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": str(exc)}})
+        except InvestigationLifecycleNotFoundError:
+            self._json(
+                HTTPStatus.NOT_FOUND,
+                {"error": {"code": "investigation.not_found"}},
+            )
         except InvalidKubernetesEventEvidenceRequestError:
             self._json(
                 HTTPStatus.BAD_REQUEST,
@@ -436,7 +489,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 {"error": {"code": "evidence.provider.unavailable"}},
             )
-        except InvestigationConflictError as exc:
+        except (InvestigationConflictError, InvestigationInProgressError) as exc:
             self._json(HTTPStatus.CONFLICT, {"error": {"code": str(exc)}})
         except ActionWorkflowError as exc:
             code = str(exc)

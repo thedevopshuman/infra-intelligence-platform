@@ -18,6 +18,8 @@ from .models import (
     IngestionFreshnessReport,
     InvestigationReport,
     InvestigationRequest,
+    InvestigationCancellationRequest,
+    InvestigationStatus,
     KubernetesEventEvidenceRequest,
     LogEvidenceRequest,
     PluginSession,
@@ -166,6 +168,30 @@ class Client:
     def get_investigation(self, investigation_id: str) -> InvestigationReport:
         return InvestigationReport.from_dict(
             self._get(f"/v1/investigations/{quote(investigation_id, safe='')}")
+        )
+
+    def get_investigation_status(self, investigation_id: str) -> InvestigationStatus:
+        """Read durable running, cancellation, or terminal state."""
+
+        return InvestigationStatus.from_dict(
+            self._get(
+                f"/v1/investigations/{quote(investigation_id, safe='')}/status"
+            )
+        )
+
+    def cancel_investigation(
+        self, request: InvestigationCancellationRequest
+    ) -> InvestigationStatus:
+        """Request cooperative cancellation without deleting audit history."""
+
+        investigation_id = request.to_dict().get("spec", {}).get("investigationId")
+        if not isinstance(investigation_id, str):
+            raise ValueError("investigation cancellation request id is invalid")
+        return InvestigationStatus.from_dict(
+            self._post(
+                f"/v1/investigations/{quote(investigation_id, safe='')}/cancel",
+                request.to_dict(),
+            )
         )
 
     def get_evidence(self, evidence_id: str) -> Evidence:

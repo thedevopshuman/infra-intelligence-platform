@@ -145,7 +145,10 @@
                 <label>Lookback<select id="investigation-lookback"><option value="30">Last 30 minutes</option><option value="60" selected>Last hour</option><option value="360">Last 6 hours</option><option value="1440">Last 24 hours</option></select></label>
               </div>
               <label class="check-row"><input id="allow-proposal" type="checkbox"><span><strong>Allow recommendations to become proposals</strong><small>No change executes without the separate action workflow.</small></span></label>
-              <button class="button primary wide" type="submit">Run investigation</button>
+              <div class="button-row">
+                <button class="button primary wide" type="submit">Run investigation</button>
+                <button class="button subtle" id="cancel-investigation" type="button" hidden>Cancel safely</button>
+              </div>
             </form>
             <article class="panel result-panel">
               <div class="panel-heading"><div><span class="kicker">Terminal report</span><h2>Investigation result</h2></div><span class="status-chip neutral" id="investigation-state">Waiting</span></div>

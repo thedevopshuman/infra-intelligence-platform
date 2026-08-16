@@ -2,6 +2,7 @@ export type ResourceHealth = "healthy" | "degraded" | "unhealthy" | "unknown";
 export type ResourceUid = `res_${string}`;
 export type EvidenceId = `evd_${string}`;
 export type InvestigationId = `inv_${string}`;
+export type InvestigationCancellationId = `can_${string}`;
 export type ActionId = `act_${string}`;
 export type ApprovalId = `apr_${string}`;
 export type IntegrationId = `int_${string}`;
@@ -823,6 +824,49 @@ export interface InvestigationTelemetryBaselineComparison {
   threshold: number;
   whenMatched: "supports" | "contradicts" | "neutral";
   whenNotMatched: "supports" | "contradicts" | "neutral";
+}
+
+export interface InvestigationCancellationRequest {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "InvestigationCancellationRequest";
+  metadata: {
+    id: InvestigationCancellationId;
+    tenantId: string;
+    actorId: string;
+    requestedAt: string;
+  };
+  spec: {
+    investigationId: InvestigationId;
+    reasonCode: "operator-requested" | "incident-resolved" | "superseded";
+  };
+}
+
+export interface InvestigationStatus {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "InvestigationStatus";
+  metadata: {
+    id: InvestigationId;
+    tenantId: string;
+    updatedAt: string;
+  };
+  spec: {
+    requestDigest: Sha256Digest;
+    state:
+      | "running"
+      | "cancellation-requested"
+      | "completed"
+      | "failed"
+      | "cancelled";
+    startedAt: string;
+    leaseExpiresAt?: string;
+    cancellation?: {
+      requestedBy: string;
+      requestedAt: string;
+      reasonCode: "operator-requested" | "incident-resolved" | "superseded";
+    };
+    completedAt?: string;
+    reportRef?: string;
+  };
 }
 
 export interface InvestigationRequest {

@@ -15,6 +15,11 @@ stateDiagram-v2
     Gathering --> Analyzing: sufficient evidence or budget threshold
     Analyzing --> Gathering: material evidence gap
     Analyzing --> Reported: ranked hypotheses + uncertainty
+    Requested --> Cancelled: cancellation before work
+    Scoped --> Cancelled: cooperative cancellation
+    Planned --> Cancelled: cooperative cancellation
+    Gathering --> Cancelled: stop before next tool
+    Analyzing --> Cancelled: stop before report
     Reported --> AwaitingApproval: mutation proposed
     Reported --> Completed: read-only result
     AwaitingApproval --> Executing: approved + policy re-check
@@ -27,7 +32,14 @@ stateDiagram-v2
     Gathering --> Failed
     Analyzing --> Failed
     Executing --> Failed
+    Requested --> Failed: execution lease expired
+    Scoped --> Failed: execution lease expired
+    Planned --> Failed: execution lease expired
+    Gathering --> Failed: execution lease expired
+    Analyzing --> Failed: execution lease expired
 ```
+
+The executable reference persists the accepted normalized request and a bounded running lease before any tool call. The first authenticated cancellation request is durable and immutable; the worker checks it before new evidence calls and terminalization. A live duplicate is rejected, while a duplicate after lease expiry closes the attempt without replaying tools. [ADR 0030](../decisions/0030-durable-investigation-lifecycle.md) records these semantics. Background dispatch, heartbeats, and stale-lease sweeping remain workflow-engine work.
 
 ## Required state
 

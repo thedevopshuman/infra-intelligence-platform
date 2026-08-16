@@ -52,7 +52,7 @@ Application validation requires the scope start to precede its end. It also reje
 
 ## Investigation report
 
-Every terminal path returns a report, including policy denial, cancellation, runtime failure, and exhausted budgets. The report records:
+Every terminal path returns a report, including policy denial, cancellation, runtime failure, and exhausted budgets. The accepted request is first represented by the separate [durable lifecycle contract](investigation-lifecycle-contract.md); status changes never mutate the final report. The report records:
 
 - outcome and stable terminal reason;
 - start/completion timestamps and the exact accepted scope;
@@ -99,6 +99,8 @@ The same restraint applies to Kubernetes Event assessments. Supporting and contr
 The investigation report may recommend a next check, monitoring step, or escalation. It cannot encode an executable mutation. A future action proposal is a separate immutable contract and workflow that receives a current policy decision, idempotency key, approval when required, and audit trail.
 
 Reports are immutable terminal artifacts. A retry creates a new investigation request and ID, linked through correlation and causation events rather than overwriting a prior report.
+
+Cancellation is cooperative and durable. A cancelled partial run may list Evidence already committed before the request was observed, but it publishes no hypotheses or recommendations. An expired execution lease is closed without replaying tools under the same ID.
 
 ## Validation invariants
 

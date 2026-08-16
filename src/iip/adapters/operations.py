@@ -16,7 +16,8 @@ class InMemoryOperationalStore:
 
     def __init__(self) -> None:
         self._investigations: dict[
-            tuple[str, str], tuple[dict[str, object], dict[str, object]]
+            tuple[str, str],
+            tuple[dict[str, object], Optional[dict[str, object]], dict[str, object]],
         ] = {}
         self._proposals: dict[tuple[str, str], dict[str, object]] = {}
         self._proposal_keys: dict[tuple[str, str], str] = {}
@@ -26,20 +27,59 @@ class InMemoryOperationalStore:
         self._audit: list[tuple[str, str, dict[str, object]]] = []
         self._lock = RLock()
 
+    def start_investigation(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        request: Mapping[str, object],
+        status: Mapping[str, object],
+    ) -> None:
+        self._assert_tenant(actor, request)
+        self._assert_tenant(actor, status)
+        key = (actor.tenant_id, investigation_id)
+        value = (
+            copy.deepcopy(dict(request)),
+            None,
+            copy.deepcopy(dict(status)),
+        )
+        with self._lock:
+            if key in self._investigations:
+                raise PersistenceError("storage.conflict")
+            self._investigations[key] = value
+
     def commit_investigation(
         self,
         actor: ActorContext,
         investigation_id: str,
         request: Mapping[str, object],
         report: Mapping[str, object],
+        status: Mapping[str, object],
     ) -> None:
         self._assert_tenant(actor, request)
         self._assert_tenant(actor, report)
+        self._assert_tenant(actor, status)
         key = (actor.tenant_id, investigation_id)
-        value = (copy.deepcopy(dict(request)), copy.deepcopy(dict(report)))
+        value = (
+            copy.deepcopy(dict(request)),
+            copy.deepcopy(dict(report)),
+            copy.deepcopy(dict(status)),
+        )
         with self._lock:
             current = self._investigations.get(key)
-            if current is not None and current != value:
+            if current is not None and current[0] != value[0]:
+                raise PersistenceError("storage.conflict")
+            if current is not None and current[1] is not None and current != value:
+                raise PersistenceError("storage.conflict")
+            current_spec = current[2].get("spec") if current is not None else None
+            report_spec = report.get("spec")
+            if (
+                isinstance(current_spec, Mapping)
+                and current_spec.get("state") == "cancellation-requested"
+                and (
+                    not isinstance(report_spec, Mapping)
+                    or report_spec.get("outcome") != "cancelled"
+                )
+            ):
                 raise PersistenceError("storage.conflict")
             self._investigations[key] = value
 
@@ -48,7 +88,11 @@ class InMemoryOperationalStore:
     ) -> Optional[Mapping[str, object]]:
         with self._lock:
             value = self._investigations.get((actor.tenant_id, investigation_id))
-            return copy.deepcopy(value[1]) if value is not None else None
+            return (
+                copy.deepcopy(value[1])
+                if value is not None and value[1] is not None
+                else None
+            )
 
     def get_investigation_request(
         self, actor: ActorContext, investigation_id: str
@@ -56,6 +100,33 @@ class InMemoryOperationalStore:
         with self._lock:
             value = self._investigations.get((actor.tenant_id, investigation_id))
             return copy.deepcopy(value[0]) if value is not None else None
+
+    def get_investigation_status(
+        self, actor: ActorContext, investigation_id: str
+    ) -> Optional[Mapping[str, object]]:
+        with self._lock:
+            value = self._investigations.get((actor.tenant_id, investigation_id))
+            return copy.deepcopy(value[2]) if value is not None else None
+
+    def request_investigation_cancellation(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        status: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self._assert_tenant(actor, status)
+        key = (actor.tenant_id, investigation_id)
+        with self._lock:
+            current = self._investigations.get(key)
+            if current is None:
+                raise PersistenceError("storage.not-found")
+            current_spec = current[2].get("spec")
+            state = current_spec.get("state") if isinstance(current_spec, Mapping) else None
+            if state != "running":
+                return copy.deepcopy(current[2])
+            updated = copy.deepcopy(dict(status))
+            self._investigations[key] = (current[0], current[1], updated)
+            return copy.deepcopy(updated)
 
     def get_proposal_by_key(
         self, actor: ActorContext, idempotency_key: str

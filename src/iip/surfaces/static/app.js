@@ -6,6 +6,7 @@ const state = {
   resources: [],
   investigations: [],
   evidence: [],
+  activeInvestigationId: null,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -319,6 +320,8 @@ async function addDemoResource() {
     },
     status: { health: "degraded", lifecycle: "active" },
   };
+  state.activeInvestigationId = payload.metadata.id;
+  $("#cancel-investigation").hidden = false;
   try {
     await api("/v1/resources", { method: "POST", body: JSON.stringify(payload) });
     await refreshResources();
@@ -326,7 +329,44 @@ async function addDemoResource() {
   } catch (error) {
     showNotice(`Could not add the demo resource (${error.message}).`, "error");
   } finally {
+    state.activeInvestigationId = null;
+    $("#cancel-investigation").hidden = true;
+    $("#cancel-investigation").disabled = false;
+    $("#cancel-investigation").textContent = "Cancel safely";
     button.disabled = false;
+  }
+}
+
+async function cancelInvestigation() {
+  const investigationId = state.activeInvestigationId;
+  if (!investigationId || !state.session) return;
+  const button = $("#cancel-investigation");
+  button.disabled = true;
+  button.textContent = "Requesting cancellation…";
+  const requestedAt = new Date().toISOString();
+  const payload = {
+    apiVersion: "iip.platform/v1alpha1",
+    kind: "InvestigationCancellationRequest",
+    metadata: {
+      id: identifier("can"),
+      tenantId: state.session.metadata.tenantId,
+      actorId: state.session.metadata.actorId,
+      requestedAt,
+    },
+    spec: { investigationId, reasonCode: "operator-requested" },
+  };
+  try {
+    const status = await api(`/v1/investigations/${encodeURIComponent(investigationId)}/cancel`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    $("#investigation-state").textContent = status.spec.state === "cancelled" ? "Cancelled" : "Stopping safely";
+    $("#investigation-state").className = "status-chip warning";
+    showNotice("Cancellation was recorded. In-flight evidence will stop at its bounded deadline.");
+  } catch (error) {
+    showNotice(`Cancellation failed (${error.message}).`, "error");
+    button.disabled = false;
+    button.textContent = "Cancel safely";
   }
 }
 
@@ -533,6 +573,7 @@ function bindEvents() {
   $("#resource-search").addEventListener("input", renderResources);
   $("#health-filter").addEventListener("change", renderResources);
   $("#investigation-form").addEventListener("submit", runInvestigation);
+  $("#cancel-investigation").addEventListener("click", cancelInvestigation);
   $("#evidence-form").addEventListener("submit", (event) => {
     event.preventDefault();
     lookupEvidence($("#evidence-id").value.trim());

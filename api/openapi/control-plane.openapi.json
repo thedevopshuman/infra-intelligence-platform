@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, Kubernetes Event, resource-change, and repository/runbook context evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven evidence assessment, governed actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -388,6 +388,34 @@
         }
       }
     },
+    "/v1/investigations/{investigationId}/status": {
+      "get": {
+        "operationId": "getInvestigationStatus",
+        "description": "Return the current tenant-scoped lifecycle state. Running state is persisted before tools execute; terminal status points to the immutable report.",
+        "parameters": [{"name": "investigationId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"}}],
+        "responses": {
+          "200": {"description": "Durable investigation lifecycle status", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-status.schema.json"}}}},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/investigations/{investigationId}/cancel": {
+      "post": {
+        "operationId": "cancelInvestigation",
+        "description": "Atomically record the first authenticated cooperative cancellation request. Already committed evidence is retained; no lifecycle or audit data is deleted.",
+        "parameters": [{"name": "investigationId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-cancellation-request.schema.json"}}}},
+        "responses": {
+          "202": {"description": "Cancellation recorded or current terminal status returned", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-status.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
     "/v1/actions/proposals": {
       "post": {
         "operationId": "proposeAction",
@@ -511,6 +539,8 @@
       "OtlpMetricsEvidence": {"$ref": "../../contracts/schemas/otlp-metrics-evidence.schema.json"},
       "InvestigationRequest": {"$ref": "../../contracts/schemas/investigation-request.schema.json"},
       "InvestigationReport": {"$ref": "../../contracts/schemas/investigation-report.schema.json"},
+      "InvestigationCancellationRequest": {"$ref": "../../contracts/schemas/investigation-cancellation-request.schema.json"},
+      "InvestigationStatus": {"$ref": "../../contracts/schemas/investigation-status.schema.json"},
       "IntegrationConfig": {"$ref": "../../contracts/schemas/integration-config.schema.json"},
       "ActionProposal": {"$ref": "../../contracts/schemas/action-proposal.schema.json"},
       "ActionApproval": {"$ref": "../../contracts/schemas/action-approval.schema.json"},

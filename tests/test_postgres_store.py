@@ -653,6 +653,77 @@ class PostgresOperationalStoreTests(unittest.TestCase):
             reconnected.get(ActorContext("other", "another-tenant"), evidence_id)
         )
 
+    def test_investigation_lifecycle_is_durable_and_transitions_atomically(self) -> None:
+        actor = ActorContext("developer", "local")
+        request = json.loads(
+            (ROOT / "contracts/examples/investigation-request.json").read_text()
+        )
+        cancellation_status = json.loads(
+            (ROOT / "contracts/examples/investigation-status.json").read_text()
+        )
+        running_status = copy.deepcopy(cancellation_status)
+        running_status["metadata"]["updatedAt"] = running_status["spec"]["startedAt"]
+        running_status["spec"]["state"] = "running"
+        del running_status["spec"]["cancellation"]
+        investigation_id = request["metadata"]["id"]
+
+        self.operations.start_investigation(
+            actor, investigation_id, request, running_status
+        )
+        self.assertEqual(
+            self.operations.get_investigation_status(actor, investigation_id),
+            running_status,
+        )
+        self.assertIsNone(
+            self.operations.get_investigation(actor, investigation_id)
+        )
+        self.assertEqual(
+            self.operations.request_investigation_cancellation(
+                actor, investigation_id, cancellation_status
+            ),
+            cancellation_status,
+        )
+
+        report = json.loads(
+            (ROOT / "contracts/examples/investigation-report.json").read_text()
+        )
+        report["spec"].update(
+            {
+                "outcome": "cancelled",
+                "terminalReason": "cancelled",
+                "summary": "The investigation stopped after a cooperative cancellation request.",
+                "hypotheses": [],
+                "recommendations": [],
+            }
+        )
+        terminal_status = copy.deepcopy(cancellation_status)
+        terminal_status["metadata"]["updatedAt"] = report["spec"]["completedAt"]
+        terminal_status["spec"].update(
+            {
+                "state": "cancelled",
+                "completedAt": report["spec"]["completedAt"],
+                "reportRef": (
+                    f"investigation://local/{investigation_id}/report"
+                ),
+            }
+        )
+        del terminal_status["spec"]["leaseExpiresAt"]
+        self.operations.commit_investigation(
+            actor, investigation_id, request, report, terminal_status
+        )
+
+        reconnected = PostgresOperationalStore(DATABASE_URL)
+        self.assertEqual(reconnected.get_investigation(actor, investigation_id), report)
+        self.assertEqual(
+            reconnected.get_investigation_status(actor, investigation_id),
+            terminal_status,
+        )
+        self.assertIsNone(
+            reconnected.get_investigation(
+                ActorContext("other", "another-tenant"), investigation_id
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

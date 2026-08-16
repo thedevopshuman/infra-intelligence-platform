@@ -136,6 +136,8 @@ main { min-width: 0; padding: 0 40px 60px; }
 .button.primary { color: #071312; background: var(--cyan); border-color: var(--cyan); box-shadow: 0 8px 28px rgb(40 207 200 / 12%); }
 .button.primary:hover { background: #7aeee9; }
 .button.wide { width: 100%; min-height: 44px; }
+.button-row { display: grid; gap: 8px; }
+.button-row .button.subtle { min-height: 40px; }
 .text-button { padding: 7px; color: var(--cyan); background: transparent; border: 0; cursor: pointer; font-size: 11px; }
 .text-button:hover { text-decoration: underline; }
 

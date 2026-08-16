@@ -52,6 +52,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0025-loki-historical-log-evidence-adapter.md",
     "docs/decisions/0026-resource-history-change-evidence.md",
     "docs/decisions/0029-investigation-context-correlation.md",
+    "docs/decisions/0030-durable-investigation-lifecycle.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/kubernetes-event-evidence.md",
@@ -91,6 +92,8 @@ REQUIRED_PATHS = (
     "contracts/schemas/otlp-logs-evidence.schema.json",
     "contracts/schemas/investigation-request.schema.json",
     "contracts/schemas/investigation-report.schema.json",
+    "contracts/schemas/investigation-cancellation-request.schema.json",
+    "contracts/schemas/investigation-status.schema.json",
     "contracts/schemas/ingestion-freshness-report.schema.json",
     "contracts/schemas/session-context.schema.json",
     "contracts/schemas/evaluation-scenario.schema.json",
@@ -120,6 +123,8 @@ REQUIRED_PATHS = (
     "contracts/examples/investigation-report-kubernetes-events.json",
     "contracts/examples/investigation-report-logs.json",
     "contracts/examples/investigation-report-context.json",
+    "contracts/examples/investigation-cancellation-request.json",
+    "contracts/examples/investigation-status.json",
     "contracts/examples/investigation-report-telemetry.json",
     "contracts/examples/investigation-report-telemetry-baseline.json",
     "contracts/examples/ingestion-freshness-report.json",
@@ -145,6 +150,7 @@ REQUIRED_PATHS = (
     "docs/specifications/action-contract.md",
     "docs/specifications/plugin-session-contract.md",
     "docs/specifications/investigation-contract.md",
+    "docs/specifications/investigation-lifecycle-contract.md",
     "docs/specifications/ingestion-freshness-contract.md",
     "docs/specifications/session-context-contract.md",
     "docs/specifications/evaluation-scenario-contract.md",
@@ -172,6 +178,7 @@ REQUIRED_PATHS = (
     "src/iip/adapters/otlp_receiver.py",
     "src/iip/adapters/otlp_logs_receiver.py",
     "src/iip/adapters/postgres/migrations/0006_source_checkpoint_provider_cursors.sql",
+    "src/iip/adapters/postgres/migrations/0007_investigation_lifecycle.sql",
     "tests/test_evidence_collection.py",
     "tests/test_kubernetes_event_evidence.py",
     "tests/test_telemetry_evidence.py",
@@ -191,6 +198,7 @@ REQUIRED_PATHS = (
     "tests/test_log_evidence.py",
     "tests/test_resource_change_evidence.py",
     "tests/test_investigation_logs.py",
+    "tests/test_investigation_lifecycle.py",
     "tests/test_otlp_logs_receiver.py",
     "tests/test_otlp_receiver_integration.py",
     "scripts/test_otel.sh",
@@ -1040,6 +1048,75 @@ def validate_investigation_change_examples(
             )
             if evidence_id not in hypothesis.get(field, []):
                 fail(errors, f"change {disposition} Evidence must cite its hypothesis")
+
+
+def validate_investigation_lifecycle_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check cancellation and lifecycle status links beyond JSON Schema."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    request = documents.get(example_dir / "investigation-request.json")
+    cancellation = documents.get(
+        example_dir / "investigation-cancellation-request.json"
+    )
+    status = documents.get(example_dir / "investigation-status.json")
+    if not all(isinstance(item, dict) for item in (request, cancellation, status)):
+        return
+    request_metadata = request.get("metadata")
+    cancellation_metadata = cancellation.get("metadata")
+    cancellation_spec = cancellation.get("spec")
+    status_metadata = status.get("metadata")
+    status_spec = status.get("spec")
+    if not all(
+        isinstance(item, dict)
+        for item in (
+            request_metadata,
+            cancellation_metadata,
+            cancellation_spec,
+            status_metadata,
+            status_spec,
+        )
+    ):
+        return
+    investigation_id = request_metadata.get("id")
+    if cancellation_spec.get("investigationId") != investigation_id:
+        fail(errors, "cancellation request must target its investigation example")
+    if status_metadata.get("id") != investigation_id:
+        fail(errors, "investigation status must identify its request example")
+    if any(
+        metadata.get("tenantId") != request_metadata.get("tenantId")
+        for metadata in (cancellation_metadata, status_metadata)
+    ):
+        fail(errors, "investigation lifecycle examples must share a tenant")
+    if cancellation_metadata.get("actorId") != request_metadata.get("actorId"):
+        fail(errors, "cancellation actor must match its authenticated request example")
+    if status_spec.get("requestDigest") != canonical_digest(request):
+        fail(errors, "investigation status digest must match its request")
+    cancellation_status = status_spec.get("cancellation")
+    if not isinstance(cancellation_status, dict):
+        fail(errors, "cancellation-requested status requires cancellation metadata")
+    else:
+        if cancellation_status.get("requestedBy") != cancellation_metadata.get(
+            "actorId"
+        ):
+            fail(errors, "investigation cancellation requester must match its actor")
+        if cancellation_status.get("requestedAt") != cancellation_metadata.get(
+            "requestedAt"
+        ):
+            fail(errors, "investigation cancellation times must match")
+        if cancellation_status.get("reasonCode") != cancellation_spec.get(
+            "reasonCode"
+        ):
+            fail(errors, "investigation cancellation reasons must match")
+    started = parse_timestamp(status_spec.get("startedAt"))
+    requested = parse_timestamp(cancellation_metadata.get("requestedAt"))
+    updated = parse_timestamp(status_metadata.get("updatedAt"))
+    lease = parse_timestamp(status_spec.get("leaseExpiresAt"))
+    if any(value is None for value in (started, requested, updated, lease)):
+        fail(errors, "investigation lifecycle examples require valid timestamps")
+    elif not started <= requested == updated < lease:
+        fail(errors, "investigation lifecycle timestamps must be ordered")
 
 
 def validate_investigation_context_examples(
@@ -2035,6 +2112,11 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("otlp-metrics-evidence.json", "OtlpMetricsEvidence"),
         ("otlp-logs-evidence.json", "OtlpLogsEvidence"),
         ("investigation-request.json", "InvestigationRequest"),
+        (
+            "investigation-cancellation-request.json",
+            "InvestigationCancellationRequest",
+        ),
+        ("investigation-status.json", "InvestigationStatus"),
         ("investigation-request-changes.json", "InvestigationRequest"),
         ("investigation-request-context.json", "InvestigationRequest"),
         ("investigation-request-kubernetes-events.json", "InvestigationRequest"),
@@ -2069,6 +2151,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_resource_query_examples(documents, errors)
     validate_kubernetes_event_evidence_examples(documents, errors)
     validate_investigation_kubernetes_event_examples(documents, errors)
+    validate_investigation_lifecycle_examples(documents, errors)
     validate_investigation_change_examples(documents, errors)
     validate_investigation_context_examples(documents, errors)
     validate_investigation_log_examples(documents, errors)

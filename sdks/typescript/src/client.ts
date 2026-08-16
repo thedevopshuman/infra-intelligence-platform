@@ -9,8 +9,10 @@ import type {
   EvidenceId,
   IngestionFreshnessReport,
   InvestigationId,
+  InvestigationCancellationRequest,
   InvestigationReport,
   InvestigationRequest,
+  InvestigationStatus,
   KubernetesEventEvidenceRequest,
   LogEvidenceRequest,
   PluginSession,
@@ -140,6 +142,21 @@ export class InfrastructureIntelligenceClient {
 
   async getInvestigation(id: InvestigationId): Promise<InvestigationReport> {
     return this.get<InvestigationReport>(`/v1/investigations/${encodeURIComponent(id)}`);
+  }
+
+  async getInvestigationStatus(id: InvestigationId): Promise<InvestigationStatus> {
+    return this.get<InvestigationStatus>(
+      `/v1/investigations/${encodeURIComponent(id)}/status`,
+    );
+  }
+
+  async cancelInvestigation(
+    request: InvestigationCancellationRequest,
+  ): Promise<InvestigationStatus> {
+    return this.post<InvestigationStatus>(
+      `/v1/investigations/${encodeURIComponent(request.spec.investigationId)}/cancel`,
+      request,
+    );
   }
 
   async getEvidence(id: EvidenceId): Promise<Evidence> {

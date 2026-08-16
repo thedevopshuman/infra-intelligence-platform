@@ -1690,6 +1690,56 @@ class InvestigationKubernetesEventAssessment:
 
 
 @dataclass(frozen=True)
+class InvestigationCancellationRequest:
+    """Authenticated request for cooperative investigation cancellation."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationCancellationRequest":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="InvestigationCancellationRequest",
+                label="investigation cancellation request",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class InvestigationStatus:
+    """Current durable lifecycle state for an accepted investigation."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "InvestigationStatus":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="InvestigationStatus",
+                label="investigation status",
+            )
+        )
+
+    @property
+    def state(self) -> str:
+        spec = self.payload.get("spec")
+        state = spec.get("state") if isinstance(spec, Mapping) else None
+        if not isinstance(state, str):
+            raise ValueError("investigation status state is invalid")
+        return state
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class InvestigationRequest:
     """Bounded, tenant- and actor-scoped investigation input."""
 

@@ -80,6 +80,10 @@ class InvestigationConflictError(RuntimeError):
     """An investigation ID was reused with different immutable input."""
 
 
+class InvestigationInProgressError(RuntimeError):
+    """The immutable investigation ID already has a live execution lease."""
+
+
 @dataclass(frozen=True)
 class RunInvestigationCommand:
     actor: ActorContext
@@ -124,15 +128,38 @@ class DeterministicInvestigationService:
         request, metadata, spec, scope, budgets = self._validate(command)
         investigation_id = metadata["id"]
         existing = self._investigations.get_investigation(command.actor, investigation_id)
+        stored_request = self._investigations.get_investigation_request(
+            command.actor, investigation_id
+        )
         if existing is not None:
-            stored_request = self._investigations.get_investigation_request(
-                command.actor, investigation_id
-            )
             if stored_request is None or canonical_digest(stored_request) != canonical_digest(
                 request
             ):
                 raise InvestigationConflictError("investigation.id.conflict")
             return existing
+        if stored_request is not None:
+            if canonical_digest(stored_request) != canonical_digest(request):
+                raise InvestigationConflictError("investigation.id.conflict")
+            status = self._investigations.get_investigation_status(
+                command.actor, investigation_id
+            )
+            if status is None:
+                raise PersistenceError("storage.unavailable")
+            if self._lease_expired(status, self._clock.now()):
+                return self._recover_abandoned(
+                    command.actor,
+                    request,
+                    scope,
+                    status,
+                )
+            status_spec = status.get("spec")
+            if (
+                not isinstance(status_spec, Mapping)
+                or status_spec.get("state")
+                not in {"running", "cancellation-requested"}
+            ):
+                raise PersistenceError("storage.unavailable")
+            raise InvestigationInProgressError("investigation.in_progress")
 
         resources = tuple(
             self._resources.get_many(command.actor.tenant_id, scope["resourceUids"])
@@ -141,6 +168,32 @@ class DeterministicInvestigationService:
             raise InvalidInvestigationError("investigation.resource.unavailable")
 
         started_at = self._clock.now()
+        running_status = self._running_status(
+            command.actor,
+            investigation_id,
+            request,
+            started_at,
+            budgets["maxWallTimeSeconds"],
+        )
+        try:
+            self._investigations.start_investigation(
+                command.actor,
+                investigation_id,
+                request,
+                running_status,
+            )
+        except PersistenceError as exc:
+            if str(exc) != "storage.conflict":
+                raise
+            concurrent_request = self._investigations.get_investigation_request(
+                command.actor, investigation_id
+            )
+            if (
+                concurrent_request is None
+                or canonical_digest(concurrent_request) != canonical_digest(request)
+            ):
+                raise InvestigationConflictError("investigation.id.conflict") from None
+            raise InvestigationInProgressError("investigation.in_progress") from None
         evidence_documents: list[Mapping[str, object]] = []
         resource_evidence_ids: list[str] = []
         supporting_evidence_ids: list[str] = []
@@ -177,6 +230,7 @@ class DeterministicInvestigationService:
             and budgets["maxEvidenceItems"] > 0
             and tools_allow_collection
             and resource_type_allowed
+            and not self._cancellation_requested(command.actor, investigation_id)
         ):
             evidence_type = (
                 "kubernetes.pod-status"
@@ -222,7 +276,8 @@ class DeterministicInvestigationService:
         elif kubernetes_events_allowed and self._kubernetes_events is not None:
             for selection in matching_event_selections:
                 if (
-                    tool_calls >= budgets["maxToolCalls"]
+                    self._cancellation_requested(command.actor, investigation_id)
+                    or tool_calls >= budgets["maxToolCalls"]
                     or len(evidence_documents) >= budgets["maxEvidenceItems"]
                 ):
                     break
@@ -287,7 +342,8 @@ class DeterministicInvestigationService:
         elif context_allowed and self._context is not None:
             for selection in matching_context_selections:
                 if (
-                    tool_calls >= budgets["maxToolCalls"]
+                    self._cancellation_requested(command.actor, investigation_id)
+                    or tool_calls >= budgets["maxToolCalls"]
                     or len(evidence_documents) >= budgets["maxEvidenceItems"]
                 ):
                     break
@@ -351,7 +407,8 @@ class DeterministicInvestigationService:
         elif changes_allowed and self._resource_changes is not None:
             for selection in matching_change_selections:
                 if (
-                    tool_calls >= budgets["maxToolCalls"]
+                    self._cancellation_requested(command.actor, investigation_id)
+                    or tool_calls >= budgets["maxToolCalls"]
                     or len(evidence_documents) >= budgets["maxEvidenceItems"]
                 ):
                     break
@@ -414,7 +471,8 @@ class DeterministicInvestigationService:
         elif telemetry_allowed and self._telemetry is not None:
             for selection in matching_selections:
                 if (
-                    tool_calls >= budgets["maxToolCalls"]
+                    self._cancellation_requested(command.actor, investigation_id)
+                    or tool_calls >= budgets["maxToolCalls"]
                     or len(evidence_documents) >= budgets["maxEvidenceItems"]
                 ):
                     break
@@ -483,7 +541,8 @@ class DeterministicInvestigationService:
         elif logs_allowed and self._logs is not None:
             for selection in matching_log_selections:
                 if (
-                    tool_calls >= budgets["maxToolCalls"]
+                    self._cancellation_requested(command.actor, investigation_id)
+                    or tool_calls >= budgets["maxToolCalls"]
                     or len(evidence_documents) >= budgets["maxEvidenceItems"]
                 ):
                     break
@@ -592,6 +651,37 @@ class DeterministicInvestigationService:
         unknowns.extend(telemetry_unknowns)
         unknowns.extend(log_unknowns)
 
+        lifecycle_status = self._investigations.get_investigation_status(
+            command.actor, investigation_id
+        )
+        lifecycle_spec = (
+            lifecycle_status.get("spec")
+            if isinstance(lifecycle_status, Mapping)
+            else None
+        )
+        cancellation = (
+            lifecycle_spec.get("cancellation")
+            if isinstance(lifecycle_spec, Mapping)
+            and lifecycle_spec.get("state") == "cancellation-requested"
+            else None
+        )
+        if isinstance(cancellation, Mapping):
+            outcome = "cancelled"
+            terminal_reason = "cancelled"
+            summary = "The investigation stopped after a cooperative cancellation request."
+            hypotheses = []
+            unknowns.append(
+                {
+                    "statement": "The investigation ended before every eligible evidence source was attempted.",
+                    "impact": "medium",
+                    "requestedEvidenceTypes": (
+                        list(requested_types)
+                        if requested_types
+                        else ["kubernetes.resource-status"]
+                    ),
+                }
+            )
+
         selector = spec.get("agentSelector")
         if not isinstance(selector, Mapping):
             selector = {"id": "incident-investigator", "version": "0.1.0"}
@@ -621,8 +711,12 @@ class DeterministicInvestigationService:
                 "hypotheses": hypotheses,
                 "unknowns": unknowns,
                 "evidenceIds": evidence_ids,
-                "recommendations": self._recommendations(
-                    investigation_id, root_cause, supporting_evidence_ids
+                "recommendations": (
+                    []
+                    if outcome == "cancelled"
+                    else self._recommendations(
+                        investigation_id, root_cause, supporting_evidence_ids
+                    )
                 ),
                 "toolCallLedgerRef": (
                     f"ledger://{command.actor.tenant_id}/investigations/"
@@ -664,8 +758,261 @@ class DeterministicInvestigationService:
             report_spec = report["spec"]
             if isinstance(report_spec, dict):
                 report_spec["contextAssessments"] = context_assessments
+        terminal_status = self._terminal_status(
+            command.actor,
+            investigation_id,
+            request,
+            started_at,
+            completed_at,
+            outcome,
+            cancellation if isinstance(cancellation, Mapping) else None,
+        )
+        try:
+            self._investigations.commit_investigation(
+                command.actor, investigation_id, request, report, terminal_status
+            )
+        except PersistenceError as exc:
+            if str(exc) != "storage.conflict" or outcome == "cancelled":
+                raise
+            latest_status = self._investigations.get_investigation_status(
+                command.actor, investigation_id
+            )
+            latest_spec = (
+                latest_status.get("spec")
+                if isinstance(latest_status, Mapping)
+                else None
+            )
+            late_cancellation = (
+                latest_spec.get("cancellation")
+                if isinstance(latest_spec, Mapping)
+                and latest_spec.get("state") == "cancellation-requested"
+                else None
+            )
+            report_spec = report.get("spec")
+            if not isinstance(late_cancellation, Mapping) or not isinstance(
+                report_spec, dict
+            ):
+                raise
+            report_spec.update(
+                {
+                    "outcome": "cancelled",
+                    "terminalReason": "cancelled",
+                    "summary": "The investigation stopped after a cooperative cancellation request.",
+                    "hypotheses": [],
+                    "recommendations": [],
+                }
+            )
+            report_unknowns = report_spec.get("unknowns")
+            if isinstance(report_unknowns, list):
+                report_unknowns.append(
+                    {
+                        "statement": "The investigation ended before every eligible evidence source was attempted.",
+                        "impact": "medium",
+                        "requestedEvidenceTypes": (
+                            list(requested_types)
+                            if requested_types
+                            else ["kubernetes.resource-status"]
+                        ),
+                    }
+                )
+            terminal_status = self._terminal_status(
+                command.actor,
+                investigation_id,
+                request,
+                started_at,
+                completed_at,
+                "cancelled",
+                late_cancellation,
+            )
+            self._investigations.commit_investigation(
+                command.actor, investigation_id, request, report, terminal_status
+            )
+        return report
+
+    @staticmethod
+    def _running_status(
+        actor: ActorContext,
+        investigation_id: str,
+        request: Mapping[str, object],
+        started_at: str,
+        max_wall_time_seconds: int,
+    ) -> dict[str, object]:
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "InvestigationStatus",
+            "metadata": {
+                "id": investigation_id,
+                "tenantId": actor.tenant_id,
+                "updatedAt": started_at,
+            },
+            "spec": {
+                "requestDigest": canonical_digest(request),
+                "state": "running",
+                "startedAt": started_at,
+                "leaseExpiresAt": DeterministicInvestigationService._deadline(
+                    started_at, max_wall_time_seconds
+                ),
+            },
+        }
+
+    @staticmethod
+    def _terminal_status(
+        actor: ActorContext,
+        investigation_id: str,
+        request: Mapping[str, object],
+        started_at: str,
+        completed_at: str,
+        outcome: str,
+        cancellation: Mapping[str, object] | None,
+    ) -> dict[str, object]:
+        state = {
+            "conclusive": "completed",
+            "inconclusive": "completed",
+            "failed": "failed",
+            "cancelled": "cancelled",
+        }[outcome]
+        spec: dict[str, object] = {
+            "requestDigest": canonical_digest(request),
+            "state": state,
+            "startedAt": started_at,
+            "completedAt": completed_at,
+            "reportRef": (
+                f"investigation://{actor.tenant_id}/{investigation_id}/report"
+            ),
+        }
+        if state == "cancelled" and cancellation is not None:
+            spec["cancellation"] = dict(cancellation)
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "InvestigationStatus",
+            "metadata": {
+                "id": investigation_id,
+                "tenantId": actor.tenant_id,
+                "updatedAt": completed_at,
+            },
+            "spec": spec,
+        }
+
+    @staticmethod
+    def _lease_expired(status: Mapping[str, object], now: str) -> bool:
+        spec = status.get("spec")
+        if not isinstance(spec, Mapping) or spec.get("state") not in {
+            "running",
+            "cancellation-requested",
+        }:
+            return False
+        lease = DeterministicInvestigationService._parse_datetime(
+            spec.get("leaseExpiresAt")
+        )
+        current = DeterministicInvestigationService._parse_datetime(now)
+        if lease is None or current is None:
+            raise PersistenceError("storage.unavailable")
+        return current >= lease
+
+    def _cancellation_requested(
+        self, actor: ActorContext, investigation_id: str
+    ) -> bool:
+        status = self._investigations.get_investigation_status(
+            actor, investigation_id
+        )
+        spec = status.get("spec") if isinstance(status, Mapping) else None
+        return bool(
+            isinstance(spec, Mapping)
+            and spec.get("state") == "cancellation-requested"
+            and isinstance(spec.get("cancellation"), Mapping)
+        )
+
+    def _recover_abandoned(
+        self,
+        actor: ActorContext,
+        request: Mapping[str, object],
+        scope: Mapping[str, object],
+        status: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        metadata = request.get("metadata")
+        request_spec = request.get("spec")
+        status_spec = status.get("spec")
+        if (
+            not isinstance(metadata, Mapping)
+            or not isinstance(request_spec, Mapping)
+            or not isinstance(status_spec, Mapping)
+            or not isinstance(status_spec.get("startedAt"), str)
+        ):
+            raise PersistenceError("storage.unavailable")
+        investigation_id = str(metadata["id"])
+        started_at = str(status_spec["startedAt"])
+        completed_at = self._clock.now()
+        cancellation = status_spec.get("cancellation")
+        cancelled = (
+            status_spec.get("state") == "cancellation-requested"
+            and isinstance(cancellation, Mapping)
+        )
+        evidence_types = request_spec.get("evidenceTypes", [])
+        if not isinstance(evidence_types, list) or not evidence_types:
+            evidence_types = ["kubernetes.resource-status"]
+        report: dict[str, object] = {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "InvestigationReport",
+            "metadata": {
+                "id": investigation_id,
+                "tenantId": actor.tenant_id,
+                "createdAt": completed_at,
+            },
+            "spec": {
+                "requestDigest": canonical_digest(request),
+                "outcome": "cancelled" if cancelled else "failed",
+                "terminalReason": "cancelled" if cancelled else "runtime-error",
+                "startedAt": started_at,
+                "completedAt": completed_at,
+                "scope": dict(scope),
+                "summary": (
+                    "The investigation was cancelled before its prior execution could commit a terminal report."
+                    if cancelled
+                    else "The prior execution lease expired before a terminal report was committed."
+                ),
+                "hypotheses": [],
+                "unknowns": [
+                    {
+                        "statement": "The interrupted execution did not commit a complete evidence result.",
+                        "impact": "high",
+                        "requestedEvidenceTypes": list(evidence_types),
+                    }
+                ],
+                "evidenceIds": [],
+                "recommendations": [],
+                "toolCallLedgerRef": (
+                    f"ledger://{actor.tenant_id}/investigations/"
+                    f"{investigation_id}/tool-calls"
+                ),
+                "policySnapshotRef": (
+                    f"policy://{actor.tenant_id}/snapshots/"
+                    "deterministic-investigation-v1"
+                ),
+                "usage": {
+                    "toolCalls": 0,
+                    "iterations": 0,
+                    "modelTokens": 0,
+                    "wallTimeSeconds": 0,
+                    "costUsd": 0,
+                    "evidenceItems": 0,
+                },
+            },
+        }
+        terminal_status = self._terminal_status(
+            actor,
+            investigation_id,
+            request,
+            started_at,
+            completed_at,
+            "cancelled" if cancelled else "failed",
+            cancellation if isinstance(cancellation, Mapping) else None,
+        )
         self._investigations.commit_investigation(
-            command.actor, investigation_id, request, report
+            actor,
+            investigation_id,
+            request,
+            report,
+            terminal_status,
         )
         return report
 

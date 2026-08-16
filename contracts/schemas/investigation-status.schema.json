@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:investigation-status:v1alpha1",
+  "title": "Infrastructure Intelligence Investigation Status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "InvestigationStatus"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "updatedAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "updatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestDigest", "state", "startedAt"],
+      "properties": {
+        "requestDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "state": {
+          "type": "string",
+          "enum": ["running", "cancellation-requested", "completed", "failed", "cancelled"]
+        },
+        "startedAt": {"type": "string", "format": "date-time"},
+        "leaseExpiresAt": {"type": "string", "format": "date-time"},
+        "cancellation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requestedBy", "requestedAt", "reasonCode"],
+          "properties": {
+            "requestedBy": {"type": "string", "minLength": 1, "maxLength": 256},
+            "requestedAt": {"type": "string", "format": "date-time"},
+            "reasonCode": {
+              "type": "string",
+              "enum": ["operator-requested", "incident-resolved", "superseded"]
+            }
+          }
+        },
+        "completedAt": {"type": "string", "format": "date-time"},
+        "reportRef": {
+          "type": "string",
+          "format": "uri-reference",
+          "pattern": "^investigation://",
+          "maxLength": 2048
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "spec": {"properties": {"state": {"enum": ["running", "cancellation-requested"]}}}
+        }
+      },
+      "then": {
+        "properties": {
+          "spec": {
+            "required": ["leaseExpiresAt"],
+            "not": {"anyOf": [{"required": ["completedAt"]}, {"required": ["reportRef"]}]}
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "spec": {
+            "required": ["completedAt", "reportRef"],
+            "not": {"required": ["leaseExpiresAt"]}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "spec": {"properties": {"state": {"enum": ["cancellation-requested", "cancelled"]}}}
+        }
+      },
+      "then": {"properties": {"spec": {"required": ["cancellation"]}}},
+      "else": {"properties": {"spec": {"not": {"required": ["cancellation"]}}}}
+    }
+  ]
+}

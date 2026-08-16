@@ -641,14 +641,24 @@ class EvidenceStore(Protocol):
 
 
 class InvestigationRepository(Protocol):
+    def start_investigation(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        request: Mapping[str, object],
+        status: Mapping[str, object],
+    ) -> None:
+        """Persist an accepted request and its bounded running lease before tools run."""
+
     def commit_investigation(
         self,
         actor: ActorContext,
         investigation_id: str,
         request: Mapping[str, object],
         report: Mapping[str, object],
+        status: Mapping[str, object],
     ) -> None:
-        """Atomically persist an immutable request and its terminal report."""
+        """Atomically close an accepted request with an immutable terminal report."""
 
     def get_investigation(
         self, actor: ActorContext, investigation_id: str
@@ -658,7 +668,20 @@ class InvestigationRepository(Protocol):
     def get_investigation_request(
         self, actor: ActorContext, investigation_id: str
     ) -> Optional[Mapping[str, object]]:
-        """Return the immutable input paired with a stored report."""
+        """Return the immutable accepted input, including while work is running."""
+
+    def get_investigation_status(
+        self, actor: ActorContext, investigation_id: str
+    ) -> Optional[Mapping[str, object]]:
+        """Return the current tenant-scoped lifecycle status."""
+
+    def request_investigation_cancellation(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        status: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        """Atomically record the first cancellation request or return terminal state."""
 
 
 class ActionRepository(Protocol):

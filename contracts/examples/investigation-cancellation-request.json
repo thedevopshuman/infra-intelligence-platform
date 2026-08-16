@@ -1,0 +1,14 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationCancellationRequest",
+  "metadata": {
+    "id": "can_71c9e4a2b8d04f65a3c7e9b102d4f608",
+    "tenantId": "local",
+    "actorId": "developer",
+    "requestedAt": "2026-08-14T10:30:04Z"
+  },
+  "spec": {
+    "investigationId": "inv_71c9e4a2b8d04f65a3c7e9b102d4f608",
+    "reasonCode": "operator-requested"
+  }
+}

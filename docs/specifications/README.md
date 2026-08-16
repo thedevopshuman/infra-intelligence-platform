@@ -50,7 +50,9 @@ The platform exposes contracts at three levels:
 | Action workflow | [action-contract.md](action-contract.md) | `contracts/schemas/action-workflow.schema.json` | `contracts/examples/action-workflow.json` |
 | Action workflow page | [action-contract.md](action-contract.md) | `contracts/schemas/action-workflow-page.schema.json` | `contracts/examples/action-workflow-page.json` |
 | Plugin session | [plugin-session-contract.md](plugin-session-contract.md) | `contracts/schemas/plugin-session.schema.json` | `contracts/examples/plugin-session.json` |
+| Policy decision request | [policy-contract.md](policy-contract.md) | `contracts/schemas/policy-decision-request.schema.json` | `contracts/examples/policy-decision-request.json` |
+| Policy decision | [policy-contract.md](policy-contract.md) | `contracts/schemas/policy-decision.schema.json` | `contracts/examples/policy-decision.json` |
 
 `v1alpha1` means consumers should pin versions and expect deliberate evolution. Breaking changes create a new API/schema version. Fields are never silently repurposed.
 
-Planned contracts: standalone policy decisions and evaluation results.
+Planned contracts: evaluation results.

@@ -91,7 +91,7 @@ Deliverables:
 
 Exit gate: duplicate delivery cannot duplicate impact; policy, approval, execution, and verification are fully reconstructable.
 
-Reference slice delivered: versioned proposal/approval/result and execution-lifecycle contracts, investigation- and target-bound closed parameters, role separation, content-digested policy checks at proposal/approval/execution time, a durable one-shot pre-impact execution claim, concurrent duplicate rejection, fail-closed stale-lease recovery without replay, atomic terminal result/state persistence, audit references, a default no-impact validator, an explicit Kubernetes API restart adapter with observed-UID and resource-version preconditions, server-side dry-run, brokered `resources:read` + `workloads:patch`, generation/readiness verification and prior-annotation rollback, plus a tenant-scoped paginated workflow read model and console controls for proposal, independent decision, one-shot execution, and verification review. Remaining: a production credential issuer with policy/audit/revocation interoperability, production policy engine, background timer/reconciliation worker, and production-environment mutation/rollback interoperability gates.
+Reference slice delivered: versioned proposal/approval/result and execution-lifecycle contracts, investigation- and target-bound closed parameters, role separation, content-digested policy checks at proposal/approval/execution time, a durable one-shot pre-impact execution claim, concurrent duplicate rejection, fail-closed stale-lease recovery without replay, atomic terminal result/state persistence, audit references, a default no-impact validator, an explicit Kubernetes API restart adapter with observed-UID and resource-version preconditions, server-side dry-run, brokered `resources:read` + `workloads:patch`, generation/readiness verification and prior-annotation rollback, a tenant-scoped paginated workflow read model and console controls for proposal, independent decision, one-shot execution, and verification review, plus production-configurable OIDC/JWKS authentication and an external HTTPS policy-decision adapter whose immutable snapshot references flow into action records. Remaining: customer issuer/policy-bundle and credential-issuer interoperability, background timer/reconciliation worker, and production-environment mutation/rollback gates.
 
 ## Phase 5 — plugin SDK and first design partner
 
@@ -130,7 +130,7 @@ All working material stays under `docs/research/brand/` until accepted.
 | Durable event transport | **Accepted: ADR 0004** | PostgreSQL event log and outbox initially; external broker remains replaceable |
 | Credential broker client | **Accepted: ADR 0022** | External HTTPS lease exchange with projected workload identity; issuer/product interoperability remains open |
 | Workflow engine | Phase 3 end | Durable timers, approvals, retries, audit, self-hosting burden |
-| Policy engine | Phase 3 end | Explainability, data isolation, bundle/version lifecycle, ecosystem |
+| Policy engine | **Accepted integration boundary: ADR 0037** | External engine remains customer-selectable; exact decisions require tenant-bound immutable snapshot references |
 | Plugin runtime | Phase 4 end | Isolation, language support, streaming, operational cost, signing |
 | Model/provider strategy | Phase 2 start | Data policy, tool use, structured output, cost, evaluation stability |
 | License and governance | Before public pilot | Community utility, commercial sustainability, contributor clarity |

@@ -143,6 +143,23 @@ spec:
               readOnly: true
             {{- end }}
             {{- end }}
+            {{- if and (eq .Values.auth.mode "oidc") .Values.auth.oidc.caBundleExistingSecret }}
+            - name: oidc-ca
+              mountPath: {{ .Values.auth.oidc.caBundleMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- if eq .Values.policy.mode "external-http" }}
+            {{- if .Values.policy.externalHttp.bearerTokenExistingSecret }}
+            - name: policy-token
+              mountPath: {{ .Values.policy.externalHttp.bearerTokenMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.policy.externalHttp.caBundleExistingSecret }}
+            - name: policy-ca
+              mountPath: {{ .Values.policy.externalHttp.caBundleMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- end }}
             {{- if .Values.kubernetesEventEvidence.caBundleExistingSecret }}
             - name: kubernetes-events-ca
               mountPath: {{ .Values.kubernetesEventEvidence.caBundleMountPath | quote }}
@@ -177,6 +194,30 @@ spec:
               - key: {{ .Values.credentialBroker.externalHttp.caBundleSecretKey | quote }}
                 path: ca.crt
         {{- end }}
+        {{- end }}
+        {{- if and (eq .Values.auth.mode "oidc") .Values.auth.oidc.caBundleExistingSecret }}
+        - name: oidc-ca
+          secret:
+            secretName: {{ .Values.auth.oidc.caBundleExistingSecret | quote }}
+            items:
+              - key: {{ .Values.auth.oidc.caBundleSecretKey | quote }}
+                path: ca.crt
+        {{- end }}
+        {{- if and (eq .Values.policy.mode "external-http") .Values.policy.externalHttp.bearerTokenExistingSecret }}
+        - name: policy-token
+          secret:
+            secretName: {{ .Values.policy.externalHttp.bearerTokenExistingSecret | quote }}
+            items:
+              - key: {{ .Values.policy.externalHttp.bearerTokenSecretKey | quote }}
+                path: token
+        {{- end }}
+        {{- if and (eq .Values.policy.mode "external-http") .Values.policy.externalHttp.caBundleExistingSecret }}
+        - name: policy-ca
+          secret:
+            secretName: {{ .Values.policy.externalHttp.caBundleExistingSecret | quote }}
+            items:
+              - key: {{ .Values.policy.externalHttp.caBundleSecretKey | quote }}
+                path: ca.crt
         {{- end }}
         {{- if .Values.kubernetesEventEvidence.caBundleExistingSecret }}
         - name: kubernetes-events-ca

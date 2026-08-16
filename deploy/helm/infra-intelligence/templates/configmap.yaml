@@ -7,6 +7,10 @@ metadata:
 data:
   IIP_HTTP_HOST: {{ .Values.config.httpHost | quote }}
   IIP_HTTP_PORT: {{ .Values.config.httpPort | quote }}
+  IIP_AUTH_MODE: {{ .Values.auth.mode | quote }}
+  IIP_AUTH_OIDC_CONFIG_JSON: {{ .Values.auth.oidc.configJson | quote }}
+  IIP_POLICY_MODE: {{ .Values.policy.mode | quote }}
+  IIP_POLICY_CONFIG_JSON: {{ .Values.policy.externalHttp.configJson | quote }}
   IIP_CREDENTIAL_BROKER_MODE: {{ .Values.credentialBroker.mode | quote }}
   IIP_CREDENTIAL_BROKER_CONFIG_JSON: {{ .Values.credentialBroker.externalHttp.configJson | quote }}
   IIP_DATABASE_AUTO_MIGRATE: {{ .Values.database.autoMigrate | quote }}

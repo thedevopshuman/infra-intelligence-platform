@@ -167,8 +167,9 @@ class GovernedActionService:
                 "policyDecision": {
                     "allowed": decision.allowed,
                     "reasonCode": decision.reason_code,
-                    "policySnapshotRef": (
-                        f"policy://{command.actor.tenant_id}/snapshots/action-proposal-v1"
+                    "policySnapshotRef": self._policy_snapshot(
+                        decision,
+                        f"policy://{command.actor.tenant_id}/snapshots/action-proposal-v1",
                     ),
                     "inputDigest": canonical_digest(policy_input),
                 },
@@ -246,8 +247,9 @@ class GovernedActionService:
                 "proposalDigest": proposal_digest,
                 "decision": command.decision,
                 "rationale": command.rationale,
-                "policySnapshotRef": (
-                    f"policy://{command.actor.tenant_id}/snapshots/action-approval-v1"
+                "policySnapshotRef": self._policy_snapshot(
+                    policy,
+                    f"policy://{command.actor.tenant_id}/snapshots/action-approval-v1",
                 ),
                 "policyInputDigest": canonical_digest(policy_input),
             },
@@ -345,8 +347,9 @@ class GovernedActionService:
                 "policyDecision": {
                     "allowed": True,
                     "reasonCode": policy.reason_code,
-                    "policySnapshotRef": (
-                        f"policy://{command.actor.tenant_id}/snapshots/action-execution-v1"
+                    "policySnapshotRef": self._policy_snapshot(
+                        policy,
+                        f"policy://{command.actor.tenant_id}/snapshots/action-execution-v1",
                     ),
                     "inputDigest": canonical_digest(policy_input),
                 },
@@ -664,3 +667,8 @@ class GovernedActionService:
     @staticmethod
     def _format_time(value: datetime) -> str:
         return value.isoformat().replace("+00:00", "Z")
+
+    @staticmethod
+    def _policy_snapshot(decision: object, fallback: str) -> str:
+        snapshot = getattr(decision, "policy_snapshot_ref", None)
+        return snapshot if isinstance(snapshot, str) and snapshot else fallback

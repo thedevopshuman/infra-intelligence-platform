@@ -43,6 +43,7 @@ from iip.application.ports import (
     ActionExecutionOutcome,
     ActorContext,
     PersistenceError,
+    PolicyDecision,
     TelemetryMetricPoint,
     TelemetryMetricSeries,
     TelemetryMetricsQuery,
@@ -951,6 +952,53 @@ class GovernedActionTests(unittest.TestCase):
                     expires_at=proposal["spec"]["expiresAt"],
                 )
             )
+
+    def test_external_policy_snapshot_references_flow_into_action_audit_records(self) -> None:
+        class SnapshotPolicy:
+            def decide(inner_self, actor, action, resource):
+                del inner_self, resource
+                return PolicyDecision(
+                    True,
+                    "policy.external-allowed",
+                    f"policy://{actor.tenant_id}/snapshots/{action.replace(':', '-')}-42",
+                )
+
+        self.service = GovernedActionService(
+            self.resources,
+            SnapshotPolicy(),
+            self.store,
+            KubernetesRestartDryRunExecutor(),
+            self.store,
+            self.clock,
+            self.store,
+        )
+        proposal = self.proposal()
+        approval = self.service.decide(
+            DecideActionCommand(
+                ActorContext("on-call-approver", "local", ("approver",)),
+                proposal["metadata"]["id"],
+                "approved",
+                "The policy bundle and exact dry-run scope were reviewed.",
+            )
+        )
+        executor = ActorContext("workflow-executor", "local", ("executor",))
+        self.service.execute(ExecuteActionCommand(executor, proposal["metadata"]["id"]))
+        execution = self.store.get_action_execution_status(
+            executor, proposal["metadata"]["id"]
+        )
+
+        self.assertEqual(
+            proposal["spec"]["policyDecision"]["policySnapshotRef"],
+            "policy://local/snapshots/action-propose-42",
+        )
+        self.assertEqual(
+            approval["spec"]["policySnapshotRef"],
+            "policy://local/snapshots/action-approve-42",
+        )
+        self.assertEqual(
+            execution["spec"]["policyDecision"]["policySnapshotRef"],
+            "policy://local/snapshots/action-execute-42",
+        )
 
 
 class PluginSessionTests(unittest.TestCase):

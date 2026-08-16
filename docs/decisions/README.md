@@ -40,3 +40,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0034](0034-auditable-cross-signal-planning.md) | Accepted | Plan request-declared evidence candidates across signals and budgets |
 | [0035](0035-one-shot-action-execution.md) | Accepted | Claim one governed action attempt before impact and fail ambiguous recovery closed |
 | [0036](0036-request-scoped-kubernetes-restart.md) | Accepted | Execute one opt-in UID-bound Kubernetes restart with dry-run, verification, and rollback |
+| [0037](0037-oidc-and-external-policy-boundaries.md) | Accepted | Verify OIDC/JWKS identity and delegate exact decisions to a fail-closed external policy service |

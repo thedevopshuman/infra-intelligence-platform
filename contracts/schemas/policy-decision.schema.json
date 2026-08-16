@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:policy-decision:v1alpha1",
+  "title": "Infrastructure Intelligence Policy Decision",
+  "description": "A fail-closed authorization decision bound to the canonical request digest and an immutable tenant policy snapshot.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "PolicyDecision"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId"],
+      "properties": {
+        "tenantId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputDigest", "allowed", "reasonCode", "policySnapshotRef"],
+      "properties": {
+        "inputDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "allowed": {"type": "boolean"},
+        "reasonCode": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$", "maxLength": 128},
+        "policySnapshotRef": {"type": "string", "pattern": "^policy://[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}/snapshots/[a-zA-Z0-9][a-zA-Z0-9._:/@-]{0,511}$", "maxLength": 2048}
+      }
+    }
+  }
+}

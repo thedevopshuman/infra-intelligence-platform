@@ -13,7 +13,7 @@ The authenticated gateway establishes tenant and actor context. Payload tenant f
 
 Cross-tenant operations are a separate privileged use case with explicit policy and audit; they are not implemented by omitting the tenant predicate.
 
-The Phase 1 HTTP surface follows the [authentication boundary](authentication-boundary.md): a replaceable authenticator verifies a Bearer credential and derives actor, tenant, and roles before any protected use case runs. Caller-controlled identity headers are ignored. The hashed opaque-token adapter is restricted to local development and tests; production identity-provider selection remains open.
+The HTTP surface follows the [authentication boundary](authentication-boundary.md): a replaceable authenticator verifies a Bearer credential and derives actor, tenant, and roles before any protected use case runs. Caller-controlled identity headers are ignored. The hashed opaque-token adapter is restricted to local development and tests; deployed profiles can verify issuer- and audience-bound OIDC JWTs against an explicitly trusted HTTPS JWKS endpoint.
 
 ## Authority levels
 
@@ -29,6 +29,8 @@ Execution authority is consumed by a durable one-shot claim before an adapter re
 The Kubernetes restart adapter additionally requires an observed provider UID and resource version, a tenant/integration namespace-kind allowlist, server-side dry-run, and a brokered `resources:read` + `workloads:patch` lease. Live execution needs two independent switches: an immutable non-dry-run proposal and protected integration enablement. It cannot submit arbitrary paths or patch bodies.
 
 Agents and plugins declare a maximum authority; request policy may reduce but never increase it.
+
+Deployed profiles may delegate each exact decision through the [external policy boundary](authorization-policy.md). The external decision cannot change authenticated identity or request scope. A malformed, unavailable, or wrong-tenant result denies closed, and governed actions retain the returned immutable policy snapshot reference.
 
 ## Credential model
 

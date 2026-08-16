@@ -2222,3 +2222,43 @@ class PluginSession:
 
     def to_dict(self) -> Dict[str, Any]:
         return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class PolicyDecisionRequest:
+    """Authenticated, tenant-scoped input sent to a replaceable policy service."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PolicyDecisionRequest":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="PolicyDecisionRequest",
+                label="policy decision request",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class PolicyDecision:
+    """Authorization result bound to one canonical input and policy snapshot."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PolicyDecision":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="PolicyDecision",
+                label="policy decision",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)

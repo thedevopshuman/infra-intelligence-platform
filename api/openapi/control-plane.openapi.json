@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.16.0",
+    "version": "0.17.0",
     "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, Kubernetes Event, resource-change, and repository/runbook context evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven evidence assessment, governed actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -583,6 +583,8 @@
       "ActionWorkflow": {"$ref": "../../contracts/schemas/action-workflow.schema.json"},
       "ActionWorkflowPage": {"$ref": "../../contracts/schemas/action-workflow-page.schema.json"},
       "PluginSession": {"$ref": "../../contracts/schemas/plugin-session.schema.json"},
+      "PolicyDecisionRequest": {"$ref": "../../contracts/schemas/policy-decision-request.schema.json"},
+      "PolicyDecision": {"$ref": "../../contracts/schemas/policy-decision.schema.json"},
       "Error": {"$ref": "../../contracts/schemas/error.schema.json"}
     },
     "responses": {

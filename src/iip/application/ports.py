@@ -25,6 +25,10 @@ class AuthenticationConfigurationError(RuntimeError):
     """Fail-closed authentication configuration error."""
 
 
+class PolicyConfigurationError(RuntimeError):
+    """Fail-closed policy-adapter configuration error."""
+
+
 @dataclass(frozen=True)
 class ActorContext:
     """Authenticated actor and tenant scope supplied by a surface."""
@@ -40,6 +44,7 @@ class PolicyDecision:
 
     allowed: bool
     reason_code: str
+    policy_snapshot_ref: Optional[str] = None
 
 
 @dataclass(frozen=True)

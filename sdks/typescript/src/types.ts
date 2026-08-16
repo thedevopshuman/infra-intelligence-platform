@@ -1372,6 +1372,29 @@ export interface PluginSession {
   status: "ready" | "denied";
 }
 
+export interface PolicyDecisionRequest {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PolicyDecisionRequest";
+  metadata: { tenantId: string; actorId: string };
+  spec: {
+    action: `${string}:${string}`;
+    roles: string[];
+    resource: { tenantId: string } & Record<string, unknown>;
+  };
+}
+
+export interface PolicyDecision {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PolicyDecision";
+  metadata: { tenantId: string };
+  spec: {
+    inputDigest: Sha256Digest;
+    allowed: boolean;
+    reasonCode: string;
+    policySnapshotRef: `policy://${string}/snapshots/${string}`;
+  };
+}
+
 export interface ApiErrorBody {
   error: { code: string };
 }

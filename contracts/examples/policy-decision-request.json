@@ -1,0 +1,16 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PolicyDecisionRequest",
+  "metadata": {
+    "tenantId": "local",
+    "actorId": "local-operator"
+  },
+  "spec": {
+    "action": "resource:read",
+    "roles": ["developer"],
+    "resource": {
+      "tenantId": "local",
+      "resourceUid": "res_e0ae9225a316fce4c97df5c23057b97a"
+    }
+  }
+}

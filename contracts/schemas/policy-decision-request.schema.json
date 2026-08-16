@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:policy-decision-request:v1alpha1",
+  "title": "Infrastructure Intelligence Policy Decision Request",
+  "description": "The exact authenticated actor, action, and tenant-scoped resource input sent to a replaceable policy decision service.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "PolicyDecisionRequest"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId", "actorId"],
+      "properties": {
+        "tenantId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"},
+        "actorId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/@-]{0,255}$", "not": {"const": "anonymous"}}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "roles", "resource"],
+      "properties": {
+        "action": {"type": "string", "pattern": "^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$", "maxLength": 128},
+        "roles": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9._:-]{0,63}$"}
+        },
+        "resource": {
+          "type": "object",
+          "required": ["tenantId"],
+          "properties": {
+            "tenantId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"}
+          }
+        }
+      }
+    }
+  }
+}

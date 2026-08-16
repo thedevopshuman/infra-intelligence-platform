@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from iip.adapters.actions import KubernetesRestartDryRunExecutor
-from iip.adapters.auth import DenyAllAuthenticator, HashedBearerAuthenticator
+from iip.adapters.auth import (
+    DenyAllAuthenticator,
+    HashedBearerAuthenticator,
+    OidcJwtAuthenticator,
+)
 from iip.adapters.context import NoDataContextDocumentsBackend
 from iip.adapters.evidence import (
     InMemoryEvidenceStore,
@@ -21,6 +25,7 @@ from iip.adapters.evidence import (
 )
 from iip.adapters.memory import AllowTenantPolicy, InMemoryResourceStore
 from iip.adapters.operations import InMemoryOperationalStore
+from iip.adapters.policy import ExternalHttpPolicyDecisionPoint
 from iip.application.actions import GovernedActionService
 from iip.application.collect_evidence import EvidenceCollectionService
 from iip.application.context_evidence import ContextEvidenceProvider, ContextEvidenceService
@@ -45,6 +50,8 @@ from iip.application.ports import (
     IngestionTelemetrySink,
     InvestigationTelemetrySink,
     KubernetesEventsBackend,
+    PolicyConfigurationError,
+    PolicyDecisionPoint,
     ResourceRepository,
     SourceCheckpointRepository,
     TelemetryMetricsBackend,
@@ -134,6 +141,7 @@ def build_local_runtime(
     otlp_logs_receiver: OtlpLogsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
     action_executor: ActionExecutor | None = None,
+    policy: PolicyDecisionPoint | None = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -156,6 +164,7 @@ def build_local_runtime(
         otlp_logs_receiver,
         telemetry_runtime,
         action_executor,
+        policy,
     )
 
 
@@ -175,10 +184,11 @@ def _compose_runtime(
     otlp_logs_receiver: OtlpLogsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
     action_executor: ActionExecutor | None = None,
+    configured_policy: PolicyDecisionPoint | None = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
-    policy = AllowTenantPolicy()
+    policy = configured_policy or AllowTenantPolicy()
     clock = SystemClock()
     ingestion = ResourceIngestionService(store, policy)
     queries = ResourceQueryService(store, policy)
@@ -314,6 +324,7 @@ def build_postgres_runtime(
     otlp_logs_receiver: OtlpLogsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
     action_executor: ActionExecutor | None = None,
+    policy: PolicyDecisionPoint | None = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -339,6 +350,7 @@ def build_postgres_runtime(
         otlp_logs_receiver,
         telemetry_runtime,
         action_executor,
+        policy,
     )
 
 
@@ -353,12 +365,8 @@ def build_projection_maintenance(database_url: str) -> ProjectionRebuildService:
 def build_runtime_from_env() -> Runtime:
     """Select a runtime profile from process configuration at the composition root."""
 
-    identity_config = os.environ.get("IIP_AUTH_IDENTITIES_JSON")
-    if identity_config is None:
-        raise AuthenticationConfigurationError(
-            "authentication.configuration.required"
-        )
-    authenticator = HashedBearerAuthenticator.from_json(identity_config)
+    authenticator = _authenticator_from_env()
+    policy = _policy_from_env()
     objectives = _ingestion_objectives_from_env()
     metrics_runtime = _otel_metrics_runtime_from_env()
     try:
@@ -406,6 +414,7 @@ def build_runtime_from_env() -> Runtime:
                 otlp_logs_receiver=otlp_logs_receiver,
                 telemetry_runtime=telemetry_runtime,
                 action_executor=action_executor,
+                policy=policy,
             )
         auto_migrate = (
             os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
@@ -430,11 +439,43 @@ def build_runtime_from_env() -> Runtime:
             otlp_logs_receiver=otlp_logs_receiver,
             telemetry_runtime=telemetry_runtime,
             action_executor=action_executor,
+            policy=policy,
         )
     except Exception:
         if telemetry_runtime is not None:
             telemetry_runtime.shutdown()
         raise
+
+
+def _authenticator_from_env() -> Authenticator:
+    mode = os.environ.get("IIP_AUTH_MODE", "local-hashed")
+    if mode == "local-hashed":
+        identity_config = os.environ.get("IIP_AUTH_IDENTITIES_JSON")
+        if identity_config is None:
+            raise AuthenticationConfigurationError(
+                "authentication.configuration.required"
+            )
+        return HashedBearerAuthenticator.from_json(identity_config)
+    if mode == "oidc":
+        oidc_config = os.environ.get("IIP_AUTH_OIDC_CONFIG_JSON")
+        if oidc_config is None:
+            raise AuthenticationConfigurationError(
+                "authentication.configuration.required"
+            )
+        return OidcJwtAuthenticator.from_json(oidc_config)
+    raise AuthenticationConfigurationError("authentication.configuration.invalid")
+
+
+def _policy_from_env() -> PolicyDecisionPoint:
+    mode = os.environ.get("IIP_POLICY_MODE", "local")
+    if mode == "local":
+        return AllowTenantPolicy()
+    if mode == "external-http":
+        configuration = os.environ.get("IIP_POLICY_CONFIG_JSON")
+        if configuration is None:
+            raise PolicyConfigurationError("policy.configuration.required")
+        return ExternalHttpPolicyDecisionPoint.from_json(configuration)
+    raise PolicyConfigurationError("policy.configuration.invalid")
 
 
 def _ingestion_objectives_from_env() -> IngestionFreshnessObjectives:

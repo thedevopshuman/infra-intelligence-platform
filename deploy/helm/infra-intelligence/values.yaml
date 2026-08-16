@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.16.0"
+  tag: "0.17.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -47,8 +47,25 @@ database:
   autoMigrate: false
 
 auth:
+  mode: local-hashed
   existingSecret: ""
   secretKey: identities-json
+  oidc:
+    configJson: '{}'
+    caBundleExistingSecret: ""
+    caBundleSecretKey: ca.crt
+    caBundleMountPath: /var/run/iip-oidc-ca
+
+policy:
+  mode: local
+  externalHttp:
+    configJson: '{}'
+    bearerTokenExistingSecret: ""
+    bearerTokenSecretKey: token
+    bearerTokenMountPath: /var/run/iip-policy-token
+    caBundleExistingSecret: ""
+    caBundleSecretKey: ca.crt
+    caBundleMountPath: /var/run/iip-policy-ca
 
 credentialBroker:
   mode: static
@@ -182,6 +199,14 @@ networkPolicy:
     enabled: false
     cidr: 10.96.0.1/32
     port: 8443
+  oidcEgress:
+    enabled: false
+    cidr: 10.96.0.1/32
+    port: 443
+  policyEgress:
+    enabled: false
+    cidr: 10.96.0.1/32
+    port: 443
 
 podDisruptionBudget:
   enabled: false

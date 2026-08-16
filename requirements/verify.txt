@@ -8,8 +8,12 @@ attrs==26.1.0
     #   referencing
 certifi==2026.7.22
     # via requests
+cffi==2.1.1 ; platform_python_implementation != 'PyPy'
+    # via cryptography
 charset-normalizer==3.5.0
     # via requests
+cryptography==49.0.0
+    # via -r requirements/verify.in
 fqdn==1.5.1
     # via jsonschema
 googleapis-common-protos==1.75.1
@@ -58,6 +62,10 @@ psycopg==3.3.4
     # via -r requirements/verify.in
 psycopg-binary==3.3.4 ; implementation_name != 'pypy'
     # via psycopg
+pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
+    # via cffi
+pyjwt==2.13.0
+    # via -r requirements/verify.in
 python-dateutil==2.9.0.post0
     # via arrow
 referencing==0.37.0

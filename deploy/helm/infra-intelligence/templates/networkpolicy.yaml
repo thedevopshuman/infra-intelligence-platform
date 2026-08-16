@@ -90,4 +90,20 @@ spec:
         - port: {{ .Values.networkPolicy.credentialBrokerEgress.port }}
           protocol: TCP
     {{- end }}
+    {{- if .Values.networkPolicy.oidcEgress.enabled }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.oidcEgress.cidr | quote }}
+      ports:
+        - port: {{ .Values.networkPolicy.oidcEgress.port }}
+          protocol: TCP
+    {{- end }}
+    {{- if .Values.networkPolicy.policyEgress.enabled }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.policyEgress.cidr | quote }}
+      ports:
+        - port: {{ .Values.networkPolicy.policyEgress.port }}
+          protocol: TCP
+    {{- end }}
 {{- end }}

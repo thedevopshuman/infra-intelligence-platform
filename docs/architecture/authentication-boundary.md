@@ -1,6 +1,6 @@
 # Authentication boundary
 
-**Status:** Accepted Phase 1 reference boundary
+**Status:** Accepted local and production-facing boundary
 **Date:** 2026-08-14
 
 The HTTP surface authenticates credentials before constructing the application `ActorContext`. Tenant, actor, and roles come from the configured authenticator; payload fields and request headers are consistency assertions at most and never grant identity.
@@ -55,4 +55,38 @@ The reference adapter consumes a bounded JSON object through `IIP_AUTH_IDENTITIE
 
 Only token verifiers are configured. Presented tokens must be high-entropy Bearer values of at least 32 characters. Duplicate verifiers, anonymous actors, malformed identifiers, unknown properties, and unbounded configurations fail startup. Verifier configuration must still be protected as secret material because it can be used for offline token guessing.
 
-This adapter has no issuance, expiry, rotation, revocation, federation, or identity-provider discovery. It is suitable for local execution and contract tests only. [ADR 0005](../decisions/0005-credential-derived-request-identity.md) keeps the production identity-provider choice open behind the same port.
+This adapter has no issuance, expiry, rotation, revocation, federation, or identity-provider discovery. It is suitable for local execution and contract tests only.
+
+## OIDC/JWKS deployment mode
+
+`IIP_AUTH_MODE=oidc` selects the production-facing verifier described by
+[ADR 0037](../decisions/0037-oidc-and-external-policy-boundaries.md). The bounded
+`IIP_AUTH_OIDC_CONFIG_JSON` object declares an HTTPS issuer, audience, HTTPS JWKS
+URL, and the exact tenant and roles claim names. Optional settings select a
+subject-derived actor claim, protected CA bundle, bounded cache lifetime, and
+clock skew.
+
+```json
+{
+  "issuer": "https://identity.example.com/",
+  "audience": "iip-control-plane",
+  "jwksUrl": "https://identity.example.com/.well-known/jwks.json",
+  "actorClaim": "sub",
+  "tenantClaim": "iip_tenant_id",
+  "rolesClaim": "iip_roles",
+  "caBundlePath": "/var/run/iip-oidc-ca/ca.crt",
+  "cacheSeconds": 300,
+  "clockSkewSeconds": 30
+}
+```
+
+Only RS256 is accepted. The verifier requires issuer, audience, subject,
+expiration, issued-at, configured tenant, and configured roles claims. It rejects
+algorithm indirection headers, validates actor/tenant/role syntax after signature
+verification, caches at most 64 keys, and refreshes once when a key ID rotates.
+JWKS reads are TLS-only, bounded, and redirect-free. Every rejection remains the
+same `authentication.invalid` response.
+
+The platform does not issue OIDC tokens. Customer issuer enrollment, claim
+mapping governance, MFA/session policy, revocation behavior, and workload
+identity configuration stay with the deployment's identity provider.

@@ -1,0 +1,13 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PolicyDecision",
+  "metadata": {
+    "tenantId": "local"
+  },
+  "spec": {
+    "inputDigest": "sha256:1696f67d38d941efbc00452d4d794f1b889552680381c08d7e215301eb93bac2",
+    "allowed": true,
+    "reasonCode": "policy.resource-read-allowed",
+    "policySnapshotRef": "policy://local/snapshots/bundle-42"
+  }
+}

@@ -44,6 +44,8 @@ from .models import (
     OtlpLogsEvidence,
     OtlpMetricsEvidence,
     PluginSession,
+    PolicyDecision,
+    PolicyDecisionRequest,
     ResourceCollectionRequest,
     ResourceCollectionResult,
     ResourceChangeEvidenceRequest,
@@ -101,6 +103,8 @@ __all__ = [
     "OtlpLogsEvidence",
     "OtlpMetricsEvidence",
     "PluginSession",
+    "PolicyDecision",
+    "PolicyDecisionRequest",
     "ResourceCollectionRequest",
     "ResourceCollectionResult",
     "ResourceChangeEvidenceRequest",
@@ -113,4 +117,4 @@ __all__ = [
     "TelemetryEvidenceRequest",
     "TelemetryEvidenceResult",
 ]
-__version__ = "0.18.0"
+__version__ = "0.19.0"

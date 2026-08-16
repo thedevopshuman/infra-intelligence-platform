@@ -205,7 +205,11 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | --- | --- | --- |
 | `IIP_HTTP_HOST` | `0.0.0.0` | Reference API bind address |
 | `IIP_HTTP_PORT` | `8080` | Reference API port |
+| `IIP_AUTH_MODE` | `local-hashed` | Authenticator selection: local hashed verifier or `oidc` |
 | `IIP_AUTH_IDENTITIES_JSON` | required by API startup | Local Bearer-token verifier identities; supply through protected runtime configuration |
+| `IIP_AUTH_OIDC_CONFIG_JSON` | required in `oidc` mode | HTTPS issuer/JWKS, audience, claim mapping, CA path, cache, and clock-skew bounds |
+| `IIP_POLICY_MODE` | `local` | Policy adapter selection: local reference rules or `external-http` |
+| `IIP_POLICY_CONFIG_JSON` | required in `external-http` mode | TLS endpoint, protected CA/token paths, timeout, and response-size bounds |
 | `IIP_CREDENTIAL_BROKER_MODE` | `static` | Provider credential resolution: provider-specific local `static` brokers or shared `external-http` client |
 | `IIP_CREDENTIAL_BROKER_CONFIG_JSON` | unset | Required non-secret HTTPS/trust/workload-token-path/lease bounds when external mode is selected |
 | `IIP_DATABASE_URL` | unset | Select the PostgreSQL profile when set |

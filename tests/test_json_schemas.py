@@ -528,6 +528,24 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("temporality" in error or "monotonic" in error for error in errors))
 
+    def test_policy_request_rejects_ambient_credentials(self) -> None:
+        request = document("contracts/examples/policy-decision-request.json")
+        request["spec"]["ambientCredentials"] = True
+
+        errors = self.validate("policy-decision-request.schema.json", request)
+
+        self.assertTrue(any("ambientCredentials" in error for error in errors))
+
+    def test_policy_decision_requires_canonical_digest_and_snapshot_shape(self) -> None:
+        decision = document("contracts/examples/policy-decision.json")
+        decision["spec"]["inputDigest"] = "sha256:not-a-digest"
+        decision["spec"]["policySnapshotRef"] = "https://policy.example/snapshot"
+
+        errors = self.validate("policy-decision.schema.json", decision)
+
+        self.assertTrue(any("inputDigest" in error for error in errors))
+        self.assertTrue(any("policySnapshotRef" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

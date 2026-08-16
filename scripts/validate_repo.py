@@ -24,12 +24,14 @@ REQUIRED_PATHS = (
     "docs/product/constitution.md",
     "docs/architecture/overview.md",
     "docs/architecture/authentication-boundary.md",
+    "docs/architecture/authorization-policy.md",
     "docs/architecture/evidence-collection-pipeline.md",
     "docs/architecture/ingestion-freshness-telemetry.md",
     "docs/architecture/opentelemetry-portability.md",
     "docs/research/opensre-reference-analysis.md",
     "docs/research/brand/README.md",
     "docs/roadmap/initial-roadmap.md",
+    "docs/specifications/policy-contract.md",
     "docs/decisions/0005-credential-derived-request-identity.md",
     "docs/decisions/0006-deterministic-investigation-and-dry-run-actions.md",
     "docs/decisions/0007-reconciliation-membership-and-tombstones.md",
@@ -59,6 +61,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0034-auditable-cross-signal-planning.md",
     "docs/decisions/0035-one-shot-action-execution.md",
     "docs/decisions/0036-request-scoped-kubernetes-restart.md",
+    "docs/decisions/0037-oidc-and-external-policy-boundaries.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/kubernetes-event-evidence.md",
@@ -80,6 +83,8 @@ REQUIRED_PATHS = (
     "contracts/schemas/action-workflow.schema.json",
     "contracts/schemas/action-workflow-page.schema.json",
     "contracts/schemas/plugin-session.schema.json",
+    "contracts/schemas/policy-decision-request.schema.json",
+    "contracts/schemas/policy-decision.schema.json",
     "contracts/schemas/resource-collection-request.schema.json",
     "contracts/schemas/resource-collection-result.schema.json",
     "contracts/schemas/resource-neighborhood.schema.json",
@@ -126,6 +131,8 @@ REQUIRED_PATHS = (
     "contracts/examples/action-workflow.json",
     "contracts/examples/action-workflow-page.json",
     "contracts/examples/plugin-session.json",
+    "contracts/examples/policy-decision-request.json",
+    "contracts/examples/policy-decision.json",
     "contracts/examples/investigation-request.json",
     "contracts/examples/investigation-request-kubernetes-events.json",
     "contracts/examples/investigation-request-logs.json",
@@ -189,6 +196,7 @@ REQUIRED_PATHS = (
     "src/iip/adapters/credential_broker.py",
     "src/iip/adapters/kubernetes_events.py",
     "src/iip/adapters/kubernetes_actions.py",
+    "src/iip/adapters/policy.py",
     "src/iip/application/query_actions.py",
     "src/iip/adapters/otlp_receiver.py",
     "src/iip/adapters/otlp_logs_receiver.py",
@@ -213,6 +221,7 @@ REQUIRED_PATHS = (
     "tests/test_kubernetes_actions.py",
     "tests/test_kubernetes_actions_integration.py",
     "tests/test_action_queries.py",
+    "tests/test_policy_adapter.py",
     "tests/test_kubernetes_events_integration.py",
     "tests/test_otlp_receiver.py",
     "tests/test_log_evidence.py",
@@ -2261,6 +2270,8 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("integration-config.json", "IntegrationConfig"),
         ("plugin-manifest.json", "Plugin"),
         ("plugin-session.json", "PluginSession"),
+        ("policy-decision-request.json", "PolicyDecisionRequest"),
+        ("policy-decision.json", "PolicyDecision"),
         ("evidence.json", "Evidence"),
         ("context-evidence-request.json", "ContextEvidenceRequest"),
         ("context-evidence-result.json", "ContextEvidenceResult"),
@@ -2330,6 +2341,26 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_otlp_metrics_evidence_example(documents, errors)
     validate_otlp_logs_evidence_example(documents, errors)
     validate_evaluation_scenario(documents, errors)
+
+    policy_request = documents.get(example_dir / "policy-decision-request.json")
+    policy_decision = documents.get(example_dir / "policy-decision.json")
+    if isinstance(policy_request, dict) and isinstance(policy_decision, dict):
+        request_metadata = policy_request.get("metadata", {})
+        request_spec = policy_request.get("spec", {})
+        decision_metadata = policy_decision.get("metadata", {})
+        decision_spec = policy_decision.get("spec", {})
+        resource = request_spec.get("resource", {})
+        tenant_id = request_metadata.get("tenantId")
+        if resource.get("tenantId") != tenant_id:
+            fail(errors, "policy request resource tenant must match its metadata tenant")
+        if decision_metadata.get("tenantId") != tenant_id:
+            fail(errors, "policy decision tenant must match its request")
+        if decision_spec.get("inputDigest") != canonical_digest(policy_request):
+            fail(errors, "policy decision inputDigest must match its canonical request")
+        if not str(decision_spec.get("policySnapshotRef", "")).startswith(
+            f"policy://{tenant_id}/snapshots/"
+        ):
+            fail(errors, "policy decision snapshot must belong to its request tenant")
 
     plugin_example = documents.get(example_dir / "plugin-manifest.json")
     plugin_package = documents.get(ROOT / "plugins/examples/kubernetes-observer/plugin.json")

@@ -84,6 +84,8 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "telemetry-evidence-result.schema.json": ("telemetry-evidence-result.json",),
     "plugin-manifest.schema.json": ("plugin-manifest.json",),
     "plugin-session.schema.json": ("plugin-session.json",),
+    "policy-decision-request.schema.json": ("policy-decision-request.json",),
+    "policy-decision.schema.json": ("policy-decision.json",),
     "page-info.schema.json": ("page-info.json",),
     "resource-collection-request.schema.json": ("resource-collection-request.json",),
     "resource-collection-result.schema.json": ("resource-collection-result.json",),

@@ -44,6 +44,8 @@ from infra_intelligence_sdk import (
     OtlpLogsEvidence,
     OtlpMetricsEvidence,
     PluginSession,
+    PolicyDecision,
+    PolicyDecisionRequest,
     ResourceCollectionRequest,
     ResourceCollectionResult,
     ResourceChangeEvidenceRequest,
@@ -136,6 +138,10 @@ class PublicContractSdkTests(unittest.TestCase):
             example("action-workflow-page.json")
         )
         plugin_session = PluginSession.from_dict(example("plugin-session.json"))
+        policy_request = PolicyDecisionRequest.from_dict(
+            example("policy-decision-request.json")
+        )
+        policy_decision = PolicyDecision.from_dict(example("policy-decision.json"))
         telemetry_request = TelemetryEvidenceRequest.from_dict(
             example("telemetry-evidence-request.json")
         )
@@ -279,6 +285,10 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         self.assertEqual(plugin_session.to_dict()["kind"], "PluginSession")
         self.assertEqual(
+            policy_request.to_dict()["kind"], "PolicyDecisionRequest"
+        )
+        self.assertEqual(policy_decision.to_dict()["kind"], "PolicyDecision")
+        self.assertEqual(
             telemetry_request.to_dict()["kind"], "TelemetryEvidenceRequest"
         )
         self.assertEqual(
@@ -376,6 +386,32 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
     def test_examples_satisfy_cross_contract_invariants(self) -> None:
         validate_repo.validate_examples(self.documents, self.errors)
         self.assertEqual(self.errors, [])
+
+    def test_policy_decision_rejects_stale_request_digest(self) -> None:
+        request_path = ROOT / "contracts" / "examples" / "policy-decision-request.json"
+        request = copy.deepcopy(self.documents[request_path])
+        request["spec"]["action"] = "resource:list"
+        self.documents[request_path] = request
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "policy decision inputDigest must match its canonical request",
+            self.errors,
+        )
+
+    def test_policy_contract_rejects_cross_tenant_examples(self) -> None:
+        request_path = ROOT / "contracts" / "examples" / "policy-decision-request.json"
+        request = copy.deepcopy(self.documents[request_path])
+        request["spec"]["resource"]["tenantId"] = "tenant-b"
+        self.documents[request_path] = request
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "policy request resource tenant must match its metadata tenant",
+            self.errors,
+        )
 
     def test_report_rejects_citation_outside_evidence_set(self) -> None:
         report_path = ROOT / "contracts" / "examples" / "investigation-report.json"

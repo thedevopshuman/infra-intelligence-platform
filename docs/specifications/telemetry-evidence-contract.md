@@ -33,6 +33,8 @@ The first version supports only `signal: metrics`. It intentionally avoids PromQ
 
 Backend adapters must either implement these semantics or fail with a stable provider-unavailable code. They must not silently reinterpret an unsupported function. A future signal type or richer operator requires an additive contract change and conformance tests.
 
+`eq` requires the attribute to equal the supplied value. `neq` requires the attribute to exist and differ from the supplied value; a missing attribute is not a match. This rule avoids backend-specific missing-label behavior.
+
 `timeRange.start` is inclusive and `timeRange.end` is inclusive. Application validation requires `start < end <= requestedAt`, a maximum seven-day range, and a deadline no more than five minutes after `requestedAt`.
 
 ## Bounds and output
@@ -70,4 +72,4 @@ The caller supplies upper bounds for series, total data points, decoded artifact
 | `408` | `evidence.deadline.exceeded` | The bounded collection deadline elapsed. |
 | `503` | `evidence.provider.unavailable` / `storage.unavailable` | The backend, validation/redaction boundary, or evidence store failed closed. |
 
-The local reference backend deliberately returns normalized `no-data`. It proves the complete authorization, adapter, artifact, storage, HTTP, and SDK boundary without pretending to be a production metrics system. A customer backend adapter replaces it at composition time.
+The default local backend deliberately returns normalized `no-data`. It proves the complete authorization, adapter, artifact, storage, HTTP, and SDK boundary without pretending to be a configured customer system. Selecting the Prometheus-compatible reference adapter at composition time enables real range queries through an allowlisted logical metric catalog; see the [operations guide](../operations/prometheus-evidence.md). Other customer backends replace the same application port without changing this contract.

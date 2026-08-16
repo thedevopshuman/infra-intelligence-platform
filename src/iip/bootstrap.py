@@ -231,6 +231,7 @@ def build_runtime_from_env() -> Runtime:
     telemetry_runtime = _otel_metrics_runtime_from_env()
     database_url = os.environ.get("IIP_DATABASE_URL")
     try:
+        telemetry_metrics_backend = _telemetry_metrics_backend_from_env()
         if not database_url:
             return build_local_runtime(
                 authenticator,
@@ -240,6 +241,7 @@ def build_runtime_from_env() -> Runtime:
                     if telemetry_runtime is not None
                     else None
                 ),
+                telemetry_metrics_backend=telemetry_metrics_backend,
                 telemetry_runtime=telemetry_runtime,
             )
         auto_migrate = (
@@ -254,6 +256,7 @@ def build_runtime_from_env() -> Runtime:
             ingestion_telemetry_sink=(
                 telemetry_runtime.sink if telemetry_runtime is not None else None
             ),
+            telemetry_metrics_backend=telemetry_metrics_backend,
             telemetry_runtime=telemetry_runtime,
         )
     except Exception:
@@ -318,3 +321,19 @@ def _otel_metrics_runtime_from_env() -> Any:
     return build_otlp_metrics_runtime(
         OtlpMetricsConfiguration.from_environment(os.environ)
     )
+
+
+def _telemetry_metrics_backend_from_env() -> TelemetryMetricsBackend | None:
+    backend = os.environ.get("IIP_TELEMETRY_METRICS_BACKEND", "no-data")
+    if backend == "no-data":
+        return None
+    if backend != "prometheus":
+        from iip.adapters.prometheus import PrometheusConfigurationError
+
+        raise PrometheusConfigurationError(
+            "telemetry.backend.configuration.invalid"
+        )
+
+    from iip.adapters.prometheus import build_prometheus_backend_from_environment
+
+    return build_prometheus_backend_from_environment(os.environ, SystemClock())

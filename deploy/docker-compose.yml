@@ -22,6 +22,9 @@ services:
       IIP_DATABASE_AUTO_MIGRATE: "true"
       IIP_AUTH_IDENTITIES_JSON: ${IIP_AUTH_IDENTITIES_JSON:?set IIP_AUTH_IDENTITIES_JSON}
       IIP_OTEL_METRICS_ENABLED: ${IIP_OTEL_METRICS_ENABLED:-false}
+      IIP_TELEMETRY_METRICS_BACKEND: ${IIP_TELEMETRY_METRICS_BACKEND:-no-data}
+      IIP_PROMETHEUS_INTEGRATIONS_JSON: ${IIP_PROMETHEUS_INTEGRATIONS_JSON:-}
+      IIP_PROMETHEUS_CREDENTIALS_JSON: ${IIP_PROMETHEUS_CREDENTIALS_JSON:-}
       IIP_OTEL_INGESTION_ATTRIBUTE_MODE: ${IIP_OTEL_INGESTION_ATTRIBUTE_MODE:-source}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
@@ -44,6 +47,20 @@ services:
       - ./otel/collector-test.yaml:/etc/otelcol/config.yaml:ro
     ports:
       - "127.0.0.1:14318:4318"
+
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    profiles: ["telemetry-query"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./prometheus/prometheus-test.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:19090:9090"
+    read_only: true
+    tmpfs:
+      - /prometheus:uid=65534,gid=65534,mode=0750
 
 volumes:
   postgres-data:

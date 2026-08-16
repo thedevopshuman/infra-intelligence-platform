@@ -39,7 +39,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "infra-intelligence.fullname" . }}
-          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret }}
+          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret .Values.telemetryEvidence.prometheus.credentialsExistingSecret }}
           env:
             {{- if .Values.database.existingSecret }}
             - name: IIP_DATABASE_URL
@@ -61,6 +61,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.telemetry.existingSecret | quote }}
                   key: {{ .Values.telemetry.headersSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.telemetryEvidence.prometheus.credentialsExistingSecret }}
+            - name: IIP_PROMETHEUS_CREDENTIALS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetryEvidence.prometheus.credentialsExistingSecret | quote }}
+                  key: {{ .Values.telemetryEvidence.prometheus.credentialsSecretKey | quote }}
             {{- end }}
           {{- end }}
           ports:

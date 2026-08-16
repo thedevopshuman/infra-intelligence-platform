@@ -34,6 +34,8 @@ Agents and plugins declare a maximum authority; request policy may reduce but ne
 - Revocation and rotation do not require rewriting manifests.
 - Plugin credentials are isolated from the control-plane process.
 
+The Prometheus telemetry-evidence reference implements the first `CredentialBroker` lease boundary. The adapter supplies authenticated tenant, actor, integration, provider, scope, reference, and deadline context; the returned bearer lease stays inside the adapter and has a redacted representation. Its static protected-JSON broker is for local proof only. Production still requires an external short-lived issuer and process/plugin isolation appropriate to the deployment.
+
 ## Agent and prompt threats
 
 - Retrieved content cannot alter system policy, tool allowlists, budgets, or approval requirements.

@@ -61,6 +61,13 @@ telemetry:
   existingSecret: ""
   headersSecretKey: otlp-headers
 
+telemetryEvidence:
+  backend: no-data
+  prometheus:
+    integrationsJson: '{"integrations":[]}'
+    credentialsExistingSecret: ""
+    credentialsSecretKey: prometheus-credentials-json
+
 resources:
   requests:
     cpu: 50m
@@ -88,6 +95,13 @@ networkPolicy:
       kubernetes.io/metadata.name: observability
     podSelector:
       app.kubernetes.io/name: opentelemetry-collector
+  prometheusEgress:
+    enabled: false
+    port: 9090
+    namespaceSelector:
+      kubernetes.io/metadata.name: observability
+    podSelector:
+      app.kubernetes.io/name: prometheus
 
 podDisruptionBudget:
   enabled: false

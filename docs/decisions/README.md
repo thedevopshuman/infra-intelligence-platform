@@ -18,3 +18,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0012](0012-opentelemetry-portability-boundary.md) | Accepted | OpenTelemetry is a replaceable telemetry interchange, not a storage or query authority |
 | [0013](0013-otlp-http-ingestion-metrics-export.md) | Accepted | Export bounded ingestion freshness measurements over optional, failure-isolated OTLP/HTTP |
 | [0014](0014-backend-neutral-telemetry-evidence-query.md) | Accepted | Normalize bounded historical metric queries behind a replaceable telemetry evidence port |
+| [0015](0015-prometheus-telemetry-evidence-adapter.md) | Accepted | Use an allowlisted Prometheus adapter with exact request-scoped credential resolution |

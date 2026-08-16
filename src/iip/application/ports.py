@@ -239,6 +239,34 @@ class TelemetryMetricsResult:
     warnings: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class CredentialLeaseRequest:
+    """Exact request scope supplied to a credential broker by an adapter."""
+
+    tenant_id: str
+    actor_id: str
+    integration_id: str
+    credential_ref: str
+    provider: str
+    scopes: tuple[str, ...]
+    deadline: str
+
+
+@dataclass(frozen=True, repr=False)
+class CredentialLease:
+    """Secret-bearing lease that must remain inside the requesting adapter."""
+
+    scheme: str
+    secret: str
+    expires_at: str | None = None
+
+    def __repr__(self) -> str:
+        return (
+            "CredentialLease(scheme="
+            f"{self.scheme!r}, secret=<redacted>, expires_at={self.expires_at!r})"
+        )
+
+
 class ResourceRepository(Protocol):
     def get(self, tenant_id: str, uid: str) -> Optional[Resource]:
         """Return a resource only from the requested tenant scope."""
@@ -405,6 +433,11 @@ class EvidenceProvider(Protocol):
 class TelemetryMetricsBackend(Protocol):
     def query_metrics(self, request: TelemetryMetricsQuery) -> TelemetryMetricsResult:
         """Query one configured backend without exposing credentials or vendor types."""
+
+
+class CredentialBroker(Protocol):
+    def resolve(self, request: CredentialLeaseRequest) -> CredentialLease:
+        """Issue one request-scoped credential lease to an adapter."""
 
 
 class EvidenceRedactor(Protocol):

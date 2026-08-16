@@ -4,7 +4,7 @@
 
 Infrastructure Intelligence Platform (IIP) is an architecture-first foundation for building a vendor-neutral control plane that understands infrastructure as a resource graph and event timeline, then lets governed agents investigate and act with evidence.
 
-This repository now contains an **executable local reference slice across Roadmap Phases 1–5**. It includes live Kubernetes reconciliation with per-type cursor resume and watch-expiration recovery, durable membership and tombstones, durable PostgreSQL resources/evidence/investigations/actions/audit, tenant-scoped projection verification and rebuild, measured full-schema backup/restore verification, measurable ingestion freshness/source lag with optional OTLP/HTTP metrics export, backend-neutral bounded metric evidence queries, deterministic evidence-backed investigation and evaluation, dry-run governed actions, and bounded plugin sessions. The local Phase 1 exit gate is complete, but the later phase exit gates are not: a production customer telemetry adapter or OTLP receiver, production telemetry/SLO windows, live mutation/rollback, isolated signed plugin execution, design-partner operation, and legal/brand decisions remain. It is not yet a production system.
+This repository now contains an **executable local reference slice across Roadmap Phases 1–5**. It includes live Kubernetes reconciliation with per-type cursor resume and watch-expiration recovery, durable membership and tombstones, durable PostgreSQL resources/evidence/investigations/actions/audit, tenant-scoped projection verification and rebuild, measured full-schema backup/restore verification, measurable ingestion freshness/source lag with optional OTLP/HTTP metrics export, backend-neutral bounded metric evidence queries with a real Prometheus-compatible adapter, deterministic evidence-backed investigation and evaluation, dry-run governed actions, and bounded plugin sessions. The local Phase 1 exit gate is complete, but the later phase exit gates are not: a production credential broker, inbound OTLP receiver, additional customer telemetry backends, production telemetry/SLO windows, live mutation/rollback, isolated signed plugin execution, design-partner operation, and legal/brand decisions remain. It is not yet a production system.
 
 ## Start here
 
@@ -25,6 +25,7 @@ make verify
 make test-postgres
 make test-backup-restore
 make test-otel
+make test-prometheus
 # With the local kind cluster and explicit kubeconfig:
 IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-live
 # Configure a local Bearer identity as described in docs/operations/local-development.md.
@@ -68,7 +69,7 @@ The API authenticates a Bearer credential into actor, tenant, and role context, 
 
 ## Current decisions and open questions
 
-Accepted foundations live in [`docs/decisions`](docs/decisions/README.md). PostgreSQL is accepted as the initial resource/event and operational record substrate, the deterministic investigator/dry-run action boundary is accepted as the safety baseline, and OTLP through an OpenTelemetry Collector is the accepted telemetry-portability direction. Optional outbound ingestion-metrics export and a replaceable historical metric-evidence query port are executable; a production backend adapter, inbound OTLP receiver, production export health, production identity, model, workflow/policy, credential-broker, plugin-runner, licensing, company, and brand decisions remain explicit roadmap work.
+Accepted foundations live in [`docs/decisions`](docs/decisions/README.md). PostgreSQL is accepted as the initial resource/event and operational record substrate, the deterministic investigator/dry-run action boundary is accepted as the safety baseline, and OTLP through an OpenTelemetry Collector is the accepted telemetry-portability direction. Optional outbound ingestion-metrics export, a replaceable historical metric-evidence query port, and its first Prometheus-compatible adapter are executable; an external short-lived credential broker, inbound OTLP receiver, additional production backends, production export health, production identity, model, workflow/policy, plugin-runner, licensing, company, and brand decisions remain explicit roadmap work.
 
 ## Licensing
 

@@ -1,0 +1,24 @@
+{
+  "integrations": [
+    {
+      "tenantId": "local",
+      "integrationId": "prometheus-local",
+      "provider": "prometheus",
+      "endpoint": "http://prometheus:9090",
+      "credentialRef": null,
+      "enabled": true,
+      "requestTimeoutSeconds": 10,
+      "maxResponseBytes": 1048576,
+      "metrics": [
+        {
+          "name": "platform.prometheus.up",
+          "backendMetric": "up",
+          "unit": "1",
+          "attributes": {
+            "service.name": "job"
+          }
+        }
+      ]
+    }
+  ]
+}

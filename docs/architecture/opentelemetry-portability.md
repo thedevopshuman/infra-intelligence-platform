@@ -41,7 +41,7 @@ Export is disabled by default, asynchronous, and observational. Endpoint unavail
 
 ## Customer telemetry evidence
 
-OTLP is a push/export protocol, not a historical query protocol. The first executable customer-telemetry boundary therefore addresses data already retained in a backend. `TelemetryEvidenceRequest` expresses one bounded metric selector, `TelemetryMetricsBackend` hides the vendor query/API, and the application validates a `TelemetryEvidenceResult` before storing it through the immutable Evidence pipeline. [ADR 0014](../decisions/0014-backend-neutral-telemetry-evidence-query.md) records the decision. The default no-data backend proves the boundary without claiming a configured customer system.
+OTLP is a push/export protocol, not a historical query protocol. The first executable customer-telemetry boundary therefore addresses data already retained in a backend. `TelemetryEvidenceRequest` expresses one bounded metric selector, `TelemetryMetricsBackend` hides the vendor query/API, and the application validates a `TelemetryEvidenceResult` before storing it through the immutable Evidence pipeline. [ADR 0014](../decisions/0014-backend-neutral-telemetry-evidence-query.md) records the contract decision. The default remains no-data; [ADR 0015](../decisions/0015-prometheus-telemetry-evidence-adapter.md) adds an explicitly selected Prometheus-compatible adapter with an allowlisted metric catalog and request-scoped credential resolution.
 
 An OTLP receiver can later accept a customer-selected stream and convert it into the same bounded, immutable telemetry evidence shape. It remains separate because channel authentication, tenant binding, admission control, and retention authority differ from a request/response backend query.
 
@@ -58,10 +58,10 @@ The first runtime implementation must define a receiver profile rather than acce
 ## Pending implementation decisions
 
 - whether pushed signals are retained by IIP, forwarded to customer storage, or use a hybrid policy;
-- the first production `TelemetryMetricsBackend` adapter and request-scoped credential flow;
+- the production external credential broker and additional `TelemetryMetricsBackend` adapters;
 - receiver topology and authentication for self-hosted, customer-hosted, and managed deployments;
 - retention, sampling, cardinality budgets, and regional/data-residency controls;
 - queue durability and the division of retry, batching, and delivery-health ownership between the official SDK and a sidecar/customer Collector;
 - the cadence and ownership of automatic freshness evaluation and production SLO windows.
 
-Receiver and production-backend decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, and SLO decisions belong to the Phase 3 operational-hardening gate. The current freshness API, outbound metric projection, and normalized historical-query boundary are deliberately useful before they are selected.
+Receiver, external-broker, and additional backend decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, and SLO decisions belong to the Phase 3 operational-hardening gate. The current freshness API, outbound metric projection, normalized historical-query boundary, and Prometheus reference adapter are deliberately useful before they are selected.

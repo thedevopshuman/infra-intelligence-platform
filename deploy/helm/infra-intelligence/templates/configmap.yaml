@@ -15,3 +15,5 @@ data:
   OTEL_METRIC_EXPORT_INTERVAL: {{ .Values.telemetry.exportIntervalMillis | quote }}
   OTEL_METRIC_EXPORT_TIMEOUT: {{ .Values.telemetry.exportTimeoutMillis | quote }}
   OTEL_SERVICE_NAME: {{ .Values.telemetry.serviceName | quote }}
+  IIP_TELEMETRY_METRICS_BACKEND: {{ .Values.telemetryEvidence.backend | quote }}
+  IIP_PROMETHEUS_INTEGRATIONS_JSON: {{ .Values.telemetryEvidence.prometheus.integrationsJson | quote }}

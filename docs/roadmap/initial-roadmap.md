@@ -57,7 +57,7 @@ Deliverables:
 
 Exit gate: target scenarios meet required evidence and root-cause scoring in repeated runs within declared latency and cost.
 
-Reference slice delivered: durable evidence artifacts, authenticated investigation POST/GET API, bounded deterministic agent, resource-state provider, backend-neutral metric evidence request/result contracts, a replaceable `TelemetryMetricsBackend` with an honest no-data reference implementation, authenticated metric-evidence collection API/SDK, structured root-cause taxonomy, citations, unknowns, recommendations, and zero-model cost ledger. Remaining: a production customer metric backend adapter and credential broker, OTLP receiver decision, Kubernetes events, logs, repository/runbook providers, investigation-driven telemetry selection, cancellation/crash recovery, redaction policy expansion, and a production model-provider decision.
+Reference slice delivered: durable evidence artifacts, authenticated investigation POST/GET API, bounded deterministic agent, resource-state provider, backend-neutral metric evidence request/result contracts, a replaceable `TelemetryMetricsBackend` with an honest no-data default and a real Prometheus-compatible adapter, exact request-scoped local credential resolution, authenticated metric-evidence collection API/SDK, structured root-cause taxonomy, citations, unknowns, recommendations, and zero-model cost ledger. Remaining: a production external credential broker, additional customer metric backends, OTLP receiver decision, Kubernetes events, logs, repository/runbook providers, investigation-driven telemetry selection, cancellation/crash recovery, redaction policy expansion, and a production model-provider decision.
 
 ## Phase 3 — evaluation and operational hardening
 
@@ -74,7 +74,7 @@ Deliverables:
 
 Exit gate: releases have comparable scorecards, and failures can be explained from platform telemetry.
 
-Reference slice delivered: deterministic weighted scorer, hard gates, budget checks, red-herring resistance, repeated-run harness, an optional OTLP/HTTP exporter for bounded ingestion-freshness metrics, and the normalized historical metric-evidence boundary. The OTLP/Collector portability direction is accepted in ADR 0012, the first outbound adapter in ADR 0013, and the backend-neutral evidence query in ADR 0014. Remaining: automatic signal sampling, traces/logs, production backend/receiver adapters, exporter-delivery health, durable buffering decisions, version dashboard, concurrency/noisy-neighbor/prompt-injection suites, expanded privacy controls, and measured release SLOs.
+Reference slice delivered: deterministic weighted scorer, hard gates, budget checks, red-herring resistance, repeated-run harness, an optional OTLP/HTTP exporter for bounded ingestion-freshness metrics, the normalized historical metric-evidence boundary, and a Docker-verified Prometheus query adapter. The OTLP/Collector portability direction is accepted in ADR 0012, the first outbound adapter in ADR 0013, the backend-neutral evidence query in ADR 0014, and the Prometheus translation boundary in ADR 0015. Remaining: automatic signal sampling, traces/logs, additional production backend/receiver adapters, exporter-delivery health, durable buffering decisions, version dashboard, concurrency/noisy-neighbor/prompt-injection suites, expanded privacy controls, and measured release SLOs.
 
 ## Phase 4 — governed actions and workflows
 

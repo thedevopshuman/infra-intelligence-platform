@@ -145,13 +145,19 @@ The supported local onboarding path generates 256-bit Bearer tokens for three se
 make dev-up
 ```
 
-This starts the API and PostgreSQL, waits for both health checks, and prints the console URL plus the `local-operator` token. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties; inspect the protected `.iip/local-credentials.json` only when exercising those workflows. Useful lifecycle commands are:
+This starts the API and PostgreSQL, waits for both health checks, and prints the console URL plus the `local-operator` token. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties. Run `make dev-credentials` when exercising the console approval workflow; that explicit command prints all three identities from the protected mode-`0600` file. Useful lifecycle commands are:
 
 ```bash
 make dev-status
 make dev-credentials
+make test-local-product
 make dev-down
 ```
+
+`make test-local-product` reads the protected local credentials without printing
+them and exercises the durable customer path end to end: resource ingestion,
+bounded investigation, immutable proposal, independent approval, one-shot
+dry-run execution, replay safety, and the paginated action queue.
 
 `dev-down` preserves the named PostgreSQL volume. The setup never deletes local state automatically. If manual environment control is needed instead, the Compose profile requires a local-only password supplied at runtime and never committed:
 

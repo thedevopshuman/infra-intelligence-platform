@@ -493,6 +493,21 @@ class JsonSchemaValidationTests(unittest.TestCase):
         errors = self.validate("action-result.schema.json", result)
         self.assertTrue(any("succeeded" in error for error in errors))
 
+    def test_action_workflow_state_requires_exact_record_set(self) -> None:
+        workflow = document("contracts/examples/action-workflow.json")
+        workflow["spec"]["state"] = "approved"
+
+        errors = self.validate("action-workflow.schema.json", workflow)
+
+        self.assertTrue(any("approval" in error for error in errors))
+
+        workflow = document("contracts/examples/action-workflow.json")
+        workflow["spec"]["approval"] = document(
+            "contracts/examples/action-approval.json"
+        )
+        errors = self.validate("action-workflow.schema.json", workflow)
+        self.assertTrue(errors)
+
     def test_otlp_gauge_prohibits_sum_semantics(self) -> None:
         result = document("contracts/examples/otlp-metrics-evidence.json")
         gauge = result["spec"]["series"][1]

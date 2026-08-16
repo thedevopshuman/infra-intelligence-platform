@@ -548,6 +548,7 @@ class AllowTenantPolicy:
             "action:approve",
             "action:execute",
             "action:propose",
+            "action:read",
             "evidence:collect",
             "ingestion-telemetry:read",
             "plugin:open-session",

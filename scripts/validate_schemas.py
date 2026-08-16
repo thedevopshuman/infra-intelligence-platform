@@ -33,6 +33,8 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "action-execution-status.schema.json": ("action-execution-status.json",),
     "action-proposal.schema.json": ("action-proposal.json",),
     "action-result.schema.json": ("action-result.json",),
+    "action-workflow.schema.json": ("action-workflow.json",),
+    "action-workflow-page.schema.json": ("action-workflow-page.json",),
     "agent-manifest.schema.json": ("agent-manifest.json",),
     "credential-lease-request.schema.json": ("credential-lease-request.json",),
     "credential-lease.schema.json": ("credential-lease.json",),

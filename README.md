@@ -22,9 +22,9 @@ Use Python 3.11 or newer. Verification dependencies and the PostgreSQL driver ar
 make dev-up
 ```
 
-The command creates protected local-only credentials under `.iip/`, builds and starts the API plus PostgreSQL, waits for readiness, and prints the operator token. Open [http://127.0.0.1:8080/console](http://127.0.0.1:8080/console) and enter that token. The browser console uses live tenant resources, graph/timeline queries, investigations, evidence, and action records; it does not display mock operational data.
+The command creates protected local-only credentials under `.iip/`, builds and starts the API plus PostgreSQL, waits for readiness, and prints the operator token. Open [http://127.0.0.1:8080/console](http://127.0.0.1:8080/console) and enter that token. The browser console uses live tenant resources, graph/timeline queries, investigations, evidence, and a paginated governed-action queue; it does not display mock operational data. Run `make dev-credentials` to exercise proposal, independent approval, and one-shot execution with the three separate local identities.
 
-Use `make dev-status` to inspect the containers, `make dev-credentials` to show the operator token again, and `make dev-down` to stop the stack while preserving its database.
+Use `make dev-status` to inspect the containers, `make dev-credentials` to show the separate operator, approver, and executor tokens, `make test-local-product` to exercise the complete durable customer workflow without printing credentials, and `make dev-down` to stop the stack while preserving its database.
 
 For repository verification and the isolated integration gates:
 

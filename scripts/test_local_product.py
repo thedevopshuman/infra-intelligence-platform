@@ -1,0 +1,255 @@
+#!/usr/bin/env python3
+"""Exercise the customer workflow against the running durable local stack."""
+
+from __future__ import annotations
+
+import json
+import secrets
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Mapping
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+
+ROOT = Path(__file__).resolve().parents[1]
+CREDENTIALS_PATH = ROOT / ".iip" / "local-credentials.json"
+BASE_URL = "http://127.0.0.1:8080"
+
+
+class ProductWorkflowError(RuntimeError):
+    """A stable local end-to-end gate failure."""
+
+
+def _credentials() -> dict[str, str]:
+    try:
+        document = json.loads(CREDENTIALS_PATH.read_text(encoding="utf-8"))
+        identities = document["identities"]
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise ProductWorkflowError(
+            "local credentials are unavailable; run make dev-up first"
+        ) from exc
+    tokens = {
+        str(identity.get("actorId")): str(identity.get("bearerToken"))
+        for identity in identities
+        if isinstance(identity, Mapping)
+    }
+    required = {"local-operator", "local-approver", "local-executor"}
+    if set(tokens).intersection(required) != required or any(
+        not tokens[actor] for actor in required
+    ):
+        raise ProductWorkflowError("local workflow identities are invalid")
+    return tokens
+
+
+def _request(
+    path: str,
+    token: str,
+    *,
+    method: str = "GET",
+    body: Mapping[str, object] | None = None,
+) -> Mapping[str, object]:
+    encoded = None
+    headers = {"Authorization": f"Bearer {token}"}
+    if body is not None:
+        encoded = json.dumps(body, separators=(",", ":")).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    request = Request(BASE_URL + path, data=encoded, headers=headers, method=method)
+    try:
+        with urlopen(request, timeout=15) as response:
+            result = json.load(response)
+    except HTTPError as exc:
+        try:
+            response = json.load(exc)
+            code = response.get("error", {}).get("code", "http.error")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            code = "http.error"
+        raise ProductWorkflowError(f"{method} {path} failed: {code}") from None
+    except (OSError, URLError) as exc:
+        raise ProductWorkflowError(f"{method} {path} could not reach the API") from exc
+    if not isinstance(result, Mapping):
+        raise ProductWorkflowError(f"{method} {path} returned an invalid document")
+    return result
+
+
+def _identifier(prefix: str) -> str:
+    return f"{prefix}_{secrets.token_hex(16)}"
+
+
+def main() -> int:
+    try:
+        tokens = _credentials()
+        operator = tokens["local-operator"]
+        approver = tokens["local-approver"]
+        executor = tokens["local-executor"]
+        now = datetime.now(timezone.utc)
+        suffix = secrets.token_hex(6)
+        workload_name = f"product-gate-{suffix}"
+        resource = _request(
+            "/v1/resources",
+            operator,
+            method="POST",
+            body={
+                "apiVersion": "iip.platform/v1alpha1",
+                "kind": "Resource",
+                "metadata": {
+                    "tenantId": "local",
+                    "observedAt": now.isoformat().replace("+00:00", "Z"),
+                    "observation": {
+                        "sourceId": "kubernetes-local",
+                        "streamId": _identifier("obs"),
+                        "sequence": int(now.timestamp() * 1000),
+                        "mode": "incremental",
+                        "resourceVersion": str(int(now.timestamp() * 1000)),
+                    },
+                    "labels": {"environment": "local-product-gate"},
+                },
+                "spec": {
+                    "provider": "kubernetes",
+                    "type": "apps/deployment",
+                    "externalId": f"cluster-local/default/{workload_name}",
+                    "displayName": workload_name,
+                    "attributes": {
+                        "namespace": "default",
+                        "providerUid": secrets.token_hex(16),
+                        "replicas": 2,
+                        "availableReplicas": 1,
+                    },
+                    "relationships": [],
+                },
+                "status": {"health": "degraded", "lifecycle": "active"},
+            },
+        )
+        resource_uid = str(resource.get("metadata", {}).get("uid", ""))
+        if not resource_uid.startswith("res_"):
+            raise ProductWorkflowError("resource ingestion did not return a canonical UID")
+
+        investigation_id = _identifier("inv")
+        question = f"Why is {workload_name} degraded?"
+        report = _request(
+            "/v1/investigations",
+            operator,
+            method="POST",
+            body={
+                "apiVersion": "iip.platform/v1alpha1",
+                "kind": "InvestigationRequest",
+                "metadata": {
+                    "id": investigation_id,
+                    "tenantId": "local",
+                    "actorId": "local-operator",
+                    "requestedAt": now.isoformat().replace("+00:00", "Z"),
+                    "correlationId": f"local-product-gate-{suffix}",
+                },
+                "spec": {
+                    "question": question,
+                    "trigger": {
+                        "type": "user",
+                        "source": "urn:iip:local-product-gate",
+                        "summary": question,
+                    },
+                    "scope": {
+                        "resourceUids": [resource_uid],
+                        "timeRange": {
+                            "start": (now - timedelta(hours=1))
+                            .isoformat()
+                            .replace("+00:00", "Z"),
+                            "end": now.isoformat().replace("+00:00", "Z"),
+                        },
+                    },
+                    "agentSelector": {
+                        "id": "incident-investigator",
+                        "version": "0.1.0",
+                    },
+                    "evidenceTypes": ["kubernetes.resource-status"],
+                    "allowedTools": ["resources/query", "evidence/fetch"],
+                    "budgets": {
+                        "maxToolCalls": 8,
+                        "maxWallTimeSeconds": 120,
+                        "maxModelTokens": 0,
+                        "maxCostUsd": 0,
+                        "maxEvidenceItems": 16,
+                        "maxIterations": 8,
+                    },
+                    "maxAuthority": "propose",
+                    "priority": "normal",
+                },
+            },
+        )
+        if report.get("kind") != "InvestigationReport":
+            raise ProductWorkflowError("investigation did not return a terminal report")
+
+        proposal = _request(
+            "/v1/actions/proposals",
+            operator,
+            method="POST",
+            body={
+                "investigationId": investigation_id,
+                "actionType": "kubernetes.restart-workload",
+                "targetResourceUid": resource_uid,
+                "parameters": {
+                    "namespace": "default",
+                    "workloadKind": "deployment",
+                    "workloadName": workload_name,
+                },
+                "idempotencyKey": f"local-product-gate-{suffix}",
+                "expiresAt": (now + timedelta(minutes=30))
+                .isoformat()
+                .replace("+00:00", "Z"),
+                "dryRun": True,
+            },
+        )
+        proposal_id = str(proposal.get("metadata", {}).get("id", ""))
+        if not proposal_id.startswith("act_"):
+            raise ProductWorkflowError("proposal did not return an action ID")
+
+        _request(
+            f"/v1/actions/{proposal_id}/decision",
+            approver,
+            method="POST",
+            body={
+                "decision": "approved",
+                "rationale": "The product gate is scoped, reversible, and non-mutating.",
+            },
+        )
+        result = _request(
+            f"/v1/actions/{proposal_id}/execute",
+            executor,
+            method="POST",
+            body={},
+        )
+        replay = _request(
+            f"/v1/actions/{proposal_id}/execute",
+            executor,
+            method="POST",
+            body={},
+        )
+        workflow = _request(
+            f"/v1/actions/{proposal_id}/workflow",
+            operator,
+        )
+        page = _request("/v1/actions?limit=100", operator)
+        item_ids = {
+            str(item.get("metadata", {}).get("id", ""))
+            for item in page.get("spec", {}).get("items", [])
+            if isinstance(item, Mapping)
+        }
+        if result != replay:
+            raise ProductWorkflowError("duplicate execution did not return the same result")
+        if workflow.get("spec", {}).get("state") != "dry-run":
+            raise ProductWorkflowError("workflow did not reach the dry-run terminal state")
+        if proposal_id not in item_ids:
+            raise ProductWorkflowError("terminal workflow is missing from the action queue")
+        print(
+            "local product workflow passed: resource → investigation → proposal → "
+            "independent approval → one-shot dry-run → queue"
+        )
+        print(f"action: {proposal_id}")
+        return 0
+    except ProductWorkflowError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -119,14 +119,17 @@ def compose(arguments: Sequence[str]) -> None:
         raise RuntimeError(f"Docker Compose failed with exit code {exc.returncode}") from exc
 
 
-def print_operator_credential() -> None:
+def print_credentials(*, include_workflow_identities: bool = False) -> None:
     document = load_credentials()
     identities = document.get("identities")
     if not isinstance(identities, list) or not identities or not isinstance(identities[0], dict):
         raise RuntimeError("local credentials are invalid")
-    operator = identities[0]
     print(f"Console: {document.get('consoleUrl')}")
-    print(f"Operator Bearer token: {operator.get('bearerToken')}")
+    visible = identities if include_workflow_identities else identities[:1]
+    for identity in visible:
+        actor_id = identity.get("actorId")
+        roles = ", ".join(identity.get("roles", []))
+        print(f"{actor_id} ({roles}) Bearer token: {identity.get('bearerToken')}")
     print(f"Protected credentials: {CREDENTIALS_PATH}")
 
 
@@ -138,20 +141,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "init":
             _, _, created = create_local_configuration()
             print("Created protected local configuration." if created else "Local configuration already exists.")
-            print_operator_credential()
+            print_credentials()
         elif args.command == "up":
             _, _, created = create_local_configuration()
             if created:
                 print("Created protected local configuration.")
             compose(("up", "--build", "--detach", "--wait", "--wait-timeout", "180"))
             print("Infrastructure Intelligence local stack is ready in Docker Desktop.")
-            print_operator_credential()
+            print_credentials()
         elif args.command == "status":
             if not ENV_PATH.is_file():
                 raise RuntimeError("local configuration does not exist; run make dev-up first")
             compose(("ps",))
         elif args.command == "credentials":
-            print_operator_credential()
+            print_credentials(include_workflow_identities=True)
         else:
             if not ENV_PATH.is_file():
                 raise RuntimeError("local configuration does not exist; nothing to stop")

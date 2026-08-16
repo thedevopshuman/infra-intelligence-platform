@@ -6,6 +6,9 @@ const state = {
   resources: [],
   investigations: [],
   evidence: [],
+  actionWorkflows: [],
+  actionCursor: null,
+  selectedActionId: null,
   activeInvestigationId: null,
 };
 
@@ -94,6 +97,7 @@ function switchView(name) {
   $("#page-title").textContent = target.dataset.title;
   $("#page-eyebrow").textContent = target.dataset.eyebrow;
   window.scrollTo({ top: 0, behavior: "smooth" });
+  if (name === "actions" && state.token) refreshActions();
 }
 
 function updateIdentity() {
@@ -116,7 +120,7 @@ async function connect(token, remember) {
     if (remember) sessionStorage.setItem("iip.console.token", token);
     else sessionStorage.removeItem("iip.console.token");
     updateIdentity();
-    await refreshResources();
+    await Promise.all([refreshResources(), refreshActions()]);
     $("#connection-dialog").close();
     $("#connection-error").hidden = true;
     showNotice(`Connected as ${state.session.metadata.actorId} in tenant ${state.session.metadata.tenantId}.`);
@@ -204,19 +208,28 @@ function renderMetrics() {
 }
 
 function renderResourceOptions() {
-  const select = $("#investigation-resource");
-  const selected = select.value;
-  clear(select);
-  const placeholder = node("option", "", state.resources.length ? "Choose a resource" : "No resources available");
-  placeholder.value = "";
-  select.append(placeholder);
-  state.resources.forEach((resource) => {
-    if (!resource.metadata.uid) return;
-    const option = node("option", "", `${resourceName(resource)} · ${resource.spec.type}`);
-    option.value = resource.metadata.uid;
-    select.append(option);
+  const targets = [
+    [$("#investigation-resource"), state.resources, "Choose a resource"],
+    [
+      $("#action-resource"),
+      state.resources.filter((resource) => resource.spec.provider === "kubernetes" && ["apps/deployment", "apps/statefulset", "apps/daemonset"].includes(resource.spec.type)),
+      "Choose an observed Kubernetes workload",
+    ],
+  ];
+  targets.forEach(([select, resources, prompt]) => {
+    const selected = select.value;
+    clear(select);
+    const placeholder = node("option", "", resources.length ? prompt : "No eligible resources available");
+    placeholder.value = "";
+    select.append(placeholder);
+    resources.forEach((resource) => {
+      if (!resource.metadata.uid) return;
+      const option = node("option", "", `${resourceName(resource)} · ${resource.spec.type}`);
+      option.value = resource.metadata.uid;
+      select.append(option);
+    });
+    if ([...select.options].some((option) => option.value === selected)) select.value = selected;
   });
-  if ([...select.options].some((option) => option.value === selected)) select.value = selected;
 }
 
 function showDetail(title, kicker, payload) {
@@ -308,6 +321,13 @@ async function addDemoResource() {
     metadata: {
       tenantId: state.session.metadata.tenantId,
       observedAt: now,
+      observation: {
+        sourceId: "kubernetes-local",
+        streamId: "obs_c0dec0dec0dec0dec0dec0dec0dec0de",
+        sequence: Date.now(),
+        mode: "incremental",
+        resourceVersion: String(Date.now()),
+      },
       labels: { environment: "local-demo", team: "platform" },
     },
     spec: {
@@ -320,8 +340,6 @@ async function addDemoResource() {
     },
     status: { health: "degraded", lifecycle: "active" },
   };
-  state.activeInvestigationId = payload.metadata.id;
-  $("#cancel-investigation").hidden = false;
   try {
     await api("/v1/resources", { method: "POST", body: JSON.stringify(payload) });
     await refreshResources();
@@ -329,10 +347,6 @@ async function addDemoResource() {
   } catch (error) {
     showNotice(`Could not add the demo resource (${error.message}).`, "error");
   } finally {
-    state.activeInvestigationId = null;
-    $("#cancel-investigation").hidden = true;
-    $("#cancel-investigation").disabled = false;
-    $("#cancel-investigation").textContent = "Cancel safely";
     button.disabled = false;
   }
 }
@@ -478,9 +492,15 @@ async function runInvestigation(event) {
       priority: "normal",
     },
   };
+  state.activeInvestigationId = payload.metadata.id;
+  $("#cancel-investigation").hidden = false;
   try {
     const report = await api("/v1/investigations", { method: "POST", body: JSON.stringify(payload) });
     state.investigations.unshift(report);
+    if (payload.spec.maxAuthority === "propose") {
+      $("#action-investigation-id").value = report.metadata.id;
+      $("#action-resource").value = resourceUid;
+    }
     renderInvestigation(report);
     renderMetrics();
     showNotice("Investigation completed and its terminal report was committed.");
@@ -489,6 +509,10 @@ async function runInvestigation(event) {
     $("#investigation-state").className = "status-chip danger";
     showNotice(`Investigation failed (${error.message}).`, "error");
   } finally {
+    state.activeInvestigationId = null;
+    $("#cancel-investigation").hidden = true;
+    $("#cancel-investigation").disabled = false;
+    $("#cancel-investigation").textContent = "Cancel safely";
     button.disabled = false;
     button.textContent = "Run investigation";
   }
@@ -526,22 +550,201 @@ async function lookupEvidence(id) {
   }
 }
 
-async function lookupAction(id) {
+function hasRole(role) {
+  return Boolean(state.session?.spec?.roles?.includes(role));
+}
+
+function actionStatusClass(value) {
+  if (["succeeded", "dry-run", "approved"].includes(value)) return "success";
+  if (["failed", "rejected", "denied", "manual-reconciliation-required"].includes(value)) return "danger";
+  return "warning";
+}
+
+function renderActionRows() {
+  const body = $("#action-rows");
+  clear(body);
+  state.actionWorkflows.forEach((workflow) => {
+    const proposal = workflow.spec.proposal;
+    const row = node("tr");
+    const identity = node("td");
+    identity.append(node("strong", "", proposal.spec.actionType));
+    identity.append(node("small", "", workflow.metadata.id));
+    row.append(identity);
+    const stateCell = node("td");
+    stateCell.append(node("span", `status-chip ${actionStatusClass(workflow.spec.state)}`, workflow.spec.state));
+    row.append(stateCell);
+    row.append(node("td", "", proposal.spec.parameters.workloadName));
+    row.append(node("td", "", proposal.spec.dryRun ? "Dry-run" : "Live"));
+    row.append(node("td", "", formatDate(proposal.metadata.createdAt)));
+    const actions = node("td", "row-actions");
+    const open = node("button", "text-button", "Review →");
+    open.type = "button";
+    open.addEventListener("click", () => selectAction(workflow.metadata.id));
+    actions.append(open);
+    row.append(actions);
+    body.append(row);
+  });
+  $("#action-empty").hidden = state.actionWorkflows.length !== 0;
+  $("#action-load-more").hidden = !state.actionCursor;
+}
+
+function renderActionWorkflow(workflow) {
+  state.selectedActionId = workflow.metadata.id;
+  const { proposal, approval, executionStatus, result, state: workflowState } = workflow.spec;
+  const stateChip = $("#action-state");
+  stateChip.textContent = workflowState;
+  stateChip.className = `status-chip ${actionStatusClass(workflowState)}`;
+  renderLookup($("#action-result"), [
+    ["Action ID", workflow.metadata.id],
+    ["Proposer", proposal.metadata.actorId],
+    ["Investigation", proposal.spec.investigationId],
+    ["Target", `${proposal.spec.parameters.namespace}/${proposal.spec.parameters.workloadKind}/${proposal.spec.parameters.workloadName}`],
+    ["Mode", proposal.spec.dryRun ? "Non-mutating dry-run" : "Explicit live request"],
+    ["Risk / reversible", `${proposal.spec.risk} / ${String(proposal.spec.reversible)}`],
+    ["Expires", formatDate(proposal.spec.expiresAt)],
+    ["Decision", approval ? `${approval.spec.decision} by ${approval.metadata.approverId}` : "Pending independent review"],
+    ["Rationale", approval?.spec?.rationale || "—"],
+    ["Executor", executionStatus?.spec?.executorActorId || "—"],
+    ["Verification", result?.spec?.verification?.summary || executionStatus?.spec?.summary || "Not run"],
+    ["Error code", result?.spec?.errorCode || "—"],
+    ["Rollback", result?.spec?.rollback ? `${result.spec.rollback.status}: ${result.spec.rollback.summary}` : "—"],
+    ["Audit reference", result?.spec?.auditRef || "Pending"],
+  ]);
+
+  const canDecide = workflowState === "pending-approval" && hasRole("approver") && proposal.metadata.actorId !== state.session.metadata.actorId;
+  const canExecute = workflowState === "approved" && hasRole("executor");
+  $("#action-controls").hidden = false;
+  $("#action-rationale-label").hidden = !canDecide;
+  $("#action-approve").hidden = !canDecide;
+  $("#action-reject").hidden = !canDecide;
+  $("#action-execute").hidden = !canExecute;
+  const help = $("#action-role-help");
+  if (canDecide) help.textContent = "Your approver role can decide this proposal. The proposer cannot self-approve.";
+  else if (canExecute) help.textContent = "Your executor role can claim this approved operation exactly once.";
+  else if (workflowState === "pending-approval" && proposal.metadata.actorId === state.session.metadata.actorId) help.textContent = "Connect with a different approver identity to preserve separation of duties.";
+  else if (workflowState === "pending-approval") help.textContent = "Connect with an approver identity to review this proposal.";
+  else if (workflowState === "approved") help.textContent = "Connect with an executor identity to run this approved operation once.";
+  else help.textContent = "This workflow is immutable at its current terminal or non-actionable state.";
+}
+
+async function refreshActions(append = false) {
+  if (!state.token) return;
   try {
-    const action = await api(`/v1/actions/${encodeURIComponent(id)}`);
-    const status = action.status || action.spec?.outcome || "unknown";
-    renderLookup($("#action-result"), [
-      ["Action ID", action.metadata.id],
-      ["Kind", action.kind],
-      ["State", status],
-      ["Tenant", action.metadata.tenantId],
-      ["Action type", action.spec?.actionType || "—"],
-      ["Target", action.spec?.targetResourceUid || "—"],
-      ["Dry run", action.spec?.dryRun === undefined ? "—" : String(action.spec.dryRun)],
-      ["Audit reference", action.spec?.auditRef || "Pending"],
-    ]);
+    const query = new URLSearchParams({ limit: "25" });
+    if (append && state.actionCursor) query.set("cursor", state.actionCursor);
+    const page = await api(`/v1/actions?${query}`);
+    const incoming = Array.isArray(page.spec?.items) ? page.spec.items : [];
+    if (append) {
+      const known = new Set(state.actionWorkflows.map((item) => item.metadata.id));
+      state.actionWorkflows.push(...incoming.filter((item) => !known.has(item.metadata.id)));
+    } else {
+      state.actionWorkflows = incoming;
+    }
+    state.actionCursor = page.spec?.page?.nextCursor || null;
+    renderActionRows();
+    const selected = state.actionWorkflows.find((item) => item.metadata.id === state.selectedActionId);
+    if (selected) renderActionWorkflow(selected);
+  } catch (error) {
+    showNotice(`Action queue refresh failed (${error.message}).`, "error");
+  }
+}
+
+async function selectAction(id) {
+  try {
+    const workflow = await api(`/v1/actions/${encodeURIComponent(id)}/workflow`);
+    const index = state.actionWorkflows.findIndex((item) => item.metadata.id === id);
+    if (index >= 0) state.actionWorkflows[index] = workflow;
+    else state.actionWorkflows.unshift(workflow);
+    renderActionRows();
+    renderActionWorkflow(workflow);
   } catch (error) {
     showNotice(`Action lookup failed (${error.message}).`, "error");
+  }
+}
+
+async function proposeAction(event) {
+  event.preventDefault();
+  const resource = state.resources.find((item) => item.metadata.uid === $("#action-resource").value);
+  const investigationId = $("#action-investigation-id").value.trim();
+  if (!resource || !investigationId) return;
+  const workloadKinds = {
+    "apps/deployment": "deployment",
+    "apps/statefulset": "statefulset",
+    "apps/daemonset": "daemonset",
+  };
+  const workloadKind = workloadKinds[resource.spec.type];
+  const namespace = resource.spec.attributes?.namespace;
+  const workloadName = resource.spec.externalId?.split("/").pop();
+  if (!workloadKind || typeof namespace !== "string" || !workloadName) {
+    showNotice("The selected resource does not have a safe Kubernetes workload identity.", "error");
+    return;
+  }
+  const button = event.submitter;
+  button.disabled = true;
+  button.textContent = "Creating immutable proposal…";
+  const expiresAt = new Date(Date.now() + 30 * 60_000).toISOString();
+  const payload = {
+    investigationId,
+    actionType: "kubernetes.restart-workload",
+    targetResourceUid: resource.metadata.uid,
+    parameters: { namespace, workloadKind, workloadName },
+    idempotencyKey: `console-${investigationId.slice(4, 12)}-${identifier("act", 16)}`,
+    expiresAt,
+    dryRun: $("#action-dry-run").checked,
+  };
+  try {
+    const proposal = await api("/v1/actions/proposals", { method: "POST", body: JSON.stringify(payload) });
+    await refreshActions();
+    await selectAction(proposal.metadata.id);
+    showNotice("Proposal committed. A different approver identity can now review it.");
+  } catch (error) {
+    showNotice(`Proposal failed (${error.message}).`, "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Create proposal";
+  }
+}
+
+async function decideSelectedAction(decision) {
+  const rationale = $("#action-rationale").value.trim();
+  if (!state.selectedActionId || !rationale) {
+    showNotice("A concise approval rationale is required.", "error");
+    return;
+  }
+  const buttons = [$("#action-approve"), $("#action-reject")];
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    await api(`/v1/actions/${encodeURIComponent(state.selectedActionId)}/decision`, {
+      method: "POST",
+      body: JSON.stringify({ decision, rationale }),
+    });
+    $("#action-rationale").value = "";
+    await selectAction(state.selectedActionId);
+    showNotice(`Proposal ${decision}. The immutable decision is now part of the workflow.`);
+  } catch (error) {
+    showNotice(`Decision failed (${error.message}).`, "error");
+  } finally {
+    buttons.forEach((button) => { button.disabled = false; });
+  }
+}
+
+async function executeSelectedAction() {
+  if (!state.selectedActionId) return;
+  const button = $("#action-execute");
+  button.disabled = true;
+  button.textContent = "Claiming once…";
+  try {
+    await api(`/v1/actions/${encodeURIComponent(state.selectedActionId)}/execute`, {
+      method: "POST",
+      body: "{}",
+    });
+    await selectAction(state.selectedActionId);
+    showNotice("Execution reached a durable terminal result. Duplicate delivery cannot repeat impact.");
+  } catch (error) {
+    showNotice(`Execution failed (${error.message}).`, "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Execute once";
   }
 }
 
@@ -551,7 +754,7 @@ function bindEvents() {
   $("#identity-button").addEventListener("click", () => $("#connection-dialog").showModal());
   $("#connection-close").addEventListener("click", () => $("#connection-dialog").close());
   $("#refresh-button").addEventListener("click", async () => {
-    await Promise.all([checkHealth(), refreshResources()]);
+    await Promise.all([checkHealth(), refreshResources(), refreshActions()]);
     showNotice("Live platform state refreshed.");
   });
   $("#connection-form").addEventListener("submit", async (event) => {
@@ -578,10 +781,12 @@ function bindEvents() {
     event.preventDefault();
     lookupEvidence($("#evidence-id").value.trim());
   });
-  $("#action-form").addEventListener("submit", (event) => {
-    event.preventDefault();
-    lookupAction($("#action-id").value.trim());
-  });
+  $("#action-proposal-form").addEventListener("submit", proposeAction);
+  $("#action-refresh").addEventListener("click", () => refreshActions());
+  $("#action-load-more").addEventListener("click", () => refreshActions(true));
+  $("#action-approve").addEventListener("click", () => decideSelectedAction("approved"));
+  $("#action-reject").addEventListener("click", () => decideSelectedAction("rejected"));
+  $("#action-execute").addEventListener("click", executeSelectedAction);
   $("#detail-close").addEventListener("click", () => $("#detail-dialog").close());
 }
 

@@ -7,6 +7,8 @@ from .models import (
     ActionExecutionStatus,
     ActionProposal,
     ActionResult,
+    ActionWorkflow,
+    ActionWorkflowPage,
     ContextEvidenceRequest,
     ContextEvidenceResult,
     Evidence,
@@ -60,6 +62,8 @@ __all__ = [
     "ActionExecutionStatus",
     "ActionProposal",
     "ActionResult",
+    "ActionWorkflow",
+    "ActionWorkflowPage",
     "ApiError",
     "Client",
     "ContextEvidenceRequest",
@@ -109,4 +113,4 @@ __all__ = [
     "TelemetryEvidenceRequest",
     "TelemetryEvidenceResult",
 ]
-__version__ = "0.17.0"
+__version__ = "0.18.0"

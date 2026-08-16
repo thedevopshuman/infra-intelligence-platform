@@ -11,6 +11,8 @@ from infra_intelligence_sdk import (
     ActionExecutionStatus,
     ActionProposal,
     ActionResult,
+    ActionWorkflow,
+    ActionWorkflowPage,
     ContextEvidenceRequest,
     ContextEvidenceResult,
     Evidence,
@@ -129,6 +131,10 @@ class PublicContractSdkTests(unittest.TestCase):
             example("action-execution-status.json")
         )
         action_result = ActionResult.from_dict(example("action-result.json"))
+        action_workflow = ActionWorkflow.from_dict(example("action-workflow.json"))
+        action_workflow_page = ActionWorkflowPage.from_dict(
+            example("action-workflow-page.json")
+        )
         plugin_session = PluginSession.from_dict(example("plugin-session.json"))
         telemetry_request = TelemetryEvidenceRequest.from_dict(
             example("telemetry-evidence-request.json")
@@ -267,6 +273,10 @@ class PublicContractSdkTests(unittest.TestCase):
             execution_status.to_dict()["kind"], "ActionExecutionStatus"
         )
         self.assertEqual(action_result.to_dict()["kind"], "ActionResult")
+        self.assertEqual(action_workflow.to_dict()["kind"], "ActionWorkflow")
+        self.assertEqual(
+            action_workflow_page.to_dict()["kind"], "ActionWorkflowPage"
+        )
         self.assertEqual(plugin_session.to_dict()["kind"], "PluginSession")
         self.assertEqual(
             telemetry_request.to_dict()["kind"], "TelemetryEvidenceRequest"

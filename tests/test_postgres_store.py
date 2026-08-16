@@ -692,6 +692,30 @@ class PostgresOperationalStoreTests(unittest.TestCase):
             reconnected.get_action_result(actor, proposal["metadata"]["id"]),
             result,
         )
+        workflow = reconnected.get_action_workflow(
+            actor, proposal["metadata"]["id"]
+        )
+        self.assertIsNotNone(workflow)
+        self.assertEqual(workflow.proposal, proposal)
+        self.assertEqual(workflow.approval, approval)
+        self.assertEqual(workflow.execution_status, terminal_status)
+        self.assertEqual(workflow.result, result)
+        page = reconnected.list_action_workflows(
+            actor,
+            before_created_at=None,
+            before_proposal_id=None,
+            limit=2,
+        )
+        self.assertEqual(page, (workflow,))
+        self.assertEqual(
+            reconnected.list_action_workflows(
+                ActorContext("other", "another-tenant"),
+                before_created_at=None,
+                before_proposal_id=None,
+                limit=2,
+            ),
+            (),
+        )
 
     def test_investigation_lifecycle_is_durable_and_transitions_atomically(self) -> None:
         actor = ActorContext("developer", "local")

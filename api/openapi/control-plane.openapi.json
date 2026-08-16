@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.15.0",
+    "version": "0.16.0",
     "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, Kubernetes Event, resource-change, and repository/runbook context evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven evidence assessment, governed actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -416,6 +416,23 @@
         }
       }
     },
+    "/v1/actions": {
+      "get": {
+        "operationId": "listActionWorkflows",
+        "description": "List newest governed action workflows from one tenant-consistent read model. Each item reconstructs its immutable proposal and any approval, one-shot execution lifecycle, and terminal result.",
+        "parameters": [
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}},
+          {"name": "cursor", "in": "query", "schema": {"type": "string", "pattern": "^p1\\.[A-Za-z0-9_-]+$", "maxLength": 2048}}
+        ],
+        "responses": {
+          "200": {"description": "Tenant-scoped action workflow page", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/action-workflow-page.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
     "/v1/actions/proposals": {
       "post": {
         "operationId": "proposeAction",
@@ -469,6 +486,21 @@
         "responses": {
           "200": {"description": "Proposal, one-shot execution lifecycle, or terminal result", "content": {"application/json": {"schema": {"oneOf": [{"$ref": "../../contracts/schemas/action-proposal.schema.json"}, {"$ref": "../../contracts/schemas/action-execution-status.schema.json"}, {"$ref": "../../contracts/schemas/action-result.schema.json"}]}}}},
           "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/actions/{proposalId}/workflow": {
+      "get": {
+        "operationId": "getActionWorkflow",
+        "description": "Get one tenant-scoped action read model reconstructed from a consistent proposal, approval, execution, and result snapshot.",
+        "parameters": [{"name": "proposalId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^act_[a-f0-9]{32}$"}}],
+        "responses": {
+          "200": {"description": "Reconstructed governed action workflow", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/action-workflow.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
           "404": {"$ref": "#/components/responses/ResourceNotFound"},
           "503": {"$ref": "#/components/responses/StorageUnavailable"}
         }
@@ -548,6 +580,8 @@
       "ActionApproval": {"$ref": "../../contracts/schemas/action-approval.schema.json"},
       "ActionExecutionStatus": {"$ref": "../../contracts/schemas/action-execution-status.schema.json"},
       "ActionResult": {"$ref": "../../contracts/schemas/action-result.schema.json"},
+      "ActionWorkflow": {"$ref": "../../contracts/schemas/action-workflow.schema.json"},
+      "ActionWorkflowPage": {"$ref": "../../contracts/schemas/action-workflow-page.schema.json"},
       "PluginSession": {"$ref": "../../contracts/schemas/plugin-session.schema.json"},
       "Error": {"$ref": "../../contracts/schemas/error.schema.json"}
     },

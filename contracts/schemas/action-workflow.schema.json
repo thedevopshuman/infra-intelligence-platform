@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:action-workflow:v1alpha1",
+  "title": "Infrastructure Intelligence Action Workflow",
+  "description": "A tenant-scoped read model that reconstructs one governed action from its immutable proposal, approval, one-shot execution lifecycle, and terminal result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "ActionWorkflow"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^act_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "proposal"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "pending-approval",
+            "denied",
+            "approved",
+            "rejected",
+            "executing",
+            "dry-run",
+            "succeeded",
+            "failed",
+            "rolled-back",
+            "manual-reconciliation-required"
+          ]
+        },
+        "proposal": {"$ref": "urn:iip:contracts:action-proposal:v1alpha1"},
+        "approval": {"$ref": "urn:iip:contracts:action-approval:v1alpha1"},
+        "executionStatus": {"$ref": "urn:iip:contracts:action-execution-status:v1alpha1"},
+        "result": {"$ref": "urn:iip:contracts:action-result:v1alpha1"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"spec": {"properties": {"state": {"enum": ["pending-approval", "denied"]}}}}},
+      "then": {"properties": {"spec": {"not": {"anyOf": [{"required": ["approval"]}, {"required": ["executionStatus"]}, {"required": ["result"]}]}}}}
+    },
+    {
+      "if": {"properties": {"spec": {"properties": {"state": {"enum": ["approved", "rejected"]}}}}},
+      "then": {"properties": {"spec": {"required": ["approval"], "not": {"anyOf": [{"required": ["executionStatus"]}, {"required": ["result"]}]}}}}
+    },
+    {
+      "if": {"properties": {"spec": {"properties": {"state": {"enum": ["executing", "manual-reconciliation-required"]}}}}},
+      "then": {"properties": {"spec": {"required": ["approval", "executionStatus"], "not": {"required": ["result"]}}}}
+    },
+    {
+      "if": {"properties": {"spec": {"properties": {"state": {"enum": ["dry-run", "succeeded", "failed", "rolled-back"]}}}}},
+      "then": {"properties": {"spec": {"required": ["approval", "executionStatus", "result"]}}}
+    }
+  ]
+}

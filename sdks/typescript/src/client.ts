@@ -4,6 +4,8 @@ import type {
   ActionId,
   ActionProposal,
   ActionResult,
+  ActionWorkflow,
+  ActionWorkflowPage,
   ApiErrorBody,
   ContextEvidenceRequest,
   Evidence,
@@ -228,6 +230,20 @@ export class InfrastructureIntelligenceClient {
     return this.get<ActionProposal | ActionExecutionStatus | ActionResult>(
       `/v1/actions/${encodeURIComponent(proposalId)}`,
     );
+  }
+
+  async getActionWorkflow(proposalId: ActionId): Promise<ActionWorkflow> {
+    return this.get<ActionWorkflow>(
+      `/v1/actions/${encodeURIComponent(proposalId)}/workflow`,
+    );
+  }
+
+  async listActionWorkflows(
+    options: { limit?: number; cursor?: string } = {},
+  ): Promise<ActionWorkflowPage> {
+    const query = new URLSearchParams({ limit: String(options.limit ?? 50) });
+    if (options.cursor) query.set("cursor", options.cursor);
+    return this.get<ActionWorkflowPage>(`/v1/actions?${query}`);
   }
 
   async openPluginSession(command: {

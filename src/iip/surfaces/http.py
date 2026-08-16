@@ -85,6 +85,11 @@ from iip.application.plugin_sessions import (
     PluginHandshakeError,
 )
 from iip.application.ports import ActorContext, AuthenticationError, PersistenceError
+from iip.application.query_actions import (
+    ActionQueryAuthorizationError,
+    ActionQueryError,
+    ActionWorkflowNotFoundError,
+)
 from iip.application.query_resources import (
     InvalidCursorError,
     InvalidQueryError,
@@ -109,7 +114,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.15.0"
+    server_version = "IIPReference/0.16.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -176,6 +181,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path == "/v1/telemetry/ingestion":
             self._query_ingestion_telemetry(actor, parsed.query)
             return
+        if path == "/v1/actions":
+            self._query_actions(actor, parsed.query)
+            return
         if is_resource_query:
             self._query_resource(actor, segments[2], segments[3], parsed.query)
             return
@@ -220,6 +228,26 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "action.not_found",
             )
             return
+        if (
+            len(segments) == 4
+            and segments[:2] == ["v1", "actions"]
+            and segments[3] == "workflow"
+        ):
+            try:
+                document = self.runtime.action_queries.get(actor, segments[2])
+                self._json(HTTPStatus.OK, dict(document))
+            except ActionQueryError as exc:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": str(exc)}})
+            except ActionQueryAuthorizationError:
+                self._json(HTTPStatus.FORBIDDEN, {"error": {"code": "policy.denied"}})
+            except ActionWorkflowNotFoundError:
+                self._json(HTTPStatus.NOT_FOUND, {"error": {"code": "action.not_found"}})
+            except PersistenceError:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"error": {"code": "storage.unavailable"}},
+                )
+            return
         if len(segments) == 3 and segments[:2] == ["v1", "plugin-sessions"]:
             self._stored_document(
                 lambda: self.runtime.operational_store.get_plugin_session(
@@ -260,6 +288,35 @@ class ApiHandler(BaseHTTPRequestHandler):
                 {"error": {"code": "ingestion.source_not_found"}},
             )
         except (IngestionTelemetryStateError, PersistenceError):
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "storage.unavailable"}},
+            )
+
+    def _query_actions(self, actor: ActorContext, query: str) -> None:
+        try:
+            try:
+                parameters = parse_qs(
+                    query,
+                    keep_blank_values=True,
+                    max_num_fields=3,
+                )
+            except ValueError:
+                raise ActionQueryError("request.invalid") from None
+            if set(parameters).difference({"cursor", "limit"}):
+                raise ActionQueryError("request.invalid")
+            cursor = self._single(parameters, "cursor")
+            document = self.runtime.action_queries.list(
+                actor,
+                limit=self._limit(parameters),
+                cursor=cursor,
+            )
+            self._json(HTTPStatus.OK, dict(document))
+        except (ActionQueryError, InvalidQueryError) as exc:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": str(exc)}})
+        except ActionQueryAuthorizationError:
+            self._json(HTTPStatus.FORBIDDEN, {"error": {"code": "policy.denied"}})
+        except PersistenceError:
             self._json(
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 {"error": {"code": "storage.unavailable"}},

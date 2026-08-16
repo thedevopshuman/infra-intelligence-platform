@@ -706,6 +706,16 @@ class InvestigationRepository(Protocol):
         """Atomically record the first cancellation request or return terminal state."""
 
 
+@dataclass(frozen=True)
+class ActionWorkflowRecord:
+    """Consistent tenant-scoped action records returned by one repository read."""
+
+    proposal: Mapping[str, object]
+    approval: Optional[Mapping[str, object]] = None
+    execution_status: Optional[Mapping[str, object]] = None
+    result: Optional[Mapping[str, object]] = None
+
+
 class ActionRepository(Protocol):
     def get_proposal_by_key(
         self, actor: ActorContext, idempotency_key: str
@@ -716,6 +726,21 @@ class ActionRepository(Protocol):
         self, actor: ActorContext, proposal_id: str
     ) -> Optional[Mapping[str, object]]:
         """Resolve one tenant-scoped proposal."""
+
+    def get_action_workflow(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[ActionWorkflowRecord]:
+        """Read one proposal and its related records from one consistent snapshot."""
+
+    def list_action_workflows(
+        self,
+        actor: ActorContext,
+        *,
+        before_created_at: Optional[str],
+        before_proposal_id: Optional[str],
+        limit: int,
+    ) -> Iterable[ActionWorkflowRecord]:
+        """Return newest tenant workflows before an optional stable position."""
 
     def commit_proposal(
         self, actor: ActorContext, document: Mapping[str, object]

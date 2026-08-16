@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:action-workflow-page:v1alpha1",
+  "title": "Infrastructure Intelligence Action Workflow Page",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "ActionWorkflowPage"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId"],
+      "properties": {
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items", "page"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {"$ref": "urn:iip:contracts:action-workflow:v1alpha1"}
+        },
+        "page": {"$ref": "urn:iip:contracts:page-info:v1alpha1"}
+      }
+    }
+  }
+}

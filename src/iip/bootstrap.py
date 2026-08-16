@@ -67,6 +67,7 @@ from iip.application.observe_ingestion import (
     IngestionTelemetryInputError,
 )
 from iip.application.plugin_sessions import PluginSessionService
+from iip.application.query_actions import ActionWorkflowQueryService
 from iip.application.query_resources import ResourceQueryService
 from iip.application.resource_change_evidence import (
     ResourceChangeEvidenceService,
@@ -103,6 +104,7 @@ class Runtime:
     investigations: DeterministicInvestigationService
     investigation_lifecycle: InvestigationLifecycleService
     actions: GovernedActionService
+    action_queries: ActionWorkflowQueryService
     plugin_sessions: PluginSessionService
     operational_store: Any
     evidence_store: Any
@@ -288,6 +290,7 @@ def _compose_runtime(
             clock,
             operational,
         ),
+        action_queries=ActionWorkflowQueryService(operational, policy),
         plugin_sessions=PluginSessionService(policy, operational, clock),
         operational_store=operational,
         evidence_store=evidence_store,

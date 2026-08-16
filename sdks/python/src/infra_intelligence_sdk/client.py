@@ -14,6 +14,8 @@ from .models import (
     ActionExecutionStatus,
     ActionProposal,
     ActionResult,
+    ActionWorkflow,
+    ActionWorkflowPage,
     ContextEvidenceRequest,
     Evidence,
     IngestionFreshnessReport,
@@ -274,6 +276,25 @@ class Client:
         if kind == "ActionResult":
             return ActionResult.from_dict(payload)
         raise ValueError("action response kind is invalid")
+
+    def get_action_workflow(self, proposal_id: str) -> ActionWorkflow:
+        """Get the consistent proposal, approval, execution, and result view."""
+
+        return ActionWorkflow.from_dict(
+            self._get(f"/v1/actions/{quote(proposal_id, safe='')}/workflow")
+        )
+
+    def list_action_workflows(
+        self, *, limit: int = 50, cursor: Optional[str] = None
+    ) -> ActionWorkflowPage:
+        """List newest governed actions in this client's tenant scope."""
+
+        query = {"limit": str(limit)}
+        if cursor is not None:
+            query["cursor"] = cursor
+        return ActionWorkflowPage.from_dict(
+            self._get(f"/v1/actions?{urlencode(query)}")
+        )
 
     def open_plugin_session(self, command: Mapping[str, Any]) -> PluginSession:
         return PluginSession.from_dict(self._post("/v1/plugin-sessions", command))

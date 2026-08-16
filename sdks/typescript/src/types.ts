@@ -1310,6 +1310,41 @@ export interface ActionResult {
   };
 }
 
+export type ActionWorkflowState =
+  | "pending-approval"
+  | "denied"
+  | "approved"
+  | "rejected"
+  | "executing"
+  | "dry-run"
+  | "succeeded"
+  | "failed"
+  | "rolled-back"
+  | "manual-reconciliation-required";
+
+export interface ActionWorkflow {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ActionWorkflow";
+  metadata: { id: ActionId; tenantId: string };
+  spec: {
+    state: ActionWorkflowState;
+    proposal: ActionProposal;
+    approval?: ActionApproval;
+    executionStatus?: ActionExecutionStatus;
+    result?: ActionResult;
+  };
+}
+
+export interface ActionWorkflowPage {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ActionWorkflowPage";
+  metadata: { tenantId: string };
+  spec: {
+    items: ActionWorkflow[];
+    page: PageInfo;
+  };
+}
+
 export interface PluginSession {
   apiVersion: "iip.platform/v1alpha1";
   kind: "PluginSession";

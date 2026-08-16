@@ -135,6 +135,8 @@ main { min-width: 0; padding: 0 40px 60px; }
 .button.subtle:hover { color: var(--text); border-color: #35445a; }
 .button.primary { color: #071312; background: var(--cyan); border-color: var(--cyan); box-shadow: 0 8px 28px rgb(40 207 200 / 12%); }
 .button.primary:hover { background: #7aeee9; }
+.button.danger-outline { color: var(--red); border-color: rgb(255 113 133 / 34%); }
+.button.danger-outline:hover { background: rgb(255 113 133 / 8%); }
 .button.wide { width: 100%; min-height: 44px; }
 .button-row { display: grid; gap: 8px; }
 .button-row .button.subtle { min-height: 40px; }
@@ -262,6 +264,14 @@ td small { display: block; max-width: 310px; margin-top: 4px; overflow: hidden; 
 .guardrail h3 { margin: 15px 0 7px; font-size: 13px; }
 .guardrail p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
 
+.action-workbench { display: grid; grid-template-columns: minmax(320px, .72fr) minmax(460px, 1.28fr); gap: 16px; margin-bottom: 16px; }
+.action-controls { padding: 0 22px 22px; }
+.action-controls > label { display: grid; gap: 8px; margin-bottom: 12px; color: #bac4d2; font-size: 10px; font-weight: 650; }
+.action-control-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.action-controls > small { display: block; margin-top: 11px; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.action-queue { margin-bottom: 20px; }
+.queue-footer { display: flex; justify-content: center; padding: 13px; border-top: 1px solid var(--line-soft); }
+
 dialog { color: var(--text); background: transparent; border: 0; padding: 0; }
 dialog::backdrop { background: rgb(3 6 10 / 78%); backdrop-filter: blur(9px); }
 .connection-card { position: relative; width: min(440px, calc(100vw - 30px)); padding: 35px; background: linear-gradient(160deg, #151e2b, #0d131d); border: 1px solid #2a3a4e; border-radius: 19px; box-shadow: var(--shadow); }
@@ -291,6 +301,7 @@ code { color: var(--cyan); font-family: ui-monospace, SFMono-Regular, Menlo, mon
   .hero-card { grid-template-columns: 1fr .5fr; }
   .metric-grid, .guardrail-grid { grid-template-columns: repeat(2, 1fr); }
   .workbench { grid-template-columns: 1fr; }
+  .action-workbench { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {

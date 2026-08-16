@@ -77,6 +77,8 @@ REQUIRED_PATHS = (
     "contracts/schemas/action-approval.schema.json",
     "contracts/schemas/action-execution-status.schema.json",
     "contracts/schemas/action-result.schema.json",
+    "contracts/schemas/action-workflow.schema.json",
+    "contracts/schemas/action-workflow-page.schema.json",
     "contracts/schemas/plugin-session.schema.json",
     "contracts/schemas/resource-collection-request.schema.json",
     "contracts/schemas/resource-collection-result.schema.json",
@@ -121,6 +123,8 @@ REQUIRED_PATHS = (
     "contracts/examples/action-approval.json",
     "contracts/examples/action-execution-status.json",
     "contracts/examples/action-result.json",
+    "contracts/examples/action-workflow.json",
+    "contracts/examples/action-workflow-page.json",
     "contracts/examples/plugin-session.json",
     "contracts/examples/investigation-request.json",
     "contracts/examples/investigation-request-kubernetes-events.json",
@@ -185,6 +189,7 @@ REQUIRED_PATHS = (
     "src/iip/adapters/credential_broker.py",
     "src/iip/adapters/kubernetes_events.py",
     "src/iip/adapters/kubernetes_actions.py",
+    "src/iip/application/query_actions.py",
     "src/iip/adapters/otlp_receiver.py",
     "src/iip/adapters/otlp_logs_receiver.py",
     "src/iip/adapters/postgres/migrations/0006_source_checkpoint_provider_cursors.sql",
@@ -207,6 +212,7 @@ REQUIRED_PATHS = (
     "tests/test_kubernetes_events_backend.py",
     "tests/test_kubernetes_actions.py",
     "tests/test_kubernetes_actions_integration.py",
+    "tests/test_action_queries.py",
     "tests/test_kubernetes_events_integration.py",
     "tests/test_otlp_receiver.py",
     "tests/test_log_evidence.py",
@@ -2346,6 +2352,8 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     action_approval = documents.get(example_dir / "action-approval.json")
     action_execution = documents.get(example_dir / "action-execution-status.json")
     action_result = documents.get(example_dir / "action-result.json")
+    action_workflow = documents.get(example_dir / "action-workflow.json")
+    action_workflow_page = documents.get(example_dir / "action-workflow-page.json")
     plugin_session = documents.get(example_dir / "plugin-session.json")
     if all(
         isinstance(item, dict)
@@ -2404,6 +2412,18 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             or not proposal_time <= approval_time <= result_time <= expiry_time
         ):
             fail(errors, "action example timestamps must be created <= approved <= completed <= expiry")
+
+    if isinstance(action_workflow, dict) and isinstance(action_proposal, dict):
+        workflow_metadata = action_workflow.get("metadata", {})
+        workflow_spec = action_workflow.get("spec", {})
+        if workflow_metadata.get("id") != action_proposal.get("metadata", {}).get("id"):
+            fail(errors, "action workflow must identify its embedded proposal")
+        if workflow_spec.get("proposal") != action_proposal:
+            fail(errors, "action workflow example must embed the canonical proposal example")
+    if isinstance(action_workflow_page, dict) and isinstance(action_workflow, dict):
+        page_items = action_workflow_page.get("spec", {}).get("items", [])
+        if page_items != [action_workflow]:
+            fail(errors, "action workflow page must contain the canonical workflow example")
 
     if isinstance(plugin_example, dict) and isinstance(plugin_session, dict):
         manifest_metadata = plugin_example.get("metadata", {})

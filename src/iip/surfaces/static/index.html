@@ -173,10 +173,40 @@
             <article class="guardrail"><span>03</span><h3>Execute</h3><p>Policy is checked again; duplicate delivery cannot duplicate impact.</p></article>
             <article class="guardrail"><span>04</span><h3>Verify</h3><p>The outcome and evidence are written to the immutable audit trail.</p></article>
           </div>
-          <article class="panel lookup-panel">
-            <h2>Action lookup</h2>
-            <form id="action-form" class="inline-form"><label><span class="sr-only">Action proposal ID</span><input id="action-id" required pattern="act_[a-f0-9]{32}" placeholder="act_…"></label><button class="button primary" type="submit">Retrieve</button></form>
-            <div id="action-result" class="empty-state"><div class="empty-icon">↯</div><p>Enter an action proposal ID to inspect its current state.</p></div>
+          <div class="action-workbench">
+            <form class="panel form-panel" id="action-proposal-form">
+              <span class="kicker">New governed proposal</span>
+              <h2>Prepare a bounded restart</h2>
+              <p>The proposal is bound to a completed investigation and the exact observed workload. A separate identity must approve it.</p>
+              <label>Investigation ID<input id="action-investigation-id" required pattern="inv_[a-f0-9]{32}" placeholder="inv_…"></label>
+              <label>Target workload<select id="action-resource" required><option value="">Choose an observed Kubernetes workload</option></select></label>
+              <label class="check-row"><input id="action-dry-run" type="checkbox" checked><span><strong>Non-mutating dry-run</strong><small>The default executor performs no mutation. Live execution requires protected server configuration too.</small></span></label>
+              <button class="button primary wide" type="submit">Create proposal</button>
+            </form>
+            <article class="panel result-panel">
+              <div class="panel-heading"><div><span class="kicker">Selected workflow</span><h2>Review and decide</h2></div><span class="status-chip neutral" id="action-state">No selection</span></div>
+              <div id="action-result" class="empty-state tall"><div class="empty-icon">↯</div><h3>Select an action</h3><p>Create a proposal or choose a workflow from the queue below.</p></div>
+              <div class="action-controls" id="action-controls" hidden>
+                <label id="action-rationale-label">Approval rationale<textarea id="action-rationale" maxlength="2048" rows="3" placeholder="Explain why this exact scope should or should not proceed."></textarea></label>
+                <div class="action-control-row">
+                  <button class="button primary" id="action-approve" type="button">Approve</button>
+                  <button class="button subtle danger-outline" id="action-reject" type="button">Reject</button>
+                  <button class="button primary" id="action-execute" type="button">Execute once</button>
+                </div>
+                <small id="action-role-help"></small>
+              </div>
+            </article>
+          </div>
+          <article class="panel table-panel action-queue">
+            <div class="panel-heading"><div><span class="kicker">Tenant action queue</span><h2>Newest workflows</h2></div><button class="button subtle" id="action-refresh" type="button">Refresh queue</button></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Action</th><th>State</th><th>Target</th><th>Mode</th><th>Created</th><th></th></tr></thead>
+                <tbody id="action-rows"></tbody>
+              </table>
+            </div>
+            <div id="action-empty" class="empty-state"><div class="empty-icon">↯</div><h3>No governed actions yet</h3><p>Run an investigation with proposal authority, then create a bounded restart above.</p></div>
+            <div class="queue-footer"><button class="button subtle" id="action-load-more" type="button" hidden>Load more</button></div>
           </article>
         </section>
       </main>

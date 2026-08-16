@@ -2173,6 +2173,42 @@ class ActionResult:
 
 
 @dataclass(frozen=True)
+class ActionWorkflow:
+    """Reconstructed proposal, approval, execution, and result read model."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ActionWorkflow":
+        return cls(
+            _validate_envelope(payload, kind="ActionWorkflow", label="action workflow")
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class ActionWorkflowPage:
+    """Bounded tenant-scoped page of governed action workflows."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ActionWorkflowPage":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="ActionWorkflowPage",
+                label="action workflow page",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class PluginSession:
     """Bounded host-issued plugin handshake result."""
 

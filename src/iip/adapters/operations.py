@@ -9,7 +9,7 @@ from datetime import datetime
 from threading import RLock
 from typing import Mapping, Optional
 
-from iip.application.ports import ActorContext, PersistenceError
+from iip.application.ports import ActionWorkflowRecord, ActorContext, PersistenceError
 
 
 class InMemoryOperationalStore:
@@ -144,6 +144,62 @@ class InMemoryOperationalStore:
         with self._lock:
             value = self._proposals.get((actor.tenant_id, proposal_id))
             return copy.deepcopy(value) if value is not None else None
+
+    def get_action_workflow(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[ActionWorkflowRecord]:
+        key = (actor.tenant_id, proposal_id)
+        with self._lock:
+            proposal = self._proposals.get(key)
+            if proposal is None:
+                return None
+            return ActionWorkflowRecord(
+                proposal=copy.deepcopy(proposal),
+                approval=copy.deepcopy(self._approvals.get(key)),
+                execution_status=copy.deepcopy(self._action_executions.get(key)),
+                result=copy.deepcopy(self._results.get(key)),
+            )
+
+    def list_action_workflows(
+        self,
+        actor: ActorContext,
+        *,
+        before_created_at: Optional[str],
+        before_proposal_id: Optional[str],
+        limit: int,
+    ) -> tuple[ActionWorkflowRecord, ...]:
+        if limit < 1 or limit > 101:
+            raise PersistenceError("storage.input-invalid")
+        if (before_created_at is None) != (before_proposal_id is None):
+            raise PersistenceError("storage.input-invalid")
+        before = (
+            self._action_position(before_created_at, before_proposal_id)
+            if before_created_at is not None and before_proposal_id is not None
+            else None
+        )
+        with self._lock:
+            candidates = []
+            for key, proposal in self._proposals.items():
+                if key[0] != actor.tenant_id:
+                    continue
+                metadata = proposal.get("metadata")
+                if not isinstance(metadata, Mapping):
+                    raise PersistenceError("storage.corrupt")
+                position = self._action_position(
+                    metadata.get("createdAt"), metadata.get("id")
+                )
+                if before is None or position < before:
+                    candidates.append((position, key, proposal))
+            candidates.sort(key=lambda item: item[0], reverse=True)
+            return tuple(
+                ActionWorkflowRecord(
+                    proposal=copy.deepcopy(proposal),
+                    approval=copy.deepcopy(self._approvals.get(key)),
+                    execution_status=copy.deepcopy(self._action_executions.get(key)),
+                    result=copy.deepcopy(self._results.get(key)),
+                )
+                for _, key, proposal in candidates[:limit]
+            )
 
     def commit_proposal(
         self, actor: ActorContext, document: Mapping[str, object]
@@ -291,6 +347,18 @@ class InMemoryOperationalStore:
         if parsed.tzinfo is None:
             raise PersistenceError("storage.input-invalid")
         return parsed
+
+    @staticmethod
+    def _action_position(created_at: object, proposal_id: object) -> tuple[datetime, str]:
+        if not isinstance(created_at, str) or not isinstance(proposal_id, str):
+            raise PersistenceError("storage.corrupt")
+        try:
+            parsed = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except ValueError:
+            raise PersistenceError("storage.corrupt") from None
+        if parsed.tzinfo is None:
+            raise PersistenceError("storage.corrupt")
+        return parsed, proposal_id
 
     def commit_plugin_session(
         self, actor: ActorContext, document: Mapping[str, object]

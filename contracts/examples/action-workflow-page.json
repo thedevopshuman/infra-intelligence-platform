@@ -1,0 +1,61 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ActionWorkflowPage",
+  "metadata": {
+    "tenantId": "local"
+  },
+  "spec": {
+    "items": [
+      {
+        "apiVersion": "iip.platform/v1alpha1",
+        "kind": "ActionWorkflow",
+        "metadata": {
+          "id": "act_55555555555555555555555555555555",
+          "tenantId": "local"
+        },
+        "spec": {
+          "state": "pending-approval",
+          "proposal": {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "ActionProposal",
+            "metadata": {
+              "id": "act_55555555555555555555555555555555",
+              "tenantId": "local",
+              "actorId": "incident-investigator",
+              "createdAt": "2026-08-14T13:00:00Z"
+            },
+            "spec": {
+              "investigationId": "inv_71c9e4a2b8d04f65a3c7e9b102d4f608",
+              "investigationDigest": "sha256:2ddb9acfa5b7b664770ab9ddc96c68086f74ded25ffd1a1e9cd631b3446debd5",
+              "integrationId": "kubernetes-local",
+              "actionType": "kubernetes.restart-workload",
+              "targetResourceUid": "res_e0ae9225a316fce4c97df5c23057b97a",
+              "targetDigest": "sha256:9062a9611ca8400b1dd0c31bd2b8e4f26e40d9234d8c7da148296753849c7c3c",
+              "parameters": {
+                "namespace": "default",
+                "workloadKind": "deployment",
+                "workloadName": "api"
+              },
+              "dryRun": true,
+              "risk": "low",
+              "reversible": true,
+              "idempotencyKey": "incident-71c9-restart-api-001",
+              "expiresAt": "2026-08-14T13:30:00Z",
+              "policyDecision": {
+                "allowed": true,
+                "reasonCode": "policy.action.proposal-allowed",
+                "policySnapshotRef": "policy://local/snapshots/action-proposal-v1",
+                "inputDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+              }
+            },
+            "status": "pending-approval"
+          }
+        }
+      }
+    ],
+    "page": {
+      "limit": 50,
+      "hasMore": false
+    }
+  }
+}

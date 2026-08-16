@@ -10,7 +10,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from iip.application.investigate import canonical_digest
-from iip.application.ports import ActorContext, PersistenceError
+from iip.application.ports import ActionWorkflowRecord, ActorContext, PersistenceError
 
 
 class PostgresOperationalStore:
@@ -289,6 +289,97 @@ class PostgresOperationalStore:
             "SELECT document FROM iip.action_proposals WHERE tenant_id = %s AND proposal_id = %s",
             (actor.tenant_id, proposal_id),
         )
+
+    def get_action_workflow(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[ActionWorkflowRecord]:
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    SELECT p.document AS proposal,
+                           a.document AS approval,
+                           e.document AS execution_status,
+                           r.document AS result
+                    FROM iip.action_proposals AS p
+                    LEFT JOIN iip.action_approvals AS a
+                      ON a.tenant_id = p.tenant_id
+                     AND a.proposal_id = p.proposal_id
+                    LEFT JOIN iip.action_executions AS e
+                      ON e.tenant_id = p.tenant_id
+                     AND e.proposal_id = p.proposal_id
+                    LEFT JOIN iip.action_results AS r
+                      ON r.tenant_id = p.tenant_id
+                     AND r.proposal_id = p.proposal_id
+                    WHERE p.tenant_id = %s AND p.proposal_id = %s
+                    """,
+                    (actor.tenant_id, proposal_id),
+                ).fetchone()
+            return self._workflow_record(row) if row is not None else None
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def list_action_workflows(
+        self,
+        actor: ActorContext,
+        *,
+        before_created_at: Optional[str],
+        before_proposal_id: Optional[str],
+        limit: int,
+    ) -> tuple[ActionWorkflowRecord, ...]:
+        if limit < 1 or limit > 101:
+            raise PersistenceError("storage.input-invalid")
+        if (before_created_at is None) != (before_proposal_id is None):
+            raise PersistenceError("storage.input-invalid")
+        position_clause = ""
+        parameters: tuple[object, ...]
+        if before_created_at is None:
+            parameters = (actor.tenant_id, limit)
+        else:
+            position_clause = """
+              AND (
+                    (p.document #>> '{metadata,createdAt}')::timestamptz,
+                    p.proposal_id
+                  ) < (%s::timestamptz, %s)
+            """
+            parameters = (
+                actor.tenant_id,
+                before_created_at,
+                before_proposal_id,
+                limit,
+            )
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT p.document AS proposal,
+                           a.document AS approval,
+                           e.document AS execution_status,
+                           r.document AS result
+                    FROM iip.action_proposals AS p
+                    LEFT JOIN iip.action_approvals AS a
+                      ON a.tenant_id = p.tenant_id
+                     AND a.proposal_id = p.proposal_id
+                    LEFT JOIN iip.action_executions AS e
+                      ON e.tenant_id = p.tenant_id
+                     AND e.proposal_id = p.proposal_id
+                    LEFT JOIN iip.action_results AS r
+                      ON r.tenant_id = p.tenant_id
+                     AND r.proposal_id = p.proposal_id
+                    WHERE p.tenant_id = %s
+                    """
+                    + position_clause
+                    + """
+                    ORDER BY
+                      (p.document #>> '{metadata,createdAt}')::timestamptz DESC,
+                      p.proposal_id DESC
+                    LIMIT %s
+                    """,
+                    parameters,
+                ).fetchall()
+            return tuple(self._workflow_record(row) for row in rows)
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
 
     def commit_proposal(
         self, actor: ActorContext, document: Mapping[str, object]
@@ -574,6 +665,24 @@ class PostgresOperationalStore:
             raise PersistenceError("storage.conflict") from None
         except psycopg.Error:
             raise PersistenceError("storage.unavailable") from None
+
+    @staticmethod
+    def _workflow_record(row: Mapping[str, object]) -> ActionWorkflowRecord:
+        proposal = row.get("proposal")
+        if not isinstance(proposal, Mapping):
+            raise PersistenceError("storage.corrupt")
+        related = []
+        for key in ("approval", "execution_status", "result"):
+            document = row.get(key)
+            if document is not None and not isinstance(document, Mapping):
+                raise PersistenceError("storage.corrupt")
+            related.append(dict(document) if isinstance(document, Mapping) else None)
+        return ActionWorkflowRecord(
+            proposal=dict(proposal),
+            approval=related[0],
+            execution_status=related[1],
+            result=related[2],
+        )
 
     @staticmethod
     def _assert_tenant(actor: ActorContext, document: Mapping[str, object]) -> None:

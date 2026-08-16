@@ -785,6 +785,25 @@ export interface InvestigationChangeSelection {
   interpretation?: InvestigationChangeInterpretation;
 }
 
+export interface InvestigationContextInterpretation {
+  minDocuments: number;
+  whenMatched: "supports" | "contradicts" | "neutral";
+  whenNotMatched: "supports" | "contradicts" | "neutral";
+}
+
+export interface InvestigationContextSelection {
+  id: `xqs_${string}`;
+  integrationId: string;
+  rootCauseClasses?: string[];
+  query: { kinds: ContextDocumentKind[]; referenceIds: string[] };
+  limits: {
+    maxDocuments: number;
+    maxExcerptChars: number;
+    maxBytes: number;
+  };
+  interpretation?: InvestigationContextInterpretation;
+}
+
 export interface InvestigationTelemetryInterpretation {
   statistic: "minimum" | "maximum" | "mean";
   unit: string;
@@ -833,6 +852,7 @@ export interface InvestigationRequest {
     allowedTools?: string[];
     kubernetesEventSelections?: InvestigationKubernetesEventSelection[];
     changeSelections?: InvestigationChangeSelection[];
+    contextSelections?: InvestigationContextSelection[];
     logSelections?: InvestigationLogSelection[];
     telemetrySelections?: InvestigationTelemetrySelection[];
     budgets: InvestigationBudgets;
@@ -930,6 +950,24 @@ export interface InvestigationChangeAssessment {
     | "incomplete";
 }
 
+export interface InvestigationContextAssessment {
+  selectionId: `xqs_${string}`;
+  evidenceId: EvidenceId;
+  rootCauseClass: string;
+  kinds: ContextDocumentKind[];
+  referenceIds: string[];
+  minDocuments: number;
+  observedDocumentCount?: number;
+  observedDocumentIds?: `ctx_${string}`[];
+  observedReferenceIds?: string[];
+  disposition:
+    | "supporting"
+    | "contradicting"
+    | "neutral"
+    | "no-data"
+    | "incomplete";
+}
+
 export interface InvestigationTelemetryBaselineAssessment {
   assessmentType: "baseline-comparison";
   selectionId: `tqs_${string}`;
@@ -993,6 +1031,7 @@ export interface InvestigationReport {
     )[];
     kubernetesEventAssessments?: InvestigationKubernetesEventAssessment[];
     changeAssessments?: InvestigationChangeAssessment[];
+    contextAssessments?: InvestigationContextAssessment[];
     logAssessments?: InvestigationLogAssessment[];
     evidenceIds: EvidenceId[];
     recommendations: InvestigationRecommendation[];

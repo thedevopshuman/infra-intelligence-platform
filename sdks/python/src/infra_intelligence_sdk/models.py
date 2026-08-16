@@ -1320,6 +1320,192 @@ class InvestigationChangeAssessment:
 
 
 @dataclass(frozen=True)
+class InvestigationContextInterpretation:
+    min_documents: int
+    when_matched: str
+    when_not_matched: str
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationContextInterpretation":
+        minimum = payload.get("minDocuments")
+        dispositions = ("supports", "contradicts", "neutral")
+        if (
+            not isinstance(minimum, int)
+            or isinstance(minimum, bool)
+            or not 1 <= minimum <= 32
+            or payload.get("whenMatched") not in dispositions
+            or payload.get("whenNotMatched") not in dispositions
+            or payload.get("whenMatched") == payload.get("whenNotMatched")
+        ):
+            raise ValueError("investigation context interpretation is invalid")
+        return cls(minimum, payload["whenMatched"], payload["whenNotMatched"])
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "minDocuments": self.min_documents,
+            "whenMatched": self.when_matched,
+            "whenNotMatched": self.when_not_matched,
+        }
+
+
+@dataclass(frozen=True)
+class InvestigationContextSelection:
+    selection_id: str
+    integration_id: str
+    query: Mapping[str, Any]
+    limits: Mapping[str, Any]
+    root_cause_classes: tuple[str, ...] = ()
+    interpretation: Optional[InvestigationContextInterpretation] = None
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "InvestigationContextSelection":
+        selection_id = payload.get("id")
+        integration_id = payload.get("integrationId")
+        query = payload.get("query")
+        limits = payload.get("limits")
+        classes = payload.get("rootCauseClasses", [])
+        interpretation = payload.get("interpretation")
+        if not isinstance(selection_id, str) or not selection_id.startswith("xqs_"):
+            raise ValueError("investigation context selection id is invalid")
+        if not isinstance(integration_id, str) or not integration_id:
+            raise ValueError("investigation context integrationId is invalid")
+        if not isinstance(query, Mapping) or not isinstance(limits, Mapping):
+            raise ValueError("investigation context query and limits are required")
+        if not isinstance(classes, list) or any(
+            not isinstance(item, str) for item in classes
+        ):
+            raise ValueError("investigation context rootCauseClasses are invalid")
+        if interpretation is not None and not isinstance(interpretation, Mapping):
+            raise ValueError("investigation context interpretation is invalid")
+        if interpretation is not None and not classes:
+            raise ValueError(
+                "investigation context interpretation requires rootCauseClasses"
+            )
+        normalized = (
+            InvestigationContextInterpretation.from_dict(interpretation)
+            if isinstance(interpretation, Mapping)
+            else None
+        )
+        maximum = limits.get("maxDocuments")
+        if (
+            normalized is not None
+            and isinstance(maximum, int)
+            and normalized.min_documents > maximum
+        ):
+            raise ValueError("investigation context interpretation exceeds result limit")
+        return cls(
+            selection_id,
+            integration_id,
+            dict(query),
+            dict(limits),
+            tuple(classes),
+            normalized,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "id": self.selection_id,
+            "integrationId": self.integration_id,
+            "query": dict(self.query),
+            "limits": dict(self.limits),
+        }
+        if self.root_cause_classes:
+            result["rootCauseClasses"] = list(self.root_cause_classes)
+        if self.interpretation is not None:
+            result["interpretation"] = self.interpretation.to_dict()
+        return result
+
+
+@dataclass(frozen=True)
+class InvestigationContextAssessment:
+    selection_id: str
+    evidence_id: str
+    root_cause_class: str
+    kinds: tuple[str, ...]
+    reference_ids: tuple[str, ...]
+    min_documents: int
+    disposition: str
+    observed_document_count: Optional[int] = None
+    observed_document_ids: tuple[str, ...] = ()
+    observed_reference_ids: tuple[str, ...] = ()
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "InvestigationContextAssessment":
+        disposition = payload.get("disposition")
+        kinds = payload.get("kinds")
+        refs = payload.get("referenceIds")
+        minimum = payload.get("minDocuments")
+        count = payload.get("observedDocumentCount")
+        document_ids = payload.get("observedDocumentIds")
+        observed_refs = payload.get("observedReferenceIds")
+        data_dispositions = ("supporting", "contradicting", "neutral")
+        empty_dispositions = ("no-data", "incomplete")
+        if (
+            any(
+                not isinstance(payload.get(field), str)
+                for field in ("selectionId", "evidenceId", "rootCauseClass")
+            )
+            or not isinstance(kinds, list)
+            or any(not isinstance(item, str) for item in kinds)
+            or not isinstance(refs, list)
+            or any(not isinstance(item, str) for item in refs)
+            or not isinstance(minimum, int)
+            or isinstance(minimum, bool)
+            or minimum < 1
+            or disposition not in data_dispositions + empty_dispositions
+            or (
+                disposition in data_dispositions
+                and (
+                    not isinstance(count, int)
+                    or isinstance(count, bool)
+                    or count < 1
+                    or not isinstance(document_ids, list)
+                    or len(document_ids) != count
+                    or not isinstance(observed_refs, list)
+                    or not observed_refs
+                )
+            )
+            or (
+                disposition in empty_dispositions
+                and any(
+                    item is not None for item in (count, document_ids, observed_refs)
+                )
+            )
+        ):
+            raise ValueError("investigation context assessment is invalid")
+        return cls(
+            payload["selectionId"],
+            payload["evidenceId"],
+            payload["rootCauseClass"],
+            tuple(kinds),
+            tuple(refs),
+            minimum,
+            disposition,
+            count,
+            tuple(document_ids or ()),
+            tuple(observed_refs or ()),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "selectionId": self.selection_id,
+            "evidenceId": self.evidence_id,
+            "rootCauseClass": self.root_cause_class,
+            "kinds": list(self.kinds),
+            "referenceIds": list(self.reference_ids),
+            "minDocuments": self.min_documents,
+            "disposition": self.disposition,
+        }
+        if self.observed_document_count is not None:
+            result["observedDocumentCount"] = self.observed_document_count
+            result["observedDocumentIds"] = list(self.observed_document_ids)
+            result["observedReferenceIds"] = list(self.observed_reference_ids)
+        return result
+
+
+@dataclass(frozen=True)
 class InvestigationKubernetesEventInterpretation:
     """Closed condition-count rule declared by an investigation caller."""
 
@@ -1586,6 +1772,18 @@ class InvestigationRequest:
             raise ValueError("investigation changeSelections must be an array")
         return tuple(InvestigationChangeSelection.from_dict(value) for value in values)
 
+    @property
+    def context_selections(self) -> tuple[InvestigationContextSelection, ...]:
+        """Return bounded untrusted repository/runbook context candidates."""
+
+        spec = self.payload.get("spec")
+        values = spec.get("contextSelections", []) if isinstance(spec, Mapping) else []
+        if not isinstance(values, list) or any(
+            not isinstance(value, Mapping) for value in values
+        ):
+            raise ValueError("investigation contextSelections must be an array")
+        return tuple(InvestigationContextSelection.from_dict(value) for value in values)
+
 
 @dataclass(frozen=True)
 class InvestigationReport:
@@ -1676,6 +1874,18 @@ class InvestigationReport:
         ):
             raise ValueError("investigation changeAssessments must be an array")
         return tuple(InvestigationChangeAssessment.from_dict(value) for value in values)
+
+    @property
+    def context_assessments(self) -> tuple[InvestigationContextAssessment, ...]:
+        """Return context-count assessments without exposing excerpt text."""
+
+        spec = self.payload.get("spec")
+        values = spec.get("contextAssessments", []) if isinstance(spec, Mapping) else []
+        if not isinstance(values, list) or any(
+            not isinstance(value, Mapping) for value in values
+        ):
+            raise ValueError("investigation contextAssessments must be an array")
+        return tuple(InvestigationContextAssessment.from_dict(value) for value in values)
 
 
 @dataclass(frozen=True)

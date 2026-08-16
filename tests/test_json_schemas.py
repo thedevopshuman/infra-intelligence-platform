@@ -398,6 +398,22 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("documents" in error for error in errors))
 
+    def test_context_interpretation_requires_root_cause_scope(self) -> None:
+        request = document("contracts/examples/investigation-request-context.json")
+        del request["spec"]["contextSelections"][0]["rootCauseClasses"]
+
+        errors = self.validate("investigation-request.schema.json", request)
+
+        self.assertTrue(any("rootCauseClasses" in error for error in errors))
+
+    def test_context_no_data_assessment_rejects_document_details(self) -> None:
+        report = document("contracts/examples/investigation-report-context.json")
+        report["spec"]["contextAssessments"][0]["disposition"] = "no-data"
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(errors)
+
     def test_otlp_gauge_prohibits_sum_semantics(self) -> None:
         result = document("contracts/examples/otlp-metrics-evidence.json")
         gauge = result["spec"]["series"][1]

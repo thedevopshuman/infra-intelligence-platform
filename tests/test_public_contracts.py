@@ -16,6 +16,9 @@ from infra_intelligence_sdk import (
     EvaluationScenario,
     InvestigationReport,
     InvestigationRequest,
+    InvestigationContextAssessment,
+    InvestigationContextInterpretation,
+    InvestigationContextSelection,
     InvestigationKubernetesEventAssessment,
     InvestigationKubernetesEventInterpretation,
     InvestigationKubernetesEventSelection,
@@ -75,6 +78,9 @@ class PublicContractSdkTests(unittest.TestCase):
         log_investigation = InvestigationRequest.from_dict(
             example("investigation-request-logs.json")
         )
+        context_investigation = InvestigationRequest.from_dict(
+            example("investigation-request-context.json")
+        )
         report = InvestigationReport.from_dict(example("investigation-report.json"))
         telemetry_report = InvestigationReport.from_dict(
             example("investigation-report-telemetry.json")
@@ -87,6 +93,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         log_report = InvestigationReport.from_dict(
             example("investigation-report-logs.json")
+        )
+        context_report = InvestigationReport.from_dict(
+            example("investigation-report-context.json")
         )
         freshness = IngestionFreshnessReport.from_dict(
             example("ingestion-freshness-report.json")
@@ -202,6 +211,21 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertIsInstance(log_assessment, InvestigationLogAssessment)
         self.assertEqual(log_assessment.observed_record_count, 2)
         self.assertEqual(log_assessment.disposition, "supporting")
+        context_selection = context_investigation.context_selections[0]
+        self.assertIsInstance(context_selection, InvestigationContextSelection)
+        self.assertIsInstance(
+            context_selection.interpretation,
+            InvestigationContextInterpretation,
+        )
+        self.assertEqual(context_selection.query["kinds"], ["runbook"])
+        context_assessment = context_report.context_assessments[0]
+        self.assertIsInstance(context_assessment, InvestigationContextAssessment)
+        self.assertEqual(context_assessment.observed_document_count, 1)
+        self.assertEqual(
+            context_assessment.observed_reference_ids,
+            ("runbooks/api-rollout",),
+        )
+        self.assertNotIn("excerpt", context_assessment.to_dict())
         self.assertEqual(report.to_dict()["kind"], "InvestigationReport")
         self.assertEqual(freshness.to_dict()["kind"], "IngestionFreshnessReport")
         self.assertEqual(session.to_dict()["kind"], "SessionContext")
@@ -466,6 +490,24 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn(
             "log assessment disposition must match its rule",
+            self.errors,
+        )
+
+    def test_context_assessment_must_match_its_declared_rule(self) -> None:
+        path = (
+            ROOT
+            / "contracts"
+            / "examples"
+            / "investigation-report-context.json"
+        )
+        report = copy.deepcopy(self.documents[path])
+        report["spec"]["contextAssessments"][0]["observedDocumentCount"] = 0
+        self.documents[path] = report
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "context assessment with data requires matching document IDs, count, and references",
             self.errors,
         )
 

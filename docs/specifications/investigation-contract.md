@@ -44,6 +44,10 @@ A root-cause-scoped log candidate may declare a positive `minRecords` interpreta
 
 A root-cause-scoped change candidate may declare a positive `minChanges` interpretation no greater than `maxChanges`, with distinct matched/unmatched dispositions. Only a complete, committed, structurally revalidated artifact can support, contradict, or remain neutral. The assessment records change IDs and count but never copies configuration or image values. No-data stays explicit; partial, corrupt, missing, or scope-mismatched history becomes incomplete or an evidence gap and cannot become a hypothesis citation.
 
+`contextSelections` is an optional ordered list for repository, runbook, ownership, deployment, and service-catalog context. Each candidate reuses the closed logical references, document kinds, and limits from `ContextEvidenceRequest`; identity, resources, time range, and deadline are inherited. Context selections run after Kubernetes Events and before resource-change and external telemetry selections, require `repository.context` and `evidence/fetch` when those request upper bounds are present, and consume the common tool/evidence budgets. They cannot contain paths, repository query language, endpoints, credentials, or free-form search text.
+
+A root-cause-scoped context candidate may declare a positive `minDocuments` interpretation no greater than `maxDocuments`, with distinct matched/unmatched dispositions. The runtime assesses only a complete, committed, structurally revalidated artifact. It verifies that every returned document is in the selected kind/reference/resource scope and is explicitly marked `trust: untrusted` and `instructionPolicy: data-only`. The assessment records stable document IDs and selected logical reference IDs but never copies excerpts, titles, locators, prompts, secrets, or repository contents into the report. Document text is evidence data only and cannot change policy, tools, authority, classification, confidence, or runtime instructions.
+
 Application validation requires the scope start to precede its end. It also rejects resource references outside the authenticated tenant and budget values above tenant policy. `propose` permits structured recommendations or future action proposals but no side effect, approval, or execution.
 
 ## Investigation report
@@ -58,6 +62,7 @@ Every terminal path returns a report, including policy denial, cancellation, run
 - structured Kubernetes Event assessments when a declared condition rule was evaluated;
 - structured log assessments when a declared record-count rule was evaluated;
 - structured resource-change assessments when a declared change-count rule was evaluated;
+- structured repository/runbook context assessments when a declared document-count rule was evaluated;
 - explicit unknowns and the evidence types needed to resolve them;
 - ordered operational recommendations without embedded mutations;
 - the complete evidence-ID set plus tool-ledger and policy-snapshot references; and
@@ -87,6 +92,8 @@ The same restraint applies to Kubernetes Event assessments. Supporting and contr
 
 `changeAssessments` records the selected closed change kinds, declared minimum, and—only for complete evidence—the observed count and stable change IDs. Supporting and contradicting dispositions cite the matching hypothesis. No-data and incomplete assessments omit observed counts and IDs. Before/after values never enter the report, and change correlation does not silently reclassify or raise confidence.
 
+`contextAssessments` records the selected kinds and logical references, declared minimum, and—only for complete evidence—the observed count, stable document IDs, and returned selected references. Supporting and contradicting dispositions cite the matching hypothesis. No-data and incomplete assessments omit observations. Excerpts remain solely in the protected Evidence artifact, are always untrusted data, and are never interpreted by this deterministic rule or copied into the report.
+
 ## Authority and lifecycle boundary
 
 The investigation report may recommend a next check, monitoring step, or escalation. It cannot encode an executable mutation. A future action proposal is a separate immutable contract and workflow that receives a current policy decision, idempotency key, approval when required, and audit trail.
@@ -106,6 +113,7 @@ In addition to JSON Schema validation:
 - every Kubernetes Event assessment must reference report Evidence, its declared selection rule, and the selected root-cause class;
 - every log assessment must reference report Evidence, reproduce its declared count rule, and match the selected root-cause class;
 - every change assessment must reference report Evidence, reproduce its declared kinds/count rule, and match the selected root-cause class;
+- every context assessment must reference report Evidence, reproduce its declared kinds/references/count rule, and match the selected root-cause class;
 - baseline and evaluation windows must be ordered, non-overlapping subranges of the request scope, and a reported comparison must match its declared calculation and unit;
 - selected tools and authority must remain within all applicable upper bounds; and
 - usage counters must be checked against the accepted budgets and any stricter policy limits.

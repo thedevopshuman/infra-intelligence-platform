@@ -32,3 +32,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0026](0026-resource-history-change-evidence.md) | Accepted | Derive bounded value-minimized changes from accepted resource history |
 | [0027](0027-investigation-change-correlation.md) | Accepted | Assess committed value-minimized changes in investigations |
 | [0028](0028-untrusted-context-evidence.md) | Accepted | Treat allowlisted repository/runbook content as untrusted Evidence |
+| [0029](0029-investigation-context-correlation.md) | Accepted | Correlate context as untrusted data without copying prose or granting authority |

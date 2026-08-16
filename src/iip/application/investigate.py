@@ -19,6 +19,11 @@ from iip.application.collect_evidence import (
     EvidenceRedactionError,
     InvalidEvidenceRequestError,
 )
+from iip.application.context_evidence import (
+    CollectContextEvidenceCommand,
+    ContextEvidenceService,
+    InvalidContextEvidenceRequestError,
+)
 from iip.application.ports import (
     ActorContext,
     Clock,
@@ -55,6 +60,8 @@ _LOG_SELECTION_ID = re.compile(r"lqs_[a-f0-9]{16}")
 _LOG_RECORD_ID = re.compile(r"log_[a-f0-9]{32}")
 _CHANGE_SELECTION_ID = re.compile(r"cqs_[a-f0-9]{16}")
 _CHANGE_ID = re.compile(r"chg_[a-f0-9]{32}")
+_CONTEXT_SELECTION_ID = re.compile(r"xqs_[a-f0-9]{16}")
+_CONTEXT_DOCUMENT_ID = re.compile(r"ctx_[a-f0-9]{32}")
 _INTEGRATION_ID = re.compile(r"[a-z][a-z0-9._-]{2,127}")
 _RESOURCE_UID = re.compile(r"res_[a-f0-9]{32}")
 _ROOT_CAUSE_CLASS = re.compile(r"[a-z][a-z0-9._/-]{2,127}")
@@ -99,6 +106,7 @@ class DeterministicInvestigationService:
         telemetry: TelemetryEvidenceService | None = None,
         logs: LogEvidenceService | None = None,
         resource_changes: ResourceChangeEvidenceService | None = None,
+        context: ContextEvidenceService | None = None,
         evidence_store: EvidenceStore | None = None,
     ) -> None:
         self._resources = resources
@@ -109,6 +117,7 @@ class DeterministicInvestigationService:
         self._telemetry = telemetry
         self._logs = logs
         self._resource_changes = resource_changes
+        self._context = context
         self._evidence_store = evidence_store
 
     def execute(self, command: RunInvestigationCommand) -> Mapping[str, object]:
@@ -144,6 +153,8 @@ class DeterministicInvestigationService:
         log_unknowns: list[dict[str, object]] = []
         change_assessments: list[dict[str, object]] = []
         change_unknowns: list[dict[str, object]] = []
+        context_assessments: list[dict[str, object]] = []
+        context_unknowns: list[dict[str, object]] = []
         tool_calls = 0
         allowed_tools = spec.get("allowedTools", [])
         requested_types = spec.get("evidenceTypes", [])
@@ -155,6 +166,7 @@ class DeterministicInvestigationService:
             not in {
                 "kubernetes.event",
                 "resource.change",
+                "repository.context",
                 "telemetry.metrics",
                 "telemetry.logs",
             }
@@ -259,6 +271,66 @@ class DeterministicInvestigationService:
                         )
                     else:
                         kubernetes_event_assessments.append(assessment)
+                        evidence_id = str(assessment["evidenceId"])
+                        if assessment["disposition"] == "supporting":
+                            supporting_evidence_ids.append(evidence_id)
+                        elif assessment["disposition"] == "contradicting":
+                            contradicting_evidence_ids.append(evidence_id)
+
+        context_allowed = (
+            (not requested_types or "repository.context" in requested_types)
+            and tools_allow_collection
+        )
+        matching_context_selections = self._matching_context_selections(spec, root_cause)
+        if matching_context_selections and context_allowed and self._context is None:
+            context_unknowns.append(self._context_unknown("unavailable"))
+        elif context_allowed and self._context is not None:
+            for selection in matching_context_selections:
+                if (
+                    tool_calls >= budgets["maxToolCalls"]
+                    or len(evidence_documents) >= budgets["maxEvidenceItems"]
+                ):
+                    break
+                tool_calls += 1
+                try:
+                    context_request = self._context_request(
+                        command,
+                        selection,
+                        scope,
+                        started_at,
+                        budgets,
+                    )
+                    context_evidence = self._context.execute(
+                        CollectContextEvidenceCommand(command.actor, context_request)
+                    )
+                except (
+                    EvidenceAuthorizationError,
+                    EvidenceDeadlineExceededError,
+                    EvidenceProviderUnavailableError,
+                    EvidenceRedactionError,
+                    InvalidContextEvidenceRequestError,
+                    InvalidEvidenceRequestError,
+                    PersistenceError,
+                ):
+                    context_unknowns.append(
+                        self._context_unknown(str(selection["id"]))
+                    )
+                    continue
+                evidence_documents.append(context_evidence)
+                if isinstance(selection.get("interpretation"), Mapping):
+                    assessment = self._assess_context(
+                        command.actor,
+                        selection,
+                        context_evidence,
+                        root_cause,
+                        context_request,
+                    )
+                    if assessment is None:
+                        context_unknowns.append(
+                            self._context_assessment_unknown(str(selection["id"]))
+                        )
+                    else:
+                        context_assessments.append(assessment)
                         evidence_id = str(assessment["evidenceId"])
                         if assessment["disposition"] == "supporting":
                             supporting_evidence_ids.append(evidence_id)
@@ -516,6 +588,7 @@ class DeterministicInvestigationService:
             unknowns = []
         unknowns.extend(kubernetes_event_unknowns)
         unknowns.extend(change_unknowns)
+        unknowns.extend(context_unknowns)
         unknowns.extend(telemetry_unknowns)
         unknowns.extend(log_unknowns)
 
@@ -587,10 +660,289 @@ class DeterministicInvestigationService:
             report_spec = report["spec"]
             if isinstance(report_spec, dict):
                 report_spec["changeAssessments"] = change_assessments
+        if context_assessments:
+            report_spec = report["spec"]
+            if isinstance(report_spec, dict):
+                report_spec["contextAssessments"] = context_assessments
         self._investigations.commit_investigation(
             command.actor, investigation_id, request, report
         )
         return report
+
+    @staticmethod
+    def _matching_context_selections(
+        spec: Mapping[str, object],
+        root_cause: str | None,
+    ) -> tuple[Mapping[str, object], ...]:
+        selections = spec.get("contextSelections", [])
+        if not isinstance(selections, list):
+            return ()
+        matching = []
+        for selection in selections:
+            if not isinstance(selection, Mapping):
+                continue
+            classes = selection.get("rootCauseClasses")
+            if classes is None or (
+                root_cause is not None
+                and isinstance(classes, list)
+                and root_cause in classes
+            ):
+                matching.append(selection)
+        return tuple(matching)
+
+    @staticmethod
+    def _context_request(
+        command: RunInvestigationCommand,
+        selection: Mapping[str, object],
+        scope: Mapping[str, object],
+        started_at: str,
+        budgets: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        material = (
+            f"{command.request['metadata']['id']}\x1f{selection['id']}".encode()
+        )
+        request_id = "ctq_" + hashlib.sha256(material).hexdigest()[:32]
+        max_wall_time = budgets["maxWallTimeSeconds"]
+        if not isinstance(max_wall_time, int) or isinstance(max_wall_time, bool):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "ContextEvidenceRequest",
+            "metadata": {
+                "requestId": request_id,
+                "tenantId": command.actor.tenant_id,
+                "actorId": command.actor.actor_id,
+                "requestedAt": started_at,
+            },
+            "spec": {
+                "integrationId": selection["integrationId"],
+                "resourceRefs": list(scope["resourceUids"]),
+                "query": dict(selection["query"]),
+                "limits": dict(selection["limits"]),
+                "deadline": DeterministicInvestigationService._deadline(
+                    started_at,
+                    min(max_wall_time, 300),
+                ),
+            },
+        }
+
+    @staticmethod
+    def _context_unknown(selection_id: str) -> dict[str, object]:
+        return {
+            "statement": (
+                "Selected repository/runbook context could not be collected for "
+                f"{selection_id}."
+            ),
+            "impact": "medium",
+            "requestedEvidenceTypes": ["repository.context"],
+        }
+
+    @staticmethod
+    def _context_assessment_unknown(selection_id: str) -> dict[str, object]:
+        return {
+            "statement": (
+                "Selected repository/runbook context could not be safely assessed for "
+                f"{selection_id}."
+            ),
+            "impact": "medium",
+            "requestedEvidenceTypes": ["repository.context"],
+        }
+
+    def _assess_context(
+        self,
+        actor: ActorContext,
+        selection: Mapping[str, object],
+        evidence: Mapping[str, object],
+        root_cause: str | None,
+        context_request: Mapping[str, object],
+    ) -> dict[str, object] | None:
+        interpretation = selection.get("interpretation")
+        if (
+            self._evidence_store is None
+            or root_cause is None
+            or not isinstance(interpretation, Mapping)
+        ):
+            return None
+        try:
+            metadata = evidence["metadata"]
+            if not isinstance(metadata, Mapping):
+                return None
+            evidence_id = metadata["id"]
+            if not isinstance(evidence_id, str):
+                return None
+            artifact = self._evidence_store.read_artifact(actor, evidence_id)
+        except (KeyError, PersistenceError):
+            return None
+        if not isinstance(artifact, bytes):
+            return None
+        try:
+            document = json.loads(artifact.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        if (
+            not isinstance(document, Mapping)
+            or set(document) != {"apiVersion", "kind", "metadata", "spec"}
+            or document.get("apiVersion") != "iip.platform/v1alpha1"
+            or document.get("kind") != "ContextEvidenceResult"
+        ):
+            return None
+        artifact_metadata = document.get("metadata")
+        artifact_spec = document.get("spec")
+        request_metadata = context_request.get("metadata")
+        request_spec = context_request.get("spec")
+        if (
+            not isinstance(artifact_metadata, Mapping)
+            or set(artifact_metadata)
+            != {"requestId", "tenantId", "integrationId", "createdAt"}
+            or not isinstance(request_metadata, Mapping)
+            or artifact_metadata.get("requestId") != request_metadata.get("requestId")
+            or artifact_metadata.get("tenantId") != actor.tenant_id
+            or artifact_metadata.get("integrationId") != selection.get("integrationId")
+            or self._parse_datetime(artifact_metadata.get("createdAt")) is None
+            or not isinstance(artifact_spec, Mapping)
+            or set(artifact_spec)
+            != {"requestDigest", "status", "documents", "summary", "warnings"}
+            or not isinstance(request_spec, Mapping)
+            or artifact_spec.get("requestDigest") != canonical_digest(context_request)
+        ):
+            return None
+        status = artifact_spec.get("status")
+        documents = artifact_spec.get("documents")
+        summary = artifact_spec.get("summary")
+        warnings = artifact_spec.get("warnings")
+        query = request_spec.get("query")
+        limits = request_spec.get("limits")
+        refs = request_spec.get("resourceRefs")
+        if (
+            status not in {"complete", "partial", "no-data"}
+            or not isinstance(documents, list)
+            or not isinstance(summary, Mapping)
+            or set(summary) != {"documentCount", "countsByKind"}
+            or not isinstance(warnings, list)
+            or len(warnings) != len(set(warnings))
+            or any(
+                warning
+                not in {"backend-partial", "document-limit", "excerpt-limit"}
+                for warning in warnings
+            )
+            or not isinstance(query, Mapping)
+            or not isinstance(query.get("kinds"), list)
+            or not isinstance(query.get("referenceIds"), list)
+            or not isinstance(limits, Mapping)
+            or not isinstance(limits.get("maxDocuments"), int)
+            or not isinstance(limits.get("maxExcerptChars"), int)
+            or len(documents) > limits["maxDocuments"]
+            or not isinstance(refs, list)
+        ):
+            return None
+        if status == "no-data":
+            if documents or warnings:
+                return None
+        elif status == "partial":
+            if not warnings:
+                return None
+        elif not documents or warnings:
+            return None
+
+        requested_kinds = set(query["kinds"])
+        requested_references = set(query["referenceIds"])
+        known_kinds = {"runbook", "source", "configuration", "service-catalog"}
+        if not requested_kinds:
+            requested_kinds = known_kinds
+        ids: set[str] = set()
+        references: set[str] = set()
+        counts: dict[str, int] = {}
+        sort_keys: list[tuple[str, str]] = []
+        required = {
+            "id",
+            "referenceId",
+            "resourceRefs",
+            "kind",
+            "title",
+            "locator",
+            "revision",
+            "excerpt",
+            "excerptHash",
+            "redactionMethods",
+            "trust",
+            "instructionPolicy",
+        }
+        for item in documents:
+            if not isinstance(item, Mapping) or set(item) != required:
+                return None
+            document_id = item.get("id")
+            reference_id = item.get("referenceId")
+            document_refs = item.get("resourceRefs")
+            kind = item.get("kind")
+            excerpt = item.get("excerpt")
+            methods = item.get("redactionMethods")
+            if (
+                not isinstance(document_id, str)
+                or not _CONTEXT_DOCUMENT_ID.fullmatch(document_id)
+                or document_id in ids
+                or not isinstance(reference_id, str)
+                or reference_id in references
+                or (requested_references and reference_id not in requested_references)
+                or kind not in requested_kinds
+                or not isinstance(document_refs, list)
+                or not document_refs
+                or not set(document_refs).issubset(refs)
+                or len(document_refs) != len(set(document_refs))
+                or not self._safe_log_text(item.get("title"), maximum=256)
+                or not self._safe_log_text(item.get("locator"), maximum=2048)
+                or not self._safe_log_text(item.get("revision"), maximum=128)
+                or not isinstance(excerpt, str)
+                or not 1 <= len(excerpt) <= limits["maxExcerptChars"]
+                or item.get("excerptHash")
+                != "sha256:" + hashlib.sha256(excerpt.encode("utf-8")).hexdigest()
+                or not isinstance(methods, list)
+                or not methods
+                or len(methods) != len(set(methods))
+                or any(
+                    not isinstance(method, str)
+                    or not _ROOT_CAUSE_CLASS.fullmatch(method)
+                    for method in methods
+                )
+                or item.get("trust") != "untrusted"
+                or item.get("instructionPolicy") != "data-only"
+            ):
+                return None
+            ids.add(document_id)
+            references.add(reference_id)
+            counts[str(kind)] = counts.get(str(kind), 0) + 1
+            sort_keys.append((str(kind), reference_id))
+        if (
+            sort_keys != sorted(sort_keys)
+            or summary.get("documentCount") != len(documents)
+            or summary.get("countsByKind") != dict(sorted(counts.items()))
+        ):
+            return None
+
+        assessment: dict[str, object] = {
+            "selectionId": selection["id"],
+            "evidenceId": evidence_id,
+            "rootCauseClass": root_cause,
+            "kinds": list(query["kinds"]),
+            "referenceIds": list(query["referenceIds"]),
+            "minDocuments": interpretation["minDocuments"],
+        }
+        if status == "no-data":
+            assessment["disposition"] = "no-data"
+            return assessment
+        if status == "partial":
+            assessment["disposition"] = "incomplete"
+            return assessment
+        observed_count = len(documents)
+        configured = interpretation[
+            "whenMatched"
+            if observed_count >= interpretation["minDocuments"]
+            else "whenNotMatched"
+        ]
+        assessment["observedDocumentCount"] = observed_count
+        assessment["observedDocumentIds"] = sorted(ids)
+        assessment["observedReferenceIds"] = sorted(references)
+        assessment["disposition"] = self._assessment_disposition(configured)
+        return assessment
 
     @staticmethod
     def _matching_change_selections(
@@ -2183,6 +2535,86 @@ class DeterministicInvestigationService:
             event_selection_ids.add(event_selection_id)
         spec["kubernetesEventSelections"] = normalized_event_selections
 
+        context_selections = spec.get("contextSelections", [])
+        if not isinstance(context_selections, list) or len(context_selections) > 8:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        normalized_context_selections: list[dict[str, object]] = []
+        context_selection_ids: set[str] = set()
+        for value in context_selections:
+            if (
+                not isinstance(value, Mapping)
+                or not {"id", "integrationId", "query", "limits"} <= set(value)
+                or set(value).difference(
+                    {
+                        "id",
+                        "integrationId",
+                        "query",
+                        "limits",
+                        "rootCauseClasses",
+                        "interpretation",
+                    }
+                )
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            context_selection_id = value.get("id")
+            integration_id = value.get("integrationId")
+            if (
+                not isinstance(context_selection_id, str)
+                or not _CONTEXT_SELECTION_ID.fullmatch(context_selection_id)
+                or context_selection_id in context_selection_ids
+                or not isinstance(integration_id, str)
+                or not _INTEGRATION_ID.fullmatch(integration_id)
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            try:
+                context_query, context_limits = (
+                    ContextEvidenceService.validate_query_contract(
+                        value.get("query"), value.get("limits")
+                    )
+                )
+            except InvalidContextEvidenceRequestError:
+                raise InvalidInvestigationError(
+                    "investigation.contract.invalid"
+                ) from None
+            context_classes = value.get("rootCauseClasses")
+            if context_classes is not None and (
+                not isinstance(context_classes, list)
+                or not 1 <= len(context_classes) <= 16
+                or any(
+                    not isinstance(root_cause, str)
+                    or not _ROOT_CAUSE_CLASS.fullmatch(root_cause)
+                    for root_cause in context_classes
+                )
+                or len(context_classes) != len(set(context_classes))
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            context_interpretation = value.get("interpretation")
+            normalized_context_interpretation = None
+            if context_interpretation is not None:
+                if context_classes is None:
+                    raise InvalidInvestigationError(
+                        "investigation.contract.invalid"
+                    )
+                normalized_context_interpretation = (
+                    DeterministicInvestigationService._validate_context_interpretation(
+                        context_interpretation,
+                        maximum_documents=context_limits["maxDocuments"],
+                    )
+                )
+            normalized_context: dict[str, object] = {
+                "id": context_selection_id,
+                "integrationId": integration_id,
+                "query": context_query,
+                "limits": context_limits,
+            }
+            if context_classes is not None:
+                normalized_context["rootCauseClasses"] = list(context_classes)
+            if normalized_context_interpretation is not None:
+                normalized_context["interpretation"] = normalized_context_interpretation
+            normalized_context_selections.append(normalized_context)
+            context_selection_ids.add(context_selection_id)
+        spec["contextSelections"] = normalized_context_selections
+
         change_selections = spec.get("changeSelections", [])
         if not isinstance(change_selections, list) or len(change_selections) > 8:
             raise InvalidInvestigationError("investigation.contract.invalid")
@@ -2485,6 +2917,32 @@ class DeterministicInvestigationService:
             not isinstance(minimum, int)
             or isinstance(minimum, bool)
             or not 1 <= minimum <= maximum_changes
+            or when_matched not in _INTERPRETATION_DISPOSITIONS
+            or when_not_matched not in _INTERPRETATION_DISPOSITIONS
+            or when_matched == when_not_matched
+        ):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        return dict(value)
+
+    @staticmethod
+    def _validate_context_interpretation(
+        value: object,
+        *,
+        maximum_documents: int,
+    ) -> dict[str, object]:
+        if not isinstance(value, Mapping) or set(value) != {
+            "minDocuments",
+            "whenMatched",
+            "whenNotMatched",
+        }:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        minimum = value.get("minDocuments")
+        when_matched = value.get("whenMatched")
+        when_not_matched = value.get("whenNotMatched")
+        if (
+            not isinstance(minimum, int)
+            or isinstance(minimum, bool)
+            or not 1 <= minimum <= maximum_documents
             or when_matched not in _INTERPRETATION_DISPOSITIONS
             or when_not_matched not in _INTERPRETATION_DISPOSITIONS
             or when_matched == when_not_matched

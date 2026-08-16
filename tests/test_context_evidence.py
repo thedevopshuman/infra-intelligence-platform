@@ -23,6 +23,10 @@ from iip.application.context_evidence import (
     InvalidContextEvidenceRequestError,
 )
 from iip.application.ingest_resource import IngestResourceCommand
+from iip.application.investigate import (
+    InvalidInvestigationError,
+    RunInvestigationCommand,
+)
 from iip.application.ports import ActorContext
 from iip.bootstrap import build_local_runtime
 from iip.surfaces.http import ApiHandler
@@ -178,6 +182,120 @@ class ContextEvidenceTests(unittest.TestCase):
             build_context_backend_from_environment(
                 {"IIP_CONTEXT_INTEGRATIONS_JSON": json.dumps(payload)},
                 SystemClock(),
+            )
+
+    def investigation_request(self, marker: str = "e") -> dict:
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "InvestigationRequest",
+            "metadata": {
+                "id": "inv_" + marker * 32,
+                "tenantId": self.actor.tenant_id,
+                "actorId": self.actor.actor_id,
+                "requestedAt": iso(self.now),
+            },
+            "spec": {
+                "question": "Is the approved rollout runbook available for this incident?",
+                "trigger": {
+                    "type": "alert",
+                    "source": "urn:iip:test:alert",
+                    "summary": "One rollout replica is unavailable.",
+                },
+                "scope": {
+                    "resourceUids": [self.uid],
+                    "timeRange": {
+                        "start": iso(self.now - timedelta(minutes=5)),
+                        "end": iso(self.now),
+                    },
+                },
+                "evidenceTypes": [
+                    "kubernetes.resource-status",
+                    "repository.context",
+                ],
+                "allowedTools": ["evidence/fetch"],
+                "contextSelections": [
+                    {
+                        "id": "xqs_0123456789abcdef",
+                        "integrationId": "context-local",
+                        "rootCauseClasses": [
+                            "kubernetes.rollout.unavailable-replicas"
+                        ],
+                        "query": {
+                            "kinds": ["runbook"],
+                            "referenceIds": ["runbooks/api-rollout"],
+                        },
+                        "limits": {
+                            "maxDocuments": 4,
+                            "maxExcerptChars": 4096,
+                            "maxBytes": 262144,
+                        },
+                        "interpretation": {
+                            "minDocuments": 1,
+                            "whenMatched": "supports",
+                            "whenNotMatched": "neutral",
+                        },
+                    }
+                ],
+                "budgets": {
+                    "maxToolCalls": 4,
+                    "maxWallTimeSeconds": 60,
+                    "maxModelTokens": 0,
+                    "maxCostUsd": 0,
+                    "maxEvidenceItems": 4,
+                    "maxIterations": 1,
+                },
+                "maxAuthority": "read",
+            },
+        }
+
+    def test_investigation_cites_only_committed_context_metadata(self) -> None:
+        request = self.investigation_request()
+        report = self.runtime.investigations.execute(
+            RunInvestigationCommand(self.actor, request)
+        )
+
+        assessment = report["spec"]["contextAssessments"][0]
+        self.assertEqual(assessment["disposition"], "supporting")
+        self.assertEqual(assessment["observedDocumentCount"], 1)
+        self.assertEqual(assessment["observedReferenceIds"], ["runbooks/api-rollout"])
+        self.assertNotIn("excerpt", assessment)
+        self.assertIn(
+            assessment["evidenceId"],
+            report["spec"]["hypotheses"][0]["supportingEvidenceIds"],
+        )
+        schema = json.loads(
+            (ROOT / "contracts/schemas/investigation-report.schema.json").read_text()
+        )
+        self.assertEqual(
+            validate_schemas.instance_validation_errors(
+                schema, report, label="investigation context report"
+            ),
+            [],
+        )
+
+    def test_partial_context_is_incomplete_and_invalid_rule_fails_early(self) -> None:
+        partial = self.investigation_request("f")
+        partial["spec"]["contextSelections"][0]["limits"]["maxExcerptChars"] = 10
+        report = self.runtime.investigations.execute(
+            RunInvestigationCommand(self.actor, partial)
+        )
+        assessment = report["spec"]["contextAssessments"][0]
+        self.assertEqual(assessment["disposition"], "incomplete")
+        self.assertNotIn("observedDocumentCount", assessment)
+        self.assertNotIn(
+            assessment["evidenceId"],
+            report["spec"]["hypotheses"][0]["supportingEvidenceIds"],
+        )
+
+        invalid = self.investigation_request("1")
+        invalid["spec"]["contextSelections"][0]["interpretation"][
+            "minDocuments"
+        ] = 5
+        with self.assertRaisesRegex(
+            InvalidInvestigationError, "investigation.contract.invalid"
+        ):
+            self.runtime.investigations.execute(
+                RunInvestigationCommand(self.actor, invalid)
             )
 
 

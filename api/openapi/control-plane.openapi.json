@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.7.0",
-    "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, Kubernetes Event, and resource-change evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven evidence assessment, governed actions, and bounded plugin sessions."
+    "version": "0.8.0",
+    "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, Kubernetes Event, resource-change, and repository/runbook context evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven evidence assessment, governed actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -365,7 +365,7 @@
     "/v1/investigations": {
       "post": {
         "operationId": "runInvestigation",
-        "description": "Run a bounded investigation. Optional Kubernetes Event, metric, and historical log selections inherit authenticated identity, resource/time scope, and investigation tool/evidence budgets before using configured backend-neutral adapters. Root-cause-scoped selections assess only committed normalized artifacts and record supporting, contradicting, neutral, no-data, or incomplete results; deterministic log assessment never interprets body prose.",
+        "description": "Run a bounded investigation. Optional Kubernetes Event, repository/runbook context, resource-change, metric, and historical log selections inherit authenticated identity, resource/time scope, and investigation tool/evidence budgets before using configured backend-neutral adapters. Root-cause-scoped selections assess only committed normalized artifacts and record supporting, contradicting, neutral, no-data, or incomplete results. Context and log prose is untrusted data, is never interpreted as instructions, and is not copied into reports.",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-request.schema.json"}}}},
         "responses": {
           "201": {"description": "Immutable terminal investigation report", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-report.schema.json"}}}},
@@ -504,6 +504,8 @@
       "KubernetesEventEvidenceResult": {"$ref": "../../contracts/schemas/kubernetes-event-evidence-result.schema.json"},
       "ResourceChangeEvidenceRequest": {"$ref": "../../contracts/schemas/resource-change-evidence-request.schema.json"},
       "ResourceChangeEvidenceResult": {"$ref": "../../contracts/schemas/resource-change-evidence-result.schema.json"},
+      "ContextEvidenceRequest": {"$ref": "../../contracts/schemas/context-evidence-request.schema.json"},
+      "ContextEvidenceResult": {"$ref": "../../contracts/schemas/context-evidence-result.schema.json"},
       "TelemetryEvidenceRequest": {"$ref": "../../contracts/schemas/telemetry-evidence-request.schema.json"},
       "TelemetryEvidenceResult": {"$ref": "../../contracts/schemas/telemetry-evidence-result.schema.json"},
       "OtlpMetricsEvidence": {"$ref": "../../contracts/schemas/otlp-metrics-evidence.schema.json"},

@@ -81,6 +81,11 @@
           "maxItems": 8,
           "items": {"$ref": "#/$defs/changeAssessment"}
         },
+        "contextAssessments": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {"$ref": "#/$defs/contextAssessment"}
+        },
         "evidenceIds": {
           "type": "array",
           "maxItems": 1024,
@@ -607,6 +612,72 @@
               "anyOf": [
                 {"required": ["observedChangeCount"]},
                 {"required": ["observedChangeIds"]}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "contextAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selectionId", "evidenceId", "rootCauseClass", "kinds",
+        "referenceIds", "minDocuments", "disposition"
+      ],
+      "properties": {
+        "selectionId": {"type": "string", "pattern": "^xqs_[a-f0-9]{16}$"},
+        "evidenceId": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"},
+        "rootCauseClass": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{2,127}$"},
+        "kinds": {
+          "type": "array",
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {"type": "string", "enum": ["runbook", "source", "configuration", "service-catalog"]}
+        },
+        "referenceIds": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{2,127}$"}
+        },
+        "minDocuments": {"type": "integer", "minimum": 1, "maximum": 32},
+        "observedDocumentCount": {"type": "integer", "minimum": 1, "maximum": 32},
+        "observedDocumentIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^ctx_[a-f0-9]{32}$"}
+        },
+        "observedReferenceIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{2,127}$"}
+        },
+        "disposition": {
+          "type": "string",
+          "enum": ["supporting", "contradicting", "neutral", "no-data", "incomplete"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {"enum": ["supporting", "contradicting", "neutral"]}
+            }
+          },
+          "then": {
+            "required": ["observedDocumentCount", "observedDocumentIds", "observedReferenceIds"]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {"required": ["observedDocumentCount"]},
+                {"required": ["observedDocumentIds"]},
+                {"required": ["observedReferenceIds"]}
               ]
             }
           }

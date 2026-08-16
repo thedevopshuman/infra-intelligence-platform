@@ -16,6 +16,9 @@ from .models import (
     InvestigationChangeAssessment,
     InvestigationChangeInterpretation,
     InvestigationChangeSelection,
+    InvestigationContextAssessment,
+    InvestigationContextInterpretation,
+    InvestigationContextSelection,
     InvestigationKubernetesEventAssessment,
     InvestigationKubernetesEventInterpretation,
     InvestigationKubernetesEventSelection,
@@ -64,6 +67,9 @@ __all__ = [
     "InvestigationChangeAssessment",
     "InvestigationChangeInterpretation",
     "InvestigationChangeSelection",
+    "InvestigationContextAssessment",
+    "InvestigationContextInterpretation",
+    "InvestigationContextSelection",
     "InvestigationKubernetesEventAssessment",
     "InvestigationKubernetesEventInterpretation",
     "InvestigationKubernetesEventSelection",
@@ -95,4 +101,4 @@ __all__ = [
     "TelemetryEvidenceRequest",
     "TelemetryEvidenceResult",
 ]
-__version__ = "0.10.0"
+__version__ = "0.11.0"

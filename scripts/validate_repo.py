@@ -57,6 +57,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0032-scope-end-rolling-baseline.md",
     "docs/decisions/0033-adversarial-evidence-release-gate.md",
     "docs/decisions/0034-auditable-cross-signal-planning.md",
+    "docs/decisions/0035-one-shot-action-execution.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/kubernetes-event-evidence.md",
@@ -72,6 +73,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/integration-config.schema.json",
     "contracts/schemas/action-proposal.schema.json",
     "contracts/schemas/action-approval.schema.json",
+    "contracts/schemas/action-execution-status.schema.json",
     "contracts/schemas/action-result.schema.json",
     "contracts/schemas/plugin-session.schema.json",
     "contracts/schemas/resource-collection-request.schema.json",
@@ -115,6 +117,7 @@ REQUIRED_PATHS = (
     "contracts/examples/integration-config.json",
     "contracts/examples/action-proposal.json",
     "contracts/examples/action-approval.json",
+    "contracts/examples/action-execution-status.json",
     "contracts/examples/action-result.json",
     "contracts/examples/plugin-session.json",
     "contracts/examples/investigation-request.json",
@@ -183,6 +186,7 @@ REQUIRED_PATHS = (
     "src/iip/adapters/otlp_logs_receiver.py",
     "src/iip/adapters/postgres/migrations/0006_source_checkpoint_provider_cursors.sql",
     "src/iip/adapters/postgres/migrations/0007_investigation_lifecycle.sql",
+    "src/iip/adapters/postgres/migrations/0008_action_execution_lifecycle.sql",
     "tests/test_evidence_collection.py",
     "tests/test_kubernetes_event_evidence.py",
     "tests/test_telemetry_evidence.py",
@@ -2235,6 +2239,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
 
     versioned_examples = (
         ("action-approval.json", "ActionApproval"),
+        ("action-execution-status.json", "ActionExecutionStatus"),
         ("action-proposal.json", "ActionProposal"),
         ("action-result.json", "ActionResult"),
         ("agent-manifest.json", "Agent"),
@@ -2330,11 +2335,17 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
 
     action_proposal = documents.get(example_dir / "action-proposal.json")
     action_approval = documents.get(example_dir / "action-approval.json")
+    action_execution = documents.get(example_dir / "action-execution-status.json")
     action_result = documents.get(example_dir / "action-result.json")
     plugin_session = documents.get(example_dir / "plugin-session.json")
     if all(
         isinstance(item, dict)
-        for item in (action_proposal, action_approval, action_result)
+        for item in (
+            action_proposal,
+            action_approval,
+            action_execution,
+            action_result,
+        )
     ):
         proposal_metadata = action_proposal["metadata"]
         proposal_spec = action_proposal["spec"]
@@ -2342,10 +2353,13 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         approval_spec = action_approval["spec"]
         result_metadata = action_result["metadata"]
         result_spec = action_result["spec"]
+        execution_metadata = action_execution["metadata"]
+        execution_spec = action_execution["spec"]
         if len(
             {
                 proposal_metadata.get("tenantId"),
                 approval_metadata.get("tenantId"),
+                execution_metadata.get("tenantId"),
                 result_metadata.get("tenantId"),
             }
         ) != 1:
@@ -2354,12 +2368,22 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             fail(errors, "action approval must identify its proposal")
         if result_metadata.get("id") != proposal_metadata.get("id"):
             fail(errors, "action result must identify its proposal")
+        if execution_metadata.get("id") != proposal_metadata.get("id"):
+            fail(errors, "action execution status must identify its proposal")
         if result_spec.get("approvalId") != approval_metadata.get("id"):
             fail(errors, "action result must identify its approval")
+        if execution_spec.get("approvalId") != approval_metadata.get("id"):
+            fail(errors, "action execution status must identify its approval")
         if result_spec.get("idempotencyKey") != proposal_spec.get("idempotencyKey"):
             fail(errors, "action result must retain its proposal idempotency key")
         if result_spec.get("proposalDigest") != canonical_digest(action_proposal):
             fail(errors, "action result proposalDigest must match its proposal")
+        if approval_spec.get("proposalDigest") != canonical_digest(action_proposal):
+            fail(errors, "action approval proposalDigest must match its proposal")
+        if execution_spec.get("proposalDigest") != canonical_digest(action_proposal):
+            fail(errors, "action execution proposalDigest must match its proposal")
+        if execution_spec.get("state") != result_spec.get("outcome"):
+            fail(errors, "terminal action execution state must match result outcome")
         if proposal_metadata.get("actorId") == approval_metadata.get("approverId"):
             fail(errors, "action proposal and approval actors must be distinct")
         proposal_time = parse_timestamp(proposal_metadata.get("createdAt"))

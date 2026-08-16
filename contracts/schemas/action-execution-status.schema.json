@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:action-execution-status:v1alpha1",
+  "title": "Infrastructure Intelligence Action Execution Status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "ActionExecutionStatus"},
+    "metadata": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "tenantId", "updatedAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^act_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "updatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object", "additionalProperties": false,
+      "required": ["proposalDigest", "approvalId", "state", "attempt", "executorActorId", "startedAt", "policyDecision"],
+      "properties": {
+        "proposalDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "approvalId": {"type": "string", "pattern": "^apr_[a-f0-9]{32}$"},
+        "state": {"type": "string", "enum": ["executing", "dry-run", "succeeded", "failed", "rolled-back", "manual-reconciliation-required"]},
+        "attempt": {"const": 1},
+        "executorActorId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "startedAt": {"type": "string", "format": "date-time"},
+        "leaseExpiresAt": {"type": "string", "format": "date-time"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "operationRef": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048},
+        "summary": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "policyDecision": {
+          "type": "object", "additionalProperties": false,
+          "required": ["allowed", "reasonCode", "policySnapshotRef", "inputDigest"],
+          "properties": {
+            "allowed": {"const": true},
+            "reasonCode": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$"},
+            "policySnapshotRef": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048},
+            "inputDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"spec": {"properties": {"state": {"const": "executing"}}}}},
+      "then": {"properties": {"spec": {"required": ["leaseExpiresAt"], "not": {"anyOf": [{"required": ["completedAt"]}, {"required": ["operationRef"]}, {"required": ["summary"]}]}}}},
+      "else": {"properties": {"spec": {"required": ["completedAt", "summary"], "not": {"required": ["leaseExpiresAt"]}}}}
+    },
+    {
+      "if": {"properties": {"spec": {"properties": {"state": {"enum": ["dry-run", "succeeded", "failed", "rolled-back"]}}}}},
+      "then": {"properties": {"spec": {"required": ["operationRef"]}}}
+    }
+  ]
+}

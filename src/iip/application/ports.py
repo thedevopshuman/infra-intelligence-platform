@@ -737,10 +737,32 @@ class ActionRepository(Protocol):
     ) -> Optional[Mapping[str, object]]:
         """Resolve an idempotent terminal action result."""
 
-    def commit_action_result(
+    def claim_action_execution(
         self, actor: ActorContext, document: Mapping[str, object]
+    ) -> bool:
+        """Atomically claim the one permitted execution attempt for a proposal."""
+
+    def get_action_execution_status(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[Mapping[str, object]]:
+        """Resolve the durable execution lifecycle for one proposal."""
+
+    def mark_action_execution_uncertain(
+        self,
+        actor: ActorContext,
+        proposal_id: str,
+        observed_at: str,
+        document: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        """Fail an expired execution lease closed without replaying its side effect."""
+
+    def commit_action_result(
+        self,
+        actor: ActorContext,
+        document: Mapping[str, object],
+        status: Mapping[str, object],
     ) -> None:
-        """Persist a terminal action result once."""
+        """Atomically persist the terminal action result and lifecycle state once."""
 
 
 @dataclass(frozen=True)

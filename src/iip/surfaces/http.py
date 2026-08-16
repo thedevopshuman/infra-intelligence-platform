@@ -109,7 +109,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.13.0"
+    server_version = "IIPReference/0.14.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -496,8 +496,19 @@ class ApiHandler(BaseHTTPRequestHandler):
             status = (
                 HTTPStatus.FORBIDDEN
                 if any(word in code for word in ("denied", "role-required", "not-approved"))
+                else HTTPStatus.SERVICE_UNAVAILABLE
+                if code.endswith("state-unavailable")
                 else HTTPStatus.CONFLICT
-                if any(word in code for word in ("conflict", "expired"))
+                if any(
+                    word in code
+                    for word in (
+                        "conflict",
+                        "expired",
+                        "in-progress",
+                        "reconciliation-required",
+                        "proposal-mismatch",
+                    )
+                )
                 else HTTPStatus.BAD_REQUEST
             )
             self._json(status, {"error": {"code": code}})
@@ -753,6 +764,11 @@ class ApiHandler(BaseHTTPRequestHandler):
         self, actor: ActorContext, proposal_id: str
     ) -> Optional[Mapping[str, object]]:
         document = self.runtime.operational_store.get_action_result(actor, proposal_id)
+        if document is not None:
+            return document
+        document = self.runtime.operational_store.get_action_execution_status(
+            actor, proposal_id
+        )
         if document is not None:
             return document
         return self.runtime.operational_store.get_proposal(actor, proposal_id)

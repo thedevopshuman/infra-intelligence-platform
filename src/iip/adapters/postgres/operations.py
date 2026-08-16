@@ -336,16 +336,185 @@ class PostgresOperationalStore:
             (actor.tenant_id, proposal_id),
         )
 
-    def commit_action_result(
+    def claim_action_execution(
         self, actor: ActorContext, document: Mapping[str, object]
+    ) -> bool:
+        self._assert_tenant(actor, document)
+        metadata = document.get("metadata")
+        spec = document.get("spec")
+        if (
+            not isinstance(metadata, Mapping)
+            or not isinstance(spec, Mapping)
+            or spec.get("state") != "executing"
+        ):
+            raise PersistenceError("storage.input-invalid")
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    INSERT INTO iip.action_executions (
+                        tenant_id, proposal_id, state, document,
+                        lease_expires_at, updated_at
+                    ) VALUES (%s, %s, 'executing', %s, %s, %s)
+                    ON CONFLICT (tenant_id, proposal_id) DO NOTHING
+                    RETURNING proposal_id
+                    """,
+                    (
+                        actor.tenant_id,
+                        metadata["id"],
+                        Jsonb(dict(document)),
+                        spec["leaseExpiresAt"],
+                        metadata["updatedAt"],
+                    ),
+                ).fetchone()
+            return row is not None
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def get_action_execution_status(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[Mapping[str, object]]:
+        return self._one_document(
+            "SELECT document FROM iip.action_executions WHERE tenant_id = %s AND proposal_id = %s",
+            (actor.tenant_id, proposal_id),
+        )
+
+    def mark_action_execution_uncertain(
+        self,
+        actor: ActorContext,
+        proposal_id: str,
+        observed_at: str,
+        document: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self._assert_tenant(actor, document)
+        metadata = document.get("metadata")
+        spec = document.get("spec")
+        if not isinstance(metadata, Mapping) or not isinstance(spec, Mapping):
+            raise PersistenceError("storage.input-invalid")
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    UPDATE iip.action_executions
+                    SET state = 'manual-reconciliation-required',
+                        document = %s,
+                        lease_expires_at = NULL,
+                        updated_at = %s
+                    WHERE tenant_id = %s
+                      AND proposal_id = %s
+                      AND state = 'executing'
+                      AND lease_expires_at <= %s
+                    RETURNING document
+                    """,
+                    (
+                        Jsonb(dict(document)),
+                        metadata["updatedAt"],
+                        actor.tenant_id,
+                        proposal_id,
+                        observed_at,
+                    ),
+                ).fetchone()
+                if row is None:
+                    row = connection.execute(
+                        """
+                        SELECT document
+                        FROM iip.action_executions
+                        WHERE tenant_id = %s AND proposal_id = %s
+                        """,
+                        (actor.tenant_id, proposal_id),
+                    ).fetchone()
+            if row is None:
+                raise PersistenceError("storage.not-found")
+            return dict(row["document"])
+        except PersistenceError:
+            raise
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def commit_action_result(
+        self,
+        actor: ActorContext,
+        document: Mapping[str, object],
+        status: Mapping[str, object],
     ) -> None:
         self._assert_tenant(actor, document)
+        self._assert_tenant(actor, status)
         metadata = document["metadata"]
-        assert isinstance(metadata, Mapping)
-        self._insert(
-            "INSERT INTO iip.action_results (tenant_id, proposal_id, document, completed_at) VALUES (%s, %s, %s, %s)",
-            (actor.tenant_id, metadata["id"], Jsonb(dict(document)), metadata["completedAt"]),
-        )
+        status_metadata = status.get("metadata")
+        status_spec = status.get("spec")
+        assert isinstance(metadata, Mapping) and isinstance(status_metadata, Mapping)
+        if (
+            status_metadata.get("id") != metadata.get("id")
+            or not isinstance(status_spec, Mapping)
+            or status_spec.get("state") == "executing"
+        ):
+            raise PersistenceError("storage.input-invalid")
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    UPDATE iip.action_executions
+                    SET state = %s,
+                        document = %s,
+                        lease_expires_at = NULL,
+                        updated_at = %s
+                    WHERE tenant_id = %s
+                      AND proposal_id = %s
+                      AND state = 'executing'
+                    RETURNING proposal_id
+                    """,
+                    (
+                        status_spec["state"],
+                        Jsonb(dict(status)),
+                        status_metadata["updatedAt"],
+                        actor.tenant_id,
+                        metadata["id"],
+                    ),
+                ).fetchone()
+                if row is None:
+                    existing = connection.execute(
+                        """
+                        SELECT document
+                        FROM iip.action_results
+                        WHERE tenant_id = %s AND proposal_id = %s
+                        """,
+                        (actor.tenant_id, metadata["id"]),
+                    ).fetchone()
+                    existing_status = connection.execute(
+                        """
+                        SELECT document
+                        FROM iip.action_executions
+                        WHERE tenant_id = %s AND proposal_id = %s
+                        """,
+                        (actor.tenant_id, metadata["id"]),
+                    ).fetchone()
+                    if (
+                        existing is not None
+                        and existing_status is not None
+                        and dict(existing["document"]) == dict(document)
+                        and dict(existing_status["document"]) == dict(status)
+                    ):
+                        return
+                    raise PersistenceError("storage.conflict")
+                connection.execute(
+                    """
+                    INSERT INTO iip.action_results (
+                        tenant_id, proposal_id, document, completed_at
+                    ) VALUES (%s, %s, %s, %s)
+                    """,
+                    (
+                        actor.tenant_id,
+                        metadata["id"],
+                        Jsonb(dict(document)),
+                        metadata["completedAt"],
+                    ),
+                )
+        except PersistenceError:
+            raise
+        except psycopg.errors.UniqueViolation:
+            raise PersistenceError("storage.conflict") from None
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
 
     def commit_plugin_session(
         self, actor: ActorContext, document: Mapping[str, object]

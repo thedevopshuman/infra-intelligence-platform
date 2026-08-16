@@ -282,6 +282,7 @@ def _compose_runtime(
             KubernetesRestartDryRunExecutor(),
             operational,
             clock,
+            operational,
         ),
         plugin_sessions=PluginSessionService(policy, operational, clock),
         operational_store=operational,

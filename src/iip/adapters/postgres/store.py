@@ -44,6 +44,7 @@ _MIGRATIONS = (
     "0005_projection_rebuild_source.sql",
     "0006_source_checkpoint_provider_cursors.sql",
     "0007_investigation_lifecycle.sql",
+    "0008_action_execution_lifecycle.sql",
 )
 
 

@@ -91,7 +91,7 @@ Deliverables:
 
 Exit gate: duplicate delivery cannot duplicate impact; policy, approval, execution, and verification are fully reconstructable.
 
-Reference slice delivered: versioned proposal/approval/result contracts, durable idempotency, expiry, role separation, current policy checks, audit references, a no-impact Kubernetes restart dry-run executor, protected credential-lease contracts, and an external workload-identity broker client shared by read adapters. Remaining: a production credential issuer with policy/audit/revocation interoperability, production policy engine, durable retry/timer worker, approval UI, live server-side dry-run, mutation-scoped credential integration, verification, and tested rollback.
+Reference slice delivered: versioned proposal/approval/result and execution-lifecycle contracts, investigation- and target-bound closed parameters, role separation, content-digested policy checks at proposal/approval/execution time, a durable one-shot pre-impact execution claim, concurrent duplicate rejection, fail-closed stale-lease recovery without replay, atomic terminal result/state persistence, audit references, a no-impact Kubernetes restart dry-run executor, protected credential-lease contracts, and an external workload-identity broker client shared by read adapters. Remaining: a production credential issuer with policy/audit/revocation interoperability, production policy engine, background timer/reconciliation worker, full approval controls in the console, live server-side dry-run, mutation-scoped credential integration, verification, and tested rollback.
 
 ## Phase 5 — plugin SDK and first design partner
 

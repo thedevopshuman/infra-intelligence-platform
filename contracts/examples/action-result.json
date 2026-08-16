@@ -7,12 +7,14 @@
     "completedAt": "2026-08-14T13:03:00Z"
   },
   "spec": {
-    "proposalDigest": "sha256:8e1a256c41579a1e1fe0ae6bf88c06878ef00c9671d914060cca88c9e424f9b6",
+    "proposalDigest": "sha256:37ea8c7e0f9b2488d56e0bc59130705ac2d2a6de3985769c86f52bf3ae340315",
     "approvalId": "apr_66666666666666666666666666666666",
     "outcome": "dry-run",
     "idempotencyKey": "incident-71c9-restart-api-001",
-    "execution": {"provider": "kubernetes", "operationRef": "kubernetes://kind-iip-dev/namespaces/iip-demo/deployments/api"},
+    "execution": {"provider": "kubernetes", "operationRef": "kubernetes://kind-iip-dev/namespaces/default/deployments/api"},
     "verification": {"status": "not-run", "summary": "Server-side dry-run accepted the restart patch; no mutation was persisted."},
-    "auditRef": "audit://local/actions/act_55555555555555555555555555555555"
+    "auditRef": "audit://local/actions/act_55555555555555555555555555555555",
+    "executionStatusRef": "action://local/act_55555555555555555555555555555555/execution",
+    "executionPolicyInputDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
   }
 }

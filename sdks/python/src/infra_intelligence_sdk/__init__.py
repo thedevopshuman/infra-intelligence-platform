@@ -4,6 +4,7 @@ from .client import Client
 from .errors import ApiError
 from .models import (
     ActionApproval,
+    ActionExecutionStatus,
     ActionProposal,
     ActionResult,
     ContextEvidenceRequest,
@@ -56,6 +57,7 @@ from .models import (
 
 __all__ = [
     "ActionApproval",
+    "ActionExecutionStatus",
     "ActionProposal",
     "ActionResult",
     "ApiError",
@@ -107,4 +109,4 @@ __all__ = [
     "TelemetryEvidenceRequest",
     "TelemetryEvidenceResult",
 ]
-__version__ = "0.15.0"
+__version__ = "0.16.0"

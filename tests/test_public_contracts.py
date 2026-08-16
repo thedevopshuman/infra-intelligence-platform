@@ -8,6 +8,7 @@ from pathlib import Path
 
 from infra_intelligence_sdk import (
     ActionApproval,
+    ActionExecutionStatus,
     ActionProposal,
     ActionResult,
     ContextEvidenceRequest,
@@ -124,6 +125,9 @@ class PublicContractSdkTests(unittest.TestCase):
         integration = IntegrationConfig.from_dict(example("integration-config.json"))
         proposal = ActionProposal.from_dict(example("action-proposal.json"))
         approval = ActionApproval.from_dict(example("action-approval.json"))
+        execution_status = ActionExecutionStatus.from_dict(
+            example("action-execution-status.json")
+        )
         action_result = ActionResult.from_dict(example("action-result.json"))
         plugin_session = PluginSession.from_dict(example("plugin-session.json"))
         telemetry_request = TelemetryEvidenceRequest.from_dict(
@@ -259,6 +263,9 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(integration.to_dict()["kind"], "IntegrationConfig")
         self.assertEqual(proposal.to_dict()["kind"], "ActionProposal")
         self.assertEqual(approval.to_dict()["kind"], "ActionApproval")
+        self.assertEqual(
+            execution_status.to_dict()["kind"], "ActionExecutionStatus"
+        )
         self.assertEqual(action_result.to_dict()["kind"], "ActionResult")
         self.assertEqual(plugin_session.to_dict()["kind"], "PluginSession")
         self.assertEqual(

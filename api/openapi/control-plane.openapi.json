@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.13.0",
+    "version": "0.14.0",
     "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, Kubernetes Event, resource-change, and repository/runbook context evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven evidence assessment, governed actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -419,7 +419,7 @@
     "/v1/actions/proposals": {
       "post": {
         "operationId": "proposeAction",
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["investigationId", "actionType", "targetResourceUid", "parameters", "idempotencyKey", "expiresAt"], "properties": {"investigationId": {"type": "string"}, "actionType": {"const": "kubernetes.restart-workload"}, "targetResourceUid": {"type": "string"}, "parameters": {"type": "object"}, "idempotencyKey": {"type": "string"}, "expiresAt": {"type": "string", "format": "date-time"}, "dryRun": {"type": "boolean", "default": true}}}}}},
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "additionalProperties": false, "required": ["investigationId", "actionType", "targetResourceUid", "parameters", "idempotencyKey", "expiresAt"], "properties": {"investigationId": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"}, "actionType": {"const": "kubernetes.restart-workload"}, "targetResourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}, "parameters": {"type": "object", "additionalProperties": false, "required": ["namespace", "workloadKind", "workloadName"], "properties": {"namespace": {"type": "string", "maxLength": 253}, "workloadKind": {"type": "string", "enum": ["deployment", "statefulset", "daemonset"]}, "workloadName": {"type": "string", "maxLength": 253}}}, "idempotencyKey": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{8,128}$"}, "expiresAt": {"type": "string", "format": "date-time"}, "dryRun": {"type": "boolean", "default": true}}}}}},
         "responses": {
           "201": {"description": "Immutable action proposal", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/action-proposal.schema.json"}}}},
           "400": {"$ref": "#/components/responses/InvalidRequest"},
@@ -465,7 +465,7 @@
         "operationId": "getAction",
         "parameters": [{"name": "proposalId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^act_[a-f0-9]{32}$"}}],
         "responses": {
-          "200": {"description": "Proposal or terminal result"},
+          "200": {"description": "Proposal, one-shot execution lifecycle, or terminal result", "content": {"application/json": {"schema": {"oneOf": [{"$ref": "../../contracts/schemas/action-proposal.schema.json"}, {"$ref": "../../contracts/schemas/action-execution-status.schema.json"}, {"$ref": "../../contracts/schemas/action-result.schema.json"}]}}}},
           "401": {"$ref": "#/components/responses/Unauthorized"},
           "404": {"$ref": "#/components/responses/ResourceNotFound"},
           "503": {"$ref": "#/components/responses/StorageUnavailable"}
@@ -544,6 +544,7 @@
       "IntegrationConfig": {"$ref": "../../contracts/schemas/integration-config.schema.json"},
       "ActionProposal": {"$ref": "../../contracts/schemas/action-proposal.schema.json"},
       "ActionApproval": {"$ref": "../../contracts/schemas/action-approval.schema.json"},
+      "ActionExecutionStatus": {"$ref": "../../contracts/schemas/action-execution-status.schema.json"},
       "ActionResult": {"$ref": "../../contracts/schemas/action-result.schema.json"},
       "PluginSession": {"$ref": "../../contracts/schemas/plugin-session.schema.json"},
       "Error": {"$ref": "../../contracts/schemas/error.schema.json"}

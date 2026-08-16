@@ -2139,6 +2139,26 @@ class ActionApproval:
 
 
 @dataclass(frozen=True)
+class ActionExecutionStatus:
+    """Durable one-shot execution state, including fail-closed recovery."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ActionExecutionStatus":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="ActionExecutionStatus",
+                label="action execution status",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class ActionResult:
     """Auditable terminal result of a governed operation."""
 

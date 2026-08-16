@@ -9,8 +9,10 @@
   },
   "spec": {
     "proposalId": "act_55555555555555555555555555555555",
+    "proposalDigest": "sha256:37ea8c7e0f9b2488d56e0bc59130705ac2d2a6de3985769c86f52bf3ae340315",
     "decision": "approved",
     "rationale": "Dry-run is scoped to the degraded demo Deployment and has no cluster impact.",
-    "policySnapshotRef": "policy://local/snapshots/action-approval-v1"
+    "policySnapshotRef": "policy://local/snapshots/action-approval-v1",
+    "policyInputDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
   }
 }

@@ -1,5 +1,6 @@
 import type {
   ActionApproval,
+  ActionExecutionStatus,
   ActionId,
   ActionProposal,
   ActionResult,
@@ -191,7 +192,11 @@ export class InfrastructureIntelligenceClient {
     investigationId: InvestigationId;
     actionType: "kubernetes.restart-workload";
     targetResourceUid: ResourceUid;
-    parameters: Record<string, unknown>;
+    parameters: {
+      namespace: string;
+      workloadKind: "deployment" | "statefulset" | "daemonset";
+      workloadName: string;
+    };
     idempotencyKey: string;
     expiresAt: string;
     dryRun?: boolean;
@@ -214,6 +219,14 @@ export class InfrastructureIntelligenceClient {
     return this.post<ActionResult>(
       `/v1/actions/${encodeURIComponent(proposalId)}/execute`,
       {},
+    );
+  }
+
+  async getAction(
+    proposalId: ActionId,
+  ): Promise<ActionProposal | ActionExecutionStatus | ActionResult> {
+    return this.get<ActionProposal | ActionExecutionStatus | ActionResult>(
+      `/v1/actions/${encodeURIComponent(proposalId)}`,
     );
   }
 

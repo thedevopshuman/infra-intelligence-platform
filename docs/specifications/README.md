@@ -45,6 +45,7 @@ The platform exposes contracts at three levels:
 | Credential lease | [credential-lease-contract.md](credential-lease-contract.md) | `contracts/schemas/credential-lease.schema.json` | `contracts/examples/credential-lease.json` |
 | Action proposal | [action-contract.md](action-contract.md) | `contracts/schemas/action-proposal.schema.json` | `contracts/examples/action-proposal.json` |
 | Action approval | [action-contract.md](action-contract.md) | `contracts/schemas/action-approval.schema.json` | `contracts/examples/action-approval.json` |
+| Action execution status | [action-contract.md](action-contract.md) | `contracts/schemas/action-execution-status.schema.json` | `contracts/examples/action-execution-status.json` |
 | Action result | [action-contract.md](action-contract.md) | `contracts/schemas/action-result.schema.json` | `contracts/examples/action-result.json` |
 | Plugin session | [plugin-session-contract.md](plugin-session-contract.md) | `contracts/schemas/plugin-session.schema.json` | `contracts/examples/plugin-session.json` |
 

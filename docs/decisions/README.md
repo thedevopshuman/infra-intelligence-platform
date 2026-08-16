@@ -38,3 +38,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0032](0032-scope-end-rolling-baseline.md) | Accepted | Derive auditable rolling metric windows from the accepted investigation scope |
 | [0033](0033-adversarial-evidence-release-gate.md) | Accepted | Fail evaluation when instruction-shaped evidence crosses into report output |
 | [0034](0034-auditable-cross-signal-planning.md) | Accepted | Plan request-declared evidence candidates across signals and budgets |
+| [0035](0035-one-shot-action-execution.md) | Accepted | Claim one governed action attempt before impact and fail ambiguous recovery closed |

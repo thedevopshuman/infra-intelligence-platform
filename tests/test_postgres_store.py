@@ -607,7 +607,8 @@ class PostgresOperationalStoreTests(unittest.TestCase):
             connection.execute(
                 """
                 TRUNCATE iip.audit_records, iip.plugin_sessions,
-                         iip.action_results, iip.action_approvals,
+                         iip.action_results, iip.action_executions,
+                         iip.action_approvals,
                          iip.action_proposals, iip.investigations,
                          iip.evidence_artifacts, iip.resource_relationships,
                          iip.source_reconciliations, iip.source_checkpoints,
@@ -651,6 +652,45 @@ class PostgresOperationalStoreTests(unittest.TestCase):
         self.assertEqual(len(tuple(reconnected.list(actor))), 1)
         self.assertIsNone(
             reconnected.get(ActorContext("other", "another-tenant"), evidence_id)
+        )
+
+    def test_action_execution_claim_and_terminal_result_are_atomic(self) -> None:
+        actor = ActorContext("workflow-executor", "local", ("executor",))
+        proposal = json.loads(
+            (ROOT / "contracts/examples/action-proposal.json").read_text()
+        )
+        approval = json.loads(
+            (ROOT / "contracts/examples/action-approval.json").read_text()
+        )
+        terminal_status = json.loads(
+            (ROOT / "contracts/examples/action-execution-status.json").read_text()
+        )
+        result = json.loads(
+            (ROOT / "contracts/examples/action-result.json").read_text()
+        )
+        running_status = copy.deepcopy(terminal_status)
+        running_status["metadata"]["updatedAt"] = running_status["spec"]["startedAt"]
+        running_status["spec"]["state"] = "executing"
+        running_status["spec"]["leaseExpiresAt"] = "2026-08-14T13:07:59Z"
+        for field in ("completedAt", "operationRef", "summary"):
+            del running_status["spec"][field]
+
+        self.operations.commit_proposal(actor, proposal)
+        self.operations.commit_approval(actor, approval)
+        self.assertTrue(self.operations.claim_action_execution(actor, running_status))
+        self.assertFalse(self.operations.claim_action_execution(actor, running_status))
+        self.operations.commit_action_result(actor, result, terminal_status)
+
+        reconnected = PostgresOperationalStore(DATABASE_URL)
+        self.assertEqual(
+            reconnected.get_action_execution_status(
+                actor, proposal["metadata"]["id"]
+            ),
+            terminal_status,
+        )
+        self.assertEqual(
+            reconnected.get_action_result(actor, proposal["metadata"]["id"]),
+            result,
         )
 
     def test_investigation_lifecycle_is_durable_and_transitions_atomically(self) -> None:

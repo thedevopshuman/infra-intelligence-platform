@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Mapping
+from datetime import datetime, timedelta
+from typing import Mapping
 
 from iip.application.investigate import canonical_digest
 from iip.application.ports import (
@@ -14,9 +15,12 @@ from iip.application.ports import (
     ActorContext,
     AuditSink,
     Clock,
+    InvestigationRepository,
+    PersistenceError,
     PolicyDecisionPoint,
     ResourceRepository,
 )
+from iip.domain.models import Resource
 
 
 class ActionWorkflowError(RuntimeError):
@@ -53,6 +57,15 @@ class GovernedActionService:
     """Enforce policy, approval, idempotency, expiry, execution, and audit."""
 
     SUPPORTED_ACTION = "kubernetes.restart-workload"
+    EXECUTION_LEASE_SECONDS = 300
+    _DNS_LABEL = r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?"
+    _DNS_SUBDOMAIN = re.compile(rf"{_DNS_LABEL}(?:\.{_DNS_LABEL})*")
+    _PROVIDER = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}")
+    _WORKLOAD_TYPES = {
+        "deployment": "apps/deployment",
+        "statefulset": "apps/statefulset",
+        "daemonset": "apps/daemonset",
+    }
 
     def __init__(
         self,
@@ -62,6 +75,7 @@ class GovernedActionService:
         executor: ActionExecutor,
         audit: AuditSink,
         clock: Clock,
+        investigations: InvestigationRepository,
     ) -> None:
         self._resources = resources
         self._policy = policy
@@ -69,6 +83,7 @@ class GovernedActionService:
         self._executor = executor
         self._audit = audit
         self._clock = clock
+        self._investigations = investigations
 
     def propose(self, command: ProposeActionCommand) -> Mapping[str, object]:
         if command.action_type != self.SUPPORTED_ACTION:
@@ -80,6 +95,18 @@ class GovernedActionService:
         )
         if target is None:
             raise ActionWorkflowError("action.target.unavailable")
+        parameters = self._validated_parameters(command.parameters, target)
+        investigation_request = self._investigations.get_investigation_request(
+            command.actor, command.investigation_id
+        )
+        investigation_report = self._investigations.get_investigation(
+            command.actor, command.investigation_id
+        )
+        self._validate_investigation_binding(
+            investigation_request,
+            investigation_report,
+            command.target_resource_uid,
+        )
         if self._parse_time(command.expires_at) <= self._parse_time(self._clock.now()):
             raise ActionWorkflowError("action.expiry.invalid")
 
@@ -90,26 +117,26 @@ class GovernedActionService:
             "investigationId": command.investigation_id,
             "actionType": command.action_type,
             "targetResourceUid": command.target_resource_uid,
-            "parameters": dict(command.parameters),
+            "parameters": parameters,
             "dryRun": command.dry_run,
+            "expiresAt": command.expires_at,
         }
         if existing is not None:
-            spec = existing["spec"]
-            assert isinstance(spec, Mapping)
-            if any(spec.get(key) != value for key, value in intended.items()):
-                raise ActionWorkflowError("action.idempotency-key.conflict")
+            self._validate_proposal_replay(existing, command, intended)
             return existing
 
-        decision = self._policy.decide(
-            command.actor,
-            "action:propose",
-            {
-                "tenantId": command.actor.tenant_id,
-                "actionType": command.action_type,
-                "targetResourceUid": command.target_resource_uid,
-                "dryRun": command.dry_run,
-            },
-        )
+        target_digest = canonical_digest(target.to_dict())
+        investigation_digest = canonical_digest(investigation_report)
+        policy_input = {
+            "tenantId": command.actor.tenant_id,
+            "investigationDigest": investigation_digest,
+            "actionType": command.action_type,
+            "targetResourceUid": command.target_resource_uid,
+            "targetDigest": target_digest,
+            "parameters": parameters,
+            "dryRun": command.dry_run,
+        }
+        decision = self._policy.decide(command.actor, "action:propose", policy_input)
         material = f"{command.actor.tenant_id}\x1f{command.idempotency_key}".encode()
         proposal_id = "act_" + hashlib.sha256(material).hexdigest()[:32]
         proposal: dict[str, object] = {
@@ -123,6 +150,8 @@ class GovernedActionService:
             },
             "spec": {
                 **intended,
+                "investigationDigest": investigation_digest,
+                "targetDigest": target_digest,
                 "risk": "low" if command.dry_run else "medium",
                 "reversible": True,
                 "idempotencyKey": command.idempotency_key,
@@ -133,11 +162,23 @@ class GovernedActionService:
                     "policySnapshotRef": (
                         f"policy://{command.actor.tenant_id}/snapshots/action-proposal-v1"
                     ),
+                    "inputDigest": canonical_digest(policy_input),
                 },
             },
             "status": "pending-approval" if decision.allowed else "denied",
         }
-        self._repository.commit_proposal(command.actor, proposal)
+        try:
+            self._repository.commit_proposal(command.actor, proposal)
+        except PersistenceError as error:
+            if str(error) != "storage.conflict":
+                raise
+            existing = self._repository.get_proposal_by_key(
+                command.actor, command.idempotency_key
+            )
+            if existing is None:
+                raise
+            self._validate_proposal_replay(existing, command, intended)
+            return existing
         self._audit.append_audit(command.actor, "action-proposed", proposal)
         return proposal
 
@@ -158,11 +199,14 @@ class GovernedActionService:
             raise ActionWorkflowError("action.proposal.not-approvable")
         if self._parse_time(str(spec["expiresAt"])) <= self._parse_time(self._clock.now()):
             raise ActionWorkflowError("action.proposal.expired")
-        policy = self._policy.decide(
-            command.actor,
-            "action:approve",
-            {"tenantId": command.actor.tenant_id, "proposalId": command.proposal_id},
-        )
+        proposal_digest = canonical_digest(proposal)
+        policy_input = {
+            "tenantId": command.actor.tenant_id,
+            "proposalId": command.proposal_id,
+            "proposalDigest": proposal_digest,
+            "decision": command.decision,
+        }
+        policy = self._policy.decide(command.actor, "action:approve", policy_input)
         if not policy.allowed:
             raise ActionWorkflowError("action.approval.policy-denied")
 
@@ -191,14 +235,33 @@ class GovernedActionService:
             },
             "spec": {
                 "proposalId": command.proposal_id,
+                "proposalDigest": proposal_digest,
                 "decision": command.decision,
                 "rationale": command.rationale,
                 "policySnapshotRef": (
                     f"policy://{command.actor.tenant_id}/snapshots/action-approval-v1"
                 ),
+                "policyInputDigest": canonical_digest(policy_input),
             },
         }
-        self._repository.commit_approval(command.actor, approval)
+        try:
+            self._repository.commit_approval(command.actor, approval)
+        except PersistenceError as error:
+            if str(error) != "storage.conflict":
+                raise
+            existing = self._repository.get_approval(
+                command.actor, command.proposal_id
+            )
+            if existing is None:
+                raise
+            existing_spec = existing.get("spec")
+            if (
+                not isinstance(existing_spec, Mapping)
+                or existing_spec.get("decision") != command.decision
+                or existing_spec.get("rationale") != command.rationale
+            ):
+                raise ActionWorkflowError("action.approval.conflict") from None
+            return existing
         self._audit.append_audit(command.actor, "action-decided", approval)
         return approval
 
@@ -221,23 +284,94 @@ class GovernedActionService:
         )
         if approval_spec.get("decision") != "approved":
             raise ActionWorkflowError("action.execution.not-approved")
+        proposal_digest = canonical_digest(proposal)
+        approved_digest = approval_spec.get("proposalDigest")
+        if approved_digest is not None and approved_digest != proposal_digest:
+            raise ActionWorkflowError("action.approval.proposal-mismatch")
         if self._parse_time(str(proposal_spec["expiresAt"])) <= self._parse_time(
             self._clock.now()
         ):
             raise ActionWorkflowError("action.proposal.expired")
-        policy = self._policy.decide(
-            command.actor,
-            "action:execute",
-            {"tenantId": command.actor.tenant_id, "proposalId": command.proposal_id},
-        )
+        target_uid = str(proposal_spec["targetResourceUid"])
+        target = self._resources.get(command.actor.tenant_id, target_uid)
+        if target is None or target.lifecycle != "active":
+            raise ActionWorkflowError("action.target.unavailable")
+        self._validated_parameters(proposal_spec.get("parameters"), target)
+        policy_input = {
+            "tenantId": command.actor.tenant_id,
+            "proposalId": command.proposal_id,
+            "proposalDigest": proposal_digest,
+            "approvalId": approval_metadata["id"],
+            "actionType": proposal_spec["actionType"],
+            "targetResourceUid": target_uid,
+            "proposalTargetDigest": proposal_spec.get("targetDigest"),
+            "currentTargetDigest": canonical_digest(target.to_dict()),
+            "parameters": proposal_spec["parameters"],
+            "dryRun": proposal_spec["dryRun"],
+        }
+        policy = self._policy.decide(command.actor, "action:execute", policy_input)
         if not policy.allowed:
             raise ActionWorkflowError("action.execution.policy-denied")
+
+        started_at = self._clock.now()
+        lease_expires_at = self._format_time(
+            self._parse_time(started_at)
+            + timedelta(seconds=self.EXECUTION_LEASE_SECONDS)
+        )
+        execution_status: dict[str, object] = {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "ActionExecutionStatus",
+            "metadata": {
+                "id": command.proposal_id,
+                "tenantId": command.actor.tenant_id,
+                "updatedAt": started_at,
+            },
+            "spec": {
+                "proposalDigest": proposal_digest,
+                "approvalId": approval_metadata["id"],
+                "state": "executing",
+                "attempt": 1,
+                "executorActorId": command.actor.actor_id,
+                "startedAt": started_at,
+                "leaseExpiresAt": lease_expires_at,
+                "policyDecision": {
+                    "allowed": True,
+                    "reasonCode": policy.reason_code,
+                    "policySnapshotRef": (
+                        f"policy://{command.actor.tenant_id}/snapshots/action-execution-v1"
+                    ),
+                    "inputDigest": canonical_digest(policy_input),
+                },
+            },
+        }
+        if not self._repository.claim_action_execution(
+            command.actor, execution_status
+        ):
+            result = self._repository.get_action_result(
+                command.actor, command.proposal_id
+            )
+            if result is not None:
+                return result
+            return self._resolve_existing_execution(command)
+
+        self._audit.append_audit(
+            command.actor,
+            "action-execution-started",
+            {
+                "proposalId": command.proposal_id,
+                "proposalDigest": proposal_digest,
+                "approvalId": approval_metadata["id"],
+                "leaseExpiresAt": lease_expires_at,
+                "policyInputDigest": canonical_digest(policy_input),
+            },
+        )
 
         outcome = self._executor.execute(
             command.actor,
             proposal,
             approval_id=str(approval_metadata["id"]),
         )
+        self._validate_outcome(outcome)
         audit_ref = self._audit.append_audit(
             command.actor,
             "action-executed",
@@ -269,10 +403,191 @@ class GovernedActionService:
                     "summary": outcome.verification_summary,
                 },
                 "auditRef": audit_ref,
+                "executionStatusRef": (
+                    f"action://{command.actor.tenant_id}/{command.proposal_id}/execution"
+                ),
+                "executionPolicyInputDigest": canonical_digest(policy_input),
             },
         }
-        self._repository.commit_action_result(command.actor, result)
+        completed_at = str(result["metadata"]["completedAt"])  # type: ignore[index]
+        terminal_status: dict[str, object] = {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "ActionExecutionStatus",
+            "metadata": {
+                "id": command.proposal_id,
+                "tenantId": command.actor.tenant_id,
+                "updatedAt": completed_at,
+            },
+            "spec": {
+                **dict(execution_status["spec"]),  # type: ignore[arg-type]
+                "state": outcome.outcome,
+                "completedAt": completed_at,
+                "operationRef": outcome.operation_ref,
+                "summary": outcome.verification_summary,
+            },
+        }
+        del terminal_status["spec"]["leaseExpiresAt"]  # type: ignore[index]
+        self._repository.commit_action_result(
+            command.actor, result, terminal_status
+        )
         return result
+
+    def _resolve_existing_execution(
+        self,
+        command: ExecuteActionCommand,
+    ) -> Mapping[str, object]:
+        current = self._repository.get_action_execution_status(
+            command.actor, command.proposal_id
+        )
+        if current is None:
+            raise ActionWorkflowError("action.execution.state-unavailable")
+        spec = current.get("spec")
+        if not isinstance(spec, Mapping):
+            raise ActionWorkflowError("action.execution.state-unavailable")
+        if spec.get("state") != "executing":
+            result = self._repository.get_action_result(
+                command.actor, command.proposal_id
+            )
+            if result is not None:
+                return result
+            raise ActionWorkflowError("action.execution.reconciliation-required")
+        now = self._clock.now()
+        if self._parse_time(str(spec.get("leaseExpiresAt"))) > self._parse_time(now):
+            raise ActionWorkflowError("action.execution.in-progress")
+        uncertain: dict[str, object] = {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "ActionExecutionStatus",
+            "metadata": {
+                "id": command.proposal_id,
+                "tenantId": command.actor.tenant_id,
+                "updatedAt": now,
+            },
+            "spec": {
+                "proposalDigest": spec.get("proposalDigest"),
+                "approvalId": spec.get("approvalId"),
+                "state": "manual-reconciliation-required",
+                "attempt": spec.get("attempt", 1),
+                "executorActorId": spec.get("executorActorId"),
+                "startedAt": spec.get("startedAt"),
+                "completedAt": now,
+                "summary": (
+                    "The execution lease expired without a terminal result. The "
+                    "operation will not be replayed automatically because impact is unknown."
+                ),
+                "policyDecision": spec.get("policyDecision"),
+            },
+        }
+        resolved = self._repository.mark_action_execution_uncertain(
+            command.actor, command.proposal_id, now, uncertain
+        )
+        resolved_spec = resolved.get("spec")
+        if isinstance(resolved_spec, Mapping) and resolved_spec.get("state") == "executing":
+            raise ActionWorkflowError("action.execution.in-progress")
+        self._audit.append_audit(
+            command.actor,
+            "action-execution-reconciliation-required",
+            {
+                "proposalId": command.proposal_id,
+                "proposalDigest": spec.get("proposalDigest"),
+            },
+        )
+        raise ActionWorkflowError("action.execution.reconciliation-required")
+
+    @staticmethod
+    def _validate_proposal_replay(
+        existing: Mapping[str, object],
+        command: ProposeActionCommand,
+        intended: Mapping[str, object],
+    ) -> None:
+        metadata = existing.get("metadata")
+        spec = existing.get("spec")
+        if (
+            not isinstance(metadata, Mapping)
+            or metadata.get("actorId") != command.actor.actor_id
+            or not isinstance(spec, Mapping)
+            or any(spec.get(key) != value for key, value in intended.items())
+        ):
+            raise ActionWorkflowError("action.idempotency-key.conflict")
+
+    @classmethod
+    def _validate_outcome(cls, outcome: object) -> None:
+        if (
+            getattr(outcome, "outcome", None)
+            not in ("dry-run", "succeeded", "failed", "rolled-back")
+            or not isinstance(getattr(outcome, "provider", None), str)
+            or cls._PROVIDER.fullmatch(outcome.provider) is None
+            or not isinstance(getattr(outcome, "operation_ref", None), str)
+            or not 1 <= len(outcome.operation_ref) <= 2048
+            or getattr(outcome, "verification_status", None)
+            not in ("not-run", "passed", "failed")
+            or not isinstance(getattr(outcome, "verification_summary", None), str)
+            or not 1 <= len(outcome.verification_summary) <= 4096
+        ):
+            raise ActionWorkflowError("action.executor.output-invalid")
+
+    def _validated_parameters(
+        self, parameters: object, target: Resource
+    ) -> dict[str, object]:
+        if not isinstance(parameters, Mapping) or set(parameters) != {
+            "namespace",
+            "workloadKind",
+            "workloadName",
+        }:
+            raise ActionWorkflowError("action.parameters.invalid")
+        namespace = parameters.get("namespace")
+        workload_kind = parameters.get("workloadKind")
+        workload_name = parameters.get("workloadName")
+        if (
+            not isinstance(namespace, str)
+            or len(namespace) > 253
+            or self._DNS_SUBDOMAIN.fullmatch(namespace) is None
+            or not isinstance(workload_name, str)
+            or len(workload_name) > 253
+            or self._DNS_SUBDOMAIN.fullmatch(workload_name) is None
+            or workload_kind not in self._WORKLOAD_TYPES
+        ):
+            raise ActionWorkflowError("action.parameters.invalid")
+        external_parts = target.identity.external_id.split("/")
+        if (
+            target.identity.provider != "kubernetes"
+            or target.identity.resource_type != self._WORKLOAD_TYPES[workload_kind]
+            or len(external_parts) != 3
+            or external_parts[1] != namespace
+            or external_parts[2] != workload_name
+        ):
+            raise ActionWorkflowError("action.parameters.target-mismatch")
+        return {
+            "namespace": namespace,
+            "workloadKind": workload_kind,
+            "workloadName": workload_name,
+        }
+
+    @staticmethod
+    def _validate_investigation_binding(
+        request: object,
+        report: object,
+        target_resource_uid: str,
+    ) -> None:
+        if not isinstance(request, Mapping) or not isinstance(report, Mapping):
+            raise ActionWorkflowError("action.investigation.unavailable")
+        request_spec = request.get("spec")
+        report_spec = report.get("spec")
+        if not isinstance(request_spec, Mapping) or not isinstance(
+            report_spec, Mapping
+        ):
+            raise ActionWorkflowError("action.investigation.unavailable")
+        request_scope = request_spec.get("scope")
+        report_scope = report_spec.get("scope")
+        if (
+            request_spec.get("maxAuthority") != "propose"
+            or not isinstance(request_scope, Mapping)
+            or not isinstance(report_scope, Mapping)
+            or target_resource_uid not in request_scope.get("resourceUids", ())
+            or target_resource_uid not in report_scope.get("resourceUids", ())
+            or report_spec.get("requestDigest") != canonical_digest(request)
+            or report_spec.get("outcome") in ("failed", "cancelled")
+        ):
+            raise ActionWorkflowError("action.investigation.not-authorized")
 
     @staticmethod
     def _parse_time(value: str) -> datetime:
@@ -283,3 +598,7 @@ class GovernedActionService:
         if parsed.tzinfo is None:
             raise ActionWorkflowError("action.time.invalid")
         return parsed
+
+    @staticmethod
+    def _format_time(value: datetime) -> str:
+        return value.isoformat().replace("+00:00", "Z")

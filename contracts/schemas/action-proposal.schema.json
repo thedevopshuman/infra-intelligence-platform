@@ -23,9 +23,19 @@
       "required": ["investigationId", "actionType", "targetResourceUid", "parameters", "risk", "reversible", "dryRun", "idempotencyKey", "expiresAt", "policyDecision"],
       "properties": {
         "investigationId": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"},
-        "actionType": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{2,127}$"},
+        "investigationDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "actionType": {"const": "kubernetes.restart-workload"},
         "targetResourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
-        "parameters": {"type": "object", "maxProperties": 32, "additionalProperties": true},
+        "targetDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "parameters": {
+          "type": "object", "additionalProperties": false,
+          "required": ["namespace", "workloadKind", "workloadName"],
+          "properties": {
+            "namespace": {"type": "string", "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)*$", "maxLength": 253},
+            "workloadKind": {"type": "string", "enum": ["deployment", "statefulset", "daemonset"]},
+            "workloadName": {"type": "string", "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)*$", "maxLength": 253}
+          }
+        },
         "risk": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
         "reversible": {"const": true},
         "dryRun": {"type": "boolean"},
@@ -37,7 +47,8 @@
           "properties": {
             "allowed": {"type": "boolean"},
             "reasonCode": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$"},
-            "policySnapshotRef": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048}
+            "policySnapshotRef": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048},
+            "inputDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
           }
         }
       }

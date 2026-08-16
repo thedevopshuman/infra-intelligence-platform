@@ -1,0 +1,26 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ActionExecutionStatus",
+  "metadata": {
+    "id": "act_55555555555555555555555555555555",
+    "tenantId": "local",
+    "updatedAt": "2026-08-14T13:03:00Z"
+  },
+  "spec": {
+    "proposalDigest": "sha256:37ea8c7e0f9b2488d56e0bc59130705ac2d2a6de3985769c86f52bf3ae340315",
+    "approvalId": "apr_66666666666666666666666666666666",
+    "state": "dry-run",
+    "attempt": 1,
+    "executorActorId": "workflow-executor",
+    "startedAt": "2026-08-14T13:02:59Z",
+    "completedAt": "2026-08-14T13:03:00Z",
+    "operationRef": "kubernetes://kind-iip-dev/namespaces/default/deployments/api",
+    "summary": "The approved restart request passed server-side dry-run validation; no mutation was persisted.",
+    "policyDecision": {
+      "allowed": true,
+      "reasonCode": "policy.action.execution-allowed",
+      "policySnapshotRef": "policy://local/snapshots/action-execution-v1",
+      "inputDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  }
+}

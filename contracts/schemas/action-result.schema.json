@@ -40,7 +40,9 @@
             "summary": {"type": "string", "minLength": 1, "maxLength": 4096}
           }
         },
-        "auditRef": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048}
+        "auditRef": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048},
+        "executionStatusRef": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048},
+        "executionPolicyInputDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
       }
     }
   }

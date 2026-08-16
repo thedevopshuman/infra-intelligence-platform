@@ -24,6 +24,8 @@ The Phase 1 HTTP surface follows the [authentication boundary](authentication-bo
 | Approve | Approve a specific immutable proposal | Human or delegated policy principal |
 | Execute | Perform the exact approved, idempotent action | Policy re-check immediately before execution |
 
+Execution authority is consumed by a durable one-shot claim before an adapter receives a request. A lost process cannot turn an uncertain outcome into an automatic retry: after lease expiry, the attempt requires manual provider-state reconciliation. The claim records content digests and identities, never execution credentials.
+
 Agents and plugins declare a maximum authority; request policy may reduce but never increase it.
 
 ## Credential model

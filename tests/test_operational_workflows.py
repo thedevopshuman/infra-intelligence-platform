@@ -661,6 +661,34 @@ class GovernedActionTests(unittest.TestCase):
         )
         self.target_uid = stored.identity.uid
         self.store = InMemoryOperationalStore()
+        self.proposer = ActorContext("incident-investigator", "local")
+        request = example("investigation-request.json")
+        report = example("investigation-report.json")
+        status = {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "InvestigationStatus",
+            "metadata": {
+                "id": request["metadata"]["id"],
+                "tenantId": "local",
+                "updatedAt": report["spec"]["completedAt"],
+            },
+            "spec": {
+                "requestDigest": report["spec"]["requestDigest"],
+                "state": "completed",
+                "startedAt": report["spec"]["startedAt"],
+                "completedAt": report["spec"]["completedAt"],
+                "reportRef": (
+                    f"investigation://local/{request['metadata']['id']}/report"
+                ),
+            },
+        }
+        self.store.commit_investigation(
+            self.proposer,
+            request["metadata"]["id"],
+            request,
+            report,
+            status,
+        )
         self.service = GovernedActionService(
             self.resources,
             self.policy,
@@ -668,8 +696,8 @@ class GovernedActionTests(unittest.TestCase):
             KubernetesRestartDryRunExecutor(),
             self.store,
             self.clock,
+            self.store,
         )
-        self.proposer = ActorContext("incident-investigator", "local")
 
     def proposal(self) -> dict:
         return self.service.propose(
@@ -679,7 +707,7 @@ class GovernedActionTests(unittest.TestCase):
                 action_type="kubernetes.restart-workload",
                 target_resource_uid=self.target_uid,
                 parameters={
-                    "namespace": "iip-demo",
+                    "namespace": "default",
                     "workloadKind": "deployment",
                     "workloadName": "api",
                 },
@@ -723,6 +751,117 @@ class GovernedActionTests(unittest.TestCase):
         self.assertEqual(result, replay)
         self.assertEqual(result["spec"]["outcome"], "dry-run")
         assert_schema(self, "action-result.schema.json", result)
+        execution = self.store.get_action_execution_status(
+            executor, proposal["metadata"]["id"]
+        )
+        self.assertEqual(execution["spec"]["state"], "dry-run")
+        assert_schema(self, "action-execution-status.schema.json", execution)
+
+    def test_expired_execution_lease_fails_closed_without_replay(self) -> None:
+        class MutableClock:
+            value = "2026-08-17T10:00:00Z"
+
+            def now(self) -> str:
+                return self.value
+
+        class CrashingExecutor:
+            calls = 0
+
+            def execute(self, actor, proposal, *, approval_id):
+                del actor, proposal, approval_id
+                self.calls += 1
+                raise RuntimeError("simulated process loss after durable claim")
+
+        clock = MutableClock()
+        action_executor = CrashingExecutor()
+        self.service = GovernedActionService(
+            self.resources,
+            self.policy,
+            self.store,
+            action_executor,
+            self.store,
+            clock,
+            self.store,
+        )
+        proposal = self.proposal()
+        self.service.decide(
+            DecideActionCommand(
+                ActorContext("on-call-approver", "local", ("approver",)),
+                proposal["metadata"]["id"],
+                "approved",
+                "Scoped dry-run is safe.",
+            )
+        )
+        executor = ActorContext("workflow-executor", "local", ("executor",))
+
+        with self.assertRaisesRegex(RuntimeError, "simulated process loss"):
+            self.service.execute(
+                ExecuteActionCommand(executor, proposal["metadata"]["id"])
+            )
+        running = self.store.get_action_execution_status(
+            executor, proposal["metadata"]["id"]
+        )
+        self.assertEqual(running["spec"]["state"], "executing")
+        assert_schema(self, "action-execution-status.schema.json", running)
+
+        clock.value = "2026-08-17T10:06:00Z"
+        with self.assertRaisesRegex(ActionWorkflowError, "reconciliation-required"):
+            self.service.execute(
+                ExecuteActionCommand(executor, proposal["metadata"]["id"])
+            )
+        self.assertEqual(action_executor.calls, 1)
+        uncertain = self.store.get_action_execution_status(
+            executor, proposal["metadata"]["id"]
+        )
+        self.assertEqual(
+            uncertain["spec"]["state"], "manual-reconciliation-required"
+        )
+        assert_schema(self, "action-execution-status.schema.json", uncertain)
+
+    def test_proposal_rejects_target_identity_mismatch(self) -> None:
+        with self.assertRaisesRegex(ActionWorkflowError, "target-mismatch"):
+            self.service.propose(
+                ProposeActionCommand(
+                    actor=self.proposer,
+                    investigation_id="inv_71c9e4a2b8d04f65a3c7e9b102d4f608",
+                    action_type="kubernetes.restart-workload",
+                    target_resource_uid=self.target_uid,
+                    parameters={
+                        "namespace": "another-namespace",
+                        "workloadKind": "deployment",
+                        "workloadName": "api",
+                    },
+                    idempotency_key="incident-71c9-restart-api-002",
+                    expires_at="2099-08-14T13:30:00Z",
+                )
+            )
+
+    def test_idempotency_key_cannot_change_expiry_or_actor(self) -> None:
+        proposal = self.proposal()
+        with self.assertRaisesRegex(ActionWorkflowError, "idempotency-key.conflict"):
+            self.service.propose(
+                ProposeActionCommand(
+                    actor=self.proposer,
+                    investigation_id=proposal["spec"]["investigationId"],
+                    action_type=proposal["spec"]["actionType"],
+                    target_resource_uid=proposal["spec"]["targetResourceUid"],
+                    parameters=proposal["spec"]["parameters"],
+                    idempotency_key=proposal["spec"]["idempotencyKey"],
+                    expires_at="2099-08-14T13:31:00Z",
+                )
+            )
+        with self.assertRaisesRegex(ActionWorkflowError, "idempotency-key.conflict"):
+            self.service.propose(
+                ProposeActionCommand(
+                    actor=ActorContext("different-proposer", "local"),
+                    investigation_id=proposal["spec"]["investigationId"],
+                    action_type=proposal["spec"]["actionType"],
+                    target_resource_uid=proposal["spec"]["targetResourceUid"],
+                    parameters=proposal["spec"]["parameters"],
+                    idempotency_key=proposal["spec"]["idempotencyKey"],
+                    expires_at=proposal["spec"]["expiresAt"],
+                )
+            )
 
 
 class PluginSessionTests(unittest.TestCase):

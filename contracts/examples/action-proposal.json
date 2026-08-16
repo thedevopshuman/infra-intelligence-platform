@@ -9,9 +9,11 @@
   },
   "spec": {
     "investigationId": "inv_71c9e4a2b8d04f65a3c7e9b102d4f608",
+    "investigationDigest": "sha256:2ddb9acfa5b7b664770ab9ddc96c68086f74ded25ffd1a1e9cd631b3446debd5",
     "actionType": "kubernetes.restart-workload",
     "targetResourceUid": "res_e0ae9225a316fce4c97df5c23057b97a",
-    "parameters": {"namespace": "iip-demo", "workloadKind": "deployment", "workloadName": "api"},
+    "targetDigest": "sha256:9062a9611ca8400b1dd0c31bd2b8e4f26e40d9234d8c7da148296753849c7c3c",
+    "parameters": {"namespace": "default", "workloadKind": "deployment", "workloadName": "api"},
     "risk": "low",
     "reversible": true,
     "dryRun": true,
@@ -20,7 +22,8 @@
     "policyDecision": {
       "allowed": true,
       "reasonCode": "policy.action.proposal-allowed",
-      "policySnapshotRef": "policy://local/snapshots/action-proposal-v1"
+      "policySnapshotRef": "policy://local/snapshots/action-proposal-v1",
+      "inputDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
     }
   },
   "status": "pending-approval"

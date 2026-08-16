@@ -461,6 +461,23 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(errors)
 
+    def test_running_action_status_rejects_terminal_fields(self) -> None:
+        status = document("contracts/examples/action-execution-status.json")
+        status["spec"]["state"] = "executing"
+        status["spec"]["leaseExpiresAt"] = "2026-08-14T13:07:59Z"
+
+        errors = self.validate("action-execution-status.schema.json", status)
+
+        self.assertTrue(errors)
+
+    def test_terminal_action_status_rejects_execution_lease(self) -> None:
+        status = document("contracts/examples/action-execution-status.json")
+        status["spec"]["leaseExpiresAt"] = "2026-08-14T13:07:59Z"
+
+        errors = self.validate("action-execution-status.schema.json", status)
+
+        self.assertTrue(errors)
+
     def test_otlp_gauge_prohibits_sum_semantics(self) -> None:
         result = document("contracts/examples/otlp-metrics-evidence.json")
         gauge = result["spec"]["series"][1]

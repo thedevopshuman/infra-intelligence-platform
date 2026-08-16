@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+from datetime import datetime
 from threading import RLock
 from typing import Mapping, Optional
 
@@ -23,6 +24,7 @@ class InMemoryOperationalStore:
         self._proposal_keys: dict[tuple[str, str], str] = {}
         self._approvals: dict[tuple[str, str], dict[str, object]] = {}
         self._results: dict[tuple[str, str], dict[str, object]] = {}
+        self._action_executions: dict[tuple[str, str], dict[str, object]] = {}
         self._sessions: dict[tuple[str, str], dict[str, object]] = {}
         self._audit: list[tuple[str, str, dict[str, object]]] = []
         self._lock = RLock()
@@ -191,19 +193,104 @@ class InMemoryOperationalStore:
             value = self._results.get((actor.tenant_id, proposal_id))
             return copy.deepcopy(value) if value is not None else None
 
-    def commit_action_result(
+    def claim_action_execution(
         self, actor: ActorContext, document: Mapping[str, object]
-    ) -> None:
+    ) -> bool:
         self._assert_tenant(actor, document)
-        metadata = document["metadata"]
-        assert isinstance(metadata, Mapping)
-        key = (actor.tenant_id, str(metadata["id"]))
+        metadata = document.get("metadata")
+        spec = document.get("spec")
+        if (
+            not isinstance(metadata, Mapping)
+            or not isinstance(spec, Mapping)
+            or spec.get("state") != "executing"
+        ):
+            raise PersistenceError("storage.input-invalid")
+        key = (actor.tenant_id, str(metadata.get("id")))
         value = copy.deepcopy(dict(document))
         with self._lock:
+            if key in self._action_executions:
+                return False
+            self._action_executions[key] = value
+            return True
+
+    def get_action_execution_status(
+        self, actor: ActorContext, proposal_id: str
+    ) -> Optional[Mapping[str, object]]:
+        with self._lock:
+            value = self._action_executions.get((actor.tenant_id, proposal_id))
+            return copy.deepcopy(value) if value is not None else None
+
+    def mark_action_execution_uncertain(
+        self,
+        actor: ActorContext,
+        proposal_id: str,
+        observed_at: str,
+        document: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self._assert_tenant(actor, document)
+        key = (actor.tenant_id, proposal_id)
+        with self._lock:
+            current = self._action_executions.get(key)
+            if current is None:
+                raise PersistenceError("storage.not-found")
+            current_spec = current.get("spec")
+            if not isinstance(current_spec, Mapping):
+                raise PersistenceError("storage.input-invalid")
+            if (
+                current_spec.get("state") == "executing"
+                and self._parse_time(str(current_spec.get("leaseExpiresAt")))
+                <= self._parse_time(observed_at)
+            ):
+                self._action_executions[key] = copy.deepcopy(dict(document))
+            return copy.deepcopy(self._action_executions[key])
+
+    def commit_action_result(
+        self,
+        actor: ActorContext,
+        document: Mapping[str, object],
+        status: Mapping[str, object],
+    ) -> None:
+        self._assert_tenant(actor, document)
+        self._assert_tenant(actor, status)
+        metadata = document["metadata"]
+        status_metadata = status.get("metadata")
+        status_spec = status.get("spec")
+        assert isinstance(metadata, Mapping) and isinstance(status_metadata, Mapping)
+        key = (actor.tenant_id, str(metadata["id"]))
+        if (
+            status_metadata.get("id") != key[1]
+            or not isinstance(status_spec, Mapping)
+            or status_spec.get("state") == "executing"
+        ):
+            raise PersistenceError("storage.input-invalid")
+        value = copy.deepcopy(dict(document))
+        status_value = copy.deepcopy(dict(status))
+        with self._lock:
             current = self._results.get(key)
-            if current is not None and current != value:
+            current_status = self._action_executions.get(key)
+            if current is not None:
+                if current != value or current_status != status_value:
+                    raise PersistenceError("storage.conflict")
+                return
+            current_spec = (
+                current_status.get("spec")
+                if isinstance(current_status, Mapping)
+                else None
+            )
+            if not isinstance(current_spec, Mapping) or current_spec.get("state") != "executing":
                 raise PersistenceError("storage.conflict")
             self._results[key] = value
+            self._action_executions[key] = status_value
+
+    @staticmethod
+    def _parse_time(value: str) -> datetime:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            raise PersistenceError("storage.input-invalid") from None
+        if parsed.tzinfo is None:
+            raise PersistenceError("storage.input-invalid")
+        return parsed
 
     def commit_plugin_session(
         self, actor: ActorContext, document: Mapping[str, object]

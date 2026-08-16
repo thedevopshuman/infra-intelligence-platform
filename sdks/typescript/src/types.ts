@@ -1216,9 +1216,15 @@ export interface ActionProposal {
   metadata: { id: ActionId; tenantId: string; actorId: string; createdAt: string };
   spec: {
     investigationId: InvestigationId;
+    investigationDigest?: Sha256Digest;
     actionType: string;
     targetResourceUid: ResourceUid;
-    parameters: Record<string, unknown>;
+    targetDigest?: Sha256Digest;
+    parameters: {
+      namespace: string;
+      workloadKind: "deployment" | "statefulset" | "daemonset";
+      workloadName: string;
+    };
     risk: "low" | "medium" | "high" | "critical";
     reversible: true;
     dryRun: boolean;
@@ -1228,6 +1234,7 @@ export interface ActionProposal {
       allowed: boolean;
       reasonCode: string;
       policySnapshotRef: string;
+      inputDigest?: Sha256Digest;
     };
   };
   status: "pending-approval" | "denied" | "expired";
@@ -1244,9 +1251,41 @@ export interface ActionApproval {
   };
   spec: {
     proposalId: ActionId;
+    proposalDigest?: Sha256Digest;
     decision: "approved" | "rejected";
     rationale: string;
     policySnapshotRef: string;
+    policyInputDigest?: Sha256Digest;
+  };
+}
+
+export interface ActionExecutionStatus {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ActionExecutionStatus";
+  metadata: { id: ActionId; tenantId: string; updatedAt: string };
+  spec: {
+    proposalDigest: Sha256Digest;
+    approvalId: ApprovalId;
+    state:
+      | "executing"
+      | "dry-run"
+      | "succeeded"
+      | "failed"
+      | "rolled-back"
+      | "manual-reconciliation-required";
+    attempt: 1;
+    executorActorId: string;
+    startedAt: string;
+    leaseExpiresAt?: string;
+    completedAt?: string;
+    operationRef?: string;
+    summary?: string;
+    policyDecision: {
+      allowed: true;
+      reasonCode: string;
+      policySnapshotRef: string;
+      inputDigest: Sha256Digest;
+    };
   };
 }
 
@@ -1262,6 +1301,8 @@ export interface ActionResult {
     execution: { provider: string; operationRef: string };
     verification: { status: "not-run" | "passed" | "failed"; summary: string };
     auditRef: string;
+    executionStatusRef?: string;
+    executionPolicyInputDigest?: Sha256Digest;
   };
 }
 

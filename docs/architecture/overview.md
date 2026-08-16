@@ -87,6 +87,7 @@ flowchart TB
 6. The runtime selects an agent manifest, resolves allowed tools, applies budgets, and gathers evidence.
 7. The agent emits ranked hypotheses and recommendations with evidence references and uncertainty.
 8. Proposed mutations enter a workflow. Policy and approval decide whether an action may execute.
+9. The action attempt is durably claimed before any executor call. Expired ambiguous attempts fail closed for manual reconciliation instead of being replayed.
 9. Every decision, tool call, approval, execution, and result produces audit events.
 
 Collector plugins cross the extension boundary through bounded resource collection request/result contracts. A complete batch returns an explicit scope digest, candidate checkpoint, and optional opaque provider cursor map; only the trusted ingestion workflow may commit that state after every resource observation and event is durable. The host stores the last complete source membership and generates deterministic tombstones for resources missing from the next complete snapshot. Membership, tombstones, checkpoint, and provider cursors commit together. Partial, failed, cancelled, stale-resume, or scope-drifted passes never imply deletion. [ADR 0007](../decisions/0007-reconciliation-membership-and-tombstones.md) records membership authority, and [ADR 0009](../decisions/0009-provider-cursor-sets-and-watch-recovery.md) records list/watch recovery.
@@ -131,7 +132,9 @@ Start as a modular control-plane service plus asynchronous workers. Preserve log
 
 The initial Helm chart deploys the reference API and accepts an existing Secret reference for PostgreSQL configuration. Planned components are ingestion and outbox workers, correlator, workflow worker, plugin runner, and backing stores. Data-plane collectors may run in customer clusters and send normalized observations through authenticated, tenant-scoped channels.
 
-The API image also serves a dependency-free same-origin web console. It is a real control-plane surface over public contracts: the console authenticates a credential, reads the derived session context, lists tenant resources, opens graph/timeline views, runs bounded investigations, follows Evidence citations, and retrieves governed action state. It stores no platform data of its own and does not bypass application ports. The local Docker lifecycle creates a hardened non-root API container and durable PostgreSQL stack; production identity, ingress, and browser-session choices remain deployment decisions.
+The API image also serves a dependency-free same-origin web console. It is a real control-plane surface over public contracts: the console authenticates a credential, reads the derived session context, lists tenant resources, opens graph/timeline views, runs bounded investigations, follows Evidence citations, and retrieves governed proposal, execution-lifecycle, and result state. It stores no platform data of its own and does not bypass application ports. The local Docker lifecycle creates a hardened non-root API container and durable PostgreSQL stack; production identity, ingress, and browser-session choices remain deployment decisions.
+
+Governed execution follows [ADR 0035](../decisions/0035-one-shot-action-execution.md). Proposal parameters are closed and identity-bound. The store atomically owns the sole execution claim; current policy is re-evaluated over content digests immediately before the claim. Result and terminal lifecycle state commit together, while an expired non-terminal claim becomes manual reconciliation rather than a retry. This is the safety prerequisite for the disabled-by-default live Kubernetes executor.
 
 ## Cross-cutting invariants
 

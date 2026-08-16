@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 from .errors import ApiError
 from .models import (
     ActionApproval,
+    ActionExecutionStatus,
     ActionProposal,
     ActionResult,
     ContextEvidenceRequest,
@@ -260,6 +261,19 @@ class Client:
         return ActionResult.from_dict(
             self._post(f"/v1/actions/{quote(proposal_id, safe='')}/execute", {})
         )
+
+    def get_action(
+        self, proposal_id: str
+    ) -> ActionProposal | ActionExecutionStatus | ActionResult:
+        payload = self._get(f"/v1/actions/{quote(proposal_id, safe='')}")
+        kind = payload.get("kind")
+        if kind == "ActionProposal":
+            return ActionProposal.from_dict(payload)
+        if kind == "ActionExecutionStatus":
+            return ActionExecutionStatus.from_dict(payload)
+        if kind == "ActionResult":
+            return ActionResult.from_dict(payload)
+        raise ValueError("action response kind is invalid")
 
     def open_plugin_session(self, command: Mapping[str, Any]) -> PluginSession:
         return PluginSession.from_dict(self._post("/v1/plugin-sessions", command))

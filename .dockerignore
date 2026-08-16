@@ -7,6 +7,4 @@ node_modules
 dist
 docs
 tests
-sdks
 deploy
-

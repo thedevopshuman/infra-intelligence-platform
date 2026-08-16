@@ -1372,6 +1372,100 @@ export interface PluginSession {
   status: "ready" | "denied";
 }
 
+export type PluginCapability =
+  | "resource-observer"
+  | "event-source"
+  | "evidence-provider"
+  | "action-provider"
+  | "surface";
+
+export interface PluginManifest {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "Plugin";
+  metadata: {
+    id: string;
+    version: string;
+    displayName: string;
+    publisher?: string;
+    description?: string;
+  };
+  spec: {
+    protocolVersion: "1.0";
+    entrypoint: {
+      transport: "stdio" | "http" | "grpc" | "wasm";
+      target: string;
+      healthPath?: string;
+    };
+    artifact?: {
+      type: "oci-image";
+      reference: string;
+      digest: Sha256Digest;
+      signature: {
+        algorithm: "ed25519";
+        keyId: string;
+        value: string;
+      };
+    };
+    capabilities: PluginCapability[];
+    interfaces?: Array<{
+      capability: PluginCapability;
+      method: string;
+      inputSchema: string;
+      outputSchema: string;
+    }>;
+    permissions: {
+      network: string[];
+      secrets: string[];
+      resources: string[];
+      actions: string[];
+    };
+    configSchema?: Record<string, unknown>;
+  };
+}
+
+export interface PluginInvocation {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PluginInvocation";
+  metadata: {
+    id: `pin_${string}`;
+    sessionId: PluginSessionId;
+    tenantId: string;
+    actorId: string;
+    createdAt: string;
+    deadline: string;
+  };
+  spec: {
+    manifestDigest: Sha256Digest;
+    capability: string;
+    method: string;
+    input: Record<string, unknown>;
+  };
+}
+
+export interface PluginInvocationResult {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PluginInvocationResult";
+  metadata: {
+    id: `pin_${string}`;
+    sessionId: PluginSessionId;
+    tenantId: string;
+    pluginId: string;
+    pluginVersion: string;
+    completedAt: string;
+  };
+  spec: {
+    outputDigest: Sha256Digest;
+    usage: { wallTimeMillis: number; outputBytes: number };
+  } & (
+    | { status: "succeeded"; output: Record<string, unknown>; error?: never }
+    | {
+        status: "failed" | "cancelled";
+        error: { code: string };
+        output?: never;
+      }
+  );
+}
+
 export interface PolicyDecisionRequest {
   apiVersion: "iip.platform/v1alpha1";
   kind: "PolicyDecisionRequest";

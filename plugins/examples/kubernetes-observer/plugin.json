@@ -3,7 +3,7 @@
   "kind": "Plugin",
   "metadata": {
     "id": "kubernetes-observer",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "displayName": "Kubernetes Observer",
     "publisher": "local-development",
     "description": "Example read-only resource and event integration."
@@ -12,7 +12,17 @@
     "protocolVersion": "1.0",
     "entrypoint": {
       "transport": "stdio",
-      "target": "python -m kubernetes_observer"
+      "target": "python -m kubernetes_observer --stdio"
+    },
+    "artifact": {
+      "type": "oci-image",
+      "reference": "ghcr.io/replace-me/iip-kubernetes-observer@sha256:631af837f552055a375fc7b3c1879de30974859f0915cd735125557c7d8edbea",
+      "digest": "sha256:631af837f552055a375fc7b3c1879de30974859f0915cd735125557c7d8edbea",
+      "signature": {
+        "algorithm": "ed25519",
+        "keyId": "local-development-2026",
+        "value": "I-uJSEKQenHkb0YWqp726B4BQngsoPeCXTvhupSUm1J63NXw4m4qy7QvwwmPoLY9rKgWeaNQM06hPTIfkQ2MBg"
+      }
     },
     "capabilities": ["resource-observer"],
     "interfaces": [

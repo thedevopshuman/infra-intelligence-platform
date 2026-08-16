@@ -14,8 +14,9 @@ from .live import LiveCollectionError, list_objects, watch_then_list_objects
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description="Collect and normalize Kubernetes objects")
-    result.add_argument("--request", required=True, type=Path)
-    source = result.add_mutually_exclusive_group(required=True)
+    result.add_argument("--request", type=Path)
+    result.add_argument("--stdio", action="store_true")
+    source = result.add_mutually_exclusive_group()
     source.add_argument("--objects", type=Path)
     source.add_argument("--live-context")
     result.add_argument("--kubeconfig", type=Path)
@@ -26,12 +27,33 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
-        request = json.loads(args.request.read_text(encoding="utf-8"))
+        if args.stdio:
+            if args.request is not None or args.live_context is not None:
+                raise ValueError("stdio accepts one invocation and a fixed object source")
+            raw = sys.stdin.buffer.read(1_048_577)
+            if len(raw) > 1_048_576:
+                raise ValueError("invocation exceeds the input limit")
+            invocation = json.loads(raw)
+            if (
+                not isinstance(invocation, dict)
+                or invocation.get("apiVersion") != "iip.platform/v1alpha1"
+                or invocation.get("kind") != "PluginInvocation"
+                or not isinstance(invocation.get("spec"), dict)
+                or invocation["spec"].get("capability") != "resource-observer"
+                or invocation["spec"].get("method") != "collect"
+                or not isinstance(invocation["spec"].get("input"), dict)
+            ):
+                raise ValueError("invalid invocation")
+            request = invocation["spec"]["input"]
+        else:
+            if args.request is None:
+                raise ValueError("fixture and live modes require --request")
+            request = json.loads(args.request.read_text(encoding="utf-8"))
         if args.objects is not None:
             if args.kubeconfig is not None:
                 raise ValueError("kubeconfig is only valid with live collection")
             objects = json.loads(args.objects.read_text(encoding="utf-8"))
-        else:
+        elif args.live_context is not None:
             if args.kubeconfig is None:
                 raise ValueError("live collection requires an explicit kubeconfig")
             spec = request.get("spec")
@@ -55,6 +77,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if isinstance(resume, dict)
                 else list_objects(**options)
             )
+        else:
+            raise ValueError("an explicit object source is required")
         result = collect(request, objects).to_dict()
     except LiveCollectionError as exc:
         print(json.dumps({"error": {"code": str(exc)}}))
@@ -63,6 +87,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps({"error": {"code": "collector.request_invalid"}}))
         return 2
     print(json.dumps(result, ensure_ascii=False, separators=(",", ":"), sort_keys=True))
+    if args.stdio:
+        return 0
     return 0 if result["spec"]["completion"]["status"] == "complete" else 1
 
 

@@ -2225,6 +2225,58 @@ class PluginSession:
 
 
 @dataclass(frozen=True)
+class PluginManifest:
+    """Declarative plugin capabilities, permissions, artifact, and signature."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PluginManifest":
+        return cls(_validate_envelope(payload, kind="Plugin", label="plugin manifest"))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class PluginInvocation:
+    """Request-scoped plugin method input without capability bearer material."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PluginInvocation":
+        return cls(
+            _validate_envelope(
+                payload, kind="PluginInvocation", label="plugin invocation"
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class PluginInvocationResult:
+    """Bounded host-wrapped plugin output with stable runtime status."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PluginInvocationResult":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="PluginInvocationResult",
+                label="plugin invocation result",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class PolicyDecisionRequest:
     """Authenticated, tenant-scoped input sent to a replaceable policy service."""
 

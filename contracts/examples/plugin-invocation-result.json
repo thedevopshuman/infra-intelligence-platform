@@ -1,0 +1,79 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PluginInvocationResult",
+  "metadata": {
+    "id": "pin_4da8d7ab485b4d7f90f7b5b932c70827",
+    "sessionId": "psn_77777777777777777777777777777777",
+    "tenantId": "local",
+    "pluginId": "kubernetes-observer",
+    "pluginVersion": "0.3.0",
+    "completedAt": "2026-08-14T12:44:31Z"
+  },
+  "spec": {
+    "status": "succeeded",
+    "outputDigest": "sha256:5aa0942b58c28df0ed912c5a6ccea81563ce4d425b8855f14627a03a80996ab0",
+    "output": {
+      "apiVersion": "iip.platform/v1alpha1",
+      "kind": "ResourceCollectionResult",
+      "metadata": {
+        "requestId": "col_2fd7b920cf1a4d56b83b90d18a56c012",
+        "tenantId": "local",
+        "sourceId": "kubernetes-local",
+        "createdAt": "2026-08-14T10:30:00Z"
+      },
+      "spec": {
+        "observations": [
+          {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "Resource",
+            "metadata": {
+              "tenantId": "local",
+              "observedAt": "2026-08-14T10:30:00Z",
+              "observation": {
+                "sourceId": "kubernetes-local",
+                "streamId": "obs_0f4e8c2a6b1d4975a3c9e7f102d468ab",
+                "sequence": 42,
+                "mode": "incremental",
+                "resourceVersion": "398712"
+              },
+              "labels": {
+                "environment": "development",
+                "team": "platform"
+              }
+            },
+            "spec": {
+              "provider": "kubernetes",
+              "type": "apps/deployment",
+              "externalId": "cluster-local/default/api",
+              "displayName": "api",
+              "attributes": {
+                "namespace": "default",
+                "replicas": 3,
+                "availableReplicas": 2
+              },
+              "relationships": []
+            },
+            "status": {
+              "health": "degraded",
+              "lifecycle": "active"
+            }
+          }
+        ],
+        "completion": {
+          "status": "complete",
+          "resourceCount": 1,
+          "nextSequence": 43,
+          "checkpoint": "kubernetes:cluster-local:resource-version:398712",
+          "providerCursors": {
+            "/apis/apps/v1/namespaces/default/deployments": "398712"
+          },
+          "scopeDigest": "sha256:c606751c52a1d350c9bacd31dc59d32b50a7e3d23050db44b13eff7a14ffe687"
+        }
+      }
+    },
+    "usage": {
+      "wallTimeMillis": 842,
+      "outputBytes": 1147
+    }
+  }
+}

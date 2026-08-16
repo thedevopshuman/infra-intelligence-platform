@@ -248,6 +248,49 @@ class KubernetesObserverConformanceTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertEqual(json.loads(output.getvalue()), self.expected)
 
+    def test_stdio_protocol_accepts_one_public_invocation(self) -> None:
+        invocation = {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "PluginInvocation",
+            "metadata": {
+                "id": "pin_11111111111111111111111111111111",
+                "sessionId": "psn_11111111111111111111111111111111",
+                "tenantId": "local",
+                "actorId": "plugin-host",
+                "createdAt": "2026-08-14T11:00:00Z",
+                "deadline": "2026-08-14T11:01:00Z",
+            },
+            "spec": {
+                "manifestDigest": "sha256:" + "1" * 64,
+                "capability": "resource-observer",
+                "method": "collect",
+                "input": self.request,
+            },
+        }
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "kubernetes_observer",
+                "--stdio",
+                "--objects",
+                str(PLUGIN / "fixtures" / "kubernetes-list.json"),
+            ],
+            input=json.dumps(invocation),
+            text=True,
+            capture_output=True,
+            timeout=10,
+            check=False,
+            env={
+                "PYTHONPATH": (
+                    f"{ROOT / 'sdks' / 'python' / 'src'}:{PLUGIN / 'src'}"
+                )
+            },
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(json.loads(completed.stdout), self.expected)
+
     def test_live_transport_requires_explicit_configuration_and_builds_checkpoint(self) -> None:
         provider_document = {
             "apiVersion": "v1",

@@ -108,7 +108,7 @@ Deliverables:
 
 Exit gate: a plugin built only from public docs/SDK passes conformance and runs in a pilot without elevated control-plane credentials.
 
-Reference slice delivered: session contract, declared-capability subset enforcement, token reference/digest handling, expiry/cancellation/limit framing, live observer transport, public SDK types, and conformance tests. Remaining: signed artifacts, digest enforcement, isolated out-of-process runner, OS/network/resource sandboxing, compatibility automation, design-partner deployment, and public governance/legal decisions.
+Reference slice delivered: session and invocation/result contracts, declared-capability subset enforcement, token reference/digest handling, expiry/cancellation/limit framing, live observer transport, public SDK types, Ed25519 publisher trust, digest-pinned pre-pulled OCI artifacts, and a real out-of-process Docker conformance runner with no network/mounts/credentials, read-only non-root execution, and bounded CPU/memory/swap/PIDs/files/tmpfs/time/input/output. Remaining: durable cross-restart execution claims, mediated network and credential delivery, cancellation propagation to owning workflows, automated compatibility matrices, design-partner deployment, and public governance/legal decisions.
 
 ## Parallel track — company and brand
 
@@ -131,7 +131,7 @@ All working material stays under `docs/research/brand/` until accepted.
 | Credential broker client | **Accepted: ADR 0022** | External HTTPS lease exchange with projected workload identity; issuer/product interoperability remains open |
 | Workflow engine | Phase 3 end | Durable timers, approvals, retries, audit, self-hosting burden |
 | Policy engine | **Accepted integration boundary: ADR 0037** | External engine remains customer-selectable; exact decisions require tenant-bound immutable snapshot references |
-| Plugin runtime | Phase 4 end | Isolation, language support, streaming, operational cost, signing |
+| Plugin runtime | **Accepted first profile: ADR 0038** | No-network signed OCI execution first; durable claims and mediated connectivity remain before external authority |
 | Model/provider strategy | Phase 2 start | Data policy, tool use, structured output, cost, evaluation stability |
 | License and governance | Before public pilot | Community utility, commercial sustainability, contributor clarity |
 

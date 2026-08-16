@@ -2,7 +2,7 @@
 
 This package is a runnable, read-only resource-observer example. It consumes the public resource collection request contract, normalizes a Kubernetes `List` document, and returns the public collection result contract without importing server internals.
 
-The fixture CLI proves normalization, ordering, tenancy propagation, bounded output, reconciliation completion, and secret omission. An explicit `kubectl` development transport lists each resource type independently, returns a provider cursor map, resumes bounded watches from host-committed state, and recovers expired watches through a fresh full reconciliation. Capability-token verification, cancellation propagation, and process isolation remain host/runtime work.
+The fixture CLI proves normalization, ordering, tenancy propagation, bounded output, reconciliation completion, and secret omission. An explicit `kubectl` development transport lists each resource type independently, returns a provider cursor map, resumes bounded watches from host-committed state, and recovers expired watches through a fresh full reconciliation. The signed runner provides a separate offline stdio conformance path with capability-token verification and process isolation; live credential/network mediation remains host/runtime work.
 
 ## Run the conformance fixture
 
@@ -16,6 +16,13 @@ PYTHONPATH=sdks/python/src:plugins/examples/kubernetes-observer/src \
 ```
 
 The result must exactly match `fixtures/expected-result.json`. `make verify` runs this comparison and validates every returned resource against the shared JSON Schemas.
+
+To build, sign with an ephemeral test key, and run the container by immutable
+digest in the no-network sandbox:
+
+```bash
+make test-plugin-runner
+```
 
 ## Run against the local kind cluster
 

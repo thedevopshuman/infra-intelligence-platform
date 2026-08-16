@@ -5,11 +5,11 @@
     "id": "psn_77777777777777777777777777777777",
     "tenantId": "local",
     "pluginId": "kubernetes-observer",
-    "pluginVersion": "0.2.0",
+    "pluginVersion": "0.3.0",
     "createdAt": "2026-08-14T12:44:00Z"
   },
   "spec": {
-    "manifestDigest": "sha256:7223d5b5c38cb41b750242f9079f69a8e2246582bffde61554ddc58653a982af",
+    "manifestDigest": "sha256:50bf15e1ff06140258890a6811dc909be8d6bc179013a681327d523f99d8783b",
     "protocolVersion": "1.0",
     "grantedCapabilities": ["resource-observer"],
     "capabilityTokenRef": "capability://local/sessions/psn_77777777777777777777777777777777",

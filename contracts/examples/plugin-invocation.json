@@ -1,0 +1,46 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PluginInvocation",
+  "metadata": {
+    "id": "pin_4da8d7ab485b4d7f90f7b5b932c70827",
+    "sessionId": "psn_77777777777777777777777777777777",
+    "tenantId": "local",
+    "actorId": "plugin-host",
+    "createdAt": "2026-08-14T12:44:30Z",
+    "deadline": "2026-08-14T12:45:00Z"
+  },
+  "spec": {
+    "manifestDigest": "sha256:50bf15e1ff06140258890a6811dc909be8d6bc179013a681327d523f99d8783b",
+    "capability": "resource-observer",
+    "method": "collect",
+    "input": {
+      "apiVersion": "iip.platform/v1alpha1",
+      "kind": "ResourceCollectionRequest",
+      "metadata": {
+        "requestId": "col_2fd7b920cf1a4d56b83b90d18a56c012",
+        "tenantId": "local",
+        "actorId": "collector-local",
+        "requestedAt": "2026-08-14T10:30:00Z"
+      },
+      "spec": {
+        "sourceId": "kubernetes-local",
+        "streamId": "obs_0f4e8c2a6b1d4975a3c9e7f102d468ab",
+        "mode": "incremental",
+        "startSequence": 42,
+        "scope": {
+          "provider": "kubernetes",
+          "integrationId": "kubernetes-local",
+          "rootExternalId": "cluster-local",
+          "parameters": {
+            "namespaces": ["default"]
+          }
+        },
+        "limits": {
+          "maxResources": 100,
+          "maxOutputBytes": 1048576
+        },
+        "deadline": "2026-08-14T10:35:00Z"
+      }
+    }
+  }
+}

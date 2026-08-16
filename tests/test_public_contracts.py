@@ -43,6 +43,9 @@ from infra_intelligence_sdk import (
     LogEvidenceResult,
     OtlpLogsEvidence,
     OtlpMetricsEvidence,
+    PluginInvocation,
+    PluginInvocationResult,
+    PluginManifest,
     PluginSession,
     PolicyDecision,
     PolicyDecisionRequest,
@@ -138,6 +141,13 @@ class PublicContractSdkTests(unittest.TestCase):
             example("action-workflow-page.json")
         )
         plugin_session = PluginSession.from_dict(example("plugin-session.json"))
+        plugin_manifest = PluginManifest.from_dict(example("plugin-manifest.json"))
+        plugin_invocation = PluginInvocation.from_dict(
+            example("plugin-invocation.json")
+        )
+        plugin_result = PluginInvocationResult.from_dict(
+            example("plugin-invocation-result.json")
+        )
         policy_request = PolicyDecisionRequest.from_dict(
             example("policy-decision-request.json")
         )
@@ -284,6 +294,11 @@ class PublicContractSdkTests(unittest.TestCase):
             action_workflow_page.to_dict()["kind"], "ActionWorkflowPage"
         )
         self.assertEqual(plugin_session.to_dict()["kind"], "PluginSession")
+        self.assertEqual(plugin_manifest.to_dict()["kind"], "Plugin")
+        self.assertEqual(plugin_invocation.to_dict()["kind"], "PluginInvocation")
+        self.assertEqual(
+            plugin_result.to_dict()["kind"], "PluginInvocationResult"
+        )
         self.assertEqual(
             policy_request.to_dict()["kind"], "PolicyDecisionRequest"
         )
@@ -410,6 +425,19 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn(
             "policy request resource tenant must match its metadata tenant",
+            self.errors,
+        )
+
+    def test_plugin_result_rejects_wrong_output_digest(self) -> None:
+        result_path = ROOT / "contracts" / "examples" / "plugin-invocation-result.json"
+        result = copy.deepcopy(self.documents[result_path])
+        result["spec"]["output"]["kind"] = "DifferentResult"
+        self.documents[result_path] = result
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "plugin result outputDigest must match its canonical output",
             self.errors,
         )
 

@@ -546,6 +546,22 @@ class JsonSchemaValidationTests(unittest.TestCase):
         self.assertTrue(any("inputDigest" in error for error in errors))
         self.assertTrue(any("policySnapshotRef" in error for error in errors))
 
+    def test_plugin_manifest_artifact_signature_is_closed(self) -> None:
+        manifest = document("contracts/examples/plugin-manifest.json")
+        manifest["spec"]["artifact"]["signature"]["privateKey"] = "forbidden"
+
+        errors = self.validate("plugin-manifest.schema.json", manifest)
+
+        self.assertTrue(any("privateKey" in error for error in errors))
+
+    def test_successful_plugin_result_requires_output_and_prohibits_error(self) -> None:
+        result = document("contracts/examples/plugin-invocation-result.json")
+        result["spec"]["error"] = {"code": "plugin.runtime.failed"}
+
+        errors = self.validate("plugin-invocation-result.schema.json", result)
+
+        self.assertTrue(errors)
+
 
 if __name__ == "__main__":
     unittest.main()

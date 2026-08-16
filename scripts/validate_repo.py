@@ -25,6 +25,7 @@ REQUIRED_PATHS = (
     "docs/architecture/overview.md",
     "docs/architecture/authentication-boundary.md",
     "docs/architecture/authorization-policy.md",
+    "docs/architecture/plugin-runtime.md",
     "docs/architecture/evidence-collection-pipeline.md",
     "docs/architecture/ingestion-freshness-telemetry.md",
     "docs/architecture/opentelemetry-portability.md",
@@ -32,6 +33,7 @@ REQUIRED_PATHS = (
     "docs/research/brand/README.md",
     "docs/roadmap/initial-roadmap.md",
     "docs/specifications/policy-contract.md",
+    "docs/specifications/plugin-invocation-contract.md",
     "docs/decisions/0005-credential-derived-request-identity.md",
     "docs/decisions/0006-deterministic-investigation-and-dry-run-actions.md",
     "docs/decisions/0007-reconciliation-membership-and-tombstones.md",
@@ -62,6 +64,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0035-one-shot-action-execution.md",
     "docs/decisions/0036-request-scoped-kubernetes-restart.md",
     "docs/decisions/0037-oidc-and-external-policy-boundaries.md",
+    "docs/decisions/0038-signed-no-network-plugin-runner.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/kubernetes-event-evidence.md",
@@ -71,6 +74,7 @@ REQUIRED_PATHS = (
     "docs/operations/log-evidence.md",
     "docs/operations/resource-change-evidence.md",
     "docs/operations/postgresql-backup-restore.md",
+    "docs/operations/plugin-runner.md",
     "docs/operations/measurements/postgresql-backup-restore.json",
     "contracts/schemas/resource.schema.json",
     "contracts/schemas/credential-lease-request.schema.json",
@@ -96,6 +100,8 @@ REQUIRED_PATHS = (
     "contracts/schemas/event.schema.json",
     "contracts/schemas/agent-manifest.schema.json",
     "contracts/schemas/plugin-manifest.schema.json",
+    "contracts/schemas/plugin-invocation.schema.json",
+    "contracts/schemas/plugin-invocation-result.schema.json",
     "contracts/schemas/evidence.schema.json",
     "contracts/schemas/kubernetes-event-evidence-request.schema.json",
     "contracts/schemas/kubernetes-event-evidence-result.schema.json",
@@ -131,6 +137,8 @@ REQUIRED_PATHS = (
     "contracts/examples/action-workflow.json",
     "contracts/examples/action-workflow-page.json",
     "contracts/examples/plugin-session.json",
+    "contracts/examples/plugin-invocation.json",
+    "contracts/examples/plugin-invocation-result.json",
     "contracts/examples/policy-decision-request.json",
     "contracts/examples/policy-decision.json",
     "contracts/examples/investigation-request.json",
@@ -197,6 +205,7 @@ REQUIRED_PATHS = (
     "src/iip/adapters/kubernetes_events.py",
     "src/iip/adapters/kubernetes_actions.py",
     "src/iip/adapters/policy.py",
+    "src/iip/adapters/plugin_runner.py",
     "src/iip/application/query_actions.py",
     "src/iip/adapters/otlp_receiver.py",
     "src/iip/adapters/otlp_logs_receiver.py",
@@ -222,6 +231,7 @@ REQUIRED_PATHS = (
     "tests/test_kubernetes_actions_integration.py",
     "tests/test_action_queries.py",
     "tests/test_policy_adapter.py",
+    "tests/test_plugin_runner.py",
     "tests/test_kubernetes_events_integration.py",
     "tests/test_otlp_receiver.py",
     "tests/test_log_evidence.py",
@@ -231,6 +241,7 @@ REQUIRED_PATHS = (
     "tests/test_otlp_logs_receiver.py",
     "tests/test_otlp_receiver_integration.py",
     "scripts/test_otel.sh",
+    "scripts/run_plugin_runner_conformance.py",
     "scripts/test_prometheus.sh",
     "scripts/test_loki.sh",
     "scripts/test_kubernetes_events.sh",
@@ -2269,6 +2280,8 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("agent-manifest.json", "Agent"),
         ("integration-config.json", "IntegrationConfig"),
         ("plugin-manifest.json", "Plugin"),
+        ("plugin-invocation.json", "PluginInvocation"),
+        ("plugin-invocation-result.json", "PluginInvocationResult"),
         ("plugin-session.json", "PluginSession"),
         ("policy-decision-request.json", "PolicyDecisionRequest"),
         ("policy-decision.json", "PolicyDecision"),
@@ -2378,6 +2391,25 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
                         and interface.get("capability") not in capabilities
                     ):
                         fail(errors, "plugin interface must advertise its capability")
+        try:
+            from iip.adapters.plugin_runner import PluginTrustStore
+
+            example_trust = PluginTrustStore.from_json(
+                json.dumps(
+                    {
+                        "keys": [
+                            {
+                                "keyId": "local-development-2026",
+                                "publisher": "local-development",
+                                "publicKey": "iDSVA6ip-KrgSi71B7GGYnqy5F9yU-ubRVR5z9ZgMNA",
+                            }
+                        ]
+                    }
+                )
+            )
+            example_trust.verify(plugin_example)
+        except Exception:
+            fail(errors, "plugin manifest example signature must verify against its publisher key")
 
     action_proposal = documents.get(example_dir / "action-proposal.json")
     action_approval = documents.get(example_dir / "action-approval.json")
@@ -2386,6 +2418,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     action_workflow = documents.get(example_dir / "action-workflow.json")
     action_workflow_page = documents.get(example_dir / "action-workflow-page.json")
     plugin_session = documents.get(example_dir / "plugin-session.json")
+    plugin_invocation = documents.get(example_dir / "plugin-invocation.json")
+    plugin_invocation_result = documents.get(
+        example_dir / "plugin-invocation-result.json"
+    )
     if all(
         isinstance(item, dict)
         for item in (
@@ -2472,6 +2508,93 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             set(manifest_spec.get("capabilities", []))
         ):
             fail(errors, "plugin session cannot grant undeclared capabilities")
+
+    if all(
+        isinstance(item, dict)
+        for item in (
+            plugin_example,
+            plugin_session,
+            plugin_invocation,
+            plugin_invocation_result,
+        )
+    ):
+        manifest_metadata = plugin_example["metadata"]
+        invocation_metadata = plugin_invocation["metadata"]
+        invocation_spec = plugin_invocation["spec"]
+        result_metadata = plugin_invocation_result["metadata"]
+        result_spec = plugin_invocation_result["spec"]
+        session_metadata = plugin_session["metadata"]
+        session_spec = plugin_session["spec"]
+        if invocation_spec.get("manifestDigest") != canonical_digest(plugin_example):
+            fail(errors, "plugin invocation manifestDigest must match its manifest")
+        if len(
+            {
+                invocation_metadata.get("tenantId"),
+                result_metadata.get("tenantId"),
+                session_metadata.get("tenantId"),
+            }
+        ) != 1:
+            fail(errors, "plugin invocation, result, and session must share a tenant")
+        if len(
+            {
+                invocation_metadata.get("sessionId"),
+                result_metadata.get("sessionId"),
+                session_metadata.get("id"),
+            }
+        ) != 1:
+            fail(errors, "plugin invocation and result must identify their session")
+        if result_metadata.get("id") != invocation_metadata.get("id"):
+            fail(errors, "plugin result must identify its invocation")
+        if (
+            result_metadata.get("pluginId") != manifest_metadata.get("id")
+            or result_metadata.get("pluginVersion") != manifest_metadata.get("version")
+        ):
+            fail(errors, "plugin result must identify its manifest")
+        capability = invocation_spec.get("capability")
+        method = invocation_spec.get("method")
+        interfaces = plugin_example.get("spec", {}).get("interfaces", [])
+        if capability not in session_spec.get("grantedCapabilities", []):
+            fail(errors, "plugin invocation capability must be granted by its session")
+        if not any(
+            isinstance(interface, dict)
+            and interface.get("capability") == capability
+            and interface.get("method") == method
+            for interface in interfaces
+        ):
+            fail(errors, "plugin invocation method must resolve in its manifest")
+        created = parse_timestamp(invocation_metadata.get("createdAt"))
+        deadline = parse_timestamp(invocation_metadata.get("deadline"))
+        completed = parse_timestamp(result_metadata.get("completedAt"))
+        expires = parse_timestamp(session_spec.get("expiresAt"))
+        if None in (created, deadline, completed, expires) or not (
+            created <= completed <= deadline <= expires
+        ):
+            fail(errors, "plugin invocation timestamps must fit its session and deadline")
+        output = result_spec.get("output")
+        if result_spec.get("status") == "succeeded" and isinstance(output, dict):
+            collection_request = documents.get(
+                example_dir / "resource-collection-request.json"
+            )
+            collection_result = documents.get(
+                example_dir / "resource-collection-result.json"
+            )
+            if invocation_spec.get("input") != collection_request:
+                fail(errors, "plugin invocation input must embed its declared contract example")
+            if output != collection_result:
+                fail(errors, "plugin result output must embed its declared contract example")
+            if result_spec.get("outputDigest") != canonical_digest(output):
+                fail(errors, "plugin result outputDigest must match its canonical output")
+            output_bytes = len(
+                json.dumps(
+                    output,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            )
+            usage = result_spec.get("usage", {})
+            if usage.get("outputBytes") != output_bytes:
+                fail(errors, "plugin result outputBytes must match its canonical example output")
 
     evidence = documents.get(example_dir / "evidence.json")
     request = documents.get(example_dir / "investigation-request.json")

@@ -369,6 +369,47 @@ export interface TelemetryEvidenceResult {
   };
 }
 
+export interface OtlpMetricsEvidence {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "OtlpMetricsEvidence";
+  metadata: {
+    tenantId: string;
+    integrationId: string;
+    channelId: string;
+    receivedAt: string;
+  };
+  spec: {
+    signal: "metrics";
+    protocol: "otlp/http-protobuf";
+    timeRange: { start: string; end: string };
+    series: (
+      | {
+          metric: string;
+          unit: string;
+          kind: "gauge";
+          attributes: Record<string, string>;
+          points: { timestamp: string; value: number }[];
+          temporality?: never;
+          monotonic?: never;
+        }
+      | {
+          metric: string;
+          unit: string;
+          kind: "sum";
+          temporality: "delta" | "cumulative";
+          monotonic: boolean;
+          attributes: Record<string, string>;
+          points: { timestamp: string; value: number }[];
+        }
+    )[];
+    summary: {
+      metricCount: number;
+      seriesCount: number;
+      dataPointCount: number;
+    };
+  };
+}
+
 export interface InvestigationScope {
   resourceUids: ResourceUid[];
   timeRange: {

@@ -16,6 +16,7 @@ from infra_intelligence_sdk import (
     InvestigationRequest,
     IngestionFreshnessReport,
     IntegrationConfig,
+    OtlpMetricsEvidence,
     PluginSession,
     ResourceCollectionRequest,
     ResourceCollectionResult,
@@ -68,6 +69,9 @@ class PublicContractSdkTests(unittest.TestCase):
         telemetry_result = TelemetryEvidenceResult.from_dict(
             example("telemetry-evidence-result.json")
         )
+        otlp_metrics = OtlpMetricsEvidence.from_dict(
+            example("otlp-metrics-evidence.json")
+        )
 
         self.assertEqual(evidence.to_dict()["kind"], "Evidence")
         self.assertEqual(request.to_dict()["kind"], "InvestigationRequest")
@@ -97,6 +101,7 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             telemetry_result.to_dict()["kind"], "TelemetryEvidenceResult"
         )
+        self.assertEqual(otlp_metrics.to_dict()["kind"], "OtlpMetricsEvidence")
 
     def test_sdk_models_reject_crossed_contract_kinds(self) -> None:
         with self.assertRaisesRegex(ValueError, "kind must be Evidence"):
@@ -123,6 +128,8 @@ class PublicContractSdkTests(unittest.TestCase):
             TelemetryEvidenceResult.from_dict(
                 example("telemetry-evidence-request.json")
             )
+        with self.assertRaisesRegex(ValueError, "kind must be OtlpMetricsEvidence"):
+            OtlpMetricsEvidence.from_dict(example("telemetry-evidence-result.json"))
 
     def test_sdk_models_reject_unknown_versions(self) -> None:
         payload = example("investigation-request.json")
@@ -296,6 +303,19 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn(
             "telemetry evidence summary must match its series",
+            self.errors,
+        )
+
+    def test_otlp_metrics_evidence_rejects_incorrect_summary(self) -> None:
+        path = ROOT / "contracts" / "examples" / "otlp-metrics-evidence.json"
+        result = copy.deepcopy(self.documents[path])
+        result["spec"]["summary"]["dataPointCount"] = 3
+        self.documents[path] = result
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "OTLP metrics evidence summary must match its series",
             self.errors,
         )
 

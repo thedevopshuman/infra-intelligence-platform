@@ -68,6 +68,11 @@ telemetryEvidence:
     credentialsExistingSecret: ""
     credentialsSecretKey: prometheus-credentials-json
 
+otlpReceiver:
+  enabled: false
+  channelsExistingSecret: ""
+  channelsSecretKey: otlp-receiver-channels-json
+
 resources:
   requests:
     cpu: 50m
@@ -88,6 +93,12 @@ networkPolicy:
   enabled: false
   ingressNamespaceSelector:
     kubernetes.io/metadata.name: iip-system
+  otlpReceiverIngress:
+    enabled: false
+    namespaceSelector:
+      kubernetes.io/metadata.name: observability
+    podSelector:
+      app.kubernetes.io/name: opentelemetry-collector
   otlpEgress:
     enabled: false
     port: 4318

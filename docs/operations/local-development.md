@@ -6,7 +6,7 @@
 
 - Python 3.11 or newer
 - Helm 3 or newer
-- Optional: Docker Desktop for PostgreSQL, OpenTelemetry Collector, and Prometheus integration tests and the durable local stack
+- Optional: Docker Desktop for PostgreSQL, OpenTelemetry Collector, OTLP receiver, and Prometheus integration tests and the durable local stack
 - Optional: Docker Desktop, kind, and `kubectl` for live Kubernetes collection tests
 
 Install the pinned verification-only Python dependencies:
@@ -48,6 +48,14 @@ make test-otel
 ```
 
 The isolated target verifies receipt of a reference ingestion metric and removes its Collector afterward. See the [OpenTelemetry export guide](opentelemetry-export.md) for the long-running Compose profile, Helm settings, security constraints, and production gaps.
+
+Exercise an official OTLP/HTTP exporter against the receiver in the built API image with:
+
+```bash
+make test-otlp-receiver
+```
+
+The gate seeds the configured tenant/resource through the control plane, exports an allowlisted cumulative sum through an independent channel credential, requires OTLP success, and removes the isolated API container afterward. Pure normalization, redaction, scope, and persistence behavior remains covered by `make verify`. See the [OTLP receiver guide](otlp-metrics-receiver.md) for protected channel and Helm configuration.
 
 Exercise the historical metric-evidence adapter against a real Prometheus server with:
 
@@ -166,6 +174,8 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_INGESTION_MAX_PENDING_EVENT_AGE_SECONDS` | `60` | Local maximum age of the oldest unpublished source event |
 | `IIP_INGESTION_MAX_CLOCK_SKEW_SECONDS` | `5` | Maximum future timestamp tolerance before a skew violation |
 | `IIP_OTEL_METRICS_ENABLED` | `false` | Compose optional outbound OTLP/HTTP freshness metrics |
+| `IIP_OTLP_RECEIVER_ENABLED` | `false` | Enable the optional tenant-bound OTLP/HTTP metrics Evidence receiver |
+| `IIP_OTLP_RECEIVER_CHANNELS_JSON` | required when receiver is enabled | Protected hashed channel credentials, fixed scope, catalogs, admission limits, and handling policy |
 | `IIP_TELEMETRY_METRICS_BACKEND` | `no-data` | Historical metric evidence backend; `no-data` or `prometheus` |
 | `IIP_PROMETHEUS_INTEGRATIONS_JSON` | unset | Protected non-secret tenant/integration endpoint and allowlisted metric catalog required by the Prometheus backend |
 | `IIP_PROMETHEUS_CREDENTIALS_JSON` | empty credential set | Secret-bearing local reference broker configuration; supply only through a protected runtime channel |
@@ -179,6 +189,7 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `OTEL_SERVICE_NAME` | `infra-intelligence-api` | OpenTelemetry service resource name |
 | `IIP_TEST_DATABASE_URL` | unset | Enable PostgreSQL integration tests against an explicit test database |
 | `IIP_TEST_PROMETHEUS_ENDPOINT` | unset | Enable the real Prometheus adapter integration test against an explicit endpoint |
+| `IIP_TEST_OTLP_RECEIVER_ENDPOINT` | unset | Enable the official-exporter receiver integration test against an explicit API endpoint |
 | `IIP_KUBECONFIG` | required by live test | Explicit kubeconfig path; the observer never chooses an implicit current context |
 | `IIP_KUBE_CONTEXT` | `kind-iip-dev` | Explicit local context used only by `test-kubernetes-live` |
 

@@ -9,6 +9,7 @@ data:
   IIP_HTTP_PORT: {{ .Values.config.httpPort | quote }}
   IIP_DATABASE_AUTO_MIGRATE: {{ .Values.database.autoMigrate | quote }}
   IIP_OTEL_METRICS_ENABLED: {{ .Values.telemetry.metricsEnabled | quote }}
+  IIP_OTLP_RECEIVER_ENABLED: {{ .Values.otlpReceiver.enabled | quote }}
   IIP_OTEL_INGESTION_ATTRIBUTE_MODE: {{ .Values.telemetry.attributeMode | quote }}
   OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.telemetry.otlpEndpoint | quote }}
   OTEL_EXPORTER_OTLP_PROTOCOL: {{ .Values.telemetry.protocol | quote }}

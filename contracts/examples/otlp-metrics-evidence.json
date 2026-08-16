@@ -1,0 +1,51 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "OtlpMetricsEvidence",
+  "metadata": {
+    "tenantId": "local",
+    "integrationId": "observability-local",
+    "channelId": "otlp-local",
+    "receivedAt": "2026-08-14T10:30:01Z"
+  },
+  "spec": {
+    "signal": "metrics",
+    "protocol": "otlp/http-protobuf",
+    "timeRange": {
+      "start": "2026-08-14T10:29:00Z",
+      "end": "2026-08-14T10:30:00Z"
+    },
+    "series": [
+      {
+        "metric": "service.request.count",
+        "unit": "{request}",
+        "kind": "sum",
+        "temporality": "cumulative",
+        "monotonic": true,
+        "attributes": {
+          "deployment.environment.name": "production",
+          "service.name": "checkout"
+        },
+        "points": [
+          {"timestamp": "2026-08-14T10:30:00Z", "value": 1842}
+        ]
+      },
+      {
+        "metric": "service.request.duration",
+        "unit": "s",
+        "kind": "gauge",
+        "attributes": {
+          "deployment.environment.name": "production",
+          "service.name": "checkout"
+        },
+        "points": [
+          {"timestamp": "2026-08-14T10:29:00Z", "value": 0.125}
+        ]
+      }
+    ],
+    "summary": {
+      "metricCount": 2,
+      "seriesCount": 2,
+      "dataPointCount": 2
+    }
+  }
+}

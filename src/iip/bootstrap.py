@@ -21,6 +21,11 @@ from iip.adapters.operations import InMemoryOperationalStore
 from iip.application.actions import GovernedActionService
 from iip.application.collect_evidence import EvidenceCollectionService
 from iip.application.ingest_collection import ResourceCollectionIngestionService
+from iip.application.ingest_otlp_metrics import (
+    OtlpMetricsIngestionService,
+    OtlpMetricsReceiverAdapter,
+    OtlpReceiverConfigurationError,
+)
 from iip.application.ports import (
     AuthenticationConfigurationError,
     Authenticator,
@@ -62,6 +67,7 @@ class Runtime:
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
     telemetry_evidence: TelemetryEvidenceService
+    otlp_metrics_ingestion: OtlpMetricsIngestionService | None
     investigations: DeterministicInvestigationService
     actions: GovernedActionService
     plugin_sessions: PluginSessionService
@@ -85,6 +91,7 @@ def build_local_runtime(
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
+    otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
@@ -100,6 +107,7 @@ def build_local_runtime(
         ingestion_objectives,
         ingestion_telemetry_sink,
         telemetry_metrics_backend,
+        otlp_metrics_receiver,
         telemetry_runtime,
     )
 
@@ -112,6 +120,7 @@ def _compose_runtime(
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
+    otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
@@ -162,6 +171,11 @@ def _compose_runtime(
         queries=queries,
         evidence=evidence,
         telemetry_evidence=TelemetryEvidenceService(evidence, clock),
+        otlp_metrics_ingestion=(
+            OtlpMetricsIngestionService(otlp_metrics_receiver, evidence, clock)
+            if otlp_metrics_receiver is not None
+            else None
+        ),
         investigations=DeterministicInvestigationService(
             store, evidence, operational, clock
         ),
@@ -188,6 +202,7 @@ def build_postgres_runtime(
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
+    otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
@@ -206,6 +221,7 @@ def build_postgres_runtime(
         ingestion_objectives,
         ingestion_telemetry_sink,
         telemetry_metrics_backend,
+        otlp_metrics_receiver,
         telemetry_runtime,
     )
 
@@ -231,6 +247,7 @@ def build_runtime_from_env() -> Runtime:
     telemetry_runtime = _otel_metrics_runtime_from_env()
     database_url = os.environ.get("IIP_DATABASE_URL")
     try:
+        otlp_metrics_receiver = _otlp_metrics_receiver_from_env()
         telemetry_metrics_backend = _telemetry_metrics_backend_from_env()
         if not database_url:
             return build_local_runtime(
@@ -242,6 +259,7 @@ def build_runtime_from_env() -> Runtime:
                     else None
                 ),
                 telemetry_metrics_backend=telemetry_metrics_backend,
+                otlp_metrics_receiver=otlp_metrics_receiver,
                 telemetry_runtime=telemetry_runtime,
             )
         auto_migrate = (
@@ -257,6 +275,7 @@ def build_runtime_from_env() -> Runtime:
                 telemetry_runtime.sink if telemetry_runtime is not None else None
             ),
             telemetry_metrics_backend=telemetry_metrics_backend,
+            otlp_metrics_receiver=otlp_metrics_receiver,
             telemetry_runtime=telemetry_runtime,
         )
     except Exception:
@@ -337,3 +356,18 @@ def _telemetry_metrics_backend_from_env() -> TelemetryMetricsBackend | None:
     from iip.adapters.prometheus import build_prometheus_backend_from_environment
 
     return build_prometheus_backend_from_environment(os.environ, SystemClock())
+
+
+def _otlp_metrics_receiver_from_env() -> OtlpMetricsReceiverAdapter | None:
+    enabled = os.environ.get("IIP_OTLP_RECEIVER_ENABLED", "false").lower()
+    if enabled not in ("false", "true"):
+        raise OtlpReceiverConfigurationError("otlp.configuration.invalid")
+    if enabled == "false":
+        return None
+    configuration = os.environ.get("IIP_OTLP_RECEIVER_CHANNELS_JSON")
+    if configuration is None:
+        raise OtlpReceiverConfigurationError("otlp.configuration.required")
+
+    from iip.adapters.otlp_receiver import ConfiguredOtlpMetricsReceiver
+
+    return ConfiguredOtlpMetricsReceiver.from_json(configuration)

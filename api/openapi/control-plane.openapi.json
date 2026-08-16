@@ -3,7 +3,7 @@
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
     "version": "0.4.0",
-    "description": "Executable local reference API for collection ingestion, freshness telemetry, backend-neutral metric evidence, resource queries, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
+    "description": "Executable local reference API for collection ingestion, freshness telemetry, backend-neutral metric evidence, tenant-bound OTLP metrics intake, resource queries, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -20,6 +20,34 @@
         "operationId": "ready",
         "security": [],
         "responses": {"200": {"description": "Process is ready"}}
+      }
+    },
+    "/v1/metrics": {
+      "post": {
+        "operationId": "ingestOtlpMetrics",
+        "description": "Optional OTLP/HTTP binary Protobuf receiver. This operation uses a separately configured channel Bearer credential; the global control-plane identity is not accepted.",
+        "security": [{"otlpChannelBearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-protobuf": {
+              "schema": {"type": "string", "format": "binary"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Full OTLP success; the body is a serialized ExportMetricsServiceResponse",
+            "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+          },
+          "400": {"$ref": "#/components/responses/OtlpInvalidRequest"},
+          "401": {"$ref": "#/components/responses/OtlpUnauthorized"},
+          "403": {"$ref": "#/components/responses/OtlpPolicyDenied"},
+          "404": {"$ref": "#/components/responses/OtlpReceiverDisabled"},
+          "413": {"$ref": "#/components/responses/OtlpRequestTooLarge"},
+          "415": {"$ref": "#/components/responses/OtlpUnsupportedMedia"},
+          "503": {"$ref": "#/components/responses/OtlpUnavailable"}
+        }
       }
     },
     "/v1/resources": {
@@ -301,6 +329,11 @@
         "type": "http",
         "scheme": "bearer",
         "description": "Bearer credential verified by the configured authenticator. Tenant, actor, and roles are derived from the verified identity and are never accepted from identity assertion headers."
+      },
+      "otlpChannelBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Independent OTLP receiver channel credential. Tenant, integration, resource scope, catalogs, limits, and retention come only from protected channel configuration."
       }
     },
     "parameters": {
@@ -321,6 +354,7 @@
       "Evidence": {"$ref": "../../contracts/schemas/evidence.schema.json"},
       "TelemetryEvidenceRequest": {"$ref": "../../contracts/schemas/telemetry-evidence-request.schema.json"},
       "TelemetryEvidenceResult": {"$ref": "../../contracts/schemas/telemetry-evidence-result.schema.json"},
+      "OtlpMetricsEvidence": {"$ref": "../../contracts/schemas/otlp-metrics-evidence.schema.json"},
       "InvestigationRequest": {"$ref": "../../contracts/schemas/investigation-request.schema.json"},
       "InvestigationReport": {"$ref": "../../contracts/schemas/investigation-report.schema.json"},
       "IntegrationConfig": {"$ref": "../../contracts/schemas/integration-config.schema.json"},
@@ -331,6 +365,36 @@
       "Error": {"$ref": "../../contracts/schemas/error.schema.json"}
     },
     "responses": {
+      "OtlpInvalidRequest": {
+        "description": "The OTLP protobuf or normalized metric semantics are invalid",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpUnauthorized": {
+        "description": "The independent receiver channel credential is missing or invalid",
+        "headers": {"WWW-Authenticate": {"schema": {"type": "string"}, "example": "Bearer"}},
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpPolicyDenied": {
+        "description": "Evidence collection policy denied the configured channel scope",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpReceiverDisabled": {
+        "description": "The optional receiver is disabled",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpRequestTooLarge": {
+        "description": "The encoded, decompressed, or normalized payload exceeded a channel bound",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpUnsupportedMedia": {
+        "description": "Only OTLP binary Protobuf with identity or gzip content encoding is accepted",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpUnavailable": {
+        "description": "The receiver, evidence processor, or storage boundary is temporarily unavailable",
+        "headers": {"Retry-After": {"schema": {"type": "integer"}, "example": 1}},
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
       "Unauthorized": {
         "description": "A valid Bearer credential is required",
         "headers": {

@@ -1,6 +1,6 @@
 # OpenTelemetry portability boundary
 
-**Status:** Accepted direction; outbound reference adapter implemented
+**Status:** Accepted direction; outbound exporter, historical query, and inbound metrics receiver reference adapters implemented
 **Date:** 2026-08-15
 **Decision:** [ADR 0012](../decisions/0012-opentelemetry-portability-boundary.md)
 
@@ -43,9 +43,9 @@ Export is disabled by default, asynchronous, and observational. Endpoint unavail
 
 OTLP is a push/export protocol, not a historical query protocol. The first executable customer-telemetry boundary therefore addresses data already retained in a backend. `TelemetryEvidenceRequest` expresses one bounded metric selector, `TelemetryMetricsBackend` hides the vendor query/API, and the application validates a `TelemetryEvidenceResult` before storing it through the immutable Evidence pipeline. [ADR 0014](../decisions/0014-backend-neutral-telemetry-evidence-query.md) records the contract decision. The default remains no-data; [ADR 0015](../decisions/0015-prometheus-telemetry-evidence-adapter.md) adds an explicitly selected Prometheus-compatible adapter with an allowlisted metric catalog and request-scoped credential resolution.
 
-An OTLP receiver can later accept a customer-selected stream and convert it into the same bounded, immutable telemetry evidence shape. It remains separate because channel authentication, tenant binding, admission control, and retention authority differ from a request/response backend query.
+The optional receiver now accepts a customer-selected OTLP/HTTP Protobuf metrics stream and converts each non-empty batch into bounded `OtlpMetricsEvidence` through the immutable Evidence pipeline. [ADR 0016](../decisions/0016-tenant-bound-otlp-metrics-receiver.md) keeps it separate because channel authentication, tenant binding, admission control, and retention authority differ from a request/response backend query. The protected channel profile fixes tenant, integration, resources, allowed metrics/attributes, limits, sensitivity, and retention; payload attributes provide no authority.
 
-The first runtime implementation must define a receiver profile rather than accepting every signal and attribute. It will bound signal types, time range, request size, cardinality, sampling, and retention. Logs, span attributes, resource attributes, and collector output are untrusted input and pass through validation, redaction, hashing, and provenance controls before becoming evidence.
+The first runtime implementation accepts gauges and numeric sums, supports bounded identity/gzip requests, and atomically rejects unknown or unsupported semantics. It bounds time, request/artifact bytes, cardinality, and processing time. All resource/scope/point attributes and Collector output are untrusted input and pass through allowlisting, validation, redaction, hashing, and provenance controls before becoming evidence. Traces, logs, histograms, arbitrary retention, forwarding, and query storage remain out of scope.
 
 ## Security and tenancy
 
@@ -57,11 +57,11 @@ The first runtime implementation must define a receiver profile rather than acce
 
 ## Pending implementation decisions
 
-- whether pushed signals are retained by IIP, forwarded to customer storage, or use a hybrid policy;
+- whether later pushed signals use immutable Evidence only, customer storage forwarding, or a hybrid policy;
 - the production external credential broker and additional `TelemetryMetricsBackend` adapters;
-- receiver topology and authentication for self-hosted, customer-hosted, and managed deployments;
+- production receiver topology, workload identity/mTLS, token rotation, and process/gateway isolation for self-hosted, customer-hosted, and managed deployments;
 - retention, sampling, cardinality budgets, and regional/data-residency controls;
 - queue durability and the division of retry, batching, and delivery-health ownership between the official SDK and a sidecar/customer Collector;
 - the cadence and ownership of automatic freshness evaluation and production SLO windows.
 
-Receiver, external-broker, and additional backend decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, and SLO decisions belong to the Phase 3 operational-hardening gate. The current freshness API, outbound metric projection, normalized historical-query boundary, and Prometheus reference adapter are deliberately useful before they are selected.
+External-broker, additional backend, receiver-isolation, and expanded-signal decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, and SLO decisions belong to the Phase 3 operational-hardening gate. The current freshness API, outbound metric projection, normalized historical-query boundary, Prometheus adapter, and tenant-bound OTLP metrics receiver are deliberately useful before those production selections.

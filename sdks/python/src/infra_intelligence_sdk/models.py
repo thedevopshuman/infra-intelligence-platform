@@ -302,6 +302,26 @@ class TelemetryEvidenceResult:
 
 
 @dataclass(frozen=True)
+class OtlpMetricsEvidence:
+    """Normalized artifact produced by a tenant-bound OTLP metrics channel."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "OtlpMetricsEvidence":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="OtlpMetricsEvidence",
+                label="OTLP metrics evidence",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class InvestigationRequest:
     """Bounded, tenant- and actor-scoped investigation input."""
 

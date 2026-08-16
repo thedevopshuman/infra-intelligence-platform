@@ -43,6 +43,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "ingestion-freshness-report.json",
     ),
     "integration-config.schema.json": ("integration-config.json",),
+    "otlp-metrics-evidence.schema.json": ("otlp-metrics-evidence.json",),
     "telemetry-evidence-request.schema.json": ("telemetry-evidence-request.json",),
     "telemetry-evidence-result.schema.json": ("telemetry-evidence-result.json",),
     "plugin-manifest.schema.json": ("plugin-manifest.json",),

@@ -23,4 +23,4 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. Supply a Bearer credential; the authenticated server derives tenant, actor, and roles from that credential. The SDK never sends identity assertion headers.
 
-Version 0.4 adds opaque provider cursor resume fields and ingestion-freshness telemetry to the public boundary.
+Version 0.4 adds opaque provider cursor resume fields, ingestion-freshness telemetry, backend-neutral telemetry evidence, and the stored `OtlpMetricsEvidence` artifact model. OTLP transport is intentionally not reimplemented by this client; send metrics with a standard OpenTelemetry SDK/Collector and the separately provisioned channel credential.

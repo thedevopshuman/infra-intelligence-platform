@@ -196,6 +196,26 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("warnings" in error for error in errors))
 
+    def test_otlp_gauge_prohibits_sum_semantics(self) -> None:
+        result = document("contracts/examples/otlp-metrics-evidence.json")
+        gauge = result["spec"]["series"][1]
+        gauge["temporality"] = "cumulative"
+        gauge["monotonic"] = True
+
+        errors = self.validate("otlp-metrics-evidence.schema.json", result)
+
+        self.assertTrue(any("temporality" in error or "monotonic" in error for error in errors))
+
+    def test_otlp_sum_requires_temporality_and_monotonicity(self) -> None:
+        result = document("contracts/examples/otlp-metrics-evidence.json")
+        summed = result["spec"]["series"][0]
+        del summed["temporality"]
+        del summed["monotonic"]
+
+        errors = self.validate("otlp-metrics-evidence.schema.json", result)
+
+        self.assertTrue(any("temporality" in error or "monotonic" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

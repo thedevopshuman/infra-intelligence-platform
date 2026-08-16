@@ -3,7 +3,7 @@
 **Status:** Accepted Phase 2 reference boundary
 **Date:** 2026-08-14
 
-The reference kernel implements the boundary that turns untrusted provider output into an immutable Evidence envelope and artifact. It establishes application ports and security ordering before durable evidence storage or an HTTP surface is introduced.
+The reference kernel implements the boundary that turns untrusted pulled provider output or a normalized pushed artifact into an immutable Evidence envelope and artifact. The same policy, resource resolution, redaction, hashing, and atomic storage semantics apply to both entry paths.
 
 ## Trust and execution sequence
 
@@ -33,6 +33,8 @@ sequenceDiagram
 
 Authorization and complete resource resolution occur before provider execution. A provider receives the authenticated tenant and actor identity, integration identifier, evidence type, resource UIDs, credential-free locator/query, deadline, and maximum decoded byte count. It does not receive ambient credentials through the application contract. A production adapter will resolve short-lived access internally from an explicitly configured integration.
 
+The `record_artifact` path is for authenticated push adapters that already hold a bounded decoded artifact, not a way to bypass Evidence controls. The OTLP receiver authenticates and bounds its channel before reading/decoding the body, then passes normalized JSON through this path. Evidence policy and tenant-scoped resource resolution still run before redaction or persistence, and no receiver payload field supplies authority.
+
 Provider results remain untrusted. The application validates result type, media type, timestamps, summary safety, and size; then the redactor inspects decoded bytes. Hashing and persistence use the redacted bytes, never the original provider bytes. The store port commits the Evidence metadata and artifact together so a record cannot reference a missing artifact.
 
 ## Ports and ownership
@@ -46,6 +48,8 @@ The application layer owns these provider-neutral ports:
 - `Clock` makes deadline and provenance behavior deterministic in tests.
 
 Metric evidence adds `TelemetryMetricsBackend`, whose request contains only normalized selectors, authenticated scope, and explicit limits. `TelemetryMetricsEvidenceProvider` validates all backend output and renders the public `TelemetryEvidenceResult` JSON before the generic evidence pipeline redacts, hashes, and commits it. A concrete backend never controls Evidence identity, tenant scope, policy, retention, or content hashes. The first concrete adapter translates an allowlisted logical metric catalog to Prometheus range queries. Its optional `CredentialBroker` lease is exact-scope and remains inside the adapter.
+
+Pushed metrics add a separate `OtlpMetricsReceiverAdapter` port. Protected channel configuration supplies tenant, integration, resources, catalogs, limits, and handling policy; the application validates normalized `OtlpMetricsEvidence` before the generic pipeline commits it. Protobuf types and channel verifiers remain in the adapter/surface boundary.
 
 The local adapter package supplies an in-memory evidence store, UUID identifier generator, UTC system clock, deterministic static provider, and structured-text redactor. JSON secret-bearing fields and common credential patterns are redacted. UTF-8 text receives pattern redaction. Unsupported binary formats fail closed instead of being persisted without inspection.
 
@@ -66,4 +70,4 @@ The reference byte limit is 16 MiB even though the public contract permits a lar
 
 The local store remains process-local, while the PostgreSQL profile durably stores evidence metadata and artifact bytes and is covered by the full-schema backup/restore experiment. Authenticated HTTP and SDK boundaries expose tenant-scoped evidence metadata retrieval and bounded metric-evidence collection; artifact bytes remain internal.
 
-This is not yet a production evidence service. There is no retention worker, encryption/KMS integration, sensitivity-specific artifact-read surface, artifact streaming, external short-lived credential broker, or OTLP receiver. The Prometheus-compatible adapter and static protected-config bearer broker prove translation and exact request scoping but are not a production identity solution. The redactor is a conservative reference for JSON and UTF-8 text, not a general data-loss-prevention system. Additional media inspectors, backends, and investigation-driven telemetry provider selection remain Phase 2 work.
+This is not yet a production evidence service. There is no retention worker, encryption/KMS integration, sensitivity-specific artifact-read surface, artifact streaming, or external short-lived credential broker. The Prometheus-compatible adapter, static protected-config bearer broker, and tenant-bound OTLP metrics receiver prove translation and exact request scoping but are not production identity, isolation, or telemetry-storage solutions. The redactor is a conservative reference for JSON and UTF-8 text, not a general data-loss-prevention system. Additional media inspectors, backends/signals, receiver isolation/workload identity, and investigation-driven telemetry provider selection remain Phase 2 work.

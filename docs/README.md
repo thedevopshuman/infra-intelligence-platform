@@ -27,6 +27,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Event contract](specifications/event-contract.md)
 - [Evidence contract](specifications/evidence-contract.md)
 - [Telemetry evidence request and result contracts](specifications/telemetry-evidence-contract.md)
+- [OTLP metrics evidence contract](specifications/otlp-metrics-evidence-contract.md)
 - [Investigation request and report contracts](specifications/investigation-contract.md)
 - [Ingestion freshness report contract](specifications/ingestion-freshness-contract.md)
 - [Evaluation scenario contract](specifications/evaluation-scenario-contract.md)
@@ -40,6 +41,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Local development](operations/local-development.md)
 - [OpenTelemetry metrics export](operations/opentelemetry-export.md)
 - [Prometheus telemetry evidence](operations/prometheus-evidence.md)
+- [OTLP metrics receiver](operations/otlp-metrics-receiver.md)
 - [PostgreSQL backup and restore experiment](operations/postgresql-backup-restore.md)
 - [Glossary](glossary.md)
 

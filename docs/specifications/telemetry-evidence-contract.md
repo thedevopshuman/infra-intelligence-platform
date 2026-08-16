@@ -9,7 +9,7 @@
 
 These contracts define the first backend-neutral customer telemetry evidence boundary. A caller requests a bounded metric query for known tenant-scoped resources. The selected backend adapter returns normalized time series, which the platform validates, redacts, hashes, and stores as an immutable Evidence artifact.
 
-They do not define OTLP ingestion. OTLP is a push/export protocol, while this contract represents a bounded historical query. An OTLP receiver can later produce the same normalized result shape after separate channel authentication, admission control, and retention decisions.
+They do not define OTLP ingestion. OTLP is a push/export protocol, while this contract represents a bounded historical query. The separate receiver produces `OtlpMetricsEvidence` after channel authentication, admission control, and retention decisions; it does not manufacture a historical query request/result correlation.
 
 ## Identity and authority
 

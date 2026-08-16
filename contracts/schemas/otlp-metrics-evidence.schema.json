@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.iip.local/v1alpha1/otlp-metrics-evidence.schema.json",
+  "title": "OTLP Metrics Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "OtlpMetricsEvidence"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId", "integrationId", "channelId", "receivedAt"],
+      "properties": {
+        "tenantId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "integrationId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{2,127}$"
+        },
+        "channelId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{2,127}$"
+        },
+        "receivedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal", "protocol", "timeRange", "series", "summary"],
+      "properties": {
+        "signal": {"const": "metrics"},
+        "protocol": {"const": "otlp/http-protobuf"},
+        "timeRange": {"$ref": "#/$defs/timeRange"},
+        "series": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/series"}
+        },
+        "summary": {"$ref": "#/$defs/summary"}
+      }
+    }
+  },
+  "$defs": {
+    "timeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"}
+      }
+    },
+    "series": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric", "unit", "kind", "attributes", "points"],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "pattern": "^[A-Za-z_:][A-Za-z0-9_.:/-]{0,255}$"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        },
+        "kind": {"enum": ["gauge", "sum"]},
+        "temporality": {"enum": ["delta", "cumulative"]},
+        "monotonic": {"type": "boolean"},
+        "attributes": {
+          "type": "object",
+          "maxProperties": 16,
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_.:/-]{0,127}$"},
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+          }
+        },
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10000,
+          "items": {"$ref": "#/$defs/point"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "gauge"}}},
+          "then": {"not": {"anyOf": [{"required": ["temporality"]}, {"required": ["monotonic"]}]}}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "sum"}}},
+          "then": {"required": ["temporality", "monotonic"]}
+        }
+      ]
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timestamp", "value"],
+      "properties": {
+        "timestamp": {"type": "string", "format": "date-time"},
+        "value": {"type": "number"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metricCount", "seriesCount", "dataPointCount"],
+      "properties": {
+        "metricCount": {"type": "integer", "minimum": 1, "maximum": 100},
+        "seriesCount": {"type": "integer", "minimum": 1, "maximum": 100},
+        "dataPointCount": {"type": "integer", "minimum": 1, "maximum": 10000}
+      }
+    }
+  }
+}

@@ -39,8 +39,10 @@ REQUIRED_PATHS = (
     "docs/decisions/0013-otlp-http-ingestion-metrics-export.md",
     "docs/decisions/0014-backend-neutral-telemetry-evidence-query.md",
     "docs/decisions/0015-prometheus-telemetry-evidence-adapter.md",
+    "docs/decisions/0016-tenant-bound-otlp-metrics-receiver.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
+    "docs/operations/otlp-metrics-receiver.md",
     "docs/operations/postgresql-backup-restore.md",
     "docs/operations/measurements/postgresql-backup-restore.json",
     "contracts/schemas/resource.schema.json",
@@ -61,6 +63,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/evidence.schema.json",
     "contracts/schemas/telemetry-evidence-request.schema.json",
     "contracts/schemas/telemetry-evidence-result.schema.json",
+    "contracts/schemas/otlp-metrics-evidence.schema.json",
     "contracts/schemas/investigation-request.schema.json",
     "contracts/schemas/investigation-report.schema.json",
     "contracts/schemas/ingestion-freshness-report.schema.json",
@@ -68,6 +71,7 @@ REQUIRED_PATHS = (
     "contracts/examples/evidence.json",
     "contracts/examples/telemetry-evidence-request.json",
     "contracts/examples/telemetry-evidence-result.json",
+    "contracts/examples/otlp-metrics-evidence.json",
     "contracts/examples/integration-config.json",
     "contracts/examples/action-proposal.json",
     "contracts/examples/action-approval.json",
@@ -86,6 +90,7 @@ REQUIRED_PATHS = (
     "contracts/examples/error.json",
     "docs/specifications/evidence-contract.md",
     "docs/specifications/telemetry-evidence-contract.md",
+    "docs/specifications/otlp-metrics-evidence-contract.md",
     "docs/specifications/integration-config-contract.md",
     "docs/specifications/action-contract.md",
     "docs/specifications/plugin-session-contract.md",
@@ -99,11 +104,13 @@ REQUIRED_PATHS = (
     "scripts/validate_schemas.py",
     "src/iip/application/collect_evidence.py",
     "src/iip/application/telemetry_evidence.py",
+    "src/iip/application/ingest_otlp_metrics.py",
     "src/iip/application/observe_ingestion.py",
     "src/iip/adapters/auth.py",
     "src/iip/adapters/evidence.py",
     "src/iip/adapters/otel.py",
     "src/iip/adapters/prometheus.py",
+    "src/iip/adapters/otlp_receiver.py",
     "src/iip/adapters/postgres/migrations/0006_source_checkpoint_provider_cursors.sql",
     "tests/test_evidence_collection.py",
     "tests/test_telemetry_evidence.py",
@@ -114,13 +121,18 @@ REQUIRED_PATHS = (
     "tests/test_otel_collector.py",
     "tests/test_prometheus_backend.py",
     "tests/test_prometheus_integration.py",
+    "tests/test_otlp_receiver.py",
+    "tests/test_otlp_receiver_integration.py",
     "scripts/test_otel.sh",
     "scripts/test_prometheus.sh",
+    "scripts/test_otlp_receiver.sh",
     "deploy/docker-compose.otel.yml",
     "deploy/docker-compose.prometheus.yml",
+    "deploy/docker-compose.otlp-receiver.yml",
     "deploy/otel/collector-test.yaml",
     "deploy/prometheus/prometheus-test.yml",
     "deploy/prometheus/integrations.example.json",
+    "deploy/otlp/receiver-channels.example.json",
     "scripts/test_kubernetes_live.sh",
     "scripts/run_reference_workflow.py",
     "scripts/backup_restore_experiment.py",
@@ -762,6 +774,89 @@ def validate_telemetry_evidence_examples(
         fail(errors, "telemetry evidence result must fit request limits")
 
 
+def validate_otlp_metrics_evidence_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check normalized receiver invariants that JSON Schema cannot express."""
+
+    path = ROOT / "contracts" / "examples" / "otlp-metrics-evidence.json"
+    document = documents.get(path)
+    if not isinstance(document, dict):
+        return
+    metadata = document.get("metadata")
+    spec = document.get("spec")
+    if not isinstance(metadata, dict) or not isinstance(spec, dict):
+        return
+    time_range = spec.get("timeRange")
+    series = spec.get("series")
+    summary = spec.get("summary")
+    if (
+        not isinstance(time_range, dict)
+        or not isinstance(series, list)
+        or not isinstance(summary, dict)
+    ):
+        return
+    start = parse_timestamp(time_range.get("start"))
+    end = parse_timestamp(time_range.get("end"))
+    received = parse_timestamp(metadata.get("receivedAt"))
+    if None in (start, end, received) or not start <= end:
+        fail(errors, "OTLP metrics evidence time range must be ordered")
+
+    point_count = 0
+    metric_names = set()
+    identities = []
+    all_timestamps = []
+    for item in series:
+        if not isinstance(item, dict):
+            continue
+        metric_names.add(item.get("metric"))
+        attributes = item.get("attributes")
+        identity = (
+            item.get("metric"),
+            item.get("kind"),
+            tuple(sorted(attributes.items())) if isinstance(attributes, dict) else (),
+        )
+        identities.append(identity)
+        points = item.get("points")
+        timestamps = []
+        if isinstance(points, list):
+            point_count += len(points)
+            for point in points:
+                timestamp = (
+                    parse_timestamp(point.get("timestamp"))
+                    if isinstance(point, dict)
+                    else None
+                )
+                timestamps.append(timestamp)
+                if (
+                    timestamp is None
+                    or start is None
+                    or end is None
+                    or not start <= timestamp <= end
+                ):
+                    fail(errors, "OTLP metrics evidence point must fit its range")
+                elif timestamp is not None:
+                    all_timestamps.append(timestamp)
+            if (
+                any(value is None for value in timestamps)
+                or timestamps != sorted(timestamps)
+                or len(set(timestamps)) != len(timestamps)
+            ):
+                fail(errors, "OTLP metrics evidence points must be strictly ascending")
+    if identities != sorted(identities) or len(identities) != len(set(identities)):
+        fail(errors, "OTLP metrics evidence series must be unique and ordered")
+    if all_timestamps and (
+        start != min(all_timestamps) or end != max(all_timestamps)
+    ):
+        fail(errors, "OTLP metrics evidence range must span its points")
+    if (
+        summary.get("metricCount") != len(metric_names)
+        or summary.get("seriesCount") != len(series)
+        or summary.get("dataPointCount") != point_count
+    ):
+        fail(errors, "OTLP metrics evidence summary must match its series")
+
+
 def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> None:
     from iip.domain.models import ContractError, Resource
 
@@ -834,6 +929,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("evidence.json", "Evidence"),
         ("telemetry-evidence-request.json", "TelemetryEvidenceRequest"),
         ("telemetry-evidence-result.json", "TelemetryEvidenceResult"),
+        ("otlp-metrics-evidence.json", "OtlpMetricsEvidence"),
         ("investigation-request.json", "InvestigationRequest"),
         ("investigation-report.json", "InvestigationReport"),
         ("ingestion-freshness-report.json", "IngestionFreshnessReport"),
@@ -850,6 +946,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_collection_examples(documents, errors)
     validate_resource_query_examples(documents, errors)
     validate_telemetry_evidence_examples(documents, errors)
+    validate_otlp_metrics_evidence_example(documents, errors)
     validate_evaluation_scenario(documents, errors)
 
     plugin_example = documents.get(example_dir / "plugin-manifest.json")

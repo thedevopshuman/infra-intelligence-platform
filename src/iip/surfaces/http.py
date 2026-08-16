@@ -9,6 +9,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Dict, Mapping, Optional
 from urllib.parse import parse_qs, urlparse
 
+from google.rpc.status_pb2 import Status
+
 from iip.application.actions import (
     ActionWorkflowError,
     DecideActionCommand,
@@ -33,6 +35,13 @@ from iip.application.ingest_resource import (
     InvalidInputError,
     ObservationConflictError,
     StaleObservationError,
+)
+from iip.application.ingest_otlp_metrics import (
+    InvalidOtlpMetricsRequestError,
+    OtlpPayloadTooLargeError,
+    OtlpReceiverAuthenticationError,
+    OtlpReceiverConfigurationError,
+    validate_channel_context,
 )
 from iip.application.investigate import (
     InvestigationConflictError,
@@ -183,6 +192,9 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         path = urlparse(self.path).path
+        if path == "/v1/metrics":
+            self._receive_otlp_metrics()
+            return
         segments = path.strip("/").split("/")
         known = (
             path
@@ -399,6 +411,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
 
     def _actor(self) -> ActorContext:
+        return self.runtime.authenticator.authenticate_bearer(self._bearer_token())
+
+    def _bearer_token(self) -> str:
         get_all = getattr(self.headers, "get_all", None)
         if callable(get_all):
             values = get_all("authorization") or []
@@ -417,7 +432,71 @@ class ApiHandler(BaseHTTPRequestHandler):
             or any(character.isspace() for character in token)
         ):
             raise AuthenticationError("authentication.invalid")
-        return self.runtime.authenticator.authenticate_bearer(token)
+        return token
+
+    def _receive_otlp_metrics(self) -> None:
+        service = self.runtime.otlp_metrics_ingestion
+        if service is None:
+            self._otlp_failure(HTTPStatus.NOT_FOUND, "otlp.receiver.disabled")
+            return
+        try:
+            try:
+                token = self._bearer_token()
+            except AuthenticationError as exc:
+                code = (
+                    "otlp.authentication.required"
+                    if str(exc) == "authentication.required"
+                    else "otlp.authentication.invalid"
+                )
+                raise OtlpReceiverAuthenticationError(code) from None
+            channel = service.authenticate_bearer(token)
+            validate_channel_context(channel)
+
+            content_type = self.headers.get("content-type", "")
+            media_type = content_type.partition(";")[0].strip().lower()
+            if media_type != "application/x-protobuf":
+                self._otlp_failure(
+                    HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
+                    "otlp.content-type.unsupported",
+                )
+                return
+            encoding = self.headers.get("content-encoding", "identity").strip().lower()
+            payload = self._read_binary(channel.limits.max_request_bytes)
+            service.ingest(channel, payload, content_encoding=encoding)
+            self._otlp_response(HTTPStatus.OK, b"")
+        except OtlpReceiverAuthenticationError as exc:
+            self._otlp_failure(HTTPStatus.UNAUTHORIZED, str(exc))
+        except OtlpPayloadTooLargeError:
+            self._otlp_failure(
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                "otlp.request.too-large",
+            )
+        except InvalidOtlpMetricsRequestError as exc:
+            status = (
+                HTTPStatus.UNSUPPORTED_MEDIA_TYPE
+                if str(exc) == "otlp.compression.unsupported"
+                else HTTPStatus.BAD_REQUEST
+            )
+            self._otlp_failure(status, str(exc))
+        except OtlpReceiverConfigurationError:
+            self._otlp_failure(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "otlp.receiver.unavailable",
+            )
+        except EvidenceAuthorizationError:
+            self._otlp_failure(HTTPStatus.FORBIDDEN, "policy.denied")
+        except InvalidEvidenceRequestError:
+            self._otlp_failure(HTTPStatus.BAD_REQUEST, "otlp.request.invalid")
+        except EvidenceDeadlineExceededError:
+            self._otlp_failure(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "otlp.receiver.unavailable",
+            )
+        except (EvidenceProviderUnavailableError, EvidenceRedactionError, PersistenceError):
+            self._otlp_failure(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "otlp.receiver.unavailable",
+            )
 
     def _authentication_failed(self, error: AuthenticationError) -> None:
         code = str(error)
@@ -546,6 +625,77 @@ class ApiHandler(BaseHTTPRequestHandler):
         if not isinstance(payload, dict):
             raise ValueError("JSON body must be an object")
         return payload
+
+    def _read_binary(self, maximum: int) -> bytes:
+        if self.headers.get("transfer-encoding") is not None:
+            raise InvalidOtlpMetricsRequestError("otlp.content-length.invalid")
+        get_all = getattr(self.headers, "get_all", None)
+        if callable(get_all):
+            values = get_all("content-length") or []
+        else:
+            value = self.headers.get("content-length")
+            values = [value] if value is not None else []
+        if len(values) != 1 or not isinstance(values[0], str):
+            raise InvalidOtlpMetricsRequestError("otlp.content-length.invalid")
+        try:
+            length = int(values[0])
+        except (TypeError, ValueError):
+            raise InvalidOtlpMetricsRequestError("otlp.content-length.invalid") from None
+        if length < 0:
+            raise InvalidOtlpMetricsRequestError("otlp.content-length.invalid")
+        if length > maximum:
+            raise OtlpPayloadTooLargeError("otlp.request.too-large")
+        payload = self.rfile.read(length)
+        if len(payload) != length:
+            raise InvalidOtlpMetricsRequestError("otlp.content-length.invalid")
+        return payload
+
+    def _otlp_failure(self, status: HTTPStatus, code: str) -> None:
+        safe_codes = {
+            "otlp.receiver.disabled",
+            "otlp.authentication.required",
+            "otlp.authentication.invalid",
+            "otlp.content-type.unsupported",
+            "otlp.content-length.invalid",
+            "otlp.compression.invalid",
+            "otlp.compression.unsupported",
+            "otlp.protobuf.invalid",
+            "otlp.metric.not-allowlisted",
+            "otlp.metric.invalid",
+            "otlp.metric.kind.unsupported",
+            "otlp.temporality.unsupported",
+            "otlp.attributes.dropped",
+            "otlp.attribute.limit",
+            "otlp.attribute.invalid",
+            "otlp.attribute.duplicate",
+            "otlp.attribute.ambiguous",
+            "otlp.attribute.type.unsupported",
+            "otlp.data-point.invalid",
+            "otlp.data-point.unsupported",
+            "otlp.data-point.time.invalid",
+            "otlp.data-point.limit",
+            "otlp.data-point.order.invalid",
+            "otlp.series.limit",
+            "otlp.series.duplicate",
+            "otlp.series.order.invalid",
+            "otlp.request.invalid",
+            "otlp.request.too-large",
+            "otlp.receiver.unavailable",
+            "policy.denied",
+        }
+        message = code if code in safe_codes else "otlp.request.invalid"
+        self._otlp_response(status, Status(message=message).SerializeToString())
+
+    def _otlp_response(self, status: HTTPStatus, body: bytes) -> None:
+        self.send_response(status.value)
+        self.send_header("content-type", "application/x-protobuf")
+        if status == HTTPStatus.UNAUTHORIZED:
+            self.send_header("WWW-Authenticate", "Bearer")
+        if status == HTTPStatus.SERVICE_UNAVAILABLE:
+            self.send_header("Retry-After", "1")
+        self.send_header("content-length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _json(self, status: HTTPStatus, payload: Dict[str, Any]) -> None:
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")

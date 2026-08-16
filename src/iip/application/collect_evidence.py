@@ -106,6 +106,48 @@ class EvidenceCollectionService:
     def execute(self, command: CollectEvidenceCommand) -> Mapping[str, object]:
         """Collect one immutable evidence artifact within explicit bounds."""
 
+        deadline = self._authorize(command)
+
+        provider = self._providers.get(command.provider)
+        if provider is None:
+            raise EvidenceProviderUnavailableError("evidence.provider.unavailable")
+
+        provider_request = EvidenceProviderRequest(
+            tenant_id=command.actor.tenant_id,
+            actor_id=command.actor.actor_id,
+            evidence_type=command.evidence_type,
+            integration_id=command.integration_id,
+            resource_uids=command.resource_uids,
+            locator=command.locator,
+            query=command.query,
+            max_bytes=command.max_bytes,
+            deadline=command.deadline,
+        )
+        try:
+            artifact = provider.fetch(provider_request)
+        except Exception:
+            raise EvidenceProviderUnavailableError(
+                "evidence.provider.unavailable"
+            ) from None
+
+        return self._commit_artifact(command, artifact, deadline)
+
+    def record_artifact(
+        self,
+        command: CollectEvidenceCommand,
+        artifact: RawEvidenceArtifact,
+    ) -> Mapping[str, object]:
+        """Authorize and commit an already supplied untrusted artifact.
+
+        Push receivers use this path after their protocol adapter has decoded and
+        bounded a payload. It deliberately applies the same tenant, policy,
+        redaction, hashing, and immutable-storage controls as provider retrieval.
+        """
+
+        deadline = self._authorize(command)
+        return self._commit_artifact(command, artifact, deadline)
+
+    def _authorize(self, command: CollectEvidenceCommand) -> datetime:
         deadline = self._validate_command(command)
         started_at = self._now()
         self._enforce_deadline(started_at, deadline)
@@ -134,29 +176,14 @@ class EvidenceCollectionService:
         }
         if resolved_uids != requested_uids:
             raise InvalidEvidenceRequestError("evidence.resource.unavailable")
+        return deadline
 
-        provider = self._providers.get(command.provider)
-        if provider is None:
-            raise EvidenceProviderUnavailableError("evidence.provider.unavailable")
-
-        provider_request = EvidenceProviderRequest(
-            tenant_id=command.actor.tenant_id,
-            actor_id=command.actor.actor_id,
-            evidence_type=command.evidence_type,
-            integration_id=command.integration_id,
-            resource_uids=command.resource_uids,
-            locator=command.locator,
-            query=command.query,
-            max_bytes=command.max_bytes,
-            deadline=command.deadline,
-        )
-        try:
-            artifact = provider.fetch(provider_request)
-        except Exception:
-            raise EvidenceProviderUnavailableError(
-                "evidence.provider.unavailable"
-            ) from None
-
+    def _commit_artifact(
+        self,
+        command: CollectEvidenceCommand,
+        artifact: RawEvidenceArtifact,
+        deadline: datetime,
+    ) -> Mapping[str, object]:
         retrieved_at = self._now()
         self._enforce_deadline(retrieved_at, deadline)
         self._validate_artifact(

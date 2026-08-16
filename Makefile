@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-postgres test-backup-restore test-otel test-prometheus test-kubernetes-live db-migrate helm-lint verify run package-chart
+.PHONY: help install-verify-deps validate validate-schemas test test-postgres test-backup-restore test-otel test-otlp-receiver test-prometheus test-kubernetes-live db-migrate helm-lint verify run package-chart
 
 PYTHON ?= python3
 HELM ?= helm
@@ -12,6 +12,7 @@ help:
 	@echo "test-postgres Run PostgreSQL integration tests with Docker Desktop"
 	@echo "test-backup-restore Measure and verify PostgreSQL recovery with Docker Desktop"
 	@echo "test-otel     Send reference metrics to an OpenTelemetry Collector"
+	@echo "test-otlp-receiver Send official OTLP metrics into the built API image"
 	@echo "test-prometheus Query a real Prometheus server through the evidence adapter"
 	@echo "test-kubernetes-live Run the observer against an explicit local Kubernetes context"
 	@echo "db-migrate    Apply PostgreSQL migrations using IIP_DATABASE_URL"
@@ -40,6 +41,9 @@ test-backup-restore:
 
 test-otel:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_otel.sh
+
+test-otlp-receiver:
+	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_otlp_receiver.sh
 
 test-prometheus:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_prometheus.sh

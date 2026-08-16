@@ -2,7 +2,7 @@
 
 **Status:** Executable reference adapter
 
-The control plane can query a Prometheus-compatible HTTP API for bounded historical metrics and normalize the result into an immutable `TelemetryEvidenceResult` artifact. This is customer telemetry evidence. It is separate from outbound OTLP platform observability and from the still-pending inbound OTLP receiver.
+The control plane can query a Prometheus-compatible HTTP API for bounded historical metrics and normalize the result into an immutable `TelemetryEvidenceResult` artifact. This is customer telemetry evidence. It is separate from outbound OTLP platform observability and from the inbound OTLP metrics receiver, which accepts selected pushed batches instead of executing historical queries.
 
 The adapter implements Prometheus's range-query HTTP API with form-encoded `POST /api/v1/query_range`. Public requests never contain PromQL, endpoints, backend metric names, or credentials. [ADR 0015](../decisions/0015-prometheus-telemetry-evidence-adapter.md) records the security and translation decisions.
 

@@ -61,6 +61,11 @@
         "summary": {"type": "string", "minLength": 1, "maxLength": 8192},
         "hypotheses": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/hypothesis"}},
         "unknowns": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/unknown"}},
+        "telemetryAssessments": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {"$ref": "#/$defs/telemetryAssessment"}
+        },
         "evidenceIds": {
           "type": "array",
           "maxItems": 1024,
@@ -209,6 +214,72 @@
           "items": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{2,127}$"}
         }
       }
+    },
+    "telemetryAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selectionId",
+        "evidenceId",
+        "rootCauseClass",
+        "metric",
+        "statistic",
+        "unit",
+        "operator",
+        "threshold",
+        "disposition"
+      ],
+      "properties": {
+        "selectionId": {"type": "string", "pattern": "^tqs_[a-f0-9]{16}$"},
+        "evidenceId": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"},
+        "rootCauseClass": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._/-]{2,127}$"
+        },
+        "metric": {
+          "type": "string",
+          "pattern": "^[A-Za-z_:][A-Za-z0-9_.:/-]{0,255}$"
+        },
+        "statistic": {
+          "type": "string",
+          "enum": ["minimum", "maximum", "mean"]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["lt", "lte", "gt", "gte"]
+        },
+        "threshold": {"type": "number"},
+        "observedValue": {"type": "number"},
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "supporting",
+            "contradicting",
+            "neutral",
+            "no-data",
+            "incomplete"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": ["supporting", "contradicting", "neutral"]
+              }
+            }
+          },
+          "then": {"required": ["observedValue"]},
+          "else": {"not": {"required": ["observedValue"]}}
+        }
+      ]
     },
     "recommendation": {
       "type": "object",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -21,6 +22,7 @@ from iip.application.collect_evidence import (
 from iip.application.ports import (
     ActorContext,
     Clock,
+    EvidenceStore,
     InvestigationRepository,
     PersistenceError,
     ResourceRepository,
@@ -36,6 +38,11 @@ _SELECTION_ID = re.compile(r"tqs_[a-f0-9]{16}")
 _INTEGRATION_ID = re.compile(r"[a-z][a-z0-9._-]{2,127}")
 _RESOURCE_UID = re.compile(r"res_[a-f0-9]{32}")
 _ROOT_CAUSE_CLASS = re.compile(r"[a-z][a-z0-9._/-]{2,127}")
+_INTERPRETATION_STATISTICS = frozenset({"minimum", "maximum", "mean"})
+_INTERPRETATION_OPERATORS = frozenset({"lt", "lte", "gt", "gte"})
+_INTERPRETATION_DISPOSITIONS = frozenset(
+    {"supports", "contradicts", "neutral"}
+)
 
 
 class InvalidInvestigationError(ValueError):
@@ -69,12 +76,14 @@ class DeterministicInvestigationService:
         investigations: InvestigationRepository,
         clock: Clock,
         telemetry: TelemetryEvidenceService | None = None,
+        evidence_store: EvidenceStore | None = None,
     ) -> None:
         self._resources = resources
         self._evidence = evidence
         self._investigations = investigations
         self._clock = clock
         self._telemetry = telemetry
+        self._evidence_store = evidence_store
 
     def execute(self, command: RunInvestigationCommand) -> Mapping[str, object]:
         request, metadata, spec, scope, budgets = self._validate(command)
@@ -98,7 +107,10 @@ class DeterministicInvestigationService:
 
         started_at = self._clock.now()
         evidence_documents: list[Mapping[str, object]] = []
+        resource_evidence_ids: list[str] = []
         supporting_evidence_ids: list[str] = []
+        contradicting_evidence_ids: list[str] = []
+        telemetry_assessments: list[dict[str, object]] = []
         telemetry_unknowns: list[dict[str, object]] = []
         tool_calls = 0
         allowed_tools = spec.get("allowedTools", [])
@@ -137,7 +149,9 @@ class DeterministicInvestigationService:
                 )
             )
             evidence_documents.append(resource_evidence)
-            supporting_evidence_ids.append(resource_evidence["metadata"]["id"])
+            resource_evidence_id = resource_evidence["metadata"]["id"]
+            resource_evidence_ids.append(resource_evidence_id)
+            supporting_evidence_ids.append(resource_evidence_id)
 
         root_cause, statement, confidence = self._classify(resources)
         telemetry_allowed = (
@@ -156,16 +170,17 @@ class DeterministicInvestigationService:
                     break
                 tool_calls += 1
                 try:
+                    telemetry_request = self._telemetry_request(
+                        command,
+                        selection,
+                        scope,
+                        started_at,
+                        budgets,
+                    )
                     telemetry_evidence = self._telemetry.execute(
                         CollectTelemetryEvidenceCommand(
                             command.actor,
-                            self._telemetry_request(
-                                command,
-                                selection,
-                                scope,
-                                started_at,
-                                budgets,
-                            ),
+                            telemetry_request,
                         )
                     )
                 except (
@@ -182,12 +197,34 @@ class DeterministicInvestigationService:
                     )
                     continue
                 evidence_documents.append(telemetry_evidence)
+                interpretation = selection.get("interpretation")
+                if isinstance(interpretation, Mapping):
+                    assessment = self._assess_telemetry(
+                        command.actor,
+                        selection,
+                        telemetry_evidence,
+                        root_cause,
+                        telemetry_request,
+                    )
+                    if assessment is None:
+                        telemetry_unknowns.append(
+                            self._telemetry_assessment_unknown(
+                                str(selection["id"])
+                            )
+                        )
+                    else:
+                        telemetry_assessments.append(assessment)
+                        evidence_id = str(assessment["evidenceId"])
+                        if assessment["disposition"] == "supporting":
+                            supporting_evidence_ids.append(evidence_id)
+                        elif assessment["disposition"] == "contradicting":
+                            contradicting_evidence_ids.append(evidence_id)
 
         completed_at = self._clock.now()
         evidence_ids = [
             document["metadata"]["id"] for document in evidence_documents
         ]
-        if not supporting_evidence_ids:
+        if not resource_evidence_ids:
             outcome = "inconclusive"
             budget_exhausted = (
                 budgets["maxToolCalls"] == 0 or budgets["maxEvidenceItems"] == 0
@@ -234,7 +271,7 @@ class DeterministicInvestigationService:
                     "confidence": confidence,
                     "disposition": "leading",
                     "supportingEvidenceIds": supporting_evidence_ids,
-                    "contradictingEvidenceIds": [],
+                    "contradictingEvidenceIds": contradicting_evidence_ids,
                 }
             ]
             unknowns = []
@@ -290,6 +327,10 @@ class DeterministicInvestigationService:
                 },
             },
         }
+        if telemetry_assessments:
+            report_spec = report["spec"]
+            if isinstance(report_spec, dict):
+                report_spec["telemetryAssessments"] = telemetry_assessments
         self._investigations.commit_investigation(
             command.actor, investigation_id, request, report
         )
@@ -364,6 +405,153 @@ class DeterministicInvestigationService:
             "impact": "medium",
             "requestedEvidenceTypes": ["telemetry.metrics"],
         }
+
+    @staticmethod
+    def _telemetry_assessment_unknown(selection_id: str) -> dict[str, object]:
+        return {
+            "statement": (
+                "Selected metric evidence could not be safely assessed for "
+                f"{selection_id}."
+            ),
+            "impact": "medium",
+            "requestedEvidenceTypes": ["telemetry.metrics"],
+        }
+
+    def _assess_telemetry(
+        self,
+        actor: ActorContext,
+        selection: Mapping[str, object],
+        evidence: Mapping[str, object],
+        root_cause: str | None,
+        telemetry_request: Mapping[str, object],
+    ) -> dict[str, object] | None:
+        interpretation = selection.get("interpretation")
+        if (
+            self._evidence_store is None
+            or root_cause is None
+            or not isinstance(interpretation, Mapping)
+        ):
+            return None
+        try:
+            metadata = evidence["metadata"]
+            if not isinstance(metadata, Mapping):
+                return None
+            evidence_id = metadata["id"]
+            if not isinstance(evidence_id, str):
+                return None
+            artifact = self._evidence_store.read_artifact(actor, evidence_id)
+        except (KeyError, PersistenceError):
+            return None
+        if not isinstance(artifact, bytes):
+            return None
+        try:
+            document = json.loads(artifact.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        if not isinstance(document, Mapping) or (
+            document.get("apiVersion") != "iip.platform/v1alpha1"
+            or document.get("kind") != "TelemetryEvidenceResult"
+        ):
+            return None
+        artifact_metadata = document.get("metadata")
+        artifact_spec = document.get("spec")
+        query = selection.get("query")
+        request_metadata = telemetry_request.get("metadata")
+        request_spec = telemetry_request.get("spec")
+        if (
+            not isinstance(artifact_metadata, Mapping)
+            or not isinstance(request_metadata, Mapping)
+            or artifact_metadata.get("requestId") != request_metadata.get("requestId")
+            or artifact_metadata.get("tenantId") != actor.tenant_id
+            or artifact_metadata.get("integrationId") != selection.get("integrationId")
+            or not isinstance(artifact_spec, Mapping)
+            or not isinstance(request_spec, Mapping)
+            or artifact_spec.get("signal") != "metrics"
+            or artifact_spec.get("requestDigest")
+            != canonical_digest(telemetry_request)
+            or artifact_spec.get("timeRange") != request_spec.get("timeRange")
+            or not isinstance(query, Mapping)
+            or not isinstance(query.get("metric"), str)
+        ):
+            return None
+        status = artifact_spec.get("status")
+        if status not in {"complete", "partial", "no-data"}:
+            return None
+        assessment: dict[str, object] = {
+            "selectionId": selection["id"],
+            "evidenceId": evidence_id,
+            "rootCauseClass": root_cause,
+            "metric": query["metric"],
+            "statistic": interpretation["statistic"],
+            "unit": interpretation["unit"],
+            "operator": interpretation["operator"],
+            "threshold": interpretation["threshold"],
+        }
+        if status == "no-data":
+            assessment["disposition"] = "no-data"
+            return assessment
+        if status == "partial":
+            assessment["disposition"] = "incomplete"
+            return assessment
+
+        series = artifact_spec.get("series")
+        if not isinstance(series, list) or not series:
+            return None
+        values: list[float] = []
+        for item in series:
+            if (
+                not isinstance(item, Mapping)
+                or item.get("metric") != query["metric"]
+                or item.get("unit") != interpretation["unit"]
+                or not isinstance(item.get("points"), list)
+                or not item["points"]
+            ):
+                return None
+            for point in item["points"]:
+                if not isinstance(point, Mapping):
+                    return None
+                value = point.get("value")
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    return None
+                try:
+                    normalized_value = float(value)
+                except (OverflowError, ValueError):
+                    return None
+                if not math.isfinite(normalized_value):
+                    return None
+                values.append(normalized_value)
+        if not values:
+            return None
+        statistic = interpretation["statistic"]
+        try:
+            if statistic == "minimum":
+                observed_value = min(values)
+            elif statistic == "maximum":
+                observed_value = max(values)
+            else:
+                observed_value = math.fsum(values) / len(values)
+        except (OverflowError, ValueError):
+            return None
+        if not math.isfinite(observed_value):
+            return None
+        threshold = float(interpretation["threshold"])
+        operator = interpretation["operator"]
+        matched = {
+            "lt": observed_value < threshold,
+            "lte": observed_value <= threshold,
+            "gt": observed_value > threshold,
+            "gte": observed_value >= threshold,
+        }[operator]
+        configured = interpretation[
+            "whenMatched" if matched else "whenNotMatched"
+        ]
+        assessment["observedValue"] = observed_value
+        assessment["disposition"] = {
+            "supports": "supporting",
+            "contradicts": "contradicting",
+            "neutral": "neutral",
+        }[configured]
+        return assessment
 
     @staticmethod
     def _classify(resources: tuple[object, ...]) -> tuple[str | None, str, float]:
@@ -514,7 +702,14 @@ class DeterministicInvestigationService:
                 "query",
                 "limits",
             } <= set(value) or set(value).difference(
-                {"id", "integrationId", "query", "limits", "rootCauseClasses"}
+                {
+                    "id",
+                    "integrationId",
+                    "query",
+                    "limits",
+                    "rootCauseClasses",
+                    "interpretation",
+                }
             ):
                 raise InvalidInvestigationError("investigation.contract.invalid")
             selection_id = value.get("id")
@@ -548,6 +743,18 @@ class DeterministicInvestigationService:
                 or len(classes) != len(set(classes))
             ):
                 raise InvalidInvestigationError("investigation.contract.invalid")
+            interpretation = value.get("interpretation")
+            normalized_interpretation = None
+            if interpretation is not None:
+                if classes is None:
+                    raise InvalidInvestigationError(
+                        "investigation.contract.invalid"
+                    )
+                normalized_interpretation = (
+                    DeterministicInvestigationService._validate_interpretation(
+                        interpretation
+                    )
+                )
             normalized: dict[str, object] = {
                 "id": selection_id,
                 "integrationId": integration_id,
@@ -556,7 +763,46 @@ class DeterministicInvestigationService:
             }
             if classes is not None:
                 normalized["rootCauseClasses"] = list(classes)
+            if normalized_interpretation is not None:
+                normalized["interpretation"] = normalized_interpretation
             normalized_selections.append(normalized)
             selection_ids.add(selection_id)
         spec["telemetrySelections"] = normalized_selections
         return request, metadata, spec, scope, budgets
+
+    @staticmethod
+    def _validate_interpretation(value: object) -> dict[str, object]:
+        if not isinstance(value, Mapping) or set(value) != {
+            "statistic",
+            "unit",
+            "operator",
+            "threshold",
+            "whenMatched",
+            "whenNotMatched",
+        }:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        statistic = value.get("statistic")
+        unit = value.get("unit")
+        operator = value.get("operator")
+        threshold = value.get("threshold")
+        when_matched = value.get("whenMatched")
+        when_not_matched = value.get("whenNotMatched")
+        try:
+            threshold_is_finite = math.isfinite(float(threshold))
+        except (OverflowError, TypeError, ValueError):
+            threshold_is_finite = False
+        if (
+            statistic not in _INTERPRETATION_STATISTICS
+            or not isinstance(unit, str)
+            or not 1 <= len(unit) <= 64
+            or any(ord(character) < 32 or ord(character) == 127 for character in unit)
+            or operator not in _INTERPRETATION_OPERATORS
+            or isinstance(threshold, bool)
+            or not isinstance(threshold, (int, float))
+            or not threshold_is_finite
+            or when_matched not in _INTERPRETATION_DISPOSITIONS
+            or when_not_matched not in _INTERPRETATION_DISPOSITIONS
+            or when_matched == when_not_matched
+        ):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        return dict(value)

@@ -437,6 +437,16 @@ export interface InvestigationTelemetrySelection {
   rootCauseClasses?: string[];
   query: TelemetryMetricQuery;
   limits: TelemetryEvidenceLimits;
+  interpretation?: InvestigationTelemetryInterpretation;
+}
+
+export interface InvestigationTelemetryInterpretation {
+  statistic: "minimum" | "maximum" | "mean";
+  unit: string;
+  operator: "lt" | "lte" | "gt" | "gte";
+  threshold: number;
+  whenMatched: "supports" | "contradicts" | "neutral";
+  whenNotMatched: "supports" | "contradicts" | "neutral";
 }
 
 export interface InvestigationRequest {
@@ -496,6 +506,24 @@ export interface InvestigationRecommendation {
   evidenceIds: EvidenceId[];
 }
 
+export interface InvestigationTelemetryAssessment {
+  selectionId: `tqs_${string}`;
+  evidenceId: EvidenceId;
+  rootCauseClass: string;
+  metric: string;
+  statistic: "minimum" | "maximum" | "mean";
+  unit: string;
+  operator: "lt" | "lte" | "gt" | "gte";
+  threshold: number;
+  observedValue?: number;
+  disposition:
+    | "supporting"
+    | "contradicting"
+    | "neutral"
+    | "no-data"
+    | "incomplete";
+}
+
 export interface InvestigationReport {
   apiVersion: "iip.platform/v1alpha1";
   kind: "InvestigationReport";
@@ -528,6 +556,7 @@ export interface InvestigationReport {
     summary: string;
     hypotheses: InvestigationHypothesis[];
     unknowns: InvestigationUnknown[];
+    telemetryAssessments?: InvestigationTelemetryAssessment[];
     evidenceIds: EvidenceId[];
     recommendations: InvestigationRecommendation[];
     toolCallLedgerRef: string;

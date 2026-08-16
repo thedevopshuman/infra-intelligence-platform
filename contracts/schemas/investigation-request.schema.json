@@ -122,6 +122,52 @@
         },
         "limits": {
           "$ref": "urn:iip:contracts:telemetry-evidence-request:v1alpha1#/$defs/limits"
+        },
+        "interpretation": {
+          "$ref": "#/$defs/telemetryInterpretation"
+        }
+      },
+      "allOf": [
+        {
+          "if": {"required": ["interpretation"]},
+          "then": {"required": ["rootCauseClasses"]}
+        }
+      ]
+    },
+    "telemetryInterpretation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statistic",
+        "unit",
+        "operator",
+        "threshold",
+        "whenMatched",
+        "whenNotMatched"
+      ],
+      "properties": {
+        "statistic": {
+          "type": "string",
+          "enum": ["minimum", "maximum", "mean"]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["lt", "lte", "gt", "gte"]
+        },
+        "threshold": {"type": "number"},
+        "whenMatched": {
+          "type": "string",
+          "enum": ["supports", "contradicts", "neutral"]
+        },
+        "whenNotMatched": {
+          "type": "string",
+          "enum": ["supports", "contradicts", "neutral"]
         }
       }
     },

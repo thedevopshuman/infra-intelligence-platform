@@ -11,6 +11,8 @@ from .models import (
     IngestionFreshnessReport,
     InvestigationReport,
     InvestigationRequest,
+    InvestigationTelemetryAssessment,
+    InvestigationTelemetryInterpretation,
     InvestigationTelemetrySelection,
     IntegrationConfig,
     OtlpMetricsEvidence,
@@ -36,6 +38,8 @@ __all__ = [
     "IngestionFreshnessReport",
     "InvestigationReport",
     "InvestigationRequest",
+    "InvestigationTelemetryAssessment",
+    "InvestigationTelemetryInterpretation",
     "InvestigationTelemetrySelection",
     "IntegrationConfig",
     "OtlpMetricsEvidence",
@@ -49,4 +53,4 @@ __all__ = [
     "TelemetryEvidenceRequest",
     "TelemetryEvidenceResult",
 ]
-__version__ = "0.4.0"
+__version__ = "0.5.0"

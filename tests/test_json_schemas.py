@@ -192,6 +192,36 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("promql" in error for error in errors))
 
+    def test_investigation_interpretation_requires_root_cause_scope(self) -> None:
+        request = document(
+            "contracts/examples/investigation-request-telemetry.json"
+        )
+        del request["spec"]["telemetrySelections"][0]["rootCauseClasses"]
+
+        errors = self.validate("investigation-request.schema.json", request)
+
+        self.assertTrue(any("rootCauseClasses" in error for error in errors))
+
+    def test_data_assessment_requires_observed_value(self) -> None:
+        report = document(
+            "contracts/examples/investigation-report-telemetry.json"
+        )
+        del report["spec"]["telemetryAssessments"][0]["observedValue"]
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(any("observedValue" in error for error in errors))
+
+    def test_no_data_assessment_rejects_observed_value(self) -> None:
+        report = document(
+            "contracts/examples/investigation-report-telemetry.json"
+        )
+        report["spec"]["telemetryAssessments"][0]["disposition"] = "no-data"
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(any("observedValue" in error for error in errors))
+
     def test_no_data_telemetry_result_cannot_contain_series(self) -> None:
         result = document("contracts/examples/telemetry-evidence-result.json")
         result["spec"]["status"] = "no-data"

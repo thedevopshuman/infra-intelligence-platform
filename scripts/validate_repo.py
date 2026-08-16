@@ -41,6 +41,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0015-prometheus-telemetry-evidence-adapter.md",
     "docs/decisions/0016-tenant-bound-otlp-metrics-receiver.md",
     "docs/decisions/0017-investigation-telemetry-selection.md",
+    "docs/decisions/0018-evidence-aware-metric-assessment.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/otlp-metrics-receiver.md",
@@ -81,6 +82,7 @@ REQUIRED_PATHS = (
     "contracts/examples/investigation-request.json",
     "contracts/examples/investigation-request-telemetry.json",
     "contracts/examples/investigation-report.json",
+    "contracts/examples/investigation-report-telemetry.json",
     "contracts/examples/ingestion-freshness-report.json",
     "contracts/examples/evaluation-scenario.json",
     "contracts/examples/resource-collection-request.json",
@@ -776,6 +778,89 @@ def validate_telemetry_evidence_examples(
         fail(errors, "telemetry evidence result must fit request limits")
 
 
+def validate_investigation_telemetry_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check telemetry request/report links that JSON Schema cannot express."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    request = documents.get(example_dir / "investigation-request-telemetry.json")
+    report = documents.get(example_dir / "investigation-report-telemetry.json")
+    if not isinstance(request, dict) or not isinstance(report, dict):
+        return
+    request_metadata = request.get("metadata")
+    request_spec = request.get("spec")
+    report_metadata = report.get("metadata")
+    report_spec = report.get("spec")
+    if not all(
+        isinstance(item, dict)
+        for item in (request_metadata, request_spec, report_metadata, report_spec)
+    ):
+        return
+    if report_metadata.get("id") != request_metadata.get("id"):
+        fail(errors, "telemetry investigation examples must share an ID")
+    if report_metadata.get("tenantId") != request_metadata.get("tenantId"):
+        fail(errors, "telemetry investigation examples must share a tenant")
+    if report_spec.get("requestDigest") != canonical_digest(request):
+        fail(errors, "telemetry investigation report digest must match its request")
+    if report_spec.get("scope") != request_spec.get("scope"):
+        fail(errors, "telemetry investigation report scope must match its request")
+
+    selections = request_spec.get("telemetrySelections", [])
+    selections_by_id = {
+        item.get("id"): item for item in selections if isinstance(item, dict)
+    }
+    report_evidence = set(report_spec.get("evidenceIds", []))
+    hypotheses = report_spec.get("hypotheses", [])
+    hypothesis_by_class = {
+        item.get("rootCauseClass"): item
+        for item in hypotheses
+        if isinstance(item, dict)
+    }
+    assessments = report_spec.get("telemetryAssessments", [])
+    for assessment in assessments if isinstance(assessments, list) else []:
+        if not isinstance(assessment, dict):
+            continue
+        selection = selections_by_id.get(assessment.get("selectionId"))
+        if not isinstance(selection, dict):
+            fail(errors, "telemetry assessment selectionId must resolve in its request")
+            continue
+        interpretation = selection.get("interpretation")
+        query = selection.get("query")
+        if not isinstance(interpretation, dict) or not isinstance(query, dict):
+            fail(errors, "telemetry assessment requires its declared request rule")
+            continue
+        expected_fields = {
+            "metric": query.get("metric"),
+            "statistic": interpretation.get("statistic"),
+            "unit": interpretation.get("unit"),
+            "operator": interpretation.get("operator"),
+            "threshold": interpretation.get("threshold"),
+        }
+        for field, expected in expected_fields.items():
+            if assessment.get(field) != expected:
+                fail(errors, f"telemetry assessment {field} must match its request")
+        root_cause = assessment.get("rootCauseClass")
+        if root_cause not in selection.get("rootCauseClasses", []):
+            fail(errors, "telemetry assessment root cause must fit its selection")
+        evidence_id = assessment.get("evidenceId")
+        if evidence_id not in report_evidence:
+            fail(errors, "telemetry assessment Evidence must belong to its report")
+        hypothesis = hypothesis_by_class.get(root_cause)
+        disposition = assessment.get("disposition")
+        if isinstance(hypothesis, dict) and disposition in {
+            "supporting",
+            "contradicting",
+        }:
+            field = (
+                "supportingEvidenceIds"
+                if disposition == "supporting"
+                else "contradictingEvidenceIds"
+            )
+            if evidence_id not in hypothesis.get(field, []):
+                fail(errors, f"telemetry {disposition} Evidence must cite its hypothesis")
+
+
 def validate_otlp_metrics_evidence_example(
     documents: Mapping[Path, object], errors: List[str]
 ) -> None:
@@ -934,6 +1019,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("otlp-metrics-evidence.json", "OtlpMetricsEvidence"),
         ("investigation-request.json", "InvestigationRequest"),
         ("investigation-report.json", "InvestigationReport"),
+        ("investigation-report-telemetry.json", "InvestigationReport"),
         ("ingestion-freshness-report.json", "IngestionFreshnessReport"),
         ("evaluation-scenario.json", "EvaluationScenario"),
         ("resource-collection-request.json", "ResourceCollectionRequest"),
@@ -948,6 +1034,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_collection_examples(documents, errors)
     validate_resource_query_examples(documents, errors)
     validate_telemetry_evidence_examples(documents, errors)
+    validate_investigation_telemetry_examples(documents, errors)
     validate_otlp_metrics_evidence_example(documents, errors)
     validate_evaluation_scenario(documents, errors)
 

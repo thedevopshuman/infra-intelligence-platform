@@ -85,6 +85,8 @@ An `InvestigationRequest` may include ordered `telemetrySelections` using the sa
 
 When `evidenceTypes` or `allowedTools` are present, include `telemetry.metrics` and `telemetry/query` respectively. A candidate with `rootCauseClasses` runs only when the deterministic resource classifier selects a matching class. Attempts and committed Evidence records count against the investigation's tool and evidence budgets.
 
+To let a normalized result support or contradict that class, declare `interpretation` with a statistic, the exact catalog unit, comparison operator, finite threshold, and distinct matched/unmatched dispositions. For example, a dimensionless availability metric may use `minimum`, unit `1`, `gte`, threshold `1`, matched `supports`, and unmatched `contradicts`. The investigator assesses only the committed normalized artifact. A backend/catalog unit mismatch fails closed; no implicit unit conversion occurs, and partial or no-data results are never hypothesis citations.
+
 ## Helm
 
 Set `telemetryEvidence.backend: prometheus`, put the non-secret registry in `telemetryEvidence.prometheus.integrationsJson`, and reference a Kubernetes Secret for credentials when required. If NetworkPolicy is enabled, configure `networkPolicy.prometheusEgress` for the exact Prometheus namespace, pod labels, and port. The chart contains no endpoint credentials by default.

@@ -14,6 +14,8 @@ from infra_intelligence_sdk import (
     EvaluationScenario,
     InvestigationReport,
     InvestigationRequest,
+    InvestigationTelemetryAssessment,
+    InvestigationTelemetryInterpretation,
     InvestigationTelemetrySelection,
     IngestionFreshnessReport,
     IntegrationConfig,
@@ -47,6 +49,9 @@ class PublicContractSdkTests(unittest.TestCase):
             example("investigation-request-telemetry.json")
         )
         report = InvestigationReport.from_dict(example("investigation-report.json"))
+        telemetry_report = InvestigationReport.from_dict(
+            example("investigation-report-telemetry.json")
+        )
         freshness = IngestionFreshnessReport.from_dict(
             example("ingestion-freshness-report.json")
         )
@@ -81,8 +86,16 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(request.to_dict()["kind"], "InvestigationRequest")
         selection = telemetry_investigation.telemetry_selections[0]
         self.assertIsInstance(selection, InvestigationTelemetrySelection)
+        self.assertIsInstance(
+            selection.interpretation,
+            InvestigationTelemetryInterpretation,
+        )
         self.assertEqual(selection.integration_id, "observability-local")
         self.assertEqual(selection.to_dict()["query"]["metric"], "service.request.error_ratio")
+        assessment = telemetry_report.telemetry_assessments[0]
+        self.assertIsInstance(assessment, InvestigationTelemetryAssessment)
+        self.assertEqual(assessment.disposition, "supporting")
+        self.assertEqual(assessment.to_dict()["observedValue"], 0.082)
         self.assertEqual(report.to_dict()["kind"], "InvestigationReport")
         self.assertEqual(freshness.to_dict()["kind"], "IngestionFreshnessReport")
         self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")
@@ -212,6 +225,45 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn(
             "investigation report outcome and terminalReason are inconsistent",
+            self.errors,
+        )
+
+    def test_telemetry_assessment_must_match_its_declared_rule(self) -> None:
+        path = (
+            ROOT
+            / "contracts"
+            / "examples"
+            / "investigation-report-telemetry.json"
+        )
+        report = copy.deepcopy(self.documents[path])
+        report["spec"]["telemetryAssessments"][0]["threshold"] = 0.5
+        self.documents[path] = report
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "telemetry assessment threshold must match its request",
+            self.errors,
+        )
+
+    def test_supporting_assessment_must_cite_its_hypothesis(self) -> None:
+        path = (
+            ROOT
+            / "contracts"
+            / "examples"
+            / "investigation-report-telemetry.json"
+        )
+        report = copy.deepcopy(self.documents[path])
+        assessment_id = report["spec"]["telemetryAssessments"][0]["evidenceId"]
+        report["spec"]["hypotheses"][0]["supportingEvidenceIds"].remove(
+            assessment_id
+        )
+        self.documents[path] = report
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "telemetry supporting Evidence must cite its hypothesis",
             self.errors,
         )
 

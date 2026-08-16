@@ -183,6 +183,7 @@ def _compose_runtime(
             operational,
             clock,
             telemetry=telemetry_evidence,
+            evidence_store=evidence_store,
         ),
         actions=GovernedActionService(
             store,

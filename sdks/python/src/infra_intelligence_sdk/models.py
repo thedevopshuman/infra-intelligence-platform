@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Optional
 
@@ -322,6 +323,62 @@ class OtlpMetricsEvidence:
 
 
 @dataclass(frozen=True)
+class InvestigationTelemetryInterpretation:
+    """Closed threshold rule declared by an investigation caller."""
+
+    statistic: str
+    unit: str
+    operator: str
+    threshold: float
+    when_matched: str
+    when_not_matched: str
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationTelemetryInterpretation":
+        threshold = payload.get("threshold")
+        if payload.get("statistic") not in ("minimum", "maximum", "mean"):
+            raise ValueError("investigation telemetry statistic is invalid")
+        if not isinstance(payload.get("unit"), str) or not payload["unit"]:
+            raise ValueError("investigation telemetry unit is invalid")
+        if payload.get("operator") not in ("lt", "lte", "gt", "gte"):
+            raise ValueError("investigation telemetry operator is invalid")
+        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
+            raise ValueError("investigation telemetry threshold is invalid")
+        try:
+            threshold_is_finite = math.isfinite(float(threshold))
+        except (OverflowError, ValueError):
+            threshold_is_finite = False
+        dispositions = ("supports", "contradicts", "neutral")
+        if (
+            payload.get("whenMatched") not in dispositions
+            or payload.get("whenNotMatched") not in dispositions
+            or payload.get("whenMatched") == payload.get("whenNotMatched")
+            or not threshold_is_finite
+        ):
+            raise ValueError("investigation telemetry disposition is invalid")
+        return cls(
+            statistic=payload["statistic"],
+            unit=payload["unit"],
+            operator=payload["operator"],
+            threshold=float(threshold),
+            when_matched=payload["whenMatched"],
+            when_not_matched=payload["whenNotMatched"],
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "statistic": self.statistic,
+            "unit": self.unit,
+            "operator": self.operator,
+            "threshold": self.threshold,
+            "whenMatched": self.when_matched,
+            "whenNotMatched": self.when_not_matched,
+        }
+
+
+@dataclass(frozen=True)
 class InvestigationTelemetrySelection:
     """Provider-neutral metric candidate bounded by an investigation request."""
 
@@ -330,6 +387,7 @@ class InvestigationTelemetrySelection:
     query: Mapping[str, Any]
     limits: Mapping[str, Any]
     root_cause_classes: tuple[str, ...] = ()
+    interpretation: Optional[InvestigationTelemetryInterpretation] = None
 
     @classmethod
     def from_dict(
@@ -340,6 +398,7 @@ class InvestigationTelemetrySelection:
         query = payload.get("query")
         limits = payload.get("limits")
         classes = payload.get("rootCauseClasses", [])
+        interpretation = payload.get("interpretation")
         if not isinstance(selection_id, str) or not selection_id.startswith("tqs_"):
             raise ValueError("investigation telemetry selection id is invalid")
         if not isinstance(integration_id, str) or not integration_id:
@@ -350,12 +409,19 @@ class InvestigationTelemetrySelection:
             not isinstance(item, str) for item in classes
         ):
             raise ValueError("investigation telemetry rootCauseClasses are invalid")
+        if interpretation is not None and not isinstance(interpretation, Mapping):
+            raise ValueError("investigation telemetry interpretation is invalid")
         return cls(
             selection_id=selection_id,
             integration_id=integration_id,
             query=dict(query),
             limits=dict(limits),
             root_cause_classes=tuple(classes),
+            interpretation=(
+                InvestigationTelemetryInterpretation.from_dict(interpretation)
+                if isinstance(interpretation, Mapping)
+                else None
+            ),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -367,6 +433,93 @@ class InvestigationTelemetrySelection:
         }
         if self.root_cause_classes:
             result["rootCauseClasses"] = list(self.root_cause_classes)
+        if self.interpretation is not None:
+            result["interpretation"] = self.interpretation.to_dict()
+        return result
+
+
+@dataclass(frozen=True)
+class InvestigationTelemetryAssessment:
+    """Auditable result of applying one declared rule to stored metric evidence."""
+
+    selection_id: str
+    evidence_id: str
+    root_cause_class: str
+    metric: str
+    statistic: str
+    unit: str
+    operator: str
+    threshold: float
+    disposition: str
+    observed_value: Optional[float] = None
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationTelemetryAssessment":
+        required_strings = (
+            "selectionId",
+            "evidenceId",
+            "rootCauseClass",
+            "metric",
+            "statistic",
+            "unit",
+            "operator",
+            "disposition",
+        )
+        if any(not isinstance(payload.get(field), str) for field in required_strings):
+            raise ValueError("investigation telemetry assessment is invalid")
+        threshold = payload.get("threshold")
+        observed = payload.get("observedValue")
+        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
+            raise ValueError("investigation telemetry assessment threshold is invalid")
+        if observed is not None and (
+            isinstance(observed, bool) or not isinstance(observed, (int, float))
+        ):
+            raise ValueError("investigation telemetry observedValue is invalid")
+        try:
+            values_are_finite = math.isfinite(float(threshold)) and (
+                observed is None or math.isfinite(float(observed))
+            )
+        except (OverflowError, ValueError):
+            values_are_finite = False
+        disposition = payload["disposition"]
+        data_dispositions = ("supporting", "contradicting", "neutral")
+        empty_dispositions = ("no-data", "incomplete")
+        if (
+            not values_are_finite
+            or disposition not in data_dispositions + empty_dispositions
+            or (disposition in data_dispositions and observed is None)
+            or (disposition in empty_dispositions and observed is not None)
+        ):
+            raise ValueError("investigation telemetry assessment value is invalid")
+        return cls(
+            selection_id=payload["selectionId"],
+            evidence_id=payload["evidenceId"],
+            root_cause_class=payload["rootCauseClass"],
+            metric=payload["metric"],
+            statistic=payload["statistic"],
+            unit=payload["unit"],
+            operator=payload["operator"],
+            threshold=float(threshold),
+            disposition=disposition,
+            observed_value=float(observed) if observed is not None else None,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "selectionId": self.selection_id,
+            "evidenceId": self.evidence_id,
+            "rootCauseClass": self.root_cause_class,
+            "metric": self.metric,
+            "statistic": self.statistic,
+            "unit": self.unit,
+            "operator": self.operator,
+            "threshold": self.threshold,
+            "disposition": self.disposition,
+        }
+        if self.observed_value is not None:
+            result["observedValue"] = self.observed_value
         return result
 
 
@@ -431,6 +584,21 @@ class InvestigationReport:
         """Return a JSON-serializable copy of the envelope."""
 
         return dict(self.payload)
+
+    @property
+    def telemetry_assessments(self) -> tuple[InvestigationTelemetryAssessment, ...]:
+        """Return structured interpretations without importing server classes."""
+
+        spec = self.payload.get("spec")
+        values = spec.get("telemetryAssessments", []) if isinstance(spec, Mapping) else []
+        if not isinstance(values, list) or any(
+            not isinstance(value, Mapping) for value in values
+        ):
+            raise ValueError("investigation telemetryAssessments must be an array")
+        return tuple(
+            InvestigationTelemetryAssessment.from_dict(value)
+            for value in values
+        )
 
 
 @dataclass(frozen=True)

@@ -53,6 +53,14 @@
           "maxSeries": 8,
           "maxDataPoints": 480,
           "maxBytes": 524288
+        },
+        "interpretation": {
+          "statistic": "maximum",
+          "unit": "1",
+          "operator": "gte",
+          "threshold": 0.05,
+          "whenMatched": "supports",
+          "whenNotMatched": "contradicts"
         }
       }
     ],

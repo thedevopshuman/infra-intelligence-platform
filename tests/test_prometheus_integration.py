@@ -173,6 +173,14 @@ class PrometheusIntegrationTests(unittest.TestCase):
                             "maxDataPoints": 100,
                             "maxBytes": 1048576,
                         },
+                        "interpretation": {
+                            "statistic": "minimum",
+                            "unit": "1",
+                            "operator": "gte",
+                            "threshold": 1,
+                            "whenMatched": "supports",
+                            "whenNotMatched": "contradicts",
+                        },
                     }
                 ],
                 "budgets": {
@@ -194,6 +202,13 @@ class PrometheusIntegrationTests(unittest.TestCase):
         self.assertEqual(report["spec"]["outcome"], "conclusive")
         self.assertEqual(report["spec"]["usage"]["toolCalls"], 2)
         self.assertEqual(report["spec"]["usage"]["evidenceItems"], 2)
+        assessment = report["spec"]["telemetryAssessments"][0]
+        self.assertEqual(assessment["observedValue"], 1)
+        self.assertEqual(assessment["disposition"], "supporting")
+        self.assertIn(
+            assessment["evidenceId"],
+            report["spec"]["hypotheses"][0]["supportingEvidenceIds"],
+        )
         evidence = tuple(runtime.evidence_store.list(actor))
         self.assertEqual(
             {item["spec"]["type"] for item in evidence},

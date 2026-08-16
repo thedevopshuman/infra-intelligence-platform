@@ -1,6 +1,6 @@
 # OpenTelemetry portability boundary
 
-**Status:** Accepted direction; outbound exporter, historical query, inbound receiver, and investigation selection implemented
+**Status:** Accepted direction; outbound exporter, historical query, inbound receiver, selection, and bounded assessment implemented
 **Date:** 2026-08-15
 **Decision:** [ADR 0012](../decisions/0012-opentelemetry-portability-boundary.md)
 
@@ -49,6 +49,8 @@ The first runtime implementation accepts gauges and numeric sums, supports bound
 
 Investigations can now select provider-neutral historical metric candidates after deterministic resource classification. The candidate supplies no identity or transport authority: tenant/actor, resource/time scope, deadline, and budgets are inherited from the investigation, while endpoint and credentials remain inside the configured backend adapter. [ADR 0017](../decisions/0017-investigation-telemetry-selection.md) records this orchestration boundary.
 
+A selected candidate may also declare a unit-aware threshold rule before execution. The rule is evaluated against the normalized artifact only after tenant-scoped Evidence commit, so replacing Prometheus with another backend does not change investigation semantics. [ADR 0018](../decisions/0018-evidence-aware-metric-assessment.md) records this interpretation boundary.
+
 ## Security and tenancy
 
 - Endpoint credentials and custom OTLP headers are secret references or protected runtime configuration, never public resource/report fields.
@@ -66,4 +68,4 @@ Investigations can now select provider-neutral historical metric candidates afte
 - queue durability and the division of retry, batching, and delivery-health ownership between the official SDK and a sidecar/customer Collector;
 - the cadence and ownership of automatic freshness evaluation and production SLO windows.
 
-External-broker, additional backend, receiver-isolation, numeric evidence interpretation, and expanded-signal decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, and SLO decisions belong to the Phase 3 operational-hardening gate. The current freshness API, outbound metric projection, normalized historical-query boundary, Prometheus adapter, tenant-bound OTLP metrics receiver, and deterministic investigation selection are deliberately useful before those production selections.
+External-broker, additional backend, receiver-isolation, baseline/multi-signal reasoning, and expanded-signal decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, and SLO decisions belong to the Phase 3 operational-hardening gate. The current freshness API, outbound metric projection, normalized historical-query boundary, Prometheus adapter, tenant-bound OTLP metrics receiver, deterministic investigation selection, and unit-aware threshold assessment are deliberately useful before those production selections.

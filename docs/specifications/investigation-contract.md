@@ -28,6 +28,8 @@ An agent selector is optional so policy may choose a compatible release. If pres
 
 The deterministic runtime selects generally applicable candidates and candidates whose `rootCauseClasses` contain its current classification. Selection order is request order. When request evidence/tool bounds are present, collection additionally requires `telemetry.metrics` and `telemetry/query`. Every attempted query consumes one tool call, every committed result consumes one evidence item, and execution stops before either investigation budget would be exceeded. The derived telemetry deadline is capped at five minutes even when the investigation wall-time budget is larger.
 
+A root-cause-scoped candidate may declare an `interpretation`. The rule fixes a statistic (`minimum`, `maximum`, or `mean`), exact unit, comparison operator (`lt`, `lte`, `gt`, or `gte`), finite threshold, and distinct matched/unmatched dispositions before collection. Both dispositions come from `supports`, `contradicts`, and `neutral`. A rule without `rootCauseClasses`, a constant disposition, a non-finite threshold, or a control-bearing unit is invalid. The application performs no unit conversion.
+
 Application validation requires the scope start to precede its end. It also rejects resource references outside the authenticated tenant and budget values above tenant policy. `propose` permits structured recommendations or future action proposals but no side effect, approval, or execution.
 
 ## Investigation report
@@ -38,6 +40,7 @@ Every terminal path returns a report, including policy denial, cancellation, run
 - start/completion timestamps and the exact accepted scope;
 - selected agent version, immutable manifest digest, and policy-selected model class when selection occurred;
 - ranked hypotheses with confidence and supporting and contradicting evidence IDs;
+- structured telemetry assessments when a declared metric rule was evaluated;
 - explicit unknowns and the evidence types needed to resolve them;
 - ordered operational recommendations without embedded mutations;
 - the complete evidence-ID set plus tool-ledger and policy-snapshot references; and
@@ -53,7 +56,11 @@ Every evidence ID cited by a hypothesis or recommendation must also appear in th
 
 Reports carry references, summaries, and hashes—not raw logs, metrics, traces, credentials, prompts, provider exceptions, or tool output. A missing or expired artifact does not erase the historical citation; the presentation layer marks it unavailable.
 
-Selected metric results join the report-level evidence set and remain independently immutable. The deterministic baseline does not automatically cite them as hypothesis support merely because a query returned data. Failed optional telemetry collection becomes a stable evidence gap; provider error text is never copied into the report.
+Selected metric results join the report-level evidence set and remain independently immutable. A result is never cited merely because a query returned data. When a selection declares an interpretation, the runtime reads the committed artifact through the tenant-scoped Evidence store and evaluates only a `complete` normalized result whose logical metric, exact unit, and finite points match the declaration. All returned series are flattened for the declared statistic.
+
+`telemetryAssessments` records the rule and result. `supporting` and `contradicting` assessments cite their Evidence ID on the matching hypothesis; `neutral`, `no-data`, and `incomplete` assessments remain visible without becoming hypothesis citations. No-data and incomplete assessments omit `observedValue`. A corrupt, missing, mismatched, or unreadable artifact becomes a stable evidence gap without exposing stored content or provider errors.
+
+In the deterministic reference runtime, metric assessment does not reclassify the resource-derived root cause or silently change confidence, rank, or terminal outcome. Contradicting evidence remains explicit for a later evaluator or human reviewer.
 
 ## Authority and lifecycle boundary
 
@@ -70,5 +77,6 @@ In addition to JSON Schema validation:
 - report scope must equal the accepted request scope;
 - timestamps must satisfy `requestedAt <= startedAt <= completedAt <= createdAt`;
 - every citation must belong to the report evidence set and authenticated tenant;
+- every telemetry assessment must reference report Evidence and the selected root-cause class;
 - selected tools and authority must remain within all applicable upper bounds; and
 - usage counters must be checked against the accepted budgets and any stricter policy limits.

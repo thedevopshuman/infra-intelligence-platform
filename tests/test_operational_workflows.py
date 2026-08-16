@@ -42,6 +42,8 @@ from iip.application.plugin_sessions import (
 from iip.application.ports import (
     ActorContext,
     PersistenceError,
+    TelemetryMetricPoint,
+    TelemetryMetricSeries,
     TelemetryMetricsQuery,
     TelemetryMetricsResult,
 )
@@ -130,7 +132,7 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
     def test_matching_telemetry_selection_uses_investigation_scope_and_budgets(
         self,
     ) -> None:
-        class RecordingNoDataBackend:
+        class RecordingTelemetryBackend:
             def __init__(self) -> None:
                 self.requests: list[TelemetryMetricsQuery] = []
 
@@ -140,12 +142,22 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
                 self.requests.append(request)
                 return TelemetryMetricsResult(
                     executed_at=request.end,
-                    status="no-data",
-                    series=(),
+                    status="complete",
+                    series=(
+                        TelemetryMetricSeries(
+                            metric=request.metric,
+                            unit="1",
+                            attributes=(("service.name", "api"),),
+                            points=(
+                                TelemetryMetricPoint(request.start, 0.07),
+                                TelemetryMetricPoint(request.end, 0.09),
+                            ),
+                        ),
+                    ),
                     warnings=(),
                 )
 
-        backend = RecordingNoDataBackend()
+        backend = RecordingTelemetryBackend()
         policy = AllowTenantPolicy()
         evidence_store = InMemoryEvidenceStore()
         clock = SystemClock()
@@ -168,6 +180,7 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
             InMemoryOperationalStore(),
             clock,
             telemetry=telemetry,
+            evidence_store=evidence_store,
         )
         request = copy.deepcopy(self.scenario["spec"]["request"])
         request["metadata"]["id"] = "inv_cccccccccccccccccccccccccccccccc"
@@ -197,6 +210,14 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
                     "maxDataPoints": 240,
                     "maxBytes": 262144,
                 },
+                "interpretation": {
+                    "statistic": "maximum",
+                    "unit": "1",
+                    "operator": "gte",
+                    "threshold": 0.08,
+                    "whenMatched": "supports",
+                    "whenNotMatched": "contradicts",
+                },
             }
         ]
         nonmatching = copy.deepcopy(request["spec"]["telemetrySelections"][0])
@@ -225,7 +246,15 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
         self.assertEqual(len(report["spec"]["evidenceIds"]), 2)
         self.assertEqual(
             len(report["spec"]["hypotheses"][0]["supportingEvidenceIds"]),
-            1,
+            2,
+        )
+        assessment = report["spec"]["telemetryAssessments"][0]
+        self.assertEqual(assessment["selectionId"], "tqs_0123456789abcdef")
+        self.assertEqual(assessment["observedValue"], 0.09)
+        self.assertEqual(assessment["disposition"], "supporting")
+        self.assertIn(
+            assessment["evidenceId"],
+            report["spec"]["hypotheses"][0]["supportingEvidenceIds"],
         )
         stored = tuple(evidence_store.list(self.actor))
         self.assertEqual(
@@ -233,6 +262,61 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
             {"kubernetes.pod-status", "telemetry.metrics"},
         )
         assert_schema(self, "investigation-report.schema.json", report)
+
+        contradicting_request = copy.deepcopy(request)
+        contradicting_request["metadata"]["id"] = (
+            "inv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        )
+        interpretation = contradicting_request["spec"]["telemetrySelections"][1][
+            "interpretation"
+        ]
+        interpretation["threshold"] = 1
+
+        contradicting_report = service.execute(
+            RunInvestigationCommand(self.actor, contradicting_request)
+        )
+
+        hypothesis = contradicting_report["spec"]["hypotheses"][0]
+        contradiction = contradicting_report["spec"]["telemetryAssessments"][0]
+        self.assertEqual(
+            hypothesis["rootCauseClass"],
+            "kubernetes.image-pull.manifest-not-found",
+        )
+        self.assertEqual(hypothesis["confidence"], 0.95)
+        self.assertEqual(len(hypothesis["supportingEvidenceIds"]), 1)
+        self.assertEqual(hypothesis["contradictingEvidenceIds"], [contradiction["evidenceId"]])
+        self.assertEqual(contradiction["disposition"], "contradicting")
+        assert_schema(
+            self,
+            "investigation-report.schema.json",
+            contradicting_report,
+        )
+
+        mismatched_unit_request = copy.deepcopy(request)
+        mismatched_unit_request["metadata"]["id"] = (
+            "inv_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        )
+        mismatched_unit_request["spec"]["telemetrySelections"][1][
+            "interpretation"
+        ]["unit"] = "percent"
+
+        mismatched_unit_report = service.execute(
+            RunInvestigationCommand(self.actor, mismatched_unit_request)
+        )
+
+        self.assertNotIn("telemetryAssessments", mismatched_unit_report["spec"])
+        self.assertIn(
+            "could not be safely assessed",
+            mismatched_unit_report["spec"]["unknowns"][0]["statement"],
+        )
+        self.assertEqual(
+            len(
+                mismatched_unit_report["spec"]["hypotheses"][0][
+                    "supportingEvidenceIds"
+                ]
+            ),
+            1,
+        )
 
     def test_telemetry_selection_cannot_exceed_remaining_tool_budget(self) -> None:
         request = copy.deepcopy(self.scenario["spec"]["request"])
@@ -288,6 +372,30 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
                 request["metadata"]["id"],
             )
         )
+
+    def test_interpretation_requires_a_scoped_nonconstant_rule(self) -> None:
+        request = copy.deepcopy(example("investigation-request-telemetry.json"))
+        request["metadata"]["tenantId"] = self.actor.tenant_id
+        request["metadata"]["actorId"] = self.actor.actor_id
+        request["spec"]["scope"] = copy.deepcopy(
+            self.scenario["spec"]["request"]["spec"]["scope"]
+        )
+        selection = request["spec"]["telemetrySelections"][0]
+        del selection["rootCauseClasses"]
+
+        with self.assertRaisesRegex(
+            InvalidInvestigationError,
+            "investigation.contract.invalid",
+        ):
+            self.service.execute(RunInvestigationCommand(self.actor, request))
+
+        selection["rootCauseClasses"] = ["infrastructure.resource.degraded"]
+        selection["interpretation"]["whenNotMatched"] = "supports"
+        with self.assertRaisesRegex(
+            InvalidInvestigationError,
+            "investigation.contract.invalid",
+        ):
+            self.service.execute(RunInvestigationCommand(self.actor, request))
 
     def test_evaluation_hard_gates_and_repeated_runs_are_deterministic(self) -> None:
         report = copy.deepcopy(example("investigation-report.json"))
@@ -489,6 +597,13 @@ class OperationalHttpTests(unittest.TestCase):
         self.assertEqual(report["kind"], "InvestigationReport")
         self.assertEqual(report["spec"]["usage"]["toolCalls"], 2)
         self.assertEqual(report["spec"]["usage"]["evidenceItems"], 2)
+        assessment = report["spec"]["telemetryAssessments"][0]
+        self.assertEqual(assessment["disposition"], "no-data")
+        self.assertNotIn("observedValue", assessment)
+        self.assertEqual(
+            len(report["spec"]["hypotheses"][0]["supportingEvidenceIds"]),
+            1,
+        )
         responses.clear()
         handler.path = f"/v1/investigations/{request['metadata']['id']}"
         handler.do_GET()

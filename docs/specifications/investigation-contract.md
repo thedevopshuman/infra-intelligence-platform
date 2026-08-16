@@ -59,6 +59,7 @@ Every terminal path returns a report, including policy denial, cancellation, run
 - outcome and stable terminal reason;
 - start/completion timestamps and the exact accepted scope;
 - selected agent version, immutable manifest digest, and policy-selected model class when selection occurred;
+- an optional auditable cross-signal plan with capacity, ordered candidates, and stable scheduled/deferred reasons;
 - ranked hypotheses with confidence and supporting and contradicting evidence IDs;
 - structured telemetry assessments when a declared metric rule was evaluated;
 - structured Kubernetes Event assessments when a declared condition rule was evaluated;
@@ -96,6 +97,12 @@ The same restraint applies to Kubernetes Event assessments. Supporting and contr
 
 `contextAssessments` records the selected kinds and logical references, declared minimum, and—only for complete evidence—the observed count, stable document IDs, and returned selected references. Supporting and contradicting dispositions cite the matching hypothesis. No-data and incomplete assessments omit observations. Excerpts remain solely in the protected Evidence artifact, are always untrusted data, and are never interpreted by this deterministic rule or copied into the report.
 
+## Cross-signal planning
+
+After resource classification, the deterministic runtime builds `signalPlan` across all validated request candidates. `risk-aware-v1` preserves request order inside a fixed least-risk sequence: Kubernetes Events, protected repository/runbook context, value-minimized resource changes, metrics, then logs. It applies root-cause applicability, the request's evidence/tool upper bounds, and the tool/evidence capacity remaining after resource-state collection. Each candidate is exactly once in the plan as `scheduled` or `deferred`, with a stable reason: `eligible`, `root-cause-mismatch`, `request-upper-bound`, or `budget-exhausted`.
+
+The plan grants no new capability and never adds a provider query absent from the accepted request. It is planning provenance rather than an execution ledger: cancellation, provider failure, or a concurrent deadline can prevent a scheduled step from completing. Actual calls remain authoritative in `usage` and `toolCallLedgerRef`. Automatic candidate generation from a protected integration catalog is a separate future boundary.
+
 ## Authority and lifecycle boundary
 
 The investigation report may recommend a next check, monitoring step, or escalation. It cannot encode an executable mutation. A future action proposal is a separate immutable contract and workflow that receives a current policy decision, idempotency key, approval when required, and audit trail.
@@ -118,6 +125,7 @@ In addition to JSON Schema validation:
 - every log assessment must reference report Evidence, reproduce its declared count rule, and match the selected root-cause class;
 - every change assessment must reference report Evidence, reproduce its declared kinds/count rule, and match the selected root-cause class;
 - every context assessment must reference report Evidence, reproduce its declared kinds/references/count rule, and match the selected root-cause class;
+- signal-plan steps must account for request candidates exactly once in deterministic order, use contiguous positions, and have counts matching their decisions;
 - baseline and evaluation windows must be ordered, non-overlapping subranges of the request scope, and a reported comparison must match its declared calculation and unit;
 - selected tools and authority must remain within all applicable upper bounds; and
 - usage counters must be checked against the accepted budgets and any stricter policy limits; and

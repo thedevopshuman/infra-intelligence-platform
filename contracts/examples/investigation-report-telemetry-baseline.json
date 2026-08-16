@@ -42,6 +42,23 @@
       }
     ],
     "unknowns": [],
+    "signalPlan": {
+      "strategy": "risk-aware-v1",
+      "rootCauseClass": "infrastructure.resource.degraded",
+      "capacity": {"toolCalls": 7, "evidenceItems": 15},
+      "candidateCount": 1,
+      "scheduledCount": 1,
+      "deferredCount": 0,
+      "steps": [
+        {
+          "position": 1,
+          "signal": "telemetry.metrics",
+          "selectionId": "tqs_ba5e11e0c0ffee01",
+          "decision": "scheduled",
+          "reason": "eligible"
+        }
+      ]
+    },
     "telemetryAssessments": [
       {
         "assessmentType": "baseline-comparison",

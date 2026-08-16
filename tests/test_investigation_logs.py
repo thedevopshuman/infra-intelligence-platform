@@ -246,6 +246,18 @@ class InvestigationLogTests(unittest.TestCase):
             report["spec"]["hypotheses"][0]["supportingEvidenceIds"],
         )
         self.assertEqual(report["spec"]["usage"]["toolCalls"], 2)
+        plan = report["spec"]["signalPlan"]
+        self.assertEqual(plan["strategy"], "risk-aware-v1")
+        self.assertEqual(plan["candidateCount"], 1)
+        self.assertEqual(plan["scheduledCount"], 1)
+        self.assertEqual(
+            [
+                (step["signal"], step["decision"], step["reason"])
+                for step in plan["steps"]
+            ],
+            [("telemetry.logs", "scheduled", "eligible")],
+        )
+        assert_schema(self, "investigation-report.schema.json", report)
         self.assertEqual(report["spec"]["usage"]["evidenceItems"], 2)
         artifact = store.read_artifact(self.actor, assessment["evidenceId"])
         self.assertIsNotNone(artifact)
@@ -349,6 +361,21 @@ class InvestigationLogTests(unittest.TestCase):
             {"kubernetes.pod-status", "telemetry.metrics"},
         )
         self.assertEqual(report["spec"]["usage"]["toolCalls"], 2)
+        plan = report["spec"]["signalPlan"]
+        self.assertEqual(plan["strategy"], "risk-aware-v1")
+        self.assertEqual(plan["candidateCount"], 2)
+        self.assertEqual(plan["scheduledCount"], 1)
+        self.assertEqual(
+            [
+                (step["signal"], step["decision"], step["reason"])
+                for step in plan["steps"]
+            ],
+            [
+                ("telemetry.metrics", "scheduled", "eligible"),
+                ("telemetry.logs", "deferred", "budget-exhausted"),
+            ],
+        )
+        assert_schema(self, "investigation-report.schema.json", report)
 
 
 if __name__ == "__main__":

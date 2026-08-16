@@ -1973,6 +1973,18 @@ class InvestigationReport:
         return dict(self.payload)
 
     @property
+    def signal_plan(self) -> Optional[Mapping[str, Any]]:
+        """Return the auditable cross-signal plan when the runtime emitted one."""
+
+        spec = self.payload.get("spec")
+        value = spec.get("signalPlan") if isinstance(spec, Mapping) else None
+        if value is None:
+            return None
+        if not isinstance(value, Mapping):
+            raise ValueError("investigation signalPlan must be an object")
+        return dict(value)
+
+    @property
     def telemetry_assessments(
         self,
     ) -> tuple[

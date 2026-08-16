@@ -56,6 +56,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0031-otlp-investigation-trace-export.md",
     "docs/decisions/0032-scope-end-rolling-baseline.md",
     "docs/decisions/0033-adversarial-evidence-release-gate.md",
+    "docs/decisions/0034-auditable-cross-signal-planning.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/kubernetes-event-evidence.md",
@@ -1798,6 +1799,68 @@ def expand_rolling_baseline(
     return expanded
 
 
+def validate_investigation_signal_plan(
+    request_spec: Mapping[str, object],
+    report_spec: Mapping[str, object],
+    errors: List[str],
+) -> None:
+    """Check that an emitted plan accounts for request candidates exactly once."""
+
+    plan = report_spec.get("signalPlan")
+    if plan is None:
+        return
+    if not isinstance(plan, dict):
+        return
+    definitions = (
+        ("kubernetes.event", "kubernetesEventSelections"),
+        ("repository.context", "contextSelections"),
+        ("resource.change", "changeSelections"),
+        ("telemetry.metrics", "telemetrySelections"),
+        ("telemetry.logs", "logSelections"),
+    )
+    expected = []
+    for signal, field in definitions:
+        selections = request_spec.get(field, [])
+        if isinstance(selections, list):
+            expected.extend(
+                (signal, selection.get("id"))
+                for selection in selections
+                if isinstance(selection, dict)
+            )
+    steps = plan.get("steps")
+    if not isinstance(steps, list):
+        return
+    observed = [
+        (step.get("signal"), step.get("selectionId"))
+        for step in steps
+        if isinstance(step, dict)
+    ]
+    if observed != expected:
+        fail(errors, "investigation signal plan must account for ordered request candidates")
+    if [step.get("position") for step in steps if isinstance(step, dict)] != list(
+        range(1, len(steps) + 1)
+    ):
+        fail(errors, "investigation signal plan positions must be contiguous")
+    scheduled = sum(
+        isinstance(step, dict) and step.get("decision") == "scheduled"
+        for step in steps
+    )
+    if (
+        plan.get("candidateCount") != len(steps)
+        or plan.get("scheduledCount") != scheduled
+        or plan.get("deferredCount") != len(steps) - scheduled
+    ):
+        fail(errors, "investigation signal plan counts must match its steps")
+    leading_classes = {
+        hypothesis.get("rootCauseClass")
+        for hypothesis in report_spec.get("hypotheses", [])
+        if isinstance(hypothesis, dict)
+        and hypothesis.get("disposition") == "leading"
+    }
+    if leading_classes and plan.get("rootCauseClass") not in leading_classes:
+        fail(errors, "investigation signal plan root cause must match its report")
+
+
 def validate_investigation_telemetry_pair(
     request: Mapping[str, object],
     report: Mapping[str, object],
@@ -1816,6 +1879,7 @@ def validate_investigation_telemetry_pair(
         for item in (request_metadata, request_spec, report_metadata, report_spec)
     ):
         return
+    validate_investigation_signal_plan(request_spec, report_spec, errors)
     if report_metadata.get("id") != request_metadata.get("id"):
         fail(errors, "telemetry investigation examples must share an ID")
     if report_metadata.get("tenantId") != request_metadata.get("tenantId"):

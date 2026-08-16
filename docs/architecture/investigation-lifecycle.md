@@ -69,6 +69,8 @@ A candidate may instead compare an earlier baseline window with a later evaluati
 
 Structured Kubernetes Event candidates run before metric candidates, and historical log candidates run last so scarce budgets favor lower-risk signals. A log candidate inherits the same identity and scope and may apply only a declared record-count rule to its committed normalized result. Log body prose remains confidential untrusted input and is never used by the deterministic classifier or copied into its report.
 
+Before those provider calls, `risk-aware-v1` produces one cross-signal plan from the validated request candidates, resource-derived classification, request upper bounds, and remaining tool/evidence capacity. Every candidate is recorded once with a stable scheduled/deferred reason. This makes budget pruning and signal ordering auditable without treating the plan as proof of execution or allowing it to synthesize new authority. [ADR 0034](../decisions/0034-auditable-cross-signal-planning.md) records this boundary.
+
 ## Evaluation boundary
 
 Immutable [evaluation scenarios](../specifications/evaluation-scenario-contract.md) provide synthetic graph, timeline, alert, request, and evidence fixtures while keeping the scoring oracle hidden from the investigating agent. Promotion evaluates root-cause class, evidence use, red-herring resistance, unsupported certainty, instruction-boundary preservation, least privilege, and budget compliance. Adversarial fixture fragments must not appear in reports, and a plausible narrative cannot compensate for a failed evidence, instruction, or authority gate. [ADR 0033](../decisions/0033-adversarial-evidence-release-gate.md) fixes this release gate.

@@ -1083,6 +1083,30 @@ export interface InvestigationReport {
     summary: string;
     hypotheses: InvestigationHypothesis[];
     unknowns: InvestigationUnknown[];
+    signalPlan?: {
+      strategy: "risk-aware-v1";
+      rootCauseClass?: string;
+      capacity: { toolCalls: number; evidenceItems: number };
+      candidateCount: number;
+      scheduledCount: number;
+      deferredCount: number;
+      steps: {
+        position: number;
+        signal:
+          | "kubernetes.event"
+          | "repository.context"
+          | "resource.change"
+          | "telemetry.metrics"
+          | "telemetry.logs";
+        selectionId: string;
+        decision: "scheduled" | "deferred";
+        reason:
+          | "eligible"
+          | "root-cause-mismatch"
+          | "request-upper-bound"
+          | "budget-exhausted";
+      }[];
+    };
     telemetryAssessments?: (
       | InvestigationTelemetryAssessment
       | InvestigationTelemetryBaselineAssessment

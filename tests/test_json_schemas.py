@@ -308,6 +308,16 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(errors)
 
+    def test_signal_plan_scheduled_step_requires_eligible_reason(self) -> None:
+        report = document(
+            "contracts/examples/investigation-report-telemetry-baseline.json"
+        )
+        report["spec"]["signalPlan"]["steps"][0]["reason"] = "budget-exhausted"
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(errors)
+
     def test_no_data_telemetry_result_cannot_contain_series(self) -> None:
         result = document("contracts/examples/telemetry-evidence-result.json")
         result["spec"]["status"] = "no-data"

@@ -187,6 +187,7 @@ class PublicContractSdkTests(unittest.TestCase):
             "ratio",
         )
         baseline_assessment = baseline_report.telemetry_assessments[0]
+        self.assertEqual(baseline_report.signal_plan["scheduledCount"], 1)
         self.assertIsInstance(
             baseline_assessment,
             InvestigationTelemetryBaselineAssessment,
@@ -446,6 +447,26 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn(
             "telemetry assessment comparisonUnit must match its request",
+            self.errors,
+        )
+
+    def test_signal_plan_must_account_for_request_candidates(self) -> None:
+        path = (
+            ROOT
+            / "contracts"
+            / "examples"
+            / "investigation-report-telemetry-baseline.json"
+        )
+        report = copy.deepcopy(self.documents[path])
+        report["spec"]["signalPlan"]["steps"][0]["selectionId"] = (
+            "tqs_0000000000000000"
+        )
+        self.documents[path] = report
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "investigation signal plan must account for ordered request candidates",
             self.errors,
         )
 

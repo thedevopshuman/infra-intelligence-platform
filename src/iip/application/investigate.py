@@ -262,13 +262,21 @@ class DeterministicInvestigationService:
             supporting_evidence_ids.append(resource_evidence_id)
 
         root_cause, statement, confidence = self._classify(resources)
+        signal_plan, scheduled_signals = self._build_signal_plan(
+            spec,
+            root_cause,
+            requested_types=requested_types,
+            allowed_tools=allowed_tools,
+            available_tool_calls=max(0, budgets["maxToolCalls"] - tool_calls),
+            available_evidence_items=max(
+                0, budgets["maxEvidenceItems"] - len(evidence_documents)
+            ),
+        )
         kubernetes_events_allowed = (
             (not requested_types or "kubernetes.event" in requested_types)
             and (not allowed_tools or "events/search" in allowed_tools)
         )
-        matching_event_selections = self._matching_kubernetes_event_selections(
-            spec, root_cause
-        )
+        matching_event_selections = scheduled_signals["kubernetes.event"]
         if (
             matching_event_selections
             and kubernetes_events_allowed
@@ -340,7 +348,7 @@ class DeterministicInvestigationService:
             (not requested_types or "repository.context" in requested_types)
             and tools_allow_collection
         )
-        matching_context_selections = self._matching_context_selections(spec, root_cause)
+        matching_context_selections = scheduled_signals["repository.context"]
         if matching_context_selections and context_allowed and self._context is None:
             context_unknowns.append(self._context_unknown("unavailable"))
         elif context_allowed and self._context is not None:
@@ -401,7 +409,7 @@ class DeterministicInvestigationService:
             (not requested_types or "resource.change" in requested_types)
             and tools_allow_collection
         )
-        matching_change_selections = self._matching_change_selections(spec, root_cause)
+        matching_change_selections = scheduled_signals["resource.change"]
         if (
             matching_change_selections
             and changes_allowed
@@ -469,7 +477,7 @@ class DeterministicInvestigationService:
             (not requested_types or "telemetry.metrics" in requested_types)
             and (not allowed_tools or "telemetry/query" in allowed_tools)
         )
-        matching_selections = self._matching_telemetry_selections(spec, root_cause)
+        matching_selections = scheduled_signals["telemetry.metrics"]
         if matching_selections and telemetry_allowed and self._telemetry is None:
             telemetry_unknowns.append(self._telemetry_unknown("unavailable"))
         elif telemetry_allowed and self._telemetry is not None:
@@ -539,7 +547,7 @@ class DeterministicInvestigationService:
             (not requested_types or "telemetry.logs" in requested_types)
             and (not allowed_tools or "telemetry/query" in allowed_tools)
         )
-        matching_log_selections = self._matching_log_selections(spec, root_cause)
+        matching_log_selections = scheduled_signals["telemetry.logs"]
         if matching_log_selections and logs_allowed and self._logs is None:
             log_unknowns.append(self._log_unknown("unavailable"))
         elif logs_allowed and self._logs is not None:
@@ -719,6 +727,7 @@ class DeterministicInvestigationService:
                 "summary": summary,
                 "hypotheses": hypotheses,
                 "unknowns": unknowns,
+                "signalPlan": signal_plan,
                 "evidenceIds": evidence_ids,
                 "recommendations": (
                     []
@@ -1653,6 +1662,107 @@ class DeterministicInvestigationService:
         assessment["observedChangeIds"] = sorted(ids)
         assessment["disposition"] = self._assessment_disposition(configured)
         return assessment
+
+    @staticmethod
+    def _build_signal_plan(
+        spec: Mapping[str, object],
+        root_cause: str | None,
+        *,
+        requested_types: object,
+        allowed_tools: object,
+        available_tool_calls: int,
+        available_evidence_items: int,
+    ) -> tuple[
+        dict[str, object],
+        dict[str, tuple[Mapping[str, object], ...]],
+    ]:
+        """Select a reproducible cross-signal plan under inherited upper bounds."""
+
+        evidence_types = (
+            set(requested_types) if isinstance(requested_types, list) else set()
+        )
+        tools = set(allowed_tools) if isinstance(allowed_tools, list) else set()
+        definitions = (
+            (
+                "kubernetes.event",
+                "kubernetesEventSelections",
+                "events/search",
+            ),
+            ("repository.context", "contextSelections", "evidence/fetch"),
+            ("resource.change", "changeSelections", "evidence/fetch"),
+            ("telemetry.metrics", "telemetrySelections", "telemetry/query"),
+            ("telemetry.logs", "logSelections", "telemetry/query"),
+        )
+        scheduled: dict[str, list[Mapping[str, object]]] = {
+            signal: [] for signal, _, _ in definitions
+        }
+        steps: list[dict[str, object]] = []
+        remaining_tool_calls = available_tool_calls
+        remaining_evidence_items = available_evidence_items
+        position = 0
+        for signal, field, required_tool in definitions:
+            candidates = spec.get(field, [])
+            if not isinstance(candidates, list):
+                continue
+            for candidate in candidates:
+                if not isinstance(candidate, Mapping):
+                    continue
+                position += 1
+                classes = candidate.get("rootCauseClasses")
+                matches_class = classes is None or (
+                    root_cause is not None
+                    and isinstance(classes, list)
+                    and root_cause in classes
+                )
+                within_upper_bounds = (
+                    (not evidence_types or signal in evidence_types)
+                    and (not tools or required_tool in tools)
+                )
+                if not matches_class:
+                    decision = "deferred"
+                    reason = "root-cause-mismatch"
+                elif not within_upper_bounds:
+                    decision = "deferred"
+                    reason = "request-upper-bound"
+                elif remaining_tool_calls <= 0 or remaining_evidence_items <= 0:
+                    decision = "deferred"
+                    reason = "budget-exhausted"
+                else:
+                    decision = "scheduled"
+                    reason = "eligible"
+                    remaining_tool_calls -= 1
+                    remaining_evidence_items -= 1
+                    scheduled[signal].append(candidate)
+                steps.append(
+                    {
+                        "position": position,
+                        "signal": signal,
+                        "selectionId": candidate["id"],
+                        "decision": decision,
+                        "reason": reason,
+                    }
+                )
+
+        scheduled_count = sum(
+            step["decision"] == "scheduled" for step in steps
+        )
+        plan: dict[str, object] = {
+            "strategy": "risk-aware-v1",
+            "capacity": {
+                "toolCalls": available_tool_calls,
+                "evidenceItems": available_evidence_items,
+            },
+            "candidateCount": len(steps),
+            "scheduledCount": scheduled_count,
+            "deferredCount": len(steps) - scheduled_count,
+            "steps": steps,
+        }
+        if root_cause is not None:
+            plan["rootCauseClass"] = root_cause
+        return plan, {
+            signal: tuple(candidates)
+            for signal, candidates in scheduled.items()
+        }
 
     @staticmethod
     def _matching_kubernetes_event_selections(

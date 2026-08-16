@@ -61,6 +61,7 @@
         "summary": {"type": "string", "minLength": 1, "maxLength": 8192},
         "hypotheses": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/hypothesis"}},
         "unknowns": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/unknown"}},
+        "signalPlan": {"$ref": "#/$defs/signalPlan"},
         "telemetryAssessments": {
           "type": "array",
           "maxItems": 8,
@@ -152,6 +153,80 @@
     }
   ],
   "$defs": {
+    "signalPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "capacity",
+        "candidateCount",
+        "scheduledCount",
+        "deferredCount",
+        "steps"
+      ],
+      "properties": {
+        "strategy": {"const": "risk-aware-v1"},
+        "rootCauseClass": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._/-]{2,127}$"
+        },
+        "capacity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["toolCalls", "evidenceItems"],
+          "properties": {
+            "toolCalls": {"type": "integer", "minimum": 0, "maximum": 200},
+            "evidenceItems": {"type": "integer", "minimum": 0, "maximum": 1000}
+          }
+        },
+        "candidateCount": {"type": "integer", "minimum": 0, "maximum": 40},
+        "scheduledCount": {"type": "integer", "minimum": 0, "maximum": 40},
+        "deferredCount": {"type": "integer", "minimum": 0, "maximum": 40},
+        "steps": {
+          "type": "array",
+          "maxItems": 40,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["position", "signal", "selectionId", "decision", "reason"],
+            "properties": {
+              "position": {"type": "integer", "minimum": 1, "maximum": 40},
+              "signal": {
+                "type": "string",
+                "enum": [
+                  "kubernetes.event",
+                  "repository.context",
+                  "resource.change",
+                  "telemetry.metrics",
+                  "telemetry.logs"
+                ]
+              },
+              "selectionId": {
+                "type": "string",
+                "pattern": "^(?:kes|xqs|cqs|tqs|lqs)_[a-f0-9]{16}$"
+              },
+              "decision": {"type": "string", "enum": ["scheduled", "deferred"]},
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "eligible",
+                  "root-cause-mismatch",
+                  "request-upper-bound",
+                  "budget-exhausted"
+                ]
+              }
+            },
+            "allOf": [
+              {
+                "if": {"properties": {"decision": {"const": "scheduled"}}},
+                "then": {"properties": {"reason": {"const": "eligible"}}},
+                "else": {"not": {"properties": {"reason": {"const": "eligible"}}}}
+              }
+            ]
+          }
+        }
+      }
+    },
     "scope": {
       "type": "object",
       "additionalProperties": false,

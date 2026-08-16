@@ -277,6 +277,7 @@ def build_runtime_from_env() -> Runtime:
     try:
         otlp_metrics_receiver = _otlp_metrics_receiver_from_env()
         telemetry_metrics_backend = _telemetry_metrics_backend_from_env()
+        kubernetes_events_backend = _kubernetes_events_backend_from_env()
         if not database_url:
             return build_local_runtime(
                 authenticator,
@@ -287,6 +288,7 @@ def build_runtime_from_env() -> Runtime:
                     else None
                 ),
                 telemetry_metrics_backend=telemetry_metrics_backend,
+                kubernetes_events_backend=kubernetes_events_backend,
                 otlp_metrics_receiver=otlp_metrics_receiver,
                 telemetry_runtime=telemetry_runtime,
             )
@@ -303,6 +305,7 @@ def build_runtime_from_env() -> Runtime:
                 telemetry_runtime.sink if telemetry_runtime is not None else None
             ),
             telemetry_metrics_backend=telemetry_metrics_backend,
+            kubernetes_events_backend=kubernetes_events_backend,
             otlp_metrics_receiver=otlp_metrics_receiver,
             telemetry_runtime=telemetry_runtime,
         )
@@ -384,6 +387,24 @@ def _telemetry_metrics_backend_from_env() -> TelemetryMetricsBackend | None:
     from iip.adapters.prometheus import build_prometheus_backend_from_environment
 
     return build_prometheus_backend_from_environment(os.environ, SystemClock())
+
+
+def _kubernetes_events_backend_from_env() -> KubernetesEventsBackend | None:
+    backend = os.environ.get("IIP_KUBERNETES_EVENTS_BACKEND", "no-data")
+    if backend == "no-data":
+        return None
+    if backend != "kubernetes-api":
+        from iip.adapters.kubernetes_events import KubernetesEventsConfigurationError
+
+        raise KubernetesEventsConfigurationError(
+            "kubernetes.events.configuration.invalid"
+        )
+
+    from iip.adapters.kubernetes_events import (
+        build_kubernetes_events_backend_from_environment,
+    )
+
+    return build_kubernetes_events_backend_from_environment(os.environ, SystemClock())
 
 
 def _otlp_metrics_receiver_from_env() -> OtlpMetricsReceiverAdapter | None:

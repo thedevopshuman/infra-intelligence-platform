@@ -24,3 +24,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0018](0018-evidence-aware-metric-assessment.md) | Accepted | Assess stored metric evidence with declared threshold rules |
 | [0019](0019-baseline-window-telemetry-assessment.md) | Accepted | Compare ordered telemetry windows inside one committed artifact |
 | [0020](0020-kubernetes-event-evidence-and-correlation.md) | Accepted | Normalize Kubernetes Events as evidence before investigation correlation |
+| [0021](0021-read-only-kubernetes-event-api-adapter.md) | Accepted | Query exact-scope Kubernetes Event evidence through a read-only HTTPS API adapter |

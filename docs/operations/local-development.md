@@ -7,7 +7,7 @@
 - Python 3.11 or newer
 - Helm 3 or newer
 - Optional: Docker Desktop for PostgreSQL, OpenTelemetry Collector, OTLP receiver, and Prometheus integration tests and the durable local stack
-- Optional: Docker Desktop, kind, and `kubectl` for live Kubernetes collection tests
+- Optional: Docker Desktop, kind, and `kubectl` for live Kubernetes collection and Event evidence tests
 
 Install the pinned verification-only Python dependencies:
 
@@ -64,6 +64,16 @@ make test-prometheus
 ```
 
 The isolated target queries Prometheus's self-scraped `up` metric through the generated range-query boundary, verifies normalized series, and removes the server afterward. See the [Prometheus evidence guide](prometheus-evidence.md) for protected integration mapping, credential, Compose, and Helm configuration.
+
+Exercise the read-only Kubernetes Event evidence adapter against an explicit local context with:
+
+```bash
+IIP_KUBECONFIG=/absolute/path/to/.kube/config \
+IIP_KUBE_CONTEXT=kind-iip-dev \
+make test-kubernetes-events
+```
+
+The target creates only the isolated `iip-event-test` namespace, grants its service account Deployment `get` and Event `get/list`, issues a short-lived test token, queries through the direct HTTPS adapter, commits normalized Evidence, and removes the namespace. See the [Kubernetes Event evidence guide](kubernetes-event-evidence.md) for protected registry, credential, TLS, Helm, and historical-aggregate semantics.
 
 Keep deterministic contract, SDK, kernel, and observer-conformance tests in the normal `make verify` gate. Docker Desktop supplies external dependencies for integration tests; it is not required to validate pure normalization behavior. This split keeps feedback fast while still exercising PostgreSQL against the real engine.
 
@@ -179,6 +189,9 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_TELEMETRY_METRICS_BACKEND` | `no-data` | Historical metric evidence backend; `no-data` or `prometheus` |
 | `IIP_PROMETHEUS_INTEGRATIONS_JSON` | unset | Protected non-secret tenant/integration endpoint and allowlisted metric catalog required by the Prometheus backend |
 | `IIP_PROMETHEUS_CREDENTIALS_JSON` | empty credential set | Secret-bearing local reference broker configuration; supply only through a protected runtime channel |
+| `IIP_KUBERNETES_EVENTS_BACKEND` | `no-data` | Kubernetes Event evidence backend; `no-data` or `kubernetes-api` |
+| `IIP_KUBERNETES_EVENTS_INTEGRATIONS_JSON` | unset | Protected non-secret tenant endpoint, CA path, cluster/scope allowlists, limits, and condition mappings required by the live adapter |
+| `IIP_KUBERNETES_EVENTS_CREDENTIALS_JSON` | unset | Secret-bearing local reference broker configuration required by the live adapter |
 | `IIP_OTEL_INGESTION_ATTRIBUTE_MODE` | `source` | Metric identity dimensions: `none`, `source`, or `tenant-source` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | unset outside Compose | Standard OTLP base endpoint; `/v1/metrics` is appended |
 | `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | unset | Exact signal-specific OTLP metrics endpoint |
@@ -190,7 +203,7 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_TEST_DATABASE_URL` | unset | Enable PostgreSQL integration tests against an explicit test database |
 | `IIP_TEST_PROMETHEUS_ENDPOINT` | unset | Enable the real Prometheus adapter integration test against an explicit endpoint |
 | `IIP_TEST_OTLP_RECEIVER_ENDPOINT` | unset | Enable the official-exporter receiver integration test against an explicit API endpoint |
-| `IIP_KUBECONFIG` | required by live test | Explicit kubeconfig path; the observer never chooses an implicit current context |
-| `IIP_KUBE_CONTEXT` | `kind-iip-dev` | Explicit local context used only by `test-kubernetes-live` |
+| `IIP_KUBECONFIG` | required by live tests | Explicit kubeconfig path; neither test chooses an implicit current context |
+| `IIP_KUBE_CONTEXT` | `kind-iip-dev` | Explicit local context used by `test-kubernetes-live` and `test-kubernetes-events` |
 
 Future secrets must be logical references resolved by the deployment/runtime, never committed environment files.

@@ -62,4 +62,12 @@ spec:
         - port: {{ .Values.networkPolicy.prometheusEgress.port }}
           protocol: TCP
     {{- end }}
+    {{- if .Values.networkPolicy.kubernetesApiEgress.enabled }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.kubernetesApiEgress.cidr | quote }}
+      ports:
+        - port: {{ .Values.networkPolicy.kubernetesApiEgress.port }}
+          protocol: TCP
+    {{- end }}
 {{- end }}

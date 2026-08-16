@@ -18,3 +18,5 @@ data:
   OTEL_SERVICE_NAME: {{ .Values.telemetry.serviceName | quote }}
   IIP_TELEMETRY_METRICS_BACKEND: {{ .Values.telemetryEvidence.backend | quote }}
   IIP_PROMETHEUS_INTEGRATIONS_JSON: {{ .Values.telemetryEvidence.prometheus.integrationsJson | quote }}
+  IIP_KUBERNETES_EVENTS_BACKEND: {{ .Values.kubernetesEventEvidence.backend | quote }}
+  IIP_KUBERNETES_EVENTS_INTEGRATIONS_JSON: {{ .Values.kubernetesEventEvidence.integrationsJson | quote }}

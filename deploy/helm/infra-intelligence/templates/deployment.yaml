@@ -39,7 +39,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "infra-intelligence.fullname" . }}
-          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret .Values.telemetryEvidence.prometheus.credentialsExistingSecret .Values.otlpReceiver.channelsExistingSecret }}
+          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret .Values.telemetryEvidence.prometheus.credentialsExistingSecret .Values.kubernetesEventEvidence.credentialsExistingSecret .Values.otlpReceiver.channelsExistingSecret }}
           env:
             {{- if .Values.database.existingSecret }}
             - name: IIP_DATABASE_URL
@@ -68,6 +68,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.telemetryEvidence.prometheus.credentialsExistingSecret | quote }}
                   key: {{ .Values.telemetryEvidence.prometheus.credentialsSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.kubernetesEventEvidence.credentialsExistingSecret }}
+            - name: IIP_KUBERNETES_EVENTS_CREDENTIALS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.kubernetesEventEvidence.credentialsExistingSecret | quote }}
+                  key: {{ .Values.kubernetesEventEvidence.credentialsSecretKey | quote }}
             {{- end }}
             {{- if .Values.otlpReceiver.channelsExistingSecret }}
             - name: IIP_OTLP_RECEIVER_CHANNELS_JSON
@@ -98,9 +105,22 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.kubernetesEventEvidence.caBundleExistingSecret }}
+            - name: kubernetes-events-ca
+              mountPath: {{ .Values.kubernetesEventEvidence.caBundleMountPath | quote }}
+              readOnly: true
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if .Values.kubernetesEventEvidence.caBundleExistingSecret }}
+        - name: kubernetes-events-ca
+          secret:
+            secretName: {{ .Values.kubernetesEventEvidence.caBundleExistingSecret | quote }}
+            items:
+              - key: {{ .Values.kubernetesEventEvidence.caBundleSecretKey | quote }}
+                path: ca.crt
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

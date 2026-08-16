@@ -1,0 +1,24 @@
+{
+  "integrations": [
+    {
+      "tenantId": "local",
+      "integrationId": "kubernetes-local",
+      "provider": "kubernetes",
+      "endpoint": "https://kubernetes.default.svc:443",
+      "credentialRef": "credential://kubernetes/local/events-reader",
+      "caBundlePath": "/var/run/iip-kubernetes-events/ca.crt",
+      "clusterExternalId": "cluster-local",
+      "namespaces": ["default"],
+      "clusterEventNamespace": "default",
+      "resourceTypes": ["apps/deployment", "core/pod"],
+      "requestTimeoutSeconds": 10,
+      "maxResponseBytes": 1048576,
+      "pageSize": 100,
+      "maxPages": 5,
+      "conditionMappings": {
+        "ProgressDeadlineExceeded": "workload.progress-deadline-exceeded"
+      },
+      "enabled": true
+    }
+  ]
+}

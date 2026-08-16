@@ -207,6 +207,7 @@
     "/v1/evidence/kubernetes/events/queries": {
       "post": {
         "operationId": "collectKubernetesEventEvidence",
+        "description": "Collect bounded normalized Kubernetes Event evidence for authenticated tenant-scoped resources. Provider endpoint, TLS, namespace/type allowlists, and credentials are protected integration configuration and never request fields; the default backend returns honest no-data unless the read-only Kubernetes API adapter is selected.",
         "requestBody": {
           "required": true,
           "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/kubernetes-event-evidence-request.schema.json"}}}

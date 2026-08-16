@@ -32,6 +32,8 @@ Adapters map provider records to a stable event shape:
 
 Events are ordered by `lastObservedAt` and then event ID so adapter return order cannot change artifact hashes. Returned records must satisfy the requested resource, severity, reason, and time bounds. The application rejects—not silently drops—out-of-scope records.
 
+The core Kubernetes Event API stores occurrence aggregates, not an exact historical stream. When a live aggregate's first occurrence predates the requested range but its latest occurrence is inside it, the reference adapter emits only that provable latest occurrence (`firstObservedAt == lastObservedAt`, `occurrenceCount == 1`). It does not attribute the provider's full aggregate count to the requested window.
+
 `complete` requires one or more events and no warning. `partial` requires events plus `backend-partial` or `event-limit`. `no-data` requires no events and no warnings. Summary counts must equal the normalized records. Limits bound event count, decoded artifact bytes, time range, and deadline.
 
 ## Security and privacy
@@ -52,7 +54,15 @@ The resulting JSON is stored as an `Evidence` artifact with type `kubernetes.eve
 | `408` | `evidence.deadline.exceeded` | The bounded collection deadline elapsed. |
 | `503` | `evidence.provider.unavailable` / `storage.unavailable` | Adapter, normalization/redaction, or storage failed closed. |
 
-The default local backend returns honest `no-data`, enabling deterministic local and Docker tests without a cluster. A live Kubernetes API adapter is a separate next implementation unit behind the same port.
+The default local backend returns honest `no-data`, enabling deterministic local and Docker tests without a cluster.
+
+## Live Kubernetes API binding
+
+The optional `kubernetes-api` adapter calls the HTTPS API directly and issues only `GET` requests. Protected tenant/integration configuration fixes the API endpoint, CA bundle, credential reference, cluster identity, namespace and resource-type allowlists, pagination limits, response limit, timeout, and condition overrides. The adapter resolves a Bearer lease for exactly `events:read` and `resources:read`; none of that configuration enters this public contract.
+
+For each platform resource, the adapter constructs a path from a closed built-in type catalog and the observer's external identity, reads the exact current object, and binds Event lookup to its Kubernetes UID. This prevents name reuse from attaching an old object's Events to a new resource. The core `v1` Event collection is paged with an `involvedObject.uid` field selector. Omitted item TypeMeta is accepted because Kubernetes list serialization may omit it; conflicting TypeMeta and every involved-object mismatch fail closed.
+
+Pagination or event-count truncation is `partial` only when at least one normalized Event can be returned. Truncation with no matching Event fails closed because `no-data` could not be asserted honestly. [ADR 0021](../decisions/0021-read-only-kubernetes-event-api-adapter.md) records the transport, identity, and authority semantics; the [operations guide](../operations/kubernetes-event-evidence.md) describes local and Helm configuration.
 
 ## Investigation binding
 

@@ -68,6 +68,15 @@ telemetryEvidence:
     credentialsExistingSecret: ""
     credentialsSecretKey: prometheus-credentials-json
 
+kubernetesEventEvidence:
+  backend: no-data
+  integrationsJson: '{"integrations":[]}'
+  credentialsExistingSecret: ""
+  credentialsSecretKey: kubernetes-events-credentials-json
+  caBundleExistingSecret: ""
+  caBundleSecretKey: ca.crt
+  caBundleMountPath: /var/run/iip-kubernetes-events
+
 otlpReceiver:
   enabled: false
   channelsExistingSecret: ""
@@ -113,6 +122,10 @@ networkPolicy:
       kubernetes.io/metadata.name: observability
     podSelector:
       app.kubernetes.io/name: prometheus
+  kubernetesApiEgress:
+    enabled: false
+    cidr: 10.96.0.1/32
+    port: 443
 
 podDisruptionBudget:
   enabled: false

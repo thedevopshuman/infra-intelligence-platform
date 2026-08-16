@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-postgres test-backup-restore test-otel test-otlp-receiver test-prometheus test-kubernetes-live db-migrate helm-lint verify run package-chart
+.PHONY: help install-verify-deps validate validate-schemas test test-postgres test-backup-restore test-otel test-otlp-receiver test-prometheus test-kubernetes-events test-kubernetes-live db-migrate helm-lint verify run package-chart
 
 PYTHON ?= python3
 HELM ?= helm
@@ -14,6 +14,7 @@ help:
 	@echo "test-otel     Send reference metrics to an OpenTelemetry Collector"
 	@echo "test-otlp-receiver Send official OTLP metrics into the built API image"
 	@echo "test-prometheus Query a real Prometheus server through the evidence adapter"
+	@echo "test-kubernetes-events Query a local cluster through the Event evidence adapter"
 	@echo "test-kubernetes-live Run the observer against an explicit local Kubernetes context"
 	@echo "db-migrate    Apply PostgreSQL migrations using IIP_DATABASE_URL"
 	@echo "helm-lint     Lint and render the Helm chart"
@@ -47,6 +48,9 @@ test-otlp-receiver:
 
 test-prometheus:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_prometheus.sh
+
+test-kubernetes-events:
+	IIP_TEST_PYTHON=$(PYTHON) scripts/test_kubernetes_events.sh
 
 test-kubernetes-live:
 	IIP_TEST_PYTHON=$(PYTHON) scripts/test_kubernetes_live.sh

@@ -704,6 +704,25 @@ export interface InvestigationLogSelection {
   interpretation?: InvestigationLogInterpretation;
 }
 
+export interface InvestigationChangeInterpretation {
+  minChanges: number;
+  whenMatched: "supports" | "contradicts" | "neutral";
+  whenNotMatched: "supports" | "contradicts" | "neutral";
+}
+
+export interface InvestigationChangeSelection {
+  id: `cqs_${string}`;
+  integrationId: string;
+  rootCauseClasses?: string[];
+  query: { changeKinds: ResourceChangeKind[] };
+  limits: {
+    maxChanges: number;
+    maxObservationsPerResource: number;
+    maxBytes: number;
+  };
+  interpretation?: InvestigationChangeInterpretation;
+}
+
 export interface InvestigationTelemetryInterpretation {
   statistic: "minimum" | "maximum" | "mean";
   unit: string;
@@ -751,6 +770,7 @@ export interface InvestigationRequest {
     evidenceTypes?: string[];
     allowedTools?: string[];
     kubernetesEventSelections?: InvestigationKubernetesEventSelection[];
+    changeSelections?: InvestigationChangeSelection[];
     logSelections?: InvestigationLogSelection[];
     telemetrySelections?: InvestigationTelemetrySelection[];
     budgets: InvestigationBudgets;
@@ -832,6 +852,22 @@ export interface InvestigationLogAssessment {
     | "incomplete";
 }
 
+export interface InvestigationChangeAssessment {
+  selectionId: `cqs_${string}`;
+  evidenceId: EvidenceId;
+  rootCauseClass: string;
+  changeKinds: ResourceChangeKind[];
+  minChanges: number;
+  observedChangeCount?: number;
+  observedChangeIds?: `chg_${string}`[];
+  disposition:
+    | "supporting"
+    | "contradicting"
+    | "neutral"
+    | "no-data"
+    | "incomplete";
+}
+
 export interface InvestigationTelemetryBaselineAssessment {
   assessmentType: "baseline-comparison";
   selectionId: `tqs_${string}`;
@@ -894,6 +930,7 @@ export interface InvestigationReport {
       | InvestigationTelemetryBaselineAssessment
     )[];
     kubernetesEventAssessments?: InvestigationKubernetesEventAssessment[];
+    changeAssessments?: InvestigationChangeAssessment[];
     logAssessments?: InvestigationLogAssessment[];
     evidenceIds: EvidenceId[];
     recommendations: InvestigationRecommendation[];

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, Kubernetes Event, and resource-change evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven evidence assessment, governed actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],

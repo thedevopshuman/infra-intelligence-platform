@@ -1,0 +1,72 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationRequest",
+  "metadata": {
+    "id": "inv_6a28c9f31db44ea2987fc50b1635e4ad",
+    "tenantId": "local",
+    "actorId": "developer",
+    "requestedAt": "2026-08-16T10:30:00Z",
+    "correlationId": "incident-2026-08-16-api-rollout-change"
+  },
+  "spec": {
+    "question": "Did an image or scale change precede the unavailable replica?",
+    "trigger": {
+      "type": "alert",
+      "source": "urn:iip:event:alertmanager",
+      "reference": "alert://local/api/unavailable-replicas",
+      "summary": "The api Deployment has fewer available replicas than requested."
+    },
+    "scope": {
+      "resourceUids": [
+        "res_e0ae9225a316fce4c97df5c23057b97a"
+      ],
+      "timeRange": {
+        "start": "2026-08-16T10:15:00Z",
+        "end": "2026-08-16T10:29:59Z"
+      }
+    },
+    "agentSelector": {
+      "id": "incident-investigator",
+      "version": "0.1.0"
+    },
+    "evidenceTypes": [
+      "kubernetes.resource-status",
+      "resource.change"
+    ],
+    "allowedTools": [
+      "evidence/fetch"
+    ],
+    "changeSelections": [
+      {
+        "id": "cqs_6a28c9f31db44ea2",
+        "integrationId": "platform-resource-history",
+        "rootCauseClasses": [
+          "kubernetes.rollout.unavailable-replicas"
+        ],
+        "query": {
+          "changeKinds": ["image", "scale"]
+        },
+        "limits": {
+          "maxChanges": 100,
+          "maxObservationsPerResource": 500,
+          "maxBytes": 524288
+        },
+        "interpretation": {
+          "minChanges": 1,
+          "whenMatched": "supports",
+          "whenNotMatched": "neutral"
+        }
+      }
+    ],
+    "budgets": {
+      "maxToolCalls": 8,
+      "maxWallTimeSeconds": 180,
+      "maxModelTokens": 50000,
+      "maxCostUsd": 1,
+      "maxEvidenceItems": 16,
+      "maxIterations": 8
+    },
+    "maxAuthority": "read",
+    "priority": "high"
+  }
+}

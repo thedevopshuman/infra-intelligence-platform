@@ -30,3 +30,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0024](0024-investigation-log-selection-and-assessment.md) | Accepted | Select and assess committed log evidence conservatively |
 | [0025](0025-loki-historical-log-evidence-adapter.md) | Accepted | Translate closed historical log selectors to tenant-scoped Loki queries |
 | [0026](0026-resource-history-change-evidence.md) | Accepted | Derive bounded value-minimized changes from accepted resource history |
+| [0027](0027-investigation-change-correlation.md) | Accepted | Assess committed value-minimized changes in investigations |

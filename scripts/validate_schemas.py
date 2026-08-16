@@ -41,6 +41,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "evidence.schema.json": ("evidence.json",),
     "investigation-report.schema.json": (
         "investigation-report.json",
+        "investigation-report-changes.json",
         "investigation-report-kubernetes-events.json",
         "investigation-report-logs.json",
         "investigation-report-telemetry.json",
@@ -48,6 +49,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     ),
     "investigation-request.schema.json": (
         "investigation-request.json",
+        "investigation-request-changes.json",
         "investigation-request-kubernetes-events.json",
         "investigation-request-logs.json",
         "investigation-request-telemetry.json",

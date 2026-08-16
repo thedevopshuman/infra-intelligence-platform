@@ -37,6 +37,11 @@ from iip.application.log_evidence import (
     InvalidLogEvidenceRequestError,
     LogEvidenceService,
 )
+from iip.application.resource_change_evidence import (
+    CollectResourceChangeEvidenceCommand,
+    InvalidResourceChangeEvidenceRequestError,
+    ResourceChangeEvidenceService,
+)
 from iip.application.telemetry_evidence import (
     CollectTelemetryEvidenceCommand,
     InvalidTelemetryEvidenceRequestError,
@@ -48,6 +53,8 @@ _SELECTION_ID = re.compile(r"tqs_[a-f0-9]{16}")
 _KUBERNETES_EVENT_SELECTION_ID = re.compile(r"kes_[a-f0-9]{16}")
 _LOG_SELECTION_ID = re.compile(r"lqs_[a-f0-9]{16}")
 _LOG_RECORD_ID = re.compile(r"log_[a-f0-9]{32}")
+_CHANGE_SELECTION_ID = re.compile(r"cqs_[a-f0-9]{16}")
+_CHANGE_ID = re.compile(r"chg_[a-f0-9]{32}")
 _INTEGRATION_ID = re.compile(r"[a-z][a-z0-9._-]{2,127}")
 _RESOURCE_UID = re.compile(r"res_[a-f0-9]{32}")
 _ROOT_CAUSE_CLASS = re.compile(r"[a-z][a-z0-9._/-]{2,127}")
@@ -91,6 +98,7 @@ class DeterministicInvestigationService:
         kubernetes_events: KubernetesEventEvidenceService | None = None,
         telemetry: TelemetryEvidenceService | None = None,
         logs: LogEvidenceService | None = None,
+        resource_changes: ResourceChangeEvidenceService | None = None,
         evidence_store: EvidenceStore | None = None,
     ) -> None:
         self._resources = resources
@@ -100,6 +108,7 @@ class DeterministicInvestigationService:
         self._kubernetes_events = kubernetes_events
         self._telemetry = telemetry
         self._logs = logs
+        self._resource_changes = resource_changes
         self._evidence_store = evidence_store
 
     def execute(self, command: RunInvestigationCommand) -> Mapping[str, object]:
@@ -133,6 +142,8 @@ class DeterministicInvestigationService:
         telemetry_unknowns: list[dict[str, object]] = []
         log_assessments: list[dict[str, object]] = []
         log_unknowns: list[dict[str, object]] = []
+        change_assessments: list[dict[str, object]] = []
+        change_unknowns: list[dict[str, object]] = []
         tool_calls = 0
         allowed_tools = spec.get("allowedTools", [])
         requested_types = spec.get("evidenceTypes", [])
@@ -141,7 +152,12 @@ class DeterministicInvestigationService:
             evidence_type
             for evidence_type in requested_types
             if evidence_type
-            not in {"kubernetes.event", "telemetry.metrics", "telemetry.logs"}
+            not in {
+                "kubernetes.event",
+                "resource.change",
+                "telemetry.metrics",
+                "telemetry.logs",
+            }
         ]
         resource_type_allowed = not requested_types or bool(resource_types)
         if (
@@ -243,6 +259,73 @@ class DeterministicInvestigationService:
                         )
                     else:
                         kubernetes_event_assessments.append(assessment)
+                        evidence_id = str(assessment["evidenceId"])
+                        if assessment["disposition"] == "supporting":
+                            supporting_evidence_ids.append(evidence_id)
+                        elif assessment["disposition"] == "contradicting":
+                            contradicting_evidence_ids.append(evidence_id)
+
+        changes_allowed = (
+            (not requested_types or "resource.change" in requested_types)
+            and tools_allow_collection
+        )
+        matching_change_selections = self._matching_change_selections(spec, root_cause)
+        if (
+            matching_change_selections
+            and changes_allowed
+            and self._resource_changes is None
+        ):
+            change_unknowns.append(self._change_unknown("unavailable"))
+        elif changes_allowed and self._resource_changes is not None:
+            for selection in matching_change_selections:
+                if (
+                    tool_calls >= budgets["maxToolCalls"]
+                    or len(evidence_documents) >= budgets["maxEvidenceItems"]
+                ):
+                    break
+                tool_calls += 1
+                try:
+                    change_request = self._change_request(
+                        command,
+                        selection,
+                        scope,
+                        started_at,
+                        budgets,
+                    )
+                    change_evidence = self._resource_changes.execute(
+                        CollectResourceChangeEvidenceCommand(
+                            command.actor,
+                            change_request,
+                        )
+                    )
+                except (
+                    EvidenceAuthorizationError,
+                    EvidenceDeadlineExceededError,
+                    EvidenceProviderUnavailableError,
+                    EvidenceRedactionError,
+                    InvalidEvidenceRequestError,
+                    InvalidResourceChangeEvidenceRequestError,
+                    PersistenceError,
+                ):
+                    change_unknowns.append(
+                        self._change_unknown(str(selection["id"]))
+                    )
+                    continue
+                evidence_documents.append(change_evidence)
+                if isinstance(selection.get("interpretation"), Mapping):
+                    assessment = self._assess_changes(
+                        command.actor,
+                        selection,
+                        change_evidence,
+                        root_cause,
+                        change_request,
+                    )
+                    if assessment is None:
+                        change_unknowns.append(
+                            self._change_assessment_unknown(str(selection["id"]))
+                        )
+                    else:
+                        change_assessments.append(assessment)
                         evidence_id = str(assessment["evidenceId"])
                         if assessment["disposition"] == "supporting":
                             supporting_evidence_ids.append(evidence_id)
@@ -432,6 +515,7 @@ class DeterministicInvestigationService:
             ]
             unknowns = []
         unknowns.extend(kubernetes_event_unknowns)
+        unknowns.extend(change_unknowns)
         unknowns.extend(telemetry_unknowns)
         unknowns.extend(log_unknowns)
 
@@ -499,10 +583,315 @@ class DeterministicInvestigationService:
             report_spec = report["spec"]
             if isinstance(report_spec, dict):
                 report_spec["logAssessments"] = log_assessments
+        if change_assessments:
+            report_spec = report["spec"]
+            if isinstance(report_spec, dict):
+                report_spec["changeAssessments"] = change_assessments
         self._investigations.commit_investigation(
             command.actor, investigation_id, request, report
         )
         return report
+
+    @staticmethod
+    def _matching_change_selections(
+        spec: Mapping[str, object],
+        root_cause: str | None,
+    ) -> tuple[Mapping[str, object], ...]:
+        selections = spec.get("changeSelections", [])
+        if not isinstance(selections, list):
+            return ()
+        matching = []
+        for selection in selections:
+            if not isinstance(selection, Mapping):
+                continue
+            classes = selection.get("rootCauseClasses")
+            if classes is None or (
+                root_cause is not None
+                and isinstance(classes, list)
+                and root_cause in classes
+            ):
+                matching.append(selection)
+        return tuple(matching)
+
+    @staticmethod
+    def _change_request(
+        command: RunInvestigationCommand,
+        selection: Mapping[str, object],
+        scope: Mapping[str, object],
+        started_at: str,
+        budgets: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        material = (
+            f"{command.request['metadata']['id']}\x1f{selection['id']}".encode()
+        )
+        request_id = "ceq_" + hashlib.sha256(material).hexdigest()[:32]
+        max_wall_time = budgets["maxWallTimeSeconds"]
+        if not isinstance(max_wall_time, int) or isinstance(max_wall_time, bool):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "ResourceChangeEvidenceRequest",
+            "metadata": {
+                "requestId": request_id,
+                "tenantId": command.actor.tenant_id,
+                "actorId": command.actor.actor_id,
+                "requestedAt": started_at,
+            },
+            "spec": {
+                "integrationId": selection["integrationId"],
+                "resourceRefs": list(scope["resourceUids"]),
+                "timeRange": dict(scope["timeRange"]),
+                "query": dict(selection["query"]),
+                "limits": dict(selection["limits"]),
+                "deadline": DeterministicInvestigationService._deadline(
+                    started_at,
+                    min(max_wall_time, 300),
+                ),
+            },
+        }
+
+    @staticmethod
+    def _change_unknown(selection_id: str) -> dict[str, object]:
+        return {
+            "statement": (
+                "Selected resource-change evidence could not be collected for "
+                f"{selection_id}."
+            ),
+            "impact": "medium",
+            "requestedEvidenceTypes": ["resource.change"],
+        }
+
+    @staticmethod
+    def _change_assessment_unknown(selection_id: str) -> dict[str, object]:
+        return {
+            "statement": (
+                "Selected resource-change evidence could not be safely assessed for "
+                f"{selection_id}."
+            ),
+            "impact": "medium",
+            "requestedEvidenceTypes": ["resource.change"],
+        }
+
+    def _assess_changes(
+        self,
+        actor: ActorContext,
+        selection: Mapping[str, object],
+        evidence: Mapping[str, object],
+        root_cause: str | None,
+        change_request: Mapping[str, object],
+    ) -> dict[str, object] | None:
+        interpretation = selection.get("interpretation")
+        if (
+            self._evidence_store is None
+            or root_cause is None
+            or not isinstance(interpretation, Mapping)
+        ):
+            return None
+        try:
+            metadata = evidence["metadata"]
+            if not isinstance(metadata, Mapping):
+                return None
+            evidence_id = metadata["id"]
+            if not isinstance(evidence_id, str):
+                return None
+            artifact = self._evidence_store.read_artifact(actor, evidence_id)
+        except (KeyError, PersistenceError):
+            return None
+        if not isinstance(artifact, bytes):
+            return None
+        try:
+            document = json.loads(artifact.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        if (
+            not isinstance(document, Mapping)
+            or set(document) != {"apiVersion", "kind", "metadata", "spec"}
+            or document.get("apiVersion") != "iip.platform/v1alpha1"
+            or document.get("kind") != "ResourceChangeEvidenceResult"
+        ):
+            return None
+        artifact_metadata = document.get("metadata")
+        artifact_spec = document.get("spec")
+        request_metadata = change_request.get("metadata")
+        request_spec = change_request.get("spec")
+        if (
+            not isinstance(artifact_metadata, Mapping)
+            or set(artifact_metadata)
+            != {"requestId", "tenantId", "integrationId", "createdAt"}
+            or not isinstance(request_metadata, Mapping)
+            or artifact_metadata.get("requestId") != request_metadata.get("requestId")
+            or artifact_metadata.get("tenantId") != actor.tenant_id
+            or artifact_metadata.get("integrationId") != selection.get("integrationId")
+            or self._parse_datetime(artifact_metadata.get("createdAt")) is None
+            or not isinstance(artifact_spec, Mapping)
+            or set(artifact_spec)
+            != {"requestDigest", "timeRange", "status", "changes", "summary", "warnings"}
+            or not isinstance(request_spec, Mapping)
+            or artifact_spec.get("requestDigest") != canonical_digest(change_request)
+            or artifact_spec.get("timeRange") != request_spec.get("timeRange")
+        ):
+            return None
+        status = artifact_spec.get("status")
+        changes = artifact_spec.get("changes")
+        summary = artifact_spec.get("summary")
+        warnings = artifact_spec.get("warnings")
+        query = request_spec.get("query")
+        refs = request_spec.get("resourceRefs")
+        time_range = request_spec.get("timeRange")
+        limits = request_spec.get("limits")
+        if (
+            status not in {"complete", "partial", "no-data"}
+            or not isinstance(changes, list)
+            or not isinstance(summary, Mapping)
+            or set(summary) != {"changeCount", "affectedResourceCount", "countsByKind"}
+            or not isinstance(warnings, list)
+            or len(warnings) != len(set(warnings))
+            or any(
+                warning not in {"change-limit", "observation-limit"}
+                for warning in warnings
+            )
+            or not isinstance(query, Mapping)
+            or not isinstance(query.get("changeKinds"), list)
+            or not isinstance(refs, list)
+            or not isinstance(time_range, Mapping)
+            or not isinstance(limits, Mapping)
+            or not isinstance(limits.get("maxChanges"), int)
+            or len(changes) > limits["maxChanges"]
+        ):
+            return None
+        if status == "no-data":
+            if changes or warnings:
+                return None
+        elif status == "partial":
+            if not warnings:
+                return None
+        elif not changes or warnings:
+            return None
+
+        allowed_kinds = set(query["changeKinds"])
+        known_kinds = {
+            "created",
+            "configuration",
+            "image",
+            "scale",
+            "relationships",
+            "status",
+            "deleted",
+        }
+        if not allowed_kinds:
+            allowed_kinds = known_kinds
+        start = self._parse_datetime(time_range.get("start"))
+        end = self._parse_datetime(time_range.get("end"))
+        created_at = self._parse_datetime(artifact_metadata.get("createdAt"))
+        if start is None or end is None or created_at is None:
+            return None
+        ids: set[str] = set()
+        affected: set[str] = set()
+        counts: dict[str, int] = {}
+        sort_keys: list[tuple[str, str, str, str]] = []
+        required = {
+            "id",
+            "resourceRef",
+            "kind",
+            "observedAt",
+            "recordedAt",
+            "afterObservationHash",
+            "changedPaths",
+            "source",
+        }
+        for change in changes:
+            if (
+                not isinstance(change, Mapping)
+                or not required <= set(change)
+                or set(change).difference(required | {"beforeObservationHash"})
+            ):
+                return None
+            change_id = change.get("id")
+            resource_ref = change.get("resourceRef")
+            kind = change.get("kind")
+            observed = self._parse_datetime(change.get("observedAt"))
+            recorded = self._parse_datetime(change.get("recordedAt"))
+            before_hash = change.get("beforeObservationHash")
+            after_hash = change.get("afterObservationHash")
+            paths = change.get("changedPaths")
+            source = change.get("source")
+            if (
+                not isinstance(change_id, str)
+                or not _CHANGE_ID.fullmatch(change_id)
+                or change_id in ids
+                or resource_ref not in refs
+                or kind not in allowed_kinds
+                or observed is None
+                or recorded is None
+                or not start <= observed <= recorded <= created_at
+                or not isinstance(after_hash, str)
+                or not re.fullmatch(r"[a-f0-9]{64}", after_hash)
+                or (
+                    before_hash is not None
+                    and (
+                        not isinstance(before_hash, str)
+                        or not re.fullmatch(r"[a-f0-9]{64}", before_hash)
+                        or before_hash == after_hash
+                    )
+                )
+                or not isinstance(paths, list)
+                or not 1 <= len(paths) <= 64
+                or len(paths) != len(set(paths))
+                or any(
+                    not isinstance(path, str)
+                    or not path.startswith("/")
+                    or len(path) > 512
+                    for path in paths
+                )
+                or not isinstance(source, Mapping)
+                or not {"sourceId", "streamId", "sequence"} <= set(source)
+                or set(source).difference(
+                    {"sourceId", "streamId", "sequence", "resourceVersion"}
+                )
+                or not isinstance(source.get("sourceId"), str)
+                or not isinstance(source.get("streamId"), str)
+                or not re.fullmatch(r"obs_[a-f0-9]{32}", str(source.get("streamId")))
+                or not isinstance(source.get("sequence"), int)
+                or isinstance(source.get("sequence"), bool)
+            ):
+                return None
+            ids.add(change_id)
+            affected.add(str(resource_ref))
+            counts[str(kind)] = counts.get(str(kind), 0) + 1
+            sort_keys.append(
+                (str(change["observedAt"]), str(resource_ref), str(kind), change_id)
+            )
+        if (
+            sort_keys != sorted(sort_keys)
+            or summary.get("changeCount") != len(changes)
+            or summary.get("affectedResourceCount") != len(affected)
+            or summary.get("countsByKind") != dict(sorted(counts.items()))
+        ):
+            return None
+
+        assessment: dict[str, object] = {
+            "selectionId": selection["id"],
+            "evidenceId": evidence_id,
+            "rootCauseClass": root_cause,
+            "changeKinds": list(query["changeKinds"]),
+            "minChanges": interpretation["minChanges"],
+        }
+        if status == "no-data":
+            assessment["disposition"] = "no-data"
+            return assessment
+        if status == "partial":
+            assessment["disposition"] = "incomplete"
+            return assessment
+        observed_count = len(changes)
+        configured = interpretation[
+            "whenMatched"
+            if observed_count >= interpretation["minChanges"]
+            else "whenNotMatched"
+        ]
+        assessment["observedChangeCount"] = observed_count
+        assessment["observedChangeIds"] = sorted(ids)
+        assessment["disposition"] = self._assessment_disposition(configured)
+        return assessment
 
     @staticmethod
     def _matching_kubernetes_event_selections(
@@ -1794,6 +2183,86 @@ class DeterministicInvestigationService:
             event_selection_ids.add(event_selection_id)
         spec["kubernetesEventSelections"] = normalized_event_selections
 
+        change_selections = spec.get("changeSelections", [])
+        if not isinstance(change_selections, list) or len(change_selections) > 8:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        normalized_change_selections: list[dict[str, object]] = []
+        change_selection_ids: set[str] = set()
+        for value in change_selections:
+            if (
+                not isinstance(value, Mapping)
+                or not {"id", "integrationId", "query", "limits"} <= set(value)
+                or set(value).difference(
+                    {
+                        "id",
+                        "integrationId",
+                        "query",
+                        "limits",
+                        "rootCauseClasses",
+                        "interpretation",
+                    }
+                )
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            change_selection_id = value.get("id")
+            integration_id = value.get("integrationId")
+            if (
+                not isinstance(change_selection_id, str)
+                or not _CHANGE_SELECTION_ID.fullmatch(change_selection_id)
+                or change_selection_id in change_selection_ids
+                or not isinstance(integration_id, str)
+                or not _INTEGRATION_ID.fullmatch(integration_id)
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            try:
+                change_query, change_limits = (
+                    ResourceChangeEvidenceService.validate_query_contract(
+                        value.get("query"), value.get("limits")
+                    )
+                )
+            except InvalidResourceChangeEvidenceRequestError:
+                raise InvalidInvestigationError(
+                    "investigation.contract.invalid"
+                ) from None
+            change_classes = value.get("rootCauseClasses")
+            if change_classes is not None and (
+                not isinstance(change_classes, list)
+                or not 1 <= len(change_classes) <= 16
+                or any(
+                    not isinstance(root_cause, str)
+                    or not _ROOT_CAUSE_CLASS.fullmatch(root_cause)
+                    for root_cause in change_classes
+                )
+                or len(change_classes) != len(set(change_classes))
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            change_interpretation = value.get("interpretation")
+            normalized_change_interpretation = None
+            if change_interpretation is not None:
+                if change_classes is None:
+                    raise InvalidInvestigationError(
+                        "investigation.contract.invalid"
+                    )
+                normalized_change_interpretation = (
+                    DeterministicInvestigationService._validate_change_interpretation(
+                        change_interpretation,
+                        maximum_changes=change_limits["maxChanges"],
+                    )
+                )
+            normalized_change: dict[str, object] = {
+                "id": change_selection_id,
+                "integrationId": integration_id,
+                "query": change_query,
+                "limits": change_limits,
+            }
+            if change_classes is not None:
+                normalized_change["rootCauseClasses"] = list(change_classes)
+            if normalized_change_interpretation is not None:
+                normalized_change["interpretation"] = normalized_change_interpretation
+            normalized_change_selections.append(normalized_change)
+            change_selection_ids.add(change_selection_id)
+        spec["changeSelections"] = normalized_change_selections
+
         selections = spec.get("telemetrySelections", [])
         if not isinstance(selections, list) or len(selections) > 8:
             raise InvalidInvestigationError("investigation.contract.invalid")
@@ -1990,6 +2459,32 @@ class DeterministicInvestigationService:
             not isinstance(min_records, int)
             or isinstance(min_records, bool)
             or not 1 <= min_records <= maximum_records
+            or when_matched not in _INTERPRETATION_DISPOSITIONS
+            or when_not_matched not in _INTERPRETATION_DISPOSITIONS
+            or when_matched == when_not_matched
+        ):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        return dict(value)
+
+    @staticmethod
+    def _validate_change_interpretation(
+        value: object,
+        *,
+        maximum_changes: int,
+    ) -> dict[str, object]:
+        if not isinstance(value, Mapping) or set(value) != {
+            "minChanges",
+            "whenMatched",
+            "whenNotMatched",
+        }:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        minimum = value.get("minChanges")
+        when_matched = value.get("whenMatched")
+        when_not_matched = value.get("whenNotMatched")
+        if (
+            not isinstance(minimum, int)
+            or isinstance(minimum, bool)
+            or not 1 <= minimum <= maximum_changes
             or when_matched not in _INTERPRETATION_DISPOSITIONS
             or when_not_matched not in _INTERPRETATION_DISPOSITIONS
             or when_matched == when_not_matched

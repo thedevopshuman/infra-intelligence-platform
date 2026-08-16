@@ -1101,6 +1101,185 @@ class InvestigationLogAssessment:
 
 
 @dataclass(frozen=True)
+class InvestigationChangeInterpretation:
+    """Closed resource-change count rule declared by an investigation caller."""
+
+    min_changes: int
+    when_matched: str
+    when_not_matched: str
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationChangeInterpretation":
+        minimum = payload.get("minChanges")
+        dispositions = ("supports", "contradicts", "neutral")
+        if (
+            not isinstance(minimum, int)
+            or isinstance(minimum, bool)
+            or not 1 <= minimum <= 500
+            or payload.get("whenMatched") not in dispositions
+            or payload.get("whenNotMatched") not in dispositions
+            or payload.get("whenMatched") == payload.get("whenNotMatched")
+        ):
+            raise ValueError("investigation change interpretation is invalid")
+        return cls(minimum, payload["whenMatched"], payload["whenNotMatched"])
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "minChanges": self.min_changes,
+            "whenMatched": self.when_matched,
+            "whenNotMatched": self.when_not_matched,
+        }
+
+
+@dataclass(frozen=True)
+class InvestigationChangeSelection:
+    """Value-minimized resource-change candidate bounded by an investigation."""
+
+    selection_id: str
+    integration_id: str
+    query: Mapping[str, Any]
+    limits: Mapping[str, Any]
+    root_cause_classes: tuple[str, ...] = ()
+    interpretation: Optional[InvestigationChangeInterpretation] = None
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "InvestigationChangeSelection":
+        selection_id = payload.get("id")
+        integration_id = payload.get("integrationId")
+        query = payload.get("query")
+        limits = payload.get("limits")
+        classes = payload.get("rootCauseClasses", [])
+        interpretation = payload.get("interpretation")
+        if not isinstance(selection_id, str) or not selection_id.startswith("cqs_"):
+            raise ValueError("investigation change selection id is invalid")
+        if not isinstance(integration_id, str) or not integration_id:
+            raise ValueError("investigation change integrationId is invalid")
+        if not isinstance(query, Mapping) or not isinstance(limits, Mapping):
+            raise ValueError("investigation change query and limits are required")
+        if not isinstance(classes, list) or any(
+            not isinstance(item, str) for item in classes
+        ):
+            raise ValueError("investigation change rootCauseClasses are invalid")
+        if interpretation is not None and not isinstance(interpretation, Mapping):
+            raise ValueError("investigation change interpretation is invalid")
+        if interpretation is not None and not classes:
+            raise ValueError(
+                "investigation change interpretation requires rootCauseClasses"
+            )
+        normalized = (
+            InvestigationChangeInterpretation.from_dict(interpretation)
+            if isinstance(interpretation, Mapping)
+            else None
+        )
+        maximum = limits.get("maxChanges")
+        if (
+            normalized is not None
+            and isinstance(maximum, int)
+            and normalized.min_changes > maximum
+        ):
+            raise ValueError("investigation change interpretation exceeds result limit")
+        return cls(
+            selection_id,
+            integration_id,
+            dict(query),
+            dict(limits),
+            tuple(classes),
+            normalized,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "id": self.selection_id,
+            "integrationId": self.integration_id,
+            "query": dict(self.query),
+            "limits": dict(self.limits),
+        }
+        if self.root_cause_classes:
+            result["rootCauseClasses"] = list(self.root_cause_classes)
+        if self.interpretation is not None:
+            result["interpretation"] = self.interpretation.to_dict()
+        return result
+
+
+@dataclass(frozen=True)
+class InvestigationChangeAssessment:
+    """Auditable assessment of committed value-minimized change evidence."""
+
+    selection_id: str
+    evidence_id: str
+    root_cause_class: str
+    change_kinds: tuple[str, ...]
+    min_changes: int
+    disposition: str
+    observed_change_count: Optional[int] = None
+    observed_change_ids: tuple[str, ...] = ()
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "InvestigationChangeAssessment":
+        disposition = payload.get("disposition")
+        kinds = payload.get("changeKinds")
+        minimum = payload.get("minChanges")
+        count = payload.get("observedChangeCount")
+        change_ids = payload.get("observedChangeIds")
+        data_dispositions = ("supporting", "contradicting", "neutral")
+        empty_dispositions = ("no-data", "incomplete")
+        if (
+            any(
+                not isinstance(payload.get(field), str)
+                for field in ("selectionId", "evidenceId", "rootCauseClass")
+            )
+            or not isinstance(kinds, list)
+            or any(not isinstance(kind, str) for kind in kinds)
+            or not isinstance(minimum, int)
+            or isinstance(minimum, bool)
+            or minimum < 1
+            or disposition not in data_dispositions + empty_dispositions
+            or (
+                disposition in data_dispositions
+                and (
+                    not isinstance(count, int)
+                    or isinstance(count, bool)
+                    or count < 1
+                    or not isinstance(change_ids, list)
+                    or len(change_ids) != count
+                    or any(not isinstance(item, str) for item in change_ids)
+                )
+            )
+            or (
+                disposition in empty_dispositions
+                and (count is not None or change_ids is not None)
+            )
+        ):
+            raise ValueError("investigation change assessment is invalid")
+        return cls(
+            payload["selectionId"],
+            payload["evidenceId"],
+            payload["rootCauseClass"],
+            tuple(kinds),
+            minimum,
+            disposition,
+            count,
+            tuple(change_ids or ()),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "selectionId": self.selection_id,
+            "evidenceId": self.evidence_id,
+            "rootCauseClass": self.root_cause_class,
+            "changeKinds": list(self.change_kinds),
+            "minChanges": self.min_changes,
+            "disposition": self.disposition,
+        }
+        if self.observed_change_count is not None:
+            result["observedChangeCount"] = self.observed_change_count
+            result["observedChangeIds"] = list(self.observed_change_ids)
+        return result
+
+
+@dataclass(frozen=True)
 class InvestigationKubernetesEventInterpretation:
     """Closed condition-count rule declared by an investigation caller."""
 
@@ -1355,6 +1534,18 @@ class InvestigationRequest:
             raise ValueError("investigation logSelections must be an array")
         return tuple(InvestigationLogSelection.from_dict(value) for value in values)
 
+    @property
+    def change_selections(self) -> tuple[InvestigationChangeSelection, ...]:
+        """Return bounded value-minimized resource-change candidates."""
+
+        spec = self.payload.get("spec")
+        values = spec.get("changeSelections", []) if isinstance(spec, Mapping) else []
+        if not isinstance(values, list) or any(
+            not isinstance(value, Mapping) for value in values
+        ):
+            raise ValueError("investigation changeSelections must be an array")
+        return tuple(InvestigationChangeSelection.from_dict(value) for value in values)
+
 
 @dataclass(frozen=True)
 class InvestigationReport:
@@ -1433,6 +1624,18 @@ class InvestigationReport:
         ):
             raise ValueError("investigation logAssessments must be an array")
         return tuple(InvestigationLogAssessment.from_dict(value) for value in values)
+
+    @property
+    def change_assessments(self) -> tuple[InvestigationChangeAssessment, ...]:
+        """Return structured change assessments and Evidence citations."""
+
+        spec = self.payload.get("spec")
+        values = spec.get("changeAssessments", []) if isinstance(spec, Mapping) else []
+        if not isinstance(values, list) or any(
+            not isinstance(value, Mapping) for value in values
+        ):
+            raise ValueError("investigation changeAssessments must be an array")
+        return tuple(InvestigationChangeAssessment.from_dict(value) for value in values)
 
 
 @dataclass(frozen=True)

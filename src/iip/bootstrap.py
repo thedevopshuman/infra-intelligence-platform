@@ -244,6 +244,7 @@ def _compose_runtime(
             operational,
             clock,
             kubernetes_events=kubernetes_event_evidence,
+            resource_changes=resource_change_evidence,
             telemetry=telemetry_evidence,
             logs=log_evidence,
             evidence_store=evidence_store,

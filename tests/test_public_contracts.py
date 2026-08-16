@@ -36,6 +36,8 @@ from infra_intelligence_sdk import (
     PluginSession,
     ResourceCollectionRequest,
     ResourceCollectionResult,
+    ResourceChangeEvidenceRequest,
+    ResourceChangeEvidenceResult,
     ResourceNeighborhood,
     ResourceObservation,
     ResourceTimeline,
@@ -123,8 +125,16 @@ class PublicContractSdkTests(unittest.TestCase):
         log_request = LogEvidenceRequest.from_dict(example("log-evidence-request.json"))
         log_result = LogEvidenceResult.from_dict(example("log-evidence-result.json"))
         otlp_logs = OtlpLogsEvidence.from_dict(example("otlp-logs-evidence.json"))
+        change_request = ResourceChangeEvidenceRequest.from_dict(
+            example("resource-change-evidence-request.json")
+        )
+        change_result = ResourceChangeEvidenceResult.from_dict(
+            example("resource-change-evidence-result.json")
+        )
 
         self.assertEqual(evidence.to_dict()["kind"], "Evidence")
+        self.assertEqual(change_request.to_dict()["kind"], "ResourceChangeEvidenceRequest")
+        self.assertEqual(change_result.to_dict()["kind"], "ResourceChangeEvidenceResult")
         self.assertEqual(request.to_dict()["kind"], "InvestigationRequest")
         selection = telemetry_investigation.telemetry_selections[0]
         self.assertIsInstance(selection, InvestigationTelemetrySelection)
@@ -258,6 +268,18 @@ class PublicContractSdkTests(unittest.TestCase):
         ):
             KubernetesEventEvidenceRequest.from_dict(
                 example("kubernetes-event-evidence-result.json")
+            )
+        with self.assertRaisesRegex(
+            ValueError, "kind must be ResourceChangeEvidenceRequest"
+        ):
+            ResourceChangeEvidenceRequest.from_dict(
+                example("resource-change-evidence-result.json")
+            )
+        with self.assertRaisesRegex(
+            ValueError, "kind must be ResourceChangeEvidenceResult"
+        ):
+            ResourceChangeEvidenceResult.from_dict(
+                example("resource-change-evidence-request.json")
             )
 
     def test_sdk_models_reject_unknown_versions(self) -> None:
@@ -542,6 +564,25 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn("log evidence result digest must match its request", self.errors)
         self.assertIn("log evidence summary must match its records", self.errors)
+
+    def test_resource_change_result_rejects_modified_digest_and_summary(self) -> None:
+        request_path = (
+            ROOT / "contracts" / "examples" / "resource-change-evidence-request.json"
+        )
+        request = copy.deepcopy(self.documents[request_path])
+        request["spec"]["query"]["changeKinds"] = ["scale"]
+        self.documents[request_path] = request
+        result_path = (
+            ROOT / "contracts" / "examples" / "resource-change-evidence-result.json"
+        )
+        result = copy.deepcopy(self.documents[result_path])
+        result["spec"]["summary"]["changeCount"] = 2
+        self.documents[result_path] = result
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn("resource change result digest must match its request", self.errors)
+        self.assertIn("resource change summary must match its changes", self.errors)
 
     def test_otlp_metrics_evidence_rejects_incorrect_summary(self) -> None:
         path = ROOT / "contracts" / "examples" / "otlp-metrics-evidence.json"

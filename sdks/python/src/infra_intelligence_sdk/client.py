@@ -22,6 +22,7 @@ from .models import (
     PluginSession,
     ResourceCollectionRequest,
     ResourceCollectionResult,
+    ResourceChangeEvidenceRequest,
     ResourceNeighborhood,
     ResourceObservation,
     ResourceTimeline,
@@ -197,6 +198,15 @@ class Client:
                 "/v1/evidence/kubernetes/events/queries",
                 request.to_dict(),
             )
+        )
+
+    def collect_resource_change_evidence(
+        self, request: ResourceChangeEvidenceRequest
+    ) -> Evidence:
+        """Collect normalized changes from immutable resource history."""
+
+        return Evidence.from_dict(
+            self._post("/v1/evidence/changes/queries", request.to_dict())
         )
 
     def propose_action(self, command: Mapping[str, Any]) -> ActionProposal:

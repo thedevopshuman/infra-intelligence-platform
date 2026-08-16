@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.4.0",
-    "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, and Kubernetes Event evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven event/metric selection and committed-artifact assessment, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
+    "version": "0.5.0",
+    "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, Kubernetes Event, and resource-change evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven evidence assessment, governed actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -296,6 +296,33 @@
         }
       }
     },
+    "/v1/evidence/changes/queries": {
+      "post": {
+        "operationId": "collectResourceChangeEvidence",
+        "description": "Collect bounded value-minimized changes from accepted immutable observations for authenticated tenant-scoped resources.",
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/resource-change-evidence-request.schema.json"}}}
+        },
+        "responses": {
+          "201": {"description": "Immutable Evidence envelope referencing normalized resource-change history", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/evidence.schema.json"}}}},
+          "400": {
+            "description": "Resource change request validation failed",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "change.request.invalid"}}}}
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "408": {
+            "description": "The bounded evidence deadline elapsed",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "evidence.deadline.exceeded"}}}}
+          },
+          "503": {
+            "description": "The history provider, evidence processor, or store is unavailable",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "examples": {"provider": {"value": {"error": {"code": "evidence.provider.unavailable"}}}, "storage": {"value": {"error": {"code": "storage.unavailable"}}}}}}
+          }
+        }
+      }
+    },
     "/v1/evidence/{evidenceId}": {
       "get": {
         "operationId": "getEvidence",
@@ -448,6 +475,8 @@
       "Evidence": {"$ref": "../../contracts/schemas/evidence.schema.json"},
       "KubernetesEventEvidenceRequest": {"$ref": "../../contracts/schemas/kubernetes-event-evidence-request.schema.json"},
       "KubernetesEventEvidenceResult": {"$ref": "../../contracts/schemas/kubernetes-event-evidence-result.schema.json"},
+      "ResourceChangeEvidenceRequest": {"$ref": "../../contracts/schemas/resource-change-evidence-request.schema.json"},
+      "ResourceChangeEvidenceResult": {"$ref": "../../contracts/schemas/resource-change-evidence-result.schema.json"},
       "TelemetryEvidenceRequest": {"$ref": "../../contracts/schemas/telemetry-evidence-request.schema.json"},
       "TelemetryEvidenceResult": {"$ref": "../../contracts/schemas/telemetry-evidence-result.schema.json"},
       "OtlpMetricsEvidence": {"$ref": "../../contracts/schemas/otlp-metrics-evidence.schema.json"},

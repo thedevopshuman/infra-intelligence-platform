@@ -1,0 +1,42 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ResourceChangeEvidenceResult",
+  "metadata": {
+    "requestId": "ceq_6a0df6f7a1d24040b36145288089d7a8",
+    "tenantId": "local",
+    "integrationId": "platform-history",
+    "createdAt": "2026-08-14T10:30:03Z"
+  },
+  "spec": {
+    "requestDigest": "sha256:a3db4826cea0d94693088659077096a5eb5b9a1cbee1513d8d8e772b9302086b",
+    "timeRange": {
+      "start": "2026-08-14T09:30:00Z",
+      "end": "2026-08-14T10:30:00Z"
+    },
+    "status": "complete",
+    "changes": [
+      {
+        "id": "chg_5a3ce9aa148b4c6886786ba57c362588",
+        "resourceRef": "res_e0ae9225a316fce4c97df5c23057b97a",
+        "kind": "image",
+        "observedAt": "2026-08-14T10:30:00Z",
+        "recordedAt": "2026-08-14T10:30:02Z",
+        "beforeObservationHash": "1fdbffaccc667bf10de13fa44da507a66e8c92e91890aeee70e9bb00c356ebbf",
+        "afterObservationHash": "9062a9611ca8400b1dd0c31bd2b8e4f26e40d9234d8c7da148296753849c7c3c",
+        "changedPaths": ["/spec/attributes/image"],
+        "source": {
+          "sourceId": "kubernetes-local",
+          "streamId": "obs_0f4e8c2a6b1d4975a3c9e7f102d468ab",
+          "sequence": 42,
+          "resourceVersion": "398712"
+        }
+      }
+    ],
+    "summary": {
+      "changeCount": 1,
+      "affectedResourceCount": 1,
+      "countsByKind": {"image": 1}
+    },
+    "warnings": []
+  }
+}

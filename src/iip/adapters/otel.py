@@ -284,12 +284,12 @@ def build_otlp_metrics_runtime(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.4.0",
+                    "service.version": "0.5.0",
                 }
             ),
             metric_readers=(reader,),
         )
-        meter = provider.get_meter("iip.ingestion", "0.4.0")
+        meter = provider.get_meter("iip.ingestion", "0.5.0")
         sink = OpenTelemetryIngestionSink(
             meter,
             attribute_mode=configuration.attribute_mode,

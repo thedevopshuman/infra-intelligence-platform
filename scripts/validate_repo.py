@@ -50,12 +50,14 @@ REQUIRED_PATHS = (
     "docs/decisions/0023-backend-neutral-log-evidence-and-otlp-intake.md",
     "docs/decisions/0024-investigation-log-selection-and-assessment.md",
     "docs/decisions/0025-loki-historical-log-evidence-adapter.md",
+    "docs/decisions/0026-resource-history-change-evidence.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/kubernetes-event-evidence.md",
     "docs/operations/credential-broker.md",
     "docs/operations/otlp-metrics-receiver.md",
     "docs/operations/log-evidence.md",
+    "docs/operations/resource-change-evidence.md",
     "docs/operations/postgresql-backup-restore.md",
     "docs/operations/measurements/postgresql-backup-restore.json",
     "contracts/schemas/resource.schema.json",
@@ -69,6 +71,8 @@ REQUIRED_PATHS = (
     "contracts/schemas/resource-collection-request.schema.json",
     "contracts/schemas/resource-collection-result.schema.json",
     "contracts/schemas/resource-neighborhood.schema.json",
+    "contracts/schemas/resource-change-evidence-request.schema.json",
+    "contracts/schemas/resource-change-evidence-result.schema.json",
     "contracts/schemas/resource-timeline.schema.json",
     "contracts/schemas/page-info.schema.json",
     "contracts/schemas/error.schema.json",
@@ -122,6 +126,8 @@ REQUIRED_PATHS = (
     "contracts/examples/resource-collection-result.json",
     "contracts/examples/resource-tombstone.json",
     "contracts/examples/resource-neighborhood.json",
+    "contracts/examples/resource-change-evidence-request.json",
+    "contracts/examples/resource-change-evidence-result.json",
     "contracts/examples/resource-timeline.json",
     "contracts/examples/page-info.json",
     "contracts/examples/error.json",
@@ -141,6 +147,7 @@ REQUIRED_PATHS = (
     "docs/specifications/evaluation-scenario-contract.md",
     "docs/specifications/resource-collection-contract.md",
     "docs/specifications/resource-query-contract.md",
+    "docs/specifications/resource-change-evidence-contract.md",
     "requirements/verify.in",
     "requirements/verify.txt",
     "scripts/validate_schemas.py",
@@ -151,6 +158,7 @@ REQUIRED_PATHS = (
     "src/iip/application/log_evidence.py",
     "src/iip/application/ingest_otlp_logs.py",
     "src/iip/application/observe_ingestion.py",
+    "src/iip/application/resource_change_evidence.py",
     "src/iip/adapters/auth.py",
     "src/iip/adapters/evidence.py",
     "src/iip/adapters/otel.py",
@@ -178,6 +186,7 @@ REQUIRED_PATHS = (
     "tests/test_kubernetes_events_integration.py",
     "tests/test_otlp_receiver.py",
     "tests/test_log_evidence.py",
+    "tests/test_resource_change_evidence.py",
     "tests/test_investigation_logs.py",
     "tests/test_otlp_logs_receiver.py",
     "tests/test_otlp_receiver_integration.py",
@@ -1196,6 +1205,97 @@ def validate_log_evidence_examples(
         fail(errors, "log evidence result must fit request limits")
 
 
+def validate_resource_change_evidence_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check change request/result correlation, order, scope, and summaries."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    request = documents.get(example_dir / "resource-change-evidence-request.json")
+    result = documents.get(example_dir / "resource-change-evidence-result.json")
+    if not isinstance(request, dict) or not isinstance(result, dict):
+        return
+    request_metadata = request.get("metadata")
+    request_spec = request.get("spec")
+    result_metadata = result.get("metadata")
+    result_spec = result.get("spec")
+    if not all(
+        isinstance(item, dict)
+        for item in (request_metadata, request_spec, result_metadata, result_spec)
+    ):
+        return
+    for field in ("requestId", "tenantId"):
+        if result_metadata.get(field) != request_metadata.get(field):
+            fail(errors, f"resource change result {field} must match its request")
+    if result_metadata.get("integrationId") != request_spec.get("integrationId"):
+        fail(errors, "resource change result integrationId must match its request")
+    if result_spec.get("requestDigest") != canonical_digest(request):
+        fail(errors, "resource change result digest must match its request")
+    if result_spec.get("timeRange") != request_spec.get("timeRange"):
+        fail(errors, "resource change result timeRange must match its request")
+    time_range = request_spec.get("timeRange")
+    start = end = None
+    if isinstance(time_range, dict):
+        start = parse_timestamp(time_range.get("start"))
+        end = parse_timestamp(time_range.get("end"))
+    requested_at = parse_timestamp(request_metadata.get("requestedAt"))
+    created_at = parse_timestamp(result_metadata.get("createdAt"))
+    deadline = parse_timestamp(request_spec.get("deadline"))
+    if (
+        None in (start, end, requested_at, created_at, deadline)
+        or not start < end <= requested_at <= created_at <= deadline
+    ):
+        fail(errors, "resource change example times must be monotonic")
+    changes = result_spec.get("changes")
+    summary = result_spec.get("summary")
+    query = request_spec.get("query")
+    limits = request_spec.get("limits")
+    resources = set(request_spec.get("resourceRefs", []))
+    if not isinstance(changes, list) or not isinstance(summary, dict):
+        return
+    allowed = set(query.get("changeKinds", [])) if isinstance(query, dict) else set()
+    identities = []
+    counts: dict[object, int] = {}
+    affected = set()
+    for change in changes:
+        if not isinstance(change, dict):
+            continue
+        observed = parse_timestamp(change.get("observedAt"))
+        identity = (
+            observed,
+            change.get("resourceRef"),
+            change.get("kind"),
+            change.get("id"),
+        )
+        identities.append(identity)
+        if observed is None or start is None or end is None or not start <= observed <= end:
+            fail(errors, "resource change must fit its request range")
+        resource_ref = change.get("resourceRef")
+        if resource_ref not in resources:
+            fail(errors, "resource change must fit its request scope")
+        affected.add(resource_ref)
+        kind = change.get("kind")
+        counts[kind] = counts.get(kind, 0) + 1
+        if allowed and kind not in allowed:
+            fail(errors, "resource change kind must fit its request")
+        if change.get("beforeObservationHash") == change.get("afterObservationHash"):
+            fail(errors, "resource change before and after hashes must differ")
+    if (
+        any(identity[0] is None for identity in identities)
+        or identities != sorted(identities)
+        or len({identity[3] for identity in identities}) != len(identities)
+    ):
+        fail(errors, "resource changes must be unique and ordered")
+    if (
+        summary.get("changeCount") != len(changes)
+        or summary.get("affectedResourceCount") != len(affected)
+        or summary.get("countsByKind") != counts
+    ):
+        fail(errors, "resource change summary must match its changes")
+    if isinstance(limits, dict) and len(changes) > limits.get("maxChanges", -1):
+        fail(errors, "resource change result must fit request limits")
+
+
 def validate_investigation_telemetry_examples(
     documents: Mapping[Path, object], errors: List[str]
 ) -> None:
@@ -1620,6 +1720,14 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("resource-collection-result.json", "ResourceCollectionResult"),
         ("resource-neighborhood.json", "ResourceNeighborhood"),
         ("resource-timeline.json", "ResourceTimeline"),
+        (
+            "resource-change-evidence-request.json",
+            "ResourceChangeEvidenceRequest",
+        ),
+        (
+            "resource-change-evidence-result.json",
+            "ResourceChangeEvidenceResult",
+        ),
     )
     for name, kind in versioned_examples:
         manifest = documents.get(example_dir / name)
@@ -1632,6 +1740,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_investigation_log_examples(documents, errors)
     validate_telemetry_evidence_examples(documents, errors)
     validate_log_evidence_examples(documents, errors)
+    validate_resource_change_evidence_examples(documents, errors)
     validate_investigation_telemetry_examples(documents, errors)
     validate_otlp_metrics_evidence_example(documents, errors)
     validate_otlp_logs_evidence_example(documents, errors)

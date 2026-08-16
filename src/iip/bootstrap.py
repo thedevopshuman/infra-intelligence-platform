@@ -62,6 +62,10 @@ from iip.application.observe_ingestion import (
 )
 from iip.application.plugin_sessions import PluginSessionService
 from iip.application.query_resources import ResourceQueryService
+from iip.application.resource_change_evidence import (
+    ResourceChangeEvidenceService,
+    ResourceHistoryChangeEvidenceProvider,
+)
 from iip.application.rebuild_projections import ProjectionRebuildService
 from iip.application.telemetry_evidence import (
     TelemetryEvidenceService,
@@ -84,6 +88,7 @@ class Runtime:
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
     kubernetes_event_evidence: KubernetesEventEvidenceService
+    resource_change_evidence: ResourceChangeEvidenceService
     telemetry_evidence: TelemetryEvidenceService
     log_evidence: LogEvidenceService
     otlp_metrics_ingestion: OtlpMetricsIngestionService | None
@@ -176,6 +181,7 @@ def _compose_runtime(
         else NoDataKubernetesEventsBackend(clock)
     )
     kubernetes_event_provider = KubernetesEventsEvidenceProvider(event_backend, store)
+    resource_change_provider = ResourceHistoryChangeEvidenceProvider(store, clock)
     evidence = EvidenceCollectionService(
         store,
         {
@@ -183,6 +189,7 @@ def _compose_runtime(
             "kubernetes-events": kubernetes_event_provider,
             "telemetry-query": telemetry_provider,
             "log-query": log_provider,
+            "resource-history": resource_change_provider,
         },
         evidence_store,
         StructuredTextRedactor(),
@@ -193,6 +200,7 @@ def _compose_runtime(
     telemetry_evidence = TelemetryEvidenceService(evidence, clock)
     log_evidence = LogEvidenceService(evidence, clock)
     kubernetes_event_evidence = KubernetesEventEvidenceService(evidence, clock)
+    resource_change_evidence = ResourceChangeEvidenceService(evidence, clock)
     return Runtime(
         authenticator=authenticator,
         resources=store,
@@ -217,6 +225,7 @@ def _compose_runtime(
         queries=queries,
         evidence=evidence,
         kubernetes_event_evidence=kubernetes_event_evidence,
+        resource_change_evidence=resource_change_evidence,
         telemetry_evidence=telemetry_evidence,
         log_evidence=log_evidence,
         otlp_metrics_ingestion=(

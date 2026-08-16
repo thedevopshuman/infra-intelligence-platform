@@ -15,6 +15,7 @@ import type {
   PluginSession,
   ResourceCollectionRequest,
   ResourceCollectionResult,
+  ResourceChangeEvidenceRequest,
   ResourceNeighborhood,
   ResourceObservation,
   ResourceTimeline,
@@ -156,6 +157,12 @@ export class InfrastructureIntelligenceClient {
     request: KubernetesEventEvidenceRequest,
   ): Promise<Evidence> {
     return this.post<Evidence>("/v1/evidence/kubernetes/events/queries", request);
+  }
+
+  async collectResourceChangeEvidence(
+    request: ResourceChangeEvidenceRequest,
+  ): Promise<Evidence> {
+    return this.post<Evidence>("/v1/evidence/changes/queries", request);
   }
 
   async proposeAction(command: {

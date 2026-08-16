@@ -69,6 +69,33 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("ambientCredentials" in error for error in errors))
 
+    def test_resource_change_request_rejects_values_and_provider_diff_language(self) -> None:
+        request = document("contracts/examples/resource-change-evidence-request.json")
+        request["spec"]["query"]["afterValue"] = "registry.example/customer:secret"
+
+        errors = self.validate("resource-change-evidence-request.schema.json", request)
+
+        self.assertTrue(any("afterValue" in error for error in errors))
+
+    def test_resource_change_no_data_summary_must_be_empty(self) -> None:
+        result = document("contracts/examples/resource-change-evidence-result.json")
+        result["spec"].update(
+            {
+                "status": "no-data",
+                "changes": [],
+                "warnings": [],
+                "summary": {
+                    "changeCount": 1,
+                    "affectedResourceCount": 0,
+                    "countsByKind": {},
+                },
+            }
+        )
+
+        errors = self.validate("resource-change-evidence-result.schema.json", result)
+
+        self.assertTrue(any("changeCount" in error for error in errors))
+
     def test_reconciliation_observation_requires_snapshot_id(self) -> None:
         resource = document("contracts/examples/resource.json")
         resource["metadata"]["observation"]["mode"] = "reconciliation"

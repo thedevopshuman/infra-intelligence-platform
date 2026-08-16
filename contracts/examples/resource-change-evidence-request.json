@@ -1,0 +1,27 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ResourceChangeEvidenceRequest",
+  "metadata": {
+    "requestId": "ceq_6a0df6f7a1d24040b36145288089d7a8",
+    "tenantId": "local",
+    "actorId": "developer",
+    "requestedAt": "2026-08-14T10:30:02Z"
+  },
+  "spec": {
+    "integrationId": "platform-history",
+    "resourceRefs": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+    "timeRange": {
+      "start": "2026-08-14T09:30:00Z",
+      "end": "2026-08-14T10:30:00Z"
+    },
+    "query": {
+      "changeKinds": ["image", "scale", "configuration"]
+    },
+    "limits": {
+      "maxChanges": 100,
+      "maxObservationsPerResource": 200,
+      "maxBytes": 1048576
+    },
+    "deadline": "2026-08-14T10:31:02Z"
+  }
+}

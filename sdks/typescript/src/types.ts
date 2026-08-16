@@ -517,6 +517,76 @@ export interface KubernetesEventEvidenceResult {
   };
 }
 
+export type ResourceChangeKind =
+  | "created"
+  | "configuration"
+  | "image"
+  | "scale"
+  | "relationships"
+  | "status"
+  | "deleted";
+
+export interface ResourceChangeEvidenceRequest {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ResourceChangeEvidenceRequest";
+  metadata: {
+    requestId: `ceq_${string}`;
+    tenantId: string;
+    actorId: string;
+    requestedAt: string;
+  };
+  spec: {
+    integrationId: string;
+    resourceRefs: ResourceUid[];
+    timeRange: { start: string; end: string };
+    query: { changeKinds: ResourceChangeKind[] };
+    limits: {
+      maxChanges: number;
+      maxObservationsPerResource: number;
+      maxBytes: number;
+    };
+    deadline: string;
+  };
+}
+
+export interface ResourceChangeEvidenceResult {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ResourceChangeEvidenceResult";
+  metadata: {
+    requestId: `ceq_${string}`;
+    tenantId: string;
+    integrationId: string;
+    createdAt: string;
+  };
+  spec: {
+    requestDigest: Sha256Digest;
+    timeRange: { start: string; end: string };
+    status: "complete" | "partial" | "no-data";
+    changes: {
+      id: `chg_${string}`;
+      resourceRef: ResourceUid;
+      kind: ResourceChangeKind;
+      observedAt: string;
+      recordedAt: string;
+      beforeObservationHash?: string;
+      afterObservationHash: string;
+      changedPaths: string[];
+      source: {
+        sourceId: string;
+        streamId: `obs_${string}`;
+        sequence: number;
+        resourceVersion?: string;
+      };
+    }[];
+    summary: {
+      changeCount: number;
+      affectedResourceCount: number;
+      countsByKind: Partial<Record<ResourceChangeKind, number>>;
+    };
+    warnings: ("observation-limit" | "change-limit")[];
+  };
+}
+
 export interface OtlpMetricsEvidence {
   apiVersion: "iip.platform/v1alpha1";
   kind: "OtlpMetricsEvidence";

@@ -403,6 +403,46 @@ class KubernetesEventEvidenceResult:
 
 
 @dataclass(frozen=True)
+class ResourceChangeEvidenceRequest:
+    """Bounded request for changes in tenant-scoped resource history."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ResourceChangeEvidenceRequest":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="ResourceChangeEvidenceRequest",
+                label="resource change evidence request",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class ResourceChangeEvidenceResult:
+    """Normalized resource changes stored as an immutable evidence artifact."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ResourceChangeEvidenceResult":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="ResourceChangeEvidenceResult",
+                label="resource change evidence result",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class OtlpMetricsEvidence:
     """Normalized artifact produced by a tenant-bound OTLP metrics channel."""
 

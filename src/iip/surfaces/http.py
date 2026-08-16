@@ -83,6 +83,10 @@ from iip.application.query_resources import (
     ResourceNotFoundError,
     ResourceTimelineResult,
 )
+from iip.application.resource_change_evidence import (
+    CollectResourceChangeEvidenceCommand,
+    InvalidResourceChangeEvidenceRequestError,
+)
 from iip.application.telemetry_evidence import (
     CollectTelemetryEvidenceCommand,
     InvalidTelemetryEvidenceRequestError,
@@ -94,7 +98,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.4.0"
+    server_version = "IIPReference/0.5.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -244,6 +248,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "/v1/resources",
                 "/v1/collections/ingest",
                 "/v1/evidence/kubernetes/events/queries",
+                "/v1/evidence/changes/queries",
                 "/v1/evidence/logs/queries",
                 "/v1/evidence/telemetry/queries",
                 "/v1/investigations",
@@ -295,6 +300,11 @@ class ApiHandler(BaseHTTPRequestHandler):
             elif path == "/v1/evidence/kubernetes/events/queries":
                 document = self.runtime.kubernetes_event_evidence.execute(
                     CollectKubernetesEventEvidenceCommand(actor, payload)
+                )
+                status = HTTPStatus.CREATED
+            elif path == "/v1/evidence/changes/queries":
+                document = self.runtime.resource_change_evidence.execute(
+                    CollectResourceChangeEvidenceCommand(actor, payload)
                 )
                 status = HTTPStatus.CREATED
             elif path == "/v1/investigations":
@@ -369,6 +379,11 @@ class ApiHandler(BaseHTTPRequestHandler):
                 HTTPStatus.BAD_REQUEST,
                 {"error": {"code": "kubernetes.event.request.invalid"}},
             )
+        except InvalidResourceChangeEvidenceRequestError:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": "change.request.invalid"}},
+            )
         except (InvalidLogEvidenceRequestError, InvalidTelemetryEvidenceRequestError):
             code = (
                 "logs.request.invalid"
@@ -382,6 +397,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         except InvalidEvidenceRequestError:
             if path == "/v1/evidence/kubernetes/events/queries":
                 code = "kubernetes.event.request.invalid"
+            elif path == "/v1/evidence/changes/queries":
+                code = "change.request.invalid"
             elif path == "/v1/evidence/logs/queries":
                 code = "logs.request.invalid"
             else:

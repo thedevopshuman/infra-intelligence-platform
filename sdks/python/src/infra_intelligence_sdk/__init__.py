@@ -32,6 +32,8 @@ from .models import (
     PluginSession,
     ResourceCollectionRequest,
     ResourceCollectionResult,
+    ResourceChangeEvidenceRequest,
+    ResourceChangeEvidenceResult,
     ResourceNeighborhood,
     ResourceObservation,
     ResourceObservationCursor,
@@ -73,6 +75,8 @@ __all__ = [
     "PluginSession",
     "ResourceCollectionRequest",
     "ResourceCollectionResult",
+    "ResourceChangeEvidenceRequest",
+    "ResourceChangeEvidenceResult",
     "ResourceNeighborhood",
     "ResourceObservation",
     "ResourceObservationCursor",
@@ -81,4 +85,4 @@ __all__ = [
     "TelemetryEvidenceRequest",
     "TelemetryEvidenceResult",
 ]
-__version__ = "0.7.0"
+__version__ = "0.8.0"

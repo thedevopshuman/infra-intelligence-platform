@@ -148,6 +148,9 @@
         },
         "baselineComparison": {
           "$ref": "#/$defs/telemetryBaselineComparison"
+        },
+        "rollingBaselineComparison": {
+          "$ref": "#/$defs/telemetryRollingBaselineComparison"
         }
       },
       "allOf": [
@@ -160,7 +163,17 @@
           "then": {"required": ["rootCauseClasses"]}
         },
         {
-          "not": {"required": ["interpretation", "baselineComparison"]}
+          "if": {"required": ["rollingBaselineComparison"]},
+          "then": {"required": ["rootCauseClasses"]}
+        },
+        {
+          "not": {
+            "anyOf": [
+              {"required": ["interpretation", "baselineComparison"]},
+              {"required": ["interpretation", "rollingBaselineComparison"]},
+              {"required": ["baselineComparison", "rollingBaselineComparison"]}
+            ]
+          }
         }
       ]
     },
@@ -228,6 +241,66 @@
         },
         "baselineTimeRange": {"$ref": "#/$defs/assessmentTimeRange"},
         "evaluationTimeRange": {"$ref": "#/$defs/assessmentTimeRange"},
+        "calculation": {
+          "type": "string",
+          "enum": ["difference", "ratio"]
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["lt", "lte", "gt", "gte"]
+        },
+        "threshold": {"type": "number"},
+        "whenMatched": {
+          "type": "string",
+          "enum": ["supports", "contradicts", "neutral"]
+        },
+        "whenNotMatched": {
+          "type": "string",
+          "enum": ["supports", "contradicts", "neutral"]
+        }
+      }
+    },
+    "telemetryRollingBaselineComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statistic",
+        "unit",
+        "baselineDurationSeconds",
+        "evaluationDurationSeconds",
+        "gapSeconds",
+        "calculation",
+        "operator",
+        "threshold",
+        "whenMatched",
+        "whenNotMatched"
+      ],
+      "properties": {
+        "statistic": {
+          "type": "string",
+          "enum": ["minimum", "maximum", "mean"]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        },
+        "baselineDurationSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 604800
+        },
+        "evaluationDurationSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 604800
+        },
+        "gapSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400
+        },
         "calculation": {
           "type": "string",
           "enum": ["difference", "ratio"]

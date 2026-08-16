@@ -35,3 +35,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0029](0029-investigation-context-correlation.md) | Accepted | Correlate context as untrusted data without copying prose or granting authority |
 | [0030](0030-durable-investigation-lifecycle.md) | Accepted | Persist bounded investigation leases and cooperative cancellation before tools run |
 | [0031](0031-otlp-investigation-trace-export.md) | Accepted | Export bounded terminal investigation traces over optional OTLP/HTTP |
+| [0032](0032-scope-end-rolling-baseline.md) | Accepted | Derive auditable rolling metric windows from the accepted investigation scope |

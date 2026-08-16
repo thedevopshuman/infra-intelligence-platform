@@ -29,7 +29,7 @@ from infra_intelligence_sdk import (
     InvestigationLogSelection,
     InvestigationTelemetryAssessment,
     InvestigationTelemetryBaselineAssessment,
-    InvestigationTelemetryBaselineComparison,
+    InvestigationTelemetryRollingBaselineComparison,
     InvestigationTelemetryInterpretation,
     InvestigationTelemetrySelection,
     IngestionFreshnessReport,
@@ -177,12 +177,13 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(assessment.to_dict()["observedValue"], 0.082)
         baseline_selection = baseline_investigation.telemetry_selections[0]
         self.assertIsInstance(
-            baseline_selection.baseline_comparison,
-            InvestigationTelemetryBaselineComparison,
+            baseline_selection.rolling_baseline_comparison,
+            InvestigationTelemetryRollingBaselineComparison,
         )
         self.assertIsNone(baseline_selection.interpretation)
+        self.assertIsNone(baseline_selection.baseline_comparison)
         self.assertEqual(
-            baseline_selection.baseline_comparison.calculation,
+            baseline_selection.rolling_baseline_comparison.calculation,
             "ratio",
         )
         baseline_assessment = baseline_report.telemetry_assessments[0]

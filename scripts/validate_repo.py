@@ -9,7 +9,7 @@ import json
 import math
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable, List, Mapping, Optional
 
@@ -54,6 +54,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0029-investigation-context-correlation.md",
     "docs/decisions/0030-durable-investigation-lifecycle.md",
     "docs/decisions/0031-otlp-investigation-trace-export.md",
+    "docs/decisions/0032-scope-end-rolling-baseline.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/kubernetes-event-evidence.md",
@@ -1724,6 +1725,62 @@ def validate_investigation_telemetry_examples(
             validate_investigation_telemetry_pair(request, report, errors)
 
 
+def expand_rolling_baseline(
+    rule: Mapping[str, object],
+    request_spec: Mapping[str, object],
+) -> Optional[dict[str, object]]:
+    """Expand a scope-end anchored example rule to its auditable windows."""
+
+    scope = request_spec.get("scope")
+    scope_range = scope.get("timeRange") if isinstance(scope, dict) else None
+    scope_end = (
+        parse_timestamp(scope_range.get("end"))
+        if isinstance(scope_range, dict)
+        else None
+    )
+    baseline_seconds = rule.get("baselineDurationSeconds")
+    evaluation_seconds = rule.get("evaluationDurationSeconds")
+    gap_seconds = rule.get("gapSeconds")
+    if (
+        scope_end is None
+        or not isinstance(baseline_seconds, int)
+        or isinstance(baseline_seconds, bool)
+        or not isinstance(evaluation_seconds, int)
+        or isinstance(evaluation_seconds, bool)
+        or not isinstance(gap_seconds, int)
+        or isinstance(gap_seconds, bool)
+    ):
+        return None
+    evaluation_start = scope_end - timedelta(seconds=evaluation_seconds)
+    baseline_end = evaluation_start - timedelta(seconds=gap_seconds)
+    baseline_start = baseline_end - timedelta(seconds=baseline_seconds)
+
+    def timestamp(value: datetime) -> str:
+        return value.isoformat().replace("+00:00", "Z")
+
+    expanded = {
+        key: rule.get(key)
+        for key in (
+            "statistic",
+            "unit",
+            "calculation",
+            "operator",
+            "threshold",
+            "whenMatched",
+            "whenNotMatched",
+        )
+    }
+    expanded["baselineTimeRange"] = {
+        "start": timestamp(baseline_start),
+        "end": timestamp(baseline_end),
+    }
+    expanded["evaluationTimeRange"] = {
+        "start": timestamp(evaluation_start),
+        "end": timestamp(scope_end),
+    }
+    return expanded
+
+
 def validate_investigation_telemetry_pair(
     request: Mapping[str, object],
     report: Mapping[str, object],
@@ -1772,6 +1829,13 @@ def validate_investigation_telemetry_pair(
             continue
         interpretation = selection.get("interpretation")
         baseline_comparison = selection.get("baselineComparison")
+        rolling_baseline = selection.get("rollingBaselineComparison")
+        if not isinstance(baseline_comparison, dict) and isinstance(
+            rolling_baseline, dict
+        ):
+            baseline_comparison = expand_rolling_baseline(
+                rolling_baseline, request_spec
+            )
         rule = (
             interpretation
             if isinstance(interpretation, dict)

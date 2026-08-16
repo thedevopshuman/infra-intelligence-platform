@@ -656,6 +656,94 @@ class InvestigationTelemetryBaselineComparison:
 
 
 @dataclass(frozen=True)
+class InvestigationTelemetryRollingBaselineComparison:
+    """Scope-end anchored baseline windows expanded by the control plane."""
+
+    statistic: str
+    unit: str
+    baseline_duration_seconds: int
+    evaluation_duration_seconds: int
+    gap_seconds: int
+    calculation: str
+    operator: str
+    threshold: float
+    when_matched: str
+    when_not_matched: str
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationTelemetryRollingBaselineComparison":
+        expected = {
+            "statistic",
+            "unit",
+            "baselineDurationSeconds",
+            "evaluationDurationSeconds",
+            "gapSeconds",
+            "calculation",
+            "operator",
+            "threshold",
+            "whenMatched",
+            "whenNotMatched",
+        }
+        durations = (
+            payload.get("baselineDurationSeconds"),
+            payload.get("evaluationDurationSeconds"),
+            payload.get("gapSeconds"),
+        )
+        threshold = payload.get("threshold")
+        dispositions = ("supports", "contradicts", "neutral")
+        if (
+            set(payload) != expected
+            or payload.get("statistic") not in ("minimum", "maximum", "mean")
+            or not isinstance(payload.get("unit"), str)
+            or not payload["unit"]
+            or any(
+                not isinstance(value, int) or isinstance(value, bool)
+                for value in durations
+            )
+            or not 60 <= durations[0] <= 604_800
+            or not 60 <= durations[1] <= 604_800
+            or not 1 <= durations[2] <= 86_400
+            or payload.get("calculation") not in ("difference", "ratio")
+            or payload.get("operator") not in ("lt", "lte", "gt", "gte")
+            or isinstance(threshold, bool)
+            or not isinstance(threshold, (int, float))
+            or not math.isfinite(float(threshold))
+            or payload.get("whenMatched") not in dispositions
+            or payload.get("whenNotMatched") not in dispositions
+            or payload.get("whenMatched") == payload.get("whenNotMatched")
+        ):
+            raise ValueError("investigation rolling baseline comparison is invalid")
+        return cls(
+            statistic=payload["statistic"],
+            unit=payload["unit"],
+            baseline_duration_seconds=durations[0],
+            evaluation_duration_seconds=durations[1],
+            gap_seconds=durations[2],
+            calculation=payload["calculation"],
+            operator=payload["operator"],
+            threshold=float(threshold),
+            when_matched=payload["whenMatched"],
+            when_not_matched=payload["whenNotMatched"],
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "statistic": self.statistic,
+            "unit": self.unit,
+            "baselineDurationSeconds": self.baseline_duration_seconds,
+            "evaluationDurationSeconds": self.evaluation_duration_seconds,
+            "gapSeconds": self.gap_seconds,
+            "calculation": self.calculation,
+            "operator": self.operator,
+            "threshold": self.threshold,
+            "whenMatched": self.when_matched,
+            "whenNotMatched": self.when_not_matched,
+        }
+
+
+@dataclass(frozen=True)
 class InvestigationTelemetrySelection:
     """Provider-neutral metric candidate bounded by an investigation request."""
 
@@ -666,6 +754,9 @@ class InvestigationTelemetrySelection:
     root_cause_classes: tuple[str, ...] = ()
     interpretation: Optional[InvestigationTelemetryInterpretation] = None
     baseline_comparison: Optional[InvestigationTelemetryBaselineComparison] = None
+    rolling_baseline_comparison: Optional[
+        InvestigationTelemetryRollingBaselineComparison
+    ] = None
 
     @classmethod
     def from_dict(
@@ -678,6 +769,7 @@ class InvestigationTelemetrySelection:
         classes = payload.get("rootCauseClasses", [])
         interpretation = payload.get("interpretation")
         baseline_comparison = payload.get("baselineComparison")
+        rolling_baseline_comparison = payload.get("rollingBaselineComparison")
         if not isinstance(selection_id, str) or not selection_id.startswith("tqs_"):
             raise ValueError("investigation telemetry selection id is invalid")
         if not isinstance(integration_id, str) or not integration_id:
@@ -694,10 +786,21 @@ class InvestigationTelemetrySelection:
             baseline_comparison, Mapping
         ):
             raise ValueError("investigation telemetry baselineComparison is invalid")
-        if interpretation is not None and baseline_comparison is not None:
+        if rolling_baseline_comparison is not None and not isinstance(
+            rolling_baseline_comparison, Mapping
+        ):
+            raise ValueError(
+                "investigation telemetry rollingBaselineComparison is invalid"
+            )
+        rules = (
+            interpretation,
+            baseline_comparison,
+            rolling_baseline_comparison,
+        )
+        if sum(rule is not None for rule in rules) > 1:
             raise ValueError("investigation telemetry assessment rule is ambiguous")
         if (
-            interpretation is not None or baseline_comparison is not None
+            any(rule is not None for rule in rules)
         ) and not classes:
             raise ValueError(
                 "investigation telemetry assessment rule requires rootCauseClasses"
@@ -720,6 +823,13 @@ class InvestigationTelemetrySelection:
                 if isinstance(baseline_comparison, Mapping)
                 else None
             ),
+            rolling_baseline_comparison=(
+                InvestigationTelemetryRollingBaselineComparison.from_dict(
+                    rolling_baseline_comparison
+                )
+                if isinstance(rolling_baseline_comparison, Mapping)
+                else None
+            ),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -735,6 +845,10 @@ class InvestigationTelemetrySelection:
             result["interpretation"] = self.interpretation.to_dict()
         if self.baseline_comparison is not None:
             result["baselineComparison"] = self.baseline_comparison.to_dict()
+        if self.rolling_baseline_comparison is not None:
+            result["rollingBaselineComparison"] = (
+                self.rolling_baseline_comparison.to_dict()
+            )
         return result
 
 

@@ -734,6 +734,7 @@ export interface InvestigationTelemetrySelection {
   limits: TelemetryEvidenceLimits;
   interpretation?: InvestigationTelemetryInterpretation;
   baselineComparison?: InvestigationTelemetryBaselineComparison;
+  rollingBaselineComparison?: InvestigationTelemetryRollingBaselineComparison;
 }
 
 export interface InvestigationKubernetesEventInterpretation {
@@ -819,6 +820,19 @@ export interface InvestigationTelemetryBaselineComparison {
   unit: string;
   baselineTimeRange: { start: string; end: string };
   evaluationTimeRange: { start: string; end: string };
+  calculation: "difference" | "ratio";
+  operator: "lt" | "lte" | "gt" | "gte";
+  threshold: number;
+  whenMatched: "supports" | "contradicts" | "neutral";
+  whenNotMatched: "supports" | "contradicts" | "neutral";
+}
+
+export interface InvestigationTelemetryRollingBaselineComparison {
+  statistic: "minimum" | "maximum" | "mean";
+  unit: string;
+  baselineDurationSeconds: number;
+  evaluationDurationSeconds: number;
+  gapSeconds: number;
   calculation: "difference" | "ratio";
   operator: "lt" | "lte" | "gt" | "gte";
   threshold: number;

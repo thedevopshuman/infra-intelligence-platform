@@ -30,6 +30,7 @@ from .models import (
     InvestigationTelemetryAssessment,
     InvestigationTelemetryBaselineAssessment,
     InvestigationTelemetryBaselineComparison,
+    InvestigationTelemetryRollingBaselineComparison,
     InvestigationTelemetryInterpretation,
     InvestigationTelemetrySelection,
     IntegrationConfig,
@@ -83,6 +84,7 @@ __all__ = [
     "InvestigationTelemetryAssessment",
     "InvestigationTelemetryBaselineAssessment",
     "InvestigationTelemetryBaselineComparison",
+    "InvestigationTelemetryRollingBaselineComparison",
     "InvestigationTelemetryInterpretation",
     "InvestigationTelemetrySelection",
     "IntegrationConfig",
@@ -105,4 +107,4 @@ __all__ = [
     "TelemetryEvidenceRequest",
     "TelemetryEvidenceResult",
 ]
-__version__ = "0.12.0"
+__version__ = "0.13.0"

@@ -366,6 +366,53 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
         )
         assert_schema(self, "investigation-report.schema.json", baseline_report)
 
+        rolling_request = copy.deepcopy(baseline_request)
+        rolling_request["metadata"]["id"] = (
+            "inv_16161616161616161616161616161616"
+        )
+        rolling_selection = rolling_request["spec"]["telemetrySelections"][1]
+        explicit_rule = rolling_selection.pop("baselineComparison")
+        rolling_selection["rollingBaselineComparison"] = {
+            "statistic": explicit_rule["statistic"],
+            "unit": explicit_rule["unit"],
+            "baselineDurationSeconds": 60,
+            "evaluationDurationSeconds": 62,
+            "gapSeconds": 660,
+            "calculation": explicit_rule["calculation"],
+            "operator": explicit_rule["operator"],
+            "threshold": explicit_rule["threshold"],
+            "whenMatched": explicit_rule["whenMatched"],
+            "whenNotMatched": explicit_rule["whenNotMatched"],
+        }
+
+        rolling_report = service.execute(
+            RunInvestigationCommand(self.actor, rolling_request)
+        )
+
+        rolling = rolling_report["spec"]["telemetryAssessments"][0]
+        self.assertEqual(
+            rolling["baselineTimeRange"],
+            {"start": "2026-08-14T10:15:00Z", "end": "2026-08-14T10:16:00Z"},
+        )
+        self.assertEqual(
+            rolling["evaluationTimeRange"],
+            {"start": "2026-08-14T10:27:00Z", "end": "2026-08-14T10:28:02Z"},
+        )
+        self.assertEqual(rolling["disposition"], "supporting")
+        assert_schema(self, "investigation-report.schema.json", rolling_report)
+
+        oversized_rolling = copy.deepcopy(rolling_request)
+        oversized_rolling["metadata"]["id"] = (
+            "inv_17171717171717171717171717171717"
+        )
+        oversized_rolling["spec"]["telemetrySelections"][1][
+            "rollingBaselineComparison"
+        ]["baselineDurationSeconds"] = 1800
+        with self.assertRaisesRegex(
+            InvalidInvestigationError, "investigation.contract.invalid"
+        ):
+            service.execute(RunInvestigationCommand(self.actor, oversized_rolling))
+
         difference_request = copy.deepcopy(baseline_request)
         difference_request["metadata"]["id"] = (
             "inv_15151515151515151515151515151515"

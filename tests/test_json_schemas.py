@@ -266,6 +266,18 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(errors)
 
+    def test_rolling_baseline_rejects_out_of_bounds_duration(self) -> None:
+        request = document(
+            "contracts/examples/investigation-request-telemetry-baseline.json"
+        )
+        request["spec"]["telemetrySelections"][0]["rollingBaselineComparison"][
+            "gapSeconds"
+        ] = 0
+
+        errors = self.validate("investigation-request.schema.json", request)
+
+        self.assertTrue(any("gapSeconds" in error for error in errors))
+
     def test_baseline_data_assessment_requires_all_derived_values(self) -> None:
         report = document(
             "contracts/examples/investigation-report-telemetry-baseline.json"

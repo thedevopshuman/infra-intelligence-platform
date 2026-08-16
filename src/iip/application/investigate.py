@@ -3124,6 +3124,7 @@ class DeterministicInvestigationService:
                     "rootCauseClasses",
                     "interpretation",
                     "baselineComparison",
+                    "rollingBaselineComparison",
                 }
             ):
                 raise InvalidInvestigationError("investigation.contract.invalid")
@@ -3160,7 +3161,15 @@ class DeterministicInvestigationService:
                 raise InvalidInvestigationError("investigation.contract.invalid")
             interpretation = value.get("interpretation")
             baseline_comparison = value.get("baselineComparison")
-            if interpretation is not None and baseline_comparison is not None:
+            rolling_baseline_comparison = value.get("rollingBaselineComparison")
+            if sum(
+                candidate is not None
+                for candidate in (
+                    interpretation,
+                    baseline_comparison,
+                    rolling_baseline_comparison,
+                )
+            ) > 1:
                 raise InvalidInvestigationError("investigation.contract.invalid")
             normalized_interpretation = None
             if interpretation is not None:
@@ -3182,6 +3191,18 @@ class DeterministicInvestigationService:
                 normalized_baseline_comparison = (
                     DeterministicInvestigationService._validate_baseline_comparison(
                         baseline_comparison,
+                        scope_start=start,
+                        scope_end=end,
+                    )
+                )
+            if rolling_baseline_comparison is not None:
+                if classes is None:
+                    raise InvalidInvestigationError(
+                        "investigation.contract.invalid"
+                    )
+                normalized_baseline_comparison = (
+                    DeterministicInvestigationService._validate_rolling_baseline_comparison(
+                        rolling_baseline_comparison,
                         scope_start=start,
                         scope_end=end,
                     )
@@ -3505,6 +3526,74 @@ class DeterministicInvestigationService:
         normalized["baselineTimeRange"] = baseline_range
         normalized["evaluationTimeRange"] = evaluation_range
         return normalized
+
+    @staticmethod
+    def _validate_rolling_baseline_comparison(
+        value: object,
+        *,
+        scope_start: datetime,
+        scope_end: datetime,
+    ) -> dict[str, object]:
+        required = {
+            "statistic",
+            "unit",
+            "baselineDurationSeconds",
+            "evaluationDurationSeconds",
+            "gapSeconds",
+            "calculation",
+            "operator",
+            "threshold",
+            "whenMatched",
+            "whenNotMatched",
+        }
+        if not isinstance(value, Mapping) or set(value) != required:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        baseline_duration = value.get("baselineDurationSeconds")
+        evaluation_duration = value.get("evaluationDurationSeconds")
+        gap = value.get("gapSeconds")
+        if (
+            not isinstance(baseline_duration, int)
+            or isinstance(baseline_duration, bool)
+            or not 60 <= baseline_duration <= 604_800
+            or not isinstance(evaluation_duration, int)
+            or isinstance(evaluation_duration, bool)
+            or not 60 <= evaluation_duration <= 604_800
+            or not isinstance(gap, int)
+            or isinstance(gap, bool)
+            or not 1 <= gap <= 86_400
+        ):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        evaluation_end = scope_end
+        evaluation_start = evaluation_end - timedelta(
+            seconds=evaluation_duration
+        )
+        baseline_end = evaluation_start - timedelta(seconds=gap)
+        baseline_start = baseline_end - timedelta(seconds=baseline_duration)
+        explicit = {
+            key: value[key]
+            for key in (
+                "statistic",
+                "unit",
+                "calculation",
+                "operator",
+                "threshold",
+                "whenMatched",
+                "whenNotMatched",
+            )
+        }
+        explicit["baselineTimeRange"] = {
+            "start": baseline_start.isoformat().replace("+00:00", "Z"),
+            "end": baseline_end.isoformat().replace("+00:00", "Z"),
+        }
+        explicit["evaluationTimeRange"] = {
+            "start": evaluation_start.isoformat().replace("+00:00", "Z"),
+            "end": evaluation_end.isoformat().replace("+00:00", "Z"),
+        }
+        return DeterministicInvestigationService._validate_baseline_comparison(
+            explicit,
+            scope_start=scope_start,
+            scope_end=scope_end,
+        )
 
     @staticmethod
     def _validate_assessment_range(

@@ -54,17 +54,12 @@
           "maxDataPoints": 480,
           "maxBytes": 524288
         },
-        "baselineComparison": {
+        "rollingBaselineComparison": {
           "statistic": "mean",
           "unit": "1",
-          "baselineTimeRange": {
-            "start": "2026-08-16T08:30:00Z",
-            "end": "2026-08-16T08:45:00Z"
-          },
-          "evaluationTimeRange": {
-            "start": "2026-08-16T09:15:00Z",
-            "end": "2026-08-16T09:30:00Z"
-          },
+          "baselineDurationSeconds": 900,
+          "evaluationDurationSeconds": 900,
+          "gapSeconds": 1800,
           "calculation": "ratio",
           "operator": "gte",
           "threshold": 5,

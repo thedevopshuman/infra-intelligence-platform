@@ -17,6 +17,9 @@ from infra_intelligence_sdk import (
     InvestigationKubernetesEventAssessment,
     InvestigationKubernetesEventInterpretation,
     InvestigationKubernetesEventSelection,
+    InvestigationLogAssessment,
+    InvestigationLogInterpretation,
+    InvestigationLogSelection,
     InvestigationTelemetryAssessment,
     InvestigationTelemetryBaselineAssessment,
     InvestigationTelemetryBaselineComparison,
@@ -64,6 +67,9 @@ class PublicContractSdkTests(unittest.TestCase):
         event_investigation = InvestigationRequest.from_dict(
             example("investigation-request-kubernetes-events.json")
         )
+        log_investigation = InvestigationRequest.from_dict(
+            example("investigation-request-logs.json")
+        )
         report = InvestigationReport.from_dict(example("investigation-report.json"))
         telemetry_report = InvestigationReport.from_dict(
             example("investigation-report-telemetry.json")
@@ -73,6 +79,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         event_report = InvestigationReport.from_dict(
             example("investigation-report-kubernetes-events.json")
+        )
+        log_report = InvestigationReport.from_dict(
+            example("investigation-report-logs.json")
         )
         freshness = IngestionFreshnessReport.from_dict(
             example("ingestion-freshness-report.json")
@@ -160,6 +169,17 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         self.assertEqual(event_assessment.matched_event_count, 1)
         self.assertEqual(event_assessment.disposition, "supporting")
+        log_selection = log_investigation.log_selections[0]
+        self.assertIsInstance(log_selection, InvestigationLogSelection)
+        self.assertIsInstance(
+            log_selection.interpretation,
+            InvestigationLogInterpretation,
+        )
+        self.assertEqual(log_selection.interpretation.min_records, 2)
+        log_assessment = log_report.log_assessments[0]
+        self.assertIsInstance(log_assessment, InvestigationLogAssessment)
+        self.assertEqual(log_assessment.observed_record_count, 2)
+        self.assertEqual(log_assessment.disposition, "supporting")
         self.assertEqual(report.to_dict()["kind"], "InvestigationReport")
         self.assertEqual(freshness.to_dict()["kind"], "IngestionFreshnessReport")
         self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")
@@ -385,6 +405,24 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn(
             "Kubernetes Event assessment minMatches must match its request",
+            self.errors,
+        )
+
+    def test_log_assessment_must_match_its_declared_rule(self) -> None:
+        path = (
+            ROOT
+            / "contracts"
+            / "examples"
+            / "investigation-report-logs.json"
+        )
+        report = copy.deepcopy(self.documents[path])
+        report["spec"]["logAssessments"][0]["observedRecordCount"] = 1
+        self.documents[path] = report
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "log assessment disposition must match its rule",
             self.errors,
         )
 

@@ -48,6 +48,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0021-read-only-kubernetes-event-api-adapter.md",
     "docs/decisions/0022-external-workload-identity-credential-broker.md",
     "docs/decisions/0023-backend-neutral-log-evidence-and-otlp-intake.md",
+    "docs/decisions/0024-investigation-log-selection-and-assessment.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/kubernetes-event-evidence.md",
@@ -104,10 +105,12 @@ REQUIRED_PATHS = (
     "contracts/examples/plugin-session.json",
     "contracts/examples/investigation-request.json",
     "contracts/examples/investigation-request-kubernetes-events.json",
+    "contracts/examples/investigation-request-logs.json",
     "contracts/examples/investigation-request-telemetry.json",
     "contracts/examples/investigation-request-telemetry-baseline.json",
     "contracts/examples/investigation-report.json",
     "contracts/examples/investigation-report-kubernetes-events.json",
+    "contracts/examples/investigation-report-logs.json",
     "contracts/examples/investigation-report-telemetry.json",
     "contracts/examples/investigation-report-telemetry-baseline.json",
     "contracts/examples/ingestion-freshness-report.json",
@@ -168,6 +171,7 @@ REQUIRED_PATHS = (
     "tests/test_kubernetes_events_integration.py",
     "tests/test_otlp_receiver.py",
     "tests/test_log_evidence.py",
+    "tests/test_investigation_logs.py",
     "tests/test_otlp_logs_receiver.py",
     "tests/test_otlp_receiver_integration.py",
     "scripts/test_otel.sh",
@@ -909,6 +913,102 @@ def validate_investigation_kubernetes_event_examples(
                 )
 
 
+def validate_investigation_log_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check log investigation request/report links beyond JSON Schema."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    request = documents.get(example_dir / "investigation-request-logs.json")
+    report = documents.get(example_dir / "investigation-report-logs.json")
+    if not isinstance(request, dict) or not isinstance(report, dict):
+        return
+    request_metadata = request.get("metadata")
+    request_spec = request.get("spec")
+    report_metadata = report.get("metadata")
+    report_spec = report.get("spec")
+    if not all(
+        isinstance(item, dict)
+        for item in (request_metadata, request_spec, report_metadata, report_spec)
+    ):
+        return
+    if report_metadata.get("id") != request_metadata.get("id"):
+        fail(errors, "log investigation examples must share an ID")
+    if report_metadata.get("tenantId") != request_metadata.get("tenantId"):
+        fail(errors, "log investigation examples must share a tenant")
+    if report_spec.get("requestDigest") != canonical_digest(request):
+        fail(errors, "log investigation report digest must match its request")
+    if report_spec.get("scope") != request_spec.get("scope"):
+        fail(errors, "log investigation report scope must match its request")
+
+    selections = request_spec.get("logSelections", [])
+    selections_by_id = {
+        item.get("id"): item for item in selections if isinstance(item, dict)
+    }
+    report_evidence = set(report_spec.get("evidenceIds", []))
+    hypotheses = report_spec.get("hypotheses", [])
+    hypothesis_by_class = {
+        item.get("rootCauseClass"): item
+        for item in hypotheses
+        if isinstance(item, dict)
+    }
+    assessments = report_spec.get("logAssessments", [])
+    disposition_map = {
+        "supports": "supporting",
+        "contradicts": "contradicting",
+        "neutral": "neutral",
+    }
+    for assessment in assessments if isinstance(assessments, list) else []:
+        if not isinstance(assessment, dict):
+            continue
+        selection = selections_by_id.get(assessment.get("selectionId"))
+        if not isinstance(selection, dict):
+            fail(errors, "log assessment selectionId must resolve")
+            continue
+        rule = selection.get("interpretation")
+        if not isinstance(rule, dict):
+            fail(errors, "log assessment requires its declared rule")
+            continue
+        minimum = rule.get("minRecords")
+        limits = selection.get("limits")
+        if assessment.get("minRecords") != minimum:
+            fail(errors, "log assessment minRecords must match its request")
+        maximum = limits.get("maxRecords") if isinstance(limits, dict) else None
+        if isinstance(minimum, int) and isinstance(maximum, int) and minimum > maximum:
+            fail(errors, "log assessment threshold must fit its result limit")
+        root_cause = assessment.get("rootCauseClass")
+        if root_cause not in selection.get("rootCauseClasses", []):
+            fail(errors, "log assessment root cause must fit its selection")
+        evidence_id = assessment.get("evidenceId")
+        if evidence_id not in report_evidence:
+            fail(errors, "log assessment Evidence must belong to its report")
+        disposition = assessment.get("disposition")
+        observed = assessment.get("observedRecordCount")
+        if disposition in {"supporting", "contradicting", "neutral"}:
+            if not isinstance(observed, int) or not isinstance(minimum, int):
+                fail(errors, "log assessment with data requires an observed count")
+            else:
+                configured = rule.get(
+                    "whenMatched" if observed >= minimum else "whenNotMatched"
+                )
+                if disposition != disposition_map.get(configured):
+                    fail(errors, "log assessment disposition must match its rule")
+        elif observed is not None:
+            fail(errors, "log no-data or incomplete assessment must omit its count")
+        hypothesis = hypothesis_by_class.get(root_cause)
+        if isinstance(hypothesis, dict) and disposition in {
+            "supporting",
+            "contradicting",
+        }:
+            field = (
+                "supportingEvidenceIds"
+                if disposition == "supporting"
+                else "contradictingEvidenceIds"
+            )
+            if evidence_id not in hypothesis.get(field, []):
+                fail(errors, f"log {disposition} Evidence must cite its hypothesis")
+
+
 def validate_telemetry_evidence_examples(
     documents: Mapping[Path, object], errors: List[str]
 ) -> None:
@@ -1497,9 +1597,11 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("otlp-logs-evidence.json", "OtlpLogsEvidence"),
         ("investigation-request.json", "InvestigationRequest"),
         ("investigation-request-kubernetes-events.json", "InvestigationRequest"),
+        ("investigation-request-logs.json", "InvestigationRequest"),
         ("investigation-report.json", "InvestigationReport"),
         ("investigation-report-telemetry.json", "InvestigationReport"),
         ("investigation-report-kubernetes-events.json", "InvestigationReport"),
+        ("investigation-report-logs.json", "InvestigationReport"),
         ("investigation-report-telemetry-baseline.json", "InvestigationReport"),
         ("ingestion-freshness-report.json", "IngestionFreshnessReport"),
         ("evaluation-scenario.json", "EvaluationScenario"),
@@ -1516,6 +1618,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_resource_query_examples(documents, errors)
     validate_kubernetes_event_evidence_examples(documents, errors)
     validate_investigation_kubernetes_event_examples(documents, errors)
+    validate_investigation_log_examples(documents, errors)
     validate_telemetry_evidence_examples(documents, errors)
     validate_log_evidence_examples(documents, errors)
     validate_investigation_telemetry_examples(documents, errors)

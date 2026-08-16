@@ -31,6 +31,12 @@ Log bodies are untrusted and may contain credentials, personal data, or prompt-i
 
 The immutable Evidence envelope uses type `telemetry.logs`, ephemeral retention, exact resource references, request digest, and redaction metadata. Reports and future agents must cite the Evidence ID and read only the committed tenant-scoped artifact, never raw adapter output.
 
+## Investigation binding
+
+An investigation may carry ordered `logSelections` that reuse this contract's query and limit fragments. The runtime derives identity, resources, time range, and deadline from the accepted investigation; a selection cannot widen any of them. When upper bounds are present, collection requires both `telemetry.logs` and `telemetry/query`.
+
+A root-cause-scoped selection may declare a positive minimum record count no greater than `maxRecords`. The investigator revalidates and counts only records in the committed normalized result. It never evaluates body prose. Complete results can support, contradict, or remain neutral according to the predeclared rule; no-data and partial results remain explicit and cannot become citations.
+
 ## HTTP and SDK binding
 
 `POST /v1/evidence/logs/queries` accepts `LogEvidenceRequest` and returns the committed Evidence envelope with `201 Created`. The normalized result remains in the evidence store.

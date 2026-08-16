@@ -874,6 +874,173 @@ class InvestigationTelemetryBaselineAssessment:
 
 
 @dataclass(frozen=True)
+class InvestigationLogInterpretation:
+    """Closed record-count rule declared by an investigation caller."""
+
+    min_records: int
+    when_matched: str
+    when_not_matched: str
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationLogInterpretation":
+        min_records = payload.get("minRecords")
+        dispositions = ("supports", "contradicts", "neutral")
+        if (
+            not isinstance(min_records, int)
+            or isinstance(min_records, bool)
+            or min_records < 1
+            or payload.get("whenMatched") not in dispositions
+            or payload.get("whenNotMatched") not in dispositions
+            or payload.get("whenMatched") == payload.get("whenNotMatched")
+        ):
+            raise ValueError("investigation log interpretation is invalid")
+        return cls(
+            min_records=min_records,
+            when_matched=payload["whenMatched"],
+            when_not_matched=payload["whenNotMatched"],
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "minRecords": self.min_records,
+            "whenMatched": self.when_matched,
+            "whenNotMatched": self.when_not_matched,
+        }
+
+
+@dataclass(frozen=True)
+class InvestigationLogSelection:
+    """Provider-neutral log candidate bounded by an investigation request."""
+
+    selection_id: str
+    integration_id: str
+    query: Mapping[str, Any]
+    limits: Mapping[str, Any]
+    root_cause_classes: tuple[str, ...] = ()
+    interpretation: Optional[InvestigationLogInterpretation] = None
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "InvestigationLogSelection":
+        selection_id = payload.get("id")
+        integration_id = payload.get("integrationId")
+        query = payload.get("query")
+        limits = payload.get("limits")
+        classes = payload.get("rootCauseClasses", [])
+        interpretation = payload.get("interpretation")
+        if not isinstance(selection_id, str) or not selection_id.startswith("lqs_"):
+            raise ValueError("investigation log selection id is invalid")
+        if not isinstance(integration_id, str) or not integration_id:
+            raise ValueError("investigation log integrationId is invalid")
+        if not isinstance(query, Mapping) or not isinstance(limits, Mapping):
+            raise ValueError("investigation log query and limits are required")
+        if not isinstance(classes, list) or any(
+            not isinstance(item, str) for item in classes
+        ):
+            raise ValueError("investigation log rootCauseClasses are invalid")
+        if interpretation is not None and not isinstance(interpretation, Mapping):
+            raise ValueError("investigation log interpretation is invalid")
+        if interpretation is not None and not classes:
+            raise ValueError(
+                "investigation log interpretation requires rootCauseClasses"
+            )
+        normalized_interpretation = (
+            InvestigationLogInterpretation.from_dict(interpretation)
+            if isinstance(interpretation, Mapping)
+            else None
+        )
+        max_records = limits.get("maxRecords")
+        if (
+            normalized_interpretation is not None
+            and isinstance(max_records, int)
+            and normalized_interpretation.min_records > max_records
+        ):
+            raise ValueError("investigation log interpretation exceeds result limit")
+        return cls(
+            selection_id=selection_id,
+            integration_id=integration_id,
+            query=dict(query),
+            limits=dict(limits),
+            root_cause_classes=tuple(classes),
+            interpretation=normalized_interpretation,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "id": self.selection_id,
+            "integrationId": self.integration_id,
+            "query": dict(self.query),
+            "limits": dict(self.limits),
+        }
+        if self.root_cause_classes:
+            result["rootCauseClasses"] = list(self.root_cause_classes)
+        if self.interpretation is not None:
+            result["interpretation"] = self.interpretation.to_dict()
+        return result
+
+
+@dataclass(frozen=True)
+class InvestigationLogAssessment:
+    """Auditable result of applying one rule to stored normalized logs."""
+
+    selection_id: str
+    evidence_id: str
+    root_cause_class: str
+    min_records: int
+    disposition: str
+    observed_record_count: Optional[int] = None
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "InvestigationLogAssessment":
+        disposition = payload.get("disposition")
+        minimum = payload.get("minRecords")
+        observed = payload.get("observedRecordCount")
+        data_dispositions = ("supporting", "contradicting", "neutral")
+        empty_dispositions = ("no-data", "incomplete")
+        if (
+            any(
+                not isinstance(payload.get(field), str)
+                for field in ("selectionId", "evidenceId", "rootCauseClass")
+            )
+            or not isinstance(minimum, int)
+            or isinstance(minimum, bool)
+            or minimum < 1
+            or disposition not in data_dispositions + empty_dispositions
+            or (
+                disposition in data_dispositions
+                and (
+                    not isinstance(observed, int)
+                    or isinstance(observed, bool)
+                    or observed < 1
+                )
+            )
+            or (disposition in empty_dispositions and observed is not None)
+        ):
+            raise ValueError("investigation log assessment is invalid")
+        return cls(
+            selection_id=payload["selectionId"],
+            evidence_id=payload["evidenceId"],
+            root_cause_class=payload["rootCauseClass"],
+            min_records=minimum,
+            disposition=disposition,
+            observed_record_count=observed,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "selectionId": self.selection_id,
+            "evidenceId": self.evidence_id,
+            "rootCauseClass": self.root_cause_class,
+            "minRecords": self.min_records,
+            "disposition": self.disposition,
+        }
+        if self.observed_record_count is not None:
+            result["observedRecordCount"] = self.observed_record_count
+        return result
+
+
+@dataclass(frozen=True)
 class InvestigationKubernetesEventInterpretation:
     """Closed condition-count rule declared by an investigation caller."""
 
@@ -1116,6 +1283,18 @@ class InvestigationRequest:
             for value in values
         )
 
+    @property
+    def log_selections(self) -> tuple[InvestigationLogSelection, ...]:
+        """Return bounded backend-neutral log candidates."""
+
+        spec = self.payload.get("spec")
+        values = spec.get("logSelections", []) if isinstance(spec, Mapping) else []
+        if not isinstance(values, list) or any(
+            not isinstance(value, Mapping) for value in values
+        ):
+            raise ValueError("investigation logSelections must be an array")
+        return tuple(InvestigationLogSelection.from_dict(value) for value in values)
+
 
 @dataclass(frozen=True)
 class InvestigationReport:
@@ -1182,6 +1361,18 @@ class InvestigationReport:
             InvestigationKubernetesEventAssessment.from_dict(value)
             for value in values
         )
+
+    @property
+    def log_assessments(self) -> tuple[InvestigationLogAssessment, ...]:
+        """Return structured log-count assessments and Evidence citations."""
+
+        spec = self.payload.get("spec")
+        values = spec.get("logAssessments", []) if isinstance(spec, Mapping) else []
+        if not isinstance(values, list) or any(
+            not isinstance(value, Mapping) for value in values
+        ):
+            raise ValueError("investigation logAssessments must be an array")
+        return tuple(InvestigationLogAssessment.from_dict(value) for value in values)
 
 
 @dataclass(frozen=True)

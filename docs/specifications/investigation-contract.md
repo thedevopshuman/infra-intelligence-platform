@@ -36,6 +36,10 @@ Alternatively, a root-cause-scoped candidate may declare `baselineComparison`; a
 
 A root-cause-scoped event candidate may declare an interpretation consisting of normalized condition keys, a positive minimum match count within `maxEvents`, and distinct matched/unmatched dispositions. Complete stored evidence records the matching event IDs/count and applies the declared disposition. Explicitly empty evidence is `no-data`, partial evidence is `incomplete`, and corrupt or mismatched evidence becomes a stable unknown. The investigator never assesses the backend's raw Kubernetes objects or response text.
 
+`logSelections` is a separate optional ordered list for historical logs. Each candidate reuses the backend-neutral logical service, severity, exact attribute filter, and output-limit fragments from `LogEvidenceRequest`, while identity, resources, time range, and deadline are inherited from the investigation. Eligible log selections run after Kubernetes Event and metric selections. Collection requires `telemetry.logs` and `telemetry/query` when the request supplies those upper bounds, and consumes the same tool/evidence budgets.
+
+A root-cause-scoped log candidate may declare a positive `minRecords` interpretation no greater than its `maxRecords` limit, with distinct matched/unmatched dispositions. The deterministic runtime validates and counts records from the committed normalized artifact only. It does not inspect log body text, infer meaning from prose, or issue a hidden text search. No-data, partial, corrupt, and mismatched evidence follow the same conservative evidence-gap rules as other signals.
+
 Application validation requires the scope start to precede its end. It also rejects resource references outside the authenticated tenant and budget values above tenant policy. `propose` permits structured recommendations or future action proposals but no side effect, approval, or execution.
 
 ## Investigation report
@@ -48,6 +52,7 @@ Every terminal path returns a report, including policy denial, cancellation, run
 - ranked hypotheses with confidence and supporting and contradicting evidence IDs;
 - structured telemetry assessments when a declared metric rule was evaluated;
 - structured Kubernetes Event assessments when a declared condition rule was evaluated;
+- structured log assessments when a declared record-count rule was evaluated;
 - explicit unknowns and the evidence types needed to resolve them;
 - ordered operational recommendations without embedded mutations;
 - the complete evidence-ID set plus tool-ledger and policy-snapshot references; and
@@ -73,6 +78,8 @@ In the deterministic reference runtime, metric assessment does not reclassify th
 
 The same restraint applies to Kubernetes Event assessments. Supporting and contradicting dispositions add the committed Evidence ID to the matching hypothesis. Neutral, no-data, and incomplete assessments remain visible without becoming citations. Event facts enrich the audit trail but do not secretly rewrite classification or confidence.
 
+`logAssessments` records the declared minimum and, only for a complete result, the observed normalized record count. Supporting and contradicting dispositions cite the matching hypothesis. No-data and incomplete assessments omit the observed count. Log body prose is never copied into the report or used by the deterministic rule.
+
 ## Authority and lifecycle boundary
 
 The investigation report may recommend a next check, monitoring step, or escalation. It cannot encode an executable mutation. A future action proposal is a separate immutable contract and workflow that receives a current policy decision, idempotency key, approval when required, and audit trail.
@@ -90,6 +97,7 @@ In addition to JSON Schema validation:
 - every citation must belong to the report evidence set and authenticated tenant;
 - every telemetry assessment must reference report Evidence and the selected root-cause class;
 - every Kubernetes Event assessment must reference report Evidence, its declared selection rule, and the selected root-cause class;
+- every log assessment must reference report Evidence, reproduce its declared count rule, and match the selected root-cause class;
 - baseline and evaluation windows must be ordered, non-overlapping subranges of the request scope, and a reported comparison must match its declared calculation and unit;
 - selected tools and authority must remain within all applicable upper bounds; and
 - usage counters must be checked against the accepted budgets and any stricter policy limits.

@@ -331,6 +331,30 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(errors)
 
+    def test_log_selection_reuses_closed_backend_neutral_query(self) -> None:
+        request = document("contracts/examples/investigation-request-logs.json")
+        request["spec"]["logSelections"][0]["query"]["logql"] = "{app=\"api\"}"
+
+        errors = self.validate("investigation-request.schema.json", request)
+
+        self.assertTrue(any("logql" in error for error in errors))
+
+    def test_log_interpretation_requires_root_cause_scope(self) -> None:
+        request = document("contracts/examples/investigation-request-logs.json")
+        del request["spec"]["logSelections"][0]["rootCauseClasses"]
+
+        errors = self.validate("investigation-request.schema.json", request)
+
+        self.assertTrue(any("rootCauseClasses" in error for error in errors))
+
+    def test_log_no_data_assessment_rejects_observed_count(self) -> None:
+        report = document("contracts/examples/investigation-report-logs.json")
+        report["spec"]["logAssessments"][0]["disposition"] = "no-data"
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(errors)
+
     def test_otlp_gauge_prohibits_sum_semantics(self) -> None:
         result = document("contracts/examples/otlp-metrics-evidence.json")
         gauge = result["spec"]["series"][1]

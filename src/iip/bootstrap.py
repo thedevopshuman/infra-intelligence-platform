@@ -236,6 +236,7 @@ def _compose_runtime(
             clock,
             kubernetes_events=kubernetes_event_evidence,
             telemetry=telemetry_evidence,
+            logs=log_evidence,
             evidence_store=evidence_store,
         ),
         actions=GovernedActionService(

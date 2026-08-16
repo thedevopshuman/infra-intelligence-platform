@@ -71,6 +71,11 @@
           "maxItems": 8,
           "items": {"$ref": "#/$defs/kubernetesEventAssessment"}
         },
+        "logAssessments": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {"$ref": "#/$defs/logAssessment"}
+        },
         "evidenceIds": {
           "type": "array",
           "maxItems": 1024,
@@ -474,6 +479,54 @@
               ]
             }
           }
+        }
+      ]
+    },
+    "logAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selectionId",
+        "evidenceId",
+        "rootCauseClass",
+        "minRecords",
+        "disposition"
+      ],
+      "properties": {
+        "selectionId": {"type": "string", "pattern": "^lqs_[a-f0-9]{16}$"},
+        "evidenceId": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"},
+        "rootCauseClass": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._/-]{2,127}$"
+        },
+        "minRecords": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "observedRecordCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "supporting",
+            "contradicting",
+            "neutral",
+            "no-data",
+            "incomplete"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": ["supporting", "contradicting", "neutral"]
+              }
+            }
+          },
+          "then": {"required": ["observedRecordCount"]},
+          "else": {"not": {"required": ["observedRecordCount"]}}
         }
       ]
     },

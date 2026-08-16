@@ -1,0 +1,73 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationRequest",
+  "metadata": {
+    "id": "inv_10f7d4ea459b4ce9835fbe8142ccaa55",
+    "tenantId": "local",
+    "actorId": "developer",
+    "requestedAt": "2026-08-16T10:30:00Z",
+    "correlationId": "incident-2026-08-16-api-error-logs"
+  },
+  "spec": {
+    "question": "Do bounded api error logs support the rollout failure hypothesis?",
+    "trigger": {
+      "type": "alert",
+      "source": "urn:iip:event:alertmanager",
+      "reference": "alert://local/api/unavailable-replicas",
+      "summary": "The api Deployment has fewer available replicas than requested."
+    },
+    "scope": {
+      "resourceUids": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+      "timeRange": {
+        "start": "2026-08-16T10:15:00Z",
+        "end": "2026-08-16T10:29:59Z"
+      }
+    },
+    "agentSelector": {
+      "id": "incident-investigator",
+      "version": "0.1.0"
+    },
+    "evidenceTypes": [
+      "kubernetes.resource-status",
+      "telemetry.logs"
+    ],
+    "allowedTools": ["evidence/fetch", "telemetry/query"],
+    "logSelections": [
+      {
+        "id": "lqs_10f7d4ea459b4ce9",
+        "integrationId": "observability-local",
+        "rootCauseClasses": ["kubernetes.rollout.unavailable-replicas"],
+        "query": {
+          "serviceNames": ["api"],
+          "severities": ["error"],
+          "filters": [
+            {
+              "attribute": "error.type",
+              "operator": "eq",
+              "value": "ProgressDeadlineExceeded"
+            }
+          ]
+        },
+        "limits": {
+          "maxRecords": 100,
+          "maxBytes": 524288
+        },
+        "interpretation": {
+          "minRecords": 2,
+          "whenMatched": "supports",
+          "whenNotMatched": "neutral"
+        }
+      }
+    ],
+    "budgets": {
+      "maxToolCalls": 8,
+      "maxWallTimeSeconds": 180,
+      "maxModelTokens": 50000,
+      "maxCostUsd": 1,
+      "maxEvidenceItems": 16,
+      "maxIterations": 8
+    },
+    "maxAuthority": "read",
+    "priority": "high"
+  }
+}

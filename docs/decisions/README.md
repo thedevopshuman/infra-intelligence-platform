@@ -27,3 +27,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0021](0021-read-only-kubernetes-event-api-adapter.md) | Accepted | Query exact-scope Kubernetes Event evidence through a read-only HTTPS API adapter |
 | [0022](0022-external-workload-identity-credential-broker.md) | Accepted | Resolve provider leases through an external workload-identity credential broker |
 | [0023](0023-backend-neutral-log-evidence-and-otlp-intake.md) | Accepted | Normalize log evidence and accept selected OTLP logs separately |
+| [0024](0024-investigation-log-selection-and-assessment.md) | Accepted | Select and assess committed log evidence conservatively |

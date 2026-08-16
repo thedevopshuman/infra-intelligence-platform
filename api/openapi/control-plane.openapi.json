@@ -301,7 +301,7 @@
     "/v1/investigations": {
       "post": {
         "operationId": "runInvestigation",
-        "description": "Run a bounded investigation. Optional Kubernetes Event and telemetry selections inherit authenticated identity, resource/time scope, and investigation tool/evidence budgets before using configured backend-neutral adapters. Root-cause-scoped selections assess only committed normalized artifacts and record supporting, contradicting, neutral, no-data, or incomplete results.",
+        "description": "Run a bounded investigation. Optional Kubernetes Event, metric, and historical log selections inherit authenticated identity, resource/time scope, and investigation tool/evidence budgets before using configured backend-neutral adapters. Root-cause-scoped selections assess only committed normalized artifacts and record supporting, contradicting, neutral, no-data, or incomplete results; deterministic log assessment never interprets body prose.",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-request.schema.json"}}}},
         "responses": {
           "201": {"description": "Immutable terminal investigation report", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-report.schema.json"}}}},

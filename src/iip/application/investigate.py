@@ -32,6 +32,11 @@ from iip.application.kubernetes_event_evidence import (
     InvalidKubernetesEventEvidenceRequestError,
     KubernetesEventEvidenceService,
 )
+from iip.application.log_evidence import (
+    CollectLogEvidenceCommand,
+    InvalidLogEvidenceRequestError,
+    LogEvidenceService,
+)
 from iip.application.telemetry_evidence import (
     CollectTelemetryEvidenceCommand,
     InvalidTelemetryEvidenceRequestError,
@@ -41,6 +46,8 @@ from iip.application.telemetry_evidence import (
 
 _SELECTION_ID = re.compile(r"tqs_[a-f0-9]{16}")
 _KUBERNETES_EVENT_SELECTION_ID = re.compile(r"kes_[a-f0-9]{16}")
+_LOG_SELECTION_ID = re.compile(r"lqs_[a-f0-9]{16}")
+_LOG_RECORD_ID = re.compile(r"log_[a-f0-9]{32}")
 _INTEGRATION_ID = re.compile(r"[a-z][a-z0-9._-]{2,127}")
 _RESOURCE_UID = re.compile(r"res_[a-f0-9]{32}")
 _ROOT_CAUSE_CLASS = re.compile(r"[a-z][a-z0-9._/-]{2,127}")
@@ -83,6 +90,7 @@ class DeterministicInvestigationService:
         clock: Clock,
         kubernetes_events: KubernetesEventEvidenceService | None = None,
         telemetry: TelemetryEvidenceService | None = None,
+        logs: LogEvidenceService | None = None,
         evidence_store: EvidenceStore | None = None,
     ) -> None:
         self._resources = resources
@@ -91,6 +99,7 @@ class DeterministicInvestigationService:
         self._clock = clock
         self._kubernetes_events = kubernetes_events
         self._telemetry = telemetry
+        self._logs = logs
         self._evidence_store = evidence_store
 
     def execute(self, command: RunInvestigationCommand) -> Mapping[str, object]:
@@ -122,6 +131,8 @@ class DeterministicInvestigationService:
         kubernetes_event_unknowns: list[dict[str, object]] = []
         telemetry_assessments: list[dict[str, object]] = []
         telemetry_unknowns: list[dict[str, object]] = []
+        log_assessments: list[dict[str, object]] = []
+        log_unknowns: list[dict[str, object]] = []
         tool_calls = 0
         allowed_tools = spec.get("allowedTools", [])
         requested_types = spec.get("evidenceTypes", [])
@@ -129,7 +140,8 @@ class DeterministicInvestigationService:
         resource_types = [
             evidence_type
             for evidence_type in requested_types
-            if evidence_type not in {"kubernetes.event", "telemetry.metrics"}
+            if evidence_type
+            not in {"kubernetes.event", "telemetry.metrics", "telemetry.logs"}
         ]
         resource_type_allowed = not requested_types or bool(resource_types)
         if (
@@ -306,6 +318,64 @@ class DeterministicInvestigationService:
                         elif assessment["disposition"] == "contradicting":
                             contradicting_evidence_ids.append(evidence_id)
 
+        logs_allowed = (
+            (not requested_types or "telemetry.logs" in requested_types)
+            and (not allowed_tools or "telemetry/query" in allowed_tools)
+        )
+        matching_log_selections = self._matching_log_selections(spec, root_cause)
+        if matching_log_selections and logs_allowed and self._logs is None:
+            log_unknowns.append(self._log_unknown("unavailable"))
+        elif logs_allowed and self._logs is not None:
+            for selection in matching_log_selections:
+                if (
+                    tool_calls >= budgets["maxToolCalls"]
+                    or len(evidence_documents) >= budgets["maxEvidenceItems"]
+                ):
+                    break
+                tool_calls += 1
+                try:
+                    log_request = self._log_request(
+                        command,
+                        selection,
+                        scope,
+                        started_at,
+                        budgets,
+                    )
+                    log_evidence = self._logs.execute(
+                        CollectLogEvidenceCommand(command.actor, log_request)
+                    )
+                except (
+                    EvidenceAuthorizationError,
+                    EvidenceDeadlineExceededError,
+                    EvidenceProviderUnavailableError,
+                    EvidenceRedactionError,
+                    InvalidEvidenceRequestError,
+                    InvalidLogEvidenceRequestError,
+                    PersistenceError,
+                ):
+                    log_unknowns.append(self._log_unknown(str(selection["id"])))
+                    continue
+                evidence_documents.append(log_evidence)
+                if isinstance(selection.get("interpretation"), Mapping):
+                    assessment = self._assess_logs(
+                        command.actor,
+                        selection,
+                        log_evidence,
+                        root_cause,
+                        log_request,
+                    )
+                    if assessment is None:
+                        log_unknowns.append(
+                            self._log_assessment_unknown(str(selection["id"]))
+                        )
+                    else:
+                        log_assessments.append(assessment)
+                        evidence_id = str(assessment["evidenceId"])
+                        if assessment["disposition"] == "supporting":
+                            supporting_evidence_ids.append(evidence_id)
+                        elif assessment["disposition"] == "contradicting":
+                            contradicting_evidence_ids.append(evidence_id)
+
         completed_at = self._clock.now()
         evidence_ids = [
             document["metadata"]["id"] for document in evidence_documents
@@ -338,7 +408,7 @@ class DeterministicInvestigationService:
                     "impact": "medium",
                     "requestedEvidenceTypes": [
                         "kubernetes.event",
-                        "kubernetes.pod-log",
+                        "telemetry.logs",
                         "telemetry.metrics",
                     ],
                 }
@@ -363,6 +433,7 @@ class DeterministicInvestigationService:
             unknowns = []
         unknowns.extend(kubernetes_event_unknowns)
         unknowns.extend(telemetry_unknowns)
+        unknowns.extend(log_unknowns)
 
         selector = spec.get("agentSelector")
         if not isinstance(selector, Mapping):
@@ -424,6 +495,10 @@ class DeterministicInvestigationService:
                 report_spec["kubernetesEventAssessments"] = (
                     kubernetes_event_assessments
                 )
+        if log_assessments:
+            report_spec = report["spec"]
+            if isinstance(report_spec, dict):
+                report_spec["logAssessments"] = log_assessments
         self._investigations.commit_investigation(
             command.actor, investigation_id, request, report
         )
@@ -699,6 +774,391 @@ class DeterministicInvestigationService:
             }
         )
         return assessment
+
+    @staticmethod
+    def _matching_log_selections(
+        spec: Mapping[str, object],
+        root_cause: str | None,
+    ) -> tuple[Mapping[str, object], ...]:
+        selections = spec.get("logSelections", [])
+        if not isinstance(selections, list):
+            return ()
+        matching = []
+        for selection in selections:
+            if not isinstance(selection, Mapping):
+                continue
+            classes = selection.get("rootCauseClasses")
+            if classes is None or (
+                root_cause is not None
+                and isinstance(classes, list)
+                and root_cause in classes
+            ):
+                matching.append(selection)
+        return tuple(matching)
+
+    @staticmethod
+    def _log_request(
+        command: RunInvestigationCommand,
+        selection: Mapping[str, object],
+        scope: Mapping[str, object],
+        started_at: str,
+        budgets: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        material = (
+            f"{command.request['metadata']['id']}\x1f{selection['id']}".encode()
+        )
+        request_id = "leq_" + hashlib.sha256(material).hexdigest()[:32]
+        max_wall_time = budgets["maxWallTimeSeconds"]
+        if not isinstance(max_wall_time, int) or isinstance(max_wall_time, bool):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "LogEvidenceRequest",
+            "metadata": {
+                "requestId": request_id,
+                "tenantId": command.actor.tenant_id,
+                "actorId": command.actor.actor_id,
+                "requestedAt": started_at,
+            },
+            "spec": {
+                "integrationId": selection["integrationId"],
+                "resourceRefs": list(scope["resourceUids"]),
+                "signal": "logs",
+                "timeRange": dict(scope["timeRange"]),
+                "query": dict(selection["query"]),
+                "limits": dict(selection["limits"]),
+                "deadline": DeterministicInvestigationService._deadline(
+                    started_at,
+                    min(max_wall_time, 300),
+                ),
+            },
+        }
+
+    @staticmethod
+    def _log_unknown(selection_id: str) -> dict[str, object]:
+        return {
+            "statement": (
+                "Selected log evidence could not be collected for "
+                f"{selection_id}."
+            ),
+            "impact": "medium",
+            "requestedEvidenceTypes": ["telemetry.logs"],
+        }
+
+    @staticmethod
+    def _log_assessment_unknown(selection_id: str) -> dict[str, object]:
+        return {
+            "statement": (
+                "Selected log evidence could not be safely assessed for "
+                f"{selection_id}."
+            ),
+            "impact": "medium",
+            "requestedEvidenceTypes": ["telemetry.logs"],
+        }
+
+    def _assess_logs(
+        self,
+        actor: ActorContext,
+        selection: Mapping[str, object],
+        evidence: Mapping[str, object],
+        root_cause: str | None,
+        log_request: Mapping[str, object],
+    ) -> dict[str, object] | None:
+        interpretation = selection.get("interpretation")
+        if (
+            self._evidence_store is None
+            or root_cause is None
+            or not isinstance(interpretation, Mapping)
+        ):
+            return None
+        try:
+            metadata = evidence["metadata"]
+            if not isinstance(metadata, Mapping):
+                return None
+            evidence_id = metadata["id"]
+            if not isinstance(evidence_id, str):
+                return None
+            artifact = self._evidence_store.read_artifact(actor, evidence_id)
+        except (KeyError, PersistenceError):
+            return None
+        if not isinstance(artifact, bytes):
+            return None
+        try:
+            document = json.loads(artifact.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        if (
+            not isinstance(document, Mapping)
+            or set(document) != {"apiVersion", "kind", "metadata", "spec"}
+            or document.get("apiVersion") != "iip.platform/v1alpha1"
+            or document.get("kind") != "LogEvidenceResult"
+        ):
+            return None
+        artifact_metadata = document.get("metadata")
+        artifact_spec = document.get("spec")
+        request_metadata = log_request.get("metadata")
+        request_spec = log_request.get("spec")
+        if (
+            not isinstance(artifact_metadata, Mapping)
+            or set(artifact_metadata)
+            != {"requestId", "tenantId", "integrationId", "createdAt"}
+            or not isinstance(request_metadata, Mapping)
+            or artifact_metadata.get("requestId") != request_metadata.get("requestId")
+            or artifact_metadata.get("tenantId") != actor.tenant_id
+            or artifact_metadata.get("integrationId") != selection.get("integrationId")
+            or not isinstance(artifact_spec, Mapping)
+            or set(artifact_spec)
+            != {
+                "signal",
+                "requestDigest",
+                "timeRange",
+                "status",
+                "records",
+                "summary",
+                "warnings",
+            }
+            or not isinstance(request_spec, Mapping)
+            or artifact_spec.get("signal") != "logs"
+            or artifact_spec.get("requestDigest") != canonical_digest(log_request)
+            or artifact_spec.get("timeRange") != request_spec.get("timeRange")
+        ):
+            return None
+        created_at = self._parse_datetime(artifact_metadata.get("createdAt"))
+        deadline = self._parse_datetime(request_spec.get("deadline"))
+        request_range = request_spec.get("timeRange")
+        query = request_spec.get("query")
+        limits = request_spec.get("limits")
+        if (
+            created_at is None
+            or deadline is None
+            or created_at > deadline
+            or not isinstance(request_range, Mapping)
+            or not isinstance(query, Mapping)
+            or not isinstance(limits, Mapping)
+        ):
+            return None
+        start = self._parse_datetime(request_range.get("start"))
+        end = self._parse_datetime(request_range.get("end"))
+        services = query.get("serviceNames")
+        severities = query.get("severities")
+        filters = query.get("filters")
+        resource_refs = request_spec.get("resourceRefs")
+        max_records = limits.get("maxRecords")
+        records = artifact_spec.get("records")
+        summary = artifact_spec.get("summary")
+        warnings = artifact_spec.get("warnings")
+        status = artifact_spec.get("status")
+        if (
+            start is None
+            or end is None
+            or not end <= created_at <= deadline
+            or not isinstance(services, list)
+            or not isinstance(severities, list)
+            or not isinstance(filters, list)
+            or not isinstance(resource_refs, list)
+            or not isinstance(max_records, int)
+            or isinstance(max_records, bool)
+            or not isinstance(records, list)
+            or len(records) > max_records
+            or not isinstance(summary, Mapping)
+            or set(summary) != {"recordCount", "errorCount"}
+            or not isinstance(warnings, list)
+            or len(warnings) > 8
+            or any(not isinstance(warning, str) for warning in warnings)
+            or len(warnings) != len(set(warnings))
+            or any(warning not in {"backend-partial", "record-limit"} for warning in warnings)
+            or status not in {"complete", "partial", "no-data"}
+        ):
+            return None
+
+        record_ids: set[str] = set()
+        previous_key: tuple[str, str] | None = None
+        error_count = 0
+        for record in records:
+            if not self._valid_log_record(
+                record,
+                start=start,
+                end=end,
+                created_at=created_at,
+                resource_refs=resource_refs,
+                services=services,
+                severities=severities,
+                filters=filters,
+                record_ids=record_ids,
+                previous_key=previous_key,
+            ):
+                return None
+            record_id = str(record["id"])
+            record_ids.add(record_id)
+            previous_key = (str(record["timestamp"]), record_id)
+            if record.get("severity") in {"error", "fatal"}:
+                error_count += 1
+        if (
+            not isinstance(summary.get("recordCount"), int)
+            or isinstance(summary.get("recordCount"), bool)
+            or not isinstance(summary.get("errorCount"), int)
+            or isinstance(summary.get("errorCount"), bool)
+            or summary.get("recordCount") != len(records)
+            or summary.get("errorCount") != error_count
+        ):
+            return None
+
+        assessment: dict[str, object] = {
+            "selectionId": selection["id"],
+            "evidenceId": evidence_id,
+            "rootCauseClass": root_cause,
+            "minRecords": interpretation["minRecords"],
+        }
+        if status == "no-data":
+            if records or warnings:
+                return None
+            assessment["disposition"] = "no-data"
+            return assessment
+        if status == "partial":
+            if not records or not warnings:
+                return None
+            assessment["disposition"] = "incomplete"
+            return assessment
+        if not records or warnings:
+            return None
+        observed_count = len(records)
+        matched = observed_count >= interpretation["minRecords"]
+        configured = interpretation[
+            "whenMatched" if matched else "whenNotMatched"
+        ]
+        assessment["observedRecordCount"] = observed_count
+        assessment["disposition"] = self._assessment_disposition(configured)
+        return assessment
+
+    @staticmethod
+    def _valid_log_record(
+        record: object,
+        *,
+        start: datetime,
+        end: datetime,
+        created_at: datetime,
+        resource_refs: list[object],
+        services: list[object],
+        severities: list[object],
+        filters: list[object],
+        record_ids: set[str],
+        previous_key: tuple[str, str] | None,
+    ) -> bool:
+        required = {
+            "id",
+            "resourceRef",
+            "timestamp",
+            "severity",
+            "serviceName",
+            "body",
+            "attributes",
+        }
+        optional = {"observedTimestamp", "traceId", "spanId"}
+        if (
+            not isinstance(record, Mapping)
+            or not required <= set(record)
+            or set(record).difference(required | optional)
+        ):
+            return False
+        record_id = record.get("id")
+        timestamp = DeterministicInvestigationService._parse_datetime(
+            record.get("timestamp")
+        )
+        observed = (
+            DeterministicInvestigationService._parse_datetime(
+                record.get("observedTimestamp")
+            )
+            if "observedTimestamp" in record
+            else None
+        )
+        key = (str(record.get("timestamp")), str(record_id))
+        attributes = record.get("attributes")
+        severity = record.get("severity")
+        trace_id = record.get("traceId")
+        span_id = record.get("spanId")
+        if (
+            not isinstance(record_id, str)
+            or not _LOG_RECORD_ID.fullmatch(record_id)
+            or record_id in record_ids
+            or record.get("resourceRef") not in resource_refs
+            or timestamp is None
+            or not start <= timestamp <= end
+            or ("observedTimestamp" in record and observed is None)
+            or (observed is not None and not timestamp <= observed <= created_at)
+            or not isinstance(severity, str)
+            or severity
+            not in ("trace", "debug", "info", "warn", "error", "fatal", "unspecified")
+            or (severities and severity not in severities)
+            or record.get("serviceName") not in services
+            or not DeterministicInvestigationService._safe_log_text(
+                record.get("body"), maximum=4096, allow_formatting=True
+            )
+            or not isinstance(attributes, Mapping)
+            or len(attributes) > 16
+            or (trace_id is None) != (span_id is None)
+            or (
+                trace_id is not None
+                and (
+                    not isinstance(trace_id, str)
+                    or not re.fullmatch(r"[a-f0-9]{32}", trace_id)
+                )
+            )
+            or (
+                span_id is not None
+                and (
+                    not isinstance(span_id, str)
+                    or not re.fullmatch(r"[a-f0-9]{16}", span_id)
+                )
+            )
+            or (previous_key is not None and key < previous_key)
+        ):
+            return False
+        for name, value in attributes.items():
+            if (
+                not isinstance(name, str)
+                or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.:/-]{0,127}", name)
+                or not DeterministicInvestigationService._safe_log_text(
+                    value, maximum=256
+                )
+            ):
+                return False
+        return DeterministicInvestigationService._log_filters_match(
+            attributes, filters
+        )
+
+    @staticmethod
+    def _safe_log_text(
+        value: object,
+        *,
+        maximum: int,
+        allow_formatting: bool = False,
+    ) -> bool:
+        if not isinstance(value, str) or not 1 <= len(value) <= maximum:
+            return False
+        allowed = {9, 10, 13} if allow_formatting else set()
+        return not any(
+            (ord(character) < 32 and ord(character) not in allowed)
+            or ord(character) == 127
+            for character in value
+        )
+
+    @staticmethod
+    def _log_filters_match(
+        attributes: Mapping[object, object],
+        filters: list[object],
+    ) -> bool:
+        for item in filters:
+            if not isinstance(item, Mapping):
+                return False
+            name = item.get("attribute")
+            operator = item.get("operator")
+            expected = item.get("value")
+            actual = attributes.get(name)
+            if operator == "eq" and actual != expected:
+                return False
+            if operator == "neq" and (actual is None or actual == expected):
+                return False
+        return True
 
     @staticmethod
     def _matching_telemetry_selections(
@@ -1431,7 +1891,111 @@ class DeterministicInvestigationService:
             normalized_selections.append(normalized)
             selection_ids.add(selection_id)
         spec["telemetrySelections"] = normalized_selections
+
+        log_selections = spec.get("logSelections", [])
+        if not isinstance(log_selections, list) or len(log_selections) > 8:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        normalized_log_selections: list[dict[str, object]] = []
+        log_selection_ids: set[str] = set()
+        for value in log_selections:
+            if (
+                not isinstance(value, Mapping)
+                or not {"id", "integrationId", "query", "limits"} <= set(value)
+                or set(value).difference(
+                    {
+                        "id",
+                        "integrationId",
+                        "query",
+                        "limits",
+                        "rootCauseClasses",
+                        "interpretation",
+                    }
+                )
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            log_selection_id = value.get("id")
+            integration_id = value.get("integrationId")
+            if (
+                not isinstance(log_selection_id, str)
+                or not _LOG_SELECTION_ID.fullmatch(log_selection_id)
+                or log_selection_id in log_selection_ids
+                or not isinstance(integration_id, str)
+                or not _INTEGRATION_ID.fullmatch(integration_id)
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            try:
+                log_query, log_limits = LogEvidenceService.validate_query_contract(
+                    value.get("query"), value.get("limits")
+                )
+            except InvalidLogEvidenceRequestError:
+                raise InvalidInvestigationError(
+                    "investigation.contract.invalid"
+                ) from None
+            log_classes = value.get("rootCauseClasses")
+            if log_classes is not None and (
+                not isinstance(log_classes, list)
+                or not 1 <= len(log_classes) <= 16
+                or any(
+                    not isinstance(root_cause, str)
+                    or not _ROOT_CAUSE_CLASS.fullmatch(root_cause)
+                    for root_cause in log_classes
+                )
+                or len(log_classes) != len(set(log_classes))
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            log_interpretation = value.get("interpretation")
+            normalized_log_interpretation = None
+            if log_interpretation is not None:
+                if log_classes is None:
+                    raise InvalidInvestigationError(
+                        "investigation.contract.invalid"
+                    )
+                normalized_log_interpretation = (
+                    DeterministicInvestigationService._validate_log_interpretation(
+                        log_interpretation,
+                        maximum_records=log_limits["maxRecords"],
+                    )
+                )
+            normalized_log: dict[str, object] = {
+                "id": log_selection_id,
+                "integrationId": integration_id,
+                "query": log_query,
+                "limits": log_limits,
+            }
+            if log_classes is not None:
+                normalized_log["rootCauseClasses"] = list(log_classes)
+            if normalized_log_interpretation is not None:
+                normalized_log["interpretation"] = normalized_log_interpretation
+            normalized_log_selections.append(normalized_log)
+            log_selection_ids.add(log_selection_id)
+        spec["logSelections"] = normalized_log_selections
         return request, metadata, spec, scope, budgets
+
+    @staticmethod
+    def _validate_log_interpretation(
+        value: object,
+        *,
+        maximum_records: int,
+    ) -> dict[str, object]:
+        if not isinstance(value, Mapping) or set(value) != {
+            "minRecords",
+            "whenMatched",
+            "whenNotMatched",
+        }:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        min_records = value.get("minRecords")
+        when_matched = value.get("whenMatched")
+        when_not_matched = value.get("whenNotMatched")
+        if (
+            not isinstance(min_records, int)
+            or isinstance(min_records, bool)
+            or not 1 <= min_records <= maximum_records
+            or when_matched not in _INTERPRETATION_DISPOSITIONS
+            or when_not_matched not in _INTERPRETATION_DISPOSITIONS
+            or when_matched == when_not_matched
+        ):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        return dict(value)
 
     @staticmethod
     def _validate_kubernetes_event_interpretation(

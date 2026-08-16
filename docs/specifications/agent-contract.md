@@ -40,7 +40,7 @@ The registry validates and stores an immutable manifest release. At execution, t
 
 Agents cannot approve their own proposals. An `execute` authority manifest still requires an immutable proposal, current policy decision, idempotency key, and audit trail.
 
-The reference incident agent declares `telemetry/query` as a tool capability. That capability does not let it synthesize vendor queries or widen scope: an investigation must also carry a valid telemetry selection, request/tool evidence upper bounds must permit it, tenant policy must allow collection, and the configured backend catalog must translate it.
+The reference incident agent declares `telemetry/query` as a tool capability for normalized metric and historical log queries. That capability does not let it synthesize vendor queries, search log bodies, or widen scope: an investigation must also carry a valid signal-specific selection, request/tool evidence upper bounds must permit it, tenant policy must allow collection, and the configured backend catalog must translate it.
 
 ## Evaluation
 

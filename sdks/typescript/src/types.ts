@@ -382,6 +382,17 @@ export type LogSeverity =
   | "fatal"
   | "unspecified";
 
+export interface LogEvidenceQuery {
+  serviceNames: string[];
+  severities: LogSeverity[];
+  filters: { attribute: string; operator: "eq" | "neq"; value: string }[];
+}
+
+export interface LogEvidenceLimits {
+  maxRecords: number;
+  maxBytes: number;
+}
+
 export interface LogEvidenceRequest {
   apiVersion: "iip.platform/v1alpha1";
   kind: "LogEvidenceRequest";
@@ -396,12 +407,8 @@ export interface LogEvidenceRequest {
     resourceRefs: ResourceUid[];
     signal: "logs";
     timeRange: { start: string; end: string };
-    query: {
-      serviceNames: string[];
-      severities: LogSeverity[];
-      filters: { attribute: string; operator: "eq" | "neq"; value: string }[];
-    };
-    limits: { maxRecords: number; maxBytes: number };
+    query: LogEvidenceQuery;
+    limits: LogEvidenceLimits;
     deadline: string;
   };
 }
@@ -600,6 +607,21 @@ export interface InvestigationKubernetesEventSelection {
   interpretation?: InvestigationKubernetesEventInterpretation;
 }
 
+export interface InvestigationLogInterpretation {
+  minRecords: number;
+  whenMatched: "supports" | "contradicts" | "neutral";
+  whenNotMatched: "supports" | "contradicts" | "neutral";
+}
+
+export interface InvestigationLogSelection {
+  id: `lqs_${string}`;
+  integrationId: string;
+  rootCauseClasses?: string[];
+  query: LogEvidenceQuery;
+  limits: LogEvidenceLimits;
+  interpretation?: InvestigationLogInterpretation;
+}
+
 export interface InvestigationTelemetryInterpretation {
   statistic: "minimum" | "maximum" | "mean";
   unit: string;
@@ -647,6 +669,7 @@ export interface InvestigationRequest {
     evidenceTypes?: string[];
     allowedTools?: string[];
     kubernetesEventSelections?: InvestigationKubernetesEventSelection[];
+    logSelections?: InvestigationLogSelection[];
     telemetrySelections?: InvestigationTelemetrySelection[];
     budgets: InvestigationBudgets;
     maxAuthority: "read" | "propose";
@@ -705,6 +728,20 @@ export interface InvestigationKubernetesEventAssessment {
   minMatches: number;
   matchedEventCount?: number;
   matchedEventIds?: `kve_${string}`[];
+  disposition:
+    | "supporting"
+    | "contradicting"
+    | "neutral"
+    | "no-data"
+    | "incomplete";
+}
+
+export interface InvestigationLogAssessment {
+  selectionId: `lqs_${string}`;
+  evidenceId: EvidenceId;
+  rootCauseClass: string;
+  minRecords: number;
+  observedRecordCount?: number;
   disposition:
     | "supporting"
     | "contradicting"
@@ -775,6 +812,7 @@ export interface InvestigationReport {
       | InvestigationTelemetryBaselineAssessment
     )[];
     kubernetesEventAssessments?: InvestigationKubernetesEventAssessment[];
+    logAssessments?: InvestigationLogAssessment[];
     evidenceIds: EvidenceId[];
     recommendations: InvestigationRecommendation[];
     toolCallLedgerRef: string;

@@ -1,0 +1,82 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationReport",
+  "metadata": {
+    "id": "inv_10f7d4ea459b4ce9835fbe8142ccaa55",
+    "tenantId": "local",
+    "createdAt": "2026-08-16T10:30:09Z"
+  },
+  "spec": {
+    "requestDigest": "sha256:2ab46ef8e2f6528c976531d5a1e5f6d218ea7053e6702fc6a0f5f37e197af026",
+    "outcome": "conclusive",
+    "terminalReason": "sufficient-evidence",
+    "startedAt": "2026-08-16T10:30:01Z",
+    "completedAt": "2026-08-16T10:30:09Z",
+    "scope": {
+      "resourceUids": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+      "timeRange": {
+        "start": "2026-08-16T10:15:00Z",
+        "end": "2026-08-16T10:29:59Z"
+      }
+    },
+    "agent": {
+      "id": "incident-investigator",
+      "version": "0.1.0",
+      "manifestDigest": "sha256:7da250dedb1d113e64a75278f014c3b72bb319c66adbfd15f8a8104a7a10eb97",
+      "modelClass": "local"
+    },
+    "summary": "The rollout is unavailable and the bounded error-log query met its declared record threshold.",
+    "hypotheses": [
+      {
+        "id": "hyp_10f7d4ea459b4ce9",
+        "rank": 1,
+        "statement": "The rollout is unavailable and emitted repeated structured progress-deadline errors.",
+        "rootCauseClass": "kubernetes.rollout.unavailable-replicas",
+        "confidence": 0.82,
+        "disposition": "leading",
+        "supportingEvidenceIds": [
+          "evd_55555555555555555555555555555555",
+          "evd_77777777777777777777777777777777"
+        ],
+        "contradictingEvidenceIds": []
+      }
+    ],
+    "unknowns": [],
+    "logAssessments": [
+      {
+        "selectionId": "lqs_10f7d4ea459b4ce9",
+        "evidenceId": "evd_77777777777777777777777777777777",
+        "rootCauseClass": "kubernetes.rollout.unavailable-replicas",
+        "minRecords": 2,
+        "observedRecordCount": 2,
+        "disposition": "supporting"
+      }
+    ],
+    "evidenceIds": [
+      "evd_55555555555555555555555555555555",
+      "evd_77777777777777777777777777777777"
+    ],
+    "recommendations": [
+      {
+        "id": "rec_10f7d4ea459b4ce9",
+        "type": "next-check",
+        "description": "Inspect the newest workload revision and Pod status before acting.",
+        "priority": "high",
+        "evidenceIds": [
+          "evd_55555555555555555555555555555555",
+          "evd_77777777777777777777777777777777"
+        ]
+      }
+    ],
+    "toolCallLedgerRef": "ledger://local/investigations/inv_10f7d4ea459b4ce9835fbe8142ccaa55/tool-calls",
+    "policySnapshotRef": "policy://local/snapshots/deterministic-investigation-v1",
+    "usage": {
+      "toolCalls": 2,
+      "iterations": 1,
+      "modelTokens": 0,
+      "wallTimeSeconds": 8,
+      "costUsd": 0,
+      "evidenceItems": 2
+    }
+  }
+}

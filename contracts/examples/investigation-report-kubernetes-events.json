@@ -1,0 +1,84 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationReport",
+  "metadata": {
+    "id": "inv_cafe28f7d4ea459b4ce9835fbe8142cc",
+    "tenantId": "local",
+    "createdAt": "2026-08-16T10:30:08Z"
+  },
+  "spec": {
+    "requestDigest": "sha256:3bc37dd535116799fe36debfa627d47a26ea1fea9639fe5bde95b9197319a5ea",
+    "outcome": "conclusive",
+    "terminalReason": "sufficient-evidence",
+    "startedAt": "2026-08-16T10:30:01Z",
+    "completedAt": "2026-08-16T10:30:08Z",
+    "scope": {
+      "resourceUids": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+      "timeRange": {
+        "start": "2026-08-16T10:15:00Z",
+        "end": "2026-08-16T10:29:59Z"
+      }
+    },
+    "agent": {
+      "id": "incident-investigator",
+      "version": "0.1.0",
+      "manifestDigest": "sha256:7da250dedb1d113e64a75278f014c3b72bb319c66adbfd15f8a8104a7a10eb97",
+      "modelClass": "local"
+    },
+    "summary": "The api Deployment has fewer available replicas than requested, and its controller reported a progress deadline failure.",
+    "hypotheses": [
+      {
+        "id": "hyp_28f7d4ea459b4ce9",
+        "rank": 1,
+        "statement": "The rollout is unavailable and exceeded its progress deadline.",
+        "rootCauseClass": "kubernetes.rollout.unavailable-replicas",
+        "confidence": 0.82,
+        "disposition": "leading",
+        "supportingEvidenceIds": [
+          "evd_55555555555555555555555555555555",
+          "evd_66666666666666666666666666666666"
+        ],
+        "contradictingEvidenceIds": []
+      }
+    ],
+    "unknowns": [],
+    "kubernetesEventAssessments": [
+      {
+        "selectionId": "kes_28f7d4ea459b4ce9",
+        "evidenceId": "evd_66666666666666666666666666666666",
+        "rootCauseClass": "kubernetes.rollout.unavailable-replicas",
+        "conditions": ["workload.progress-deadline-exceeded"],
+        "minMatches": 1,
+        "matchedEventCount": 1,
+        "matchedEventIds": ["kve_79584db884b6478ea438561b6a803913"],
+        "disposition": "supporting"
+      }
+    ],
+    "evidenceIds": [
+      "evd_55555555555555555555555555555555",
+      "evd_66666666666666666666666666666666"
+    ],
+    "recommendations": [
+      {
+        "id": "rec_28f7d4ea459b4ce9",
+        "type": "next-check",
+        "description": "Inspect the newest workload revision and Pod status before acting.",
+        "priority": "high",
+        "evidenceIds": [
+          "evd_55555555555555555555555555555555",
+          "evd_66666666666666666666666666666666"
+        ]
+      }
+    ],
+    "toolCallLedgerRef": "ledger://local/investigations/inv_cafe28f7d4ea459b4ce9835fbe8142cc/tool-calls",
+    "policySnapshotRef": "policy://local/snapshots/deterministic-investigation-v1",
+    "usage": {
+      "toolCalls": 2,
+      "iterations": 1,
+      "modelTokens": 0,
+      "wallTimeSeconds": 7,
+      "costUsd": 0,
+      "evidenceItems": 2
+    }
+  }
+}

@@ -10,6 +10,7 @@ import type {
   InvestigationId,
   InvestigationReport,
   InvestigationRequest,
+  KubernetesEventEvidenceRequest,
   PluginSession,
   ResourceCollectionRequest,
   ResourceCollectionResult,
@@ -139,6 +140,12 @@ export class InfrastructureIntelligenceClient {
 
   async collectTelemetryEvidence(request: TelemetryEvidenceRequest): Promise<Evidence> {
     return this.post<Evidence>("/v1/evidence/telemetry/queries", request);
+  }
+
+  async collectKubernetesEventEvidence(
+    request: KubernetesEventEvidenceRequest,
+  ): Promise<Evidence> {
+    return this.post<Evidence>("/v1/evidence/kubernetes/events/queries", request);
   }
 
   async proposeAction(command: {

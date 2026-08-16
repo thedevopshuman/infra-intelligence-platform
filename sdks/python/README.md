@@ -13,6 +13,8 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 `InvestigationRequest.telemetry_selections` returns typed `InvestigationTelemetrySelection` candidates. Each contains only a provider-neutral query, output limits, and an optional closed `InvestigationTelemetryInterpretation`; authenticated identity, resources, time range, and deadline are inherited by the server from the investigation. `InvestigationReport.telemetry_assessments` exposes the applied unit-aware rule and committed Evidence citation without importing server internals.
 
+`KubernetesEventEvidenceRequest` and `KubernetesEventEvidenceResult` expose the normalized customer-cluster event boundary, which is distinct from internal platform CloudEvents. `InvestigationRequest.kubernetes_event_selections` and `InvestigationReport.kubernetes_event_assessments` expose condition-count correlation and committed Evidence citations. The SDK never carries kubeconfig, cluster credentials, or Kubernetes client types.
+
 `EvaluationScenario` exposes the offline, replayable scenario envelope used by evaluation tooling. It carries fixtures and a scoring oracle but grants no runtime access or authority.
 
 `ResourceObservationCursor` represents optional source ordering, replay checkpoint, and reconciliation metadata carried inside a resource observation.
@@ -30,3 +32,5 @@ Version 0.4 adds opaque provider cursor resume fields, ingestion-freshness telem
 Version 0.5 adds investigation telemetry interpretation and assessment types. Threshold rules are root-cause scoped, unit-aware, and evaluated server-side against committed normalized Evidence.
 
 Version 0.6 adds baseline-window comparison request and report types. Ordered baseline and evaluation subranges are evaluated from one committed normalized artifact as a difference or ratio, without adding a backend query.
+
+Version 0.7 adds Kubernetes Event evidence request/result, investigation selection/assessment models, and `collect_kubernetes_event_evidence`. The default server backend returns honest no-data until a live adapter is configured.

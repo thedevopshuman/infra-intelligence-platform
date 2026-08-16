@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:kubernetes-event-evidence-result:v1alpha1",
+  "title": "Infrastructure Intelligence Kubernetes Event Evidence Result",
+  "description": "Normalized Kubernetes Events stored as one immutable Evidence artifact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "KubernetesEventEvidenceResult"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "tenantId", "integrationId", "createdAt"],
+      "properties": {
+        "requestId": {"type": "string", "pattern": "^keq_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "integrationId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{2,127}$"
+        },
+        "createdAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requestDigest",
+        "timeRange",
+        "status",
+        "events",
+        "summary",
+        "warnings"
+      ],
+      "properties": {
+        "requestDigest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "timeRange": {"$ref": "#/$defs/timeRange"},
+        "status": {
+          "type": "string",
+          "enum": ["complete", "partial", "no-data"]
+        },
+        "events": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {"$ref": "#/$defs/event"}
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["eventCount", "warningEventCount"],
+          "properties": {
+            "eventCount": {"type": "integer", "minimum": 0, "maximum": 1000},
+            "warningEventCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["backend-partial", "event-limit"]
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"spec": {"properties": {"status": {"const": "complete"}}}}},
+      "then": {
+        "properties": {
+          "spec": {
+            "properties": {
+              "events": {"minItems": 1},
+              "warnings": {"maxItems": 0}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"spec": {"properties": {"status": {"const": "partial"}}}}},
+      "then": {
+        "properties": {
+          "spec": {
+            "properties": {
+              "events": {"minItems": 1},
+              "warnings": {"minItems": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"spec": {"properties": {"status": {"const": "no-data"}}}}},
+      "then": {
+        "properties": {
+          "spec": {
+            "properties": {
+              "events": {"maxItems": 0},
+              "warnings": {"maxItems": 0},
+              "summary": {
+                "properties": {
+                  "eventCount": {"const": 0},
+                  "warningEventCount": {"const": 0}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "timeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"}
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "resourceRef",
+        "severity",
+        "reason",
+        "condition",
+        "firstObservedAt",
+        "lastObservedAt",
+        "occurrenceCount"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^kve_[a-f0-9]{32}$"},
+        "resourceRef": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
+        "severity": {"type": "string", "enum": ["normal", "warning"]},
+        "reason": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$"
+        },
+        "condition": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._/-]{2,127}$"
+        },
+        "firstObservedAt": {"type": "string", "format": "date-time"},
+        "lastObservedAt": {"type": "string", "format": "date-time"},
+        "occurrenceCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "reportingController": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^[^\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]*$"
+        }
+      }
+    }
+  }
+}

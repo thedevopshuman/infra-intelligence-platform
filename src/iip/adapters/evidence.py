@@ -15,6 +15,8 @@ from iip.application.ports import (
     ActorContext,
     EvidenceProviderRequest,
     EvidenceRedactionResult,
+    KubernetesEventQuery,
+    KubernetesEventsResult,
     PersistenceError,
     RawEvidenceArtifact,
     TelemetryMetricsQuery,
@@ -208,6 +210,22 @@ class NoDataTelemetryMetricsBackend:
             executed_at=now,
             status="no-data",
             series=(),
+        )
+
+
+class NoDataKubernetesEventsBackend:
+    """Safe local backend that proves event plumbing without inventing Events."""
+
+    def __init__(self, clock: object) -> None:
+        self._clock = clock
+
+    def query_events(self, request: KubernetesEventQuery) -> KubernetesEventsResult:
+        del request
+        now = getattr(self._clock, "now")()
+        return KubernetesEventsResult(
+            executed_at=now,
+            status="no-data",
+            events=(),
         )
 
 

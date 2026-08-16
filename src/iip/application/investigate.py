@@ -27,6 +27,11 @@ from iip.application.ports import (
     PersistenceError,
     ResourceRepository,
 )
+from iip.application.kubernetes_event_evidence import (
+    CollectKubernetesEventEvidenceCommand,
+    InvalidKubernetesEventEvidenceRequestError,
+    KubernetesEventEvidenceService,
+)
 from iip.application.telemetry_evidence import (
     CollectTelemetryEvidenceCommand,
     InvalidTelemetryEvidenceRequestError,
@@ -35,6 +40,7 @@ from iip.application.telemetry_evidence import (
 
 
 _SELECTION_ID = re.compile(r"tqs_[a-f0-9]{16}")
+_KUBERNETES_EVENT_SELECTION_ID = re.compile(r"kes_[a-f0-9]{16}")
 _INTEGRATION_ID = re.compile(r"[a-z][a-z0-9._-]{2,127}")
 _RESOURCE_UID = re.compile(r"res_[a-f0-9]{32}")
 _ROOT_CAUSE_CLASS = re.compile(r"[a-z][a-z0-9._/-]{2,127}")
@@ -75,6 +81,7 @@ class DeterministicInvestigationService:
         evidence: EvidenceCollectionService,
         investigations: InvestigationRepository,
         clock: Clock,
+        kubernetes_events: KubernetesEventEvidenceService | None = None,
         telemetry: TelemetryEvidenceService | None = None,
         evidence_store: EvidenceStore | None = None,
     ) -> None:
@@ -82,6 +89,7 @@ class DeterministicInvestigationService:
         self._evidence = evidence
         self._investigations = investigations
         self._clock = clock
+        self._kubernetes_events = kubernetes_events
         self._telemetry = telemetry
         self._evidence_store = evidence_store
 
@@ -110,6 +118,8 @@ class DeterministicInvestigationService:
         resource_evidence_ids: list[str] = []
         supporting_evidence_ids: list[str] = []
         contradicting_evidence_ids: list[str] = []
+        kubernetes_event_assessments: list[dict[str, object]] = []
+        kubernetes_event_unknowns: list[dict[str, object]] = []
         telemetry_assessments: list[dict[str, object]] = []
         telemetry_unknowns: list[dict[str, object]] = []
         tool_calls = 0
@@ -119,7 +129,7 @@ class DeterministicInvestigationService:
         resource_types = [
             evidence_type
             for evidence_type in requested_types
-            if evidence_type != "telemetry.metrics"
+            if evidence_type not in {"kubernetes.event", "telemetry.metrics"}
         ]
         resource_type_allowed = not requested_types or bool(resource_types)
         if (
@@ -154,6 +164,79 @@ class DeterministicInvestigationService:
             supporting_evidence_ids.append(resource_evidence_id)
 
         root_cause, statement, confidence = self._classify(resources)
+        kubernetes_events_allowed = (
+            (not requested_types or "kubernetes.event" in requested_types)
+            and (not allowed_tools or "events/search" in allowed_tools)
+        )
+        matching_event_selections = self._matching_kubernetes_event_selections(
+            spec, root_cause
+        )
+        if (
+            matching_event_selections
+            and kubernetes_events_allowed
+            and self._kubernetes_events is None
+        ):
+            kubernetes_event_unknowns.append(
+                self._kubernetes_event_unknown("unavailable")
+            )
+        elif kubernetes_events_allowed and self._kubernetes_events is not None:
+            for selection in matching_event_selections:
+                if (
+                    tool_calls >= budgets["maxToolCalls"]
+                    or len(evidence_documents) >= budgets["maxEvidenceItems"]
+                ):
+                    break
+                tool_calls += 1
+                try:
+                    event_request = self._kubernetes_event_request(
+                        command,
+                        selection,
+                        scope,
+                        started_at,
+                        budgets,
+                    )
+                    event_evidence = self._kubernetes_events.execute(
+                        CollectKubernetesEventEvidenceCommand(
+                            command.actor,
+                            event_request,
+                        )
+                    )
+                except (
+                    EvidenceAuthorizationError,
+                    EvidenceDeadlineExceededError,
+                    EvidenceProviderUnavailableError,
+                    EvidenceRedactionError,
+                    InvalidEvidenceRequestError,
+                    InvalidKubernetesEventEvidenceRequestError,
+                    PersistenceError,
+                ):
+                    kubernetes_event_unknowns.append(
+                        self._kubernetes_event_unknown(str(selection["id"]))
+                    )
+                    continue
+                evidence_documents.append(event_evidence)
+                if isinstance(selection.get("interpretation"), Mapping):
+                    assessment = self._assess_kubernetes_events(
+                        command.actor,
+                        selection,
+                        event_evidence,
+                        root_cause,
+                        event_request,
+                    )
+                    if assessment is None:
+                        kubernetes_event_unknowns.append(
+                            self._kubernetes_event_assessment_unknown(
+                                str(selection["id"])
+                            )
+                        )
+                    else:
+                        kubernetes_event_assessments.append(assessment)
+                        evidence_id = str(assessment["evidenceId"])
+                        if assessment["disposition"] == "supporting":
+                            supporting_evidence_ids.append(evidence_id)
+                        elif assessment["disposition"] == "contradicting":
+                            contradicting_evidence_ids.append(evidence_id)
+
         telemetry_allowed = (
             (not requested_types or "telemetry.metrics" in requested_types)
             and (not allowed_tools or "telemetry/query" in allowed_tools)
@@ -278,6 +361,7 @@ class DeterministicInvestigationService:
                 }
             ]
             unknowns = []
+        unknowns.extend(kubernetes_event_unknowns)
         unknowns.extend(telemetry_unknowns)
 
         selector = spec.get("agentSelector")
@@ -334,10 +418,287 @@ class DeterministicInvestigationService:
             report_spec = report["spec"]
             if isinstance(report_spec, dict):
                 report_spec["telemetryAssessments"] = telemetry_assessments
+        if kubernetes_event_assessments:
+            report_spec = report["spec"]
+            if isinstance(report_spec, dict):
+                report_spec["kubernetesEventAssessments"] = (
+                    kubernetes_event_assessments
+                )
         self._investigations.commit_investigation(
             command.actor, investigation_id, request, report
         )
         return report
+
+    @staticmethod
+    def _matching_kubernetes_event_selections(
+        spec: Mapping[str, object],
+        root_cause: str | None,
+    ) -> tuple[Mapping[str, object], ...]:
+        selections = spec.get("kubernetesEventSelections", [])
+        if not isinstance(selections, list):
+            return ()
+        matching = []
+        for selection in selections:
+            if not isinstance(selection, Mapping):
+                continue
+            classes = selection.get("rootCauseClasses")
+            if classes is None or (
+                root_cause is not None
+                and isinstance(classes, list)
+                and root_cause in classes
+            ):
+                matching.append(selection)
+        return tuple(matching)
+
+    @staticmethod
+    def _kubernetes_event_request(
+        command: RunInvestigationCommand,
+        selection: Mapping[str, object],
+        scope: Mapping[str, object],
+        started_at: str,
+        budgets: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        material = (
+            f"{command.request['metadata']['id']}\x1f{selection['id']}".encode()
+        )
+        request_id = "keq_" + hashlib.sha256(material).hexdigest()[:32]
+        max_wall_time = budgets["maxWallTimeSeconds"]
+        if not isinstance(max_wall_time, int) or isinstance(max_wall_time, bool):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "KubernetesEventEvidenceRequest",
+            "metadata": {
+                "requestId": request_id,
+                "tenantId": command.actor.tenant_id,
+                "actorId": command.actor.actor_id,
+                "requestedAt": started_at,
+            },
+            "spec": {
+                "integrationId": selection["integrationId"],
+                "resourceRefs": list(scope["resourceUids"]),
+                "timeRange": dict(scope["timeRange"]),
+                "query": dict(selection["query"]),
+                "limits": dict(selection["limits"]),
+                "deadline": DeterministicInvestigationService._deadline(
+                    started_at,
+                    min(max_wall_time, 300),
+                ),
+            },
+        }
+
+    @staticmethod
+    def _kubernetes_event_unknown(selection_id: str) -> dict[str, object]:
+        return {
+            "statement": (
+                "Selected Kubernetes Event evidence could not be collected for "
+                f"{selection_id}."
+            ),
+            "impact": "medium",
+            "requestedEvidenceTypes": ["kubernetes.event"],
+        }
+
+    @staticmethod
+    def _kubernetes_event_assessment_unknown(
+        selection_id: str,
+    ) -> dict[str, object]:
+        return {
+            "statement": (
+                "Selected Kubernetes Event evidence could not be safely assessed for "
+                f"{selection_id}."
+            ),
+            "impact": "medium",
+            "requestedEvidenceTypes": ["kubernetes.event"],
+        }
+
+    def _assess_kubernetes_events(
+        self,
+        actor: ActorContext,
+        selection: Mapping[str, object],
+        evidence: Mapping[str, object],
+        root_cause: str | None,
+        event_request: Mapping[str, object],
+    ) -> dict[str, object] | None:
+        interpretation = selection.get("interpretation")
+        if (
+            self._evidence_store is None
+            or root_cause is None
+            or not isinstance(interpretation, Mapping)
+        ):
+            return None
+        try:
+            metadata = evidence["metadata"]
+            if not isinstance(metadata, Mapping):
+                return None
+            evidence_id = metadata["id"]
+            if not isinstance(evidence_id, str):
+                return None
+            artifact = self._evidence_store.read_artifact(actor, evidence_id)
+        except (KeyError, PersistenceError):
+            return None
+        if not isinstance(artifact, bytes):
+            return None
+        try:
+            document = json.loads(artifact.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        if (
+            not isinstance(document, Mapping)
+            or set(document) != {"apiVersion", "kind", "metadata", "spec"}
+            or document.get("apiVersion") != "iip.platform/v1alpha1"
+            or document.get("kind") != "KubernetesEventEvidenceResult"
+        ):
+            return None
+        artifact_metadata = document.get("metadata")
+        artifact_spec = document.get("spec")
+        request_metadata = event_request.get("metadata")
+        request_spec = event_request.get("spec")
+        if (
+            not isinstance(artifact_metadata, Mapping)
+            or set(artifact_metadata)
+            != {"requestId", "tenantId", "integrationId", "createdAt"}
+            or not isinstance(request_metadata, Mapping)
+            or artifact_metadata.get("requestId") != request_metadata.get("requestId")
+            or artifact_metadata.get("tenantId") != actor.tenant_id
+            or artifact_metadata.get("integrationId") != selection.get("integrationId")
+            or self._parse_datetime(artifact_metadata.get("createdAt")) is None
+            or not isinstance(artifact_spec, Mapping)
+            or set(artifact_spec)
+            != {"requestDigest", "timeRange", "status", "events", "summary", "warnings"}
+            or not isinstance(request_spec, Mapping)
+            or artifact_spec.get("requestDigest") != canonical_digest(event_request)
+            or artifact_spec.get("timeRange") != request_spec.get("timeRange")
+        ):
+            return None
+
+        assessment: dict[str, object] = {
+            "selectionId": selection["id"],
+            "evidenceId": evidence_id,
+            "rootCauseClass": root_cause,
+            "conditions": list(interpretation["conditions"]),
+            "minMatches": interpretation["minMatches"],
+        }
+        status = artifact_spec.get("status")
+        events = artifact_spec.get("events")
+        summary = artifact_spec.get("summary")
+        warnings = artifact_spec.get("warnings")
+        if (
+            status not in {"complete", "partial", "no-data"}
+            or not isinstance(events, list)
+            or not isinstance(summary, Mapping)
+            or set(summary) != {"eventCount", "warningEventCount"}
+            or not isinstance(warnings, list)
+            or len(warnings) != len(set(warnings))
+            or any(warning not in {"backend-partial", "event-limit"} for warning in warnings)
+            or summary.get("eventCount") != len(events)
+            or summary.get("warningEventCount")
+            != sum(
+                isinstance(event, Mapping) and event.get("severity") == "warning"
+                for event in events
+            )
+        ):
+            return None
+        if status == "no-data":
+            if events or warnings:
+                return None
+            assessment["disposition"] = "no-data"
+            return assessment
+        if status == "partial":
+            if not events or not warnings:
+                return None
+        elif not events or warnings:
+            return None
+
+        request_query = request_spec.get("query")
+        request_refs = request_spec.get("resourceRefs")
+        request_range = request_spec.get("timeRange")
+        if (
+            not isinstance(request_query, Mapping)
+            or not isinstance(request_refs, list)
+            or not isinstance(request_range, Mapping)
+        ):
+            return None
+        start = self._parse_datetime(request_range.get("start"))
+        end = self._parse_datetime(request_range.get("end"))
+        severities = request_query.get("severities")
+        reasons = request_query.get("reasons")
+        if (
+            start is None
+            or end is None
+            or not isinstance(severities, list)
+            or not isinstance(reasons, list)
+        ):
+            return None
+        event_ids: set[str] = set()
+        matched_ids: list[str] = []
+        previous_key: tuple[str, str] | None = None
+        required_fields = {
+            "id",
+            "resourceRef",
+            "severity",
+            "reason",
+            "condition",
+            "firstObservedAt",
+            "lastObservedAt",
+            "occurrenceCount",
+        }
+        for event in events:
+            if (
+                not isinstance(event, Mapping)
+                or not required_fields <= set(event)
+                or set(event).difference(
+                    required_fields | {"reportingController", "message"}
+                )
+            ):
+                return None
+            event_id = event.get("id")
+            first = self._parse_datetime(event.get("firstObservedAt"))
+            last = self._parse_datetime(event.get("lastObservedAt"))
+            key = (str(event.get("lastObservedAt")), str(event_id))
+            if (
+                not isinstance(event_id, str)
+                or not re.fullmatch(r"kve_[a-f0-9]{32}", event_id)
+                or event_id in event_ids
+                or event.get("resourceRef") not in request_refs
+                or event.get("severity") not in {"normal", "warning"}
+                or (severities and event.get("severity") not in severities)
+                or not isinstance(event.get("reason"), str)
+                or not re.fullmatch(
+                    r"[A-Za-z][A-Za-z0-9_.-]{0,127}", str(event.get("reason"))
+                )
+                or (reasons and event.get("reason") not in reasons)
+                or not isinstance(event.get("condition"), str)
+                or not _ROOT_CAUSE_CLASS.fullmatch(str(event.get("condition")))
+                or first is None
+                or last is None
+                or not start <= first <= last <= end
+                or not isinstance(event.get("occurrenceCount"), int)
+                or isinstance(event.get("occurrenceCount"), bool)
+                or not 1 <= event["occurrenceCount"] <= 2_147_483_647
+                or (previous_key is not None and key < previous_key)
+            ):
+                return None
+            event_ids.add(event_id)
+            previous_key = key
+            if event["condition"] in interpretation["conditions"]:
+                matched_ids.append(event_id)
+
+        if status == "partial":
+            assessment["disposition"] = "incomplete"
+            return assessment
+
+        matched = len(matched_ids) >= interpretation["minMatches"]
+        configured = interpretation[
+            "whenMatched" if matched else "whenNotMatched"
+        ]
+        assessment.update(
+            {
+                "matchedEventCount": len(matched_ids),
+                "matchedEventIds": matched_ids,
+                "disposition": self._assessment_disposition(configured),
+            }
+        )
+        return assessment
 
     @staticmethod
     def _matching_telemetry_selections(
@@ -893,6 +1254,86 @@ class DeterministicInvestigationService:
             ):
                 raise InvalidInvestigationError("investigation.contract.invalid")
             spec[field] = list(values)
+        event_selections = spec.get("kubernetesEventSelections", [])
+        if not isinstance(event_selections, list) or len(event_selections) > 8:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        normalized_event_selections: list[dict[str, object]] = []
+        event_selection_ids: set[str] = set()
+        for value in event_selections:
+            if (
+                not isinstance(value, Mapping)
+                or not {"id", "integrationId", "query", "limits"} <= set(value)
+                or set(value).difference(
+                    {
+                        "id",
+                        "integrationId",
+                        "query",
+                        "limits",
+                        "rootCauseClasses",
+                        "interpretation",
+                    }
+                )
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            event_selection_id = value.get("id")
+            integration_id = value.get("integrationId")
+            if (
+                not isinstance(event_selection_id, str)
+                or not _KUBERNETES_EVENT_SELECTION_ID.fullmatch(event_selection_id)
+                or event_selection_id in event_selection_ids
+                or not isinstance(integration_id, str)
+                or not _INTEGRATION_ID.fullmatch(integration_id)
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            try:
+                event_query, event_limits = (
+                    KubernetesEventEvidenceService.validate_query_contract(
+                        value.get("query"), value.get("limits")
+                    )
+                )
+            except InvalidKubernetesEventEvidenceRequestError:
+                raise InvalidInvestigationError(
+                    "investigation.contract.invalid"
+                ) from None
+            event_classes = value.get("rootCauseClasses")
+            if event_classes is not None and (
+                not isinstance(event_classes, list)
+                or not 1 <= len(event_classes) <= 16
+                or any(
+                    not isinstance(root_cause, str)
+                    or not _ROOT_CAUSE_CLASS.fullmatch(root_cause)
+                    for root_cause in event_classes
+                )
+                or len(event_classes) != len(set(event_classes))
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            event_interpretation = value.get("interpretation")
+            normalized_event_interpretation = None
+            if event_interpretation is not None:
+                if event_classes is None:
+                    raise InvalidInvestigationError(
+                        "investigation.contract.invalid"
+                    )
+                normalized_event_interpretation = (
+                    DeterministicInvestigationService._validate_kubernetes_event_interpretation(
+                        event_interpretation,
+                        maximum_matches=event_limits["maxEvents"],
+                    )
+                )
+            normalized_event: dict[str, object] = {
+                "id": event_selection_id,
+                "integrationId": integration_id,
+                "query": event_query,
+                "limits": event_limits,
+            }
+            if event_classes is not None:
+                normalized_event["rootCauseClasses"] = list(event_classes)
+            if normalized_event_interpretation is not None:
+                normalized_event["interpretation"] = normalized_event_interpretation
+            normalized_event_selections.append(normalized_event)
+            event_selection_ids.add(event_selection_id)
+        spec["kubernetesEventSelections"] = normalized_event_selections
+
         selections = spec.get("telemetrySelections", [])
         if not isinstance(selections, list) or len(selections) > 8:
             raise InvalidInvestigationError("investigation.contract.invalid")
@@ -991,6 +1432,42 @@ class DeterministicInvestigationService:
             selection_ids.add(selection_id)
         spec["telemetrySelections"] = normalized_selections
         return request, metadata, spec, scope, budgets
+
+    @staticmethod
+    def _validate_kubernetes_event_interpretation(
+        value: object,
+        *,
+        maximum_matches: int,
+    ) -> dict[str, object]:
+        if not isinstance(value, Mapping) or set(value) != {
+            "conditions",
+            "minMatches",
+            "whenMatched",
+            "whenNotMatched",
+        }:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        conditions = value.get("conditions")
+        min_matches = value.get("minMatches")
+        when_matched = value.get("whenMatched")
+        when_not_matched = value.get("whenNotMatched")
+        if (
+            not isinstance(conditions, list)
+            or not 1 <= len(conditions) <= 16
+            or any(
+                not isinstance(condition, str)
+                or not _ROOT_CAUSE_CLASS.fullmatch(condition)
+                for condition in conditions
+            )
+            or len(conditions) != len(set(conditions))
+            or not isinstance(min_matches, int)
+            or isinstance(min_matches, bool)
+            or not 1 <= min_matches <= maximum_matches
+            or when_matched not in _INTERPRETATION_DISPOSITIONS
+            or when_not_matched not in _INTERPRETATION_DISPOSITIONS
+            or when_matched == when_not_matched
+        ):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        return dict(value)
 
     @staticmethod
     def _validate_interpretation(value: object) -> dict[str, object]:

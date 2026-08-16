@@ -1,0 +1,37 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "KubernetesEventEvidenceResult",
+  "metadata": {
+    "requestId": "keq_28f7d4ea459b4ce9835fbe8142ccdb11",
+    "tenantId": "local",
+    "integrationId": "kubernetes-local",
+    "createdAt": "2026-08-16T10:30:05Z"
+  },
+  "spec": {
+    "requestDigest": "sha256:06df31bd14b4cd51e2bcae148cb4cbf9090a4118c8cd3dfd16752969f7cd0dc1",
+    "timeRange": {
+      "start": "2026-08-16T10:15:00Z",
+      "end": "2026-08-16T10:29:59Z"
+    },
+    "status": "complete",
+    "events": [
+      {
+        "id": "kve_79584db884b6478ea438561b6a803913",
+        "resourceRef": "res_e0ae9225a316fce4c97df5c23057b97a",
+        "severity": "warning",
+        "reason": "ProgressDeadlineExceeded",
+        "condition": "workload.progress-deadline-exceeded",
+        "firstObservedAt": "2026-08-16T10:26:52Z",
+        "lastObservedAt": "2026-08-16T10:29:54Z",
+        "occurrenceCount": 4,
+        "reportingController": "deployment-controller",
+        "message": "The Deployment exceeded its configured progress deadline."
+      }
+    ],
+    "summary": {
+      "eventCount": 1,
+      "warningEventCount": 1
+    },
+    "warnings": []
+  }
+}

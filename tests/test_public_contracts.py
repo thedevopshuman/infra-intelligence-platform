@@ -14,6 +14,9 @@ from infra_intelligence_sdk import (
     EvaluationScenario,
     InvestigationReport,
     InvestigationRequest,
+    InvestigationKubernetesEventAssessment,
+    InvestigationKubernetesEventInterpretation,
+    InvestigationKubernetesEventSelection,
     InvestigationTelemetryAssessment,
     InvestigationTelemetryBaselineAssessment,
     InvestigationTelemetryBaselineComparison,
@@ -21,6 +24,8 @@ from infra_intelligence_sdk import (
     InvestigationTelemetrySelection,
     IngestionFreshnessReport,
     IntegrationConfig,
+    KubernetesEventEvidenceRequest,
+    KubernetesEventEvidenceResult,
     OtlpMetricsEvidence,
     PluginSession,
     ResourceCollectionRequest,
@@ -53,12 +58,18 @@ class PublicContractSdkTests(unittest.TestCase):
         baseline_investigation = InvestigationRequest.from_dict(
             example("investigation-request-telemetry-baseline.json")
         )
+        event_investigation = InvestigationRequest.from_dict(
+            example("investigation-request-kubernetes-events.json")
+        )
         report = InvestigationReport.from_dict(example("investigation-report.json"))
         telemetry_report = InvestigationReport.from_dict(
             example("investigation-report-telemetry.json")
         )
         baseline_report = InvestigationReport.from_dict(
             example("investigation-report-telemetry-baseline.json")
+        )
+        event_report = InvestigationReport.from_dict(
+            example("investigation-report-kubernetes-events.json")
         )
         freshness = IngestionFreshnessReport.from_dict(
             example("ingestion-freshness-report.json")
@@ -85,6 +96,12 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         telemetry_result = TelemetryEvidenceResult.from_dict(
             example("telemetry-evidence-result.json")
+        )
+        event_request = KubernetesEventEvidenceRequest.from_dict(
+            example("kubernetes-event-evidence-request.json")
+        )
+        event_result = KubernetesEventEvidenceResult.from_dict(
+            example("kubernetes-event-evidence-result.json")
         )
         otlp_metrics = OtlpMetricsEvidence.from_dict(
             example("otlp-metrics-evidence.json")
@@ -124,6 +141,19 @@ class PublicContractSdkTests(unittest.TestCase):
             baseline_assessment.to_dict()["assessmentType"],
             "baseline-comparison",
         )
+        event_selection = event_investigation.kubernetes_event_selections[0]
+        self.assertIsInstance(event_selection, InvestigationKubernetesEventSelection)
+        self.assertIsInstance(
+            event_selection.interpretation,
+            InvestigationKubernetesEventInterpretation,
+        )
+        event_assessment = event_report.kubernetes_event_assessments[0]
+        self.assertIsInstance(
+            event_assessment,
+            InvestigationKubernetesEventAssessment,
+        )
+        self.assertEqual(event_assessment.matched_event_count, 1)
+        self.assertEqual(event_assessment.disposition, "supporting")
         self.assertEqual(report.to_dict()["kind"], "InvestigationReport")
         self.assertEqual(freshness.to_dict()["kind"], "IngestionFreshnessReport")
         self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")
@@ -149,6 +179,12 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         self.assertEqual(
             telemetry_result.to_dict()["kind"], "TelemetryEvidenceResult"
+        )
+        self.assertEqual(
+            event_request.to_dict()["kind"], "KubernetesEventEvidenceRequest"
+        )
+        self.assertEqual(
+            event_result.to_dict()["kind"], "KubernetesEventEvidenceResult"
         )
         self.assertEqual(otlp_metrics.to_dict()["kind"], "OtlpMetricsEvidence")
 
@@ -179,6 +215,12 @@ class PublicContractSdkTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(ValueError, "kind must be OtlpMetricsEvidence"):
             OtlpMetricsEvidence.from_dict(example("telemetry-evidence-result.json"))
+        with self.assertRaisesRegex(
+            ValueError, "kind must be KubernetesEventEvidenceRequest"
+        ):
+            KubernetesEventEvidenceRequest.from_dict(
+                example("kubernetes-event-evidence-result.json")
+            )
 
     def test_sdk_models_reject_unknown_versions(self) -> None:
         payload = example("investigation-request.json")
@@ -310,6 +352,24 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn(
             "telemetry supporting Evidence must cite its hypothesis",
+            self.errors,
+        )
+
+    def test_kubernetes_event_assessment_must_match_its_declared_rule(self) -> None:
+        path = (
+            ROOT
+            / "contracts"
+            / "examples"
+            / "investigation-report-kubernetes-events.json"
+        )
+        report = copy.deepcopy(self.documents[path])
+        report["spec"]["kubernetesEventAssessments"][0]["minMatches"] = 2
+        self.documents[path] = report
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "Kubernetes Event assessment minMatches must match its request",
             self.errors,
         )
 

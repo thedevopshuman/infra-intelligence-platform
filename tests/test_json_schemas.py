@@ -285,6 +285,52 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("warnings" in error for error in errors))
 
+    def test_kubernetes_event_request_rejects_provider_arguments(self) -> None:
+        request = document(
+            "contracts/examples/kubernetes-event-evidence-request.json"
+        )
+        request["spec"]["query"]["fieldSelector"] = "type=Warning"
+
+        errors = self.validate(
+            "kubernetes-event-evidence-request.schema.json", request
+        )
+
+        self.assertTrue(any("fieldSelector" in error for error in errors))
+
+    def test_no_data_kubernetes_event_result_cannot_contain_events(self) -> None:
+        result = document(
+            "contracts/examples/kubernetes-event-evidence-result.json"
+        )
+        result["spec"]["status"] = "no-data"
+
+        errors = self.validate(
+            "kubernetes-event-evidence-result.schema.json", result
+        )
+
+        self.assertTrue(any("events" in error for error in errors))
+
+    def test_event_interpretation_requires_root_cause_scope(self) -> None:
+        request = document(
+            "contracts/examples/investigation-request-kubernetes-events.json"
+        )
+        del request["spec"]["kubernetesEventSelections"][0]["rootCauseClasses"]
+
+        errors = self.validate("investigation-request.schema.json", request)
+
+        self.assertTrue(any("rootCauseClasses" in error for error in errors))
+
+    def test_event_no_data_assessment_rejects_match_details(self) -> None:
+        report = document(
+            "contracts/examples/investigation-report-kubernetes-events.json"
+        )
+        report["spec"]["kubernetesEventAssessments"][0][
+            "disposition"
+        ] = "no-data"
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(errors)
+
     def test_otlp_gauge_prohibits_sum_semantics(self) -> None:
         result = document("contracts/examples/otlp-metrics-evidence.json")
         gauge = result["spec"]["series"][1]

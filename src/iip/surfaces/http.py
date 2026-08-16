@@ -48,6 +48,10 @@ from iip.application.investigate import (
     InvalidInvestigationError,
     RunInvestigationCommand,
 )
+from iip.application.kubernetes_event_evidence import (
+    CollectKubernetesEventEvidenceCommand,
+    InvalidKubernetesEventEvidenceRequestError,
+)
 from iip.application.observe_ingestion import (
     GetIngestionFreshnessCommand,
     IngestionSourceNotFoundError,
@@ -201,6 +205,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             in (
                 "/v1/resources",
                 "/v1/collections/ingest",
+                "/v1/evidence/kubernetes/events/queries",
                 "/v1/evidence/telemetry/queries",
                 "/v1/investigations",
                 "/v1/actions/proposals",
@@ -241,6 +246,11 @@ class ApiHandler(BaseHTTPRequestHandler):
             elif path == "/v1/evidence/telemetry/queries":
                 document = self.runtime.telemetry_evidence.execute(
                     CollectTelemetryEvidenceCommand(actor, payload)
+                )
+                status = HTTPStatus.CREATED
+            elif path == "/v1/evidence/kubernetes/events/queries":
+                document = self.runtime.kubernetes_event_evidence.execute(
+                    CollectKubernetesEventEvidenceCommand(actor, payload)
                 )
                 status = HTTPStatus.CREATED
             elif path == "/v1/investigations":
@@ -310,10 +320,20 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": str(exc)}})
         except CollectionConflictError as exc:
             self._json(HTTPStatus.CONFLICT, {"error": {"code": str(exc)}})
-        except (InvalidTelemetryEvidenceRequestError, InvalidEvidenceRequestError):
+        except InvalidKubernetesEventEvidenceRequestError:
             self._json(
                 HTTPStatus.BAD_REQUEST,
-                {"error": {"code": "telemetry.request.invalid"}},
+                {"error": {"code": "kubernetes.event.request.invalid"}},
+            )
+        except (InvalidTelemetryEvidenceRequestError, InvalidEvidenceRequestError):
+            code = (
+                "kubernetes.event.request.invalid"
+                if path == "/v1/evidence/kubernetes/events/queries"
+                else "telemetry.request.invalid"
+            )
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": code}},
             )
         except EvidenceAuthorizationError:
             self._json(HTTPStatus.FORBIDDEN, {"error": {"code": "policy.denied"}})

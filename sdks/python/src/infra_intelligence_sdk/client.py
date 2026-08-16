@@ -17,6 +17,7 @@ from .models import (
     IngestionFreshnessReport,
     InvestigationReport,
     InvestigationRequest,
+    KubernetesEventEvidenceRequest,
     PluginSession,
     ResourceCollectionRequest,
     ResourceCollectionResult,
@@ -170,6 +171,18 @@ class Client:
 
         return Evidence.from_dict(
             self._post("/v1/evidence/telemetry/queries", request.to_dict())
+        )
+
+    def collect_kubernetes_event_evidence(
+        self, request: KubernetesEventEvidenceRequest
+    ) -> Evidence:
+        """Collect normalized Kubernetes Event evidence through its adapter."""
+
+        return Evidence.from_dict(
+            self._post(
+                "/v1/evidence/kubernetes/events/queries",
+                request.to_dict(),
+            )
         )
 
     def propose_action(self, command: Mapping[str, Any]) -> ActionProposal:

@@ -10,6 +10,7 @@ from iip.adapters.actions import KubernetesRestartDryRunExecutor
 from iip.adapters.auth import DenyAllAuthenticator, HashedBearerAuthenticator
 from iip.adapters.evidence import (
     InMemoryEvidenceStore,
+    NoDataKubernetesEventsBackend,
     NoDataTelemetryMetricsBackend,
     ResourceStateEvidenceProvider,
     StructuredTextRedactor,
@@ -32,11 +33,16 @@ from iip.application.ports import (
     EventLog,
     EventOutbox,
     IngestionTelemetrySink,
+    KubernetesEventsBackend,
     ResourceRepository,
     SourceCheckpointRepository,
     TelemetryMetricsBackend,
 )
 from iip.application.investigate import DeterministicInvestigationService
+from iip.application.kubernetes_event_evidence import (
+    KubernetesEventEvidenceService,
+    KubernetesEventsEvidenceProvider,
+)
 from iip.application.ingest_resource import ResourceIngestionService
 from iip.application.observe_ingestion import (
     IngestionFreshnessObjectives,
@@ -66,6 +72,7 @@ class Runtime:
     ingestion_telemetry: IngestionFreshnessService
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
+    kubernetes_event_evidence: KubernetesEventEvidenceService
     telemetry_evidence: TelemetryEvidenceService
     otlp_metrics_ingestion: OtlpMetricsIngestionService | None
     investigations: DeterministicInvestigationService
@@ -91,6 +98,7 @@ def build_local_runtime(
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
+    kubernetes_events_backend: KubernetesEventsBackend | None = None,
     otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
 ) -> Runtime:
@@ -107,6 +115,7 @@ def build_local_runtime(
         ingestion_objectives,
         ingestion_telemetry_sink,
         telemetry_metrics_backend,
+        kubernetes_events_backend,
         otlp_metrics_receiver,
         telemetry_runtime,
     )
@@ -120,6 +129,7 @@ def _compose_runtime(
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
+    kubernetes_events_backend: KubernetesEventsBackend | None = None,
     otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
 ) -> Runtime:
@@ -135,10 +145,17 @@ def _compose_runtime(
         else NoDataTelemetryMetricsBackend(clock)
     )
     telemetry_provider = TelemetryMetricsEvidenceProvider(metrics_backend)
+    event_backend = (
+        kubernetes_events_backend
+        if kubernetes_events_backend is not None
+        else NoDataKubernetesEventsBackend(clock)
+    )
+    kubernetes_event_provider = KubernetesEventsEvidenceProvider(event_backend, store)
     evidence = EvidenceCollectionService(
         store,
         {
             "resource-state": ResourceStateEvidenceProvider(store),
+            "kubernetes-events": kubernetes_event_provider,
             "telemetry-query": telemetry_provider,
         },
         evidence_store,
@@ -148,6 +165,7 @@ def _compose_runtime(
         clock,
     )
     telemetry_evidence = TelemetryEvidenceService(evidence, clock)
+    kubernetes_event_evidence = KubernetesEventEvidenceService(evidence, clock)
     return Runtime(
         authenticator=authenticator,
         resources=store,
@@ -171,6 +189,7 @@ def _compose_runtime(
         ),
         queries=queries,
         evidence=evidence,
+        kubernetes_event_evidence=kubernetes_event_evidence,
         telemetry_evidence=telemetry_evidence,
         otlp_metrics_ingestion=(
             OtlpMetricsIngestionService(otlp_metrics_receiver, evidence, clock)
@@ -182,6 +201,7 @@ def _compose_runtime(
             evidence,
             operational,
             clock,
+            kubernetes_events=kubernetes_event_evidence,
             telemetry=telemetry_evidence,
             evidence_store=evidence_store,
         ),
@@ -208,6 +228,7 @@ def build_postgres_runtime(
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
+    kubernetes_events_backend: KubernetesEventsBackend | None = None,
     otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
 ) -> Runtime:
@@ -227,6 +248,7 @@ def build_postgres_runtime(
         ingestion_objectives,
         ingestion_telemetry_sink,
         telemetry_metrics_backend,
+        kubernetes_events_backend,
         otlp_metrics_receiver,
         telemetry_runtime,
     )

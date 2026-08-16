@@ -23,3 +23,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0017](0017-investigation-telemetry-selection.md) | Accepted | Select bounded telemetry queries inside investigations |
 | [0018](0018-evidence-aware-metric-assessment.md) | Accepted | Assess stored metric evidence with declared threshold rules |
 | [0019](0019-baseline-window-telemetry-assessment.md) | Accepted | Compare ordered telemetry windows inside one committed artifact |
+| [0020](0020-kubernetes-event-evidence-and-correlation.md) | Accepted | Normalize Kubernetes Events as evidence before investigation correlation |

@@ -32,6 +32,10 @@ A root-cause-scoped candidate may declare an `interpretation`. The rule fixes a 
 
 Alternatively, a root-cause-scoped candidate may declare `baselineComparison`; a selection cannot declare both rule forms. It fixes the same statistic, unit, operator, threshold, and dispositions plus ordered baseline/evaluation time ranges and either `difference` or `ratio`. Both ranges are subranges of the inherited investigation scope and must satisfy `scope.start <= baseline.start < baseline.end < evaluation.start < evaluation.end <= scope.end`. This is still one query over the investigation scope and one immutable artifact, not two hidden backend calls.
 
+`kubernetesEventSelections` is a separate optional ordered list for customer Kubernetes Events. Each candidate reuses the public Kubernetes Event query and limits and inherits authenticated investigation identity, resource scope, time range, and deadline. It cannot contain a Kubernetes endpoint, credential, kubeconfig, raw command, or cluster-wide selector. Eligible event selections run before telemetry selections; each attempt consumes one tool call, and each committed artifact consumes one evidence item.
+
+A root-cause-scoped event candidate may declare an interpretation consisting of normalized condition keys, a positive minimum match count within `maxEvents`, and distinct matched/unmatched dispositions. Complete stored evidence records the matching event IDs/count and applies the declared disposition. Explicitly empty evidence is `no-data`, partial evidence is `incomplete`, and corrupt or mismatched evidence becomes a stable unknown. The investigator never assesses the backend's raw Kubernetes objects or response text.
+
 Application validation requires the scope start to precede its end. It also rejects resource references outside the authenticated tenant and budget values above tenant policy. `propose` permits structured recommendations or future action proposals but no side effect, approval, or execution.
 
 ## Investigation report
@@ -43,6 +47,7 @@ Every terminal path returns a report, including policy denial, cancellation, run
 - selected agent version, immutable manifest digest, and policy-selected model class when selection occurred;
 - ranked hypotheses with confidence and supporting and contradicting evidence IDs;
 - structured telemetry assessments when a declared metric rule was evaluated;
+- structured Kubernetes Event assessments when a declared condition rule was evaluated;
 - explicit unknowns and the evidence types needed to resolve them;
 - ordered operational recommendations without embedded mutations;
 - the complete evidence-ID set plus tool-ledger and policy-snapshot references; and
@@ -66,6 +71,8 @@ For a baseline assessment, the runtime splits only the finite points already pre
 
 In the deterministic reference runtime, metric assessment does not reclassify the resource-derived root cause or silently change confidence, rank, or terminal outcome. Contradicting evidence remains explicit for a later evaluator or human reviewer.
 
+The same restraint applies to Kubernetes Event assessments. Supporting and contradicting dispositions add the committed Evidence ID to the matching hypothesis. Neutral, no-data, and incomplete assessments remain visible without becoming citations. Event facts enrich the audit trail but do not secretly rewrite classification or confidence.
+
 ## Authority and lifecycle boundary
 
 The investigation report may recommend a next check, monitoring step, or escalation. It cannot encode an executable mutation. A future action proposal is a separate immutable contract and workflow that receives a current policy decision, idempotency key, approval when required, and audit trail.
@@ -82,6 +89,7 @@ In addition to JSON Schema validation:
 - timestamps must satisfy `requestedAt <= startedAt <= completedAt <= createdAt`;
 - every citation must belong to the report evidence set and authenticated tenant;
 - every telemetry assessment must reference report Evidence and the selected root-cause class;
+- every Kubernetes Event assessment must reference report Evidence, its declared selection rule, and the selected root-cause class;
 - baseline and evaluation windows must be ordered, non-overlapping subranges of the request scope, and a reported comparison must match its declared calculation and unit;
 - selected tools and authority must remain within all applicable upper bounds; and
 - usage counters must be checked against the accepted budgets and any stricter policy limits.

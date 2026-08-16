@@ -44,6 +44,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0017-investigation-telemetry-selection.md",
     "docs/decisions/0018-evidence-aware-metric-assessment.md",
     "docs/decisions/0019-baseline-window-telemetry-assessment.md",
+    "docs/decisions/0020-kubernetes-event-evidence-and-correlation.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/otlp-metrics-receiver.md",
@@ -65,6 +66,8 @@ REQUIRED_PATHS = (
     "contracts/schemas/agent-manifest.schema.json",
     "contracts/schemas/plugin-manifest.schema.json",
     "contracts/schemas/evidence.schema.json",
+    "contracts/schemas/kubernetes-event-evidence-request.schema.json",
+    "contracts/schemas/kubernetes-event-evidence-result.schema.json",
     "contracts/schemas/telemetry-evidence-request.schema.json",
     "contracts/schemas/telemetry-evidence-result.schema.json",
     "contracts/schemas/otlp-metrics-evidence.schema.json",
@@ -73,6 +76,8 @@ REQUIRED_PATHS = (
     "contracts/schemas/ingestion-freshness-report.schema.json",
     "contracts/schemas/evaluation-scenario.schema.json",
     "contracts/examples/evidence.json",
+    "contracts/examples/kubernetes-event-evidence-request.json",
+    "contracts/examples/kubernetes-event-evidence-result.json",
     "contracts/examples/telemetry-evidence-request.json",
     "contracts/examples/telemetry-evidence-result.json",
     "contracts/examples/otlp-metrics-evidence.json",
@@ -82,9 +87,11 @@ REQUIRED_PATHS = (
     "contracts/examples/action-result.json",
     "contracts/examples/plugin-session.json",
     "contracts/examples/investigation-request.json",
+    "contracts/examples/investigation-request-kubernetes-events.json",
     "contracts/examples/investigation-request-telemetry.json",
     "contracts/examples/investigation-request-telemetry-baseline.json",
     "contracts/examples/investigation-report.json",
+    "contracts/examples/investigation-report-kubernetes-events.json",
     "contracts/examples/investigation-report-telemetry.json",
     "contracts/examples/investigation-report-telemetry-baseline.json",
     "contracts/examples/ingestion-freshness-report.json",
@@ -97,6 +104,7 @@ REQUIRED_PATHS = (
     "contracts/examples/page-info.json",
     "contracts/examples/error.json",
     "docs/specifications/evidence-contract.md",
+    "docs/specifications/kubernetes-event-evidence-contract.md",
     "docs/specifications/telemetry-evidence-contract.md",
     "docs/specifications/otlp-metrics-evidence-contract.md",
     "docs/specifications/integration-config-contract.md",
@@ -111,6 +119,7 @@ REQUIRED_PATHS = (
     "requirements/verify.txt",
     "scripts/validate_schemas.py",
     "src/iip/application/collect_evidence.py",
+    "src/iip/application/kubernetes_event_evidence.py",
     "src/iip/application/telemetry_evidence.py",
     "src/iip/application/ingest_otlp_metrics.py",
     "src/iip/application/observe_ingestion.py",
@@ -121,6 +130,7 @@ REQUIRED_PATHS = (
     "src/iip/adapters/otlp_receiver.py",
     "src/iip/adapters/postgres/migrations/0006_source_checkpoint_provider_cursors.sql",
     "tests/test_evidence_collection.py",
+    "tests/test_kubernetes_event_evidence.py",
     "tests/test_telemetry_evidence.py",
     "tests/test_ingestion_freshness.py",
     "tests/test_authentication.py",
@@ -691,6 +701,181 @@ def validate_evaluation_scenario(
         fail(errors, "evaluation scenario scoring weights must sum to 100")
 
 
+def validate_kubernetes_event_evidence_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check Kubernetes Event request/result links beyond JSON Schema."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    request = documents.get(example_dir / "kubernetes-event-evidence-request.json")
+    result = documents.get(example_dir / "kubernetes-event-evidence-result.json")
+    if not isinstance(request, dict) or not isinstance(result, dict):
+        return
+    request_metadata = request.get("metadata")
+    request_spec = request.get("spec")
+    result_metadata = result.get("metadata")
+    result_spec = result.get("spec")
+    if not all(
+        isinstance(item, dict)
+        for item in (request_metadata, request_spec, result_metadata, result_spec)
+    ):
+        return
+    for field in ("requestId", "tenantId"):
+        if result_metadata.get(field) != request_metadata.get(field):
+            fail(errors, f"Kubernetes Event result {field} must match its request")
+    if result_metadata.get("integrationId") != request_spec.get("integrationId"):
+        fail(errors, "Kubernetes Event result integrationId must match its request")
+    if result_spec.get("requestDigest") != canonical_digest(request):
+        fail(errors, "Kubernetes Event result digest must match its request")
+    if result_spec.get("timeRange") != request_spec.get("timeRange"):
+        fail(errors, "Kubernetes Event result timeRange must match its request")
+
+    time_range = request_spec.get("timeRange")
+    start = end = None
+    if isinstance(time_range, dict):
+        start = parse_timestamp(time_range.get("start"))
+        end = parse_timestamp(time_range.get("end"))
+    requested_at = parse_timestamp(request_metadata.get("requestedAt"))
+    created_at = parse_timestamp(result_metadata.get("createdAt"))
+    deadline = parse_timestamp(request_spec.get("deadline"))
+    if (
+        None in (start, end, requested_at, created_at, deadline)
+        or not start < end <= requested_at <= created_at <= deadline
+    ):
+        fail(errors, "Kubernetes Event evidence example times must be monotonic")
+
+    events = result_spec.get("events")
+    summary = result_spec.get("summary")
+    query = request_spec.get("query")
+    limits = request_spec.get("limits")
+    resource_refs = set(request_spec.get("resourceRefs", []))
+    if not isinstance(events, list) or not isinstance(summary, dict):
+        return
+    event_ids = set()
+    sort_keys = []
+    warning_count = 0
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        event_id = event.get("id")
+        if event_id in event_ids:
+            fail(errors, "Kubernetes Event result IDs must be unique")
+        event_ids.add(event_id)
+        if event.get("resourceRef") not in resource_refs:
+            fail(errors, "Kubernetes Event result resource must fit its request")
+        if isinstance(query, dict):
+            severities = query.get("severities", [])
+            reasons = query.get("reasons", [])
+            if severities and event.get("severity") not in severities:
+                fail(errors, "Kubernetes Event severity must fit its request")
+            if reasons and event.get("reason") not in reasons:
+                fail(errors, "Kubernetes Event reason must fit its request")
+        first = parse_timestamp(event.get("firstObservedAt"))
+        last = parse_timestamp(event.get("lastObservedAt"))
+        if (
+            None in (first, last, start, end)
+            or not start <= first <= last <= end
+        ):
+            fail(errors, "Kubernetes Event occurrence must fit its request range")
+        sort_keys.append((event.get("lastObservedAt"), event_id))
+        warning_count += event.get("severity") == "warning"
+    if sort_keys != sorted(sort_keys):
+        fail(errors, "Kubernetes Event result must use deterministic order")
+    if summary.get("eventCount") != len(events) or summary.get(
+        "warningEventCount"
+    ) != warning_count:
+        fail(errors, "Kubernetes Event summary must match its events")
+    if isinstance(limits, dict) and len(events) > limits.get("maxEvents", -1):
+        fail(errors, "Kubernetes Event result must fit request limits")
+
+
+def validate_investigation_kubernetes_event_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check event investigation request/report links beyond JSON Schema."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    request = documents.get(
+        example_dir / "investigation-request-kubernetes-events.json"
+    )
+    report = documents.get(
+        example_dir / "investigation-report-kubernetes-events.json"
+    )
+    if not isinstance(request, dict) or not isinstance(report, dict):
+        return
+    request_metadata = request.get("metadata")
+    request_spec = request.get("spec")
+    report_metadata = report.get("metadata")
+    report_spec = report.get("spec")
+    if not all(
+        isinstance(item, dict)
+        for item in (request_metadata, request_spec, report_metadata, report_spec)
+    ):
+        return
+    if report_metadata.get("id") != request_metadata.get("id"):
+        fail(errors, "Kubernetes Event investigation examples must share an ID")
+    if report_metadata.get("tenantId") != request_metadata.get("tenantId"):
+        fail(errors, "Kubernetes Event investigation examples must share a tenant")
+    if report_spec.get("requestDigest") != canonical_digest(request):
+        fail(errors, "Kubernetes Event investigation report digest must match its request")
+    if report_spec.get("scope") != request_spec.get("scope"):
+        fail(errors, "Kubernetes Event investigation report scope must match its request")
+
+    selections = request_spec.get("kubernetesEventSelections", [])
+    selections_by_id = {
+        item.get("id"): item for item in selections if isinstance(item, dict)
+    }
+    report_evidence = set(report_spec.get("evidenceIds", []))
+    hypotheses = report_spec.get("hypotheses", [])
+    hypothesis_by_class = {
+        item.get("rootCauseClass"): item
+        for item in hypotheses
+        if isinstance(item, dict)
+    }
+    assessments = report_spec.get("kubernetesEventAssessments", [])
+    for assessment in assessments if isinstance(assessments, list) else []:
+        if not isinstance(assessment, dict):
+            continue
+        selection = selections_by_id.get(assessment.get("selectionId"))
+        if not isinstance(selection, dict):
+            fail(errors, "Kubernetes Event assessment selectionId must resolve")
+            continue
+        rule = selection.get("interpretation")
+        if not isinstance(rule, dict):
+            fail(errors, "Kubernetes Event assessment requires its declared rule")
+            continue
+        for field in ("conditions", "minMatches"):
+            if assessment.get(field) != rule.get(field):
+                fail(errors, f"Kubernetes Event assessment {field} must match its request")
+        root_cause = assessment.get("rootCauseClass")
+        if root_cause not in selection.get("rootCauseClasses", []):
+            fail(errors, "Kubernetes Event assessment root cause must fit its selection")
+        evidence_id = assessment.get("evidenceId")
+        if evidence_id not in report_evidence:
+            fail(errors, "Kubernetes Event assessment Evidence must belong to its report")
+        matched_ids = assessment.get("matchedEventIds")
+        if isinstance(matched_ids, list) and assessment.get("matchedEventCount") != len(
+            matched_ids
+        ):
+            fail(errors, "Kubernetes Event matched count must match its IDs")
+        hypothesis = hypothesis_by_class.get(root_cause)
+        disposition = assessment.get("disposition")
+        if isinstance(hypothesis, dict) and disposition in {
+            "supporting",
+            "contradicting",
+        }:
+            field = (
+                "supportingEvidenceIds"
+                if disposition == "supporting"
+                else "contradictingEvidenceIds"
+            )
+            if evidence_id not in hypothesis.get(field, []):
+                fail(
+                    errors,
+                    f"Kubernetes Event {disposition} Evidence must cite its hypothesis",
+                )
+
+
 def validate_telemetry_evidence_examples(
     documents: Mapping[Path, object], errors: List[str]
 ) -> None:
@@ -1125,10 +1310,20 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("evidence.json", "Evidence"),
         ("telemetry-evidence-request.json", "TelemetryEvidenceRequest"),
         ("telemetry-evidence-result.json", "TelemetryEvidenceResult"),
+        (
+            "kubernetes-event-evidence-request.json",
+            "KubernetesEventEvidenceRequest",
+        ),
+        (
+            "kubernetes-event-evidence-result.json",
+            "KubernetesEventEvidenceResult",
+        ),
         ("otlp-metrics-evidence.json", "OtlpMetricsEvidence"),
         ("investigation-request.json", "InvestigationRequest"),
+        ("investigation-request-kubernetes-events.json", "InvestigationRequest"),
         ("investigation-report.json", "InvestigationReport"),
         ("investigation-report-telemetry.json", "InvestigationReport"),
+        ("investigation-report-kubernetes-events.json", "InvestigationReport"),
         ("investigation-report-telemetry-baseline.json", "InvestigationReport"),
         ("ingestion-freshness-report.json", "IngestionFreshnessReport"),
         ("evaluation-scenario.json", "EvaluationScenario"),
@@ -1143,6 +1338,8 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
 
     validate_collection_examples(documents, errors)
     validate_resource_query_examples(documents, errors)
+    validate_kubernetes_event_evidence_examples(documents, errors)
+    validate_investigation_kubernetes_event_examples(documents, errors)
     validate_telemetry_evidence_examples(documents, errors)
     validate_investigation_telemetry_examples(documents, errors)
     validate_otlp_metrics_evidence_example(documents, errors)

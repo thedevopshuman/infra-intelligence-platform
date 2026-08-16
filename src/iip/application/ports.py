@@ -240,6 +240,60 @@ class TelemetryMetricsResult:
 
 
 @dataclass(frozen=True)
+class KubernetesEventResourceRef:
+    """Scoped platform identity plus the external identity an adapter may query."""
+
+    platform_uid: str
+    provider: str
+    resource_type: str
+    external_id: str
+
+
+@dataclass(frozen=True)
+class KubernetesEventQuery:
+    """Credential-free normalized Kubernetes Event query for one integration."""
+
+    tenant_id: str
+    actor_id: str
+    request_id: str
+    integration_id: str
+    resources: tuple[KubernetesEventResourceRef, ...]
+    start: str
+    end: str
+    severities: tuple[str, ...]
+    reasons: tuple[str, ...]
+    max_events: int
+    max_bytes: int
+    deadline: str
+
+
+@dataclass(frozen=True)
+class KubernetesEventRecord:
+    """One untrusted normalized event returned by a Kubernetes adapter."""
+
+    event_id: str
+    resource_uid: str
+    severity: str
+    reason: str
+    condition: str
+    first_observed_at: str
+    last_observed_at: str
+    occurrence_count: int
+    reporting_controller: Optional[str] = None
+    message: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class KubernetesEventsResult:
+    """Untrusted bounded event result returned by a Kubernetes adapter."""
+
+    executed_at: str
+    status: str
+    events: tuple[KubernetesEventRecord, ...]
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class CredentialLeaseRequest:
     """Exact request scope supplied to a credential broker by an adapter."""
 
@@ -433,6 +487,11 @@ class EvidenceProvider(Protocol):
 class TelemetryMetricsBackend(Protocol):
     def query_metrics(self, request: TelemetryMetricsQuery) -> TelemetryMetricsResult:
         """Query one configured backend without exposing credentials or vendor types."""
+
+
+class KubernetesEventsBackend(Protocol):
+    def query_events(self, request: KubernetesEventQuery) -> KubernetesEventsResult:
+        """Query scoped Kubernetes Events without exposing credentials or client types."""
 
 
 class CredentialBroker(Protocol):

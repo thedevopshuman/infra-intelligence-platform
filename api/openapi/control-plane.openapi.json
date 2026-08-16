@@ -3,7 +3,7 @@
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
     "version": "0.4.0",
-    "description": "Executable local reference API for collection ingestion, freshness telemetry, backend-neutral metric evidence, tenant-bound OTLP metrics intake, resource queries, investigation-driven telemetry selection and threshold/baseline assessment, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
+    "description": "Executable local reference API for collection ingestion, freshness telemetry, backend-neutral metric and Kubernetes Event evidence, tenant-bound OTLP metrics intake, resource queries, investigation-driven event/metric selection and committed-artifact assessment, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -204,6 +204,32 @@
         }
       }
     },
+    "/v1/evidence/kubernetes/events/queries": {
+      "post": {
+        "operationId": "collectKubernetesEventEvidence",
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/kubernetes-event-evidence-request.schema.json"}}}
+        },
+        "responses": {
+          "201": {"description": "Immutable Evidence envelope referencing the normalized Kubernetes Event result artifact", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/evidence.schema.json"}}}},
+          "400": {
+            "description": "Kubernetes Event request validation failed",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "kubernetes.event.request.invalid"}}}}
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "408": {
+            "description": "The bounded evidence deadline elapsed",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "evidence.deadline.exceeded"}}}}
+          },
+          "503": {
+            "description": "The Kubernetes Event provider, evidence processor, or store is unavailable",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "examples": {"provider": {"value": {"error": {"code": "evidence.provider.unavailable"}}}, "storage": {"value": {"error": {"code": "storage.unavailable"}}}}}}
+          }
+        }
+      }
+    },
     "/v1/evidence/{evidenceId}": {
       "get": {
         "operationId": "getEvidence",
@@ -219,7 +245,7 @@
     "/v1/investigations": {
       "post": {
         "operationId": "runInvestigation",
-        "description": "Run a bounded investigation. Optional telemetry selections inherit authenticated identity, resource/time scope, and investigation tool/evidence budgets before using the configured backend-neutral metrics adapter. Root-cause-scoped selections may apply either a declared unit-aware threshold rule or ordered baseline/evaluation windows to the one committed normalized artifact and record supporting, contradicting, neutral, no-data, or incomplete assessments.",
+        "description": "Run a bounded investigation. Optional Kubernetes Event and telemetry selections inherit authenticated identity, resource/time scope, and investigation tool/evidence budgets before using configured backend-neutral adapters. Root-cause-scoped selections assess only committed normalized artifacts and record supporting, contradicting, neutral, no-data, or incomplete results.",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-request.schema.json"}}}},
         "responses": {
           "201": {"description": "Immutable terminal investigation report", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-report.schema.json"}}}},
@@ -353,6 +379,8 @@
       "PageInfo": {"$ref": "../../contracts/schemas/page-info.schema.json"},
       "Event": {"$ref": "../../contracts/schemas/event.schema.json"},
       "Evidence": {"$ref": "../../contracts/schemas/evidence.schema.json"},
+      "KubernetesEventEvidenceRequest": {"$ref": "../../contracts/schemas/kubernetes-event-evidence-request.schema.json"},
+      "KubernetesEventEvidenceResult": {"$ref": "../../contracts/schemas/kubernetes-event-evidence-result.schema.json"},
       "TelemetryEvidenceRequest": {"$ref": "../../contracts/schemas/telemetry-evidence-request.schema.json"},
       "TelemetryEvidenceResult": {"$ref": "../../contracts/schemas/telemetry-evidence-result.schema.json"},
       "OtlpMetricsEvidence": {"$ref": "../../contracts/schemas/otlp-metrics-evidence.schema.json"},

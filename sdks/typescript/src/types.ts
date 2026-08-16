@@ -373,6 +373,65 @@ export interface TelemetryEvidenceResult {
   };
 }
 
+export interface KubernetesEventQuery {
+  severities: ("normal" | "warning")[];
+  reasons: string[];
+}
+
+export interface KubernetesEventEvidenceLimits {
+  maxEvents: number;
+  maxBytes: number;
+}
+
+export interface KubernetesEventEvidenceRequest {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "KubernetesEventEvidenceRequest";
+  metadata: {
+    requestId: `keq_${string}`;
+    tenantId: string;
+    actorId: string;
+    requestedAt: string;
+  };
+  spec: {
+    integrationId: string;
+    resourceRefs: ResourceUid[];
+    timeRange: { start: string; end: string };
+    query: KubernetesEventQuery;
+    limits: KubernetesEventEvidenceLimits;
+    deadline: string;
+  };
+}
+
+export interface KubernetesEventEvidenceResult {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "KubernetesEventEvidenceResult";
+  metadata: {
+    requestId: `keq_${string}`;
+    tenantId: string;
+    integrationId: string;
+    createdAt: string;
+  };
+  spec: {
+    requestDigest: Sha256Digest;
+    timeRange: { start: string; end: string };
+    status: "complete" | "partial" | "no-data";
+    events: {
+      id: `kve_${string}`;
+      resourceRef: ResourceUid;
+      severity: "normal" | "warning";
+      reason: string;
+      condition: string;
+      firstObservedAt: string;
+      lastObservedAt: string;
+      occurrenceCount: number;
+      reportingController?: string;
+      message?: string;
+    }[];
+    summary: { eventCount: number; warningEventCount: number };
+    warnings: ("backend-partial" | "event-limit")[];
+  };
+}
+
 export interface OtlpMetricsEvidence {
   apiVersion: "iip.platform/v1alpha1";
   kind: "OtlpMetricsEvidence";
@@ -441,6 +500,22 @@ export interface InvestigationTelemetrySelection {
   baselineComparison?: InvestigationTelemetryBaselineComparison;
 }
 
+export interface InvestigationKubernetesEventInterpretation {
+  conditions: string[];
+  minMatches: number;
+  whenMatched: "supports" | "contradicts" | "neutral";
+  whenNotMatched: "supports" | "contradicts" | "neutral";
+}
+
+export interface InvestigationKubernetesEventSelection {
+  id: `kes_${string}`;
+  integrationId: string;
+  rootCauseClasses?: string[];
+  query: KubernetesEventQuery;
+  limits: KubernetesEventEvidenceLimits;
+  interpretation?: InvestigationKubernetesEventInterpretation;
+}
+
 export interface InvestigationTelemetryInterpretation {
   statistic: "minimum" | "maximum" | "mean";
   unit: string;
@@ -487,6 +562,7 @@ export interface InvestigationRequest {
     };
     evidenceTypes?: string[];
     allowedTools?: string[];
+    kubernetesEventSelections?: InvestigationKubernetesEventSelection[];
     telemetrySelections?: InvestigationTelemetrySelection[];
     budgets: InvestigationBudgets;
     maxAuthority: "read" | "propose";
@@ -529,6 +605,22 @@ export interface InvestigationTelemetryAssessment {
   operator: "lt" | "lte" | "gt" | "gte";
   threshold: number;
   observedValue?: number;
+  disposition:
+    | "supporting"
+    | "contradicting"
+    | "neutral"
+    | "no-data"
+    | "incomplete";
+}
+
+export interface InvestigationKubernetesEventAssessment {
+  selectionId: `kes_${string}`;
+  evidenceId: EvidenceId;
+  rootCauseClass: string;
+  conditions: string[];
+  minMatches: number;
+  matchedEventCount?: number;
+  matchedEventIds?: `kve_${string}`[];
   disposition:
     | "supporting"
     | "contradicting"
@@ -598,6 +690,7 @@ export interface InvestigationReport {
       | InvestigationTelemetryAssessment
       | InvestigationTelemetryBaselineAssessment
     )[];
+    kubernetesEventAssessments?: InvestigationKubernetesEventAssessment[];
     evidenceIds: EvidenceId[];
     recommendations: InvestigationRecommendation[];
     toolCallLedgerRef: string;

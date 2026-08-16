@@ -28,3 +28,5 @@ Version 0.4 adds opaque provider cursor resume fields, ingestion-freshness telem
 Version 0.5 adds `InvestigationTelemetryInterpretation` and `InvestigationTelemetryAssessment`. Threshold rules are root-cause scoped, unit-aware, and evaluated server-side against committed normalized Evidence.
 
 Version 0.6 adds `InvestigationTelemetryBaselineComparison` and `InvestigationTelemetryBaselineAssessment`. Ordered baseline and evaluation subranges are evaluated from one committed normalized artifact as a difference or ratio, without adding a backend query.
+
+Version 0.7 adds `KubernetesEventEvidenceRequest`, `KubernetesEventEvidenceResult`, investigation event selection/assessment types, and `collectKubernetesEventEvidence`. These types contain normalized scope and facts only—never kubeconfig, credentials, endpoints, or Kubernetes client objects.

@@ -1,0 +1,27 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "KubernetesEventEvidenceRequest",
+  "metadata": {
+    "requestId": "keq_28f7d4ea459b4ce9835fbe8142ccdb11",
+    "tenantId": "local",
+    "actorId": "developer",
+    "requestedAt": "2026-08-16T10:30:00Z"
+  },
+  "spec": {
+    "integrationId": "kubernetes-local",
+    "resourceRefs": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+    "timeRange": {
+      "start": "2026-08-16T10:15:00Z",
+      "end": "2026-08-16T10:29:59Z"
+    },
+    "query": {
+      "severities": ["warning"],
+      "reasons": ["ProgressDeadlineExceeded"]
+    },
+    "limits": {
+      "maxEvents": 100,
+      "maxBytes": 524288
+    },
+    "deadline": "2026-08-16T10:31:00Z"
+  }
+}

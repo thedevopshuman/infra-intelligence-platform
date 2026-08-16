@@ -1,0 +1,67 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationRequest",
+  "metadata": {
+    "id": "inv_cafe28f7d4ea459b4ce9835fbe8142cc",
+    "tenantId": "local",
+    "actorId": "developer",
+    "requestedAt": "2026-08-16T10:30:00Z",
+    "correlationId": "incident-2026-08-16-api-progress-deadline"
+  },
+  "spec": {
+    "question": "Why did the api Deployment stop making rollout progress?",
+    "trigger": {
+      "type": "alert",
+      "source": "urn:iip:event:alertmanager",
+      "reference": "alert://local/api/unavailable-replicas",
+      "summary": "The api Deployment has fewer available replicas than requested."
+    },
+    "scope": {
+      "resourceUids": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+      "timeRange": {
+        "start": "2026-08-16T10:15:00Z",
+        "end": "2026-08-16T10:29:59Z"
+      }
+    },
+    "agentSelector": {
+      "id": "incident-investigator",
+      "version": "0.1.0"
+    },
+    "evidenceTypes": [
+      "kubernetes.resource-status",
+      "kubernetes.event"
+    ],
+    "allowedTools": ["evidence/fetch", "events/search"],
+    "kubernetesEventSelections": [
+      {
+        "id": "kes_28f7d4ea459b4ce9",
+        "integrationId": "kubernetes-local",
+        "rootCauseClasses": ["kubernetes.rollout.unavailable-replicas"],
+        "query": {
+          "severities": ["warning"],
+          "reasons": ["ProgressDeadlineExceeded"]
+        },
+        "limits": {
+          "maxEvents": 100,
+          "maxBytes": 524288
+        },
+        "interpretation": {
+          "conditions": ["workload.progress-deadline-exceeded"],
+          "minMatches": 1,
+          "whenMatched": "supports",
+          "whenNotMatched": "neutral"
+        }
+      }
+    ],
+    "budgets": {
+      "maxToolCalls": 8,
+      "maxWallTimeSeconds": 180,
+      "maxModelTokens": 50000,
+      "maxCostUsd": 1,
+      "maxEvidenceItems": 16,
+      "maxIterations": 8
+    },
+    "maxAuthority": "read",
+    "priority": "high"
+  }
+}

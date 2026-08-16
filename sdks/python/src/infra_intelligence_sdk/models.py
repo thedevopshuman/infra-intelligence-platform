@@ -303,6 +303,46 @@ class TelemetryEvidenceResult:
 
 
 @dataclass(frozen=True)
+class KubernetesEventEvidenceRequest:
+    """Bounded backend-neutral request for tenant-scoped Kubernetes Events."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "KubernetesEventEvidenceRequest":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="KubernetesEventEvidenceRequest",
+                label="Kubernetes Event evidence request",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class KubernetesEventEvidenceResult:
+    """Normalized Kubernetes Events stored as an immutable evidence artifact."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "KubernetesEventEvidenceResult":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="KubernetesEventEvidenceResult",
+                label="Kubernetes Event evidence result",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class OtlpMetricsEvidence:
     """Normalized artifact produced by a tenant-bound OTLP metrics channel."""
 
@@ -774,6 +814,190 @@ class InvestigationTelemetryBaselineAssessment:
 
 
 @dataclass(frozen=True)
+class InvestigationKubernetesEventInterpretation:
+    """Closed condition-count rule declared by an investigation caller."""
+
+    conditions: tuple[str, ...]
+    min_matches: int
+    when_matched: str
+    when_not_matched: str
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationKubernetesEventInterpretation":
+        conditions = payload.get("conditions")
+        min_matches = payload.get("minMatches")
+        dispositions = ("supports", "contradicts", "neutral")
+        if (
+            not isinstance(conditions, list)
+            or not conditions
+            or any(not isinstance(condition, str) for condition in conditions)
+            or len(conditions) != len(set(conditions))
+            or not isinstance(min_matches, int)
+            or isinstance(min_matches, bool)
+            or min_matches < 1
+            or payload.get("whenMatched") not in dispositions
+            or payload.get("whenNotMatched") not in dispositions
+            or payload.get("whenMatched") == payload.get("whenNotMatched")
+        ):
+            raise ValueError("investigation Kubernetes Event interpretation is invalid")
+        return cls(
+            conditions=tuple(conditions),
+            min_matches=min_matches,
+            when_matched=payload["whenMatched"],
+            when_not_matched=payload["whenNotMatched"],
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "conditions": list(self.conditions),
+            "minMatches": self.min_matches,
+            "whenMatched": self.when_matched,
+            "whenNotMatched": self.when_not_matched,
+        }
+
+
+@dataclass(frozen=True)
+class InvestigationKubernetesEventSelection:
+    """Provider-neutral event candidate bounded by an investigation request."""
+
+    selection_id: str
+    integration_id: str
+    query: Mapping[str, Any]
+    limits: Mapping[str, Any]
+    root_cause_classes: tuple[str, ...] = ()
+    interpretation: Optional[InvestigationKubernetesEventInterpretation] = None
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationKubernetesEventSelection":
+        selection_id = payload.get("id")
+        integration_id = payload.get("integrationId")
+        query = payload.get("query")
+        limits = payload.get("limits")
+        classes = payload.get("rootCauseClasses", [])
+        interpretation = payload.get("interpretation")
+        if not isinstance(selection_id, str) or not selection_id.startswith("kes_"):
+            raise ValueError("investigation Kubernetes Event selection id is invalid")
+        if not isinstance(integration_id, str) or not integration_id:
+            raise ValueError("investigation Kubernetes Event integrationId is invalid")
+        if not isinstance(query, Mapping) or not isinstance(limits, Mapping):
+            raise ValueError("investigation Kubernetes Event query and limits are required")
+        if not isinstance(classes, list) or any(
+            not isinstance(item, str) for item in classes
+        ):
+            raise ValueError("investigation Kubernetes Event rootCauseClasses are invalid")
+        if interpretation is not None and not isinstance(interpretation, Mapping):
+            raise ValueError("investigation Kubernetes Event interpretation is invalid")
+        if interpretation is not None and not classes:
+            raise ValueError(
+                "investigation Kubernetes Event interpretation requires rootCauseClasses"
+            )
+        return cls(
+            selection_id=selection_id,
+            integration_id=integration_id,
+            query=dict(query),
+            limits=dict(limits),
+            root_cause_classes=tuple(classes),
+            interpretation=(
+                InvestigationKubernetesEventInterpretation.from_dict(interpretation)
+                if isinstance(interpretation, Mapping)
+                else None
+            ),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "id": self.selection_id,
+            "integrationId": self.integration_id,
+            "query": dict(self.query),
+            "limits": dict(self.limits),
+        }
+        if self.root_cause_classes:
+            result["rootCauseClasses"] = list(self.root_cause_classes)
+        if self.interpretation is not None:
+            result["interpretation"] = self.interpretation.to_dict()
+        return result
+
+
+@dataclass(frozen=True)
+class InvestigationKubernetesEventAssessment:
+    """Auditable result of applying one rule to stored event evidence."""
+
+    selection_id: str
+    evidence_id: str
+    root_cause_class: str
+    conditions: tuple[str, ...]
+    min_matches: int
+    disposition: str
+    matched_event_count: Optional[int] = None
+    matched_event_ids: tuple[str, ...] = ()
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationKubernetesEventAssessment":
+        conditions = payload.get("conditions")
+        disposition = payload.get("disposition")
+        count = payload.get("matchedEventCount")
+        event_ids = payload.get("matchedEventIds")
+        data_dispositions = ("supporting", "contradicting", "neutral")
+        empty_dispositions = ("no-data", "incomplete")
+        if (
+            any(
+                not isinstance(payload.get(field), str)
+                for field in ("selectionId", "evidenceId", "rootCauseClass")
+            )
+            or not isinstance(conditions, list)
+            or not conditions
+            or any(not isinstance(condition, str) for condition in conditions)
+            or not isinstance(payload.get("minMatches"), int)
+            or isinstance(payload.get("minMatches"), bool)
+            or disposition not in data_dispositions + empty_dispositions
+            or (
+                disposition in data_dispositions
+                and (
+                    not isinstance(count, int)
+                    or isinstance(count, bool)
+                    or not isinstance(event_ids, list)
+                    or any(not isinstance(event_id, str) for event_id in event_ids)
+                )
+            )
+            or (
+                disposition in empty_dispositions
+                and (count is not None or event_ids is not None)
+            )
+        ):
+            raise ValueError("investigation Kubernetes Event assessment is invalid")
+        return cls(
+            selection_id=payload["selectionId"],
+            evidence_id=payload["evidenceId"],
+            root_cause_class=payload["rootCauseClass"],
+            conditions=tuple(conditions),
+            min_matches=payload["minMatches"],
+            disposition=disposition,
+            matched_event_count=count,
+            matched_event_ids=tuple(event_ids or ()),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "selectionId": self.selection_id,
+            "evidenceId": self.evidence_id,
+            "rootCauseClass": self.root_cause_class,
+            "conditions": list(self.conditions),
+            "minMatches": self.min_matches,
+            "disposition": self.disposition,
+        }
+        if self.matched_event_count is not None:
+            result["matchedEventCount"] = self.matched_event_count
+            result["matchedEventIds"] = list(self.matched_event_ids)
+        return result
+
+
+@dataclass(frozen=True)
 class InvestigationRequest:
     """Bounded, tenant- and actor-scoped investigation input."""
 
@@ -808,6 +1032,27 @@ class InvestigationRequest:
             raise ValueError("investigation telemetry selection must be an object")
         return tuple(
             InvestigationTelemetrySelection.from_dict(value)
+            for value in values
+        )
+
+    @property
+    def kubernetes_event_selections(
+        self,
+    ) -> tuple[InvestigationKubernetesEventSelection, ...]:
+        """Return bounded Kubernetes Event candidates."""
+
+        spec = self.payload.get("spec")
+        values = (
+            spec.get("kubernetesEventSelections", [])
+            if isinstance(spec, Mapping)
+            else []
+        )
+        if not isinstance(values, list) or any(
+            not isinstance(value, Mapping) for value in values
+        ):
+            raise ValueError("investigation kubernetesEventSelections must be an array")
+        return tuple(
+            InvestigationKubernetesEventSelection.from_dict(value)
             for value in values
         )
 
@@ -854,6 +1099,27 @@ class InvestigationReport:
             InvestigationTelemetryBaselineAssessment.from_dict(value)
             if value.get("assessmentType") == "baseline-comparison"
             else InvestigationTelemetryAssessment.from_dict(value)
+            for value in values
+        )
+
+    @property
+    def kubernetes_event_assessments(
+        self,
+    ) -> tuple[InvestigationKubernetesEventAssessment, ...]:
+        """Return structured event assessments and their Evidence citations."""
+
+        spec = self.payload.get("spec")
+        values = (
+            spec.get("kubernetesEventAssessments", [])
+            if isinstance(spec, Mapping)
+            else []
+        )
+        if not isinstance(values, list) or any(
+            not isinstance(value, Mapping) for value in values
+        ):
+            raise ValueError("investigation kubernetesEventAssessments must be an array")
+        return tuple(
+            InvestigationKubernetesEventAssessment.from_dict(value)
             for value in values
         )
 

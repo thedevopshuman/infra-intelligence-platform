@@ -36,6 +36,7 @@ from .models import (
     ResourceObservation,
     ResourceObservationCursor,
     ResourceTimeline,
+    SessionContext,
     TelemetryEvidenceRequest,
     TelemetryEvidenceResult,
 )
@@ -76,6 +77,7 @@ __all__ = [
     "ResourceObservation",
     "ResourceObservationCursor",
     "ResourceTimeline",
+    "SessionContext",
     "TelemetryEvidenceRequest",
     "TelemetryEvidenceResult",
 ]

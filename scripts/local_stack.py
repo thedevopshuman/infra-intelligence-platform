@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""Secure, one-command lifecycle for the durable local Docker stack."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import secrets
+import stat
+import subprocess
+import sys
+from pathlib import Path
+from typing import Mapping, Sequence
+
+
+ROOT = Path(__file__).resolve().parents[1]
+STATE_DIR = ROOT / ".iip"
+ENV_PATH = STATE_DIR / "local.env"
+CREDENTIALS_PATH = STATE_DIR / "local-credentials.json"
+COMPOSE_PATH = ROOT / "deploy" / "docker-compose.yml"
+PROJECT = "iip-local"
+
+
+def _token_identity(actor_id: str, roles: Sequence[str]) -> tuple[dict[str, object], dict[str, object]]:
+    token = secrets.token_hex(32)
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    verifier = {
+        "tokenSha256": f"sha256:{digest}",
+        "actorId": actor_id,
+        "tenantId": "local",
+        "roles": list(roles),
+    }
+    credential = {
+        "actorId": actor_id,
+        "tenantId": "local",
+        "roles": list(roles),
+        "bearerToken": token,
+    }
+    return verifier, credential
+
+
+def create_local_configuration() -> tuple[Path, Path, bool]:
+    """Create protected local-only configuration, or preserve the existing pair."""
+
+    if ENV_PATH.exists() and CREDENTIALS_PATH.exists():
+        return ENV_PATH, CREDENTIALS_PATH, False
+    if ENV_PATH.exists() or CREDENTIALS_PATH.exists():
+        raise RuntimeError("local configuration is incomplete; restore or remove both .iip files")
+
+    STATE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(STATE_DIR, 0o700)
+    identities: list[dict[str, object]] = []
+    credentials: list[dict[str, object]] = []
+    for actor, roles in (
+        ("local-operator", ("developer",)),
+        ("local-approver", ("approver",)),
+        ("local-executor", ("executor",)),
+    ):
+        verifier, credential = _token_identity(actor, roles)
+        identities.append(verifier)
+        credentials.append(credential)
+
+    identity_document = json.dumps({"identities": identities}, separators=(",", ":"))
+    environment = "\n".join(
+        (
+            f"COMPOSE_PROJECT_NAME={PROJECT}",
+            f"IIP_POSTGRES_PASSWORD={secrets.token_hex(24)}",
+            f"IIP_AUTH_IDENTITIES_JSON={identity_document}",
+            "",
+        )
+    )
+    credential_document = {
+        "consoleUrl": "http://127.0.0.1:8080/console",
+        "tenantId": "local",
+        "identities": credentials,
+    }
+
+    ENV_PATH.write_text(environment, encoding="utf-8")
+    CREDENTIALS_PATH.write_text(
+        json.dumps(credential_document, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    os.chmod(ENV_PATH, stat.S_IRUSR | stat.S_IWUSR)
+    os.chmod(CREDENTIALS_PATH, stat.S_IRUSR | stat.S_IWUSR)
+    return ENV_PATH, CREDENTIALS_PATH, True
+
+
+def load_credentials() -> Mapping[str, object]:
+    if not CREDENTIALS_PATH.is_file():
+        raise RuntimeError("local credentials do not exist; run make dev-up first")
+    try:
+        document = json.loads(CREDENTIALS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("local credentials are unreadable") from exc
+    if not isinstance(document, dict):
+        raise RuntimeError("local credentials are invalid")
+    return document
+
+
+def compose(arguments: Sequence[str]) -> None:
+    command = [
+        os.environ.get("IIP_DOCKER_BIN", "docker"),
+        "compose",
+        "--project-name",
+        PROJECT,
+        "--env-file",
+        str(ENV_PATH),
+        "--file",
+        str(COMPOSE_PATH),
+        *arguments,
+    ]
+    try:
+        subprocess.run(command, cwd=ROOT, check=True)
+    except FileNotFoundError as exc:
+        raise RuntimeError("Docker CLI is unavailable; start Docker Desktop and retry") from exc
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(f"Docker Compose failed with exit code {exc.returncode}") from exc
+
+
+def print_operator_credential() -> None:
+    document = load_credentials()
+    identities = document.get("identities")
+    if not isinstance(identities, list) or not identities or not isinstance(identities[0], dict):
+        raise RuntimeError("local credentials are invalid")
+    operator = identities[0]
+    print(f"Console: {document.get('consoleUrl')}")
+    print(f"Operator Bearer token: {operator.get('bearerToken')}")
+    print(f"Protected credentials: {CREDENTIALS_PATH}")
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("command", choices=("init", "up", "status", "credentials", "down"))
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "init":
+            _, _, created = create_local_configuration()
+            print("Created protected local configuration." if created else "Local configuration already exists.")
+            print_operator_credential()
+        elif args.command == "up":
+            _, _, created = create_local_configuration()
+            if created:
+                print("Created protected local configuration.")
+            compose(("up", "--build", "--detach", "--wait", "--wait-timeout", "180"))
+            print("Infrastructure Intelligence local stack is ready in Docker Desktop.")
+            print_operator_credential()
+        elif args.command == "status":
+            if not ENV_PATH.is_file():
+                raise RuntimeError("local configuration does not exist; run make dev-up first")
+            compose(("ps",))
+        elif args.command == "credentials":
+            print_operator_credential()
+        else:
+            if not ENV_PATH.is_file():
+                raise RuntimeError("local configuration does not exist; nothing to stop")
+            compose(("down",))
+            print("Stopped the local stack. The PostgreSQL volume was preserved.")
+        return 0
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

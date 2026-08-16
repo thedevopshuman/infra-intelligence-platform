@@ -19,6 +19,7 @@ import type {
   ResourceObservation,
   ResourceTimeline,
   ResourceUid,
+  SessionContext,
   TelemetryEvidenceRequest,
 } from "./types.js";
 
@@ -68,6 +69,10 @@ export class InfrastructureIntelligenceClient {
     });
     const result = await this.read<{ items: ResourceObservation[] }>(response);
     return result.items;
+  }
+
+  async getSession(): Promise<SessionContext> {
+    return this.get<SessionContext>("/v1/session");
   }
 
   async getResourceNeighborhood(

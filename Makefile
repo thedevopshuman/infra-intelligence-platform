@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-postgres test-backup-restore test-otel test-otlp-receiver test-prometheus test-kubernetes-events test-kubernetes-live db-migrate helm-lint verify run package-chart
+.PHONY: help install-verify-deps validate validate-schemas test test-postgres test-backup-restore test-otel test-otlp-receiver test-prometheus test-kubernetes-events test-kubernetes-live db-migrate helm-lint verify run package-chart dev-init dev-up dev-status dev-credentials dev-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -20,6 +20,10 @@ help:
 	@echo "helm-lint     Lint and render the Helm chart"
 	@echo "verify        Run all local quality gates"
 	@echo "run           Start the reference HTTP API on port 8080"
+	@echo "dev-up        Start the durable local product stack in Docker Desktop"
+	@echo "dev-status    Show the durable local stack status"
+	@echo "dev-credentials Show the local console URL and operator token"
+	@echo "dev-down      Stop the local stack while preserving its database"
 	@echo "package-chart Package the Helm chart under dist/"
 
 install-verify-deps:
@@ -66,6 +70,21 @@ verify: validate validate-schemas test helm-lint
 
 run:
 	PYTHONPATH=src $(PYTHON) -m iip.surfaces.http
+
+dev-init:
+	$(PYTHON) scripts/local_stack.py init
+
+dev-up:
+	$(PYTHON) scripts/local_stack.py up
+
+dev-status:
+	$(PYTHON) scripts/local_stack.py status
+
+dev-credentials:
+	$(PYTHON) scripts/local_stack.py credentials
+
+dev-down:
+	$(PYTHON) scripts/local_stack.py down
 
 package-chart:
 	mkdir -p dist

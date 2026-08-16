@@ -3,7 +3,7 @@
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
     "version": "0.4.0",
-    "description": "Executable local reference API for collection ingestion, freshness telemetry, backend-neutral metric, log, and Kubernetes Event evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven event/metric selection and committed-artifact assessment, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
+    "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, and Kubernetes Event evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven event/metric selection and committed-artifact assessment, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -20,6 +20,16 @@
         "operationId": "ready",
         "security": [],
         "responses": {"200": {"description": "Process is ready"}}
+      }
+    },
+    "/v1/session": {
+      "get": {
+        "operationId": "getSession",
+        "description": "Return the non-secret tenant, actor, and role context derived from the authenticated control-plane credential.",
+        "responses": {
+          "200": {"description": "Authenticated session context", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/session-context.schema.json"}}}},
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
       }
     },
     "/v1/metrics": {
@@ -432,6 +442,7 @@
       "ResourceNeighborhood": {"$ref": "../../contracts/schemas/resource-neighborhood.schema.json"},
       "ResourceTimeline": {"$ref": "../../contracts/schemas/resource-timeline.schema.json"},
       "IngestionFreshnessReport": {"$ref": "../../contracts/schemas/ingestion-freshness-report.schema.json"},
+      "SessionContext": {"$ref": "../../contracts/schemas/session-context.schema.json"},
       "PageInfo": {"$ref": "../../contracts/schemas/page-info.schema.json"},
       "Event": {"$ref": "../../contracts/schemas/event.schema.json"},
       "Evidence": {"$ref": "../../contracts/schemas/evidence.schema.json"},

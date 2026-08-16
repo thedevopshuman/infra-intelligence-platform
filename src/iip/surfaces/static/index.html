@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="description" content="Infrastructure Intelligence Platform operations console">
+    <title>Infrastructure Intelligence</title>
+    <link rel="stylesheet" href="/console/app.css">
+    <script src="/console/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <div class="product-mark">
+          <span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>
+            <strong>Infrastructure</strong>
+            <small>Intelligence Platform</small>
+          </span>
+        </div>
+        <span class="provisional">Provisional identity</span>
+
+        <nav class="nav-list">
+          <button class="nav-item active" type="button" data-view="overview">
+            <span aria-hidden="true">⌂</span> Overview
+          </button>
+          <button class="nav-item" type="button" data-view="resources">
+            <span aria-hidden="true">◇</span> Resources
+          </button>
+          <button class="nav-item" type="button" data-view="investigate">
+            <span aria-hidden="true">◎</span> Investigate
+          </button>
+          <button class="nav-item" type="button" data-view="evidence">
+            <span aria-hidden="true">▣</span> Evidence
+          </button>
+          <button class="nav-item" type="button" data-view="actions">
+            <span aria-hidden="true">↯</span> Actions
+          </button>
+        </nav>
+
+        <div class="sidebar-foot">
+          <button class="identity-button" id="identity-button" type="button">
+            <span class="avatar" id="avatar">?</span>
+            <span>
+              <strong id="actor-label">Not connected</strong>
+              <small id="tenant-label">Connect to begin</small>
+            </span>
+            <span aria-hidden="true">⋯</span>
+          </button>
+        </div>
+      </aside>
+
+      <main id="main-content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="page-eyebrow">Operational posture</p>
+            <h1 id="page-title">Overview</h1>
+          </div>
+          <div class="topbar-actions">
+            <span class="status-chip"><i id="api-status-dot"></i><span id="api-status">Checking API</span></span>
+            <button class="button subtle" id="refresh-button" type="button">Refresh</button>
+            <button class="button primary" type="button" data-go="investigate">New investigation</button>
+          </div>
+        </header>
+
+        <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
+
+        <section class="view active" id="view-overview" data-title="Overview" data-eyebrow="Operational posture">
+          <div class="hero-card">
+            <div>
+              <span class="kicker">Evidence before answers</span>
+              <h2>See what changed. Understand what broke. Act with guardrails.</h2>
+              <p>The platform joins live infrastructure identity, history, and telemetry into one tenant-safe investigation path.</p>
+            </div>
+            <div class="hero-graphic" aria-hidden="true">
+              <span class="node n1"></span><span class="node n2"></span><span class="node n3"></span><span class="node n4"></span>
+              <span class="trace t1"></span><span class="trace t2"></span><span class="trace t3"></span>
+              <span class="pulse"></span>
+            </div>
+          </div>
+
+          <div class="metric-grid" aria-label="Platform summary">
+            <article class="metric-card"><span>Known resources</span><strong id="metric-resources">—</strong><small>Current tenant graph</small></article>
+            <article class="metric-card"><span>Needs attention</span><strong id="metric-attention">—</strong><small>Degraded or unhealthy</small></article>
+            <article class="metric-card"><span>Investigations</span><strong id="metric-investigations">0</strong><small>Started in this tab</small></article>
+            <article class="metric-card"><span>Evidence items</span><strong id="metric-evidence">0</strong><small>Retrieved in this tab</small></article>
+          </div>
+
+          <div class="two-column">
+            <article class="panel">
+              <div class="panel-heading">
+                <div><span class="kicker">Live graph</span><h2>Resources needing attention</h2></div>
+                <button class="text-button" type="button" data-go="resources">View resources →</button>
+              </div>
+              <div id="attention-list" class="stack-list empty-state"><p>Connect to load your tenant graph.</p></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading">
+                <div><span class="kicker">Investigation ledger</span><h2>Recent findings</h2></div>
+                <button class="text-button" type="button" data-go="investigate">Investigate →</button>
+              </div>
+              <div id="recent-investigations" class="stack-list empty-state"><p>No investigation has run in this tab.</p></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="view-resources" data-title="Resources" data-eyebrow="Tenant resource graph" hidden>
+          <div class="section-intro">
+            <div><h2>Infrastructure inventory</h2><p>Canonical identities from your configured observers, separated by tenant.</p></div>
+            <button class="button primary" id="demo-resource-button" type="button">Add demo resource</button>
+          </div>
+          <article class="panel table-panel">
+            <div class="table-tools">
+              <label class="search-field"><span class="sr-only">Filter resources</span><input id="resource-search" type="search" placeholder="Filter by name, provider, type, or UID"></label>
+              <select id="health-filter" aria-label="Filter resource health">
+                <option value="all">All health states</option>
+                <option value="healthy">Healthy</option>
+                <option value="degraded">Degraded</option>
+                <option value="unhealthy">Unhealthy</option>
+                <option value="unknown">Unknown</option>
+              </select>
+              <span class="table-count" id="resource-count">0 resources</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Resource</th><th>Provider</th><th>Type</th><th>Health</th><th>Observed</th><th><span class="sr-only">Actions</span></th></tr></thead>
+                <tbody id="resource-rows"></tbody>
+              </table>
+            </div>
+            <div class="empty-state" id="resource-empty"><div class="empty-icon">◇</div><h3>No resources yet</h3><p>Connect an observer or add the safe demo Deployment to try the workflow.</p></div>
+          </article>
+        </section>
+
+        <section class="view" id="view-investigate" data-title="Investigate" data-eyebrow="Evidence-backed analysis" hidden>
+          <div class="workbench">
+            <form class="panel form-panel" id="investigation-form">
+              <span class="kicker">New bounded investigation</span>
+              <h2>What do you need to understand?</h2>
+              <p>The reference investigator is deterministic and read-only. It will only inspect the resource and evidence scope declared here.</p>
+              <label>Question<textarea id="investigation-question" required maxlength="4096" rows="4" placeholder="Why is this workload degraded?"></textarea></label>
+              <div class="form-grid">
+                <label>Primary resource<select id="investigation-resource" required><option value="">Choose a resource</option></select></label>
+                <label>Lookback<select id="investigation-lookback"><option value="30">Last 30 minutes</option><option value="60" selected>Last hour</option><option value="360">Last 6 hours</option><option value="1440">Last 24 hours</option></select></label>
+              </div>
+              <label class="check-row"><input id="allow-proposal" type="checkbox"><span><strong>Allow recommendations to become proposals</strong><small>No change executes without the separate action workflow.</small></span></label>
+              <button class="button primary wide" type="submit">Run investigation</button>
+            </form>
+            <article class="panel result-panel">
+              <div class="panel-heading"><div><span class="kicker">Terminal report</span><h2>Investigation result</h2></div><span class="status-chip neutral" id="investigation-state">Waiting</span></div>
+              <div id="investigation-result" class="empty-state tall"><div class="empty-icon">◎</div><h3>Ready when you are</h3><p>Select a resource and ask a focused operational question.</p></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="view-evidence" data-title="Evidence" data-eyebrow="Immutable provenance" hidden>
+          <div class="section-intro"><div><h2>Evidence lookup</h2><p>Retrieve immutable, content-addressed evidence metadata in your tenant scope.</p></div></div>
+          <article class="panel lookup-panel">
+            <form id="evidence-form" class="inline-form"><label><span class="sr-only">Evidence ID</span><input id="evidence-id" required pattern="evd_[a-f0-9]{32}" placeholder="evd_…"></label><button class="button primary" type="submit">Retrieve</button></form>
+            <div id="evidence-result" class="empty-state"><div class="empty-icon">▣</div><p>Enter an evidence ID cited by an investigation.</p></div>
+          </article>
+        </section>
+
+        <section class="view" id="view-actions" data-title="Actions" data-eyebrow="Governed operations" hidden>
+          <div class="section-intro"><div><h2>Guardrails before change</h2><p>Proposal, independent approval, execution, and verification remain separate, auditable steps.</p></div></div>
+          <div class="guardrail-grid">
+            <article class="guardrail"><span>01</span><h3>Propose</h3><p>Bind a reversible action to an investigation and an idempotency key.</p></article>
+            <article class="guardrail"><span>02</span><h3>Approve</h3><p>A different authenticated actor reviews scope, rationale, and policy.</p></article>
+            <article class="guardrail"><span>03</span><h3>Execute</h3><p>Policy is checked again; duplicate delivery cannot duplicate impact.</p></article>
+            <article class="guardrail"><span>04</span><h3>Verify</h3><p>The outcome and evidence are written to the immutable audit trail.</p></article>
+          </div>
+          <article class="panel lookup-panel">
+            <h2>Action lookup</h2>
+            <form id="action-form" class="inline-form"><label><span class="sr-only">Action proposal ID</span><input id="action-id" required pattern="act_[a-f0-9]{32}" placeholder="act_…"></label><button class="button primary" type="submit">Retrieve</button></form>
+            <div id="action-result" class="empty-state"><div class="empty-icon">↯</div><p>Enter an action proposal ID to inspect its current state.</p></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="connection-dialog">
+      <form method="dialog" id="connection-form" class="connection-card">
+        <button class="dialog-close" id="connection-close" type="button" aria-label="Close connection dialog">×</button>
+        <span class="mark large" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="kicker">Secure control-plane access</span>
+        <h2>Connect your workspace</h2>
+        <p>Enter a local development Bearer token. The token is sent only to this same-origin API and is never written to platform logs or resources.</p>
+        <label>Bearer token<input id="token-input" type="password" autocomplete="off" required placeholder="Paste a generated local token"></label>
+        <label class="check-row compact"><input id="remember-token" type="checkbox"><span><strong>Keep for this browser tab</strong><small>Uses session storage; never local storage.</small></span></label>
+        <p class="form-error" id="connection-error" role="alert" hidden></p>
+        <button class="button primary wide" id="connect-button" type="submit">Connect securely</button>
+        <small class="connection-help">Run <code>make dev-up</code> to create a local stack and credentials.</small>
+      </form>
+    </dialog>
+
+    <dialog id="detail-dialog" class="detail-dialog">
+      <div class="detail-card">
+        <div class="panel-heading"><div><span class="kicker" id="detail-kicker">Resource detail</span><h2 id="detail-title">Detail</h2></div><button class="dialog-close" id="detail-close" type="button" aria-label="Close detail">×</button></div>
+        <pre id="detail-content"></pre>
+      </div>
+    </dialog>
+  </body>
+</html>

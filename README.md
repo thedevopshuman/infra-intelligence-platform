@@ -16,7 +16,17 @@ This repository now contains an **executable local reference slice across Roadma
 
 ## Local quick start
 
-Use Python 3.11 or newer. Verification dependencies and the PostgreSQL driver are pinned for reproducible local and CI behavior.
+Use Python 3.11 or newer. Verification dependencies and the PostgreSQL driver are pinned for reproducible local and CI behavior. With Docker Desktop running, the durable product stack now has a one-command start:
+
+```bash
+make dev-up
+```
+
+The command creates protected local-only credentials under `.iip/`, builds and starts the API plus PostgreSQL, waits for readiness, and prints the operator token. Open [http://127.0.0.1:8080/console](http://127.0.0.1:8080/console) and enter that token. The browser console uses live tenant resources, graph/timeline queries, investigations, evidence, and action records; it does not display mock operational data.
+
+Use `make dev-status` to inspect the containers, `make dev-credentials` to show the operator token again, and `make dev-down` to stop the stack while preserving its database.
+
+For repository verification and the isolated integration gates:
 
 ```bash
 python3 -m pip install --requirement requirements/verify.txt
@@ -30,7 +40,8 @@ make test-prometheus
 # With the local kind cluster and explicit kubeconfig:
 IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-events
 IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-live
-# Configure a local Bearer identity as described in docs/operations/local-development.md.
+# Configure a local Bearer identity as described in docs/operations/local-development.md
+# only when running the in-memory API outside Docker.
 make run
 ```
 

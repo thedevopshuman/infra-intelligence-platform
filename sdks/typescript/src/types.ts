@@ -15,6 +15,18 @@ export type ResourceLifecycle =
   | "deleted"
   | "unknown";
 
+export interface SessionContext {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "SessionContext";
+  metadata: {
+    tenantId: string;
+    actorId: string;
+  };
+  spec: {
+    roles: string[];
+  };
+}
+
 export interface ResourceRelationship {
   type: string;
   target: string;

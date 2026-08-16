@@ -245,6 +245,26 @@ class IngestionFreshnessReport:
 
 
 @dataclass(frozen=True)
+class SessionContext:
+    """Non-secret identity context derived from the client's credential."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "SessionContext":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="SessionContext",
+                label="session context",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class Evidence:
     """Public metadata and provenance for one immutable evidence artifact."""
 

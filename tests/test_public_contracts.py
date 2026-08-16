@@ -39,6 +39,7 @@ from infra_intelligence_sdk import (
     ResourceNeighborhood,
     ResourceObservation,
     ResourceTimeline,
+    SessionContext,
     TelemetryEvidenceRequest,
     TelemetryEvidenceResult,
 )
@@ -86,6 +87,7 @@ class PublicContractSdkTests(unittest.TestCase):
         freshness = IngestionFreshnessReport.from_dict(
             example("ingestion-freshness-report.json")
         )
+        session = SessionContext.from_dict(example("session-context.json"))
         collection_request = ResourceCollectionRequest.from_dict(
             example("resource-collection-request.json")
         )
@@ -182,6 +184,7 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(log_assessment.disposition, "supporting")
         self.assertEqual(report.to_dict()["kind"], "InvestigationReport")
         self.assertEqual(freshness.to_dict()["kind"], "IngestionFreshnessReport")
+        self.assertEqual(session.to_dict()["kind"], "SessionContext")
         self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")
         self.assertEqual(collection_result.to_dict()["kind"], "ResourceCollectionResult")
         self.assertIsNone(collection_request.resume)

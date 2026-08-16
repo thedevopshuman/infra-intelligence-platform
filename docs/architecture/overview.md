@@ -127,6 +127,8 @@ Start as a modular control-plane service plus asynchronous workers. Preserve log
 
 The initial Helm chart deploys the reference API and accepts an existing Secret reference for PostgreSQL configuration. Planned components are ingestion and outbox workers, correlator, workflow worker, plugin runner, and backing stores. Data-plane collectors may run in customer clusters and send normalized observations through authenticated, tenant-scoped channels.
 
+The API image also serves a dependency-free same-origin web console. It is a real control-plane surface over public contracts: the console authenticates a credential, reads the derived session context, lists tenant resources, opens graph/timeline views, runs bounded investigations, follows Evidence citations, and retrieves governed action state. It stores no platform data of its own and does not bypass application ports. The local Docker lifecycle creates a hardened non-root API container and durable PostgreSQL stack; production identity, ingress, and browser-session choices remain deployment decisions.
+
 ## Cross-cutting invariants
 
 - Tenant ID, actor ID, and roles are derived through the [authentication boundary](authentication-boundary.md), not trusted from payloads or identity assertion headers.

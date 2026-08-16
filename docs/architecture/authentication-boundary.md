@@ -5,6 +5,8 @@
 
 The HTTP surface authenticates credentials before constructing the application `ActorContext`. Tenant, actor, and roles come from the configured authenticator; payload fields and request headers are consistency assertions at most and never grant identity.
 
+An authenticated client may call `GET /v1/session` to retrieve its non-secret `SessionContext`. This enables browser and SDK workflows to populate required identity assertions from server-derived context. The response does not replace authorization at a use-case port and cannot be used to select or elevate an identity.
+
 ```mermaid
 sequenceDiagram
     participant Client

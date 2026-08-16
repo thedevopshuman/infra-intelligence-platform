@@ -6,6 +6,7 @@ import json
 import os
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from importlib.resources import files
 from typing import Any, Callable, Dict, Mapping, Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -95,9 +96,20 @@ class ApiHandler(BaseHTTPRequestHandler):
     runtime: Runtime
     server_version = "IIPReference/0.4.0"
 
+    _console_assets = {
+        "/": ("index.html", "text/html; charset=utf-8"),
+        "/console": ("index.html", "text/html; charset=utf-8"),
+        "/console/": ("index.html", "text/html; charset=utf-8"),
+        "/console/app.css": ("app.css", "text/css; charset=utf-8"),
+        "/console/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    }
+
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         parsed = urlparse(self.path)
         path = parsed.path
+        if path in self._console_assets:
+            self._console_asset(path)
+            return
         if path in ("/healthz", "/readyz"):
             self._json(HTTPStatus.OK, {"status": "ok"})
             return
@@ -113,6 +125,20 @@ class ApiHandler(BaseHTTPRequestHandler):
             except AuthenticationError as exc:
                 self._authentication_failed(exc)
                 return
+        if path == "/v1/session":
+            self._json(
+                HTTPStatus.OK,
+                {
+                    "apiVersion": "iip.platform/v1alpha1",
+                    "kind": "SessionContext",
+                    "metadata": {
+                        "tenantId": actor.tenant_id,
+                        "actorId": actor.actor_id,
+                    },
+                    "spec": {"roles": sorted(actor.roles)},
+                },
+            )
+            return
         if path == "/v1/resources":
             try:
                 if parsed.query:
@@ -813,6 +839,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     def _otlp_response(self, status: HTTPStatus, body: bytes) -> None:
         self.send_response(status.value)
         self.send_header("content-type", "application/x-protobuf")
+        self._security_headers()
         if status == HTTPStatus.UNAUTHORIZED:
             self.send_header("WWW-Authenticate", "Bearer")
         if status == HTTPStatus.SERVICE_UNAVAILABLE:
@@ -825,11 +852,46 @@ class ApiHandler(BaseHTTPRequestHandler):
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         self.send_response(status.value)
         self.send_header("content-type", "application/json")
+        self._security_headers()
         if status == HTTPStatus.UNAUTHORIZED:
             self.send_header("WWW-Authenticate", "Bearer")
         self.send_header("content-length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _console_asset(self, path: str) -> None:
+        filename, content_type = self._console_assets[path]
+        try:
+            body = files("iip.surfaces").joinpath("static", filename).read_bytes()
+        except (FileNotFoundError, OSError):
+            self._json(
+                HTTPStatus.NOT_FOUND,
+                {"error": {"code": "route.not_found"}},
+            )
+            return
+        self.send_response(HTTPStatus.OK.value)
+        self.send_header("content-type", content_type)
+        self._security_headers()
+        self.send_header("cache-control", "no-store" if filename == "index.html" else "no-cache")
+        self.send_header("content-length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _security_headers(self) -> None:
+        self.send_header("x-content-type-options", "nosniff")
+        self.send_header("referrer-policy", "no-referrer")
+        self.send_header("x-frame-options", "DENY")
+        self.send_header("cross-origin-opener-policy", "same-origin")
+        self.send_header(
+            "permissions-policy",
+            "camera=(), microphone=(), geolocation=()",
+        )
+        self.send_header(
+            "content-security-policy",
+            "default-src 'none'; script-src 'self'; style-src 'self'; "
+            "img-src 'self' data:; connect-src 'self'; base-uri 'none'; "
+            "form-action 'self'; frame-ancestors 'none'",
+        )
 
 
 def main() -> None:

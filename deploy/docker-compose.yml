@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:18.4-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: iip
       POSTGRES_USER: iip
@@ -11,7 +12,7 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql
 
   api:
     build:
@@ -42,7 +43,21 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
 
   otel-collector:
     image: otel/opentelemetry-collector:0.158.0

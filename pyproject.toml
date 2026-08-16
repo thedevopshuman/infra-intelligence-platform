@@ -27,3 +27,4 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "iip.adapters.postgres" = ["migrations/*.sql"]
+"iip.surfaces" = ["static/*"]

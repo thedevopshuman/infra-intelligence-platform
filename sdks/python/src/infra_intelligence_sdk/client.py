@@ -25,6 +25,7 @@ from .models import (
     ResourceNeighborhood,
     ResourceObservation,
     ResourceTimeline,
+    SessionContext,
     TelemetryEvidenceRequest,
 )
 
@@ -74,6 +75,11 @@ class Client:
         if not isinstance(items, list):
             raise ApiError(200, "response.invalid")
         return [ResourceObservation.from_dict(item) for item in items]
+
+    def get_session(self) -> SessionContext:
+        """Return the actor, tenant, and roles derived from this credential."""
+
+        return SessionContext.from_dict(self._get("/v1/session"))
 
     def get_resource_neighborhood(
         self,

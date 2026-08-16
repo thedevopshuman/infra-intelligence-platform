@@ -1,0 +1,11 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "SessionContext",
+  "metadata": {
+    "tenantId": "local",
+    "actorId": "local-operator"
+  },
+  "spec": {
+    "roles": ["developer"]
+  }
+}

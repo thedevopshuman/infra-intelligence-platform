@@ -15,5 +15,6 @@ coverage/
 .env
 .env.*
 !.env.example
+.iip/
 *.log
 *.tgz

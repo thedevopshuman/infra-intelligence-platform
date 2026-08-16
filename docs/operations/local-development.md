@@ -108,6 +108,8 @@ make run
 
 The local surface stores resources in memory. Its hashed opaque-token authenticator is a local reference boundary, not a production identity provider.
 
+Open `http://127.0.0.1:8080/console` for the browser console, or use the API directly. The console sends the Bearer token only to the same-origin control plane. By default the token exists only in page memory; the optional “keep for this browser tab” setting uses `sessionStorage`, never persistent `localStorage`. The console shell is public, while every tenant data request still authenticates independently.
+
 ```bash
 curl -X POST http://localhost:8080/v1/resources \
   -H 'content-type: application/json' \
@@ -129,7 +131,21 @@ The local in-memory process starts empty, so a source returns `ingestion.source_
 
 ## Run the durable Docker profile
 
-The Compose profile requires a local-only password supplied at runtime and never committed:
+The supported local onboarding path generates 256-bit Bearer tokens for three separate development actors, stores only their SHA-256 verifiers in the API environment, writes raw tokens to a mode-`0600` ignored file, and generates a separate PostgreSQL password:
+
+```bash
+make dev-up
+```
+
+This starts the API and PostgreSQL, waits for both health checks, and prints the console URL plus the `local-operator` token. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties; inspect the protected `.iip/local-credentials.json` only when exercising those workflows. Useful lifecycle commands are:
+
+```bash
+make dev-status
+make dev-credentials
+make dev-down
+```
+
+`dev-down` preserves the named PostgreSQL volume. The setup never deletes local state automatically. If manual environment control is needed instead, the Compose profile requires a local-only password supplied at runtime and never committed:
 
 ```bash
 export IIP_POSTGRES_PASSWORD="$(openssl rand -hex 24)"
@@ -137,7 +153,7 @@ docker compose -f deploy/docker-compose.yml up --build --detach
 docker compose -f deploy/docker-compose.yml ps
 ```
 
-This is the long-running development stack visible in Docker Desktop: the API plus PostgreSQL and a named database volume. It differs from `make test-postgres`, whose test container and volume are always removed on exit. Stop the development stack with `docker compose -f deploy/docker-compose.yml down`; add `--volumes` only when you intentionally want to delete its local database.
+This is the long-running development stack visible in Docker Desktop: the API plus PostgreSQL and a named database volume. It differs from `make test-postgres`, whose test container and volume are always removed on exit. The API is published only on `127.0.0.1`, runs as a non-root user with a read-only container filesystem, drops Linux capabilities, and enables `no-new-privileges`. Stop the manual stack with `docker compose -f deploy/docker-compose.yml down`; add `--volumes` only when you intentionally want to delete its local database.
 
 The API migrates the local Compose database on startup. Automatic migration is disabled by default in Helm and should be a separately controlled deployment step outside local development.
 

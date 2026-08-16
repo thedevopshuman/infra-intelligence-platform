@@ -12,6 +12,7 @@ data:
   IIP_DATABASE_AUTO_MIGRATE: {{ .Values.database.autoMigrate | quote }}
   IIP_OTEL_METRICS_ENABLED: {{ .Values.telemetry.metricsEnabled | quote }}
   IIP_OTLP_RECEIVER_ENABLED: {{ .Values.otlpReceiver.enabled | quote }}
+  IIP_OTLP_LOGS_RECEIVER_ENABLED: {{ .Values.otlpLogsReceiver.enabled | quote }}
   IIP_OTEL_INGESTION_ATTRIBUTE_MODE: {{ .Values.telemetry.attributeMode | quote }}
   OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.telemetry.otlpEndpoint | quote }}
   OTEL_EXPORTER_OTLP_PROTOCOL: {{ .Values.telemetry.protocol | quote }}
@@ -19,6 +20,7 @@ data:
   OTEL_METRIC_EXPORT_TIMEOUT: {{ .Values.telemetry.exportTimeoutMillis | quote }}
   OTEL_SERVICE_NAME: {{ .Values.telemetry.serviceName | quote }}
   IIP_TELEMETRY_METRICS_BACKEND: {{ .Values.telemetryEvidence.backend | quote }}
+  IIP_TELEMETRY_LOGS_BACKEND: {{ .Values.logEvidence.backend | quote }}
   IIP_PROMETHEUS_INTEGRATIONS_JSON: {{ .Values.telemetryEvidence.prometheus.integrationsJson | quote }}
   IIP_KUBERNETES_EVENTS_BACKEND: {{ .Values.kubernetesEventEvidence.backend | quote }}
   IIP_KUBERNETES_EVENTS_INTEGRATIONS_JSON: {{ .Values.kubernetesEventEvidence.integrationsJson | quote }}

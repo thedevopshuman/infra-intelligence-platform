@@ -44,6 +44,8 @@ The Prometheus and Kubernetes Event evidence adapters implement the `CredentialB
 - Model output is advisory until a deterministic application boundary accepts it.
 - Data sent to a model follows tenant policy for residency, retention, provider, and redaction.
 
+Log bodies receive confidential handling by default and remain untrusted after redaction: retrieved or pushed text cannot grant authority or become instructions. OTLP channel credentials are independent of interactive control-plane identities, and channel configuration—not payload resource attributes—fixes tenant, integration, resource, service catalog, retention, and admission limits.
+
 ## Plugin threats
 
 Plugins are signed artifacts with immutable version and digest, explicit network/secret/resource/action permissions, protocol compatibility, resource limits, and an audit identity. Default execution is out-of-process. A crash, timeout, or malformed response fails the capability closed without destabilizing the control plane.

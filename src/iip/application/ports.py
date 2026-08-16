@@ -240,6 +240,51 @@ class TelemetryMetricsResult:
 
 
 @dataclass(frozen=True)
+class TelemetryLogsQuery:
+    """Credential-free normalized log query passed to a backend adapter."""
+
+    tenant_id: str
+    actor_id: str
+    request_id: str
+    integration_id: str
+    resource_uids: tuple[str, ...]
+    start: str
+    end: str
+    service_names: tuple[str, ...]
+    severities: tuple[str, ...]
+    filters: tuple[tuple[str, str, str], ...]
+    max_records: int
+    max_bytes: int
+    deadline: str
+
+
+@dataclass(frozen=True)
+class TelemetryLogRecord:
+    """One untrusted normalized log record returned by a backend adapter."""
+
+    record_id: str
+    resource_uid: str
+    timestamp: str
+    severity: str
+    service_name: str
+    body: str
+    attributes: tuple[tuple[str, str], ...]
+    observed_timestamp: Optional[str] = None
+    trace_id: Optional[str] = None
+    span_id: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class TelemetryLogsResult:
+    """Untrusted bounded result returned by a log backend adapter."""
+
+    executed_at: str
+    status: str
+    records: tuple[TelemetryLogRecord, ...]
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class KubernetesEventResourceRef:
     """Scoped platform identity plus the external identity an adapter may query."""
 
@@ -487,6 +532,11 @@ class EvidenceProvider(Protocol):
 class TelemetryMetricsBackend(Protocol):
     def query_metrics(self, request: TelemetryMetricsQuery) -> TelemetryMetricsResult:
         """Query one configured backend without exposing credentials or vendor types."""
+
+
+class TelemetryLogsBackend(Protocol):
+    def query_logs(self, request: TelemetryLogsQuery) -> TelemetryLogsResult:
+        """Query scoped logs without exposing credentials or vendor query types."""
 
 
 class KubernetesEventsBackend(Protocol):

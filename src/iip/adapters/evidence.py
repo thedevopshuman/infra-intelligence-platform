@@ -21,6 +21,8 @@ from iip.application.ports import (
     RawEvidenceArtifact,
     TelemetryMetricsQuery,
     TelemetryMetricsResult,
+    TelemetryLogsQuery,
+    TelemetryLogsResult,
 )
 
 
@@ -210,6 +212,22 @@ class NoDataTelemetryMetricsBackend:
             executed_at=now,
             status="no-data",
             series=(),
+        )
+
+
+class NoDataTelemetryLogsBackend:
+    """Safe local backend that proves log plumbing without inventing records."""
+
+    def __init__(self, clock: object) -> None:
+        self._clock = clock
+
+    def query_logs(self, request: TelemetryLogsQuery) -> TelemetryLogsResult:
+        del request
+        now = getattr(self._clock, "now")()
+        return TelemetryLogsResult(
+            executed_at=now,
+            status="no-data",
+            records=(),
         )
 
 

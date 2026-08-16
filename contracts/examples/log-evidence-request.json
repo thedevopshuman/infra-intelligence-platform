@@ -1,0 +1,35 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "LogEvidenceRequest",
+  "metadata": {
+    "requestId": "leq_6a0df6f7a1d24040b36145288089d7a8",
+    "tenantId": "local",
+    "actorId": "developer",
+    "requestedAt": "2026-08-14T10:30:02Z"
+  },
+  "spec": {
+    "integrationId": "observability-local",
+    "resourceRefs": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+    "signal": "logs",
+    "timeRange": {
+      "start": "2026-08-14T10:25:00Z",
+      "end": "2026-08-14T10:30:00Z"
+    },
+    "query": {
+      "serviceNames": ["checkout"],
+      "severities": ["error", "fatal"],
+      "filters": [
+        {
+          "attribute": "k8s.namespace.name",
+          "operator": "eq",
+          "value": "default"
+        }
+      ]
+    },
+    "limits": {
+      "maxRecords": 200,
+      "maxBytes": 1048576
+    },
+    "deadline": "2026-08-14T10:31:02Z"
+  }
+}

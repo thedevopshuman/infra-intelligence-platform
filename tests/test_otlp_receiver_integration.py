@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import unittest
 import urllib.request
 from pathlib import Path
 
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader, MetricExportResult
 from opentelemetry.sdk.resources import Resource
@@ -20,10 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
     "set IIP_TEST_OTLP_RECEIVER_ENDPOINT to run the Docker receiver gate",
 )
 class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
-    def test_official_exporter_reaches_built_api_image(self) -> None:
-        base_url = os.environ["IIP_TEST_OTLP_RECEIVER_ENDPOINT"].rstrip("/")
-        control_token = os.environ["IIP_TEST_OTLP_CONTROL_TOKEN"]
-        channel_token = os.environ["IIP_TEST_OTLP_CHANNEL_TOKEN"]
+    def seed_resource(self, base_url: str, control_token: str) -> None:
         resource = json.loads(
             (ROOT / "contracts" / "examples" / "resource.json").read_text()
         )
@@ -38,6 +39,12 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
         )
         with urllib.request.urlopen(request, timeout=5) as response:
             self.assertEqual(response.status, 202)
+
+    def test_official_exporter_reaches_built_api_image(self) -> None:
+        base_url = os.environ["IIP_TEST_OTLP_RECEIVER_ENDPOINT"].rstrip("/")
+        control_token = os.environ["IIP_TEST_OTLP_CONTROL_TOKEN"]
+        channel_token = os.environ["IIP_TEST_OTLP_CHANNEL_TOKEN"]
+        self.seed_resource(base_url, control_token)
 
         reader = InMemoryMetricReader()
         provider = MeterProvider(
@@ -70,6 +77,39 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
             )
         finally:
             exporter.shutdown()
+            provider.shutdown()
+
+    def test_official_log_exporter_reaches_built_api_image(self) -> None:
+        base_url = os.environ["IIP_TEST_OTLP_RECEIVER_ENDPOINT"].rstrip("/")
+        control_token = os.environ["IIP_TEST_OTLP_CONTROL_TOKEN"]
+        channel_token = os.environ["IIP_TEST_OTLP_CHANNEL_TOKEN"]
+        self.seed_resource(base_url, control_token)
+
+        exporter = OTLPLogExporter(
+            endpoint=f"{base_url}/v1/logs",
+            headers={"Authorization": f"Bearer {channel_token}"},
+            timeout=5,
+        )
+        provider = LoggerProvider(
+            resource=Resource.create(
+                {
+                    "service.name": "checkout",
+                    "deployment.environment.name": "docker-test",
+                    "k8s.namespace.name": "default",
+                }
+            )
+        )
+        provider.add_log_record_processor(SimpleLogRecordProcessor(exporter))
+        logger = logging.getLogger("iip.receiver.docker-test")
+        logger.setLevel(logging.ERROR)
+        handler = LoggingHandler(logger_provider=provider)
+        logger.addHandler(handler)
+        try:
+            logger.error("database request exceeded its deadline")
+            self.assertTrue(provider.force_flush(timeout_millis=5000))
+        finally:
+            logger.removeHandler(handler)
+            handler.close()
             provider.shutdown()
 
 

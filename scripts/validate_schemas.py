@@ -55,6 +55,8 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "ingestion-freshness-report.json",
     ),
     "integration-config.schema.json": ("integration-config.json",),
+    "log-evidence-request.schema.json": ("log-evidence-request.json",),
+    "log-evidence-result.schema.json": ("log-evidence-result.json",),
     "kubernetes-event-evidence-request.schema.json": (
         "kubernetes-event-evidence-request.json",
     ),
@@ -62,6 +64,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "kubernetes-event-evidence-result.json",
     ),
     "otlp-metrics-evidence.schema.json": ("otlp-metrics-evidence.json",),
+    "otlp-logs-evidence.schema.json": ("otlp-logs-evidence.json",),
     "telemetry-evidence-request.schema.json": ("telemetry-evidence-request.json",),
     "telemetry-evidence-result.schema.json": ("telemetry-evidence-result.json",),
     "plugin-manifest.schema.json": ("plugin-manifest.json",),

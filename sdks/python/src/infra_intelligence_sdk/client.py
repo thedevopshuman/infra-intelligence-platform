@@ -18,6 +18,7 @@ from .models import (
     InvestigationReport,
     InvestigationRequest,
     KubernetesEventEvidenceRequest,
+    LogEvidenceRequest,
     PluginSession,
     ResourceCollectionRequest,
     ResourceCollectionResult,
@@ -171,6 +172,13 @@ class Client:
 
         return Evidence.from_dict(
             self._post("/v1/evidence/telemetry/queries", request.to_dict())
+        )
+
+    def collect_log_evidence(self, request: LogEvidenceRequest) -> Evidence:
+        """Collect normalized log evidence through the configured backend."""
+
+        return Evidence.from_dict(
+            self._post("/v1/evidence/logs/queries", request.to_dict())
         )
 
     def collect_kubernetes_event_evidence(

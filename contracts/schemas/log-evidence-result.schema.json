@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:log-evidence-result:v1alpha1",
+  "title": "Infrastructure Intelligence Log Evidence Result",
+  "description": "Normalized bounded log records stored as an immutable Evidence artifact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "LogEvidenceResult"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "tenantId", "integrationId", "createdAt"],
+      "properties": {
+        "requestId": {"type": "string", "pattern": "^leq_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "pattern": "^[a-zA-Z0-9._-]{1,128}$"},
+        "integrationId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "createdAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal", "requestDigest", "timeRange", "status", "records", "summary", "warnings"],
+      "properties": {
+        "signal": {"const": "logs"},
+        "requestDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "timeRange": {"$ref": "#/$defs/timeRange"},
+        "status": {"enum": ["complete", "partial", "no-data"]},
+        "records": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {"$ref": "#/$defs/record"}
+        },
+        "summary": {"$ref": "#/$defs/summary"},
+        "warnings": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {"enum": ["backend-partial", "record-limit"]}
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "complete"}}},
+          "then": {"properties": {"records": {"minItems": 1}, "warnings": {"maxItems": 0}}}
+        },
+        {
+          "if": {"properties": {"status": {"const": "partial"}}},
+          "then": {"properties": {"records": {"minItems": 1}, "warnings": {"minItems": 1}}}
+        },
+        {
+          "if": {"properties": {"status": {"const": "no-data"}}},
+          "then": {
+            "properties": {
+              "records": {"maxItems": 0},
+              "warnings": {"maxItems": 0},
+              "summary": {"properties": {"recordCount": {"const": 0}, "errorCount": {"const": 0}}}
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "timeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"}
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "resourceRef", "timestamp", "severity", "serviceName", "body", "attributes"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^log_[a-f0-9]{32}$"},
+        "resourceRef": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "observedTimestamp": {"type": "string", "format": "date-time"},
+        "severity": {"enum": ["trace", "debug", "info", "warn", "error", "fatal", "unspecified"]},
+        "serviceName": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.:/-]{0,127}$"},
+        "body": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "attributes": {
+          "type": "object",
+          "maxProperties": 16,
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_.:/-]{0,127}$"},
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+          }
+        },
+        "traceId": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+        "spanId": {"type": "string", "pattern": "^[a-f0-9]{16}$"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordCount", "errorCount"],
+      "properties": {
+        "recordCount": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "errorCount": {"type": "integer", "minimum": 0, "maximum": 1000}
+      }
+    }
+  }
+}

@@ -55,7 +55,7 @@ Exercise an official OTLP/HTTP exporter against the receiver in the built API im
 make test-otlp-receiver
 ```
 
-The gate seeds the configured tenant/resource through the control plane, exports an allowlisted cumulative sum through an independent channel credential, requires OTLP success, and removes the isolated API container afterward. Pure normalization, redaction, scope, and persistence behavior remains covered by `make verify`. See the [OTLP receiver guide](otlp-metrics-receiver.md) for protected channel and Helm configuration.
+The gate seeds the configured tenant/resource through the control plane, exports an allowlisted cumulative sum and log record through independent channel authentication, requires OTLP success, and removes the isolated API container afterward. Pure normalization, redaction, scope, and persistence behavior remains covered by `make verify`. See the [metrics receiver guide](otlp-metrics-receiver.md) and [log evidence guide](log-evidence.md) for protected channel and Helm configuration.
 
 Exercise the historical metric-evidence adapter against a real Prometheus server with:
 
@@ -189,6 +189,9 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_OTLP_RECEIVER_ENABLED` | `false` | Enable the optional tenant-bound OTLP/HTTP metrics Evidence receiver |
 | `IIP_OTLP_RECEIVER_CHANNELS_JSON` | required when receiver is enabled | Protected hashed channel credentials, fixed scope, catalogs, admission limits, and handling policy |
 | `IIP_TELEMETRY_METRICS_BACKEND` | `no-data` | Historical metric evidence backend; `no-data` or `prometheus` |
+| `IIP_TELEMETRY_LOGS_BACKEND` | `no-data` | Historical log evidence backend; only honest `no-data` is implemented currently |
+| `IIP_OTLP_LOGS_RECEIVER_ENABLED` | `false` | Enable the optional tenant-bound OTLP/HTTP logs Evidence receiver |
+| `IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON` | required when logs receiver is enabled | Protected hashed logs-channel credentials, fixed resource/service scope, mappings, limits, and handling policy |
 | `IIP_PROMETHEUS_INTEGRATIONS_JSON` | unset | Protected non-secret tenant/integration endpoint and allowlisted metric catalog required by the Prometheus backend |
 | `IIP_PROMETHEUS_CREDENTIALS_JSON` | empty credential set | Secret-bearing local reference broker configuration; supply only through a protected runtime channel |
 | `IIP_KUBERNETES_EVENTS_BACKEND` | `no-data` | Kubernetes Event evidence backend; `no-data` or `kubernetes-api` |

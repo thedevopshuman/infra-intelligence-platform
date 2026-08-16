@@ -1,0 +1,41 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "LogEvidenceResult",
+  "metadata": {
+    "requestId": "leq_6a0df6f7a1d24040b36145288089d7a8",
+    "tenantId": "local",
+    "integrationId": "observability-local",
+    "createdAt": "2026-08-14T10:30:04Z"
+  },
+  "spec": {
+    "signal": "logs",
+    "requestDigest": "sha256:13ef70c209c6c68ff88953219a8ff4a8bc8c5afc232c98164bc66c838dd4605d",
+    "timeRange": {
+      "start": "2026-08-14T10:25:00Z",
+      "end": "2026-08-14T10:30:00Z"
+    },
+    "status": "complete",
+    "records": [
+      {
+        "id": "log_b217e4c70fe144158c4dc8c1c555a8cf",
+        "resourceRef": "res_e0ae9225a316fce4c97df5c23057b97a",
+        "timestamp": "2026-08-14T10:29:48Z",
+        "observedTimestamp": "2026-08-14T10:29:49Z",
+        "severity": "error",
+        "serviceName": "checkout",
+        "body": "database request exceeded its deadline",
+        "attributes": {
+          "k8s.namespace.name": "default",
+          "operation.name": "CreateOrder"
+        },
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "spanId": "00f067aa0ba902b7"
+      }
+    ],
+    "summary": {
+      "recordCount": 1,
+      "errorCount": 1
+    },
+    "warnings": []
+  }
+}

@@ -7,6 +7,8 @@ services:
       IIP_AUTH_IDENTITIES_JSON: ${IIP_AUTH_IDENTITIES_JSON:?set IIP_AUTH_IDENTITIES_JSON}
       IIP_OTLP_RECEIVER_ENABLED: "true"
       IIP_OTLP_RECEIVER_CHANNELS_JSON: ${IIP_OTLP_RECEIVER_CHANNELS_JSON:?set IIP_OTLP_RECEIVER_CHANNELS_JSON}
+      IIP_OTLP_LOGS_RECEIVER_ENABLED: "true"
+      IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON: ${IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON:?set IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=1)"]
       interval: 2s

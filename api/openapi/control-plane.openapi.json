@@ -3,7 +3,7 @@
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
     "version": "0.4.0",
-    "description": "Executable local reference API for collection ingestion, freshness telemetry, backend-neutral metric and Kubernetes Event evidence, tenant-bound OTLP metrics intake, resource queries, investigation-driven event/metric selection and committed-artifact assessment, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
+    "description": "Executable local reference API for collection ingestion, freshness telemetry, backend-neutral metric, log, and Kubernetes Event evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven event/metric selection and committed-artifact assessment, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -38,6 +38,34 @@
         "responses": {
           "200": {
             "description": "Full OTLP success; the body is a serialized ExportMetricsServiceResponse",
+            "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+          },
+          "400": {"$ref": "#/components/responses/OtlpInvalidRequest"},
+          "401": {"$ref": "#/components/responses/OtlpUnauthorized"},
+          "403": {"$ref": "#/components/responses/OtlpPolicyDenied"},
+          "404": {"$ref": "#/components/responses/OtlpReceiverDisabled"},
+          "413": {"$ref": "#/components/responses/OtlpRequestTooLarge"},
+          "415": {"$ref": "#/components/responses/OtlpUnsupportedMedia"},
+          "503": {"$ref": "#/components/responses/OtlpUnavailable"}
+        }
+      }
+    },
+    "/v1/logs": {
+      "post": {
+        "operationId": "ingestOtlpLogs",
+        "description": "Optional OTLP/HTTP binary Protobuf logs receiver. This operation uses a separately configured logs-channel Bearer credential; the global control-plane identity is not accepted.",
+        "security": [{"otlpChannelBearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-protobuf": {
+              "schema": {"type": "string", "format": "binary"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Full OTLP success; the body is a serialized ExportLogsServiceResponse",
             "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
           },
           "400": {"$ref": "#/components/responses/OtlpInvalidRequest"},
@@ -199,6 +227,33 @@
           },
           "503": {
             "description": "The telemetry provider, evidence processor, or store is unavailable",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "examples": {"provider": {"value": {"error": {"code": "evidence.provider.unavailable"}}}, "storage": {"value": {"error": {"code": "storage.unavailable"}}}}}}
+          }
+        }
+      }
+    },
+    "/v1/evidence/logs/queries": {
+      "post": {
+        "operationId": "collectLogEvidence",
+        "description": "Collect bounded normalized log evidence for authenticated tenant-scoped resources. The request uses logical services, severities, and attribute filters; provider endpoints, credentials, and vendor query languages remain protected adapter configuration.",
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/log-evidence-request.schema.json"}}}
+        },
+        "responses": {
+          "201": {"description": "Immutable Evidence envelope referencing the normalized log result artifact", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/evidence.schema.json"}}}},
+          "400": {
+            "description": "Log evidence request validation failed",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "logs.request.invalid"}}}}
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "408": {
+            "description": "The bounded evidence deadline elapsed",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "evidence.deadline.exceeded"}}}}
+          },
+          "503": {
+            "description": "The log provider, evidence processor, or store is unavailable",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "examples": {"provider": {"value": {"error": {"code": "evidence.provider.unavailable"}}}, "storage": {"value": {"error": {"code": "storage.unavailable"}}}}}}
           }
         }

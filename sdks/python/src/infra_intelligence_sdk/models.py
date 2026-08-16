@@ -303,6 +303,46 @@ class TelemetryEvidenceResult:
 
 
 @dataclass(frozen=True)
+class LogEvidenceRequest:
+    """Bounded backend-neutral request for tenant-scoped log evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "LogEvidenceRequest":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="LogEvidenceRequest",
+                label="log evidence request",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class LogEvidenceResult:
+    """Normalized log records stored as an immutable evidence artifact."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "LogEvidenceResult":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="LogEvidenceResult",
+                label="log evidence result",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class KubernetesEventEvidenceRequest:
     """Bounded backend-neutral request for tenant-scoped Kubernetes Events."""
 
@@ -355,6 +395,26 @@ class OtlpMetricsEvidence:
                 payload,
                 kind="OtlpMetricsEvidence",
                 label="OTLP metrics evidence",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class OtlpLogsEvidence:
+    """Normalized artifact produced by a tenant-bound OTLP logs channel."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "OtlpLogsEvidence":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="OtlpLogsEvidence",
+                label="OTLP logs evidence",
             )
         )
 

@@ -39,7 +39,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "infra-intelligence.fullname" . }}
-          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret .Values.telemetryEvidence.prometheus.credentialsExistingSecret .Values.kubernetesEventEvidence.credentialsExistingSecret .Values.otlpReceiver.channelsExistingSecret }}
+          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret .Values.telemetryEvidence.prometheus.credentialsExistingSecret .Values.kubernetesEventEvidence.credentialsExistingSecret .Values.otlpReceiver.channelsExistingSecret .Values.otlpLogsReceiver.channelsExistingSecret }}
           env:
             {{- if .Values.database.existingSecret }}
             - name: IIP_DATABASE_URL
@@ -82,6 +82,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.otlpReceiver.channelsExistingSecret | quote }}
                   key: {{ .Values.otlpReceiver.channelsSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.otlpLogsReceiver.channelsExistingSecret }}
+            - name: IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.otlpLogsReceiver.channelsExistingSecret | quote }}
+                  key: {{ .Values.otlpLogsReceiver.channelsSecretKey | quote }}
             {{- end }}
           {{- end }}
           ports:

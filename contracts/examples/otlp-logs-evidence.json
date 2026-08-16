@@ -1,0 +1,40 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "OtlpLogsEvidence",
+  "metadata": {
+    "tenantId": "local",
+    "integrationId": "observability-local",
+    "channelId": "otlp-logs-local",
+    "receivedAt": "2026-08-14T10:30:01Z"
+  },
+  "spec": {
+    "signal": "logs",
+    "protocol": "otlp/http-protobuf",
+    "timeRange": {
+      "start": "2026-08-14T10:29:48Z",
+      "end": "2026-08-14T10:29:48Z"
+    },
+    "records": [
+      {
+        "id": "log_b217e4c70fe144158c4dc8c1c555a8cf",
+        "resourceRef": "res_e0ae9225a316fce4c97df5c23057b97a",
+        "timestamp": "2026-08-14T10:29:48Z",
+        "observedTimestamp": "2026-08-14T10:29:49Z",
+        "severity": "error",
+        "serviceName": "checkout",
+        "body": "database request exceeded its deadline",
+        "attributes": {
+          "deployment.environment.name": "production",
+          "k8s.namespace.name": "default"
+        },
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "spanId": "00f067aa0ba902b7"
+      }
+    ],
+    "summary": {
+      "serviceCount": 1,
+      "recordCount": 1,
+      "errorCount": 1
+    }
+  }
+}

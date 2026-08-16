@@ -26,6 +26,9 @@ from infra_intelligence_sdk import (
     IntegrationConfig,
     KubernetesEventEvidenceRequest,
     KubernetesEventEvidenceResult,
+    LogEvidenceRequest,
+    LogEvidenceResult,
+    OtlpLogsEvidence,
     OtlpMetricsEvidence,
     PluginSession,
     ResourceCollectionRequest,
@@ -106,6 +109,9 @@ class PublicContractSdkTests(unittest.TestCase):
         otlp_metrics = OtlpMetricsEvidence.from_dict(
             example("otlp-metrics-evidence.json")
         )
+        log_request = LogEvidenceRequest.from_dict(example("log-evidence-request.json"))
+        log_result = LogEvidenceResult.from_dict(example("log-evidence-result.json"))
+        otlp_logs = OtlpLogsEvidence.from_dict(example("otlp-logs-evidence.json"))
 
         self.assertEqual(evidence.to_dict()["kind"], "Evidence")
         self.assertEqual(request.to_dict()["kind"], "InvestigationRequest")
@@ -187,6 +193,9 @@ class PublicContractSdkTests(unittest.TestCase):
             event_result.to_dict()["kind"], "KubernetesEventEvidenceResult"
         )
         self.assertEqual(otlp_metrics.to_dict()["kind"], "OtlpMetricsEvidence")
+        self.assertEqual(log_request.to_dict()["kind"], "LogEvidenceRequest")
+        self.assertEqual(log_result.to_dict()["kind"], "LogEvidenceResult")
+        self.assertEqual(otlp_logs.to_dict()["kind"], "OtlpLogsEvidence")
 
     def test_sdk_models_reject_crossed_contract_kinds(self) -> None:
         with self.assertRaisesRegex(ValueError, "kind must be Evidence"):
@@ -215,6 +224,12 @@ class PublicContractSdkTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(ValueError, "kind must be OtlpMetricsEvidence"):
             OtlpMetricsEvidence.from_dict(example("telemetry-evidence-result.json"))
+        with self.assertRaisesRegex(ValueError, "kind must be LogEvidenceRequest"):
+            LogEvidenceRequest.from_dict(example("log-evidence-result.json"))
+        with self.assertRaisesRegex(ValueError, "kind must be LogEvidenceResult"):
+            LogEvidenceResult.from_dict(example("log-evidence-request.json"))
+        with self.assertRaisesRegex(ValueError, "kind must be OtlpLogsEvidence"):
+            OtlpLogsEvidence.from_dict(example("otlp-metrics-evidence.json"))
         with self.assertRaisesRegex(
             ValueError, "kind must be KubernetesEventEvidenceRequest"
         ):
@@ -472,6 +487,21 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
             self.errors,
         )
 
+    def test_log_result_rejects_modified_digest_and_summary(self) -> None:
+        request_path = ROOT / "contracts" / "examples" / "log-evidence-request.json"
+        request = copy.deepcopy(self.documents[request_path])
+        request["spec"]["query"]["serviceNames"] = ["another-service"]
+        self.documents[request_path] = request
+        result_path = ROOT / "contracts" / "examples" / "log-evidence-result.json"
+        result = copy.deepcopy(self.documents[result_path])
+        result["spec"]["summary"]["errorCount"] = 0
+        self.documents[result_path] = result
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn("log evidence result digest must match its request", self.errors)
+        self.assertIn("log evidence summary must match its records", self.errors)
+
     def test_otlp_metrics_evidence_rejects_incorrect_summary(self) -> None:
         path = ROOT / "contracts" / "examples" / "otlp-metrics-evidence.json"
         result = copy.deepcopy(self.documents[path])
@@ -482,6 +512,19 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn(
             "OTLP metrics evidence summary must match its series",
+            self.errors,
+        )
+
+    def test_otlp_logs_evidence_rejects_incorrect_summary(self) -> None:
+        path = ROOT / "contracts" / "examples" / "otlp-logs-evidence.json"
+        result = copy.deepcopy(self.documents[path])
+        result["spec"]["summary"]["recordCount"] = 2
+        self.documents[path] = result
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "OTLP logs evidence summary must match its records",
             self.errors,
         )
 

@@ -1,0 +1,35 @@
+{
+  "channels": [
+    {
+      "channelId": "otlp-logs-local",
+      "tokenSha256": "sha256:7c75c255431a559e0c620d65a7e3407039b8bc17bc7956b10c85a693e6cd2e85",
+      "tenantId": "local",
+      "integrationId": "observability-local",
+      "resourceRef": "res_e0ae9225a316fce4c97df5c23057b97a",
+      "services": [
+        {
+          "otlpName": "checkout",
+          "serviceName": "checkout",
+          "attributes": {
+            "deployment.environment.name": "deployment.environment.name",
+            "k8s.namespace.name": "k8s.namespace.name"
+          }
+        }
+      ],
+      "limits": {
+        "maxRequestBytes": 1048576,
+        "maxArtifactBytes": 1048576,
+        "maxLogRecords": 200,
+        "maxAttributesPerRecord": 8,
+        "maxBodyBytes": 4096,
+        "maxAgeSeconds": 3600,
+        "maxClockSkewSeconds": 30,
+        "maxProcessingSeconds": 10
+      },
+      "handling": {
+        "sensitivity": "confidential",
+        "retentionClass": "ephemeral"
+      }
+    }
+  ]
+}

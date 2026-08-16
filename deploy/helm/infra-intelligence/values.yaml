@@ -79,6 +79,9 @@ telemetryEvidence:
     credentialsExistingSecret: ""
     credentialsSecretKey: prometheus-credentials-json
 
+logEvidence:
+  backend: no-data
+
 kubernetesEventEvidence:
   backend: no-data
   integrationsJson: '{"integrations":[]}'
@@ -92,6 +95,11 @@ otlpReceiver:
   enabled: false
   channelsExistingSecret: ""
   channelsSecretKey: otlp-receiver-channels-json
+
+otlpLogsReceiver:
+  enabled: false
+  channelsExistingSecret: ""
+  channelsSecretKey: otlp-logs-receiver-channels-json
 
 resources:
   requests:

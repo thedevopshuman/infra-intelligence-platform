@@ -373,6 +373,72 @@ export interface TelemetryEvidenceResult {
   };
 }
 
+export type LogSeverity =
+  | "trace"
+  | "debug"
+  | "info"
+  | "warn"
+  | "error"
+  | "fatal"
+  | "unspecified";
+
+export interface LogEvidenceRequest {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "LogEvidenceRequest";
+  metadata: {
+    requestId: `leq_${string}`;
+    tenantId: string;
+    actorId: string;
+    requestedAt: string;
+  };
+  spec: {
+    integrationId: string;
+    resourceRefs: ResourceUid[];
+    signal: "logs";
+    timeRange: { start: string; end: string };
+    query: {
+      serviceNames: string[];
+      severities: LogSeverity[];
+      filters: { attribute: string; operator: "eq" | "neq"; value: string }[];
+    };
+    limits: { maxRecords: number; maxBytes: number };
+    deadline: string;
+  };
+}
+
+export interface NormalizedLogRecord {
+  id: `log_${string}`;
+  resourceRef: ResourceUid;
+  timestamp: string;
+  observedTimestamp?: string;
+  severity: LogSeverity;
+  serviceName: string;
+  body: string;
+  attributes: Record<string, string>;
+  traceId?: string;
+  spanId?: string;
+}
+
+export interface LogEvidenceResult {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "LogEvidenceResult";
+  metadata: {
+    requestId: `leq_${string}`;
+    tenantId: string;
+    integrationId: string;
+    createdAt: string;
+  };
+  spec: {
+    signal: "logs";
+    requestDigest: Sha256Digest;
+    timeRange: { start: string; end: string };
+    status: "complete" | "partial" | "no-data";
+    records: NormalizedLogRecord[];
+    summary: { recordCount: number; errorCount: number };
+    warnings: ("backend-partial" | "record-limit")[];
+  };
+}
+
 export interface KubernetesEventQuery {
   severities: ("normal" | "warning")[];
   reasons: string[];
@@ -470,6 +536,24 @@ export interface OtlpMetricsEvidence {
       seriesCount: number;
       dataPointCount: number;
     };
+  };
+}
+
+export interface OtlpLogsEvidence {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "OtlpLogsEvidence";
+  metadata: {
+    tenantId: string;
+    integrationId: string;
+    channelId: string;
+    receivedAt: string;
+  };
+  spec: {
+    signal: "logs";
+    protocol: "otlp/http-protobuf";
+    timeRange: { start: string; end: string };
+    records: NormalizedLogRecord[];
+    summary: { serviceCount: number; recordCount: number; errorCount: number };
   };
 }
 

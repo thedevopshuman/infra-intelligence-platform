@@ -43,6 +43,11 @@ from iip.application.ingest_otlp_metrics import (
     OtlpReceiverConfigurationError,
     validate_channel_context,
 )
+from iip.application.ingest_otlp_logs import (
+    InvalidOtlpLogsRequestError,
+    OtlpLogsPayloadTooLargeError,
+    validate_logs_channel_context,
+)
 from iip.application.investigate import (
     InvestigationConflictError,
     InvalidInvestigationError,
@@ -51,6 +56,10 @@ from iip.application.investigate import (
 from iip.application.kubernetes_event_evidence import (
     CollectKubernetesEventEvidenceCommand,
     InvalidKubernetesEventEvidenceRequestError,
+)
+from iip.application.log_evidence import (
+    CollectLogEvidenceCommand,
+    InvalidLogEvidenceRequestError,
 )
 from iip.application.observe_ingestion import (
     GetIngestionFreshnessCommand,
@@ -199,6 +208,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path == "/v1/metrics":
             self._receive_otlp_metrics()
             return
+        if path == "/v1/logs":
+            self._receive_otlp_logs()
+            return
         segments = path.strip("/").split("/")
         known = (
             path
@@ -206,6 +218,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "/v1/resources",
                 "/v1/collections/ingest",
                 "/v1/evidence/kubernetes/events/queries",
+                "/v1/evidence/logs/queries",
                 "/v1/evidence/telemetry/queries",
                 "/v1/investigations",
                 "/v1/actions/proposals",
@@ -246,6 +259,11 @@ class ApiHandler(BaseHTTPRequestHandler):
             elif path == "/v1/evidence/telemetry/queries":
                 document = self.runtime.telemetry_evidence.execute(
                     CollectTelemetryEvidenceCommand(actor, payload)
+                )
+                status = HTTPStatus.CREATED
+            elif path == "/v1/evidence/logs/queries":
+                document = self.runtime.log_evidence.execute(
+                    CollectLogEvidenceCommand(actor, payload)
                 )
                 status = HTTPStatus.CREATED
             elif path == "/v1/evidence/kubernetes/events/queries":
@@ -325,12 +343,23 @@ class ApiHandler(BaseHTTPRequestHandler):
                 HTTPStatus.BAD_REQUEST,
                 {"error": {"code": "kubernetes.event.request.invalid"}},
             )
-        except (InvalidTelemetryEvidenceRequestError, InvalidEvidenceRequestError):
+        except (InvalidLogEvidenceRequestError, InvalidTelemetryEvidenceRequestError):
             code = (
-                "kubernetes.event.request.invalid"
-                if path == "/v1/evidence/kubernetes/events/queries"
+                "logs.request.invalid"
+                if path == "/v1/evidence/logs/queries"
                 else "telemetry.request.invalid"
             )
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": code}},
+            )
+        except InvalidEvidenceRequestError:
+            if path == "/v1/evidence/kubernetes/events/queries":
+                code = "kubernetes.event.request.invalid"
+            elif path == "/v1/evidence/logs/queries":
+                code = "logs.request.invalid"
+            else:
+                code = "telemetry.request.invalid"
             self._json(
                 HTTPStatus.BAD_REQUEST,
                 {"error": {"code": code}},
@@ -492,6 +521,69 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "otlp.request.too-large",
             )
         except InvalidOtlpMetricsRequestError as exc:
+            status = (
+                HTTPStatus.UNSUPPORTED_MEDIA_TYPE
+                if str(exc) == "otlp.compression.unsupported"
+                else HTTPStatus.BAD_REQUEST
+            )
+            self._otlp_failure(status, str(exc))
+        except OtlpReceiverConfigurationError:
+            self._otlp_failure(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "otlp.receiver.unavailable",
+            )
+        except EvidenceAuthorizationError:
+            self._otlp_failure(HTTPStatus.FORBIDDEN, "policy.denied")
+        except InvalidEvidenceRequestError:
+            self._otlp_failure(HTTPStatus.BAD_REQUEST, "otlp.request.invalid")
+        except EvidenceDeadlineExceededError:
+            self._otlp_failure(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "otlp.receiver.unavailable",
+            )
+        except (EvidenceProviderUnavailableError, EvidenceRedactionError, PersistenceError):
+            self._otlp_failure(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "otlp.receiver.unavailable",
+            )
+
+    def _receive_otlp_logs(self) -> None:
+        service = self.runtime.otlp_logs_ingestion
+        if service is None:
+            self._otlp_failure(HTTPStatus.NOT_FOUND, "otlp.receiver.disabled")
+            return
+        try:
+            try:
+                token = self._bearer_token()
+            except AuthenticationError as exc:
+                code = (
+                    "otlp.authentication.required"
+                    if str(exc) == "authentication.required"
+                    else "otlp.authentication.invalid"
+                )
+                raise OtlpReceiverAuthenticationError(code) from None
+            channel = service.authenticate_bearer(token)
+            validate_logs_channel_context(channel)
+            content_type = self.headers.get("content-type", "")
+            media_type = content_type.partition(";")[0].strip().lower()
+            if media_type != "application/x-protobuf":
+                self._otlp_failure(
+                    HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
+                    "otlp.content-type.unsupported",
+                )
+                return
+            encoding = self.headers.get("content-encoding", "identity").strip().lower()
+            payload = self._read_binary(channel.limits.max_request_bytes)
+            service.ingest(channel, payload, content_encoding=encoding)
+            self._otlp_response(HTTPStatus.OK, b"")
+        except OtlpReceiverAuthenticationError as exc:
+            self._otlp_failure(HTTPStatus.UNAUTHORIZED, str(exc))
+        except (OtlpLogsPayloadTooLargeError, OtlpPayloadTooLargeError):
+            self._otlp_failure(
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                "otlp.request.too-large",
+            )
+        except (InvalidOtlpLogsRequestError, InvalidOtlpMetricsRequestError) as exc:
             status = (
                 HTTPStatus.UNSUPPORTED_MEDIA_TYPE
                 if str(exc) == "otlp.compression.unsupported"
@@ -698,6 +790,18 @@ class ApiHandler(BaseHTTPRequestHandler):
             "otlp.series.limit",
             "otlp.series.duplicate",
             "otlp.series.order.invalid",
+            "otlp.service.not-allowlisted",
+            "otlp.log-record.invalid",
+            "otlp.log-record.unsupported",
+            "otlp.log-record.time.invalid",
+            "otlp.log-record.limit",
+            "otlp.log-record.order.invalid",
+            "otlp.log-body.invalid",
+            "otlp.log-body.type.unsupported",
+            "otlp.log-severity.invalid",
+            "otlp.trace-context.invalid",
+            "otlp.artifact.too-large",
+            "otlp.clock.invalid",
             "otlp.request.invalid",
             "otlp.request.too-large",
             "otlp.receiver.unavailable",

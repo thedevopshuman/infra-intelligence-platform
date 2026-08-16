@@ -47,11 +47,13 @@ REQUIRED_PATHS = (
     "docs/decisions/0020-kubernetes-event-evidence-and-correlation.md",
     "docs/decisions/0021-read-only-kubernetes-event-api-adapter.md",
     "docs/decisions/0022-external-workload-identity-credential-broker.md",
+    "docs/decisions/0023-backend-neutral-log-evidence-and-otlp-intake.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/kubernetes-event-evidence.md",
     "docs/operations/credential-broker.md",
     "docs/operations/otlp-metrics-receiver.md",
+    "docs/operations/log-evidence.md",
     "docs/operations/postgresql-backup-restore.md",
     "docs/operations/measurements/postgresql-backup-restore.json",
     "contracts/schemas/resource.schema.json",
@@ -77,6 +79,9 @@ REQUIRED_PATHS = (
     "contracts/schemas/telemetry-evidence-request.schema.json",
     "contracts/schemas/telemetry-evidence-result.schema.json",
     "contracts/schemas/otlp-metrics-evidence.schema.json",
+    "contracts/schemas/log-evidence-request.schema.json",
+    "contracts/schemas/log-evidence-result.schema.json",
+    "contracts/schemas/otlp-logs-evidence.schema.json",
     "contracts/schemas/investigation-request.schema.json",
     "contracts/schemas/investigation-report.schema.json",
     "contracts/schemas/ingestion-freshness-report.schema.json",
@@ -89,6 +94,9 @@ REQUIRED_PATHS = (
     "contracts/examples/telemetry-evidence-request.json",
     "contracts/examples/telemetry-evidence-result.json",
     "contracts/examples/otlp-metrics-evidence.json",
+    "contracts/examples/log-evidence-request.json",
+    "contracts/examples/log-evidence-result.json",
+    "contracts/examples/otlp-logs-evidence.json",
     "contracts/examples/integration-config.json",
     "contracts/examples/action-proposal.json",
     "contracts/examples/action-approval.json",
@@ -116,6 +124,8 @@ REQUIRED_PATHS = (
     "docs/specifications/kubernetes-event-evidence-contract.md",
     "docs/specifications/telemetry-evidence-contract.md",
     "docs/specifications/otlp-metrics-evidence-contract.md",
+    "docs/specifications/log-evidence-contract.md",
+    "docs/specifications/otlp-logs-evidence-contract.md",
     "docs/specifications/integration-config-contract.md",
     "docs/specifications/action-contract.md",
     "docs/specifications/plugin-session-contract.md",
@@ -131,6 +141,8 @@ REQUIRED_PATHS = (
     "src/iip/application/kubernetes_event_evidence.py",
     "src/iip/application/telemetry_evidence.py",
     "src/iip/application/ingest_otlp_metrics.py",
+    "src/iip/application/log_evidence.py",
+    "src/iip/application/ingest_otlp_logs.py",
     "src/iip/application/observe_ingestion.py",
     "src/iip/adapters/auth.py",
     "src/iip/adapters/evidence.py",
@@ -139,6 +151,7 @@ REQUIRED_PATHS = (
     "src/iip/adapters/credential_broker.py",
     "src/iip/adapters/kubernetes_events.py",
     "src/iip/adapters/otlp_receiver.py",
+    "src/iip/adapters/otlp_logs_receiver.py",
     "src/iip/adapters/postgres/migrations/0006_source_checkpoint_provider_cursors.sql",
     "tests/test_evidence_collection.py",
     "tests/test_kubernetes_event_evidence.py",
@@ -154,6 +167,8 @@ REQUIRED_PATHS = (
     "tests/test_kubernetes_events_backend.py",
     "tests/test_kubernetes_events_integration.py",
     "tests/test_otlp_receiver.py",
+    "tests/test_log_evidence.py",
+    "tests/test_otlp_logs_receiver.py",
     "tests/test_otlp_receiver_integration.py",
     "scripts/test_otel.sh",
     "scripts/test_prometheus.sh",
@@ -168,6 +183,7 @@ REQUIRED_PATHS = (
     "deploy/credential-broker/external-http.example.json",
     "deploy/kubernetes-events/integrations.example.json",
     "deploy/otlp/receiver-channels.example.json",
+    "deploy/otlp/log-receiver-channels.example.json",
     "scripts/test_kubernetes_live.sh",
     "scripts/run_reference_workflow.py",
     "scripts/backup_restore_experiment.py",
@@ -984,6 +1000,91 @@ def validate_telemetry_evidence_examples(
         fail(errors, "telemetry evidence result must fit request limits")
 
 
+def validate_log_evidence_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check log request/result correlation, scope, order, and summary."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    request = documents.get(example_dir / "log-evidence-request.json")
+    result = documents.get(example_dir / "log-evidence-result.json")
+    if not isinstance(request, dict) or not isinstance(result, dict):
+        return
+    request_metadata = request.get("metadata")
+    request_spec = request.get("spec")
+    result_metadata = result.get("metadata")
+    result_spec = result.get("spec")
+    if not all(
+        isinstance(item, dict)
+        for item in (request_metadata, request_spec, result_metadata, result_spec)
+    ):
+        return
+    for field in ("requestId", "tenantId"):
+        if result_metadata.get(field) != request_metadata.get(field):
+            fail(errors, f"log evidence result {field} must match its request")
+    if result_metadata.get("integrationId") != request_spec.get("integrationId"):
+        fail(errors, "log evidence result integrationId must match its request")
+    if result_spec.get("requestDigest") != canonical_digest(request):
+        fail(errors, "log evidence result digest must match its request")
+    if result_spec.get("timeRange") != request_spec.get("timeRange"):
+        fail(errors, "log evidence result timeRange must match its request")
+
+    time_range = request_spec.get("timeRange")
+    start = end = None
+    if isinstance(time_range, dict):
+        start = parse_timestamp(time_range.get("start"))
+        end = parse_timestamp(time_range.get("end"))
+    requested_at = parse_timestamp(request_metadata.get("requestedAt"))
+    created_at = parse_timestamp(result_metadata.get("createdAt"))
+    deadline = parse_timestamp(request_spec.get("deadline"))
+    if (
+        None in (start, end, requested_at, created_at, deadline)
+        or not start < end <= requested_at <= created_at <= deadline
+    ):
+        fail(errors, "log evidence example times must be monotonic")
+
+    records = result_spec.get("records")
+    summary = result_spec.get("summary")
+    query = request_spec.get("query")
+    resources = request_spec.get("resourceRefs")
+    limits = request_spec.get("limits")
+    if not isinstance(records, list) or not isinstance(summary, dict):
+        return
+    identities = []
+    error_count = 0
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        instant = parse_timestamp(record.get("timestamp"))
+        identity = (instant, record.get("id"))
+        identities.append(identity)
+        if instant is None or start is None or end is None or not start <= instant <= end:
+            fail(errors, "log evidence record must fit its request range")
+        if isinstance(resources, list) and record.get("resourceRef") not in resources:
+            fail(errors, "log evidence record resource must fit its request")
+        if isinstance(query, dict):
+            if record.get("serviceName") not in query.get("serviceNames", []):
+                fail(errors, "log evidence record service must fit its request")
+            severities = query.get("severities", [])
+            if severities and record.get("severity") not in severities:
+                fail(errors, "log evidence record severity must fit its request")
+        if record.get("severity") in ("error", "fatal"):
+            error_count += 1
+    if (
+        any(identity[0] is None for identity in identities)
+        or identities != sorted(identities)
+        or len(identities) != len(set(identities))
+    ):
+        fail(errors, "log evidence records must be unique and ordered")
+    if (
+        summary.get("recordCount") != len(records)
+        or summary.get("errorCount") != error_count
+    ):
+        fail(errors, "log evidence summary must match its records")
+    if isinstance(limits, dict) and len(records) > limits.get("maxRecords", -1):
+        fail(errors, "log evidence result must fit request limits")
+
+
 def validate_investigation_telemetry_examples(
     documents: Mapping[Path, object], errors: List[str]
 ) -> None:
@@ -1255,6 +1356,61 @@ def validate_otlp_metrics_evidence_example(
         fail(errors, "OTLP metrics evidence summary must match its series")
 
 
+def validate_otlp_logs_evidence_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check OTLP logs time, order, uniqueness, and summary invariants."""
+
+    path = ROOT / "contracts" / "examples" / "otlp-logs-evidence.json"
+    document = documents.get(path)
+    if not isinstance(document, dict):
+        return
+    spec = document.get("spec")
+    if not isinstance(spec, dict):
+        return
+    time_range = spec.get("timeRange")
+    records = spec.get("records")
+    summary = spec.get("summary")
+    if (
+        not isinstance(time_range, dict)
+        or not isinstance(records, list)
+        or not isinstance(summary, dict)
+    ):
+        return
+    start = parse_timestamp(time_range.get("start"))
+    end = parse_timestamp(time_range.get("end"))
+    identities = []
+    timestamps = []
+    services = set()
+    error_count = 0
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        timestamp = parse_timestamp(record.get("timestamp"))
+        identities.append((timestamp, record.get("id")))
+        if timestamp is not None:
+            timestamps.append(timestamp)
+        services.add(record.get("serviceName"))
+        if record.get("severity") in ("error", "fatal"):
+            error_count += 1
+        if timestamp is None or start is None or end is None or not start <= timestamp <= end:
+            fail(errors, "OTLP logs evidence record must fit its range")
+    if (
+        any(identity[0] is None for identity in identities)
+        or identities != sorted(identities)
+        or len(identities) != len(set(identities))
+    ):
+        fail(errors, "OTLP logs evidence records must be unique and ordered")
+    if timestamps and (start != min(timestamps) or end != max(timestamps)):
+        fail(errors, "OTLP logs evidence range must span its records")
+    if (
+        summary.get("serviceCount") != len(services)
+        or summary.get("recordCount") != len(records)
+        or summary.get("errorCount") != error_count
+    ):
+        fail(errors, "OTLP logs evidence summary must match its records")
+
+
 def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> None:
     from iip.domain.models import ContractError, Resource
 
@@ -1327,6 +1483,8 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("evidence.json", "Evidence"),
         ("telemetry-evidence-request.json", "TelemetryEvidenceRequest"),
         ("telemetry-evidence-result.json", "TelemetryEvidenceResult"),
+        ("log-evidence-request.json", "LogEvidenceRequest"),
+        ("log-evidence-result.json", "LogEvidenceResult"),
         (
             "kubernetes-event-evidence-request.json",
             "KubernetesEventEvidenceRequest",
@@ -1336,6 +1494,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "KubernetesEventEvidenceResult",
         ),
         ("otlp-metrics-evidence.json", "OtlpMetricsEvidence"),
+        ("otlp-logs-evidence.json", "OtlpLogsEvidence"),
         ("investigation-request.json", "InvestigationRequest"),
         ("investigation-request-kubernetes-events.json", "InvestigationRequest"),
         ("investigation-report.json", "InvestigationReport"),
@@ -1358,8 +1517,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_kubernetes_event_evidence_examples(documents, errors)
     validate_investigation_kubernetes_event_examples(documents, errors)
     validate_telemetry_evidence_examples(documents, errors)
+    validate_log_evidence_examples(documents, errors)
     validate_investigation_telemetry_examples(documents, errors)
     validate_otlp_metrics_evidence_example(documents, errors)
+    validate_otlp_logs_evidence_example(documents, errors)
     validate_evaluation_scenario(documents, errors)
 
     plugin_example = documents.get(example_dir / "plugin-manifest.json")

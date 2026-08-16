@@ -25,3 +25,4 @@ data:
   IIP_LOKI_INTEGRATIONS_JSON: {{ .Values.logEvidence.loki.integrationsJson | quote }}
   IIP_KUBERNETES_EVENTS_BACKEND: {{ .Values.kubernetesEventEvidence.backend | quote }}
   IIP_KUBERNETES_EVENTS_INTEGRATIONS_JSON: {{ .Values.kubernetesEventEvidence.integrationsJson | quote }}
+  IIP_CONTEXT_BACKEND: {{ .Values.contextEvidence.backend | quote }}

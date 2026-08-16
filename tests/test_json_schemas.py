@@ -382,6 +382,22 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(errors)
 
+    def test_context_request_rejects_public_filesystem_path(self) -> None:
+        request = document("contracts/examples/context-evidence-request.json")
+        request["spec"]["query"]["path"] = "/etc/passwd"
+
+        errors = self.validate("context-evidence-request.schema.json", request)
+
+        self.assertTrue(any("path" in error for error in errors))
+
+    def test_context_no_data_result_cannot_contain_documents(self) -> None:
+        result = document("contracts/examples/context-evidence-result.json")
+        result["spec"]["status"] = "no-data"
+
+        errors = self.validate("context-evidence-result.schema.json", result)
+
+        self.assertTrue(any("documents" in error for error in errors))
+
     def test_otlp_gauge_prohibits_sum_semantics(self) -> None:
         result = document("contracts/examples/otlp-metrics-evidence.json")
         gauge = result["spec"]["series"][1]

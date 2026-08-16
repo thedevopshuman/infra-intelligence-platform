@@ -1,0 +1,37 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ContextEvidenceResult",
+  "metadata": {
+    "requestId": "ctq_4d8a2f6c1b3e5097a8c6d4e2f109753b",
+    "tenantId": "local",
+    "integrationId": "context-local",
+    "createdAt": "2026-08-17T08:30:02Z"
+  },
+  "spec": {
+    "requestDigest": "sha256:654c7dfd69eac6ebaf7fb2b2b6a2ddd6ae90be86a6cc6ff190e231513f092909",
+    "status": "complete",
+    "documents": [
+      {
+        "id": "ctx_7e4a1c9b2d6f5083a7e5c1b9d3f62480",
+        "referenceId": "runbooks/api-rollout",
+        "resourceRefs": [
+          "res_e0ae9225a316fce4c97df5c23057b97a"
+        ],
+        "kind": "runbook",
+        "title": "API rollout recovery",
+        "locator": "repo://platform-operations/runbooks/api-rollout.md",
+        "revision": "sha256:5a1ecbd3d998e764d5fac19001e0927127b2ce4a8585f742cb65c58cd518be0c",
+        "excerpt": "# API rollback\n\nVerify the image digest, then inspect rollout status before approving a rollback.",
+        "excerptHash": "sha256:86819d3bcb33342ae1a60b6ec8f3b5fedc592749821b54046a0aeeac4632c015",
+        "redactionMethods": ["none"],
+        "trust": "untrusted",
+        "instructionPolicy": "data-only"
+      }
+    ],
+    "summary": {
+      "documentCount": 1,
+      "countsByKind": {"runbook": 1}
+    },
+    "warnings": []
+  }
+}

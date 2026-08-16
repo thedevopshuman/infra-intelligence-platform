@@ -10,6 +10,8 @@ from infra_intelligence_sdk import (
     ActionApproval,
     ActionProposal,
     ActionResult,
+    ContextEvidenceRequest,
+    ContextEvidenceResult,
     Evidence,
     EvaluationScenario,
     InvestigationReport,
@@ -131,10 +133,18 @@ class PublicContractSdkTests(unittest.TestCase):
         change_result = ResourceChangeEvidenceResult.from_dict(
             example("resource-change-evidence-result.json")
         )
+        context_request = ContextEvidenceRequest.from_dict(
+            example("context-evidence-request.json")
+        )
+        context_result = ContextEvidenceResult.from_dict(
+            example("context-evidence-result.json")
+        )
 
         self.assertEqual(evidence.to_dict()["kind"], "Evidence")
         self.assertEqual(change_request.to_dict()["kind"], "ResourceChangeEvidenceRequest")
         self.assertEqual(change_result.to_dict()["kind"], "ResourceChangeEvidenceResult")
+        self.assertEqual(context_request.to_dict()["kind"], "ContextEvidenceRequest")
+        self.assertEqual(context_result.to_dict()["kind"], "ContextEvidenceResult")
         self.assertEqual(request.to_dict()["kind"], "InvestigationRequest")
         selection = telemetry_investigation.telemetry_selections[0]
         self.assertIsInstance(selection, InvestigationTelemetrySelection)
@@ -281,6 +291,14 @@ class PublicContractSdkTests(unittest.TestCase):
             ResourceChangeEvidenceResult.from_dict(
                 example("resource-change-evidence-request.json")
             )
+        with self.assertRaisesRegex(
+            ValueError, "kind must be ContextEvidenceRequest"
+        ):
+            ContextEvidenceRequest.from_dict(example("context-evidence-result.json"))
+        with self.assertRaisesRegex(
+            ValueError, "kind must be ContextEvidenceResult"
+        ):
+            ContextEvidenceResult.from_dict(example("context-evidence-request.json"))
 
     def test_sdk_models_reject_unknown_versions(self) -> None:
         payload = example("investigation-request.json")
@@ -583,6 +601,21 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn("resource change result digest must match its request", self.errors)
         self.assertIn("resource change summary must match its changes", self.errors)
+
+    def test_context_result_rejects_modified_digest_and_excerpt_hash(self) -> None:
+        request_path = ROOT / "contracts" / "examples" / "context-evidence-request.json"
+        request = copy.deepcopy(self.documents[request_path])
+        request["spec"]["query"]["kinds"] = ["source"]
+        self.documents[request_path] = request
+        result_path = ROOT / "contracts" / "examples" / "context-evidence-result.json"
+        result = copy.deepcopy(self.documents[result_path])
+        result["spec"]["documents"][0]["excerpt"] += " changed"
+        self.documents[result_path] = result
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn("context result digest must match its request", self.errors)
+        self.assertIn("context excerpt hash must match its redacted text", self.errors)
 
     def test_otlp_metrics_evidence_rejects_incorrect_summary(self) -> None:
         path = ROOT / "contracts" / "examples" / "otlp-metrics-evidence.json"

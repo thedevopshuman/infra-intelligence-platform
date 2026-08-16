@@ -1,0 +1,26 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ContextEvidenceRequest",
+  "metadata": {
+    "requestId": "ctq_4d8a2f6c1b3e5097a8c6d4e2f109753b",
+    "tenantId": "local",
+    "actorId": "developer",
+    "requestedAt": "2026-08-17T08:30:00Z"
+  },
+  "spec": {
+    "integrationId": "context-local",
+    "resourceRefs": [
+      "res_e0ae9225a316fce4c97df5c23057b97a"
+    ],
+    "query": {
+      "kinds": ["runbook", "source"],
+      "referenceIds": ["runbooks/api-rollout"]
+    },
+    "limits": {
+      "maxDocuments": 8,
+      "maxExcerptChars": 4096,
+      "maxBytes": 524288
+    },
+    "deadline": "2026-08-17T08:31:00Z"
+  }
+}

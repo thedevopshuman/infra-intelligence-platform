@@ -1402,6 +1402,104 @@ def validate_resource_change_evidence_examples(
         fail(errors, "resource change result must fit request limits")
 
 
+def validate_context_evidence_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check context request/result correlation, scope, hashes, and summaries."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    request = documents.get(example_dir / "context-evidence-request.json")
+    result = documents.get(example_dir / "context-evidence-result.json")
+    if not isinstance(request, dict) or not isinstance(result, dict):
+        return
+    request_metadata = request.get("metadata")
+    request_spec = request.get("spec")
+    result_metadata = result.get("metadata")
+    result_spec = result.get("spec")
+    if not all(
+        isinstance(item, dict)
+        for item in (request_metadata, request_spec, result_metadata, result_spec)
+    ):
+        return
+    for field in ("requestId", "tenantId"):
+        if result_metadata.get(field) != request_metadata.get(field):
+            fail(errors, f"context result {field} must match its request")
+    if result_metadata.get("integrationId") != request_spec.get("integrationId"):
+        fail(errors, "context result integrationId must match its request")
+    if result_spec.get("requestDigest") != canonical_digest(request):
+        fail(errors, "context result digest must match its request")
+    requested_at = parse_timestamp(request_metadata.get("requestedAt"))
+    created_at = parse_timestamp(result_metadata.get("createdAt"))
+    deadline = parse_timestamp(request_spec.get("deadline"))
+    if (
+        None in (requested_at, created_at, deadline)
+        or not requested_at <= created_at <= deadline
+    ):
+        fail(errors, "context evidence example times must be monotonic")
+    query = request_spec.get("query")
+    limits = request_spec.get("limits")
+    requested_resources = set(request_spec.get("resourceRefs", []))
+    requested_kinds = set(query.get("kinds", [])) if isinstance(query, dict) else set()
+    requested_refs = (
+        set(query.get("referenceIds", [])) if isinstance(query, dict) else set()
+    )
+    context_documents = result_spec.get("documents")
+    summary = result_spec.get("summary")
+    if not isinstance(context_documents, list) or not isinstance(summary, dict):
+        return
+    ids = set()
+    references = set()
+    counts: dict[object, int] = {}
+    sort_keys = []
+    for document in context_documents:
+        if not isinstance(document, dict):
+            continue
+        ids.add(document.get("id"))
+        references.add(document.get("referenceId"))
+        kind = document.get("kind")
+        counts[kind] = counts.get(kind, 0) + 1
+        sort_keys.append((kind, document.get("referenceId")))
+        if not set(document.get("resourceRefs", [])).issubset(requested_resources):
+            fail(errors, "context document resources must fit its request")
+        if requested_kinds and kind not in requested_kinds:
+            fail(errors, "context document kind must fit its request")
+        if requested_refs and document.get("referenceId") not in requested_refs:
+            fail(errors, "context document reference must fit its request")
+        excerpt = document.get("excerpt")
+        expected_hash = (
+            "sha256:" + hashlib.sha256(excerpt.encode("utf-8")).hexdigest()
+            if isinstance(excerpt, str)
+            else None
+        )
+        if document.get("excerptHash") != expected_hash:
+            fail(errors, "context excerpt hash must match its redacted text")
+        if document.get("trust") != "untrusted" or document.get(
+            "instructionPolicy"
+        ) != "data-only":
+            fail(errors, "context documents must remain untrusted data")
+    if (
+        len(ids) != len(context_documents)
+        or len(references) != len(context_documents)
+        or sort_keys != sorted(sort_keys)
+    ):
+        fail(errors, "context documents must be unique and ordered")
+    if (
+        summary.get("documentCount") != len(context_documents)
+        or summary.get("countsByKind") != counts
+    ):
+        fail(errors, "context summary must match its documents")
+    if isinstance(limits, dict):
+        if len(context_documents) > limits.get("maxDocuments", -1):
+            fail(errors, "context result must fit its document limit")
+        if any(
+            isinstance(document, dict)
+            and isinstance(document.get("excerpt"), str)
+            and len(document["excerpt"]) > limits.get("maxExcerptChars", -1)
+            for document in context_documents
+        ):
+            fail(errors, "context result must fit its excerpt limit")
+
+
 def validate_investigation_telemetry_examples(
     documents: Mapping[Path, object], errors: List[str]
 ) -> None:
@@ -1798,6 +1896,8 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("plugin-manifest.json", "Plugin"),
         ("plugin-session.json", "PluginSession"),
         ("evidence.json", "Evidence"),
+        ("context-evidence-request.json", "ContextEvidenceRequest"),
+        ("context-evidence-result.json", "ContextEvidenceResult"),
         ("telemetry-evidence-request.json", "TelemetryEvidenceRequest"),
         ("telemetry-evidence-result.json", "TelemetryEvidenceResult"),
         ("log-evidence-request.json", "LogEvidenceRequest"),
@@ -1850,6 +1950,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_telemetry_evidence_examples(documents, errors)
     validate_log_evidence_examples(documents, errors)
     validate_resource_change_evidence_examples(documents, errors)
+    validate_context_evidence_examples(documents, errors)
     validate_investigation_telemetry_examples(documents, errors)
     validate_otlp_metrics_evidence_example(documents, errors)
     validate_otlp_logs_evidence_example(documents, errors)

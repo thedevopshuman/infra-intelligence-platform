@@ -17,6 +17,8 @@ The platform exposes contracts at three levels:
 | Resource timeline | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/resource-timeline.schema.json` | `contracts/examples/resource-timeline.json` |
 | Resource change evidence request | [resource-change-evidence-contract.md](resource-change-evidence-contract.md) | `contracts/schemas/resource-change-evidence-request.schema.json` | `contracts/examples/resource-change-evidence-request.json` |
 | Resource change evidence result | [resource-change-evidence-contract.md](resource-change-evidence-contract.md) | `contracts/schemas/resource-change-evidence-result.schema.json` | `contracts/examples/resource-change-evidence-result.json` |
+| Repository/runbook context request | [context-evidence-contract.md](context-evidence-contract.md) | `contracts/schemas/context-evidence-request.schema.json` | `contracts/examples/context-evidence-request.json` |
+| Repository/runbook context result | [context-evidence-contract.md](context-evidence-contract.md) | `contracts/schemas/context-evidence-result.schema.json` | `contracts/examples/context-evidence-result.json` |
 | Ingestion freshness report | [ingestion-freshness-contract.md](ingestion-freshness-contract.md) | `contracts/schemas/ingestion-freshness-report.schema.json` | `contracts/examples/ingestion-freshness-report.json` |
 | Session context | [session-context-contract.md](session-context-contract.md) | `contracts/schemas/session-context.schema.json` | `contracts/examples/session-context.json` |
 | Page information | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/page-info.schema.json` | `contracts/examples/page-info.json` |

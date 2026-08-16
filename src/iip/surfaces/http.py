@@ -25,6 +25,10 @@ from iip.application.collect_evidence import (
     EvidenceRedactionError,
     InvalidEvidenceRequestError,
 )
+from iip.application.context_evidence import (
+    CollectContextEvidenceCommand,
+    InvalidContextEvidenceRequestError,
+)
 from iip.application.ingest_collection import (
     CollectionConflictError,
     IngestCollectionCommand,
@@ -98,7 +102,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.6.0"
+    server_version = "IIPReference/0.7.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -249,6 +253,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "/v1/collections/ingest",
                 "/v1/evidence/kubernetes/events/queries",
                 "/v1/evidence/changes/queries",
+                "/v1/evidence/context/queries",
                 "/v1/evidence/logs/queries",
                 "/v1/evidence/telemetry/queries",
                 "/v1/investigations",
@@ -305,6 +310,11 @@ class ApiHandler(BaseHTTPRequestHandler):
             elif path == "/v1/evidence/changes/queries":
                 document = self.runtime.resource_change_evidence.execute(
                     CollectResourceChangeEvidenceCommand(actor, payload)
+                )
+                status = HTTPStatus.CREATED
+            elif path == "/v1/evidence/context/queries":
+                document = self.runtime.context_evidence.execute(
+                    CollectContextEvidenceCommand(actor, payload)
                 )
                 status = HTTPStatus.CREATED
             elif path == "/v1/investigations":
@@ -384,6 +394,11 @@ class ApiHandler(BaseHTTPRequestHandler):
                 HTTPStatus.BAD_REQUEST,
                 {"error": {"code": "change.request.invalid"}},
             )
+        except InvalidContextEvidenceRequestError:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": "context.request.invalid"}},
+            )
         except (InvalidLogEvidenceRequestError, InvalidTelemetryEvidenceRequestError):
             code = (
                 "logs.request.invalid"
@@ -399,6 +414,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                 code = "kubernetes.event.request.invalid"
             elif path == "/v1/evidence/changes/queries":
                 code = "change.request.invalid"
+            elif path == "/v1/evidence/context/queries":
+                code = "context.request.invalid"
             elif path == "/v1/evidence/logs/queries":
                 code = "logs.request.invalid"
             else:

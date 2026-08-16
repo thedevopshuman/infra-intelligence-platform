@@ -13,6 +13,7 @@ from .models import (
     ActionApproval,
     ActionProposal,
     ActionResult,
+    ContextEvidenceRequest,
     Evidence,
     IngestionFreshnessReport,
     InvestigationReport,
@@ -207,6 +208,13 @@ class Client:
 
         return Evidence.from_dict(
             self._post("/v1/evidence/changes/queries", request.to_dict())
+        )
+
+    def collect_context_evidence(self, request: ContextEvidenceRequest) -> Evidence:
+        """Collect redacted allowlisted repository and runbook context."""
+
+        return Evidence.from_dict(
+            self._post("/v1/evidence/context/queries", request.to_dict())
         )
 
     def propose_action(self, command: Mapping[str, Any]) -> ActionProposal:

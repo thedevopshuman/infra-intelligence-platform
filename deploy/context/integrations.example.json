@@ -1,0 +1,19 @@
+{
+  "integrations": [
+    {
+      "tenantId": "local",
+      "integrationId": "context-local",
+      "root": "/var/run/iip-context",
+      "documents": [
+        {
+          "referenceId": "runbooks/api-rollout",
+          "resourceRefs": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+          "kind": "runbook",
+          "title": "API rollout recovery",
+          "locator": "repo://platform-operations/runbooks/api-rollout.md",
+          "path": "api-rollout.md"
+        }
+      ]
+    }
+  ]
+}

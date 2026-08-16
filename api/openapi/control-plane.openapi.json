@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, Kubernetes Event, and resource-change evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven evidence assessment, governed actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -318,6 +318,33 @@
           },
           "503": {
             "description": "The history provider, evidence processor, or store is unavailable",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "examples": {"provider": {"value": {"error": {"code": "evidence.provider.unavailable"}}}, "storage": {"value": {"error": {"code": "storage.unavailable"}}}}}}
+          }
+        }
+      }
+    },
+    "/v1/evidence/context/queries": {
+      "post": {
+        "operationId": "collectContextEvidence",
+        "description": "Collect bounded redacted excerpts from tenant-scoped repository and runbook files explicitly allowlisted in protected integration configuration. Returned text is always marked untrusted data and never grants instructions or authority.",
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/context-evidence-request.schema.json"}}}
+        },
+        "responses": {
+          "201": {"description": "Immutable Evidence envelope referencing normalized repository/runbook context", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/evidence.schema.json"}}}},
+          "400": {
+            "description": "Context evidence request validation failed",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "context.request.invalid"}}}}
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "408": {
+            "description": "The bounded evidence deadline elapsed",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "evidence.deadline.exceeded"}}}}
+          },
+          "503": {
+            "description": "The context provider, evidence processor, or store is unavailable",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "examples": {"provider": {"value": {"error": {"code": "evidence.provider.unavailable"}}}, "storage": {"value": {"error": {"code": "storage.unavailable"}}}}}}
           }
         }

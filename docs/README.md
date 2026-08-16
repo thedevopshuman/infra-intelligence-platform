@@ -46,6 +46,7 @@ The documentation tree is the product and engineering system of record. A change
 - [OTLP metrics receiver](operations/otlp-metrics-receiver.md)
 - [Log evidence and OTLP logs intake](operations/log-evidence.md)
 - [Resource and deployment change evidence](operations/resource-change-evidence.md)
+- [Repository and runbook context evidence](operations/context-evidence.md)
 - [PostgreSQL backup and restore experiment](operations/postgresql-backup-restore.md)
 - [Glossary](glossary.md)
 

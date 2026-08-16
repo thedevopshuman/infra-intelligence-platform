@@ -587,6 +587,68 @@ export interface ResourceChangeEvidenceResult {
   };
 }
 
+export type ContextDocumentKind =
+  | "runbook"
+  | "source"
+  | "configuration"
+  | "service-catalog";
+
+export interface ContextEvidenceRequest {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ContextEvidenceRequest";
+  metadata: {
+    requestId: `ctq_${string}`;
+    tenantId: string;
+    actorId: string;
+    requestedAt: string;
+  };
+  spec: {
+    integrationId: string;
+    resourceRefs: ResourceUid[];
+    query: { kinds: ContextDocumentKind[]; referenceIds: string[] };
+    limits: {
+      maxDocuments: number;
+      maxExcerptChars: number;
+      maxBytes: number;
+    };
+    deadline: string;
+  };
+}
+
+export interface ContextEvidenceResult {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ContextEvidenceResult";
+  metadata: {
+    requestId: `ctq_${string}`;
+    tenantId: string;
+    integrationId: string;
+    createdAt: string;
+  };
+  spec: {
+    requestDigest: Sha256Digest;
+    status: "complete" | "partial" | "no-data";
+    documents: {
+      id: `ctx_${string}`;
+      referenceId: string;
+      resourceRefs: ResourceUid[];
+      kind: ContextDocumentKind;
+      title: string;
+      locator: string;
+      revision: string;
+      excerpt: string;
+      excerptHash: Sha256Digest;
+      redactionMethods: string[];
+      trust: "untrusted";
+      instructionPolicy: "data-only";
+    }[];
+    summary: {
+      documentCount: number;
+      countsByKind: Partial<Record<ContextDocumentKind, number>>;
+    };
+    warnings: ("backend-partial" | "document-limit" | "excerpt-limit")[];
+  };
+}
+
 export interface OtlpMetricsEvidence {
   apiVersion: "iip.platform/v1alpha1";
   kind: "OtlpMetricsEvidence";

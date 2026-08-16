@@ -443,6 +443,46 @@ class ResourceChangeEvidenceResult:
 
 
 @dataclass(frozen=True)
+class ContextEvidenceRequest:
+    """Bounded request for allowlisted repository and runbook context."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ContextEvidenceRequest":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="ContextEvidenceRequest",
+                label="context evidence request",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class ContextEvidenceResult:
+    """Normalized untrusted context stored as an immutable evidence artifact."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ContextEvidenceResult":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="ContextEvidenceResult",
+                label="context evidence result",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class OtlpMetricsEvidence:
     """Normalized artifact produced by a tenant-bound OTLP metrics channel."""
 

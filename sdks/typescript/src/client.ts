@@ -4,6 +4,7 @@ import type {
   ActionProposal,
   ActionResult,
   ApiErrorBody,
+  ContextEvidenceRequest,
   Evidence,
   EvidenceId,
   IngestionFreshnessReport,
@@ -163,6 +164,10 @@ export class InfrastructureIntelligenceClient {
     request: ResourceChangeEvidenceRequest,
   ): Promise<Evidence> {
     return this.post<Evidence>("/v1/evidence/changes/queries", request);
+  }
+
+  async collectContextEvidence(request: ContextEvidenceRequest): Promise<Evidence> {
+    return this.post<Evidence>("/v1/evidence/context/queries", request);
   }
 
   async proposeAction(command: {

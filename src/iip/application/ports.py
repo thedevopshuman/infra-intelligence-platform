@@ -182,6 +182,46 @@ class RawEvidenceArtifact:
 
 
 @dataclass(frozen=True)
+class ContextDocumentQuery:
+    """Credential-free bounded repository/runbook query for one tenant scope."""
+
+    tenant_id: str
+    actor_id: str
+    request_id: str
+    integration_id: str
+    resource_uids: tuple[str, ...]
+    kinds: tuple[str, ...]
+    reference_ids: tuple[str, ...]
+    max_documents: int
+    max_excerpt_chars: int
+    max_bytes: int
+    deadline: str
+
+
+@dataclass(frozen=True)
+class ContextDocument:
+    """One untrusted repository/runbook document returned by a backend."""
+
+    reference_id: str
+    resource_uids: tuple[str, ...]
+    kind: str
+    title: str
+    locator: str
+    revision: str
+    content: str
+
+
+@dataclass(frozen=True)
+class ContextDocumentsResult:
+    """Untrusted bounded result returned by a repository/runbook backend."""
+
+    executed_at: str
+    status: str
+    documents: tuple[ContextDocument, ...]
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class EvidenceRedactionResult:
     """Decoded artifact bytes after mandatory redaction inspection."""
 
@@ -542,6 +582,11 @@ class TelemetryLogsBackend(Protocol):
 class KubernetesEventsBackend(Protocol):
     def query_events(self, request: KubernetesEventQuery) -> KubernetesEventsResult:
         """Query scoped Kubernetes Events without exposing credentials or client types."""
+
+
+class ContextDocumentsBackend(Protocol):
+    def query_context(self, request: ContextDocumentQuery) -> ContextDocumentsResult:
+        """Read allowlisted repository/runbook context without exposing storage details."""
 
 
 class CredentialBroker(Protocol):

@@ -6,6 +6,8 @@ from .models import (
     ActionApproval,
     ActionProposal,
     ActionResult,
+    ContextEvidenceRequest,
+    ContextEvidenceResult,
     Evidence,
     EvaluationScenario,
     IngestionFreshnessReport,
@@ -52,6 +54,8 @@ __all__ = [
     "ActionResult",
     "ApiError",
     "Client",
+    "ContextEvidenceRequest",
+    "ContextEvidenceResult",
     "Evidence",
     "EvaluationScenario",
     "IngestionFreshnessReport",
@@ -91,4 +95,4 @@ __all__ = [
     "TelemetryEvidenceRequest",
     "TelemetryEvidenceResult",
 ]
-__version__ = "0.9.0"
+__version__ = "0.10.0"

@@ -8,6 +8,7 @@ from typing import Any
 
 from iip.adapters.actions import KubernetesRestartDryRunExecutor
 from iip.adapters.auth import DenyAllAuthenticator, HashedBearerAuthenticator
+from iip.adapters.context import NoDataContextDocumentsBackend
 from iip.adapters.evidence import (
     InMemoryEvidenceStore,
     NoDataKubernetesEventsBackend,
@@ -22,6 +23,7 @@ from iip.adapters.memory import AllowTenantPolicy, InMemoryResourceStore
 from iip.adapters.operations import InMemoryOperationalStore
 from iip.application.actions import GovernedActionService
 from iip.application.collect_evidence import EvidenceCollectionService
+from iip.application.context_evidence import ContextEvidenceProvider, ContextEvidenceService
 from iip.application.ingest_collection import ResourceCollectionIngestionService
 from iip.application.ingest_otlp_metrics import (
     OtlpMetricsIngestionService,
@@ -38,6 +40,7 @@ from iip.application.ports import (
     EventLog,
     EventOutbox,
     CredentialBroker,
+    ContextDocumentsBackend,
     IngestionTelemetrySink,
     KubernetesEventsBackend,
     ResourceRepository,
@@ -89,6 +92,7 @@ class Runtime:
     evidence: EvidenceCollectionService
     kubernetes_event_evidence: KubernetesEventEvidenceService
     resource_change_evidence: ResourceChangeEvidenceService
+    context_evidence: ContextEvidenceService
     telemetry_evidence: TelemetryEvidenceService
     log_evidence: LogEvidenceService
     otlp_metrics_ingestion: OtlpMetricsIngestionService | None
@@ -118,6 +122,7 @@ def build_local_runtime(
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
     telemetry_logs_backend: TelemetryLogsBackend | None = None,
     kubernetes_events_backend: KubernetesEventsBackend | None = None,
+    context_documents_backend: ContextDocumentsBackend | None = None,
     otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     otlp_logs_receiver: OtlpLogsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
@@ -137,6 +142,7 @@ def build_local_runtime(
         telemetry_metrics_backend,
         telemetry_logs_backend,
         kubernetes_events_backend,
+        context_documents_backend,
         otlp_metrics_receiver,
         otlp_logs_receiver,
         telemetry_runtime,
@@ -153,6 +159,7 @@ def _compose_runtime(
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
     telemetry_logs_backend: TelemetryLogsBackend | None = None,
     kubernetes_events_backend: KubernetesEventsBackend | None = None,
+    context_documents_backend: ContextDocumentsBackend | None = None,
     otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     otlp_logs_receiver: OtlpLogsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
@@ -182,6 +189,13 @@ def _compose_runtime(
     )
     kubernetes_event_provider = KubernetesEventsEvidenceProvider(event_backend, store)
     resource_change_provider = ResourceHistoryChangeEvidenceProvider(store, clock)
+    redactor = StructuredTextRedactor()
+    context_backend = (
+        context_documents_backend
+        if context_documents_backend is not None
+        else NoDataContextDocumentsBackend(clock)
+    )
+    context_provider = ContextEvidenceProvider(context_backend, redactor, clock)
     evidence = EvidenceCollectionService(
         store,
         {
@@ -190,9 +204,10 @@ def _compose_runtime(
             "telemetry-query": telemetry_provider,
             "log-query": log_provider,
             "resource-history": resource_change_provider,
+            "context-query": context_provider,
         },
         evidence_store,
-        StructuredTextRedactor(),
+        redactor,
         policy,
         UuidEvidenceIdGenerator(),
         clock,
@@ -201,6 +216,7 @@ def _compose_runtime(
     log_evidence = LogEvidenceService(evidence, clock)
     kubernetes_event_evidence = KubernetesEventEvidenceService(evidence, clock)
     resource_change_evidence = ResourceChangeEvidenceService(evidence, clock)
+    context_evidence = ContextEvidenceService(evidence, clock)
     return Runtime(
         authenticator=authenticator,
         resources=store,
@@ -226,6 +242,7 @@ def _compose_runtime(
         evidence=evidence,
         kubernetes_event_evidence=kubernetes_event_evidence,
         resource_change_evidence=resource_change_evidence,
+        context_evidence=context_evidence,
         telemetry_evidence=telemetry_evidence,
         log_evidence=log_evidence,
         otlp_metrics_ingestion=(
@@ -274,6 +291,7 @@ def build_postgres_runtime(
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
     telemetry_logs_backend: TelemetryLogsBackend | None = None,
     kubernetes_events_backend: KubernetesEventsBackend | None = None,
+    context_documents_backend: ContextDocumentsBackend | None = None,
     otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     otlp_logs_receiver: OtlpLogsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
@@ -296,6 +314,7 @@ def build_postgres_runtime(
         telemetry_metrics_backend,
         telemetry_logs_backend,
         kubernetes_events_backend,
+        context_documents_backend,
         otlp_metrics_receiver,
         otlp_logs_receiver,
         telemetry_runtime,
@@ -335,6 +354,7 @@ def build_runtime_from_env() -> Runtime:
         kubernetes_events_backend = _kubernetes_events_backend_from_env(
             credential_broker
         )
+        context_documents_backend = _context_documents_backend_from_env()
         if not database_url:
             return build_local_runtime(
                 authenticator,
@@ -347,6 +367,7 @@ def build_runtime_from_env() -> Runtime:
                 telemetry_metrics_backend=telemetry_metrics_backend,
                 telemetry_logs_backend=telemetry_logs_backend,
                 kubernetes_events_backend=kubernetes_events_backend,
+                context_documents_backend=context_documents_backend,
                 otlp_metrics_receiver=otlp_metrics_receiver,
                 otlp_logs_receiver=otlp_logs_receiver,
                 telemetry_runtime=telemetry_runtime,
@@ -366,6 +387,7 @@ def build_runtime_from_env() -> Runtime:
             telemetry_metrics_backend=telemetry_metrics_backend,
             telemetry_logs_backend=telemetry_logs_backend,
             kubernetes_events_backend=kubernetes_events_backend,
+            context_documents_backend=context_documents_backend,
             otlp_metrics_receiver=otlp_metrics_receiver,
             otlp_logs_receiver=otlp_logs_receiver,
             telemetry_runtime=telemetry_runtime,
@@ -492,6 +514,25 @@ def _telemetry_logs_backend_from_env(
     return build_loki_backend_from_environment(
         os.environ, SystemClock(), credential_broker
     )
+
+
+def _context_documents_backend_from_env() -> ContextDocumentsBackend | None:
+    backend = os.environ.get("IIP_CONTEXT_BACKEND", "no-data")
+    if backend == "no-data":
+        return None
+    if backend != "files":
+        from iip.adapters.context import ContextConfigurationError
+
+        raise ContextConfigurationError("context.configuration.invalid")
+
+    from iip.adapters.context import build_context_backend_from_environment
+
+    configured = build_context_backend_from_environment(os.environ, SystemClock())
+    if configured is None:
+        from iip.adapters.context import ContextConfigurationError
+
+        raise ContextConfigurationError("context.configuration.required")
+    return configured
 
 
 def _credential_broker_from_env() -> CredentialBroker | None:

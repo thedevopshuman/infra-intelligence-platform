@@ -147,6 +147,7 @@ def _compose_runtime(
         UuidEvidenceIdGenerator(),
         clock,
     )
+    telemetry_evidence = TelemetryEvidenceService(evidence, clock)
     return Runtime(
         authenticator=authenticator,
         resources=store,
@@ -170,14 +171,18 @@ def _compose_runtime(
         ),
         queries=queries,
         evidence=evidence,
-        telemetry_evidence=TelemetryEvidenceService(evidence, clock),
+        telemetry_evidence=telemetry_evidence,
         otlp_metrics_ingestion=(
             OtlpMetricsIngestionService(otlp_metrics_receiver, evidence, clock)
             if otlp_metrics_receiver is not None
             else None
         ),
         investigations=DeterministicInvestigationService(
-            store, evidence, operational, clock
+            store,
+            evidence,
+            operational,
+            clock,
+            telemetry=telemetry_evidence,
         ),
         actions=GovernedActionService(
             store,

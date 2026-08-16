@@ -22,7 +22,7 @@
     "agent": {
       "id": "incident-investigator",
       "version": "0.1.0",
-      "manifestDigest": "sha256:945d044faebb171ddd447da9c0746e68a36caa231a033101e715523ceca145e6",
+      "manifestDigest": "sha256:7da250dedb1d113e64a75278f014c3b72bb319c66adbfd15f8a8104a7a10eb97",
       "modelClass": "policy-selected"
     },
     "summary": "The latest rollout left one api replica unavailable; current Kubernetes status supports rollout health as the leading cause of the replica mismatch.",

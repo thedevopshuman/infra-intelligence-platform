@@ -20,7 +20,7 @@
     "outputs": [
       {"name": "investigation_report", "schema": "urn:iip:contracts:investigation-report:v1alpha1", "required": true}
     ],
-    "tools": ["resources/query", "events/search", "evidence/fetch"],
+    "tools": ["resources/query", "events/search", "evidence/fetch", "telemetry/query"],
     "authority": {
       "level": "propose",
       "approvalPolicy": "human-before-mutation",
@@ -33,4 +33,3 @@
     }
   }
 }
-

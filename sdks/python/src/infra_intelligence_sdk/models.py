@@ -322,6 +322,55 @@ class OtlpMetricsEvidence:
 
 
 @dataclass(frozen=True)
+class InvestigationTelemetrySelection:
+    """Provider-neutral metric candidate bounded by an investigation request."""
+
+    selection_id: str
+    integration_id: str
+    query: Mapping[str, Any]
+    limits: Mapping[str, Any]
+    root_cause_classes: tuple[str, ...] = ()
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationTelemetrySelection":
+        selection_id = payload.get("id")
+        integration_id = payload.get("integrationId")
+        query = payload.get("query")
+        limits = payload.get("limits")
+        classes = payload.get("rootCauseClasses", [])
+        if not isinstance(selection_id, str) or not selection_id.startswith("tqs_"):
+            raise ValueError("investigation telemetry selection id is invalid")
+        if not isinstance(integration_id, str) or not integration_id:
+            raise ValueError("investigation telemetry integrationId is invalid")
+        if not isinstance(query, Mapping) or not isinstance(limits, Mapping):
+            raise ValueError("investigation telemetry query and limits are required")
+        if not isinstance(classes, list) or any(
+            not isinstance(item, str) for item in classes
+        ):
+            raise ValueError("investigation telemetry rootCauseClasses are invalid")
+        return cls(
+            selection_id=selection_id,
+            integration_id=integration_id,
+            query=dict(query),
+            limits=dict(limits),
+            root_cause_classes=tuple(classes),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "id": self.selection_id,
+            "integrationId": self.integration_id,
+            "query": dict(self.query),
+            "limits": dict(self.limits),
+        }
+        if self.root_cause_classes:
+            result["rootCauseClasses"] = list(self.root_cause_classes)
+        return result
+
+
+@dataclass(frozen=True)
 class InvestigationRequest:
     """Bounded, tenant- and actor-scoped investigation input."""
 
@@ -343,6 +392,21 @@ class InvestigationRequest:
         """Return a JSON-serializable copy of the envelope."""
 
         return dict(self.payload)
+
+    @property
+    def telemetry_selections(self) -> tuple[InvestigationTelemetrySelection, ...]:
+        """Return bounded metric candidates without importing server classes."""
+
+        spec = self.payload.get("spec")
+        values = spec.get("telemetrySelections", []) if isinstance(spec, Mapping) else []
+        if not isinstance(values, list):
+            raise ValueError("investigation telemetrySelections must be an array")
+        if any(not isinstance(value, Mapping) for value in values):
+            raise ValueError("investigation telemetry selection must be an object")
+        return tuple(
+            InvestigationTelemetrySelection.from_dict(value)
+            for value in values
+        )
 
 
 @dataclass(frozen=True)

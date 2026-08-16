@@ -299,6 +299,26 @@ export type TelemetryAggregation =
   | "p95"
   | "p99";
 
+export interface TelemetryMetricQuery {
+  metric: string;
+  filters: {
+    attribute: string;
+    operator: "eq" | "neq";
+    value: string;
+  }[];
+  aggregation: {
+    function: TelemetryAggregation;
+    stepSeconds: number;
+  };
+  groupBy: string[];
+}
+
+export interface TelemetryEvidenceLimits {
+  maxSeries: number;
+  maxDataPoints: number;
+  maxBytes: number;
+}
+
 export interface TelemetryEvidenceRequest {
   apiVersion: "iip.platform/v1alpha1";
   kind: "TelemetryEvidenceRequest";
@@ -313,24 +333,8 @@ export interface TelemetryEvidenceRequest {
     resourceRefs: ResourceUid[];
     signal: "metrics";
     timeRange: { start: string; end: string };
-    query: {
-      metric: string;
-      filters: {
-        attribute: string;
-        operator: "eq" | "neq";
-        value: string;
-      }[];
-      aggregation: {
-        function: TelemetryAggregation;
-        stepSeconds: number;
-      };
-      groupBy: string[];
-    };
-    limits: {
-      maxSeries: number;
-      maxDataPoints: number;
-      maxBytes: number;
-    };
+    query: TelemetryMetricQuery;
+    limits: TelemetryEvidenceLimits;
     deadline: string;
   };
 }
@@ -427,6 +431,14 @@ export interface InvestigationBudgets {
   maxIterations: number;
 }
 
+export interface InvestigationTelemetrySelection {
+  id: `tqs_${string}`;
+  integrationId: string;
+  rootCauseClasses?: string[];
+  query: TelemetryMetricQuery;
+  limits: TelemetryEvidenceLimits;
+}
+
 export interface InvestigationRequest {
   apiVersion: "iip.platform/v1alpha1";
   kind: "InvestigationRequest";
@@ -452,6 +464,7 @@ export interface InvestigationRequest {
     };
     evidenceTypes?: string[];
     allowedTools?: string[];
+    telemetrySelections?: InvestigationTelemetrySelection[];
     budgets: InvestigationBudgets;
     maxAuthority: "read" | "propose";
     priority?: "low" | "normal" | "high" | "critical";

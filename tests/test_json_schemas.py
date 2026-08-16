@@ -180,6 +180,18 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("promql" in error for error in errors))
 
+    def test_investigation_telemetry_selection_reuses_neutral_query_contract(
+        self,
+    ) -> None:
+        request = document(
+            "contracts/examples/investigation-request-telemetry.json"
+        )
+        request["spec"]["telemetrySelections"][0]["query"]["promql"] = "up"
+
+        errors = self.validate("investigation-request.schema.json", request)
+
+        self.assertTrue(any("promql" in error for error in errors))
+
     def test_no_data_telemetry_result_cannot_contain_series(self) -> None:
         result = document("contracts/examples/telemetry-evidence-result.json")
         result["spec"]["status"] = "no-data"

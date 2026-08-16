@@ -73,3 +73,5 @@ The caller supplies upper bounds for series, total data points, decoded artifact
 | `503` | `evidence.provider.unavailable` / `storage.unavailable` | The backend, validation/redaction boundary, or evidence store failed closed. |
 
 The default local backend deliberately returns normalized `no-data`. It proves the complete authorization, adapter, artifact, storage, HTTP, and SDK boundary without pretending to be a configured customer system. Selecting the Prometheus-compatible reference adapter at composition time enables real range queries through an allowlisted logical metric catalog; see the [operations guide](../operations/prometheus-evidence.md). Other customer backends replace the same application port without changing this contract.
+
+Investigations may carry bounded `telemetrySelections` that reuse this contract's `query` and `limits` definitions. The runtime derives the complete request from authenticated investigation identity and scope, then executes it through this same service. A selection therefore cannot introduce a different backend, endpoint, credential, resource set, time range, or deadline.

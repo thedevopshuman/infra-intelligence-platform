@@ -14,6 +14,7 @@ from infra_intelligence_sdk import (
     EvaluationScenario,
     InvestigationReport,
     InvestigationRequest,
+    InvestigationTelemetrySelection,
     IngestionFreshnessReport,
     IntegrationConfig,
     OtlpMetricsEvidence,
@@ -42,6 +43,9 @@ class PublicContractSdkTests(unittest.TestCase):
     def test_sdk_models_accept_public_contract_examples(self) -> None:
         evidence = Evidence.from_dict(example("evidence.json"))
         request = InvestigationRequest.from_dict(example("investigation-request.json"))
+        telemetry_investigation = InvestigationRequest.from_dict(
+            example("investigation-request-telemetry.json")
+        )
         report = InvestigationReport.from_dict(example("investigation-report.json"))
         freshness = IngestionFreshnessReport.from_dict(
             example("ingestion-freshness-report.json")
@@ -75,6 +79,10 @@ class PublicContractSdkTests(unittest.TestCase):
 
         self.assertEqual(evidence.to_dict()["kind"], "Evidence")
         self.assertEqual(request.to_dict()["kind"], "InvestigationRequest")
+        selection = telemetry_investigation.telemetry_selections[0]
+        self.assertIsInstance(selection, InvestigationTelemetrySelection)
+        self.assertEqual(selection.integration_id, "observability-local")
+        self.assertEqual(selection.to_dict()["query"]["metric"], "service.request.error_ratio")
         self.assertEqual(report.to_dict()["kind"], "InvestigationReport")
         self.assertEqual(freshness.to_dict()["kind"], "IngestionFreshnessReport")
         self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")

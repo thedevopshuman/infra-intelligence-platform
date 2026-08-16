@@ -31,6 +31,7 @@ from iip.application.evaluate import run_repeated, score_report
 from iip.application.ingest_resource import IngestResourceCommand, ResourceIngestionService
 from iip.application.investigate import (
     DeterministicInvestigationService,
+    InvalidInvestigationError,
     RunInvestigationCommand,
 )
 from iip.application.plugin_sessions import (
@@ -38,7 +39,16 @@ from iip.application.plugin_sessions import (
     PluginHandshakeError,
     PluginSessionService,
 )
-from iip.application.ports import ActorContext, PersistenceError
+from iip.application.ports import (
+    ActorContext,
+    PersistenceError,
+    TelemetryMetricsQuery,
+    TelemetryMetricsResult,
+)
+from iip.application.telemetry_evidence import (
+    TelemetryEvidenceService,
+    TelemetryMetricsEvidenceProvider,
+)
 from iip.bootstrap import build_local_runtime
 from iip.surfaces.http import ApiHandler
 
@@ -116,6 +126,168 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
         self.assertEqual(report["spec"]["terminalReason"], "budget-exhausted")
         self.assertTrue(report["spec"]["unknowns"])
         assert_schema(self, "investigation-report.schema.json", report)
+
+    def test_matching_telemetry_selection_uses_investigation_scope_and_budgets(
+        self,
+    ) -> None:
+        class RecordingNoDataBackend:
+            def __init__(self) -> None:
+                self.requests: list[TelemetryMetricsQuery] = []
+
+            def query_metrics(
+                self, request: TelemetryMetricsQuery
+            ) -> TelemetryMetricsResult:
+                self.requests.append(request)
+                return TelemetryMetricsResult(
+                    executed_at=request.end,
+                    status="no-data",
+                    series=(),
+                    warnings=(),
+                )
+
+        backend = RecordingNoDataBackend()
+        policy = AllowTenantPolicy()
+        evidence_store = InMemoryEvidenceStore()
+        clock = SystemClock()
+        evidence = EvidenceCollectionService(
+            self.resources,
+            {
+                "resource-state": ResourceStateEvidenceProvider(self.resources),
+                "telemetry-query": TelemetryMetricsEvidenceProvider(backend),
+            },
+            evidence_store,
+            StructuredTextRedactor(),
+            policy,
+            UuidEvidenceIdGenerator(),
+            clock,
+        )
+        telemetry = TelemetryEvidenceService(evidence, clock)
+        service = DeterministicInvestigationService(
+            self.resources,
+            evidence,
+            InMemoryOperationalStore(),
+            clock,
+            telemetry=telemetry,
+        )
+        request = copy.deepcopy(self.scenario["spec"]["request"])
+        request["metadata"]["id"] = "inv_cccccccccccccccccccccccccccccccc"
+        request["spec"]["evidenceTypes"].append("telemetry.metrics")
+        request["spec"]["allowedTools"].append("telemetry/query")
+        request["spec"]["telemetrySelections"] = [
+            {
+                "id": "tqs_0123456789abcdef",
+                "integrationId": "observability-evaluation",
+                "rootCauseClasses": [
+                    "kubernetes.image-pull.manifest-not-found"
+                ],
+                "query": {
+                    "metric": "service.request.error_ratio",
+                    "filters": [
+                        {
+                            "attribute": "service.name",
+                            "operator": "eq",
+                            "value": "api",
+                        }
+                    ],
+                    "aggregation": {"function": "avg", "stepSeconds": 60},
+                    "groupBy": ["service.name"],
+                },
+                "limits": {
+                    "maxSeries": 4,
+                    "maxDataPoints": 240,
+                    "maxBytes": 262144,
+                },
+            }
+        ]
+        nonmatching = copy.deepcopy(request["spec"]["telemetrySelections"][0])
+        nonmatching["id"] = "tqs_1111111111111111"
+        nonmatching["rootCauseClasses"] = [
+            "kubernetes.rollout.unavailable-replicas"
+        ]
+        nonmatching["query"]["metric"] = "service.request.duration"
+        request["spec"]["telemetrySelections"].insert(0, nonmatching)
+
+        report = service.execute(RunInvestigationCommand(self.actor, request))
+        replay = service.execute(RunInvestigationCommand(self.actor, request))
+
+        self.assertEqual(report, replay)
+        self.assertEqual(len(backend.requests), 1)
+        query = backend.requests[0]
+        self.assertEqual(query.tenant_id, self.actor.tenant_id)
+        self.assertEqual(query.actor_id, self.actor.actor_id)
+        self.assertEqual(query.integration_id, "observability-evaluation")
+        self.assertEqual(query.metric, "service.request.error_ratio")
+        self.assertEqual(query.resource_uids, tuple(request["spec"]["scope"]["resourceUids"]))
+        self.assertEqual(query.start, request["spec"]["scope"]["timeRange"]["start"])
+        self.assertEqual(query.end, request["spec"]["scope"]["timeRange"]["end"])
+        self.assertEqual(report["spec"]["usage"]["toolCalls"], 2)
+        self.assertEqual(report["spec"]["usage"]["evidenceItems"], 2)
+        self.assertEqual(len(report["spec"]["evidenceIds"]), 2)
+        self.assertEqual(
+            len(report["spec"]["hypotheses"][0]["supportingEvidenceIds"]),
+            1,
+        )
+        stored = tuple(evidence_store.list(self.actor))
+        self.assertEqual(
+            {item["spec"]["type"] for item in stored},
+            {"kubernetes.pod-status", "telemetry.metrics"},
+        )
+        assert_schema(self, "investigation-report.schema.json", report)
+
+    def test_telemetry_selection_cannot_exceed_remaining_tool_budget(self) -> None:
+        request = copy.deepcopy(self.scenario["spec"]["request"])
+        request["metadata"]["id"] = "inv_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        request["spec"]["budgets"]["maxToolCalls"] = 1
+        request["spec"]["evidenceTypes"].append("telemetry.metrics")
+        request["spec"]["allowedTools"].append("telemetry/query")
+        request["spec"]["telemetrySelections"] = [
+            {
+                "id": "tqs_fedcba9876543210",
+                "integrationId": "observability-evaluation",
+                "query": {
+                    "metric": "service.request.count",
+                    "filters": [],
+                    "aggregation": {"function": "sum", "stepSeconds": 60},
+                    "groupBy": [],
+                },
+                "limits": {
+                    "maxSeries": 2,
+                    "maxDataPoints": 100,
+                    "maxBytes": 131072,
+                },
+            }
+        ]
+
+        report = self.service.execute(RunInvestigationCommand(self.actor, request))
+
+        self.assertEqual(report["spec"]["usage"]["toolCalls"], 1)
+        self.assertEqual(report["spec"]["usage"]["evidenceItems"], 1)
+
+    def test_invalid_telemetry_selection_fails_before_evidence_collection(self) -> None:
+        request = copy.deepcopy(
+            example("investigation-request-telemetry.json")
+        )
+        request["metadata"]["tenantId"] = self.actor.tenant_id
+        request["metadata"]["actorId"] = self.actor.actor_id
+        request["spec"]["scope"] = copy.deepcopy(
+            self.scenario["spec"]["request"]["spec"]["scope"]
+        )
+        request["spec"]["telemetrySelections"][0]["query"]["filters"][0][
+            "value"
+        ] = "Bearer customer-secret"
+
+        with self.assertRaisesRegex(
+            InvalidInvestigationError,
+            "investigation.contract.invalid",
+        ):
+            self.service.execute(RunInvestigationCommand(self.actor, request))
+
+        self.assertIsNone(
+            self.operations.get_investigation(
+                self.actor,
+                request["metadata"]["id"],
+            )
+        )
 
     def test_evaluation_hard_gates_and_repeated_runs_are_deterministic(self) -> None:
         report = copy.deepcopy(example("investigation-report.json"))
@@ -287,7 +459,20 @@ class OperationalHttpTests(unittest.TestCase):
         request = copy.deepcopy(example("investigation-request.json"))
         request["metadata"]["actorId"] = actor.actor_id
         request["spec"]["scope"]["resourceUids"] = [resource.identity.uid]
-        request["spec"]["evidenceTypes"] = ["kubernetes.resource-status"]
+        request["spec"]["evidenceTypes"] = [
+            "kubernetes.resource-status",
+            "telemetry.metrics",
+        ]
+        request["spec"]["allowedTools"].append("telemetry/query")
+        selection = copy.deepcopy(
+            example("investigation-request-telemetry.json")["spec"][
+                "telemetrySelections"
+            ][0]
+        )
+        selection["rootCauseClasses"] = [
+            "kubernetes.rollout.unavailable-replicas"
+        ]
+        request["spec"]["telemetrySelections"] = [selection]
 
         handler = object.__new__(ApiHandler)
         handler.runtime = runtime
@@ -302,6 +487,8 @@ class OperationalHttpTests(unittest.TestCase):
         self.assertEqual(responses[0][0], HTTPStatus.CREATED)
         report = responses[0][1]
         self.assertEqual(report["kind"], "InvestigationReport")
+        self.assertEqual(report["spec"]["usage"]["toolCalls"], 2)
+        self.assertEqual(report["spec"]["usage"]["evidenceItems"], 2)
         responses.clear()
         handler.path = f"/v1/investigations/{request['metadata']['id']}"
         handler.do_GET()

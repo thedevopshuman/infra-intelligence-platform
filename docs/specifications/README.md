@@ -23,7 +23,7 @@ The platform exposes contracts at three levels:
 | Telemetry evidence request | [telemetry-evidence-contract.md](telemetry-evidence-contract.md) | `contracts/schemas/telemetry-evidence-request.schema.json` | `contracts/examples/telemetry-evidence-request.json` |
 | Telemetry evidence result | [telemetry-evidence-contract.md](telemetry-evidence-contract.md) | `contracts/schemas/telemetry-evidence-result.schema.json` | `contracts/examples/telemetry-evidence-result.json` |
 | OTLP metrics evidence | [otlp-metrics-evidence-contract.md](otlp-metrics-evidence-contract.md) | `contracts/schemas/otlp-metrics-evidence.schema.json` | `contracts/examples/otlp-metrics-evidence.json` |
-| Investigation request | [investigation-contract.md](investigation-contract.md) | `contracts/schemas/investigation-request.schema.json` | `contracts/examples/investigation-request.json` |
+| Investigation request | [investigation-contract.md](investigation-contract.md) | `contracts/schemas/investigation-request.schema.json` | `contracts/examples/investigation-request.json`, `contracts/examples/investigation-request-telemetry.json` |
 | Investigation report | [investigation-contract.md](investigation-contract.md) | `contracts/schemas/investigation-report.schema.json` | `contracts/examples/investigation-report.json` |
 | Evaluation scenario | [evaluation-scenario-contract.md](evaluation-scenario-contract.md) | `contracts/schemas/evaluation-scenario.schema.json` | `contracts/examples/evaluation-scenario.json` |
 | Agent manifest | [agent-contract.md](agent-contract.md) | `contracts/schemas/agent-manifest.schema.json` | `contracts/examples/agent-manifest.json` |

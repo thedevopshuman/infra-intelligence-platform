@@ -11,6 +11,8 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 `Evidence`, `InvestigationRequest`, and `InvestigationReport` expose the corresponding `v1alpha1` public envelopes without importing server implementation classes. `run_investigation`, `get_investigation`, and `get_evidence` use the executable reference API.
 
+`InvestigationRequest.telemetry_selections` returns typed `InvestigationTelemetrySelection` candidates. Each contains only a provider-neutral query and output limits; authenticated identity, resources, time range, and deadline are inherited by the server from the investigation.
+
 `EvaluationScenario` exposes the offline, replayable scenario envelope used by evaluation tooling. It carries fixtures and a scoring oracle but grants no runtime access or authority.
 
 `ResourceObservationCursor` represents optional source ordering, replay checkpoint, and reconciliation metadata carried inside a resource observation.

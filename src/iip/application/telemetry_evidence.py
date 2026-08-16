@@ -143,9 +143,8 @@ class TelemetryEvidenceService:
             metadata = dict(request["metadata"])
             spec = dict(request["spec"])
             time_range = dict(spec["timeRange"])
-            query = dict(spec["query"])
-            aggregation = dict(query["aggregation"])
-            limits = dict(spec["limits"])
+            query = spec["query"]
+            limits = spec["limits"]
         except (KeyError, TypeError, ValueError):
             raise self._invalid() from None
 
@@ -201,14 +200,36 @@ class TelemetryEvidenceService:
         if end - start > MAX_QUERY_RANGE or deadline - requested_at > MAX_DEADLINE_OFFSET:
             raise self._invalid()
 
+        query, limits = self.validate_query_contract(query, limits)
+        return request, metadata, spec, time_range, query, limits
+
+    @classmethod
+    def validate_query_contract(
+        cls,
+        query_value: object,
+        limits_value: object,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Validate the provider-neutral query fragment shared by callers.
+
+        Investigation telemetry selections inherit identity, resource, time, and
+        deadline scope from their investigation. Reusing this validator keeps
+        their query and output budgets identical to a direct public request.
+        """
+
+        try:
+            query = dict(query_value)  # type: ignore[arg-type]
+            aggregation = dict(query["aggregation"])
+            limits = dict(limits_value)  # type: ignore[arg-type]
+        except (KeyError, TypeError, ValueError):
+            raise cls._invalid() from None
         if set(query) != {"metric", "filters", "aggregation", "groupBy"}:
-            raise self._invalid()
+            raise cls._invalid()
         metric = query.get("metric")
         if not isinstance(metric, str) or not _METRIC.fullmatch(metric):
-            raise self._invalid()
+            raise cls._invalid()
         filters = query.get("filters")
         if not isinstance(filters, list) or len(filters) > 8:
-            raise self._invalid()
+            raise cls._invalid()
         normalized_filters: list[dict[str, str]] = []
         for item in filters:
             if not isinstance(item, Mapping) or set(item) != {
@@ -216,7 +237,7 @@ class TelemetryEvidenceService:
                 "operator",
                 "value",
             }:
-                raise self._invalid()
+                raise cls._invalid()
             attribute = item.get("attribute")
             operator = item.get("operator")
             value = item.get("value")
@@ -225,23 +246,23 @@ class TelemetryEvidenceService:
                 or not _ATTRIBUTE.fullmatch(attribute)
                 or not isinstance(operator, str)
                 or operator not in _FILTER_OPERATORS
-                or not self._safe_text(value, maximum=128)
+                or not cls._safe_text(value, maximum=128)
             ):
-                raise self._invalid()
+                raise cls._invalid()
             normalized_filters.append(dict(item))
         query["filters"] = normalized_filters
 
         if set(aggregation) != {"function", "stepSeconds"}:
-            raise self._invalid()
+            raise cls._invalid()
         function = aggregation.get("function")
         if (
             not isinstance(function, str)
             or function not in _AGGREGATIONS
-            or not self._integer(
+            or not cls._integer(
                 aggregation.get("stepSeconds"), minimum=1, maximum=86_400
             )
         ):
-            raise self._invalid()
+            raise cls._invalid()
         query["aggregation"] = aggregation
 
         group_by = query.get("groupBy")
@@ -255,23 +276,23 @@ class TelemetryEvidenceService:
             )
             or len(group_by) != len(set(group_by))
         ):
-            raise self._invalid()
+            raise cls._invalid()
 
         if set(limits) != {"maxSeries", "maxDataPoints", "maxBytes"}:
-            raise self._invalid()
+            raise cls._invalid()
         if not all(
             (
-                self._integer(limits.get("maxSeries"), minimum=1, maximum=100),
-                self._integer(
+                cls._integer(limits.get("maxSeries"), minimum=1, maximum=100),
+                cls._integer(
                     limits.get("maxDataPoints"), minimum=1, maximum=10_000
                 ),
-                self._integer(
+                cls._integer(
                     limits.get("maxBytes"), minimum=1, maximum=16_777_216
                 ),
             )
         ):
-            raise self._invalid()
-        return request, metadata, spec, time_range, query, limits
+            raise cls._invalid()
+        return query, limits
 
     @staticmethod
     def _integer(value: object, *, minimum: int, maximum: int) -> bool:

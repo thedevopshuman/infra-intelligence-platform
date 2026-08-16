@@ -20,3 +20,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0014](0014-backend-neutral-telemetry-evidence-query.md) | Accepted | Normalize bounded historical metric queries behind a replaceable telemetry evidence port |
 | [0015](0015-prometheus-telemetry-evidence-adapter.md) | Accepted | Use an allowlisted Prometheus adapter with exact request-scoped credential resolution |
 | [0016](0016-tenant-bound-otlp-metrics-receiver.md) | Accepted | Accept selected OTLP metrics through tenant-bound, allowlisted Evidence channels |
+| [0017](0017-investigation-telemetry-selection.md) | Accepted | Select bounded telemetry queries inside investigations |

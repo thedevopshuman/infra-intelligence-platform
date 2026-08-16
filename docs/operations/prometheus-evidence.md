@@ -79,6 +79,12 @@ The static broker proves exact tenant/integration/reference/scope/deadline resol
 
 The adapter refuses redirects, bounds socket time and raw response bytes, requests at most one series beyond the public maximum to detect overflow, accepts only matrix float samples, and maps only allowlisted labels back to logical attributes. Provider warnings become `backend-partial`; provider error and warning text never becomes evidence or an HTTP response.
 
+## Investigation selection
+
+An `InvestigationRequest` may include ordered `telemetrySelections` using the same logical metric, filters, aggregation, grouping, and limits. The candidate's `integrationId` must resolve in this registry, and its metric and attributes must exist in that integration's allowlist. The investigation supplies tenant, actor, resource references, time range, and deadline; none of those can be overridden by the selection.
+
+When `evidenceTypes` or `allowedTools` are present, include `telemetry.metrics` and `telemetry/query` respectively. A candidate with `rootCauseClasses` runs only when the deterministic resource classifier selects a matching class. Attempts and committed Evidence records count against the investigation's tool and evidence budgets.
+
 ## Helm
 
 Set `telemetryEvidence.backend: prometheus`, put the non-secret registry in `telemetryEvidence.prometheus.integrationsJson`, and reference a Kubernetes Secret for credentials when required. If NetworkPolicy is enabled, configure `networkPolicy.prometheusEgress` for the exact Prometheus namespace, pod labels, and port. The chart contains no endpoint credentials by default.

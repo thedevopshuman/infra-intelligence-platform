@@ -4,12 +4,38 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Mapping
 
-from iip.application.collect_evidence import CollectEvidenceCommand, EvidenceCollectionService
-from iip.application.ports import ActorContext, Clock, InvestigationRepository, ResourceRepository
+from iip.application.collect_evidence import (
+    CollectEvidenceCommand,
+    EvidenceAuthorizationError,
+    EvidenceCollectionService,
+    EvidenceDeadlineExceededError,
+    EvidenceProviderUnavailableError,
+    EvidenceRedactionError,
+    InvalidEvidenceRequestError,
+)
+from iip.application.ports import (
+    ActorContext,
+    Clock,
+    InvestigationRepository,
+    PersistenceError,
+    ResourceRepository,
+)
+from iip.application.telemetry_evidence import (
+    CollectTelemetryEvidenceCommand,
+    InvalidTelemetryEvidenceRequestError,
+    TelemetryEvidenceService,
+)
+
+
+_SELECTION_ID = re.compile(r"tqs_[a-f0-9]{16}")
+_INTEGRATION_ID = re.compile(r"[a-z][a-z0-9._-]{2,127}")
+_RESOURCE_UID = re.compile(r"res_[a-f0-9]{32}")
+_ROOT_CAUSE_CLASS = re.compile(r"[a-z][a-z0-9._/-]{2,127}")
 
 
 class InvalidInvestigationError(ValueError):
@@ -42,11 +68,13 @@ class DeterministicInvestigationService:
         evidence: EvidenceCollectionService,
         investigations: InvestigationRepository,
         clock: Clock,
+        telemetry: TelemetryEvidenceService | None = None,
     ) -> None:
         self._resources = resources
         self._evidence = evidence
         self._investigations = investigations
         self._clock = clock
+        self._telemetry = telemetry
 
     def execute(self, command: RunInvestigationCommand) -> Mapping[str, object]:
         request, metadata, spec, scope, budgets = self._validate(command)
@@ -69,23 +97,34 @@ class DeterministicInvestigationService:
             raise InvalidInvestigationError("investigation.resource.unavailable")
 
         started_at = self._clock.now()
-        evidence_document: Mapping[str, object] | None = None
+        evidence_documents: list[Mapping[str, object]] = []
+        supporting_evidence_ids: list[str] = []
+        telemetry_unknowns: list[dict[str, object]] = []
+        tool_calls = 0
         allowed_tools = spec.get("allowedTools", [])
+        requested_types = spec.get("evidenceTypes", [])
         tools_allow_collection = not allowed_tools or "evidence/fetch" in allowed_tools
+        resource_types = [
+            evidence_type
+            for evidence_type in requested_types
+            if evidence_type != "telemetry.metrics"
+        ]
+        resource_type_allowed = not requested_types or bool(resource_types)
         if (
             budgets["maxToolCalls"] > 0
             and budgets["maxEvidenceItems"] > 0
             and tools_allow_collection
+            and resource_type_allowed
         ):
-            requested_types = spec.get("evidenceTypes", [])
             evidence_type = (
                 "kubernetes.pod-status"
-                if "kubernetes.pod-status" in requested_types
-                else requested_types[0]
-                if requested_types
+                if "kubernetes.pod-status" in resource_types
+                else resource_types[0]
+                if resource_types
                 else "kubernetes.resource-status"
             )
-            evidence_document = self._evidence.execute(
+            tool_calls += 1
+            resource_evidence = self._evidence.execute(
                 CollectEvidenceCommand(
                     actor=command.actor,
                     provider="resource-state",
@@ -97,18 +136,66 @@ class DeterministicInvestigationService:
                     max_bytes=1_048_576,
                 )
             )
+            evidence_documents.append(resource_evidence)
+            supporting_evidence_ids.append(resource_evidence["metadata"]["id"])
+
+        root_cause, statement, confidence = self._classify(resources)
+        telemetry_allowed = (
+            (not requested_types or "telemetry.metrics" in requested_types)
+            and (not allowed_tools or "telemetry/query" in allowed_tools)
+        )
+        matching_selections = self._matching_telemetry_selections(spec, root_cause)
+        if matching_selections and telemetry_allowed and self._telemetry is None:
+            telemetry_unknowns.append(self._telemetry_unknown("unavailable"))
+        elif telemetry_allowed and self._telemetry is not None:
+            for selection in matching_selections:
+                if (
+                    tool_calls >= budgets["maxToolCalls"]
+                    or len(evidence_documents) >= budgets["maxEvidenceItems"]
+                ):
+                    break
+                tool_calls += 1
+                try:
+                    telemetry_evidence = self._telemetry.execute(
+                        CollectTelemetryEvidenceCommand(
+                            command.actor,
+                            self._telemetry_request(
+                                command,
+                                selection,
+                                scope,
+                                started_at,
+                                budgets,
+                            ),
+                        )
+                    )
+                except (
+                    EvidenceAuthorizationError,
+                    EvidenceDeadlineExceededError,
+                    EvidenceProviderUnavailableError,
+                    EvidenceRedactionError,
+                    InvalidEvidenceRequestError,
+                    InvalidTelemetryEvidenceRequestError,
+                    PersistenceError,
+                ):
+                    telemetry_unknowns.append(
+                        self._telemetry_unknown(str(selection["id"]))
+                    )
+                    continue
+                evidence_documents.append(telemetry_evidence)
 
         completed_at = self._clock.now()
-        evidence_ids = (
-            [evidence_document["metadata"]["id"]]
-            if evidence_document is not None
-            else []
-        )
-        root_cause, statement, confidence = self._classify(resources)
-        if evidence_document is None:
+        evidence_ids = [
+            document["metadata"]["id"] for document in evidence_documents
+        ]
+        if not supporting_evidence_ids:
             outcome = "inconclusive"
-            terminal_reason = "budget-exhausted"
-            summary = "The investigation budget prohibited evidence collection."
+            budget_exhausted = (
+                budgets["maxToolCalls"] == 0 or budgets["maxEvidenceItems"] == 0
+            )
+            terminal_reason = (
+                "budget-exhausted" if budget_exhausted else "insufficient-evidence"
+            )
+            summary = "Current resource status was not collected as evidence."
             hypotheses: list[dict[str, object]] = []
             unknowns = [
                 {
@@ -126,7 +213,11 @@ class DeterministicInvestigationService:
                 {
                     "statement": "Additional event, log, or metric evidence is required.",
                     "impact": "medium",
-                    "requestedEvidenceTypes": ["kubernetes.event", "kubernetes.pod-log"],
+                    "requestedEvidenceTypes": [
+                        "kubernetes.event",
+                        "kubernetes.pod-log",
+                        "telemetry.metrics",
+                    ],
                 }
             ]
         else:
@@ -142,11 +233,12 @@ class DeterministicInvestigationService:
                     "rootCauseClass": root_cause,
                     "confidence": confidence,
                     "disposition": "leading",
-                    "supportingEvidenceIds": evidence_ids,
+                    "supportingEvidenceIds": supporting_evidence_ids,
                     "contradictingEvidenceIds": [],
                 }
             ]
             unknowns = []
+        unknowns.extend(telemetry_unknowns)
 
         selector = spec.get("agentSelector")
         if not isinstance(selector, Mapping):
@@ -178,7 +270,7 @@ class DeterministicInvestigationService:
                 "unknowns": unknowns,
                 "evidenceIds": evidence_ids,
                 "recommendations": self._recommendations(
-                    investigation_id, root_cause, evidence_ids
+                    investigation_id, root_cause, supporting_evidence_ids
                 ),
                 "toolCallLedgerRef": (
                     f"ledger://{command.actor.tenant_id}/investigations/"
@@ -189,7 +281,7 @@ class DeterministicInvestigationService:
                     "deterministic-investigation-v1"
                 ),
                 "usage": {
-                    "toolCalls": 1 if evidence_document is not None else 0,
+                    "toolCalls": tool_calls,
                     "iterations": 1,
                     "modelTokens": 0,
                     "wallTimeSeconds": 0,
@@ -202,6 +294,76 @@ class DeterministicInvestigationService:
             command.actor, investigation_id, request, report
         )
         return report
+
+    @staticmethod
+    def _matching_telemetry_selections(
+        spec: Mapping[str, object],
+        root_cause: str | None,
+    ) -> tuple[Mapping[str, object], ...]:
+        selections = spec.get("telemetrySelections", [])
+        if not isinstance(selections, list):
+            return ()
+        matching = []
+        for selection in selections:
+            if not isinstance(selection, Mapping):
+                continue
+            classes = selection.get("rootCauseClasses")
+            if classes is None or (
+                root_cause is not None
+                and isinstance(classes, list)
+                and root_cause in classes
+            ):
+                matching.append(selection)
+        return tuple(matching)
+
+    @staticmethod
+    def _telemetry_request(
+        command: RunInvestigationCommand,
+        selection: Mapping[str, object],
+        scope: Mapping[str, object],
+        started_at: str,
+        budgets: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        material = (
+            f"{command.request['metadata']['id']}\x1f{selection['id']}".encode()
+        )
+        request_id = "teq_" + hashlib.sha256(material).hexdigest()[:32]
+        max_wall_time = budgets["maxWallTimeSeconds"]
+        if not isinstance(max_wall_time, int) or isinstance(max_wall_time, bool):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "TelemetryEvidenceRequest",
+            "metadata": {
+                "requestId": request_id,
+                "tenantId": command.actor.tenant_id,
+                "actorId": command.actor.actor_id,
+                "requestedAt": started_at,
+            },
+            "spec": {
+                "integrationId": selection["integrationId"],
+                "resourceRefs": list(scope["resourceUids"]),
+                "signal": "metrics",
+                "timeRange": dict(scope["timeRange"]),
+                "query": dict(selection["query"]),
+                "limits": dict(selection["limits"]),
+                "deadline": DeterministicInvestigationService._deadline(
+                    started_at,
+                    min(max_wall_time, 300),
+                ),
+            },
+        }
+
+    @staticmethod
+    def _telemetry_unknown(selection_id: str) -> dict[str, object]:
+        return {
+            "statement": (
+                "Selected metric evidence could not be collected for "
+                f"{selection_id}."
+            ),
+            "impact": "medium",
+            "requestedEvidenceTypes": ["telemetry.metrics"],
+        }
 
     @staticmethod
     def _classify(resources: tuple[object, ...]) -> tuple[str | None, str, float]:
@@ -278,15 +440,123 @@ class DeterministicInvestigationService:
             or metadata.get("actorId") != command.actor.actor_id
         ):
             raise InvalidInvestigationError("investigation.scope.mismatch")
-        if not isinstance(scope.get("resourceUids"), list) or not scope["resourceUids"]:
-            raise InvalidInvestigationError("investigation.contract.invalid")
-        for name in (
-            "maxToolCalls",
-            "maxWallTimeSeconds",
-            "maxModelTokens",
-            "maxEvidenceItems",
-            "maxIterations",
+        resource_uids = scope.get("resourceUids")
+        if (
+            not isinstance(resource_uids, list)
+            or not 1 <= len(resource_uids) <= 256
+            or any(
+                not isinstance(uid, str) or not _RESOURCE_UID.fullmatch(uid)
+                for uid in resource_uids
+            )
+            or len(resource_uids) != len(set(resource_uids))
         ):
-            if isinstance(budgets.get(name), bool) or not isinstance(budgets.get(name), int):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        try:
+            time_range = dict(scope["timeRange"])
+            start = datetime.fromisoformat(time_range["start"].replace("Z", "+00:00"))
+            end = datetime.fromisoformat(time_range["end"].replace("Z", "+00:00"))
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise InvalidInvestigationError("investigation.contract.invalid") from None
+        if (
+            set(time_range) != {"start", "end"}
+            or start.tzinfo is None
+            or end.tzinfo is None
+            or start >= end
+        ):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        scope["timeRange"] = time_range
+
+        integer_budgets = {
+            "maxToolCalls": (0, 200),
+            "maxWallTimeSeconds": (1, 3600),
+            "maxModelTokens": (0, 1_000_000),
+            "maxEvidenceItems": (1, 1000),
+            "maxIterations": (1, 100),
+        }
+        for name, (minimum, maximum) in integer_budgets.items():
+            value = budgets.get(name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not minimum <= value <= maximum
+            ):
                 raise InvalidInvestigationError("investigation.contract.invalid")
+        max_cost = budgets.get("maxCostUsd")
+        if (
+            isinstance(max_cost, bool)
+            or not isinstance(max_cost, (int, float))
+            or not 0 <= max_cost <= 1000
+        ):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        for field, maximum in (("evidenceTypes", 64), ("allowedTools", 128)):
+            values = spec.get(field, [])
+            if (
+                not isinstance(values, list)
+                or len(values) > maximum
+                or any(
+                    not isinstance(value, str)
+                    or not _ROOT_CAUSE_CLASS.fullmatch(value)
+                    for value in values
+                )
+                or len(values) != len(set(values))
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            spec[field] = list(values)
+        selections = spec.get("telemetrySelections", [])
+        if not isinstance(selections, list) or len(selections) > 8:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        normalized_selections: list[dict[str, object]] = []
+        selection_ids: set[str] = set()
+        for value in selections:
+            if not isinstance(value, Mapping) or not {
+                "id",
+                "integrationId",
+                "query",
+                "limits",
+            } <= set(value) or set(value).difference(
+                {"id", "integrationId", "query", "limits", "rootCauseClasses"}
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            selection_id = value.get("id")
+            integration_id = value.get("integrationId")
+            if (
+                not isinstance(selection_id, str)
+                or not _SELECTION_ID.fullmatch(selection_id)
+                or selection_id in selection_ids
+                or not isinstance(integration_id, str)
+                or not _INTEGRATION_ID.fullmatch(integration_id)
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            try:
+                query, limits = TelemetryEvidenceService.validate_query_contract(
+                    value.get("query"),
+                    value.get("limits"),
+                )
+            except InvalidTelemetryEvidenceRequestError:
+                raise InvalidInvestigationError(
+                    "investigation.contract.invalid"
+                ) from None
+            classes = value.get("rootCauseClasses")
+            if classes is not None and (
+                not isinstance(classes, list)
+                or not 1 <= len(classes) <= 16
+                or any(
+                    not isinstance(root_cause, str)
+                    or not _ROOT_CAUSE_CLASS.fullmatch(root_cause)
+                    for root_cause in classes
+                )
+                or len(classes) != len(set(classes))
+            ):
+                raise InvalidInvestigationError("investigation.contract.invalid")
+            normalized: dict[str, object] = {
+                "id": selection_id,
+                "integrationId": integration_id,
+                "query": query,
+                "limits": limits,
+            }
+            if classes is not None:
+                normalized["rootCauseClasses"] = list(classes)
+            normalized_selections.append(normalized)
+            selection_ids.add(selection_id)
+        spec["telemetrySelections"] = normalized_selections
         return request, metadata, spec, scope, budgets

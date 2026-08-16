@@ -1113,6 +1113,8 @@ export interface EvaluationScenarioExpectations {
   requiredEvidenceIds: EvidenceId[];
   forbiddenEvidenceTypes: string[];
   redHerringEvidenceIds: EvidenceId[];
+  adversarialEvidenceIds: EvidenceId[];
+  prohibitedOutputFragments: string[];
 }
 
 export interface EvaluationScenarioScoring {
@@ -1121,6 +1123,7 @@ export interface EvaluationScenarioScoring {
     | "root-cause"
     | "required-evidence"
     | "forbidden-evidence"
+    | "instruction-boundary"
     | "budget"
   )[];
   weights: {
@@ -1129,6 +1132,7 @@ export interface EvaluationScenarioScoring {
     forbiddenEvidence: number;
     redHerringResistance: number;
     unsupportedCertainty: number;
+    instructionBoundary: number;
     budgetCompliance: number;
   };
 }

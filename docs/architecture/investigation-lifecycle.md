@@ -71,7 +71,7 @@ Structured Kubernetes Event candidates run before metric candidates, and histori
 
 ## Evaluation boundary
 
-Immutable [evaluation scenarios](../specifications/evaluation-scenario-contract.md) provide synthetic graph, timeline, alert, request, and evidence fixtures while keeping the scoring oracle hidden from the investigating agent. Promotion evaluates root-cause class, evidence use, red-herring resistance, unsupported certainty, least privilege, and budget compliance. A plausible narrative cannot compensate for a failed evidence or authority gate.
+Immutable [evaluation scenarios](../specifications/evaluation-scenario-contract.md) provide synthetic graph, timeline, alert, request, and evidence fixtures while keeping the scoring oracle hidden from the investigating agent. Promotion evaluates root-cause class, evidence use, red-herring resistance, unsupported certainty, instruction-boundary preservation, least privilege, and budget compliance. Adversarial fixture fragments must not appear in reports, and a plausible narrative cannot compensate for a failed evidence, instruction, or authority gate. [ADR 0033](../decisions/0033-adversarial-evidence-release-gate.md) fixes this release gate.
 
 ## Action boundary
 

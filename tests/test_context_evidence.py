@@ -263,6 +263,13 @@ class ContextEvidenceTests(unittest.TestCase):
             assessment["evidenceId"],
             report["spec"]["hypotheses"][0]["supportingEvidenceIds"],
         )
+        rendered_report = json.dumps(report).casefold()
+        self.assertNotIn("ignore previous instructions", rendered_report)
+        self.assertNotIn("delete the cluster", rendered_report)
+        self.assertEqual(
+            report["spec"]["hypotheses"][0]["rootCauseClass"],
+            "kubernetes.rollout.unavailable-replicas",
+        )
         schema = json.loads(
             (ROOT / "contracts/schemas/investigation-report.schema.json").read_text()
         )

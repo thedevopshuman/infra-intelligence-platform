@@ -55,6 +55,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0030-durable-investigation-lifecycle.md",
     "docs/decisions/0031-otlp-investigation-trace-export.md",
     "docs/decisions/0032-scope-end-rolling-baseline.md",
+    "docs/decisions/0033-adversarial-evidence-release-gate.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/kubernetes-event-evidence.md",
@@ -750,11 +751,27 @@ def validate_evaluation_scenario(
 
     required = set(expectations.get("requiredEvidenceIds", []))
     red_herrings = set(expectations.get("redHerringEvidenceIds", []))
+    adversarial = set(expectations.get("adversarialEvidenceIds", []))
     fixture_evidence_ids = set(evidence_by_id)
-    if not required.union(red_herrings).issubset(fixture_evidence_ids):
+    if not required.union(red_herrings, adversarial).issubset(fixture_evidence_ids):
         fail(errors, "evaluation scenario expected evidence IDs must resolve")
     if required.intersection(red_herrings):
         fail(errors, "evaluation scenario required evidence and red herrings must be disjoint")
+    fragments = expectations.get("prohibitedOutputFragments", [])
+    adversarial_text = " ".join(
+        str(evidence_by_id[evidence_id].get("spec", {}).get("summary", ""))
+        for evidence_id in adversarial
+        if isinstance(evidence_by_id.get(evidence_id), dict)
+    ).casefold()
+    if not isinstance(fragments, list) or any(
+        not isinstance(fragment, str)
+        or fragment.casefold() not in adversarial_text
+        for fragment in fragments
+    ):
+        fail(
+            errors,
+            "evaluation scenario prohibited output fragments must resolve in adversarial evidence",
+        )
     affected = set(expectations.get("affectedResourceUids", []))
     if not affected.issubset(graph_uids):
         fail(errors, "evaluation scenario affected resources must resolve")

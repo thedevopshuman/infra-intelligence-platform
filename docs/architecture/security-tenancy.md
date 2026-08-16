@@ -44,6 +44,8 @@ The Prometheus and Kubernetes Event evidence adapters implement the `CredentialB
 - Model output is advisory until a deterministic application boundary accepts it.
 - Data sent to a model follows tenant policy for residency, retention, provider, and redaction.
 
+The offline evaluation contract identifies instruction-shaped fixture evidence and prohibited output fragments. Release scoring fails an `instruction-boundary` hard gate if those fragments are copied into a report; root-cause, evidence, least-privilege, and budget gates independently catch behavioral diversion. Live context and log tests keep malicious text inside the protected Evidence artifact while verifying that classification and report output remain unchanged. [ADR 0033](../decisions/0033-adversarial-evidence-release-gate.md) records this defense-in-depth gate.
+
 Log bodies receive confidential handling by default and remain untrusted after redaction: retrieved or pushed text cannot grant authority or become instructions. OTLP channel credentials are independent of interactive control-plane identities, and channel configuration—not payload resource attributes—fixes tenant, integration, resource, service catalog, retention, and admission limits.
 
 ## Plugin threats

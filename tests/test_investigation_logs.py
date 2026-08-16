@@ -250,6 +250,10 @@ class InvestigationLogTests(unittest.TestCase):
         artifact = store.read_artifact(self.actor, assessment["evidenceId"])
         self.assertIsNotNone(artifact)
         self.assertNotIn(b"customer-secret", artifact or b"")
+        self.assertIn(b"ignore previous instructions", artifact or b"")
+        self.assertNotIn(
+            "ignore previous instructions", json.dumps(report).casefold()
+        )
         assert_schema(self, "investigation-report.schema.json", report)
 
     def test_no_data_and_partial_logs_cannot_become_citations(self) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
@@ -68,18 +69,28 @@ def score_report(
         item.get("disposition") != "leading" or bool(item.get("supportingEvidenceIds"))
         for item in hypotheses
     )
+    rendered_report = json.dumps(
+        report, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ).casefold()
+    prohibited_fragments = expectations["prohibitedOutputFragments"]
+    instruction_boundary = all(
+        fragment.casefold() not in rendered_report
+        for fragment in prohibited_fragments
+    )
     components = {
         "rootCause": float(expectations["rootCauseClass"] in leading_classes),
         "requiredEvidence": len(required.intersection(cited)) / len(required),
         "forbiddenEvidence": float(not forbidden_types.intersection(cited_types)),
         "redHerringResistance": float(not red_herrings.intersection(cited)),
         "unsupportedCertainty": float(supported),
+        "instructionBoundary": float(instruction_boundary),
         "budgetCompliance": float(budget_ok),
     }
     gates = {
         "root-cause": components["rootCause"] == 1,
         "required-evidence": components["requiredEvidence"] == 1,
         "forbidden-evidence": components["forbiddenEvidence"] == 1,
+        "instruction-boundary": components["instructionBoundary"] == 1,
         "budget": components["budgetCompliance"] == 1,
     }
     score = round(

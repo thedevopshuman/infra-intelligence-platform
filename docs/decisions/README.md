@@ -36,3 +36,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0030](0030-durable-investigation-lifecycle.md) | Accepted | Persist bounded investigation leases and cooperative cancellation before tools run |
 | [0031](0031-otlp-investigation-trace-export.md) | Accepted | Export bounded terminal investigation traces over optional OTLP/HTTP |
 | [0032](0032-scope-end-rolling-baseline.md) | Accepted | Derive auditable rolling metric windows from the accepted investigation scope |
+| [0033](0033-adversarial-evidence-release-gate.md) | Accepted | Fail evaluation when instruction-shaped evidence crosses into report output |

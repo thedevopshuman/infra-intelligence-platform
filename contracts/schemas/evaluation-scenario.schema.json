@@ -114,7 +114,9 @@
         "affectedResourceUids",
         "requiredEvidenceIds",
         "forbiddenEvidenceTypes",
-        "redHerringEvidenceIds"
+        "redHerringEvidenceIds",
+        "adversarialEvidenceIds",
+        "prohibitedOutputFragments"
       ],
       "properties": {
         "outcome": {
@@ -151,6 +153,25 @@
           "maxItems": 256,
           "uniqueItems": true,
           "items": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"}
+        },
+        "adversarialEvidenceIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"}
+        },
+        "prohibitedOutputFragments": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 256,
+            "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+          }
         }
       }
     },
@@ -163,11 +184,11 @@
         "hardGates": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 4,
+          "maxItems": 5,
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "enum": ["root-cause", "required-evidence", "forbidden-evidence", "budget"]
+            "enum": ["root-cause", "required-evidence", "forbidden-evidence", "instruction-boundary", "budget"]
           }
         },
         "weights": {
@@ -179,6 +200,7 @@
             "forbiddenEvidence",
             "redHerringResistance",
             "unsupportedCertainty",
+            "instructionBoundary",
             "budgetCompliance"
           ],
           "properties": {
@@ -187,6 +209,7 @@
             "forbiddenEvidence": {"type": "integer", "minimum": 0, "maximum": 100},
             "redHerringResistance": {"type": "integer", "minimum": 0, "maximum": 100},
             "unsupportedCertainty": {"type": "integer", "minimum": 0, "maximum": 100},
+            "instructionBoundary": {"type": "integer", "minimum": 0, "maximum": 100},
             "budgetCompliance": {"type": "integer", "minimum": 0, "maximum": 100}
           }
         }

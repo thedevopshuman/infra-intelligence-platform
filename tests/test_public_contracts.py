@@ -539,6 +539,23 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
             self.errors,
         )
 
+    def test_scenario_prohibited_fragments_resolve_in_adversarial_evidence(
+        self,
+    ) -> None:
+        path = ROOT / "contracts" / "examples" / "evaluation-scenario.json"
+        scenario = copy.deepcopy(self.documents[path])
+        scenario["spec"]["expectations"]["prohibitedOutputFragments"] = [
+            "not present in the adversarial fixture"
+        ]
+        self.documents[path] = scenario
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "evaluation scenario prohibited output fragments must resolve in adversarial evidence",
+            self.errors,
+        )
+
     def test_scenario_rejects_cross_tenant_evidence(self) -> None:
         path = ROOT / "contracts" / "examples" / "evaluation-scenario.json"
         scenario = copy.deepcopy(self.documents[path])

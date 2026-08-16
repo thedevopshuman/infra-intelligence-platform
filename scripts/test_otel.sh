@@ -36,6 +36,7 @@ until "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
 done
 
 IIP_TEST_OTEL_ENDPOINT=http://127.0.0.1:14318/v1/metrics \
+IIP_TEST_OTEL_TRACES_ENDPOINT=http://127.0.0.1:14318/v1/traces \
 PYTHONPATH=src:sdks/python/src \
     "$IIP_TEST_PYTHON" -m unittest tests.test_otel_collector -v
 
@@ -53,4 +54,18 @@ until "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
     sleep 1
 done
 
-echo "OTLP integration test received IIP ingestion metrics"
+attempt=0
+until "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
+    -f "$IIP_COMPOSE_FILE" logs --no-color collector 2>&1 \
+    | rg -q "iip.investigation.execute"; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 15 ]; then
+        "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
+            -f "$IIP_COMPOSE_FILE" logs --no-color collector >&2
+        echo "Collector did not receive the expected IIP trace" >&2
+        exit 1
+    fi
+    sleep 1
+done
+
+echo "OTLP integration test received IIP metrics and investigation traces"

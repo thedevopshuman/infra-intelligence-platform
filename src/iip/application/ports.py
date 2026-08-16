@@ -124,6 +124,21 @@ class IngestionFreshnessMeasurement:
 
 
 @dataclass(frozen=True)
+class InvestigationExecutionMeasurement:
+    """Bounded terminal facts offered to an observational telemetry sink."""
+
+    tenant_id: str
+    investigation_id: str
+    outcome: str
+    terminal_reason: str
+    started_at: str
+    completed_at: str
+    wall_time_seconds: float
+    tool_calls: int
+    evidence_items: int
+
+
+@dataclass(frozen=True)
 class ReconciliationSnapshot:
     """Last complete resource membership for one tenant-scoped source."""
 
@@ -517,6 +532,13 @@ class IngestionTelemetrySink(Protocol):
         self, measurement: IngestionFreshnessMeasurement
     ) -> None:
         """Record without network I/O or changing the owning use-case result."""
+
+
+class InvestigationTelemetrySink(Protocol):
+    def record_investigation_execution(
+        self, measurement: InvestigationExecutionMeasurement
+    ) -> None:
+        """Record terminal execution facts without becoming workflow authority."""
 
 
 class ReconciliationRepository(Protocol):

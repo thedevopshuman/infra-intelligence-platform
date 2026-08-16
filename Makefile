@@ -11,7 +11,7 @@ help:
 	@echo "test          Run the reference-kernel and SDK tests"
 	@echo "test-postgres Run PostgreSQL integration tests with Docker Desktop"
 	@echo "test-backup-restore Measure and verify PostgreSQL recovery with Docker Desktop"
-	@echo "test-otel     Send reference metrics to an OpenTelemetry Collector"
+	@echo "test-otel     Send reference metrics and traces to an OpenTelemetry Collector"
 	@echo "test-otlp-receiver Send official OTLP metrics and logs into the built API image"
 	@echo "test-prometheus Query a real Prometheus server through the evidence adapter"
 	@echo "test-loki     Query a real Loki server through the log evidence adapter"

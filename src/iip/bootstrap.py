@@ -42,6 +42,7 @@ from iip.application.ports import (
     CredentialBroker,
     ContextDocumentsBackend,
     IngestionTelemetrySink,
+    InvestigationTelemetrySink,
     KubernetesEventsBackend,
     ResourceRepository,
     SourceCheckpointRepository,
@@ -121,6 +122,7 @@ def build_local_runtime(
     *,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
+    investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
     telemetry_logs_backend: TelemetryLogsBackend | None = None,
     kubernetes_events_backend: KubernetesEventsBackend | None = None,
@@ -141,6 +143,7 @@ def build_local_runtime(
         authenticator or DenyAllAuthenticator(),
         ingestion_objectives,
         ingestion_telemetry_sink,
+        investigation_telemetry_sink,
         telemetry_metrics_backend,
         telemetry_logs_backend,
         kubernetes_events_backend,
@@ -158,6 +161,7 @@ def _compose_runtime(
     authenticator: Authenticator,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
+    investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
     telemetry_logs_backend: TelemetryLogsBackend | None = None,
     kubernetes_events_backend: KubernetesEventsBackend | None = None,
@@ -268,6 +272,7 @@ def _compose_runtime(
             telemetry=telemetry_evidence,
             logs=log_evidence,
             evidence_store=evidence_store,
+            telemetry_sink=investigation_telemetry_sink,
         ),
         investigation_lifecycle=InvestigationLifecycleService(operational, clock),
         actions=GovernedActionService(
@@ -292,6 +297,7 @@ def build_postgres_runtime(
     migrate: bool = False,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
+    investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
     telemetry_logs_backend: TelemetryLogsBackend | None = None,
     kubernetes_events_backend: KubernetesEventsBackend | None = None,
@@ -315,6 +321,7 @@ def build_postgres_runtime(
         authenticator or DenyAllAuthenticator(),
         ingestion_objectives,
         ingestion_telemetry_sink,
+        investigation_telemetry_sink,
         telemetry_metrics_backend,
         telemetry_logs_backend,
         kubernetes_events_backend,
@@ -343,7 +350,16 @@ def build_runtime_from_env() -> Runtime:
         )
     authenticator = HashedBearerAuthenticator.from_json(identity_config)
     objectives = _ingestion_objectives_from_env()
-    telemetry_runtime = _otel_metrics_runtime_from_env()
+    metrics_runtime = _otel_metrics_runtime_from_env()
+    try:
+        traces_runtime = _otel_traces_runtime_from_env()
+    except Exception:
+        if metrics_runtime is not None:
+            metrics_runtime.shutdown()
+        raise
+    telemetry_runtime = _combine_telemetry_runtimes(
+        metrics_runtime, traces_runtime
+    )
     database_url = os.environ.get("IIP_DATABASE_URL")
     try:
         otlp_metrics_receiver = _otlp_metrics_receiver_from_env()
@@ -364,9 +380,12 @@ def build_runtime_from_env() -> Runtime:
                 authenticator,
                 ingestion_objectives=objectives,
                 ingestion_telemetry_sink=(
-                    telemetry_runtime.sink
-                    if telemetry_runtime is not None
+                    metrics_runtime.sink
+                    if metrics_runtime is not None
                     else None
+                ),
+                investigation_telemetry_sink=(
+                    traces_runtime.sink if traces_runtime is not None else None
                 ),
                 telemetry_metrics_backend=telemetry_metrics_backend,
                 telemetry_logs_backend=telemetry_logs_backend,
@@ -386,7 +405,10 @@ def build_runtime_from_env() -> Runtime:
             migrate=auto_migrate,
             ingestion_objectives=objectives,
             ingestion_telemetry_sink=(
-                telemetry_runtime.sink if telemetry_runtime is not None else None
+                metrics_runtime.sink if metrics_runtime is not None else None
+            ),
+            investigation_telemetry_sink=(
+                traces_runtime.sink if traces_runtime is not None else None
             ),
             telemetry_metrics_backend=telemetry_metrics_backend,
             telemetry_logs_backend=telemetry_logs_backend,
@@ -458,6 +480,36 @@ def _otel_metrics_runtime_from_env() -> Any:
     return build_otlp_metrics_runtime(
         OtlpMetricsConfiguration.from_environment(os.environ)
     )
+
+
+def _otel_traces_runtime_from_env() -> Any:
+    enabled = os.environ.get("IIP_OTEL_TRACES_ENABLED", "false").lower()
+    if enabled not in ("false", "true"):
+        from iip.adapters.otel import OpenTelemetryConfigurationError
+
+        raise OpenTelemetryConfigurationError("telemetry.configuration.invalid")
+    if enabled == "false":
+        return None
+
+    from iip.adapters.otel import (
+        OtlpTracesConfiguration,
+        build_otlp_traces_runtime,
+    )
+
+    return build_otlp_traces_runtime(
+        OtlpTracesConfiguration.from_environment(os.environ)
+    )
+
+
+def _combine_telemetry_runtimes(*runtimes: Any) -> Any:
+    configured = tuple(runtime for runtime in runtimes if runtime is not None)
+    if not configured:
+        return None
+    if len(configured) == 1:
+        return configured[0]
+    from iip.adapters.otel import CompositeTelemetryRuntime
+
+    return CompositeTelemetryRuntime(configured)
 
 
 def _telemetry_metrics_backend_from_env(

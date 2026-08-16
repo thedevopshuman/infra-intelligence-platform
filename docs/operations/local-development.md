@@ -47,7 +47,7 @@ Exercise the official OTLP/HTTP exporter against a real OpenTelemetry Collector 
 make test-otel
 ```
 
-The isolated target verifies receipt of a reference ingestion metric and removes its Collector afterward. See the [OpenTelemetry export guide](opentelemetry-export.md) for the long-running Compose profile, Helm settings, security constraints, and production gaps.
+The isolated target verifies receipt of a reference ingestion metric and terminal investigation trace, then removes its Collector. See the [OpenTelemetry export guide](opentelemetry-export.md) for the long-running Compose profile, Helm settings, security constraints, and production gaps.
 
 Exercise an official OTLP/HTTP exporter against the receiver in the built API image with:
 
@@ -210,6 +210,7 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_INGESTION_MAX_PENDING_EVENT_AGE_SECONDS` | `60` | Local maximum age of the oldest unpublished source event |
 | `IIP_INGESTION_MAX_CLOCK_SKEW_SECONDS` | `5` | Maximum future timestamp tolerance before a skew violation |
 | `IIP_OTEL_METRICS_ENABLED` | `false` | Compose optional outbound OTLP/HTTP freshness metrics |
+| `IIP_OTEL_TRACES_ENABLED` | `false` | Compose optional outbound OTLP/HTTP terminal investigation traces |
 | `IIP_OTLP_RECEIVER_ENABLED` | `false` | Enable the optional tenant-bound OTLP/HTTP metrics Evidence receiver |
 | `IIP_OTLP_RECEIVER_CHANNELS_JSON` | required when receiver is enabled | Protected hashed channel credentials, fixed scope, catalogs, admission limits, and handling policy |
 | `IIP_TELEMETRY_METRICS_BACKEND` | `no-data` | Historical metric evidence backend; `no-data` or `prometheus` |
@@ -224,8 +225,9 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_KUBERNETES_EVENTS_INTEGRATIONS_JSON` | unset | Protected non-secret tenant endpoint, CA path, cluster/scope allowlists, limits, and condition mappings required by the live adapter |
 | `IIP_KUBERNETES_EVENTS_CREDENTIALS_JSON` | unset | Secret-bearing local reference broker configuration required by the live adapter |
 | `IIP_OTEL_INGESTION_ATTRIBUTE_MODE` | `source` | Metric identity dimensions: `none`, `source`, or `tenant-source` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset outside Compose | Standard OTLP base endpoint; `/v1/metrics` is appended |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset outside Compose | Standard OTLP base endpoint; the enabled signal path is appended |
 | `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | unset | Exact signal-specific OTLP metrics endpoint |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | unset | Exact signal-specific OTLP traces endpoint |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` | Standard OTLP transport selection; only HTTP/protobuf is supported |
 | `OTEL_EXPORTER_OTLP_HEADERS` | unset | Protected standard exporter header configuration |
 | `OTEL_METRIC_EXPORT_INTERVAL` | `60000` | Periodic SDK export interval in milliseconds |

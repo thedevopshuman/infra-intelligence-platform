@@ -39,7 +39,7 @@ stateDiagram-v2
     Analyzing --> Failed: execution lease expired
 ```
 
-The executable reference persists the accepted normalized request and a bounded running lease before any tool call. The first authenticated cancellation request is durable and immutable; the worker checks it before new evidence calls and terminalization. A live duplicate is rejected, while a duplicate after lease expiry closes the attempt without replaying tools. [ADR 0030](../decisions/0030-durable-investigation-lifecycle.md) records these semantics. Background dispatch, heartbeats, and stale-lease sweeping remain workflow-engine work.
+The executable reference persists the accepted normalized request and a bounded running lease before any tool call. The first authenticated cancellation request is durable and immutable; the worker checks it before new evidence calls and terminalization. A live duplicate is rejected, while a duplicate after lease expiry closes the attempt without replaying tools. [ADR 0030](../decisions/0030-durable-investigation-lifecycle.md) records these semantics. After terminal persistence, the same bounded timing/outcome/usage facts can produce a failure-isolated OTLP investigation span under [ADR 0031](../decisions/0031-otlp-investigation-trace-export.md); the trace is observational and never workflow authority. Background dispatch, heartbeats, and stale-lease sweeping remain workflow-engine work.
 
 ## Required state
 

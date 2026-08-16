@@ -118,4 +118,7 @@ In addition to JSON Schema validation:
 - every context assessment must reference report Evidence, reproduce its declared kinds/references/count rule, and match the selected root-cause class;
 - baseline and evaluation windows must be ordered, non-overlapping subranges of the request scope, and a reported comparison must match its declared calculation and unit;
 - selected tools and authority must remain within all applicable upper bounds; and
-- usage counters must be checked against the accepted budgets and any stricter policy limits.
+- usage counters must be checked against the accepted budgets and any stricter policy limits; and
+- `wallTimeSeconds` is the measured non-negative interval from `startedAt` to `completedAt`, capped at the accepted wall-time budget for conservative recovery reporting.
+
+The durable report is authoritative. Optional platform telemetry may project its bounded terminal timing, outcome, terminal reason, tool count, and evidence count as an OTLP span, but exporter success is never report success and trace data cannot replace the report. Identity attributes are disabled by default; prompts, evidence content, hypotheses, provider errors, and credentials are never projected.

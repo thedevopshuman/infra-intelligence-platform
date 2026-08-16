@@ -11,13 +11,19 @@ data:
   IIP_CREDENTIAL_BROKER_CONFIG_JSON: {{ .Values.credentialBroker.externalHttp.configJson | quote }}
   IIP_DATABASE_AUTO_MIGRATE: {{ .Values.database.autoMigrate | quote }}
   IIP_OTEL_METRICS_ENABLED: {{ .Values.telemetry.metricsEnabled | quote }}
+  IIP_OTEL_TRACES_ENABLED: {{ .Values.telemetry.tracesEnabled | quote }}
   IIP_OTLP_RECEIVER_ENABLED: {{ .Values.otlpReceiver.enabled | quote }}
   IIP_OTLP_LOGS_RECEIVER_ENABLED: {{ .Values.otlpLogsReceiver.enabled | quote }}
   IIP_OTEL_INGESTION_ATTRIBUTE_MODE: {{ .Values.telemetry.attributeMode | quote }}
+  IIP_OTEL_INVESTIGATION_ATTRIBUTE_MODE: {{ .Values.telemetry.investigationAttributeMode | quote }}
   OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.telemetry.otlpEndpoint | quote }}
   OTEL_EXPORTER_OTLP_PROTOCOL: {{ .Values.telemetry.protocol | quote }}
   OTEL_METRIC_EXPORT_INTERVAL: {{ .Values.telemetry.exportIntervalMillis | quote }}
   OTEL_METRIC_EXPORT_TIMEOUT: {{ .Values.telemetry.exportTimeoutMillis | quote }}
+  OTEL_BSP_SCHEDULE_DELAY: {{ .Values.telemetry.traceScheduleDelayMillis | quote }}
+  OTEL_BSP_EXPORT_TIMEOUT: {{ .Values.telemetry.traceExportTimeoutMillis | quote }}
+  OTEL_BSP_MAX_QUEUE_SIZE: {{ .Values.telemetry.traceMaxQueueSize | quote }}
+  OTEL_BSP_MAX_EXPORT_BATCH_SIZE: {{ .Values.telemetry.traceMaxExportBatchSize | quote }}
   OTEL_SERVICE_NAME: {{ .Values.telemetry.serviceName | quote }}
   IIP_TELEMETRY_METRICS_BACKEND: {{ .Values.telemetryEvidence.backend | quote }}
   IIP_TELEMETRY_LOGS_BACKEND: {{ .Values.logEvidence.backend | quote }}

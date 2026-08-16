@@ -28,7 +28,9 @@ from iip.application.ports import (
     ActorContext,
     Clock,
     EvidenceStore,
+    InvestigationExecutionMeasurement,
     InvestigationRepository,
+    InvestigationTelemetrySink,
     PersistenceError,
     ResourceRepository,
 )
@@ -112,6 +114,7 @@ class DeterministicInvestigationService:
         resource_changes: ResourceChangeEvidenceService | None = None,
         context: ContextEvidenceService | None = None,
         evidence_store: EvidenceStore | None = None,
+        telemetry_sink: InvestigationTelemetrySink | None = None,
     ) -> None:
         self._resources = resources
         self._evidence = evidence
@@ -123,6 +126,7 @@ class DeterministicInvestigationService:
         self._resource_changes = resource_changes
         self._context = context
         self._evidence_store = evidence_store
+        self._telemetry_sink = telemetry_sink
 
     def execute(self, command: RunInvestigationCommand) -> Mapping[str, object]:
         request, metadata, spec, scope, budgets = self._validate(command)
@@ -591,6 +595,11 @@ class DeterministicInvestigationService:
                             contradicting_evidence_ids.append(evidence_id)
 
         completed_at = self._clock.now()
+        wall_time_seconds = self._wall_time_seconds(
+            started_at,
+            completed_at,
+            budgets["maxWallTimeSeconds"],
+        )
         evidence_ids = [
             document["metadata"]["id"] for document in evidence_documents
         ]
@@ -730,7 +739,7 @@ class DeterministicInvestigationService:
                     "toolCalls": tool_calls,
                     "iterations": 1,
                     "modelTokens": 0,
-                    "wallTimeSeconds": 0,
+                    "wallTimeSeconds": wall_time_seconds,
                     "costUsd": 0,
                     "evidenceItems": len(evidence_ids),
                 },
@@ -827,6 +836,7 @@ class DeterministicInvestigationService:
             self._investigations.commit_investigation(
                 command.actor, investigation_id, request, report, terminal_status
             )
+        self._record_telemetry(report)
         return report
 
     @staticmethod
@@ -950,6 +960,14 @@ class DeterministicInvestigationService:
         evidence_types = request_spec.get("evidenceTypes", [])
         if not isinstance(evidence_types, list) or not evidence_types:
             evidence_types = ["kubernetes.resource-status"]
+        request_budgets = request_spec.get("budgets")
+        max_wall_time = (
+            request_budgets.get("maxWallTimeSeconds")
+            if isinstance(request_budgets, Mapping)
+            else 0
+        )
+        if not isinstance(max_wall_time, int) or isinstance(max_wall_time, bool):
+            raise PersistenceError("storage.unavailable")
         report: dict[str, object] = {
             "apiVersion": "iip.platform/v1alpha1",
             "kind": "InvestigationReport",
@@ -992,7 +1010,9 @@ class DeterministicInvestigationService:
                     "toolCalls": 0,
                     "iterations": 0,
                     "modelTokens": 0,
-                    "wallTimeSeconds": 0,
+                    "wallTimeSeconds": self._wall_time_seconds(
+                        started_at, completed_at, max_wall_time
+                    ),
                     "costUsd": 0,
                     "evidenceItems": 0,
                 },
@@ -1014,7 +1034,49 @@ class DeterministicInvestigationService:
             report,
             terminal_status,
         )
+        self._record_telemetry(report)
         return report
+
+    def _record_telemetry(self, report: Mapping[str, object]) -> None:
+        if self._telemetry_sink is None:
+            return
+        try:
+            metadata = report["metadata"]
+            spec = report["spec"]
+            if not isinstance(metadata, Mapping) or not isinstance(spec, Mapping):
+                return
+            usage = spec["usage"]
+            if not isinstance(usage, Mapping):
+                return
+            self._telemetry_sink.record_investigation_execution(
+                InvestigationExecutionMeasurement(
+                    tenant_id=str(metadata["tenantId"]),
+                    investigation_id=str(metadata["id"]),
+                    outcome=str(spec["outcome"]),
+                    terminal_reason=str(spec["terminalReason"]),
+                    started_at=str(spec["startedAt"]),
+                    completed_at=str(spec["completedAt"]),
+                    wall_time_seconds=float(usage["wallTimeSeconds"]),
+                    tool_calls=int(usage["toolCalls"]),
+                    evidence_items=int(usage["evidenceItems"]),
+                )
+            )
+        except Exception:
+            # Observability is intentionally failure-isolated from product behavior.
+            return
+
+    @staticmethod
+    def _wall_time_seconds(
+        started_at: str,
+        completed_at: str,
+        maximum: int,
+    ) -> float:
+        started = DeterministicInvestigationService._parse_datetime(started_at)
+        completed = DeterministicInvestigationService._parse_datetime(completed_at)
+        if started is None or completed is None:
+            raise PersistenceError("storage.unavailable")
+        elapsed = max(0.0, (completed - started).total_seconds())
+        return round(min(float(maximum), elapsed), 3)
 
     @staticmethod
     def _matching_context_selections(

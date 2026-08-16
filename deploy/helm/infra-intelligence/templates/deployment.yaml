@@ -105,6 +105,16 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if eq .Values.credentialBroker.mode "external-http" }}
+            - name: credential-broker-identity
+              mountPath: {{ .Values.credentialBroker.externalHttp.identityMountPath | quote }}
+              readOnly: true
+            {{- if .Values.credentialBroker.externalHttp.caBundleExistingSecret }}
+            - name: credential-broker-ca
+              mountPath: {{ .Values.credentialBroker.externalHttp.caBundleMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- end }}
             {{- if .Values.kubernetesEventEvidence.caBundleExistingSecret }}
             - name: kubernetes-events-ca
               mountPath: {{ .Values.kubernetesEventEvidence.caBundleMountPath | quote }}
@@ -113,6 +123,23 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if eq .Values.credentialBroker.mode "external-http" }}
+        - name: credential-broker-identity
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: {{ .Values.credentialBroker.externalHttp.audience | quote }}
+                  expirationSeconds: {{ .Values.credentialBroker.externalHttp.tokenExpirationSeconds }}
+                  path: token
+        {{- if .Values.credentialBroker.externalHttp.caBundleExistingSecret }}
+        - name: credential-broker-ca
+          secret:
+            secretName: {{ .Values.credentialBroker.externalHttp.caBundleExistingSecret | quote }}
+            items:
+              - key: {{ .Values.credentialBroker.externalHttp.caBundleSecretKey | quote }}
+                path: ca.crt
+        {{- end }}
+        {{- end }}
         {{- if .Values.kubernetesEventEvidence.caBundleExistingSecret }}
         - name: kubernetes-events-ca
           secret:

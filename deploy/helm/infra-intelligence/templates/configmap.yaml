@@ -7,6 +7,8 @@ metadata:
 data:
   IIP_HTTP_HOST: {{ .Values.config.httpHost | quote }}
   IIP_HTTP_PORT: {{ .Values.config.httpPort | quote }}
+  IIP_CREDENTIAL_BROKER_MODE: {{ .Values.credentialBroker.mode | quote }}
+  IIP_CREDENTIAL_BROKER_CONFIG_JSON: {{ .Values.credentialBroker.externalHttp.configJson | quote }}
   IIP_DATABASE_AUTO_MIGRATE: {{ .Values.database.autoMigrate | quote }}
   IIP_OTEL_METRICS_ENABLED: {{ .Values.telemetry.metricsEnabled | quote }}
   IIP_OTLP_RECEIVER_ENABLED: {{ .Values.otlpReceiver.enabled | quote }}

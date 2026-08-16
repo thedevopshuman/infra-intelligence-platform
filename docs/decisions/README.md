@@ -25,3 +25,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0019](0019-baseline-window-telemetry-assessment.md) | Accepted | Compare ordered telemetry windows inside one committed artifact |
 | [0020](0020-kubernetes-event-evidence-and-correlation.md) | Accepted | Normalize Kubernetes Events as evidence before investigation correlation |
 | [0021](0021-read-only-kubernetes-event-api-adapter.md) | Accepted | Query exact-scope Kubernetes Event evidence through a read-only HTTPS API adapter |
+| [0022](0022-external-workload-identity-credential-broker.md) | Accepted | Resolve provider leases through an external workload-identity credential broker |

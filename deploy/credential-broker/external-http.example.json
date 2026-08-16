@@ -1,0 +1,9 @@
+{
+  "endpoint": "https://credential-broker.security.svc:8443",
+  "caBundlePath": "/var/run/iip-credential-broker-ca/ca.crt",
+  "workloadIdentityTokenPath": "/var/run/iip-credential-broker-identity/token",
+  "requestTimeoutSeconds": 5,
+  "maxResponseBytes": 65536,
+  "maxLeaseSeconds": 900,
+  "maxClockSkewSeconds": 30
+}

@@ -390,17 +390,22 @@ class PrometheusTelemetryMetricsBackend:
             "User-Agent": "iip-prometheus-adapter/0.4.0",
         }
         if integration.credential_ref is not None:
-            lease = self._credentials.resolve(
-                CredentialLeaseRequest(
-                    tenant_id=request.tenant_id,
-                    actor_id=request.actor_id,
-                    integration_id=request.integration_id,
-                    credential_ref=integration.credential_ref,
-                    provider="prometheus",
-                    scopes=("metrics:read",),
-                    deadline=request.deadline,
+            try:
+                lease = self._credentials.resolve(
+                    CredentialLeaseRequest(
+                        tenant_id=request.tenant_id,
+                        actor_id=request.actor_id,
+                        integration_id=request.integration_id,
+                        credential_ref=integration.credential_ref,
+                        provider="prometheus",
+                        scopes=("metrics:read",),
+                        deadline=request.deadline,
+                    )
                 )
-            )
+            except Exception:
+                raise PrometheusBackendError(
+                    "telemetry.credential.unavailable"
+                ) from None
             if lease.scheme != "bearer" or not _safe_secret(lease.secret):
                 raise PrometheusBackendError("telemetry.credential.unavailable")
             headers["Authorization"] = f"Bearer {lease.secret}"
@@ -555,6 +560,7 @@ class PrometheusTelemetryMetricsBackend:
 def build_prometheus_backend_from_environment(
     environment: Mapping[str, str],
     clock: Clock,
+    credential_broker: CredentialBroker | None = None,
 ) -> PrometheusTelemetryMetricsBackend:
     """Build the adapter from protected runtime configuration."""
 
@@ -568,7 +574,9 @@ def build_prometheus_backend_from_environment(
     ) or '{"credentials":[]}'
     return PrometheusTelemetryMetricsBackend(
         PrometheusIntegrationRegistry.from_json(encoded_integrations),
-        StaticBearerCredentialBroker.from_json(encoded_credentials),
+        credential_broker
+        if credential_broker is not None
+        else StaticBearerCredentialBroker.from_json(encoded_credentials),
         clock,
     )
 

@@ -88,7 +88,7 @@ IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-live
 
 The kind cluster runs as containers inside Docker Desktop. Docker Desktop's separate built-in Kubernetes feature is not required for this workflow and should normally remain disabled to avoid an unnecessary second context and control plane.
 
-The target seeds `deploy/kubernetes/dev/seed-incident.yaml`, whose intentionally nonexistent image produces a real `ErrImagePull`/`ImagePullBackOff`. It verifies that the observer returns a complete canonical graph and an unhealthy Pod with only the safe waiting reason. It then deletes only the harmless reconciliation-probe ConfigMap, resumes from every committed per-path cursor, relists the complete scope, and requires one host-generated tombstone. This local transport does not replace the future credential broker or isolated plugin runner.
+The target seeds `deploy/kubernetes/dev/seed-incident.yaml`, whose intentionally nonexistent image produces a real `ErrImagePull`/`ImagePullBackOff`. It verifies that the observer returns a complete canonical graph and an unhealthy Pod with only the safe waiting reason. It then deletes only the harmless reconciliation-probe ConfigMap, resumes from every committed per-path cursor, relists the complete scope, and requires one host-generated tombstone. This local transport does not use the external credential-broker client and does not replace the future isolated plugin runner.
 
 ## Run the reference API
 
@@ -176,6 +176,8 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_HTTP_HOST` | `0.0.0.0` | Reference API bind address |
 | `IIP_HTTP_PORT` | `8080` | Reference API port |
 | `IIP_AUTH_IDENTITIES_JSON` | required by API startup | Local Bearer-token verifier identities; supply through protected runtime configuration |
+| `IIP_CREDENTIAL_BROKER_MODE` | `static` | Provider credential resolution: provider-specific local `static` brokers or shared `external-http` client |
+| `IIP_CREDENTIAL_BROKER_CONFIG_JSON` | unset | Required non-secret HTTPS/trust/workload-token-path/lease bounds when external mode is selected |
 | `IIP_DATABASE_URL` | unset | Select the PostgreSQL profile when set |
 | `IIP_DATABASE_AUTO_MIGRATE` | `false` | Apply packaged migrations at startup; local Compose only |
 | `IIP_INGESTION_MAX_CHECKPOINT_AGE_SECONDS` | `300` | Local maximum age of the last complete committed collection |

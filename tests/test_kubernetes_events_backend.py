@@ -462,6 +462,21 @@ class KubernetesApiEventsBackendTests(unittest.TestCase):
         ):
             adapter.query_events(query())
 
+        class FailingCredentials:
+            def resolve(self, request: CredentialLeaseRequest) -> CredentialLease:
+                del request
+                raise RuntimeError("upstream token=provider-secret")
+
+        adapter, transport, _ = backend([])
+        adapter._credentials = FailingCredentials()
+        with self.assertRaisesRegex(
+            KubernetesEventsBackendError,
+            "kubernetes.events.credential.unavailable",
+        ) as raised:
+            adapter.query_events(query())
+        self.assertNotIn("provider-secret", str(raised.exception))
+        self.assertEqual(transport.calls, [])
+
 
 class KubernetesEventsRuntimeCompositionTests(unittest.TestCase):
     def identities(self) -> str:

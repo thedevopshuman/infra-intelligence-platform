@@ -70,4 +70,12 @@ spec:
         - port: {{ .Values.networkPolicy.kubernetesApiEgress.port }}
           protocol: TCP
     {{- end }}
+    {{- if .Values.networkPolicy.credentialBrokerEgress.enabled }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.credentialBrokerEgress.cidr | quote }}
+      ports:
+        - port: {{ .Values.networkPolicy.credentialBrokerEgress.port }}
+          protocol: TCP
+    {{- end }}
 {{- end }}

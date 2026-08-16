@@ -34,7 +34,7 @@ Agents and plugins declare a maximum authority; request policy may reduce but ne
 - Revocation and rotation do not require rewriting manifests.
 - Plugin credentials are isolated from the control-plane process.
 
-The Prometheus telemetry-evidence reference implements the first `CredentialBroker` lease boundary. The adapter supplies authenticated tenant, actor, integration, provider, scope, reference, and deadline context; the returned bearer lease stays inside the adapter and has a redacted representation. Its static protected-JSON broker is for local proof only. Production still requires an external short-lived issuer and process/plugin isolation appropriate to the deployment.
+The Prometheus and Kubernetes Event evidence adapters implement the `CredentialBroker` lease boundary. Each supplies authenticated tenant, actor, integration, provider, scope, reference, and deadline context; the returned bearer lease stays inside the adapter and has a redacted representation. Static protected-JSON brokers remain local-only. The optional external HTTPS client authenticates with explicitly projected workload identity, validates short lease lifetime and request correlation, and is shared across adapters. The external issuer remains responsible for independent workload/tenant/scope policy, issuance, rotation, revocation, and secret-free audit; process/plugin isolation remains deployment work.
 
 ## Agent and prompt threats
 

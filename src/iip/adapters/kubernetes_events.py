@@ -833,18 +833,21 @@ class KubernetesApiEventsBackend:
 def build_kubernetes_events_backend_from_environment(
     environment: Mapping[str, str],
     clock: Clock,
+    credential_broker: CredentialBroker | None = None,
 ) -> KubernetesApiEventsBackend:
     """Build the live adapter from protected runtime configuration."""
 
     integrations = environment.get("IIP_KUBERNETES_EVENTS_INTEGRATIONS_JSON")
     credentials = environment.get("IIP_KUBERNETES_EVENTS_CREDENTIALS_JSON")
-    if integrations is None or credentials is None:
+    if integrations is None or (credential_broker is None and credentials is None):
         raise KubernetesEventsConfigurationError(
             "kubernetes.events.configuration.required"
         )
     return KubernetesApiEventsBackend(
         KubernetesEventsIntegrationRegistry.from_json(integrations),
-        StaticKubernetesBearerCredentialBroker.from_json(credentials),
+        credential_broker
+        if credential_broker is not None
+        else StaticKubernetesBearerCredentialBroker.from_json(credentials),
         clock,
     )
 

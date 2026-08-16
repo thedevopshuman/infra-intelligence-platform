@@ -50,6 +50,17 @@ auth:
   existingSecret: ""
   secretKey: identities-json
 
+credentialBroker:
+  mode: static
+  externalHttp:
+    configJson: '{}'
+    audience: iip-credential-broker
+    tokenExpirationSeconds: 600
+    identityMountPath: /var/run/iip-credential-broker-identity
+    caBundleExistingSecret: ""
+    caBundleSecretKey: ca.crt
+    caBundleMountPath: /var/run/iip-credential-broker-ca
+
 telemetry:
   metricsEnabled: false
   otlpEndpoint: ""
@@ -126,6 +137,10 @@ networkPolicy:
     enabled: false
     cidr: 10.96.0.1/32
     port: 443
+  credentialBrokerEgress:
+    enabled: false
+    cidr: 10.96.0.1/32
+    port: 8443
 
 podDisruptionBudget:
   enabled: false

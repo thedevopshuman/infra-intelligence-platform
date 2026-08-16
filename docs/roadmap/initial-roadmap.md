@@ -57,7 +57,7 @@ Deliverables:
 
 Exit gate: target scenarios meet required evidence and root-cause scoring in repeated runs within declared latency and cost.
 
-Reference slice delivered: durable evidence artifacts, authenticated investigation POST/GET API, bounded deterministic agent, resource-state provider, backend-neutral metric evidence request/result contracts, a replaceable `TelemetryMetricsBackend` with an honest no-data default and a real Prometheus-compatible adapter, exact request-scoped local credential resolution, an optional tenant-bound OTLP/HTTP metrics evidence receiver, investigation-driven bounded metric selection under inherited scope and budgets, unit-aware threshold assessment and ordered two-window baseline comparison from committed metric artifacts, normalized Kubernetes Event request/result contracts, a replaceable `KubernetesEventsBackend` with an honest no-data default and a live exact-scope read-only HTTPS adapter, real-cluster least-privilege conformance, event-condition assessment from committed artifacts, authenticated evidence APIs/SDKs, structured root-cause taxonomy, supporting and contradicting citations, unknowns, recommendations, and zero-model cost ledger. Remaining: seasonal/rolling baselines, broader multi-signal planning, a production external credential broker, additional customer metric backends/signals, receiver isolation and workload identity, logs, repository/runbook providers, cancellation/crash recovery, redaction policy expansion, and a production model-provider decision.
+Reference slice delivered: durable evidence artifacts, authenticated investigation POST/GET API, bounded deterministic agent, resource-state provider, backend-neutral metric evidence request/result contracts, a replaceable `TelemetryMetricsBackend` with an honest no-data default and a real Prometheus-compatible adapter, exact request-scoped local credential resolution, a shared external HTTPS credential-broker client authenticated by explicitly projected workload identity, an optional tenant-bound OTLP/HTTP metrics evidence receiver, investigation-driven bounded metric selection under inherited scope and budgets, unit-aware threshold assessment and ordered two-window baseline comparison from committed metric artifacts, normalized Kubernetes Event request/result contracts, a replaceable `KubernetesEventsBackend` with an honest no-data default and a live exact-scope read-only HTTPS adapter, real-cluster least-privilege conformance, event-condition assessment from committed artifacts, authenticated evidence APIs/SDKs, structured root-cause taxonomy, supporting and contradicting citations, unknowns, recommendations, and zero-model cost ledger. Remaining: seasonal/rolling baselines, broader multi-signal planning, a production credential issuer/interoperability gate, additional customer metric backends/signals, receiver isolation and workload identity, logs, repository/runbook providers, cancellation/crash recovery, redaction policy expansion, and a production model-provider decision.
 
 ## Phase 3 — evaluation and operational hardening
 
@@ -91,7 +91,7 @@ Deliverables:
 
 Exit gate: duplicate delivery cannot duplicate impact; policy, approval, execution, and verification are fully reconstructable.
 
-Reference slice delivered: versioned proposal/approval/result contracts, durable idempotency, expiry, role separation, current policy checks, audit references, and a no-impact Kubernetes restart dry-run executor. Remaining: a production policy engine, durable retry/timer worker, request-scoped credential broker, approval UI, live server-side dry-run, mutation verification, and tested rollback.
+Reference slice delivered: versioned proposal/approval/result contracts, durable idempotency, expiry, role separation, current policy checks, audit references, a no-impact Kubernetes restart dry-run executor, protected credential-lease contracts, and an external workload-identity broker client shared by read adapters. Remaining: a production credential issuer with policy/audit/revocation interoperability, production policy engine, durable retry/timer worker, approval UI, live server-side dry-run, mutation-scoped credential integration, verification, and tested rollback.
 
 ## Phase 5 — plugin SDK and first design partner
 
@@ -128,6 +128,7 @@ All working material stays under `docs/research/brand/` until accepted.
 | --- | --- | --- |
 | Graph/observation store | **Accepted: ADR 0004** | PostgreSQL 16–18 initially; revisit from measured temporal/graph workload |
 | Durable event transport | **Accepted: ADR 0004** | PostgreSQL event log and outbox initially; external broker remains replaceable |
+| Credential broker client | **Accepted: ADR 0022** | External HTTPS lease exchange with projected workload identity; issuer/product interoperability remains open |
 | Workflow engine | Phase 3 end | Durable timers, approvals, retries, audit, self-hosting burden |
 | Policy engine | Phase 3 end | Explainability, data isolation, bundle/version lifecycle, ecosystem |
 | Plugin runtime | Phase 4 end | Isolation, language support, streaming, operational cost, signing |

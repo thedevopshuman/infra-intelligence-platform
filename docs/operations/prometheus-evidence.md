@@ -69,7 +69,9 @@ When an integration declares a `credentialRef`, the reference is resolved for th
 
 Supply it only through a secret-bearing runtime channel as `IIP_PROMETHEUS_CREDENTIALS_JSON`. Never commit a populated document, put it in a ConfigMap, or pass it in a telemetry request. The Helm chart reads this variable only from `telemetryEvidence.prometheus.credentialsExistingSecret`.
 
-The static broker proves exact tenant/integration/reference/scope/deadline resolution but is not the production credential solution. Production requires a workload-identity or external-secret broker that issues short-lived access and supports rotation and revocation.
+Alternatively select the shared [external credential broker](credential-broker.md). In `external-http` mode, `IIP_PROMETHEUS_CREDENTIALS_JSON` is not required; the adapter sends the exact tenant, actor, integration, `prometheus`, `metrics:read`, logical reference, and deadline to the broker and accepts only a validated short Bearer lease.
+
+The static broker proves exact tenant/integration/reference/scope/deadline resolution but is not the production credential solution. Production requires the external client plus an issuer that validates workload and request policy, issues short-lived access, and supports rotation, revocation, and secret-free audit.
 
 ## Translation and limits
 

@@ -32,6 +32,7 @@ from iip.application.ports import (
     Authenticator,
     EventLog,
     EventOutbox,
+    CredentialBroker,
     IngestionTelemetrySink,
     KubernetesEventsBackend,
     ResourceRepository,
@@ -276,8 +277,13 @@ def build_runtime_from_env() -> Runtime:
     database_url = os.environ.get("IIP_DATABASE_URL")
     try:
         otlp_metrics_receiver = _otlp_metrics_receiver_from_env()
-        telemetry_metrics_backend = _telemetry_metrics_backend_from_env()
-        kubernetes_events_backend = _kubernetes_events_backend_from_env()
+        credential_broker = _credential_broker_from_env()
+        telemetry_metrics_backend = _telemetry_metrics_backend_from_env(
+            credential_broker
+        )
+        kubernetes_events_backend = _kubernetes_events_backend_from_env(
+            credential_broker
+        )
         if not database_url:
             return build_local_runtime(
                 authenticator,
@@ -373,7 +379,9 @@ def _otel_metrics_runtime_from_env() -> Any:
     )
 
 
-def _telemetry_metrics_backend_from_env() -> TelemetryMetricsBackend | None:
+def _telemetry_metrics_backend_from_env(
+    credential_broker: CredentialBroker | None = None,
+) -> TelemetryMetricsBackend | None:
     backend = os.environ.get("IIP_TELEMETRY_METRICS_BACKEND", "no-data")
     if backend == "no-data":
         return None
@@ -386,10 +394,14 @@ def _telemetry_metrics_backend_from_env() -> TelemetryMetricsBackend | None:
 
     from iip.adapters.prometheus import build_prometheus_backend_from_environment
 
-    return build_prometheus_backend_from_environment(os.environ, SystemClock())
+    return build_prometheus_backend_from_environment(
+        os.environ, SystemClock(), credential_broker
+    )
 
 
-def _kubernetes_events_backend_from_env() -> KubernetesEventsBackend | None:
+def _kubernetes_events_backend_from_env(
+    credential_broker: CredentialBroker | None = None,
+) -> KubernetesEventsBackend | None:
     backend = os.environ.get("IIP_KUBERNETES_EVENTS_BACKEND", "no-data")
     if backend == "no-data":
         return None
@@ -404,7 +416,31 @@ def _kubernetes_events_backend_from_env() -> KubernetesEventsBackend | None:
         build_kubernetes_events_backend_from_environment,
     )
 
-    return build_kubernetes_events_backend_from_environment(os.environ, SystemClock())
+    return build_kubernetes_events_backend_from_environment(
+        os.environ, SystemClock(), credential_broker
+    )
+
+
+def _credential_broker_from_env() -> CredentialBroker | None:
+    mode = os.environ.get("IIP_CREDENTIAL_BROKER_MODE", "static")
+    if mode == "static":
+        return None
+    if mode != "external-http":
+        from iip.adapters.credential_broker import (
+            CredentialBrokerConfigurationError,
+        )
+
+        raise CredentialBrokerConfigurationError(
+            "credential.broker.configuration.invalid"
+        )
+
+    from iip.adapters.credential_broker import (
+        build_external_credential_broker_from_environment,
+    )
+
+    return build_external_credential_broker_from_environment(
+        os.environ, SystemClock()
+    )
 
 
 def _otlp_metrics_receiver_from_env() -> OtlpMetricsReceiverAdapter | None:

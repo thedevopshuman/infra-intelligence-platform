@@ -64,7 +64,7 @@ A candidate may instead declare ordered baseline and evaluation windows within t
 ## Pending implementation decisions
 
 - whether later pushed signals use immutable Evidence only, customer storage forwarding, or a hybrid policy;
-- the production external credential broker and additional `TelemetryMetricsBackend` adapters;
+- a production credential issuer/interoperability gate and additional `TelemetryMetricsBackend` adapters;
 - production receiver topology, workload identity/mTLS, token rotation, and process/gateway isolation for self-hosted, customer-hosted, and managed deployments;
 - retention, sampling, cardinality budgets, and regional/data-residency controls;
 - queue durability and the division of retry, batching, and delivery-health ownership between the official SDK and a sidecar/customer Collector;

@@ -54,7 +54,9 @@ The static local broker document has this secret-bearing shape and must be suppl
 }
 ```
 
-The token must remain valid through the request deadline. Production deployment still needs an external broker that issues and rotates short-lived leases; the static JSON broker is a reference boundary, not the production credential design.
+The token must remain valid through the request deadline. Production deployment still needs an external issuer that authorizes, issues, rotates, revokes, and audits short-lived leases; the static JSON broker is a reference boundary, not the production credential design.
+
+Select the shared [external credential broker client](credential-broker.md) to remove provider tokens from ordinary control-plane configuration. In `external-http` mode, `IIP_KUBERNETES_EVENTS_CREDENTIALS_JSON` is not required; the adapter requests exactly `events:read` and `resources:read` for the configured logical reference and deadline. A separately operated issuer remains required.
 
 ## Read and normalization behavior
 

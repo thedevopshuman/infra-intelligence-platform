@@ -337,6 +337,22 @@ class PrometheusBackendTests(unittest.TestCase):
         self.assertEqual(broker.requests, [])
         self.assertNotIn("Authorization", transport.requests[0]["headers"])
 
+    def test_broker_failure_text_is_replaced_before_provider_transport(self) -> None:
+        class FailingBroker:
+            def resolve(self, request: CredentialLeaseRequest) -> CredentialLease:
+                del request
+                raise RuntimeError("upstream token=provider-secret")
+
+        backend, transport, _ = self.backend()
+        backend._credentials = FailingBroker()
+        with self.assertRaisesRegex(
+            PrometheusBackendError, "telemetry.credential.unavailable"
+        ) as raised:
+            backend.query_metrics(query())
+
+        self.assertNotIn("provider-secret", str(raised.exception))
+        self.assertEqual(transport.requests, [])
+
     def test_provider_warning_maps_to_stable_partial_without_text(self) -> None:
         document = prometheus_result()
         document["warnings"] = ["backend may contain sensitive provider detail"]

@@ -31,6 +31,8 @@ The platform exposes contracts at three levels:
 | Agent manifest | [agent-contract.md](agent-contract.md) | `contracts/schemas/agent-manifest.schema.json` | `contracts/examples/agent-manifest.json` |
 | Plugin manifest | [plugin-contract.md](plugin-contract.md) | `contracts/schemas/plugin-manifest.schema.json` | `contracts/examples/plugin-manifest.json` |
 | Integration configuration | [integration-config-contract.md](integration-config-contract.md) | `contracts/schemas/integration-config.schema.json` | `contracts/examples/integration-config.json` |
+| Credential lease request | [credential-lease-contract.md](credential-lease-contract.md) | `contracts/schemas/credential-lease-request.schema.json` | `contracts/examples/credential-lease-request.json` |
+| Credential lease | [credential-lease-contract.md](credential-lease-contract.md) | `contracts/schemas/credential-lease.schema.json` | `contracts/examples/credential-lease.json` |
 | Action proposal | [action-contract.md](action-contract.md) | `contracts/schemas/action-proposal.schema.json` | `contracts/examples/action-proposal.json` |
 | Action approval | [action-contract.md](action-contract.md) | `contracts/schemas/action-approval.schema.json` | `contracts/examples/action-approval.json` |
 | Action result | [action-contract.md](action-contract.md) | `contracts/schemas/action-result.schema.json` | `contracts/examples/action-result.json` |
@@ -38,4 +40,4 @@ The platform exposes contracts at three levels:
 
 `v1alpha1` means consumers should pin versions and expect deliberate evolution. Breaking changes create a new API/schema version. Fields are never silently repurposed.
 
-Planned contracts: standalone policy decisions, workflow history, evaluation results, and credential-broker grants.
+Planned contracts: standalone policy decisions, workflow history, and evaluation results.

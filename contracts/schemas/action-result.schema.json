@@ -42,8 +42,23 @@
         },
         "auditRef": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048},
         "executionStatusRef": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048},
-        "executionPolicyInputDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+        "executionPolicyInputDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "errorCode": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,127}$"},
+        "rollback": {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "summary"],
+          "properties": {
+            "status": {"type": "string", "enum": ["succeeded", "failed"]},
+            "summary": {"type": "string", "minLength": 1, "maxLength": 4096}
+          }
+        }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"spec": {"properties": {"outcome": {"const": "rolled-back"}}}}},
+      "then": {"properties": {"spec": {"required": ["rollback"], "properties": {"rollback": {"properties": {"status": {"const": "succeeded"}}}}}}}
+    }
+  ]
 }

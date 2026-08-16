@@ -1217,9 +1217,11 @@ export interface ActionProposal {
   spec: {
     investigationId: InvestigationId;
     investigationDigest?: Sha256Digest;
+    integrationId?: string;
     actionType: string;
     targetResourceUid: ResourceUid;
     targetDigest?: Sha256Digest;
+    providerObjectUid?: string;
     parameters: {
       namespace: string;
       workloadKind: "deployment" | "statefulset" | "daemonset";
@@ -1303,6 +1305,8 @@ export interface ActionResult {
     auditRef: string;
     executionStatusRef?: string;
     executionPolicyInputDigest?: Sha256Digest;
+    errorCode?: string;
+    rollback?: { status: "succeeded" | "failed"; summary: string };
   };
 }
 

@@ -7,7 +7,7 @@
     "completedAt": "2026-08-14T13:03:00Z"
   },
   "spec": {
-    "proposalDigest": "sha256:37ea8c7e0f9b2488d56e0bc59130705ac2d2a6de3985769c86f52bf3ae340315",
+    "proposalDigest": "sha256:ba85c70f0589c908d56ca4ea3e96ec8fe63609a35b55ec1c41879341f1310b37",
     "approvalId": "apr_66666666666666666666666666666666",
     "outcome": "dry-run",
     "idempotencyKey": "incident-71c9-restart-api-001",

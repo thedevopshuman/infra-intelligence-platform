@@ -2,7 +2,7 @@
 
 **Status:** Executable client and deployment boundary; external issuer required
 
-The external broker client exchanges authenticated, exact request scope for a short-lived provider Bearer lease. It is shared by the Prometheus and Kubernetes Event evidence adapters and implements the protected [credential lease contract](../specifications/credential-lease-contract.md). [ADR 0022](../decisions/0022-external-workload-identity-credential-broker.md) fixes its authority and secret-handling semantics.
+The external broker client exchanges authenticated, exact request scope for a short-lived provider Bearer lease. It is shared by the Prometheus, Kubernetes Event evidence, and explicitly selected Kubernetes action adapters and implements the protected [credential lease contract](../specifications/credential-lease-contract.md). [ADR 0022](../decisions/0022-external-workload-identity-credential-broker.md) fixes its authority and secret-handling semantics.
 
 The repository does not ship a production credential issuer. The customer or platform operator must provide an HTTPS broker that validates workload identity and every request field, resolves the logical credential reference, issues only the requested authority, audits issuance without secret material, and supports revocation/rotation.
 

@@ -774,6 +774,9 @@ class ActionExecutionOutcome:
     operation_ref: str
     verification_status: str
     verification_summary: str
+    error_code: Optional[str] = None
+    rollback_status: Optional[str] = None
+    rollback_summary: Optional[str] = None
 
 
 class ActionExecutor(Protocol):

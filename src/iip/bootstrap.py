@@ -35,6 +35,7 @@ from iip.application.ingest_otlp_logs import (
     OtlpLogsReceiverAdapter,
 )
 from iip.application.ports import (
+    ActionExecutor,
     AuthenticationConfigurationError,
     Authenticator,
     EventLog,
@@ -130,6 +131,7 @@ def build_local_runtime(
     otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     otlp_logs_receiver: OtlpLogsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
+    action_executor: ActionExecutor | None = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -151,6 +153,7 @@ def build_local_runtime(
         otlp_metrics_receiver,
         otlp_logs_receiver,
         telemetry_runtime,
+        action_executor,
     )
 
 
@@ -169,6 +172,7 @@ def _compose_runtime(
     otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     otlp_logs_receiver: OtlpLogsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
+    action_executor: ActionExecutor | None = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -279,7 +283,7 @@ def _compose_runtime(
             store,
             policy,
             operational,
-            KubernetesRestartDryRunExecutor(),
+            action_executor or KubernetesRestartDryRunExecutor(),
             operational,
             clock,
             operational,
@@ -306,6 +310,7 @@ def build_postgres_runtime(
     otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     otlp_logs_receiver: OtlpLogsReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
+    action_executor: ActionExecutor | None = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -330,6 +335,7 @@ def build_postgres_runtime(
         otlp_metrics_receiver,
         otlp_logs_receiver,
         telemetry_runtime,
+        action_executor,
     )
 
 
@@ -366,6 +372,7 @@ def build_runtime_from_env() -> Runtime:
         otlp_metrics_receiver = _otlp_metrics_receiver_from_env()
         otlp_logs_receiver = _otlp_logs_receiver_from_env()
         credential_broker = _credential_broker_from_env()
+        action_executor = _kubernetes_action_executor_from_env(credential_broker)
         telemetry_metrics_backend = _telemetry_metrics_backend_from_env(
             credential_broker
         )
@@ -395,6 +402,7 @@ def build_runtime_from_env() -> Runtime:
                 otlp_metrics_receiver=otlp_metrics_receiver,
                 otlp_logs_receiver=otlp_logs_receiver,
                 telemetry_runtime=telemetry_runtime,
+                action_executor=action_executor,
             )
         auto_migrate = (
             os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
@@ -418,6 +426,7 @@ def build_runtime_from_env() -> Runtime:
             otlp_metrics_receiver=otlp_metrics_receiver,
             otlp_logs_receiver=otlp_logs_receiver,
             telemetry_runtime=telemetry_runtime,
+            action_executor=action_executor,
         )
     except Exception:
         if telemetry_runtime is not None:
@@ -551,6 +560,27 @@ def _kubernetes_events_backend_from_env(
     )
 
     return build_kubernetes_events_backend_from_environment(
+        os.environ, SystemClock(), credential_broker
+    )
+
+
+def _kubernetes_action_executor_from_env(
+    credential_broker: CredentialBroker | None = None,
+) -> ActionExecutor | None:
+    executor = os.environ.get("IIP_KUBERNETES_ACTION_EXECUTOR", "dry-run")
+    if executor == "dry-run":
+        return None
+    if executor != "kubernetes-api":
+        from iip.adapters.kubernetes_actions import KubernetesActionsConfigurationError
+
+        raise KubernetesActionsConfigurationError(
+            "kubernetes.actions.configuration.invalid"
+        )
+    from iip.adapters.kubernetes_actions import (
+        build_kubernetes_action_executor_from_environment,
+    )
+
+    return build_kubernetes_action_executor_from_environment(
         os.environ, SystemClock(), credential_broker
     )
 

@@ -61,6 +61,8 @@ class GovernedActionService:
     _DNS_LABEL = r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?"
     _DNS_SUBDOMAIN = re.compile(rf"{_DNS_LABEL}(?:\.{_DNS_LABEL})*")
     _PROVIDER = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}")
+    _INTEGRATION_ID = re.compile(r"[a-z][a-z0-9._-]{2,127}")
+    _PROVIDER_OBJECT_UID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,252}")
     _WORKLOAD_TYPES = {
         "deployment": "apps/deployment",
         "statefulset": "apps/statefulset",
@@ -96,6 +98,7 @@ class GovernedActionService:
         if target is None:
             raise ActionWorkflowError("action.target.unavailable")
         parameters = self._validated_parameters(command.parameters, target)
+        integration_id, provider_object_uid = self._target_binding(target)
         investigation_request = self._investigations.get_investigation_request(
             command.actor, command.investigation_id
         )
@@ -120,7 +123,10 @@ class GovernedActionService:
             "parameters": parameters,
             "dryRun": command.dry_run,
             "expiresAt": command.expires_at,
+            "integrationId": integration_id,
         }
+        if provider_object_uid is not None:
+            intended["providerObjectUid"] = provider_object_uid
         if existing is not None:
             self._validate_proposal_replay(existing, command, intended)
             return existing
@@ -133,6 +139,8 @@ class GovernedActionService:
             "actionType": command.action_type,
             "targetResourceUid": command.target_resource_uid,
             "targetDigest": target_digest,
+            "integrationId": integration_id,
+            "providerObjectUid": provider_object_uid,
             "parameters": parameters,
             "dryRun": command.dry_run,
         }
@@ -409,6 +417,15 @@ class GovernedActionService:
                 "executionPolicyInputDigest": canonical_digest(policy_input),
             },
         }
+        result_spec = result["spec"]
+        assert isinstance(result_spec, dict)
+        if outcome.error_code is not None:
+            result_spec["errorCode"] = outcome.error_code
+        if outcome.rollback_status is not None:
+            result_spec["rollback"] = {
+                "status": outcome.rollback_status,
+                "summary": outcome.rollback_summary,
+            }
         completed_at = str(result["metadata"]["completedAt"])  # type: ignore[index]
         terminal_status: dict[str, object] = {
             "apiVersion": "iip.platform/v1alpha1",
@@ -522,6 +539,33 @@ class GovernedActionService:
             not in ("not-run", "passed", "failed")
             or not isinstance(getattr(outcome, "verification_summary", None), str)
             or not 1 <= len(outcome.verification_summary) <= 4096
+            or (
+                getattr(outcome, "error_code", None) is not None
+                and (
+                    not isinstance(outcome.error_code, str)
+                    or re.fullmatch(r"[a-z][a-z0-9_.-]{2,127}", outcome.error_code)
+                    is None
+                )
+            )
+            or (
+                getattr(outcome, "rollback_status", None) is not None
+                and outcome.rollback_status not in ("succeeded", "failed")
+            )
+            or (
+                getattr(outcome, "rollback_status", None) is not None
+                and (
+                    not isinstance(getattr(outcome, "rollback_summary", None), str)
+                    or not 1 <= len(outcome.rollback_summary) <= 4096
+                )
+            )
+            or (
+                getattr(outcome, "rollback_status", None) is None
+                and getattr(outcome, "rollback_summary", None) is not None
+            )
+            or (
+                getattr(outcome, "outcome", None) == "rolled-back"
+                and getattr(outcome, "rollback_status", None) != "succeeded"
+            )
         ):
             raise ActionWorkflowError("action.executor.output-invalid")
 
@@ -561,6 +605,24 @@ class GovernedActionService:
             "workloadKind": workload_kind,
             "workloadName": workload_name,
         }
+
+    @classmethod
+    def _target_binding(cls, target: Resource) -> tuple[str, str | None]:
+        integration_id = (
+            target.observation.source_id if target.observation is not None else None
+        )
+        provider_object_uid = target.attributes.get("providerUid")
+        if (
+            not isinstance(integration_id, str)
+            or cls._INTEGRATION_ID.fullmatch(integration_id) is None
+        ):
+            raise ActionWorkflowError("action.target.integration-unavailable")
+        if provider_object_uid is not None and (
+            not isinstance(provider_object_uid, str)
+            or cls._PROVIDER_OBJECT_UID.fullmatch(provider_object_uid) is None
+        ):
+            raise ActionWorkflowError("action.target.provider-uid-invalid")
+        return integration_id, provider_object_uid
 
     @staticmethod
     def _validate_investigation_binding(

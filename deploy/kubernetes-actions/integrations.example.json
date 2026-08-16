@@ -1,0 +1,21 @@
+{
+  "integrations": [
+    {
+      "tenantId": "local",
+      "integrationId": "kubernetes-local",
+      "provider": "kubernetes",
+      "endpoint": "https://kubernetes.default.svc:443",
+      "credentialRef": "credential://kubernetes/local/action-executor",
+      "caBundlePath": "/var/run/iip-kubernetes-actions/ca.crt",
+      "clusterExternalId": "cluster-local",
+      "namespaces": ["default"],
+      "workloadKinds": ["deployment"],
+      "requestTimeoutSeconds": 10,
+      "maxResponseBytes": 1048576,
+      "verificationTimeoutSeconds": 120,
+      "pollIntervalMilliseconds": 2000,
+      "liveExecutionEnabled": false,
+      "enabled": true
+    }
+  ]
+}

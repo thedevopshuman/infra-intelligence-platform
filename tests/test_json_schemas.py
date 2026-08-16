@@ -478,6 +478,21 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(errors)
 
+    def test_rolled_back_action_requires_successful_rollback_record(self) -> None:
+        result = document("contracts/examples/action-result.json")
+        result["spec"]["outcome"] = "rolled-back"
+
+        errors = self.validate("action-result.schema.json", result)
+
+        self.assertTrue(any("rollback" in error for error in errors))
+
+        result["spec"]["rollback"] = {
+            "status": "failed",
+            "summary": "The rollback could not be verified.",
+        }
+        errors = self.validate("action-result.schema.json", result)
+        self.assertTrue(any("succeeded" in error for error in errors))
+
     def test_otlp_gauge_prohibits_sum_semantics(self) -> None:
         result = document("contracts/examples/otlp-metrics-evidence.json")
         gauge = result["spec"]["series"][1]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
@@ -12,6 +13,7 @@ from infra_intelligence_sdk import ResourceCollectionRequest, ResourceCollection
 
 API_VERSION = "iip.platform/v1alpha1"
 MAX_SAFE_SEQUENCE = 9007199254740991
+PROVIDER_UID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,252}")
 SAFE_LABEL_KEYS = frozenset(
     {
         "app",
@@ -206,6 +208,9 @@ def _safe_attributes(
     status: Mapping[str, Any],
 ) -> Dict[str, Any]:
     attributes: Dict[str, Any] = {}
+    provider_uid = metadata.get("uid")
+    if isinstance(provider_uid, str) and PROVIDER_UID.fullmatch(provider_uid):
+        attributes["providerUid"] = provider_uid
     if namespace:
         attributes["namespace"] = namespace
     if kind == "Namespace":

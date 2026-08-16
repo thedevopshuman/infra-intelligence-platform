@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-postgres test-backup-restore test-otel test-otlp-receiver test-prometheus test-loki test-kubernetes-events test-kubernetes-live db-migrate helm-lint verify run package-chart dev-init dev-up dev-status dev-credentials dev-down
+.PHONY: help install-verify-deps validate validate-schemas test test-postgres test-backup-restore test-otel test-otlp-receiver test-prometheus test-loki test-kubernetes-events test-kubernetes-actions test-kubernetes-live db-migrate helm-lint verify run package-chart dev-init dev-up dev-status dev-credentials dev-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -16,6 +16,7 @@ help:
 	@echo "test-prometheus Query a real Prometheus server through the evidence adapter"
 	@echo "test-loki     Query a real Loki server through the log evidence adapter"
 	@echo "test-kubernetes-events Query a local cluster through the Event evidence adapter"
+	@echo "test-kubernetes-actions Verify server dry-run and a governed restart on a local cluster"
 	@echo "test-kubernetes-live Run the observer against an explicit local Kubernetes context"
 	@echo "db-migrate    Apply PostgreSQL migrations using IIP_DATABASE_URL"
 	@echo "helm-lint     Lint and render the Helm chart"
@@ -59,6 +60,9 @@ test-loki:
 
 test-kubernetes-events:
 	IIP_TEST_PYTHON=$(PYTHON) scripts/test_kubernetes_events.sh
+
+test-kubernetes-actions:
+	IIP_TEST_PYTHON=$(PYTHON) scripts/test_kubernetes_actions.sh
 
 test-kubernetes-live:
 	IIP_TEST_PYTHON=$(PYTHON) scripts/test_kubernetes_live.sh

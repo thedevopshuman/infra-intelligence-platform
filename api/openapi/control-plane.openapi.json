@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.14.0",
+    "version": "0.15.0",
     "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, Kubernetes Event, resource-change, and repository/runbook context evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven evidence assessment, governed actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -419,6 +419,7 @@
     "/v1/actions/proposals": {
       "post": {
         "operationId": "proposeAction",
+        "description": "Create an immutable proposal bound to a completed investigation, the exact target resource digest, its accepted observation integration, and the observed provider object UID when available.",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "additionalProperties": false, "required": ["investigationId", "actionType", "targetResourceUid", "parameters", "idempotencyKey", "expiresAt"], "properties": {"investigationId": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"}, "actionType": {"const": "kubernetes.restart-workload"}, "targetResourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}, "parameters": {"type": "object", "additionalProperties": false, "required": ["namespace", "workloadKind", "workloadName"], "properties": {"namespace": {"type": "string", "maxLength": 253}, "workloadKind": {"type": "string", "enum": ["deployment", "statefulset", "daemonset"]}, "workloadName": {"type": "string", "maxLength": 253}}}, "idempotencyKey": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{8,128}$"}, "expiresAt": {"type": "string", "format": "date-time"}, "dryRun": {"type": "boolean", "default": true}}}}}},
         "responses": {
           "201": {"description": "Immutable action proposal", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/action-proposal.schema.json"}}}},
@@ -448,6 +449,7 @@
     "/v1/actions/{proposalId}/execute": {
       "post": {
         "operationId": "executeAction",
+        "description": "Atomically claim the approved action once, then invoke the configured executor. The safe default is non-mutating; the opt-in Kubernetes executor performs server-side dry-run before any explicitly enabled live restart and records verification or rollback.",
         "parameters": [{"name": "proposalId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^act_[a-f0-9]{32}$"}}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "maxProperties": 0}}}},
         "responses": {

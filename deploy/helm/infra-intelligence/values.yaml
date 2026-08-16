@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.14.0"
+  tag: "0.15.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -100,6 +100,15 @@ kubernetesEventEvidence:
   caBundleExistingSecret: ""
   caBundleSecretKey: ca.crt
   caBundleMountPath: /var/run/iip-kubernetes-events
+
+kubernetesActions:
+  executor: dry-run
+  integrationsJson: '{"integrations":[]}'
+  credentialsExistingSecret: ""
+  credentialsSecretKey: kubernetes-actions-credentials-json
+  caBundleExistingSecret: ""
+  caBundleSecretKey: ca.crt
+  caBundleMountPath: /var/run/iip-kubernetes-actions
 
 contextEvidence:
   backend: no-data

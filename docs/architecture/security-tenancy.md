@@ -26,6 +26,8 @@ The Phase 1 HTTP surface follows the [authentication boundary](authentication-bo
 
 Execution authority is consumed by a durable one-shot claim before an adapter receives a request. A lost process cannot turn an uncertain outcome into an automatic retry: after lease expiry, the attempt requires manual provider-state reconciliation. The claim records content digests and identities, never execution credentials.
 
+The Kubernetes restart adapter additionally requires an observed provider UID and resource version, a tenant/integration namespace-kind allowlist, server-side dry-run, and a brokered `resources:read` + `workloads:patch` lease. Live execution needs two independent switches: an immutable non-dry-run proposal and protected integration enablement. It cannot submit arbitrary paths or patch bodies.
+
 Agents and plugins declare a maximum authority; request policy may reduce but never increase it.
 
 ## Credential model

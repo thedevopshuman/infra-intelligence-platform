@@ -136,6 +136,8 @@ The API image also serves a dependency-free same-origin web console. It is a rea
 
 Governed execution follows [ADR 0035](../decisions/0035-one-shot-action-execution.md). Proposal parameters are closed and identity-bound. The store atomically owns the sole execution claim; current policy is re-evaluated over content digests immediately before the claim. Result and terminal lifecycle state commit together, while an expired non-terminal claim becomes manual reconciliation rather than a retry. This is the safety prerequisite for the disabled-by-default live Kubernetes executor.
 
+The opt-in executor in [ADR 0036](../decisions/0036-request-scoped-kubernetes-restart.md) is the first live-capable adapter. It derives a protected integration from the observed source, checks the observed Kubernetes UID, requests a two-scope lease, uses server-side dry-run and resource-version preconditions, changes one fixed pod-template annotation, verifies controller readiness, and restores the prior annotation after failed verification. The locally composed executor and Helm default remain non-mutating.
+
 ## Cross-cutting invariants
 
 - Tenant ID, actor ID, and roles are derived through the [authentication boundary](authentication-boundary.md), not trusted from payloads or identity assertion headers.

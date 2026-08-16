@@ -121,6 +121,41 @@ class KubernetesObserverConformanceTests(unittest.TestCase):
         self.assertNotIn("kube-system", encoded)
         self.assertNotIn("cluster-local/kube-system/controller", external_ids)
 
+    def test_provider_uid_is_retained_as_a_safe_action_precondition(self) -> None:
+        objects = copy.deepcopy(self.objects)
+        deployment = next(
+            item for item in objects["items"] if item.get("kind") == "Deployment"
+        )
+        deployment["metadata"]["uid"] = "provider-deployment-uid"
+
+        result = self.result(objects=objects)
+        normalized = next(
+            item
+            for item in result["spec"]["observations"]
+            if item["spec"]["type"] == "apps/deployment"
+        )
+
+        self.assertEqual(
+            normalized["spec"]["attributes"]["providerUid"],
+            "provider-deployment-uid",
+        )
+
+    def test_unsafe_provider_uid_is_not_emitted(self) -> None:
+        objects = copy.deepcopy(self.objects)
+        deployment = next(
+            item for item in objects["items"] if item.get("kind") == "Deployment"
+        )
+        deployment["metadata"]["uid"] = "provider-uid\nforged"
+
+        result = self.result(objects=objects)
+        normalized = next(
+            item
+            for item in result["spec"]["observations"]
+            if item["spec"]["type"] == "apps/deployment"
+        )
+
+        self.assertNotIn("providerUid", normalized["spec"]["attributes"])
+
     def test_relationships_reference_resources_in_the_same_result(self) -> None:
         observations = self.result()["spec"]["observations"]
         resource_uids = {item["metadata"]["uid"] for item in observations}

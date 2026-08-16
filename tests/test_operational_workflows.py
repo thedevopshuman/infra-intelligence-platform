@@ -40,6 +40,7 @@ from iip.application.plugin_sessions import (
     PluginSessionService,
 )
 from iip.application.ports import (
+    ActionExecutionOutcome,
     ActorContext,
     PersistenceError,
     TelemetryMetricPoint,
@@ -817,6 +818,94 @@ class GovernedActionTests(unittest.TestCase):
             uncertain["spec"]["state"], "manual-reconciliation-required"
         )
         assert_schema(self, "action-execution-status.schema.json", uncertain)
+
+    def test_rollback_outcome_is_persisted_as_a_valid_terminal_result(self) -> None:
+        class RolledBackExecutor:
+            def execute(self, actor, proposal, *, approval_id):
+                del actor, proposal, approval_id
+                return ActionExecutionOutcome(
+                    outcome="rolled-back",
+                    provider="kubernetes",
+                    operation_ref=(
+                        "kubernetes://cluster-local/namespaces/default/deployments/api"
+                    ),
+                    verification_status="failed",
+                    verification_summary="The restarted workload did not become ready.",
+                    error_code="action.executor.verification-failed",
+                    rollback_status="succeeded",
+                    rollback_summary="The prior restart annotation was restored.",
+                )
+
+        self.service = GovernedActionService(
+            self.resources,
+            self.policy,
+            self.store,
+            RolledBackExecutor(),
+            self.store,
+            self.clock,
+            self.store,
+        )
+        proposal = self.proposal()
+        self.service.decide(
+            DecideActionCommand(
+                ActorContext("on-call-approver", "local", ("approver",)),
+                proposal["metadata"]["id"],
+                "approved",
+                "Rollback is bounded to the approved target.",
+            )
+        )
+
+        result = self.service.execute(
+            ExecuteActionCommand(
+                ActorContext("workflow-executor", "local", ("executor",)),
+                proposal["metadata"]["id"],
+            )
+        )
+
+        self.assertEqual(result["spec"]["outcome"], "rolled-back")
+        self.assertEqual(result["spec"]["rollback"]["status"], "succeeded")
+        assert_schema(self, "action-result.schema.json", result)
+
+    def test_invalid_rollback_outcome_fails_closed(self) -> None:
+        class InvalidExecutor:
+            def execute(self, actor, proposal, *, approval_id):
+                del actor, proposal, approval_id
+                return ActionExecutionOutcome(
+                    outcome="rolled-back",
+                    provider="kubernetes",
+                    operation_ref="kubernetes://cluster-local/action",
+                    verification_status="failed",
+                    verification_summary="Invalid adapter output.",
+                    rollback_status="failed",
+                    rollback_summary="The rollback was not verified.",
+                )
+
+        self.service = GovernedActionService(
+            self.resources,
+            self.policy,
+            self.store,
+            InvalidExecutor(),
+            self.store,
+            self.clock,
+            self.store,
+        )
+        proposal = self.proposal()
+        self.service.decide(
+            DecideActionCommand(
+                ActorContext("on-call-approver", "local", ("approver",)),
+                proposal["metadata"]["id"],
+                "approved",
+                "Rollback is bounded to the approved target.",
+            )
+        )
+
+        with self.assertRaisesRegex(ActionWorkflowError, "executor.output-invalid"):
+            self.service.execute(
+                ExecuteActionCommand(
+                    ActorContext("workflow-executor", "local", ("executor",)),
+                    proposal["metadata"]["id"],
+                )
+            )
 
     def test_proposal_rejects_target_identity_mismatch(self) -> None:
         with self.assertRaisesRegex(ActionWorkflowError, "target-mismatch"):

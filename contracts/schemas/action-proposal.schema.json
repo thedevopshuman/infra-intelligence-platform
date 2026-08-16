@@ -24,9 +24,11 @@
       "properties": {
         "investigationId": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"},
         "investigationDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "integrationId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
         "actionType": {"const": "kubernetes.restart-workload"},
         "targetResourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
         "targetDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "providerObjectUid": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,252}$"},
         "parameters": {
           "type": "object", "additionalProperties": false,
           "required": ["namespace", "workloadKind", "workloadName"],

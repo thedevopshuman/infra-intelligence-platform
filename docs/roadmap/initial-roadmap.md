@@ -3,7 +3,7 @@
 **Status:** Working plan  
 **Planning horizon:** Foundation through first design partner
 
-**Implementation note (2026-08-14):** The repository contains one executable local reference slice through every phase: live reconciliation collection and checkpoint ingestion (Phase 1), durable evidence and deterministic investigations (Phase 2), repeated-run scoring (Phase 3), separation-of-duties dry-run actions (Phase 4), and bounded plugin handshake metadata (Phase 5). These are implementation units, not completed phase exit gates. Remaining gate work is listed below and external pilot/legal/brand outcomes cannot be completed by repository code alone.
+**Implementation note (2026-08-17):** The repository contains one executable local reference slice through every phase: live reconciliation collection and checkpoint ingestion (Phase 1), durable evidence and deterministic investigations (Phase 2), repeated-run scoring (Phase 3), separation-of-duties one-shot actions plus an opt-in verified Kubernetes restart (Phase 4), and bounded plugin handshake metadata (Phase 5). These are implementation units, not completed phase exit gates. Remaining gate work is listed below and external pilot/legal/brand outcomes cannot be completed by repository code alone.
 
 The roadmap is outcome-based. Dates should be added after team size and pilot constraints are known. Each phase ends with evidence that the next risk is worth taking.
 
@@ -91,7 +91,7 @@ Deliverables:
 
 Exit gate: duplicate delivery cannot duplicate impact; policy, approval, execution, and verification are fully reconstructable.
 
-Reference slice delivered: versioned proposal/approval/result and execution-lifecycle contracts, investigation- and target-bound closed parameters, role separation, content-digested policy checks at proposal/approval/execution time, a durable one-shot pre-impact execution claim, concurrent duplicate rejection, fail-closed stale-lease recovery without replay, atomic terminal result/state persistence, audit references, a no-impact Kubernetes restart dry-run executor, protected credential-lease contracts, and an external workload-identity broker client shared by read adapters. Remaining: a production credential issuer with policy/audit/revocation interoperability, production policy engine, background timer/reconciliation worker, full approval controls in the console, live server-side dry-run, mutation-scoped credential integration, verification, and tested rollback.
+Reference slice delivered: versioned proposal/approval/result and execution-lifecycle contracts, investigation- and target-bound closed parameters, role separation, content-digested policy checks at proposal/approval/execution time, a durable one-shot pre-impact execution claim, concurrent duplicate rejection, fail-closed stale-lease recovery without replay, atomic terminal result/state persistence, audit references, a default no-impact validator, and an explicit Kubernetes API restart adapter with observed-UID and resource-version preconditions, server-side dry-run, brokered `resources:read` + `workloads:patch`, generation/readiness verification, and prior-annotation rollback. Remaining: a production credential issuer with policy/audit/revocation interoperability, production policy engine, background timer/reconciliation worker, full approval controls in the console, and production-environment mutation/rollback interoperability gates.
 
 ## Phase 5 — plugin SDK and first design partner
 

@@ -1,0 +1,36 @@
+{
+  "integrations": [
+    {
+      "tenantId": "local",
+      "integrationId": "loki-local",
+      "provider": "loki",
+      "endpoint": "http://loki:3100",
+      "credentialRef": null,
+      "organizationId": null,
+      "enabled": true,
+      "requestTimeoutSeconds": 10,
+      "maxResponseBytes": 1048576,
+      "labels": {
+        "resourceUid": "resource_uid",
+        "service": "service_name",
+        "severity": "level",
+        "traceId": "trace_id",
+        "spanId": "span_id",
+        "attributes": {
+          "deployment.environment": "environment",
+          "k8s.namespace.name": "namespace"
+        }
+      },
+      "services": {
+        "api": "api"
+      },
+      "severities": {
+        "debug": "DEBUG",
+        "info": "INFO",
+        "warn": "WARN",
+        "error": "ERROR",
+        "fatal": "FATAL"
+      }
+    }
+  ]
+}

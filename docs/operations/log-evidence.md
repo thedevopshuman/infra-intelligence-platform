@@ -1,10 +1,10 @@
 # Log evidence and OTLP logs intake
 
-**Status:** Backend-neutral query and executable OTLP receiver; disabled/no-data by default
+**Status:** Backend-neutral query, Loki adapter, and executable OTLP receiver; disabled/no-data by default
 
 The platform supports two deliberately separate log paths:
 
-1. `POST /v1/evidence/logs/queries` performs a bounded historical query through `TelemetryLogsBackend`. The current default backend returns honest no-data.
+1. `POST /v1/evidence/logs/queries` performs a bounded historical query through `TelemetryLogsBackend`. The default returns honest no-data; the first live adapter queries Loki.
 2. `POST /v1/logs` accepts selected OTLP/HTTP Protobuf logs through a separately authenticated push channel and commits normalized `telemetry.logs.push` Evidence.
 
 OTLP does not define historical queries. Pointing a Collector at `/v1/logs` does not make the platform a general log store, and changing a customer's historical backend requires a backend adapter selected at composition.
@@ -13,7 +13,46 @@ OTLP does not define historical queries. Pointing a Collector at `/v1/logs` does
 
 `IIP_TELEMETRY_LOGS_BACKEND` defaults to `no-data`. Requests contain logical services, normalized severities, exact attribute filters, known resources, time range, and output bounds. Provider URLs, credentials, index names, and query languages are never public request fields.
 
-The public operation uses the interactive control-plane Bearer identity and returns only an Evidence envelope. Log artifact bytes remain behind evidence authorization. A production adapter must resolve protected integration configuration and short-lived credentials through the existing credential-broker boundary.
+The public operation uses the interactive control-plane Bearer identity and returns only an Evidence envelope. Log artifact bytes remain behind evidence authorization. A live adapter resolves protected integration configuration and short-lived credentials through the existing credential-broker boundary.
+
+## Query Loki
+
+Select the adapter and load its non-secret registry:
+
+```bash
+export IIP_TELEMETRY_LOGS_BACKEND=loki
+export IIP_LOKI_INTEGRATIONS_JSON="$(tr -d '\n' < deploy/loki/integrations.example.json)"
+```
+
+Each registry entry belongs to one tenant and integration. It fixes the Loki endpoint, optional organization identifier, timeout and response limit, label bindings, logical service catalog, severity mapping, and an optional logical credential reference. The example maps `resourceUid`, service, severity, trace/span correlation, and two allowlisted attributes. Extend mappings deliberately; arbitrary Loki labels and LogQL are not public inputs.
+
+The adapter calls Loki's [`GET /loki/api/v1/query_range`](https://grafana.com/docs/loki/latest/reference/loki-http-api/) with a generated label selector and nanosecond time bounds. It refuses redirects, limits URL/time/bytes/records, maps only configured values, and fails closed on malformed or cross-resource output. Log bodies are never searched or interpreted by this adapter.
+
+For a locally protected Bearer token, supply a secret document only through `IIP_LOKI_CREDENTIALS_JSON`:
+
+```json
+{
+  "credentials": [
+    {
+      "tenantId": "local",
+      "integrationId": "loki-local",
+      "credentialRef": "credential://local/loki/log-reader",
+      "bearerToken": "<high-entropy-provider-token>",
+      "expiresAt": "2026-08-17T12:00:00Z"
+    }
+  ]
+}
+```
+
+Do not commit a populated document or put it in a ConfigMap. In production, use the shared [external credential broker](credential-broker.md); the adapter requests an exact `loki` / `logs:read` lease and accepts only a bounded Bearer result. Loki itself has no built-in authentication layer, so self-hosted production deployments require an authenticating gateway or reverse proxy in front of the endpoint.
+
+Exercise the real adapter, normalization, and investigation path against an isolated pinned Loki container:
+
+```bash
+make test-loki
+```
+
+The gate pushes two current records, queries them through the public backend boundary, commits an immutable log Evidence artifact, and verifies that a deterministic investigation cites the supporting evidence. It removes its isolated container and storage on exit.
 
 ## Enable OTLP logs locally
 
@@ -38,6 +77,8 @@ String bodies may contain secrets or hostile instructions. They are treated as c
 The reference receiver shares the API listener. When Helm NetworkPolicy is enabled, `networkPolicy.otlpReceiverIngress` applies to metrics and logs; restrict it to the trusted Collector/gateway namespace and pods. Production isolation, workload identity or mTLS, rate limits, durable buffering, deletion/data-residency controls, and receiver-specific SLOs remain required.
 
 ## Helm and Docker verification
+
+For historical Loki queries, set `logEvidence.backend: loki`, put the non-secret registry in `logEvidence.loki.integrationsJson`, and reference a Kubernetes Secret through `logEvidence.loki.credentialsExistingSecret` when static credentials are required. With NetworkPolicy enabled, configure `networkPolicy.lokiEgress` for the exact Loki/gateway namespace, pod labels, and port. Prefer the external credential broker for production leases.
 
 For Helm, set `otlpLogsReceiver.enabled: true` and place the complete channel JSON in a Kubernetes Secret referenced by `otlpLogsReceiver.channelsExistingSecret`. The chart never writes channel configuration into a ConfigMap.
 

@@ -1,0 +1,14 @@
+services:
+  loki:
+    image: grafana/loki:3.7.0
+    command: ["-config.file=/etc/loki/loki-test.yaml"]
+    volumes:
+      - ./loki/loki-test.yaml:/etc/loki/loki-test.yaml:ro
+    ports:
+      - "127.0.0.1:13100:3100"
+    read_only: true
+    tmpfs:
+      - /loki:uid=10001,gid=10001,mode=0750
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true

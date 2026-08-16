@@ -49,4 +49,4 @@ A root-cause-scoped selection may declare a positive minimum record count no gre
 | `408` | `evidence.deadline.exceeded` | The bounded collection deadline elapsed. |
 | `503` | `evidence.provider.unavailable` / `storage.unavailable` | Backend, normalization/redaction, or storage failed closed. |
 
-Python and TypeScript SDKs expose the public request/result types and collection operation. The default runtime returns honest `no-data`; a production historical log adapter remains an explicit integration unit.
+Python and TypeScript SDKs expose the public request/result types and collection operation. The default runtime returns honest `no-data`. An explicitly selected Loki adapter proves the boundary against a real historical backend without changing this public contract; other provider adapters remain independent implementation units.

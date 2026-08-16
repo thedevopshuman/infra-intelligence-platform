@@ -62,6 +62,18 @@ spec:
         - port: {{ .Values.networkPolicy.prometheusEgress.port }}
           protocol: TCP
     {{- end }}
+    {{- if .Values.networkPolicy.lokiEgress.enabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.lokiEgress.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.lokiEgress.podSelector | nindent 14 }}
+      ports:
+        - port: {{ .Values.networkPolicy.lokiEgress.port }}
+          protocol: TCP
+    {{- end }}
     {{- if .Values.networkPolicy.kubernetesApiEgress.enabled }}
     - to:
         - ipBlock:

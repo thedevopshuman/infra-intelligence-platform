@@ -319,7 +319,9 @@ def build_runtime_from_env() -> Runtime:
         telemetry_metrics_backend = _telemetry_metrics_backend_from_env(
             credential_broker
         )
-        telemetry_logs_backend = _telemetry_logs_backend_from_env()
+        telemetry_logs_backend = _telemetry_logs_backend_from_env(
+            credential_broker
+        )
         kubernetes_events_backend = _kubernetes_events_backend_from_env(
             credential_broker
         )
@@ -464,11 +466,22 @@ def _kubernetes_events_backend_from_env(
     )
 
 
-def _telemetry_logs_backend_from_env() -> TelemetryLogsBackend | None:
+def _telemetry_logs_backend_from_env(
+    credential_broker: CredentialBroker | None = None,
+) -> TelemetryLogsBackend | None:
     backend = os.environ.get("IIP_TELEMETRY_LOGS_BACKEND", "no-data")
-    if backend != "no-data":
-        raise ValueError("logs.backend.configuration.invalid")
-    return None
+    if backend == "no-data":
+        return None
+    if backend != "loki":
+        from iip.adapters.loki import LokiConfigurationError
+
+        raise LokiConfigurationError("logs.backend.configuration.invalid")
+
+    from iip.adapters.loki import build_loki_backend_from_environment
+
+    return build_loki_backend_from_environment(
+        os.environ, SystemClock(), credential_broker
+    )
 
 
 def _credential_broker_from_env() -> CredentialBroker | None:

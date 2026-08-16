@@ -6,7 +6,7 @@
 
 - Python 3.11 or newer
 - Helm 3 or newer
-- Optional: Docker Desktop for PostgreSQL, OpenTelemetry Collector, OTLP receiver, and Prometheus integration tests and the durable local stack
+- Optional: Docker Desktop for PostgreSQL, OpenTelemetry Collector, OTLP receiver, Prometheus/Loki integration tests, and the durable local stack
 - Optional: Docker Desktop, kind, and `kubectl` for live Kubernetes collection and Event evidence tests
 
 Install the pinned verification-only Python dependencies:
@@ -64,6 +64,14 @@ make test-prometheus
 ```
 
 The isolated target queries Prometheus's self-scraped `up` metric through the generated range-query boundary, verifies normalized series, and removes the server afterward. See the [Prometheus evidence guide](prometheus-evidence.md) for protected integration mapping, credential, Compose, and Helm configuration.
+
+Exercise the historical log-evidence adapter against a real Loki server with:
+
+```bash
+make test-loki
+```
+
+The isolated target pushes current logs, queries them through generated selector-only LogQL, verifies normalized records and investigation citation, and removes the server afterward. See the [log evidence guide](log-evidence.md) for protected mappings, credentials, Compose, and Helm configuration.
 
 Exercise the read-only Kubernetes Event evidence adapter against an explicit local context with:
 
@@ -205,11 +213,13 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_OTLP_RECEIVER_ENABLED` | `false` | Enable the optional tenant-bound OTLP/HTTP metrics Evidence receiver |
 | `IIP_OTLP_RECEIVER_CHANNELS_JSON` | required when receiver is enabled | Protected hashed channel credentials, fixed scope, catalogs, admission limits, and handling policy |
 | `IIP_TELEMETRY_METRICS_BACKEND` | `no-data` | Historical metric evidence backend; `no-data` or `prometheus` |
-| `IIP_TELEMETRY_LOGS_BACKEND` | `no-data` | Historical log evidence backend; only honest `no-data` is implemented currently |
+| `IIP_TELEMETRY_LOGS_BACKEND` | `no-data` | Historical log evidence backend; `no-data` or `loki` |
 | `IIP_OTLP_LOGS_RECEIVER_ENABLED` | `false` | Enable the optional tenant-bound OTLP/HTTP logs Evidence receiver |
 | `IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON` | required when logs receiver is enabled | Protected hashed logs-channel credentials, fixed resource/service scope, mappings, limits, and handling policy |
 | `IIP_PROMETHEUS_INTEGRATIONS_JSON` | unset | Protected non-secret tenant/integration endpoint and allowlisted metric catalog required by the Prometheus backend |
 | `IIP_PROMETHEUS_CREDENTIALS_JSON` | empty credential set | Secret-bearing local reference broker configuration; supply only through a protected runtime channel |
+| `IIP_LOKI_INTEGRATIONS_JSON` | unset | Protected non-secret tenant/integration endpoint, organization, label, service, and severity catalog required by the Loki backend |
+| `IIP_LOKI_CREDENTIALS_JSON` | empty credential set | Secret-bearing local Loki broker configuration; supply only through a protected runtime channel |
 | `IIP_KUBERNETES_EVENTS_BACKEND` | `no-data` | Kubernetes Event evidence backend; `no-data` or `kubernetes-api` |
 | `IIP_KUBERNETES_EVENTS_INTEGRATIONS_JSON` | unset | Protected non-secret tenant endpoint, CA path, cluster/scope allowlists, limits, and condition mappings required by the live adapter |
 | `IIP_KUBERNETES_EVENTS_CREDENTIALS_JSON` | unset | Secret-bearing local reference broker configuration required by the live adapter |
@@ -223,6 +233,7 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `OTEL_SERVICE_NAME` | `infra-intelligence-api` | OpenTelemetry service resource name |
 | `IIP_TEST_DATABASE_URL` | unset | Enable PostgreSQL integration tests against an explicit test database |
 | `IIP_TEST_PROMETHEUS_ENDPOINT` | unset | Enable the real Prometheus adapter integration test against an explicit endpoint |
+| `IIP_TEST_LOKI_ENDPOINT` | unset | Enable the real Loki adapter integration test against an explicit endpoint |
 | `IIP_TEST_OTLP_RECEIVER_ENDPOINT` | unset | Enable the official-exporter receiver integration test against an explicit API endpoint |
 | `IIP_KUBECONFIG` | required by live tests | Explicit kubeconfig path; neither test chooses an implicit current context |
 | `IIP_KUBE_CONTEXT` | `kind-iip-dev` | Explicit local context used by `test-kubernetes-live` and `test-kubernetes-events` |

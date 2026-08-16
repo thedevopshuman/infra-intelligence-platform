@@ -20,6 +20,7 @@ from iip.adapters.credential_broker import (
     build_external_credential_broker_from_environment,
 )
 from iip.adapters.kubernetes_events import KubernetesApiEventsBackend
+from iip.adapters.loki import LokiTelemetryLogsBackend
 from iip.adapters.prometheus import PrometheusTelemetryMetricsBackend
 from iip.application.ports import CredentialLeaseRequest
 from iip.bootstrap import build_runtime_from_env
@@ -347,15 +348,20 @@ class CredentialBrokerCompositionTests(unittest.TestCase):
                 "IIP_KUBERNETES_EVENTS_INTEGRATIONS_JSON": json.dumps(
                     kubernetes_integrations()
                 ),
+                "IIP_TELEMETRY_LOGS_BACKEND": "loki",
+                "IIP_LOKI_INTEGRATIONS_JSON": json.dumps(loki_integrations()),
             }
             with patch.dict(os.environ, environment, clear=True):
                 runtime = build_runtime_from_env()
 
         telemetry = runtime.evidence._providers["telemetry-query"]._backend
         events = runtime.evidence._providers["kubernetes-events"]._backend
+        logs = runtime.evidence._providers["log-query"]._backend
         self.assertIsInstance(telemetry, PrometheusTelemetryMetricsBackend)
         self.assertIsInstance(events, KubernetesApiEventsBackend)
+        self.assertIsInstance(logs, LokiTelemetryLogsBackend)
         self.assertIs(telemetry._credentials, events._credentials)
+        self.assertIs(telemetry._credentials, logs._credentials)
         self.assertIsInstance(telemetry._credentials, ExternalHttpCredentialBroker)
         runtime.close()
 
@@ -421,6 +427,34 @@ def kubernetes_integrations() -> dict:
                 "maxPages": 5,
                 "conditionMappings": {},
                 "enabled": True,
+            }
+        ]
+    }
+
+
+def loki_integrations() -> dict:
+    return {
+        "integrations": [
+            {
+                "tenantId": "local",
+                "integrationId": "loki-local",
+                "provider": "loki",
+                "endpoint": "https://loki.example",
+                "credentialRef": "credential://loki/local/log-reader",
+                "organizationId": "local",
+                "enabled": True,
+                "requestTimeoutSeconds": 10,
+                "maxResponseBytes": 1048576,
+                "labels": {
+                    "resourceUid": "resource_uid",
+                    "service": "service_name",
+                    "severity": "level",
+                    "traceId": None,
+                    "spanId": None,
+                    "attributes": {},
+                },
+                "services": {"api": "api"},
+                "severities": {"error": "ERROR"},
             }
         ]
     }

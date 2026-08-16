@@ -30,6 +30,8 @@ The deterministic runtime selects generally applicable candidates and candidates
 
 A root-cause-scoped candidate may declare an `interpretation`. The rule fixes a statistic (`minimum`, `maximum`, or `mean`), exact unit, comparison operator (`lt`, `lte`, `gt`, or `gte`), finite threshold, and distinct matched/unmatched dispositions before collection. Both dispositions come from `supports`, `contradicts`, and `neutral`. A rule without `rootCauseClasses`, a constant disposition, a non-finite threshold, or a control-bearing unit is invalid. The application performs no unit conversion.
 
+Alternatively, a root-cause-scoped candidate may declare `baselineComparison`; a selection cannot declare both rule forms. It fixes the same statistic, unit, operator, threshold, and dispositions plus ordered baseline/evaluation time ranges and either `difference` or `ratio`. Both ranges are subranges of the inherited investigation scope and must satisfy `scope.start <= baseline.start < baseline.end < evaluation.start < evaluation.end <= scope.end`. This is still one query over the investigation scope and one immutable artifact, not two hidden backend calls.
+
 Application validation requires the scope start to precede its end. It also rejects resource references outside the authenticated tenant and budget values above tenant policy. `propose` permits structured recommendations or future action proposals but no side effect, approval, or execution.
 
 ## Investigation report
@@ -58,7 +60,9 @@ Reports carry references, summaries, and hashes—not raw logs, metrics, traces,
 
 Selected metric results join the report-level evidence set and remain independently immutable. A result is never cited merely because a query returned data. When a selection declares an interpretation, the runtime reads the committed artifact through the tenant-scoped Evidence store and evaluates only a `complete` normalized result whose logical metric, exact unit, and finite points match the declaration. All returned series are flattened for the declared statistic.
 
-`telemetryAssessments` records the rule and result. `supporting` and `contradicting` assessments cite their Evidence ID on the matching hypothesis; `neutral`, `no-data`, and `incomplete` assessments remain visible without becoming hypothesis citations. No-data and incomplete assessments omit `observedValue`. A corrupt, missing, mismatched, or unreadable artifact becomes a stable evidence gap without exposing stored content or provider errors.
+`telemetryAssessments` records the rule and result. `supporting` and `contradicting` assessments cite their Evidence ID on the matching hypothesis; `neutral`, `no-data`, and `incomplete` assessments remain visible without becoming hypothesis citations. Threshold no-data and incomplete assessments omit `observedValue`. Baseline assessments are identified by `assessmentType: baseline-comparison`; complete assessments include the two window values and derived comparison value, while no-data and incomplete assessments omit all three. A corrupt, missing, mismatched, or unreadable artifact becomes a stable evidence gap without exposing stored content or provider errors.
+
+For a baseline assessment, the runtime splits only the finite points already present in the committed artifact. It applies the declared statistic independently to each inclusive window. `difference` is `evaluationValue - baselineValue` and retains the declared metric unit. `ratio` is `evaluationValue / baselineValue` and has comparison unit `1`; a zero baseline denominator is `incomplete`. Missing points in either window, partial provider output, and non-finite calculations are also `incomplete`. There is no interpolation, carry-forward, implicit extra query, or automatic unit conversion.
 
 In the deterministic reference runtime, metric assessment does not reclassify the resource-derived root cause or silently change confidence, rank, or terminal outcome. Contradicting evidence remains explicit for a later evaluator or human reviewer.
 
@@ -78,5 +82,6 @@ In addition to JSON Schema validation:
 - timestamps must satisfy `requestedAt <= startedAt <= completedAt <= createdAt`;
 - every citation must belong to the report evidence set and authenticated tenant;
 - every telemetry assessment must reference report Evidence and the selected root-cause class;
+- baseline and evaluation windows must be ordered, non-overlapping subranges of the request scope, and a reported comparison must match its declared calculation and unit;
 - selected tools and authority must remain within all applicable upper bounds; and
 - usage counters must be checked against the accepted budgets and any stricter policy limits.

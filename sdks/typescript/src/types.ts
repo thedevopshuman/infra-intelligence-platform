@@ -438,11 +438,24 @@ export interface InvestigationTelemetrySelection {
   query: TelemetryMetricQuery;
   limits: TelemetryEvidenceLimits;
   interpretation?: InvestigationTelemetryInterpretation;
+  baselineComparison?: InvestigationTelemetryBaselineComparison;
 }
 
 export interface InvestigationTelemetryInterpretation {
   statistic: "minimum" | "maximum" | "mean";
   unit: string;
+  operator: "lt" | "lte" | "gt" | "gte";
+  threshold: number;
+  whenMatched: "supports" | "contradicts" | "neutral";
+  whenNotMatched: "supports" | "contradicts" | "neutral";
+}
+
+export interface InvestigationTelemetryBaselineComparison {
+  statistic: "minimum" | "maximum" | "mean";
+  unit: string;
+  baselineTimeRange: { start: string; end: string };
+  evaluationTimeRange: { start: string; end: string };
+  calculation: "difference" | "ratio";
   operator: "lt" | "lte" | "gt" | "gte";
   threshold: number;
   whenMatched: "supports" | "contradicts" | "neutral";
@@ -524,6 +537,31 @@ export interface InvestigationTelemetryAssessment {
     | "incomplete";
 }
 
+export interface InvestigationTelemetryBaselineAssessment {
+  assessmentType: "baseline-comparison";
+  selectionId: `tqs_${string}`;
+  evidenceId: EvidenceId;
+  rootCauseClass: string;
+  metric: string;
+  statistic: "minimum" | "maximum" | "mean";
+  unit: string;
+  baselineTimeRange: { start: string; end: string };
+  evaluationTimeRange: { start: string; end: string };
+  calculation: "difference" | "ratio";
+  comparisonUnit: string;
+  operator: "lt" | "lte" | "gt" | "gte";
+  threshold: number;
+  baselineValue?: number;
+  evaluationValue?: number;
+  comparisonValue?: number;
+  disposition:
+    | "supporting"
+    | "contradicting"
+    | "neutral"
+    | "no-data"
+    | "incomplete";
+}
+
 export interface InvestigationReport {
   apiVersion: "iip.platform/v1alpha1";
   kind: "InvestigationReport";
@@ -556,7 +594,10 @@ export interface InvestigationReport {
     summary: string;
     hypotheses: InvestigationHypothesis[];
     unknowns: InvestigationUnknown[];
-    telemetryAssessments?: InvestigationTelemetryAssessment[];
+    telemetryAssessments?: (
+      | InvestigationTelemetryAssessment
+      | InvestigationTelemetryBaselineAssessment
+    )[];
     evidenceIds: EvidenceId[];
     recommendations: InvestigationRecommendation[];
     toolCallLedgerRef: string;

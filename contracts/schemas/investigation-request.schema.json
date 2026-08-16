@@ -125,12 +125,22 @@
         },
         "interpretation": {
           "$ref": "#/$defs/telemetryInterpretation"
+        },
+        "baselineComparison": {
+          "$ref": "#/$defs/telemetryBaselineComparison"
         }
       },
       "allOf": [
         {
           "if": {"required": ["interpretation"]},
           "then": {"required": ["rootCauseClasses"]}
+        },
+        {
+          "if": {"required": ["baselineComparison"]},
+          "then": {"required": ["rootCauseClasses"]}
+        },
+        {
+          "not": {"required": ["interpretation", "baselineComparison"]}
         }
       ]
     },
@@ -169,6 +179,61 @@
           "type": "string",
           "enum": ["supports", "contradicts", "neutral"]
         }
+      }
+    },
+    "telemetryBaselineComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statistic",
+        "unit",
+        "baselineTimeRange",
+        "evaluationTimeRange",
+        "calculation",
+        "operator",
+        "threshold",
+        "whenMatched",
+        "whenNotMatched"
+      ],
+      "properties": {
+        "statistic": {
+          "type": "string",
+          "enum": ["minimum", "maximum", "mean"]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        },
+        "baselineTimeRange": {"$ref": "#/$defs/assessmentTimeRange"},
+        "evaluationTimeRange": {"$ref": "#/$defs/assessmentTimeRange"},
+        "calculation": {
+          "type": "string",
+          "enum": ["difference", "ratio"]
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["lt", "lte", "gt", "gte"]
+        },
+        "threshold": {"type": "number"},
+        "whenMatched": {
+          "type": "string",
+          "enum": ["supports", "contradicts", "neutral"]
+        },
+        "whenNotMatched": {
+          "type": "string",
+          "enum": ["supports", "contradicts", "neutral"]
+        }
+      }
+    },
+    "assessmentTimeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"}
       }
     },
     "budgets": {

@@ -210,7 +210,7 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         errors = self.validate("investigation-report.schema.json", report)
 
-        self.assertTrue(any("observedValue" in error for error in errors))
+        self.assertTrue(errors)
 
     def test_no_data_assessment_rejects_observed_value(self) -> None:
         report = document(
@@ -220,7 +220,54 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         errors = self.validate("investigation-report.schema.json", report)
 
-        self.assertTrue(any("observedValue" in error for error in errors))
+        self.assertTrue(errors)
+
+    def test_investigation_selection_rejects_ambiguous_assessment_rules(self) -> None:
+        request = document(
+            "contracts/examples/investigation-request-telemetry-baseline.json"
+        )
+        request["spec"]["telemetrySelections"][0]["interpretation"] = {
+            "statistic": "mean",
+            "unit": "1",
+            "operator": "gte",
+            "threshold": 0.05,
+            "whenMatched": "supports",
+            "whenNotMatched": "contradicts",
+        }
+
+        errors = self.validate("investigation-request.schema.json", request)
+
+        self.assertTrue(errors)
+
+    def test_baseline_data_assessment_requires_all_derived_values(self) -> None:
+        report = document(
+            "contracts/examples/investigation-report-telemetry-baseline.json"
+        )
+        del report["spec"]["telemetryAssessments"][0]["comparisonValue"]
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(errors)
+
+    def test_baseline_incomplete_assessment_rejects_derived_values(self) -> None:
+        report = document(
+            "contracts/examples/investigation-report-telemetry-baseline.json"
+        )
+        report["spec"]["telemetryAssessments"][0]["disposition"] = "incomplete"
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(errors)
+
+    def test_baseline_ratio_requires_dimensionless_comparison_unit(self) -> None:
+        report = document(
+            "contracts/examples/investigation-report-telemetry-baseline.json"
+        )
+        report["spec"]["telemetryAssessments"][0]["comparisonUnit"] = "percent"
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(errors)
 
     def test_no_data_telemetry_result_cannot_contain_series(self) -> None:
         result = document("contracts/examples/telemetry-evidence-result.json")

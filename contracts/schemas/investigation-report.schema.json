@@ -216,6 +216,12 @@
       }
     },
     "telemetryAssessment": {
+      "oneOf": [
+        {"$ref": "#/$defs/telemetryThresholdAssessment"},
+        {"$ref": "#/$defs/telemetryBaselineAssessment"}
+      ]
+    },
+    "telemetryThresholdAssessment": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -280,6 +286,119 @@
           "else": {"not": {"required": ["observedValue"]}}
         }
       ]
+    },
+    "telemetryBaselineAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assessmentType",
+        "selectionId",
+        "evidenceId",
+        "rootCauseClass",
+        "metric",
+        "statistic",
+        "unit",
+        "baselineTimeRange",
+        "evaluationTimeRange",
+        "calculation",
+        "comparisonUnit",
+        "operator",
+        "threshold",
+        "disposition"
+      ],
+      "properties": {
+        "assessmentType": {"const": "baseline-comparison"},
+        "selectionId": {"type": "string", "pattern": "^tqs_[a-f0-9]{16}$"},
+        "evidenceId": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"},
+        "rootCauseClass": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._/-]{2,127}$"
+        },
+        "metric": {
+          "type": "string",
+          "pattern": "^[A-Za-z_:][A-Za-z0-9_.:/-]{0,255}$"
+        },
+        "statistic": {
+          "type": "string",
+          "enum": ["minimum", "maximum", "mean"]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        },
+        "baselineTimeRange": {"$ref": "#/$defs/assessmentTimeRange"},
+        "evaluationTimeRange": {"$ref": "#/$defs/assessmentTimeRange"},
+        "calculation": {
+          "type": "string",
+          "enum": ["difference", "ratio"]
+        },
+        "comparisonUnit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["lt", "lte", "gt", "gte"]
+        },
+        "threshold": {"type": "number"},
+        "baselineValue": {"type": "number"},
+        "evaluationValue": {"type": "number"},
+        "comparisonValue": {"type": "number"},
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "supporting",
+            "contradicting",
+            "neutral",
+            "no-data",
+            "incomplete"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": ["supporting", "contradicting", "neutral"]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "baselineValue",
+              "evaluationValue",
+              "comparisonValue"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {"required": ["baselineValue"]},
+                {"required": ["evaluationValue"]},
+                {"required": ["comparisonValue"]}
+              ]
+            }
+          }
+        },
+        {
+          "if": {"properties": {"calculation": {"const": "ratio"}}},
+          "then": {"properties": {"comparisonUnit": {"const": "1"}}}
+        }
+      ]
+    },
+    "assessmentTimeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"}
+      }
     },
     "recommendation": {
       "type": "object",

@@ -88,7 +88,16 @@ def wait_for_up(
             )
         )
         if result.status == "complete":
-            return result
+            prometheus = next(
+                (
+                    series
+                    for series in result.series
+                    if ("service.name", "prometheus") in series.attributes
+                ),
+                None,
+            )
+            if prometheus is not None and len(prometheus.points) >= 6:
+                return result
         time.sleep(0.25)
     assert result is not None
     return result
@@ -143,7 +152,7 @@ class PrometheusIntegrationTests(unittest.TestCase):
                 "scope": {
                     "resourceUids": [stored.identity.uid],
                     "timeRange": {
-                        "start": iso(now - timedelta(seconds=15)),
+                        "start": iso(now - timedelta(seconds=10)),
                         "end": iso(now),
                     },
                 },
@@ -173,9 +182,18 @@ class PrometheusIntegrationTests(unittest.TestCase):
                             "maxDataPoints": 100,
                             "maxBytes": 1048576,
                         },
-                        "interpretation": {
-                            "statistic": "minimum",
+                        "baselineComparison": {
+                            "statistic": "mean",
                             "unit": "1",
+                            "baselineTimeRange": {
+                                "start": iso(now - timedelta(seconds=5)),
+                                "end": iso(now - timedelta(seconds=3)),
+                            },
+                            "evaluationTimeRange": {
+                                "start": iso(now - timedelta(seconds=2)),
+                                "end": iso(now),
+                            },
+                            "calculation": "ratio",
                             "operator": "gte",
                             "threshold": 1,
                             "whenMatched": "supports",
@@ -203,7 +221,11 @@ class PrometheusIntegrationTests(unittest.TestCase):
         self.assertEqual(report["spec"]["usage"]["toolCalls"], 2)
         self.assertEqual(report["spec"]["usage"]["evidenceItems"], 2)
         assessment = report["spec"]["telemetryAssessments"][0]
-        self.assertEqual(assessment["observedValue"], 1)
+        self.assertEqual(assessment["assessmentType"], "baseline-comparison")
+        self.assertEqual(assessment["baselineValue"], 1)
+        self.assertEqual(assessment["evaluationValue"], 1)
+        self.assertEqual(assessment["comparisonValue"], 1)
+        self.assertEqual(assessment["comparisonUnit"], "1")
         self.assertEqual(assessment["disposition"], "supporting")
         self.assertIn(
             assessment["evidenceId"],

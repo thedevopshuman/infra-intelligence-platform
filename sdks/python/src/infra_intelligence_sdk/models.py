@@ -379,6 +379,83 @@ class InvestigationTelemetryInterpretation:
 
 
 @dataclass(frozen=True)
+class InvestigationTelemetryBaselineComparison:
+    """Declared comparison between two subranges of investigation scope."""
+
+    statistic: str
+    unit: str
+    baseline_time_range: Mapping[str, str]
+    evaluation_time_range: Mapping[str, str]
+    calculation: str
+    operator: str
+    threshold: float
+    when_matched: str
+    when_not_matched: str
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationTelemetryBaselineComparison":
+        baseline = payload.get("baselineTimeRange")
+        evaluation = payload.get("evaluationTimeRange")
+        threshold = payload.get("threshold")
+        if payload.get("statistic") not in ("minimum", "maximum", "mean"):
+            raise ValueError("investigation telemetry baseline statistic is invalid")
+        if not isinstance(payload.get("unit"), str) or not payload["unit"]:
+            raise ValueError("investigation telemetry baseline unit is invalid")
+        if not isinstance(baseline, Mapping) or not isinstance(evaluation, Mapping):
+            raise ValueError("investigation telemetry baseline windows are invalid")
+        if any(
+            set(window) != {"start", "end"}
+            or any(not isinstance(window.get(field), str) for field in ("start", "end"))
+            for window in (baseline, evaluation)
+        ):
+            raise ValueError("investigation telemetry baseline windows are invalid")
+        if payload.get("calculation") not in ("difference", "ratio"):
+            raise ValueError("investigation telemetry baseline calculation is invalid")
+        if payload.get("operator") not in ("lt", "lte", "gt", "gte"):
+            raise ValueError("investigation telemetry baseline operator is invalid")
+        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
+            raise ValueError("investigation telemetry baseline threshold is invalid")
+        try:
+            threshold_is_finite = math.isfinite(float(threshold))
+        except (OverflowError, ValueError):
+            threshold_is_finite = False
+        dispositions = ("supports", "contradicts", "neutral")
+        if (
+            not threshold_is_finite
+            or payload.get("whenMatched") not in dispositions
+            or payload.get("whenNotMatched") not in dispositions
+            or payload.get("whenMatched") == payload.get("whenNotMatched")
+        ):
+            raise ValueError("investigation telemetry baseline disposition is invalid")
+        return cls(
+            statistic=payload["statistic"],
+            unit=payload["unit"],
+            baseline_time_range=dict(baseline),
+            evaluation_time_range=dict(evaluation),
+            calculation=payload["calculation"],
+            operator=payload["operator"],
+            threshold=float(threshold),
+            when_matched=payload["whenMatched"],
+            when_not_matched=payload["whenNotMatched"],
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "statistic": self.statistic,
+            "unit": self.unit,
+            "baselineTimeRange": dict(self.baseline_time_range),
+            "evaluationTimeRange": dict(self.evaluation_time_range),
+            "calculation": self.calculation,
+            "operator": self.operator,
+            "threshold": self.threshold,
+            "whenMatched": self.when_matched,
+            "whenNotMatched": self.when_not_matched,
+        }
+
+
+@dataclass(frozen=True)
 class InvestigationTelemetrySelection:
     """Provider-neutral metric candidate bounded by an investigation request."""
 
@@ -388,6 +465,7 @@ class InvestigationTelemetrySelection:
     limits: Mapping[str, Any]
     root_cause_classes: tuple[str, ...] = ()
     interpretation: Optional[InvestigationTelemetryInterpretation] = None
+    baseline_comparison: Optional[InvestigationTelemetryBaselineComparison] = None
 
     @classmethod
     def from_dict(
@@ -399,6 +477,7 @@ class InvestigationTelemetrySelection:
         limits = payload.get("limits")
         classes = payload.get("rootCauseClasses", [])
         interpretation = payload.get("interpretation")
+        baseline_comparison = payload.get("baselineComparison")
         if not isinstance(selection_id, str) or not selection_id.startswith("tqs_"):
             raise ValueError("investigation telemetry selection id is invalid")
         if not isinstance(integration_id, str) or not integration_id:
@@ -411,6 +490,18 @@ class InvestigationTelemetrySelection:
             raise ValueError("investigation telemetry rootCauseClasses are invalid")
         if interpretation is not None and not isinstance(interpretation, Mapping):
             raise ValueError("investigation telemetry interpretation is invalid")
+        if baseline_comparison is not None and not isinstance(
+            baseline_comparison, Mapping
+        ):
+            raise ValueError("investigation telemetry baselineComparison is invalid")
+        if interpretation is not None and baseline_comparison is not None:
+            raise ValueError("investigation telemetry assessment rule is ambiguous")
+        if (
+            interpretation is not None or baseline_comparison is not None
+        ) and not classes:
+            raise ValueError(
+                "investigation telemetry assessment rule requires rootCauseClasses"
+            )
         return cls(
             selection_id=selection_id,
             integration_id=integration_id,
@@ -420,6 +511,13 @@ class InvestigationTelemetrySelection:
             interpretation=(
                 InvestigationTelemetryInterpretation.from_dict(interpretation)
                 if isinstance(interpretation, Mapping)
+                else None
+            ),
+            baseline_comparison=(
+                InvestigationTelemetryBaselineComparison.from_dict(
+                    baseline_comparison
+                )
+                if isinstance(baseline_comparison, Mapping)
                 else None
             ),
         )
@@ -435,6 +533,8 @@ class InvestigationTelemetrySelection:
             result["rootCauseClasses"] = list(self.root_cause_classes)
         if self.interpretation is not None:
             result["interpretation"] = self.interpretation.to_dict()
+        if self.baseline_comparison is not None:
+            result["baselineComparison"] = self.baseline_comparison.to_dict()
         return result
 
 
@@ -524,6 +624,156 @@ class InvestigationTelemetryAssessment:
 
 
 @dataclass(frozen=True)
+class InvestigationTelemetryBaselineAssessment:
+    """Auditable baseline comparison evaluated from one stored metric artifact."""
+
+    selection_id: str
+    evidence_id: str
+    root_cause_class: str
+    metric: str
+    statistic: str
+    unit: str
+    baseline_time_range: Mapping[str, str]
+    evaluation_time_range: Mapping[str, str]
+    calculation: str
+    comparison_unit: str
+    operator: str
+    threshold: float
+    disposition: str
+    baseline_value: Optional[float] = None
+    evaluation_value: Optional[float] = None
+    comparison_value: Optional[float] = None
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationTelemetryBaselineAssessment":
+        if payload.get("assessmentType") != "baseline-comparison":
+            raise ValueError("investigation telemetry baseline assessment is invalid")
+        required_strings = (
+            "selectionId",
+            "evidenceId",
+            "rootCauseClass",
+            "metric",
+            "statistic",
+            "unit",
+            "calculation",
+            "comparisonUnit",
+            "operator",
+            "disposition",
+        )
+        if any(
+            not isinstance(payload.get(field), str) for field in required_strings
+        ):
+            raise ValueError("investigation telemetry baseline assessment is incomplete")
+        baseline_range = payload.get("baselineTimeRange")
+        evaluation_range = payload.get("evaluationTimeRange")
+        threshold = payload.get("threshold")
+        if (
+            not isinstance(baseline_range, Mapping)
+            or not isinstance(evaluation_range, Mapping)
+            or isinstance(threshold, bool)
+            or not isinstance(threshold, (int, float))
+        ):
+            raise ValueError("investigation telemetry baseline assessment is invalid")
+        if (
+            payload["statistic"] not in ("minimum", "maximum", "mean")
+            or payload["calculation"] not in ("difference", "ratio")
+            or payload["operator"] not in ("lt", "lte", "gt", "gte")
+            or (
+                payload["calculation"] == "ratio"
+                and payload["comparisonUnit"] != "1"
+            )
+            or any(
+                set(window) != {"start", "end"}
+                or any(
+                    not isinstance(window.get(field), str)
+                    for field in ("start", "end")
+                )
+                for window in (baseline_range, evaluation_range)
+            )
+        ):
+            raise ValueError("investigation telemetry baseline assessment is invalid")
+        disposition = payload["disposition"]
+        values = (
+            payload.get("baselineValue"),
+            payload.get("evaluationValue"),
+            payload.get("comparisonValue"),
+        )
+        data_dispositions = ("supporting", "contradicting", "neutral")
+        empty_dispositions = ("no-data", "incomplete")
+        if (
+            disposition not in data_dispositions + empty_dispositions
+            or (disposition in data_dispositions and any(value is None for value in values))
+            or (disposition in empty_dispositions and any(value is not None for value in values))
+        ):
+            raise ValueError("investigation telemetry baseline values are invalid")
+        numeric_values = (threshold,) + values
+        try:
+            values_are_finite = all(
+                value is None or (
+                    not isinstance(value, bool)
+                    and isinstance(value, (int, float))
+                    and math.isfinite(float(value))
+                )
+                for value in numeric_values
+            )
+        except (OverflowError, ValueError):
+            values_are_finite = False
+        if not values_are_finite:
+            raise ValueError("investigation telemetry baseline values are invalid")
+        return cls(
+            selection_id=payload["selectionId"],
+            evidence_id=payload["evidenceId"],
+            root_cause_class=payload["rootCauseClass"],
+            metric=payload["metric"],
+            statistic=payload["statistic"],
+            unit=payload["unit"],
+            baseline_time_range=dict(baseline_range),
+            evaluation_time_range=dict(evaluation_range),
+            calculation=payload["calculation"],
+            comparison_unit=payload["comparisonUnit"],
+            operator=payload["operator"],
+            threshold=float(threshold),
+            disposition=disposition,
+            baseline_value=(
+                float(values[0]) if values[0] is not None else None
+            ),
+            evaluation_value=(
+                float(values[1]) if values[1] is not None else None
+            ),
+            comparison_value=(
+                float(values[2]) if values[2] is not None else None
+            ),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "assessmentType": "baseline-comparison",
+            "selectionId": self.selection_id,
+            "evidenceId": self.evidence_id,
+            "rootCauseClass": self.root_cause_class,
+            "metric": self.metric,
+            "statistic": self.statistic,
+            "unit": self.unit,
+            "baselineTimeRange": dict(self.baseline_time_range),
+            "evaluationTimeRange": dict(self.evaluation_time_range),
+            "calculation": self.calculation,
+            "comparisonUnit": self.comparison_unit,
+            "operator": self.operator,
+            "threshold": self.threshold,
+            "disposition": self.disposition,
+        }
+        if self.baseline_value is not None:
+            result["baselineValue"] = self.baseline_value
+        if self.evaluation_value is not None:
+            result["evaluationValue"] = self.evaluation_value
+        if self.comparison_value is not None:
+            result["comparisonValue"] = self.comparison_value
+        return result
+
+
+@dataclass(frozen=True)
 class InvestigationRequest:
     """Bounded, tenant- and actor-scoped investigation input."""
 
@@ -586,7 +836,12 @@ class InvestigationReport:
         return dict(self.payload)
 
     @property
-    def telemetry_assessments(self) -> tuple[InvestigationTelemetryAssessment, ...]:
+    def telemetry_assessments(
+        self,
+    ) -> tuple[
+        InvestigationTelemetryAssessment | InvestigationTelemetryBaselineAssessment,
+        ...,
+    ]:
         """Return structured interpretations without importing server classes."""
 
         spec = self.payload.get("spec")
@@ -596,7 +851,9 @@ class InvestigationReport:
         ):
             raise ValueError("investigation telemetryAssessments must be an array")
         return tuple(
-            InvestigationTelemetryAssessment.from_dict(value)
+            InvestigationTelemetryBaselineAssessment.from_dict(value)
+            if value.get("assessmentType") == "baseline-comparison"
+            else InvestigationTelemetryAssessment.from_dict(value)
             for value in values
         )
 

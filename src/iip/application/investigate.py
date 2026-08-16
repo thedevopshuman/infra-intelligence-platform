@@ -198,7 +198,10 @@ class DeterministicInvestigationService:
                     continue
                 evidence_documents.append(telemetry_evidence)
                 interpretation = selection.get("interpretation")
-                if isinstance(interpretation, Mapping):
+                baseline_comparison = selection.get("baselineComparison")
+                if isinstance(interpretation, Mapping) or isinstance(
+                    baseline_comparison, Mapping
+                ):
                     assessment = self._assess_telemetry(
                         command.actor,
                         selection,
@@ -426,10 +429,16 @@ class DeterministicInvestigationService:
         telemetry_request: Mapping[str, object],
     ) -> dict[str, object] | None:
         interpretation = selection.get("interpretation")
+        baseline_comparison = selection.get("baselineComparison")
+        rule = (
+            interpretation
+            if isinstance(interpretation, Mapping)
+            else baseline_comparison
+        )
         if (
             self._evidence_store is None
             or root_cause is None
-            or not isinstance(interpretation, Mapping)
+            or not isinstance(rule, Mapping)
         ):
             return None
         try:
@@ -477,16 +486,43 @@ class DeterministicInvestigationService:
         status = artifact_spec.get("status")
         if status not in {"complete", "partial", "no-data"}:
             return None
-        assessment: dict[str, object] = {
-            "selectionId": selection["id"],
-            "evidenceId": evidence_id,
-            "rootCauseClass": root_cause,
-            "metric": query["metric"],
-            "statistic": interpretation["statistic"],
-            "unit": interpretation["unit"],
-            "operator": interpretation["operator"],
-            "threshold": interpretation["threshold"],
-        }
+        if isinstance(baseline_comparison, Mapping):
+            assessment: dict[str, object] = {
+                "assessmentType": "baseline-comparison",
+                "selectionId": selection["id"],
+                "evidenceId": evidence_id,
+                "rootCauseClass": root_cause,
+                "metric": query["metric"],
+                "statistic": baseline_comparison["statistic"],
+                "unit": baseline_comparison["unit"],
+                "baselineTimeRange": dict(
+                    baseline_comparison["baselineTimeRange"]
+                ),
+                "evaluationTimeRange": dict(
+                    baseline_comparison["evaluationTimeRange"]
+                ),
+                "calculation": baseline_comparison["calculation"],
+                "comparisonUnit": (
+                    "1"
+                    if baseline_comparison["calculation"] == "ratio"
+                    else baseline_comparison["unit"]
+                ),
+                "operator": baseline_comparison["operator"],
+                "threshold": baseline_comparison["threshold"],
+            }
+        elif isinstance(interpretation, Mapping):
+            assessment = {
+                "selectionId": selection["id"],
+                "evidenceId": evidence_id,
+                "rootCauseClass": root_cause,
+                "metric": query["metric"],
+                "statistic": interpretation["statistic"],
+                "unit": interpretation["unit"],
+                "operator": interpretation["operator"],
+                "threshold": interpretation["threshold"],
+            }
+        else:
+            return None
         if status == "no-data":
             assessment["disposition"] = "no-data"
             return assessment
@@ -494,15 +530,68 @@ class DeterministicInvestigationService:
             assessment["disposition"] = "incomplete"
             return assessment
 
-        series = artifact_spec.get("series")
-        if not isinstance(series, list) or not series:
+        points = self._metric_points(
+            artifact_spec,
+            query["metric"],
+            rule["unit"],
+            request_spec.get("timeRange"),
+        )
+        if points is None:
             return None
-        values: list[float] = []
+        if isinstance(baseline_comparison, Mapping):
+            return self._baseline_assessment(
+                assessment,
+                points,
+                baseline_comparison,
+            )
+        if not isinstance(interpretation, Mapping):
+            return None
+        observed_value = self._statistic(
+            [value for _, value in points], interpretation["statistic"]
+        )
+        if observed_value is None:
+            return None
+        matched = self._compare(
+            observed_value,
+            float(interpretation["threshold"]),
+            interpretation["operator"],
+        )
+        configured = interpretation[
+            "whenMatched" if matched else "whenNotMatched"
+        ]
+        assessment["observedValue"] = observed_value
+        assessment["disposition"] = self._assessment_disposition(configured)
+        return assessment
+
+    @staticmethod
+    def _metric_points(
+        artifact_spec: Mapping[str, object],
+        metric: object,
+        unit: object,
+        time_range: object,
+    ) -> list[tuple[datetime, float]] | None:
+        if not isinstance(time_range, Mapping):
+            return None
+        range_start = DeterministicInvestigationService._parse_datetime(
+            time_range.get("start")
+        )
+        range_end = DeterministicInvestigationService._parse_datetime(
+            time_range.get("end")
+        )
+        series = artifact_spec.get("series")
+        if (
+            range_start is None
+            or range_end is None
+            or not isinstance(series, list)
+            or not series
+        ):
+            return None
+        values: list[tuple[datetime, float]] = []
         for item in series:
             if (
                 not isinstance(item, Mapping)
-                or item.get("metric") != query["metric"]
-                or item.get("unit") != interpretation["unit"]
+                or item.get("metric") != metric
+                or item.get("unit") != unit
                 or not isinstance(item.get("points"), list)
                 or not item["points"]
             ):
@@ -510,8 +599,16 @@ class DeterministicInvestigationService:
             for point in item["points"]:
                 if not isinstance(point, Mapping):
                     return None
+                timestamp = DeterministicInvestigationService._parse_datetime(
+                    point.get("timestamp")
+                )
                 value = point.get("value")
-                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                if (
+                    timestamp is None
+                    or not range_start <= timestamp <= range_end
+                    or isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                ):
                     return None
                 try:
                     normalized_value = float(value)
@@ -519,39 +616,145 @@ class DeterministicInvestigationService:
                     return None
                 if not math.isfinite(normalized_value):
                     return None
-                values.append(normalized_value)
-        if not values:
-            return None
-        statistic = interpretation["statistic"]
+                values.append((timestamp, normalized_value))
+        return values or None
+
+    @staticmethod
+    def _baseline_assessment(
+        assessment: dict[str, object],
+        points: list[tuple[datetime, float]],
+        comparison: Mapping[str, object],
+    ) -> dict[str, object]:
+        baseline_range = comparison["baselineTimeRange"]
+        evaluation_range = comparison["evaluationTimeRange"]
+        if not isinstance(baseline_range, Mapping) or not isinstance(
+            evaluation_range, Mapping
+        ):
+            assessment["disposition"] = "incomplete"
+            return assessment
+        baseline_start = DeterministicInvestigationService._parse_datetime(
+            baseline_range.get("start")
+        )
+        baseline_end = DeterministicInvestigationService._parse_datetime(
+            baseline_range.get("end")
+        )
+        evaluation_start = DeterministicInvestigationService._parse_datetime(
+            evaluation_range.get("start")
+        )
+        evaluation_end = DeterministicInvestigationService._parse_datetime(
+            evaluation_range.get("end")
+        )
+        if any(
+            value is None
+            for value in (
+                baseline_start,
+                baseline_end,
+                evaluation_start,
+                evaluation_end,
+            )
+        ):
+            assessment["disposition"] = "incomplete"
+            return assessment
+        baseline_values = [
+            value
+            for timestamp, value in points
+            if baseline_start <= timestamp <= baseline_end
+        ]
+        evaluation_values = [
+            value
+            for timestamp, value in points
+            if evaluation_start <= timestamp <= evaluation_end
+        ]
+        statistic = comparison["statistic"]
+        baseline_value = DeterministicInvestigationService._statistic(
+            baseline_values, statistic
+        )
+        evaluation_value = DeterministicInvestigationService._statistic(
+            evaluation_values, statistic
+        )
+        if baseline_value is None or evaluation_value is None:
+            assessment["disposition"] = "incomplete"
+            return assessment
+        calculation = comparison["calculation"]
         try:
-            if statistic == "minimum":
-                observed_value = min(values)
-            elif statistic == "maximum":
-                observed_value = max(values)
+            if calculation == "difference":
+                comparison_value = evaluation_value - baseline_value
+            elif baseline_value != 0:
+                comparison_value = evaluation_value / baseline_value
             else:
-                observed_value = math.fsum(values) / len(values)
+                assessment["disposition"] = "incomplete"
+                return assessment
         except (OverflowError, ValueError):
-            return None
-        if not math.isfinite(observed_value):
-            return None
-        threshold = float(interpretation["threshold"])
-        operator = interpretation["operator"]
-        matched = {
-            "lt": observed_value < threshold,
-            "lte": observed_value <= threshold,
-            "gt": observed_value > threshold,
-            "gte": observed_value >= threshold,
-        }[operator]
-        configured = interpretation[
+            assessment["disposition"] = "incomplete"
+            return assessment
+        if not math.isfinite(comparison_value):
+            assessment["disposition"] = "incomplete"
+            return assessment
+        matched = DeterministicInvestigationService._compare(
+            comparison_value,
+            float(comparison["threshold"]),
+            comparison["operator"],
+        )
+        configured = comparison[
             "whenMatched" if matched else "whenNotMatched"
         ]
-        assessment["observedValue"] = observed_value
-        assessment["disposition"] = {
+        assessment.update(
+            {
+                "baselineValue": baseline_value,
+                "evaluationValue": evaluation_value,
+                "comparisonValue": comparison_value,
+                "disposition": DeterministicInvestigationService._assessment_disposition(
+                    configured
+                ),
+            }
+        )
+        return assessment
+
+    @staticmethod
+    def _statistic(values: list[float], statistic: object) -> float | None:
+        if not values:
+            return None
+        try:
+            if statistic == "minimum":
+                result = min(values)
+            elif statistic == "maximum":
+                result = max(values)
+            elif statistic == "mean":
+                result = math.fsum(values) / len(values)
+            else:
+                return None
+        except (OverflowError, ValueError):
+            return None
+        return result if math.isfinite(result) else None
+
+    @staticmethod
+    def _compare(value: float, threshold: float, operator: object) -> bool:
+        return {
+            "lt": value < threshold,
+            "lte": value <= threshold,
+            "gt": value > threshold,
+            "gte": value >= threshold,
+        }[operator]
+
+    @staticmethod
+    def _assessment_disposition(configured: object) -> str:
+        return {
             "supports": "supporting",
             "contradicts": "contradicting",
             "neutral": "neutral",
         }[configured]
-        return assessment
+
+    @staticmethod
+    def _parse_datetime(value: object) -> datetime | None:
+        if not isinstance(value, str):
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return None
+        return parsed
 
     @staticmethod
     def _classify(resources: tuple[object, ...]) -> tuple[str | None, str, float]:
@@ -709,6 +912,7 @@ class DeterministicInvestigationService:
                     "limits",
                     "rootCauseClasses",
                     "interpretation",
+                    "baselineComparison",
                 }
             ):
                 raise InvalidInvestigationError("investigation.contract.invalid")
@@ -744,6 +948,9 @@ class DeterministicInvestigationService:
             ):
                 raise InvalidInvestigationError("investigation.contract.invalid")
             interpretation = value.get("interpretation")
+            baseline_comparison = value.get("baselineComparison")
+            if interpretation is not None and baseline_comparison is not None:
+                raise InvalidInvestigationError("investigation.contract.invalid")
             normalized_interpretation = None
             if interpretation is not None:
                 if classes is None:
@@ -753,6 +960,19 @@ class DeterministicInvestigationService:
                 normalized_interpretation = (
                     DeterministicInvestigationService._validate_interpretation(
                         interpretation
+                    )
+                )
+            normalized_baseline_comparison = None
+            if baseline_comparison is not None:
+                if classes is None:
+                    raise InvalidInvestigationError(
+                        "investigation.contract.invalid"
+                    )
+                normalized_baseline_comparison = (
+                    DeterministicInvestigationService._validate_baseline_comparison(
+                        baseline_comparison,
+                        scope_start=start,
+                        scope_end=end,
                     )
                 )
             normalized: dict[str, object] = {
@@ -765,6 +985,8 @@ class DeterministicInvestigationService:
                 normalized["rootCauseClasses"] = list(classes)
             if normalized_interpretation is not None:
                 normalized["interpretation"] = normalized_interpretation
+            if normalized_baseline_comparison is not None:
+                normalized["baselineComparison"] = normalized_baseline_comparison
             normalized_selections.append(normalized)
             selection_ids.add(selection_id)
         spec["telemetrySelections"] = normalized_selections
@@ -806,3 +1028,89 @@ class DeterministicInvestigationService:
         ):
             raise InvalidInvestigationError("investigation.contract.invalid")
         return dict(value)
+
+    @staticmethod
+    def _validate_baseline_comparison(
+        value: object,
+        *,
+        scope_start: datetime,
+        scope_end: datetime,
+    ) -> dict[str, object]:
+        if not isinstance(value, Mapping) or set(value) != {
+            "statistic",
+            "unit",
+            "baselineTimeRange",
+            "evaluationTimeRange",
+            "calculation",
+            "operator",
+            "threshold",
+            "whenMatched",
+            "whenNotMatched",
+        }:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        statistic = value.get("statistic")
+        unit = value.get("unit")
+        calculation = value.get("calculation")
+        operator = value.get("operator")
+        threshold = value.get("threshold")
+        when_matched = value.get("whenMatched")
+        when_not_matched = value.get("whenNotMatched")
+        try:
+            threshold_is_finite = math.isfinite(float(threshold))
+        except (OverflowError, TypeError, ValueError):
+            threshold_is_finite = False
+        baseline_range, baseline_start, baseline_end = (
+            DeterministicInvestigationService._validate_assessment_range(
+                value.get("baselineTimeRange")
+            )
+        )
+        evaluation_range, evaluation_start, evaluation_end = (
+            DeterministicInvestigationService._validate_assessment_range(
+                value.get("evaluationTimeRange")
+            )
+        )
+        if (
+            statistic not in _INTERPRETATION_STATISTICS
+            or not isinstance(unit, str)
+            or not 1 <= len(unit) <= 64
+            or any(ord(character) < 32 or ord(character) == 127 for character in unit)
+            or calculation not in {"difference", "ratio"}
+            or operator not in _INTERPRETATION_OPERATORS
+            or isinstance(threshold, bool)
+            or not isinstance(threshold, (int, float))
+            or not threshold_is_finite
+            or when_matched not in _INTERPRETATION_DISPOSITIONS
+            or when_not_matched not in _INTERPRETATION_DISPOSITIONS
+            or when_matched == when_not_matched
+            or baseline_range is None
+            or evaluation_range is None
+            or baseline_start is None
+            or baseline_end is None
+            or evaluation_start is None
+            or evaluation_end is None
+            or not (
+                scope_start
+                <= baseline_start
+                < baseline_end
+                < evaluation_start
+                < evaluation_end
+                <= scope_end
+            )
+        ):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        normalized = dict(value)
+        normalized["baselineTimeRange"] = baseline_range
+        normalized["evaluationTimeRange"] = evaluation_range
+        return normalized
+
+    @staticmethod
+    def _validate_assessment_range(
+        value: object,
+    ) -> tuple[dict[str, object] | None, datetime | None, datetime | None]:
+        if not isinstance(value, Mapping) or set(value) != {"start", "end"}:
+            return None, None, None
+        start = DeterministicInvestigationService._parse_datetime(value.get("start"))
+        end = DeterministicInvestigationService._parse_datetime(value.get("end"))
+        if start is None or end is None or start >= end:
+            return None, None, None
+        return dict(value), start, end

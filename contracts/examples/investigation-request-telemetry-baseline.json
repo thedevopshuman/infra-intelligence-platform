@@ -1,0 +1,87 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationRequest",
+  "metadata": {
+    "id": "inv_ba31f96b125b4de7a06cc1e942f5d380",
+    "tenantId": "local",
+    "actorId": "developer",
+    "requestedAt": "2026-08-16T09:30:00Z",
+    "correlationId": "incident-2026-08-16-checkout-error-baseline"
+  },
+  "spec": {
+    "question": "Did checkout request errors rise relative to the earlier baseline window?",
+    "trigger": {
+      "type": "alert",
+      "source": "urn:iip:event:alertmanager",
+      "reference": "alert://local/checkout/error-ratio",
+      "summary": "The checkout workload is degraded and its error-ratio alert is firing."
+    },
+    "scope": {
+      "resourceUids": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+      "timeRange": {
+        "start": "2026-08-16T08:30:00Z",
+        "end": "2026-08-16T09:30:00Z"
+      }
+    },
+    "agentSelector": {
+      "id": "incident-investigator",
+      "version": "0.1.0"
+    },
+    "evidenceTypes": ["kubernetes.resource-status", "telemetry.metrics"],
+    "allowedTools": ["evidence/fetch", "telemetry/query"],
+    "telemetrySelections": [
+      {
+        "id": "tqs_ba5e11e0c0ffee01",
+        "integrationId": "observability-local",
+        "rootCauseClasses": ["infrastructure.resource.degraded"],
+        "query": {
+          "metric": "service.request.error_ratio",
+          "filters": [
+            {
+              "attribute": "service.name",
+              "operator": "eq",
+              "value": "checkout"
+            }
+          ],
+          "aggregation": {
+            "function": "avg",
+            "stepSeconds": 60
+          },
+          "groupBy": ["service.name"]
+        },
+        "limits": {
+          "maxSeries": 8,
+          "maxDataPoints": 480,
+          "maxBytes": 524288
+        },
+        "baselineComparison": {
+          "statistic": "mean",
+          "unit": "1",
+          "baselineTimeRange": {
+            "start": "2026-08-16T08:30:00Z",
+            "end": "2026-08-16T08:45:00Z"
+          },
+          "evaluationTimeRange": {
+            "start": "2026-08-16T09:15:00Z",
+            "end": "2026-08-16T09:30:00Z"
+          },
+          "calculation": "ratio",
+          "operator": "gte",
+          "threshold": 5,
+          "whenMatched": "supports",
+          "whenNotMatched": "contradicts"
+        }
+      }
+    ],
+    "budgets": {
+      "maxToolCalls": 8,
+      "maxWallTimeSeconds": 180,
+      "maxModelTokens": 50000,
+      "maxCostUsd": 1,
+      "maxEvidenceItems": 16,
+      "maxIterations": 8
+    },
+    "maxAuthority": "read",
+    "priority": "high"
+  }
+}

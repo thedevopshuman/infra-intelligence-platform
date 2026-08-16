@@ -1,0 +1,99 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationReport",
+  "metadata": {
+    "id": "inv_ba31f96b125b4de7a06cc1e942f5d380",
+    "tenantId": "local",
+    "createdAt": "2026-08-16T09:30:08Z"
+  },
+  "spec": {
+    "requestDigest": "sha256:1e6797ece7db714896edfe16991a3d002f9c66af45c475e3c96f190fed451522",
+    "outcome": "conclusive",
+    "terminalReason": "sufficient-evidence",
+    "startedAt": "2026-08-16T09:30:01Z",
+    "completedAt": "2026-08-16T09:30:08Z",
+    "scope": {
+      "resourceUids": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+      "timeRange": {
+        "start": "2026-08-16T08:30:00Z",
+        "end": "2026-08-16T09:30:00Z"
+      }
+    },
+    "agent": {
+      "id": "incident-investigator",
+      "version": "0.1.0",
+      "manifestDigest": "sha256:7da250dedb1d113e64a75278f014c3b72bb319c66adbfd15f8a8104a7a10eb97",
+      "modelClass": "local"
+    },
+    "summary": "The checkout workload is degraded and its mean request error ratio rose by the declared baseline ratio.",
+    "hypotheses": [
+      {
+        "id": "hyp_ba5e11e0c0ffee01",
+        "rank": 1,
+        "statement": "The scoped checkout workload reports degraded state while request errors are elevated above baseline.",
+        "rootCauseClass": "infrastructure.resource.degraded",
+        "confidence": 0.7,
+        "disposition": "leading",
+        "supportingEvidenceIds": [
+          "evd_33333333333333333333333333333333",
+          "evd_44444444444444444444444444444444"
+        ],
+        "contradictingEvidenceIds": []
+      }
+    ],
+    "unknowns": [],
+    "telemetryAssessments": [
+      {
+        "assessmentType": "baseline-comparison",
+        "selectionId": "tqs_ba5e11e0c0ffee01",
+        "evidenceId": "evd_44444444444444444444444444444444",
+        "rootCauseClass": "infrastructure.resource.degraded",
+        "metric": "service.request.error_ratio",
+        "statistic": "mean",
+        "unit": "1",
+        "baselineTimeRange": {
+          "start": "2026-08-16T08:30:00Z",
+          "end": "2026-08-16T08:45:00Z"
+        },
+        "evaluationTimeRange": {
+          "start": "2026-08-16T09:15:00Z",
+          "end": "2026-08-16T09:30:00Z"
+        },
+        "calculation": "ratio",
+        "comparisonUnit": "1",
+        "operator": "gte",
+        "threshold": 5,
+        "baselineValue": 0.01,
+        "evaluationValue": 0.082,
+        "comparisonValue": 8.2,
+        "disposition": "supporting"
+      }
+    ],
+    "evidenceIds": [
+      "evd_33333333333333333333333333333333",
+      "evd_44444444444444444444444444444444"
+    ],
+    "recommendations": [
+      {
+        "id": "rec_ba5e11e0c0ffee01",
+        "type": "next-check",
+        "description": "Inspect the newest workload revision and its Pod status before acting.",
+        "priority": "high",
+        "evidenceIds": [
+          "evd_33333333333333333333333333333333",
+          "evd_44444444444444444444444444444444"
+        ]
+      }
+    ],
+    "toolCallLedgerRef": "ledger://local/investigations/inv_ba31f96b125b4de7a06cc1e942f5d380/tool-calls",
+    "policySnapshotRef": "policy://local/snapshots/deterministic-investigation-v1",
+    "usage": {
+      "toolCalls": 2,
+      "iterations": 1,
+      "modelTokens": 0,
+      "wallTimeSeconds": 7,
+      "costUsd": 0,
+      "evidenceItems": 2
+    }
+  }
+}

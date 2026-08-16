@@ -15,6 +15,8 @@ from infra_intelligence_sdk import (
     InvestigationReport,
     InvestigationRequest,
     InvestigationTelemetryAssessment,
+    InvestigationTelemetryBaselineAssessment,
+    InvestigationTelemetryBaselineComparison,
     InvestigationTelemetryInterpretation,
     InvestigationTelemetrySelection,
     IngestionFreshnessReport,
@@ -48,9 +50,15 @@ class PublicContractSdkTests(unittest.TestCase):
         telemetry_investigation = InvestigationRequest.from_dict(
             example("investigation-request-telemetry.json")
         )
+        baseline_investigation = InvestigationRequest.from_dict(
+            example("investigation-request-telemetry-baseline.json")
+        )
         report = InvestigationReport.from_dict(example("investigation-report.json"))
         telemetry_report = InvestigationReport.from_dict(
             example("investigation-report-telemetry.json")
+        )
+        baseline_report = InvestigationReport.from_dict(
+            example("investigation-report-telemetry-baseline.json")
         )
         freshness = IngestionFreshnessReport.from_dict(
             example("ingestion-freshness-report.json")
@@ -96,6 +104,26 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertIsInstance(assessment, InvestigationTelemetryAssessment)
         self.assertEqual(assessment.disposition, "supporting")
         self.assertEqual(assessment.to_dict()["observedValue"], 0.082)
+        baseline_selection = baseline_investigation.telemetry_selections[0]
+        self.assertIsInstance(
+            baseline_selection.baseline_comparison,
+            InvestigationTelemetryBaselineComparison,
+        )
+        self.assertIsNone(baseline_selection.interpretation)
+        self.assertEqual(
+            baseline_selection.baseline_comparison.calculation,
+            "ratio",
+        )
+        baseline_assessment = baseline_report.telemetry_assessments[0]
+        self.assertIsInstance(
+            baseline_assessment,
+            InvestigationTelemetryBaselineAssessment,
+        )
+        self.assertEqual(baseline_assessment.comparison_value, 8.2)
+        self.assertEqual(
+            baseline_assessment.to_dict()["assessmentType"],
+            "baseline-comparison",
+        )
         self.assertEqual(report.to_dict()["kind"], "InvestigationReport")
         self.assertEqual(freshness.to_dict()["kind"], "IngestionFreshnessReport")
         self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")
@@ -243,6 +271,24 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn(
             "telemetry assessment threshold must match its request",
+            self.errors,
+        )
+
+    def test_baseline_assessment_must_match_its_declared_calculation(self) -> None:
+        path = (
+            ROOT
+            / "contracts"
+            / "examples"
+            / "investigation-report-telemetry-baseline.json"
+        )
+        report = copy.deepcopy(self.documents[path])
+        report["spec"]["telemetryAssessments"][0]["comparisonUnit"] = "percent"
+        self.documents[path] = report
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "telemetry assessment comparisonUnit must match its request",
             self.errors,
         )
 

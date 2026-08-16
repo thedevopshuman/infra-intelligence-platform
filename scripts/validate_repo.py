@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import math
 import re
 import sys
 from datetime import datetime
@@ -42,6 +43,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0016-tenant-bound-otlp-metrics-receiver.md",
     "docs/decisions/0017-investigation-telemetry-selection.md",
     "docs/decisions/0018-evidence-aware-metric-assessment.md",
+    "docs/decisions/0019-baseline-window-telemetry-assessment.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/otlp-metrics-receiver.md",
@@ -81,8 +83,10 @@ REQUIRED_PATHS = (
     "contracts/examples/plugin-session.json",
     "contracts/examples/investigation-request.json",
     "contracts/examples/investigation-request-telemetry.json",
+    "contracts/examples/investigation-request-telemetry-baseline.json",
     "contracts/examples/investigation-report.json",
     "contracts/examples/investigation-report-telemetry.json",
+    "contracts/examples/investigation-report-telemetry-baseline.json",
     "contracts/examples/ingestion-freshness-report.json",
     "contracts/examples/evaluation-scenario.json",
     "contracts/examples/resource-collection-request.json",
@@ -784,8 +788,30 @@ def validate_investigation_telemetry_examples(
     """Check telemetry request/report links that JSON Schema cannot express."""
 
     example_dir = ROOT / "contracts" / "examples"
-    request = documents.get(example_dir / "investigation-request-telemetry.json")
-    report = documents.get(example_dir / "investigation-report-telemetry.json")
+    pairs = (
+        (
+            "investigation-request-telemetry.json",
+            "investigation-report-telemetry.json",
+        ),
+        (
+            "investigation-request-telemetry-baseline.json",
+            "investigation-report-telemetry-baseline.json",
+        ),
+    )
+    for request_name, report_name in pairs:
+        request = documents.get(example_dir / request_name)
+        report = documents.get(example_dir / report_name)
+        if isinstance(request, dict) and isinstance(report, dict):
+            validate_investigation_telemetry_pair(request, report, errors)
+
+
+def validate_investigation_telemetry_pair(
+    request: Mapping[str, object],
+    report: Mapping[str, object],
+    errors: List[str],
+) -> None:
+    """Validate one telemetry investigation request/report example pair."""
+
     if not isinstance(request, dict) or not isinstance(report, dict):
         return
     request_metadata = request.get("metadata")
@@ -826,17 +852,100 @@ def validate_investigation_telemetry_examples(
             fail(errors, "telemetry assessment selectionId must resolve in its request")
             continue
         interpretation = selection.get("interpretation")
+        baseline_comparison = selection.get("baselineComparison")
+        rule = (
+            interpretation
+            if isinstance(interpretation, dict)
+            else baseline_comparison
+        )
         query = selection.get("query")
-        if not isinstance(interpretation, dict) or not isinstance(query, dict):
+        if not isinstance(rule, dict) or not isinstance(query, dict):
             fail(errors, "telemetry assessment requires its declared request rule")
             continue
         expected_fields = {
             "metric": query.get("metric"),
-            "statistic": interpretation.get("statistic"),
-            "unit": interpretation.get("unit"),
-            "operator": interpretation.get("operator"),
-            "threshold": interpretation.get("threshold"),
+            "statistic": rule.get("statistic"),
+            "unit": rule.get("unit"),
+            "operator": rule.get("operator"),
+            "threshold": rule.get("threshold"),
         }
+        if isinstance(baseline_comparison, dict):
+            expected_fields.update(
+                {
+                    "assessmentType": "baseline-comparison",
+                    "baselineTimeRange": baseline_comparison.get(
+                        "baselineTimeRange"
+                    ),
+                    "evaluationTimeRange": baseline_comparison.get(
+                        "evaluationTimeRange"
+                    ),
+                    "calculation": baseline_comparison.get("calculation"),
+                    "comparisonUnit": (
+                        "1"
+                        if baseline_comparison.get("calculation") == "ratio"
+                        else baseline_comparison.get("unit")
+                    ),
+                }
+            )
+            scope = request_spec.get("scope")
+            scope_range = scope.get("timeRange") if isinstance(scope, dict) else None
+            baseline_range = baseline_comparison.get("baselineTimeRange")
+            evaluation_range = baseline_comparison.get("evaluationTimeRange")
+            timestamps = (
+                parse_timestamp(scope_range.get("start"))
+                if isinstance(scope_range, dict)
+                else None,
+                parse_timestamp(baseline_range.get("start"))
+                if isinstance(baseline_range, dict)
+                else None,
+                parse_timestamp(baseline_range.get("end"))
+                if isinstance(baseline_range, dict)
+                else None,
+                parse_timestamp(evaluation_range.get("start"))
+                if isinstance(evaluation_range, dict)
+                else None,
+                parse_timestamp(evaluation_range.get("end"))
+                if isinstance(evaluation_range, dict)
+                else None,
+                parse_timestamp(scope_range.get("end"))
+                if isinstance(scope_range, dict)
+                else None,
+            )
+            if any(value is None for value in timestamps) or not (
+                timestamps[0] <= timestamps[1]
+                < timestamps[2]
+                < timestamps[3]
+                < timestamps[4]
+                <= timestamps[5]
+            ):
+                fail(
+                    errors,
+                    "telemetry baseline windows must be ordered inside request scope",
+                )
+            baseline_value = assessment.get("baselineValue")
+            evaluation_value = assessment.get("evaluationValue")
+            comparison_value = assessment.get("comparisonValue")
+            if all(
+                isinstance(value, (int, float)) and not isinstance(value, bool)
+                for value in (baseline_value, evaluation_value, comparison_value)
+            ):
+                expected_comparison = (
+                    evaluation_value - baseline_value
+                    if baseline_comparison.get("calculation") == "difference"
+                    else evaluation_value / baseline_value
+                    if baseline_value != 0
+                    else None
+                )
+                if expected_comparison is None or not math.isclose(
+                    comparison_value,
+                    expected_comparison,
+                    rel_tol=1e-12,
+                    abs_tol=1e-15,
+                ):
+                    fail(
+                        errors,
+                        "telemetry baseline comparisonValue must match its values",
+                    )
         for field, expected in expected_fields.items():
             if assessment.get(field) != expected:
                 fail(errors, f"telemetry assessment {field} must match its request")
@@ -1020,6 +1129,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("investigation-request.json", "InvestigationRequest"),
         ("investigation-report.json", "InvestigationReport"),
         ("investigation-report-telemetry.json", "InvestigationReport"),
+        ("investigation-report-telemetry-baseline.json", "InvestigationReport"),
         ("ingestion-freshness-report.json", "IngestionFreshnessReport"),
         ("evaluation-scenario.json", "EvaluationScenario"),
         ("resource-collection-request.json", "ResourceCollectionRequest"),

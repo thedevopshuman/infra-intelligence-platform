@@ -135,6 +135,7 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
         class RecordingTelemetryBackend:
             def __init__(self) -> None:
                 self.requests: list[TelemetryMetricsQuery] = []
+                self.values = (0.07, 0.09)
 
             def query_metrics(
                 self, request: TelemetryMetricsQuery
@@ -149,8 +150,8 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
                             unit="1",
                             attributes=(("service.name", "api"),),
                             points=(
-                                TelemetryMetricPoint(request.start, 0.07),
-                                TelemetryMetricPoint(request.end, 0.09),
+                                TelemetryMetricPoint(request.start, self.values[0]),
+                                TelemetryMetricPoint(request.end, self.values[1]),
                             ),
                         ),
                     ),
@@ -318,6 +319,129 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
             1,
         )
 
+        baseline_request = copy.deepcopy(request)
+        baseline_request["metadata"]["id"] = (
+            "inv_12121212121212121212121212121212"
+        )
+        baseline_selection = baseline_request["spec"]["telemetrySelections"][1]
+        del baseline_selection["interpretation"]
+        baseline_selection["baselineComparison"] = {
+            "statistic": "maximum",
+            "unit": "1",
+            "baselineTimeRange": {
+                "start": "2026-08-14T10:15:00Z",
+                "end": "2026-08-14T10:16:00Z",
+            },
+            "evaluationTimeRange": {
+                "start": "2026-08-14T10:27:00Z",
+                "end": "2026-08-14T10:28:02Z",
+            },
+            "calculation": "ratio",
+            "operator": "gte",
+            "threshold": 1.2,
+            "whenMatched": "supports",
+            "whenNotMatched": "contradicts",
+        }
+
+        baseline_report = service.execute(
+            RunInvestigationCommand(self.actor, baseline_request)
+        )
+
+        baseline_assessment = baseline_report["spec"]["telemetryAssessments"][0]
+        self.assertEqual(
+            baseline_assessment["assessmentType"], "baseline-comparison"
+        )
+        self.assertAlmostEqual(baseline_assessment["baselineValue"], 0.07)
+        self.assertAlmostEqual(baseline_assessment["evaluationValue"], 0.09)
+        self.assertAlmostEqual(
+            baseline_assessment["comparisonValue"], 0.09 / 0.07
+        )
+        self.assertEqual(baseline_assessment["comparisonUnit"], "1")
+        self.assertEqual(baseline_assessment["disposition"], "supporting")
+        self.assertIn(
+            baseline_assessment["evidenceId"],
+            baseline_report["spec"]["hypotheses"][0][
+                "supportingEvidenceIds"
+            ],
+        )
+        assert_schema(self, "investigation-report.schema.json", baseline_report)
+
+        difference_request = copy.deepcopy(baseline_request)
+        difference_request["metadata"]["id"] = (
+            "inv_15151515151515151515151515151515"
+        )
+        difference_rule = difference_request["spec"]["telemetrySelections"][1][
+            "baselineComparison"
+        ]
+        difference_rule["calculation"] = "difference"
+        difference_rule["threshold"] = 0.01
+
+        difference_report = service.execute(
+            RunInvestigationCommand(self.actor, difference_request)
+        )
+
+        difference = difference_report["spec"]["telemetryAssessments"][0]
+        self.assertAlmostEqual(difference["comparisonValue"], 0.02)
+        self.assertEqual(difference["comparisonUnit"], "1")
+        self.assertEqual(difference["disposition"], "supporting")
+        assert_schema(
+            self,
+            "investigation-report.schema.json",
+            difference_report,
+        )
+
+        zero_baseline_request = copy.deepcopy(baseline_request)
+        zero_baseline_request["metadata"]["id"] = (
+            "inv_13131313131313131313131313131313"
+        )
+        backend.values = (0, 0.09)
+
+        zero_baseline_report = service.execute(
+            RunInvestigationCommand(self.actor, zero_baseline_request)
+        )
+
+        incomplete = zero_baseline_report["spec"]["telemetryAssessments"][0]
+        self.assertEqual(incomplete["disposition"], "incomplete")
+        self.assertNotIn("baselineValue", incomplete)
+        self.assertNotIn("evaluationValue", incomplete)
+        self.assertNotIn("comparisonValue", incomplete)
+        self.assertNotIn(
+            incomplete["evidenceId"],
+            zero_baseline_report["spec"]["hypotheses"][0][
+                "supportingEvidenceIds"
+            ],
+        )
+        assert_schema(
+            self,
+            "investigation-report.schema.json",
+            zero_baseline_report,
+        )
+
+        missing_window_request = copy.deepcopy(baseline_request)
+        missing_window_request["metadata"]["id"] = (
+            "inv_14141414141414141414141414141414"
+        )
+        missing_window_request["spec"]["telemetrySelections"][1][
+            "baselineComparison"
+        ]["evaluationTimeRange"] = {
+            "start": "2026-08-14T10:20:00Z",
+            "end": "2026-08-14T10:21:00Z",
+        }
+        backend.values = (0.07, 0.09)
+
+        missing_window_report = service.execute(
+            RunInvestigationCommand(self.actor, missing_window_request)
+        )
+
+        missing = missing_window_report["spec"]["telemetryAssessments"][0]
+        self.assertEqual(missing["disposition"], "incomplete")
+        self.assertNotIn("comparisonValue", missing)
+        assert_schema(
+            self,
+            "investigation-report.schema.json",
+            missing_window_report,
+        )
+
     def test_telemetry_selection_cannot_exceed_remaining_tool_budget(self) -> None:
         request = copy.deepcopy(self.scenario["spec"]["request"])
         request["metadata"]["id"] = "inv_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -391,6 +515,40 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
 
         selection["rootCauseClasses"] = ["infrastructure.resource.degraded"]
         selection["interpretation"]["whenNotMatched"] = "supports"
+        with self.assertRaisesRegex(
+            InvalidInvestigationError,
+            "investigation.contract.invalid",
+        ):
+            self.service.execute(RunInvestigationCommand(self.actor, request))
+
+        selection["interpretation"]["whenNotMatched"] = "contradicts"
+        selection["baselineComparison"] = {
+            "statistic": "mean",
+            "unit": "1",
+            "baselineTimeRange": {
+                "start": "2026-08-14T10:15:00Z",
+                "end": "2026-08-14T10:20:00Z",
+            },
+            "evaluationTimeRange": {
+                "start": "2026-08-14T10:24:00Z",
+                "end": "2026-08-14T10:28:02Z",
+            },
+            "calculation": "difference",
+            "operator": "gte",
+            "threshold": 0.1,
+            "whenMatched": "supports",
+            "whenNotMatched": "contradicts",
+        }
+        with self.assertRaisesRegex(
+            InvalidInvestigationError,
+            "investigation.contract.invalid",
+        ):
+            self.service.execute(RunInvestigationCommand(self.actor, request))
+
+        del selection["interpretation"]
+        selection["baselineComparison"]["evaluationTimeRange"]["start"] = (
+            "2026-08-14T10:19:00Z"
+        )
         with self.assertRaisesRegex(
             InvalidInvestigationError,
             "investigation.contract.invalid",

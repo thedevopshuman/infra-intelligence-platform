@@ -87,6 +87,8 @@ When `evidenceTypes` or `allowedTools` are present, include `telemetry.metrics` 
 
 To let a normalized result support or contradict that class, declare `interpretation` with a statistic, the exact catalog unit, comparison operator, finite threshold, and distinct matched/unmatched dispositions. For example, a dimensionless availability metric may use `minimum`, unit `1`, `gte`, threshold `1`, matched `supports`, and unmatched `contradicts`. The investigator assesses only the committed normalized artifact. A backend/catalog unit mismatch fails closed; no implicit unit conversion occurs, and partial or no-data results are never hypothesis citations.
 
+Use `baselineComparison` instead when the question is about change between periods. Declare non-overlapping baseline and evaluation subranges inside the investigation range, plus `difference` or `ratio`. The adapter still executes exactly one range query for the inherited investigation scope; the investigator splits the committed normalized points locally. A difference keeps the catalog unit, a ratio uses unit `1`, and missing points or a zero baseline ratio denominator produce `incomplete`. The Docker gate exercises this path against Prometheus's real self-scraped `up` series.
+
 ## Helm
 
 Set `telemetryEvidence.backend: prometheus`, put the non-secret registry in `telemetryEvidence.prometheus.integrationsJson`, and reference a Kubernetes Secret for credentials when required. If NetworkPolicy is enabled, configure `networkPolicy.prometheusEgress` for the exact Prometheus namespace, pod labels, and port. The chart contains no endpoint credentials by default.

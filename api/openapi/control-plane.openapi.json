@@ -3,7 +3,7 @@
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
     "version": "0.4.0",
-    "description": "Executable local reference API for collection ingestion, freshness telemetry, backend-neutral metric evidence, tenant-bound OTLP metrics intake, resource queries, investigation-driven telemetry selection and threshold assessment, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
+    "description": "Executable local reference API for collection ingestion, freshness telemetry, backend-neutral metric evidence, tenant-bound OTLP metrics intake, resource queries, investigation-driven telemetry selection and threshold/baseline assessment, evidence-backed investigations, governed dry-run actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -219,7 +219,7 @@
     "/v1/investigations": {
       "post": {
         "operationId": "runInvestigation",
-        "description": "Run a bounded investigation. Optional telemetry selections inherit authenticated identity, resource/time scope, and investigation tool/evidence budgets before using the configured backend-neutral metrics adapter. Root-cause-scoped selections may apply a declared unit-aware threshold rule to the committed normalized artifact and record supporting, contradicting, neutral, no-data, or incomplete assessments.",
+        "description": "Run a bounded investigation. Optional telemetry selections inherit authenticated identity, resource/time scope, and investigation tool/evidence budgets before using the configured backend-neutral metrics adapter. Root-cause-scoped selections may apply either a declared unit-aware threshold rule or ordered baseline/evaluation windows to the one committed normalized artifact and record supporting, contradicting, neutral, no-data, or incomplete assessments.",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-request.schema.json"}}}},
         "responses": {
           "201": {"description": "Immutable terminal investigation report", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-report.schema.json"}}}},

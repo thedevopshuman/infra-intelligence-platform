@@ -95,4 +95,4 @@ The gate builds and loads the current image, creates a disposable exact-name nam
 
 ## Production gaps
 
-This proves deployment mechanics, not production certification. Image signing/SBOM/provenance, external secret-controller integration, ingress/TLS, high availability, zero-downtime migration compatibility, capacity tests, database failover, scheduled backups, disaster recovery, and environment-specific policy remain release and customer gates.
+This proves deployment mechanics, not production certification. The local release path now generates verified SBOM/provenance evidence, but organizational image signing, external secret-controller integration, ingress/TLS, high availability, zero-downtime migration compatibility, capacity tests, database failover, scheduled backups, disaster recovery, and environment-specific policy remain release and customer gates.

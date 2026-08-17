@@ -16,7 +16,7 @@ This repository now contains an **executable local reference slice across Roadma
 
 ## Local quick start
 
-Use Python 3.11 or newer. Verification dependencies and the PostgreSQL driver are pinned for reproducible local and CI behavior. With Docker Desktop running, the durable product stack now has a one-command start:
+Use Python 3.11 or newer and Node.js 24 for the TypeScript SDK boundary. Python and npm verification dependencies are locked for reproducible local and CI behavior. With Docker Desktop running, the durable product stack now has a one-command start:
 
 ```bash
 make dev-up
@@ -40,6 +40,7 @@ make test-prometheus
 make test-loki
 make test-plugin-runner
 make test-helm-install
+make release-bundle PYTHON=.venv/bin/python
 # With the local kind cluster and explicit kubeconfig:
 IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-events
 IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-actions
@@ -59,7 +60,7 @@ curl -X POST http://localhost:8080/v1/resources \
   --data @contracts/examples/resource.json
 ```
 
-The API authenticates a Bearer credential into actor, tenant, and role context, validates collection/resource boundaries, and exposes graph/timeline, ingestion-freshness, normalized metric, log, Kubernetes Event, resource-change, and repository/runbook context evidence queries. A separate optional process accepts independently authenticated OTLP metrics/logs on port `4318` without exposing control-plane routes or credentials. The API accepts bounded investigations synchronously or through durable background jobs that survive HTTP disconnects, exposes queue attempts and cooperative cancellation, and supports separately governed actions and plugin-session workflows. The action default is non-mutating; the opt-in Kubernetes API executor adds server dry-run and a doubly enabled live path. Default external provider backends honestly return no data; selected live adapters require protected endpoint, trust, scope, and credential configuration. The built-in change provider reads only tenant-scoped accepted observation history, while the file context adapter reads only cataloged files under a protected root. The default local profile remains in memory; the Docker profile persists operational records in PostgreSQL. The Helm chart has a strict closed values contract and can apply packaged PostgreSQL migrations through a separately enabled, database-only pre-install/pre-upgrade Job while serving processes remain read-only toward schema.
+The API authenticates a Bearer credential into actor, tenant, and role context, validates collection/resource boundaries, and exposes graph/timeline, ingestion-freshness, normalized metric, log, Kubernetes Event, resource-change, and repository/runbook context evidence queries. A separate optional process accepts independently authenticated OTLP metrics/logs on port `4318` without exposing control-plane routes or credentials. The API accepts bounded investigations synchronously or through durable background jobs that survive HTTP disconnects, exposes queue attempts and cooperative cancellation, and supports separately governed actions and plugin-session workflows. The action default is non-mutating; the opt-in Kubernetes API executor adds server dry-run and a doubly enabled live path. Default external provider backends honestly return no data; selected live adapters require protected endpoint, trust, scope, and credential configuration. The built-in change provider reads only tenant-scoped accepted observation history, while the file context adapter reads only cataloged files under a protected root. The default local profile remains in memory; the Docker profile persists operational records in PostgreSQL. The Helm chart has a strict closed values contract and can apply packaged PostgreSQL migrations through a separately enabled, database-only pre-install/pre-upgrade Job while serving processes remain read-only toward schema. Clean revisions can be packaged as an unsigned multi-platform release candidate with checksums, SPDX SBOM, SLSA provenance, chart, contracts, and SDK artifacts; see the [release procedure](docs/operations/release-artifacts.md).
 
 ## Repository map
 

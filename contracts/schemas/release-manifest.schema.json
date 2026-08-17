@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.iip.dev/v1alpha1/release-manifest.schema.json",
+  "title": "Release manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "const": "iip.dev/v1alpha1" },
+    "kind": { "const": "ReleaseManifest" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "chartVersion",
+        "pythonSdkVersion",
+        "typescriptSdkVersion",
+        "revision",
+        "sourceDate",
+        "signatureStatus"
+      ],
+      "properties": {
+        "version": { "$ref": "#/$defs/semver" },
+        "chartVersion": { "$ref": "#/$defs/semver" },
+        "pythonSdkVersion": { "$ref": "#/$defs/semver" },
+        "typescriptSdkVersion": { "$ref": "#/$defs/semver" },
+        "revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+        "sourceDate": { "type": "string", "format": "date-time" },
+        "signatureStatus": { "const": "unsigned" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifacts", "image"],
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/artifact" }
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "indexDigest", "platforms"],
+          "properties": {
+            "path": { "$ref": "#/$defs/fileName" },
+            "indexDigest": { "$ref": "#/$defs/digest" },
+            "platforms": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 8,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "manifestDigest", "attestations"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^linux/[a-z0-9_]+(?:/[a-z0-9.]+)?$"
+                  },
+                  "manifestDigest": { "$ref": "#/$defs/digest" },
+                  "attestations": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "https://spdx.dev/Document",
+                        "https://slsa.dev/provenance/v1"
+                      ]
+                    },
+                    "allOf": [
+                      { "contains": { "const": "https://spdx.dev/Document" } },
+                      { "contains": { "const": "https://slsa.dev/provenance/v1" } }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "fileName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "role", "mediaType", "sizeBytes", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/fileName" },
+        "role": {
+          "enum": [
+            "control-plane-image",
+            "helm-chart",
+            "public-contracts",
+            "python-sdk-source",
+            "typescript-sdk"
+          ]
+        },
+        "mediaType": {
+          "enum": [
+            "application/vnd.oci.image.layout.v1.tar",
+            "application/vnd.cncf.helm.chart.content.v1.tar+gzip",
+            "application/vnd.npm.package+gzip",
+            "application/gzip"
+          ]
+        },
+        "sizeBytes": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  }
+}

@@ -1,14 +1,16 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-postgres test-backup-restore test-otel test-otlp-receiver test-prometheus test-loki test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-local-product test-helm-install db-migrate helm-lint verify run package-chart dev-init dev-up dev-status dev-credentials dev-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-backup-restore test-otel test-otlp-receiver test-prometheus test-loki test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-local-product test-helm-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down
 
 PYTHON ?= python3
 HELM ?= helm
 DOCKER ?= docker
+NPM ?= npm
 
 help:
 	@echo "install-verify-deps Install pinned verification-only Python dependencies"
 	@echo "validate      Validate contracts, links, and package boundaries"
 	@echo "validate-schemas Validate contract examples against JSON Schemas"
 	@echo "test          Run the reference-kernel and SDK tests"
+	@echo "test-typescript Install locked TypeScript tooling and type-check the SDK"
 	@echo "test-postgres Run PostgreSQL integration tests with Docker Desktop"
 	@echo "test-backup-restore Measure and verify PostgreSQL recovery with Docker Desktop"
 	@echo "test-otel     Send reference metrics and traces to an OpenTelemetry Collector"
@@ -30,6 +32,8 @@ help:
 	@echo "dev-credentials Show the local console URL and operator token"
 	@echo "dev-down      Stop the local stack while preserving its database"
 	@echo "package-chart Package the Helm chart under dist/"
+	@echo "release-bundle Build an unsigned multi-platform release bundle with SBOM/provenance"
+	@echo "verify-release-bundle Verify IIP_RELEASE_BUNDLE checksums and OCI attestations"
 
 install-verify-deps:
 	$(PYTHON) -m pip install --requirement requirements/verify.txt
@@ -42,6 +46,10 @@ validate-schemas:
 
 test:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest discover -s tests -v
+
+test-typescript:
+	cd sdks/typescript && $(NPM) ci --ignore-scripts --no-audit --no-fund
+	cd sdks/typescript && $(NPM) run check
 
 test-postgres:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_postgres.sh
@@ -130,7 +138,7 @@ helm-lint:
 		echo "Helm validation accepted a heartbeat that cannot renew its lease" >&2; exit 1; \
 	fi
 
-verify: validate validate-schemas test helm-lint
+verify: validate validate-schemas test test-typescript helm-lint
 
 run:
 	PYTHONPATH=src $(PYTHON) -m iip.surfaces.http
@@ -153,3 +161,13 @@ dev-down:
 package-chart:
 	mkdir -p dist
 	$(HELM) package deploy/helm/infra-intelligence --destination dist
+
+release-bundle:
+	IIP_RELEASE_DOCKER_BIN=$(DOCKER) IIP_RELEASE_HELM_BIN=$(HELM) \
+		IIP_RELEASE_NPM_BIN=$(NPM) IIP_RELEASE_PYTHON=$(PYTHON) \
+		scripts/build_release_bundle.sh
+
+verify-release-bundle:
+	@test -n "$(IIP_RELEASE_BUNDLE)" || \
+		(echo "IIP_RELEASE_BUNDLE is required" >&2; exit 2)
+	$(PYTHON) scripts/release_bundle.py verify "$(IIP_RELEASE_BUNDLE)"

@@ -36,6 +36,12 @@
           "minItems": 1,
           "maxItems": 16,
           "items": {"$ref": "urn:iip:contracts:plugin-mediation-grant:v1alpha1"}
+        },
+        "actionMediationGrants": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {"$ref": "urn:iip:contracts:plugin-action-mediation-grant:v1alpha1"}
         }
       }
     }

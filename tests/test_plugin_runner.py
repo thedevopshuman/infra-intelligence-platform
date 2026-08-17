@@ -289,6 +289,37 @@ class SignedDockerPluginRunnerTests(unittest.TestCase):
         self.assertTrue(transport.calls[0]["mediationConfigured"])
         self.assertEqual(mediation.bound[2], invocation)
 
+    def test_action_permissions_require_and_receive_proposal_mediation(self) -> None:
+        manifest, trust = signed_fixture()
+        manifest["spec"]["permissions"]["actions"] = [
+            "kubernetes.restart-workload"
+        ]
+        sign_manifest(manifest)
+        session, invocation = scoped_documents(manifest)
+        invocation["spec"]["actionMediationGrants"] = [{"hostCreated": True}]
+        transport = RecordingTransport()
+
+        class Bound:
+            def handle(self, request):
+                return request
+
+        class Mediation:
+            def bind(self, actor, selected_manifest, selected_invocation):
+                self.bound = (actor, selected_manifest, selected_invocation)
+                return Bound()
+
+        mediation = Mediation()
+        result = SignedDockerPluginRunner(
+            trust,
+            transport=transport,
+            mediation=mediation,
+            now=lambda: NOW,
+        ).run(self.actor, manifest, session, invocation, TOKEN)
+
+        self.assertEqual(result["spec"]["status"], "succeeded")
+        self.assertTrue(transport.calls[0]["mediationConfigured"])
+        self.assertEqual(mediation.bound[2], invocation)
+
     def test_wrong_token_cross_tenant_expiry_and_unknown_method_fail_closed(self) -> None:
         manifest, trust = signed_fixture()
         for mutation, code in (

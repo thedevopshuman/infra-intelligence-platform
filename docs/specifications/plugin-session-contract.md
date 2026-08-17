@@ -6,6 +6,7 @@
 
 The contract does not imply in-process trust. The first runner verifies the
 manifest signature and image digest and enforces process, network, filesystem,
-CPU, memory, PID, deadline, and output isolation. It refuses network, secret, and
-action permissions. Request-scoped credential mediation and durable execution
-claims are required before a later profile may grant those authorities.
+CPU, memory, PID, deadline, and output isolation. Network and secret declarations
+require exact read-mediation grants; action declarations require exact
+proposal-only grants. No profile gives the plugin a credential, approval, or
+execution authority. Durable execution claims are mandatory for every profile.

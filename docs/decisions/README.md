@@ -73,3 +73,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0067](0067-attested-plugin-mediation-bridge-image.md) | Accepted | Ship the trusted mediation relay as a separately attested release image |
 | [0068](0068-executable-plugin-compatibility-evidence.md) | Accepted | Generate exact-host plugin compatibility evidence from executable profiles |
 | [0069](0069-manifest-bound-plugin-signatures.md) | Accepted | Authenticate the complete plugin declaration before granting runtime trust |
+| [0070](0070-proposal-only-plugin-action-mediation.md) | Accepted | Let plugins create governed proposals without approval or execution authority |

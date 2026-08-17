@@ -63,6 +63,14 @@ inventory tooling, but application `0.42.0` and later runners reject it. Re-sign
 the unsigned canonical manifest with `iip.plugin-signature/v2`; do not translate
 or reuse a `v1` signature.
 
+An `actions` declaration is only an authenticated upper bound. It grants no
+mutation authority. The first executable action profile requires a separate
+invocation-bound `PluginActionMediationGrant` and can create only an ordinary
+governed `kubernetes.restart-workload` proposal. The host derives expiry and
+idempotency, evaluates policy, records audit intent, and revalidates the action
+through the standard investigation-, target-, approval-, and execution-bound
+workflow. Plugins never approve or execute their proposals.
+
 ## Handshake
 
 The `PluginSession` handshake exchanges protocol version, plugin identity and
@@ -87,8 +95,10 @@ The container still uses `--network=none`; a fresh Unix-domain socket lets it
 select only an approved path template and query keys for a declared destination.
 The host rechecks protected binding, policy, audit, deadline, count, response
 size, and broker scope for each read. Manifest `network` and `secrets` entries
-remain upper bounds and never become ambient container authority. Action
-mediation remains unsupported.
+remain upper bounds and never become ambient container authority. A separate
+[proposal-only action mediation profile](plugin-action-mediation-contract.md)
+may create a governed proposal but cannot approve, execute, reconcile, or
+receive an action credential.
 
 ## Compatibility
 

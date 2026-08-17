@@ -50,6 +50,9 @@ from infra_intelligence_sdk import (
     LogEvidenceResult,
     OtlpLogsEvidence,
     OtlpMetricsEvidence,
+    PluginActionMediationGrant,
+    PluginActionMediationRequest,
+    PluginActionMediationResponse,
     PluginCompatibilityReport,
     PluginInvocation,
     PluginInvocationResult,
@@ -190,6 +193,15 @@ class PublicContractSdkTests(unittest.TestCase):
         plugin_manifest = PluginManifest.from_dict(example("plugin-manifest.json"))
         plugin_compatibility = PluginCompatibilityReport.from_dict(
             example("plugin-compatibility-report.json")
+        )
+        plugin_action_grant = PluginActionMediationGrant.from_dict(
+            example("plugin-action-mediation-grant.json")
+        )
+        plugin_action_request = PluginActionMediationRequest.from_dict(
+            example("plugin-action-mediation-request.json")
+        )
+        plugin_action_response = PluginActionMediationResponse.from_dict(
+            example("plugin-action-mediation-response.json")
         )
         plugin_invocation = PluginInvocation.from_dict(
             example("plugin-invocation.json")
@@ -406,6 +418,14 @@ class PublicContractSdkTests(unittest.TestCase):
             plugin_compatibility.to_dict()["spec"]["summary"]["overallStatus"],
             "compatible",
         )
+        self.assertEqual(
+            plugin_action_grant.to_dict()["kind"], "PluginActionMediationGrant"
+        )
+        self.assertEqual(
+            plugin_action_request.to_dict()["kind"], "PluginActionMediationRequest"
+        )
+        self.assertTrue(plugin_action_response.proposed)
+        self.assertEqual(plugin_action_response.proposal_id, "act_" + "5" * 32)
         self.assertEqual(plugin_invocation.to_dict()["kind"], "PluginInvocation")
         self.assertEqual(
             plugin_result.to_dict()["kind"], "PluginInvocationResult"

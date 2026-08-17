@@ -12,6 +12,8 @@ export type PluginInvocationCancellationId = `pcn_${string}`;
 export type PluginInvocationReconciliationId = `prc_${string}`;
 export type PluginMediationGrantId = `pmg_${string}`;
 export type PluginMediationRequestId = `pmr_${string}`;
+export type PluginActionMediationGrantId = `pag_${string}`;
+export type PluginActionMediationRequestId = `par_${string}`;
 export type Sha256Digest = `sha256:${string}`;
 export type ResourceLifecycle =
   | "active"
@@ -1827,6 +1829,7 @@ export interface PluginInvocation {
     method: string;
     input: Record<string, unknown>;
     mediationGrants?: PluginMediationGrant[];
+    actionMediationGrants?: PluginActionMediationGrant[];
   };
 }
 
@@ -1909,6 +1912,82 @@ export type PluginMediationResponse = PluginMediationResponseBase & {
         bodyBytes?: never;
       };
 };
+
+export interface PluginActionMediationGrant {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PluginActionMediationGrant";
+  metadata: {
+    id: PluginActionMediationGrantId;
+    invocationId: PluginInvocationId;
+    tenantId: string;
+    actorId: string;
+    issuedAt: string;
+    expiresAt: string;
+  };
+  spec: {
+    operation: "governed-action-proposal";
+    actionTypes: ["kubernetes.restart-workload"];
+    targetResourceUids: ResourceUid[];
+    dryRunPolicy: "required" | "allowed";
+    limits: { maxRequests: number; maxProposalLifetimeSeconds: number };
+  };
+}
+
+export interface PluginActionMediationRequest {
+  apiVersion: "iip.plugin-runtime/v1alpha1";
+  kind: "PluginActionMediationRequest";
+  metadata: {
+    id: PluginActionMediationRequestId;
+    invocationId: PluginInvocationId;
+    grantId: PluginActionMediationGrantId;
+  };
+  spec: {
+    investigationId: InvestigationId;
+    actionType: "kubernetes.restart-workload";
+    targetResourceUid: ResourceUid;
+    parameters: KubernetesRestartActionParameters;
+    dryRun: boolean;
+  };
+}
+
+export interface PluginActionMediationResponseBase {
+  apiVersion: "iip.plugin-runtime/v1alpha1";
+  kind: "PluginActionMediationResponse";
+  metadata: {
+    requestId: PluginActionMediationRequestId;
+    invocationId: PluginInvocationId;
+    completedAt: string;
+  };
+}
+
+export type PluginActionMediationResponse =
+  PluginActionMediationResponseBase & {
+    spec:
+      | {
+          status: "proposed";
+          proposalId: ActionId;
+          proposalDigest: Sha256Digest;
+          expiresAt: string;
+          dryRun: boolean;
+          error?: never;
+        }
+      | {
+          status: "failed";
+          error: {
+            code:
+              | "plugin.action.audit-unavailable"
+              | "plugin.action.deadline-exceeded"
+              | "plugin.action.denied"
+              | "plugin.action.limit-exceeded"
+              | "plugin.action.proposal-rejected"
+              | "plugin.action.request-invalid";
+          };
+          proposalId?: never;
+          proposalDigest?: never;
+          expiresAt?: never;
+          dryRun?: never;
+        };
+  };
 
 export interface PluginInvocationResult {
   apiVersion: "iip.platform/v1alpha1";

@@ -99,9 +99,11 @@ REQUIRED_PATHS = (
     "docs/decisions/0067-attested-plugin-mediation-bridge-image.md",
     "docs/decisions/0068-executable-plugin-compatibility-evidence.md",
     "docs/decisions/0069-manifest-bound-plugin-signatures.md",
+    "docs/decisions/0070-proposal-only-plugin-action-mediation.md",
     "docs/specifications/plugin-invocation-lifecycle-contract.md",
     "docs/specifications/plugin-mediation-contract.md",
     "docs/specifications/plugin-compatibility-contract.md",
+    "docs/specifications/plugin-action-mediation-contract.md",
     "docs/operations/evidence-retention.md",
     "docs/operations/event-delivery.md",
     "docs/operations/helm-deployment.md",
@@ -152,6 +154,9 @@ REQUIRED_PATHS = (
     "contracts/schemas/plugin-mediation-grant.schema.json",
     "contracts/schemas/plugin-mediation-request.schema.json",
     "contracts/schemas/plugin-mediation-response.schema.json",
+    "contracts/schemas/plugin-action-mediation-grant.schema.json",
+    "contracts/schemas/plugin-action-mediation-request.schema.json",
+    "contracts/schemas/plugin-action-mediation-response.schema.json",
     "contracts/schemas/plugin-compatibility-report.schema.json",
     "contracts/schemas/evidence.schema.json",
     "contracts/schemas/evidence-retention-report.schema.json",
@@ -204,6 +209,9 @@ REQUIRED_PATHS = (
     "contracts/examples/plugin-mediation-grant.json",
     "contracts/examples/plugin-mediation-request.json",
     "contracts/examples/plugin-mediation-response.json",
+    "contracts/examples/plugin-action-mediation-grant.json",
+    "contracts/examples/plugin-action-mediation-request.json",
+    "contracts/examples/plugin-action-mediation-response.json",
     "contracts/examples/plugin-compatibility-report.json",
     "contracts/examples/policy-decision-request.json",
     "contracts/examples/policy-decision.json",
@@ -325,6 +333,7 @@ REQUIRED_PATHS = (
     "tests/test_release_bundle.py",
     "tests/test_plugin_invocation_lifecycle.py",
     "tests/test_plugin_compatibility.py",
+    "tests/test_plugin_action_mediation.py",
     "tests/test_ci_supply_chain.py",
     "tests/test_investigation_signal_catalog.py",
     ".github/dependabot.yml",
@@ -726,6 +735,86 @@ def validate_plugin_compatibility_example(
         "overallStatus": "compatible" if incompatible == 0 else "incompatible",
     }:
         fail(errors, "plugin compatibility summary must match its profile results")
+
+
+def validate_plugin_action_mediation_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check proposal-only authority and identity across action mediation examples."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    grant = documents.get(example_dir / "plugin-action-mediation-grant.json")
+    request = documents.get(example_dir / "plugin-action-mediation-request.json")
+    response = documents.get(example_dir / "plugin-action-mediation-response.json")
+    if not all(isinstance(item, dict) for item in (grant, request, response)):
+        fail(errors, "plugin action mediation examples must be objects")
+        return
+    assert isinstance(grant, dict)
+    assert isinstance(request, dict)
+    assert isinstance(response, dict)
+    validate_versioned_envelope(
+        grant,
+        filename="plugin-action-mediation-grant.json",
+        kind="PluginActionMediationGrant",
+        errors=errors,
+    )
+    for name, document, kind in (
+        (
+            "plugin-action-mediation-request.json",
+            request,
+            "PluginActionMediationRequest",
+        ),
+        (
+            "plugin-action-mediation-response.json",
+            response,
+            "PluginActionMediationResponse",
+        ),
+    ):
+        if (
+            document.get("apiVersion") != "iip.plugin-runtime/v1alpha1"
+            or document.get("kind") != kind
+            or not isinstance(document.get("metadata"), dict)
+            or not isinstance(document.get("spec"), dict)
+        ):
+            fail(errors, f"{name} has the wrong private protocol envelope")
+    grant_metadata = grant["metadata"]
+    grant_spec = grant["spec"]
+    request_metadata = request["metadata"]
+    request_spec = request["spec"]
+    response_metadata = response["metadata"]
+    response_spec = response["spec"]
+    if len(
+        {
+            grant_metadata.get("invocationId"),
+            request_metadata.get("invocationId"),
+            response_metadata.get("invocationId"),
+        }
+    ) != 1:
+        fail(errors, "plugin action mediation examples must identify one invocation")
+    if request_metadata.get("grantId") != grant_metadata.get("id"):
+        fail(errors, "plugin action request must identify its host grant")
+    if response_metadata.get("requestId") != request_metadata.get("id"):
+        fail(errors, "plugin action response must identify its request")
+    if (
+        request_spec.get("actionType") not in grant_spec.get("actionTypes", [])
+        or request_spec.get("targetResourceUid")
+        not in grant_spec.get("targetResourceUids", [])
+        or grant_spec.get("dryRunPolicy") == "required"
+        and request_spec.get("dryRun") is not True
+    ):
+        fail(errors, "plugin action request must remain within its grant")
+    issued = parse_timestamp(grant_metadata.get("issuedAt"))
+    grant_expiry = parse_timestamp(grant_metadata.get("expiresAt"))
+    completed = parse_timestamp(response_metadata.get("completedAt"))
+    proposal_expiry = parse_timestamp(response_spec.get("expiresAt"))
+    if None in (issued, grant_expiry, completed, proposal_expiry) or not (
+        issued <= completed <= proposal_expiry <= grant_expiry
+    ):
+        fail(errors, "plugin action mediation timestamps must remain grant-bounded")
+    serialized = json.dumps((grant, request, response), sort_keys=True).lower()
+    for forbidden in ("credential", "approval", "executor", "endpoint"):
+        if forbidden in serialized:
+            fail(errors, f"plugin action mediation examples must not contain {forbidden}")
 
 
 def validate_collection_examples(
@@ -2623,6 +2712,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("agent-manifest.json", "Agent"),
         ("integration-config.json", "IntegrationConfig"),
         ("plugin-manifest.json", "Plugin"),
+        ("plugin-action-mediation-grant.json", "PluginActionMediationGrant"),
         ("plugin-compatibility-report.json", "PluginCompatibilityReport"),
         ("plugin-invocation.json", "PluginInvocation"),
         ("plugin-invocation-result.json", "PluginInvocationResult"),
@@ -2719,6 +2809,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_evaluation_scenario(documents, errors)
     validate_plugin_mediation_examples(documents, errors)
     validate_plugin_compatibility_example(documents, errors)
+    validate_plugin_action_mediation_examples(documents, errors)
 
     policy_request = documents.get(example_dir / "policy-decision-request.json")
     policy_decision = documents.get(example_dir / "policy-decision.json")

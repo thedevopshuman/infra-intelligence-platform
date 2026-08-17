@@ -63,3 +63,7 @@ Unix-socket client used by isolated Python plugins.
 Version 0.35 adds `PluginCompatibilityReport`, the machine-readable exact-host
 evidence emitted by the executable Docker matrix. It is not a universal support
 claim for architectures or provider integrations that were not exercised.
+
+Version 0.36 adds proposal-only plugin action mediation grant/request/response
+models and `PluginMediationClient.propose_action`. The method cannot approve or
+execute the returned proposal.

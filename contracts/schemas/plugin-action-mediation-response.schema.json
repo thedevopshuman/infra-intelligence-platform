@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:plugin-action-mediation-response:v1alpha1",
+  "title": "Plugin Action Mediation Response",
+  "description": "Host-created proposal receipt or stable failure without approval or execution authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.plugin-runtime/v1alpha1"},
+    "kind": {"const": "PluginActionMediationResponse"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "invocationId", "completedAt"],
+      "properties": {
+        "requestId": {"type": "string", "pattern": "^par_[a-f0-9]{32}$"},
+        "invocationId": {"type": "string", "pattern": "^pin_[a-f0-9]{32}$"},
+        "completedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "proposalId", "proposalDigest", "expiresAt", "dryRun"],
+          "properties": {
+            "status": {"const": "proposed"},
+            "proposalId": {"type": "string", "pattern": "^act_[a-f0-9]{32}$"},
+            "proposalDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+            "expiresAt": {"type": "string", "format": "date-time"},
+            "dryRun": {"type": "boolean"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "error"],
+          "properties": {
+            "status": {"const": "failed"},
+            "error": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["code"],
+              "properties": {
+                "code": {
+                  "enum": [
+                    "plugin.action.audit-unavailable",
+                    "plugin.action.deadline-exceeded",
+                    "plugin.action.denied",
+                    "plugin.action.limit-exceeded",
+                    "plugin.action.proposal-rejected",
+                    "plugin.action.request-invalid"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

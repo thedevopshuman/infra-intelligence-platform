@@ -804,6 +804,7 @@ class AllowTenantPolicy:
             "plugin:open-session",
             "plugin:get-invocation",
             "plugin:mediate-read",
+            "plugin:propose-action",
             "plugin:cancel-invocation",
             "plugin:reconcile-invocation",
             "resource-projection:rebuild",

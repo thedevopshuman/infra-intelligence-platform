@@ -2730,6 +2730,84 @@ class PluginMediationResponse:
 
 
 @dataclass(frozen=True)
+class PluginActionMediationGrant:
+    """Host-issued proposal-only action bounds for one plugin invocation."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PluginActionMediationGrant":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="PluginActionMediationGrant",
+                label="plugin action mediation grant",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class PluginActionMediationRequest:
+    """Untrusted request for one ordinary governed action proposal."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PluginActionMediationRequest":
+        return cls(
+            _validate_plugin_runtime_envelope(
+                payload,
+                kind="PluginActionMediationRequest",
+                label="plugin action mediation request",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class PluginActionMediationResponse:
+    """Host-created action proposal receipt or stable failure."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PluginActionMediationResponse":
+        return cls(
+            _validate_plugin_runtime_envelope(
+                payload,
+                kind="PluginActionMediationResponse",
+                label="plugin action mediation response",
+            )
+        )
+
+    @property
+    def proposed(self) -> bool:
+        spec = self.payload.get("spec")
+        return isinstance(spec, Mapping) and spec.get("status") == "proposed"
+
+    @property
+    def proposal_id(self) -> Optional[str]:
+        spec = self.payload.get("spec")
+        value = spec.get("proposalId") if isinstance(spec, Mapping) else None
+        return value if isinstance(value, str) else None
+
+    @property
+    def error_code(self) -> Optional[str]:
+        spec = self.payload.get("spec")
+        error = spec.get("error") if isinstance(spec, Mapping) else None
+        code = error.get("code") if isinstance(error, Mapping) else None
+        return code if isinstance(code, str) else None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class PluginInvocationResult:
     """Durably replayable host result with output or a stable terminal error."""
 

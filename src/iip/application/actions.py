@@ -93,6 +93,33 @@ class GovernedActionService:
         self._investigations = investigations
         self._outbox = outbox
 
+    def propose_plugin_action(
+        self,
+        actor: ActorContext,
+        *,
+        investigation_id: str,
+        action_type: str,
+        target_resource_uid: str,
+        parameters: Mapping[str, object],
+        idempotency_key: str,
+        expires_at: str,
+        dry_run: bool,
+    ) -> Mapping[str, object]:
+        """Enter a mediated plugin request into the ordinary governed workflow."""
+
+        return self.propose(
+            ProposeActionCommand(
+                actor=actor,
+                investigation_id=investigation_id,
+                action_type=action_type,
+                target_resource_uid=target_resource_uid,
+                parameters=parameters,
+                idempotency_key=idempotency_key,
+                expires_at=expires_at,
+                dry_run=dry_run,
+            )
+        )
+
     def propose(self, command: ProposeActionCommand) -> Mapping[str, object]:
         if command.action_type not in self.SUPPORTED_ACTIONS:
             raise ActionWorkflowError("action.type.unsupported")

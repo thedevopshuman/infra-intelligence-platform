@@ -926,14 +926,18 @@ class SignedDockerPluginRunner:
             actor, manifest, session, invocation, capability_token
         )
         permissions = manifest["spec"]["permissions"]
-        if not isinstance(permissions, Mapping) or permissions.get("actions"):
+        if not isinstance(permissions, Mapping):
             raise PluginRunnerError("plugin.permission.unsupported")
         mediation_handler = None
-        declared_connectivity = bool(
-            permissions.get("network") or permissions.get("secrets")
+        declared_mediation = bool(
+            permissions.get("network")
+            or permissions.get("secrets")
+            or permissions.get("actions")
         )
-        has_grants = "mediationGrants" in spec
-        if declared_connectivity or has_grants:
+        has_grants = bool(
+            spec.get("mediationGrants") or spec.get("actionMediationGrants")
+        )
+        if declared_mediation or has_grants:
             if self._mediation is None or not has_grants:
                 raise PluginRunnerError("plugin.permission.unsupported")
             try:
@@ -1190,16 +1194,18 @@ class SignedDockerPluginRunner:
                 or set(invocation) != {"apiVersion", "kind", "metadata", "spec"}
                 or set(metadata)
                 != {"id", "sessionId", "tenantId", "actorId", "createdAt", "deadline"}
-                or set(spec)
-                not in (
-                    {"manifestDigest", "capability", "method", "input"},
+                or not {"manifestDigest", "capability", "method", "input"}.issubset(
+                    spec
+                )
+                or not set(spec).issubset(
                     {
                         "manifestDigest",
                         "capability",
                         "method",
                         "input",
                         "mediationGrants",
-                    },
+                        "actionMediationGrants",
+                    }
                 )
                 or session.get("apiVersion") != "iip.platform/v1alpha1"
                 or session.get("kind") != "PluginSession"

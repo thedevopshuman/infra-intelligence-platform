@@ -7,12 +7,13 @@ import json
 import re
 import threading
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from iip.application.investigate import canonical_digest
 from iip.application.ports import (
     ActorContext,
     AuditSink,
+    PluginActionProposalGateway,
     PluginMediationBinding,
     PluginMediationBindingRegistry,
     PluginMediationGateway,
@@ -22,10 +23,17 @@ from iip.application.ports import (
 
 _GRANT_ID = re.compile(r"pmg_[a-f0-9]{32}")
 _REQUEST_ID = re.compile(r"pmr_[a-f0-9]{32}")
+_ACTION_GRANT_ID = re.compile(r"pag_[a-f0-9]{32}")
+_ACTION_REQUEST_ID = re.compile(r"par_[a-f0-9]{32}")
 _INVOCATION_ID = re.compile(r"pin_[a-f0-9]{32}")
+_INVESTIGATION_ID = re.compile(r"inv_[a-f0-9]{32}")
+_RESOURCE_UID = re.compile(r"res_[a-f0-9]{32}")
 _PATH = re.compile(r"/[A-Za-z0-9._~/-]{1,511}")
 _QUERY_KEY = re.compile(r"[A-Za-z][A-Za-z0-9._-]{0,63}")
 _TEMPLATE_PARAMETER = re.compile(r"\{[a-z][A-Za-z0-9]{0,31}\}")
+_DNS_LABEL = r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?"
+_DNS_SUBDOMAIN = re.compile(rf"{_DNS_LABEL}(?:\.{_DNS_LABEL})*")
+_ACTION_TYPE = "kubernetes.restart-workload"
 _FAILURE_CODES = frozenset(
     {
         "plugin.mediation.audit-unavailable",
@@ -261,8 +269,319 @@ class BoundPluginMediator:
         }
 
 
+class BoundPluginActionMediator:
+    """One invocation-local, proposal-only action handler."""
+
+    def __init__(
+        self,
+        actor: ActorContext,
+        plugin_id: str,
+        plugin_version: str,
+        invocation_id: str,
+        deadline: str,
+        grants: Mapping[str, Mapping[str, object]],
+        policy: PolicyDecisionPoint,
+        audit: AuditSink,
+        gateway: PluginActionProposalGateway,
+        now: Callable[[], datetime],
+    ) -> None:
+        self._actor = actor
+        self._plugin_id = plugin_id
+        self._plugin_version = plugin_version
+        self._invocation_id = invocation_id
+        self._deadline = deadline
+        self._grants = dict(grants)
+        self._policy = policy
+        self._audit = audit
+        self._gateway = gateway
+        self._now = now
+        self._responses: dict[str, tuple[str, Mapping[str, object]]] = {}
+        self._counts = {grant_id: 0 for grant_id in grants}
+        self._lock = threading.Lock()
+
+    def handle(self, request: Mapping[str, object]) -> Mapping[str, object]:
+        parsed = self._request(request)
+        if parsed is None:
+            return self._failure(
+                _action_request_id_or_fallback(request),
+                "plugin.action.request-invalid",
+            )
+        request_id, grant_id, request_spec = parsed
+        request_digest = canonical_digest(request)
+        with self._lock:
+            replay = self._responses.get(request_id)
+            if replay is not None:
+                if replay[0] == request_digest:
+                    return dict(replay[1])
+                return self._failure(request_id, "plugin.action.request-invalid")
+            response = self._handle_once(
+                request_id,
+                grant_id,
+                request_spec,
+            )
+            self._responses[request_id] = (request_digest, response)
+            return dict(response)
+
+    def _handle_once(
+        self,
+        request_id: str,
+        grant_id: str,
+        request_spec: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        grant = self._grants.get(grant_id)
+        if grant is None:
+            return self._failure(request_id, "plugin.action.denied")
+        metadata = grant["metadata"]
+        spec = grant["spec"]
+        assert isinstance(metadata, Mapping)
+        assert isinstance(spec, Mapping)
+        limits = spec["limits"]
+        assert isinstance(limits, Mapping)
+        current = self._now().astimezone(timezone.utc)
+        if current > _timestamp(self._deadline) or current > _timestamp(
+            metadata["expiresAt"]
+        ):
+            return self._failure(request_id, "plugin.action.deadline-exceeded")
+        if (
+            request_spec["actionType"] not in spec["actionTypes"]
+            or request_spec["targetResourceUid"] not in spec["targetResourceUids"]
+            or spec["dryRunPolicy"] == "required"
+            and request_spec["dryRun"] is not True
+        ):
+            return self._failure(request_id, "plugin.action.denied")
+        if self._counts[grant_id] >= limits["maxRequests"]:
+            return self._failure(request_id, "plugin.action.limit-exceeded")
+        self._counts[grant_id] += 1
+        expiry = min(
+            _timestamp(self._deadline),
+            _timestamp(metadata["expiresAt"]),
+            current + timedelta(seconds=limits["maxProposalLifetimeSeconds"]),
+        )
+        if expiry <= current:
+            return self._failure(request_id, "plugin.action.deadline-exceeded")
+        parameters = request_spec["parameters"]
+        assert isinstance(parameters, Mapping)
+        policy_resource = {
+            "tenantId": self._actor.tenant_id,
+            "pluginId": self._plugin_id,
+            "pluginVersion": self._plugin_version,
+            "invocationId": self._invocation_id,
+            "grantId": grant_id,
+            "requestId": request_id,
+            "investigationId": request_spec["investigationId"],
+            "actionType": request_spec["actionType"],
+            "targetResourceUid": request_spec["targetResourceUid"],
+            "parametersDigest": canonical_digest(parameters),
+            "dryRun": request_spec["dryRun"],
+            "expiresAt": _format_timestamp(expiry),
+        }
+        try:
+            decision = self._policy.decide(
+                self._actor,
+                "plugin:propose-action",
+                policy_resource,
+            )
+        except Exception:
+            return self._failure(request_id, "plugin.action.denied")
+        if not decision.allowed:
+            return self._failure(request_id, "plugin.action.denied")
+        try:
+            self._audit.append_audit(
+                self._actor,
+                "plugin-action-proposal-intent",
+                {
+                    "apiVersion": "iip.audit/v1alpha1",
+                    "kind": "PluginActionProposalIntent",
+                    "metadata": {
+                        "tenantId": self._actor.tenant_id,
+                        "actorId": self._actor.actor_id,
+                        "recordedAt": _format_timestamp(current),
+                    },
+                    "spec": {
+                        **policy_resource,
+                        "policyReasonCode": decision.reason_code,
+                        "policySnapshotRef": decision.policy_snapshot_ref,
+                    },
+                },
+            )
+        except Exception:
+            return self._failure(request_id, "plugin.action.audit-unavailable")
+        idempotency_key = "plugin-action-" + hashlib.sha256(
+            _canonical_bytes(
+                {
+                    "pluginId": self._plugin_id,
+                    "pluginVersion": self._plugin_version,
+                    "invocationId": self._invocation_id,
+                    "requestId": request_id,
+                }
+            )
+        ).hexdigest()
+        try:
+            proposal = self._gateway.propose_plugin_action(
+                self._actor,
+                investigation_id=str(request_spec["investigationId"]),
+                action_type=str(request_spec["actionType"]),
+                target_resource_uid=str(request_spec["targetResourceUid"]),
+                parameters=parameters,
+                idempotency_key=idempotency_key,
+                expires_at=_format_timestamp(expiry),
+                dry_run=bool(request_spec["dryRun"]),
+            )
+            proposal_metadata = proposal["metadata"]
+            proposal_spec = proposal["spec"]
+            if (
+                proposal.get("apiVersion") != "iip.platform/v1alpha1"
+                or proposal.get("kind") != "ActionProposal"
+                or proposal.get("status") != "pending-approval"
+                or not isinstance(proposal_metadata, Mapping)
+                or not isinstance(proposal_spec, Mapping)
+                or proposal_metadata.get("tenantId") != self._actor.tenant_id
+                or proposal_metadata.get("actorId") != self._actor.actor_id
+                or not isinstance(proposal_metadata.get("id"), str)
+                or re.fullmatch(r"act_[a-f0-9]{32}", proposal_metadata["id"])
+                is None
+                or proposal_spec.get("investigationId")
+                != request_spec["investigationId"]
+                or proposal_spec.get("actionType") != request_spec["actionType"]
+                or proposal_spec.get("targetResourceUid")
+                != request_spec["targetResourceUid"]
+                or proposal_spec.get("parameters") != parameters
+                or proposal_spec.get("dryRun") != request_spec["dryRun"]
+                or proposal_spec.get("idempotencyKey") != idempotency_key
+                or proposal_spec.get("expiresAt") != _format_timestamp(expiry)
+            ):
+                raise ValueError
+        except Exception:
+            return self._failure(request_id, "plugin.action.proposal-rejected")
+        return {
+            "apiVersion": "iip.plugin-runtime/v1alpha1",
+            "kind": "PluginActionMediationResponse",
+            "metadata": {
+                "requestId": request_id,
+                "invocationId": self._invocation_id,
+                "completedAt": self._timestamp(),
+            },
+            "spec": {
+                "status": "proposed",
+                "proposalId": proposal_metadata["id"],
+                "proposalDigest": canonical_digest(proposal),
+                "expiresAt": proposal_spec["expiresAt"],
+                "dryRun": proposal_spec["dryRun"],
+            },
+        }
+
+    def _request(
+        self,
+        request: Mapping[str, object],
+    ) -> tuple[str, str, Mapping[str, object]] | None:
+        try:
+            if (
+                not isinstance(request, Mapping)
+                or set(request) != {"apiVersion", "kind", "metadata", "spec"}
+                or request.get("apiVersion") != "iip.plugin-runtime/v1alpha1"
+                or request.get("kind") != "PluginActionMediationRequest"
+            ):
+                raise ValueError
+            metadata = request["metadata"]
+            spec = request["spec"]
+            if (
+                not isinstance(metadata, Mapping)
+                or set(metadata) != {"id", "invocationId", "grantId"}
+                or not isinstance(spec, Mapping)
+                or set(spec)
+                != {
+                    "investigationId",
+                    "actionType",
+                    "targetResourceUid",
+                    "parameters",
+                    "dryRun",
+                }
+            ):
+                raise ValueError
+            request_id = metadata["id"]
+            grant_id = metadata["grantId"]
+            parameters = spec["parameters"]
+            if (
+                not isinstance(request_id, str)
+                or _ACTION_REQUEST_ID.fullmatch(request_id) is None
+                or metadata.get("invocationId") != self._invocation_id
+                or not isinstance(grant_id, str)
+                or _ACTION_GRANT_ID.fullmatch(grant_id) is None
+                or not isinstance(spec.get("investigationId"), str)
+                or _INVESTIGATION_ID.fullmatch(spec["investigationId"]) is None
+                or spec.get("actionType") != _ACTION_TYPE
+                or not isinstance(spec.get("targetResourceUid"), str)
+                or _RESOURCE_UID.fullmatch(spec["targetResourceUid"]) is None
+                or not isinstance(spec.get("dryRun"), bool)
+                or not _valid_restart_parameters(parameters)
+            ):
+                raise ValueError
+            return request_id, grant_id, spec
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    def _timestamp(self) -> str:
+        return _format_timestamp(self._now().astimezone(timezone.utc))
+
+    def _failure(self, request_id: str, code: str) -> Mapping[str, object]:
+        return {
+            "apiVersion": "iip.plugin-runtime/v1alpha1",
+            "kind": "PluginActionMediationResponse",
+            "metadata": {
+                "requestId": request_id,
+                "invocationId": self._invocation_id,
+                "completedAt": self._timestamp(),
+            },
+            "spec": {"status": "failed", "error": {"code": code}},
+        }
+
+
+class BoundPluginMediationRouter:
+    """Dispatch closed private-protocol kinds without widening authority."""
+
+    def __init__(
+        self,
+        invocation_id: str,
+        read: BoundPluginMediator | None,
+        action: BoundPluginActionMediator | None,
+        now: Callable[[], datetime],
+    ) -> None:
+        self._invocation_id = invocation_id
+        self._read = read
+        self._action = action
+        self._now = now
+
+    def handle(self, request: Mapping[str, object]) -> Mapping[str, object]:
+        kind = request.get("kind") if isinstance(request, Mapping) else None
+        if kind == "PluginMediationRequest" and self._read is not None:
+            return self._read.handle(request)
+        if kind == "PluginActionMediationRequest":
+            if self._action is not None:
+                return self._action.handle(request)
+            return self._action_failure(request, "plugin.action.denied")
+        if self._read is not None:
+            return self._read.handle(request)
+        return self._action_failure(request, "plugin.action.request-invalid")
+
+    def _action_failure(
+        self, request: Mapping[str, object], code: str
+    ) -> Mapping[str, object]:
+        return {
+            "apiVersion": "iip.plugin-runtime/v1alpha1",
+            "kind": "PluginActionMediationResponse",
+            "metadata": {
+                "requestId": _action_request_id_or_fallback(request),
+                "invocationId": self._invocation_id,
+                "completedAt": _format_timestamp(
+                    self._now().astimezone(timezone.utc)
+                ),
+            },
+            "spec": {"status": "failed", "error": {"code": code}},
+        }
+
+
 class PluginMediationService:
-    """Bind public grants to protected host authority before plugin execution."""
+    """Bind read and proposal-only grants before isolated plugin execution."""
 
     def __init__(
         self,
@@ -270,12 +589,15 @@ class PluginMediationService:
         policy: PolicyDecisionPoint,
         audit: AuditSink,
         gateway: PluginMediationGateway,
+        *,
+        action_gateway: PluginActionProposalGateway | None = None,
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
     ) -> None:
         self._registry = registry
         self._policy = policy
         self._audit = audit
         self._gateway = gateway
+        self._action_gateway = action_gateway
         self._now = now
 
     def bind(
@@ -283,7 +605,7 @@ class PluginMediationService:
         actor: ActorContext,
         manifest: Mapping[str, object],
         invocation: Mapping[str, object],
-    ) -> BoundPluginMediator:
+    ) -> BoundPluginMediationRouter:
         try:
             manifest_metadata = manifest["metadata"]
             permissions = manifest["spec"]["permissions"]
@@ -304,7 +626,8 @@ class PluginMediationService:
             invocation_id = invocation_metadata["id"]
             created_at = invocation_metadata["createdAt"]
             deadline = invocation_metadata["deadline"]
-            grants = invocation_spec.get("mediationGrants")
+            grants = invocation_spec.get("mediationGrants", [])
+            action_grants = invocation_spec.get("actionMediationGrants", [])
             network_permissions = permissions.get("network")
             secret_permissions = permissions.get("secrets")
             action_permissions = permissions.get("actions")
@@ -316,14 +639,21 @@ class PluginMediationService:
                 or not isinstance(created_at, str)
                 or not isinstance(deadline, str)
                 or not isinstance(grants, list)
-                or not 1 <= len(grants) <= 16
+                or len(grants) > 16
+                or not isinstance(action_grants, list)
+                or len(action_grants) > 16
                 or invocation_spec.get("manifestDigest") != canonical_digest(manifest)
                 or not isinstance(network_permissions, list)
                 or any(not isinstance(item, str) for item in network_permissions)
                 or not isinstance(secret_permissions, list)
                 or any(not isinstance(item, str) for item in secret_permissions)
                 or not isinstance(action_permissions, list)
-                or action_permissions
+                or any(not isinstance(item, str) for item in action_permissions)
+                or not (grants or action_grants)
+                or bool(grants) != bool(network_permissions or secret_permissions)
+                or bool(action_grants) != bool(action_permissions)
+                or action_grants
+                and self._action_gateway is None
             ):
                 raise ValueError
             resolved: dict[
@@ -343,22 +673,142 @@ class PluginMediationService:
                 if grant_id in resolved:
                     raise ValueError
                 resolved[grant_id] = (grant, binding)
-            return BoundPluginMediator(
-                actor,
-                plugin_id,
-                plugin_version,
+            resolved_actions: dict[str, Mapping[str, object]] = {}
+            for grant in action_grants:
+                grant_id = self._resolve_action_grant(
+                    actor,
+                    invocation_id,
+                    created_at,
+                    deadline,
+                    action_permissions,
+                    grant,
+                )
+                if grant_id in resolved_actions:
+                    raise ValueError
+                assert isinstance(grant, Mapping)
+                resolved_actions[grant_id] = grant
+            read_mediator = (
+                BoundPluginMediator(
+                    actor,
+                    plugin_id,
+                    plugin_version,
+                    invocation_id,
+                    deadline,
+                    resolved,
+                    self._policy,
+                    self._audit,
+                    self._gateway,
+                    self._now,
+                )
+                if resolved
+                else None
+            )
+            action_mediator = (
+                BoundPluginActionMediator(
+                    actor,
+                    plugin_id,
+                    plugin_version,
+                    invocation_id,
+                    deadline,
+                    resolved_actions,
+                    self._policy,
+                    self._audit,
+                    self._action_gateway,
+                    self._now,
+                )
+                if resolved_actions and self._action_gateway is not None
+                else None
+            )
+            return BoundPluginMediationRouter(
                 invocation_id,
-                deadline,
-                resolved,
-                self._policy,
-                self._audit,
-                self._gateway,
+                read_mediator,
+                action_mediator,
                 self._now,
             )
         except PluginMediationError:
             raise
         except (KeyError, TypeError, ValueError):
             raise PluginMediationError("plugin.mediation.binding-invalid") from None
+
+    def _resolve_action_grant(
+        self,
+        actor: ActorContext,
+        invocation_id: str,
+        invocation_created_at: str,
+        invocation_deadline: str,
+        action_permissions: list[object],
+        grant: object,
+    ) -> str:
+        if not isinstance(grant, Mapping):
+            raise ValueError
+        metadata = grant.get("metadata")
+        spec = grant.get("spec")
+        if (
+            set(grant) != {"apiVersion", "kind", "metadata", "spec"}
+            or grant.get("apiVersion") != "iip.platform/v1alpha1"
+            or grant.get("kind") != "PluginActionMediationGrant"
+            or not isinstance(metadata, Mapping)
+            or set(metadata)
+            != {"id", "invocationId", "tenantId", "actorId", "issuedAt", "expiresAt"}
+            or not isinstance(spec, Mapping)
+            or set(spec)
+            != {
+                "operation",
+                "actionTypes",
+                "targetResourceUids",
+                "dryRunPolicy",
+                "limits",
+            }
+        ):
+            raise ValueError
+        grant_id = metadata.get("id")
+        action_types = spec.get("actionTypes")
+        targets = spec.get("targetResourceUids")
+        limits = spec.get("limits")
+        if (
+            not isinstance(grant_id, str)
+            or _ACTION_GRANT_ID.fullmatch(grant_id) is None
+            or metadata.get("invocationId") != invocation_id
+            or metadata.get("tenantId") != actor.tenant_id
+            or metadata.get("actorId") != actor.actor_id
+            or spec.get("operation") != "governed-action-proposal"
+            or not isinstance(action_types, list)
+            or not 1 <= len(action_types) <= 16
+            or len(action_types) != len(set(action_types))
+            or any(item != _ACTION_TYPE for item in action_types)
+            or any(item not in action_permissions for item in action_types)
+            or not isinstance(targets, list)
+            or not 1 <= len(targets) <= 64
+            or len(targets) != len(set(targets))
+            or any(
+                not isinstance(item, str) or _RESOURCE_UID.fullmatch(item) is None
+                for item in targets
+            )
+            or spec.get("dryRunPolicy") not in {"required", "allowed"}
+            or not isinstance(limits, Mapping)
+            or set(limits) != {"maxRequests", "maxProposalLifetimeSeconds"}
+            or isinstance(limits.get("maxRequests"), bool)
+            or not isinstance(limits.get("maxRequests"), int)
+            or not 1 <= limits["maxRequests"] <= 16
+            or isinstance(limits.get("maxProposalLifetimeSeconds"), bool)
+            or not isinstance(limits.get("maxProposalLifetimeSeconds"), int)
+            or not 60 <= limits["maxProposalLifetimeSeconds"] <= 3600
+        ):
+            raise ValueError
+        issued = _timestamp(metadata.get("issuedAt"))
+        expires = _timestamp(metadata.get("expiresAt"))
+        invocation_created = _timestamp(invocation_created_at)
+        invocation_expires = _timestamp(invocation_deadline)
+        current = self._now().astimezone(timezone.utc)
+        if (
+            issued < invocation_created
+            or issued > current
+            or expires > invocation_expires
+            or issued > expires
+            or current > expires
+        ):
+            raise PluginMediationError("plugin.mediation.binding-expired")
+        return grant_id
 
     def _resolve_grant(
         self,
@@ -528,9 +978,41 @@ def _text_digest(value: str) -> str:
     return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _format_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _valid_restart_parameters(value: object) -> bool:
+    if not isinstance(value, Mapping) or set(value) != {
+        "namespace",
+        "workloadKind",
+        "workloadName",
+    }:
+        return False
+    namespace = value.get("namespace")
+    workload_name = value.get("workloadName")
+    return bool(
+        isinstance(namespace, str)
+        and len(namespace) <= 253
+        and _DNS_SUBDOMAIN.fullmatch(namespace)
+        and value.get("workloadKind") in {"deployment", "statefulset", "daemonset"}
+        and isinstance(workload_name, str)
+        and len(workload_name) <= 253
+        and _DNS_SUBDOMAIN.fullmatch(workload_name)
+    )
+
+
 def _request_id_or_fallback(request: Mapping[str, object]) -> str:
     metadata = request.get("metadata") if isinstance(request, Mapping) else None
     request_id = metadata.get("id") if isinstance(metadata, Mapping) else None
     if isinstance(request_id, str) and _REQUEST_ID.fullmatch(request_id):
         return request_id
     return "pmr_" + "0" * 32
+
+
+def _action_request_id_or_fallback(request: Mapping[str, object]) -> str:
+    metadata = request.get("metadata") if isinstance(request, Mapping) else None
+    request_id = metadata.get("id") if isinstance(metadata, Mapping) else None
+    if isinstance(request_id, str) and _ACTION_REQUEST_ID.fullmatch(request_id):
+        return request_id
+    return "par_" + "0" * 32

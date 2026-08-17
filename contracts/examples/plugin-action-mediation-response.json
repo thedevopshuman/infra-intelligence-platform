@@ -1,0 +1,16 @@
+{
+  "apiVersion": "iip.plugin-runtime/v1alpha1",
+  "kind": "PluginActionMediationResponse",
+  "metadata": {
+    "requestId": "par_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "invocationId": "pin_4da8d7ab485b4d7f90f7b5b932c70827",
+    "completedAt": "2026-08-14T12:44:32Z"
+  },
+  "spec": {
+    "status": "proposed",
+    "proposalId": "act_55555555555555555555555555555555",
+    "proposalDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "expiresAt": "2026-08-14T12:45:00Z",
+    "dryRun": true
+  }
+}

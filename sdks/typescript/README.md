@@ -58,3 +58,6 @@ Version 0.34 adds invocation-scoped plugin mediation grant, request, and respons
 Version 0.35 adds `PluginCompatibilityReport` for the offline exact-host
 conformance artifact. The type does not widen plugin authority or imply support
 for untested architectures or provider integrations.
+
+Version 0.36 adds proposal-only plugin action mediation grant, request, and
+response types. Approval and execution remain separate control-plane contracts.

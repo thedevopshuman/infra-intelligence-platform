@@ -10,20 +10,24 @@ platform verifies trust and authority in this order:
    plugin identity, protocol, immutable image reference, and digest;
 3. bind the manifest digest, actor, tenant, capability token digest, declared
    method, deadline, and limits to an active `PluginSession`;
-4. atomically claim the tenant/request ID against the persisted session and
-   canonical invocation digest;
-5. when the invocation carries an approved read grant, bind it to protected
-   endpoint/credential configuration, live policy, audit, deadline, and limits;
+4. validate any read or action-proposal grant against the signed manifest,
+   deadline, and limits without performing egress or creating a proposal; bind
+   read grants additionally to protected endpoint/credential configuration;
+5. atomically claim the tenant/request ID against the persisted session and
+   canonical invocation digest before the plugin can use the bound handler;
 6. start the already-present image by immutable digest with Docker networking
    disabled, no inherited plugin environment or credentials, and at most one
    fresh invocation-local mediation-socket volume shared through the
    digest-pinned, no-network, non-root relay;
 7. mediate each allowed JSON `GET` on the host through an exact broker lease and
    direct no-redirect TLS request, returning no provider headers or credentials;
-8. enforce read-only root, non-root UID, dropped capabilities,
+8. for an action request, derive expiry and idempotency, record audit intent,
+   and enter only the ordinary governed proposal workflow—never approval or
+   execution;
+9. enforce read-only root, non-root UID, dropped capabilities,
    `no-new-privileges`, CPU, memory/swap, PID, file-descriptor, temporary storage,
    wall-time, input, stdout, and stderr limits;
-9. wrap one bounded JSON object in a host-created `PluginInvocationResult` and
+10. wrap one bounded JSON object in a host-created `PluginInvocationResult` and
    pass it to the owning contract validator before application use.
 
 The Docker client uses `--pull=never`. Artifact acquisition and signature review
@@ -41,13 +45,14 @@ receives the polling endpoint or control-plane credentials. A platform
 administrator can close a post-deadline ambiguous claim as outcome unknown, but
 cannot clear or replay it. The process-local adapter implements the same state
 machine only for no-impact conformance and is not restart durable. Network,
-secret, and action declarations remain denied. Before any side-effecting or
-externally connected plugin is enabled, the platform must add a mediated
-network/credential proxy whose grants are narrower than the manifest and
-session. Read-only network and credential declarations are enabled only through
-the [invocation-scoped mediation boundary](../specifications/plugin-mediation-contract.md);
-action declarations remain denied. Direct Docker socket access belongs only to a dedicated runner
-deployment, never the API pod.
+secret, and action declarations grant nothing by themselves. Read-only network
+and credential declarations are enabled only through the
+[read mediation boundary](../specifications/plugin-mediation-contract.md).
+Action declarations are enabled only for the
+[proposal-only mediation boundary](../specifications/plugin-action-mediation-contract.md):
+the plugin may place a proposal in the normal approval queue but never receives
+approval, execution, reconciliation, or credential authority. Direct Docker
+socket access belongs only to a dedicated runner deployment, never the API pod.
 
 The trusted relay is released as its own multi-platform OCI layout alongside the
 control plane. Its artifact entry, platform digests, SPDX SBOM, and SLSA

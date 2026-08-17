@@ -138,6 +138,15 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "plugin-mediation-grant.schema.json": ("plugin-mediation-grant.json",),
     "plugin-mediation-request.schema.json": ("plugin-mediation-request.json",),
     "plugin-mediation-response.schema.json": ("plugin-mediation-response.json",),
+    "plugin-action-mediation-grant.schema.json": (
+        "plugin-action-mediation-grant.json",
+    ),
+    "plugin-action-mediation-request.schema.json": (
+        "plugin-action-mediation-request.json",
+    ),
+    "plugin-action-mediation-response.schema.json": (
+        "plugin-action-mediation-response.json",
+    ),
     "policy-decision-request.schema.json": ("policy-decision-request.json",),
     "policy-decision.schema.json": ("policy-decision.json",),
     "page-info.schema.json": ("page-info.json",),

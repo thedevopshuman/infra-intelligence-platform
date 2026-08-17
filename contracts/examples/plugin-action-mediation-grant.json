@@ -1,0 +1,19 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PluginActionMediationGrant",
+  "metadata": {
+    "id": "pag_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "invocationId": "pin_4da8d7ab485b4d7f90f7b5b932c70827",
+    "tenantId": "local",
+    "actorId": "plugin-host",
+    "issuedAt": "2026-08-14T12:44:30Z",
+    "expiresAt": "2026-08-14T12:45:00Z"
+  },
+  "spec": {
+    "operation": "governed-action-proposal",
+    "actionTypes": ["kubernetes.restart-workload"],
+    "targetResourceUids": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+    "dryRunPolicy": "required",
+    "limits": {"maxRequests": 1, "maxProposalLifetimeSeconds": 300}
+  }
+}

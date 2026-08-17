@@ -55,8 +55,9 @@ destinations, raw response bytes, and direct credentials remain prohibited.
   to validate, minimize, and treat plugin results as untrusted.
 - The API pod still has no container-runtime socket. A production plugin runner
   remains a separate deployment and failure domain.
-- Mutating or action-provider plugins remain disabled until a separately
-  governed proposal/approval/execution protocol is defined.
+- This read protocol never expresses actions. ADR 0070 separately enables only
+  governed proposal creation; approval, execution, and credentials remain
+  outside the plugin socket.
 - The mediation contracts are an SDK/private-runner boundary, not an OpenAPI
   control-plane route.
 

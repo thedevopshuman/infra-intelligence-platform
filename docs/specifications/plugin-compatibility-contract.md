@@ -39,6 +39,7 @@ customer's exact runtime architecture and integration interoperability gates.
 
 This contract does not imply that one passing architecture supports another,
 that fixture mediation proves a live credential issuer or provider, or that
-read compatibility grants action authority. New plugin protocol versions add
+read compatibility certifies the distinct proposal-only action mediation
+profile. New plugin protocol versions and action-provider certification add
 separate matrix rows or a new report contract when compatibility semantics
 break; existing rows are never silently reinterpreted.

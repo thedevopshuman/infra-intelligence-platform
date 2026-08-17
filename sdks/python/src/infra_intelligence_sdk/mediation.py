@@ -6,7 +6,12 @@ import json
 import socket
 from pathlib import Path
 
-from .models import PluginMediationRequest, PluginMediationResponse
+from .models import (
+    PluginActionMediationRequest,
+    PluginActionMediationResponse,
+    PluginMediationRequest,
+    PluginMediationResponse,
+)
 
 
 class PluginMediationClientError(RuntimeError):
@@ -42,8 +47,39 @@ class PluginMediationClient:
     def request(self, request: PluginMediationRequest) -> PluginMediationResponse:
         if not isinstance(request, PluginMediationRequest):
             raise TypeError("request must be PluginMediationRequest")
+        response = self._exchange(
+            request.to_dict(),
+            response_type=PluginMediationResponse,
+        )
+        assert isinstance(response, PluginMediationResponse)
+        return response
+
+    def propose_action(
+        self, request: PluginActionMediationRequest
+    ) -> PluginActionMediationResponse:
+        """Request one governed proposal without receiving execution authority."""
+
+        if not isinstance(request, PluginActionMediationRequest):
+            raise TypeError("request must be PluginActionMediationRequest")
+        response = self._exchange(
+            request.to_dict(),
+            response_type=PluginActionMediationResponse,
+        )
+        assert isinstance(response, PluginActionMediationResponse)
+        return response
+
+    def _exchange(
+        self,
+        request_document: dict[str, object],
+        *,
+        response_type: type[PluginMediationResponse]
+        | type[PluginActionMediationResponse],
+    ) -> PluginMediationResponse | PluginActionMediationResponse:
         body = json.dumps(
-            request.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            request_document,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
         ).encode("utf-8")
         if len(body) > 65_536:
             raise PluginMediationClientError("plugin.mediation.request-invalid")
@@ -70,8 +106,8 @@ class PluginMediationClient:
             document = json.loads(line)
             if not isinstance(document, dict):
                 raise TypeError
-            response = PluginMediationResponse.from_dict(document)
-            request_metadata = request.payload["metadata"]
+            response = response_type.from_dict(document)
+            request_metadata = request_document["metadata"]
             response_metadata = response.payload["metadata"]
             if (
                 not isinstance(request_metadata, dict)

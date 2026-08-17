@@ -36,5 +36,5 @@ host; it is not a universal support or interoperability claim.
 - CI detects drift in signing, sandboxing, socket mediation, SDK framing, and
   output contracts through the same runnable example.
 - Live customer provider/credential-broker qualification, multi-host release
-  certification, action mediation, and support-policy publication remain
-  separate gates.
+  certification, proposal-only action-provider certification, and
+  support-policy publication remain separate gates.

@@ -35,5 +35,6 @@ authenticated the missing declaration fields.
   least-authority manifests for one immutable image.
 - The migration is intentionally execution-breaking for legacy signatures and
   has explicit re-signing guidance.
-- Publisher-key governance, revocation, registry promotion, and external
-  transparency policy remain production gates.
+- Publisher-key governance, revocation, registry promotion, external
+  transparency policy, and customer action-provider interoperability remain
+  production gates. ADR 0070 enables only host-governed proposal creation.

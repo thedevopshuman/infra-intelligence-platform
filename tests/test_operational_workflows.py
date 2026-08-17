@@ -718,6 +718,26 @@ class GovernedActionTests(unittest.TestCase):
             )
         )
 
+    def test_plugin_gateway_method_enters_the_same_governed_proposal_boundary(self) -> None:
+        proposal = self.service.propose_plugin_action(
+            self.proposer,
+            investigation_id="inv_71c9e4a2b8d04f65a3c7e9b102d4f608",
+            action_type="kubernetes.restart-workload",
+            target_resource_uid=self.target_uid,
+            parameters={
+                "namespace": "default",
+                "workloadKind": "deployment",
+                "workloadName": "api",
+            },
+            idempotency_key="plugin-action-" + "a" * 64,
+            expires_at="2099-08-14T13:30:00Z",
+            dry_run=True,
+        )
+
+        self.assertEqual(proposal["status"], "pending-approval")
+        self.assertEqual(proposal["metadata"]["actorId"], self.proposer.actor_id)
+        assert_schema(self, "action-proposal.schema.json", proposal)
+
     def test_approval_requires_separate_role_and_execution_is_idempotent(self) -> None:
         proposal = self.proposal()
         assert_schema(self, "action-proposal.schema.json", proposal)

@@ -36,6 +36,12 @@ the Docker bind, framing, path/query grant, policy, pre-egress audit, count
 limit, and no-network execution together. It does not claim live customer
 credential or Kubernetes interoperability.
 
+The proposal-only action mediation boundary is covered by schema, SDK socket,
+service, runner-routing, policy, audit, grant, idempotency, and governed-proposal
+tests. The current Docker matrix does not yet contain an external action-provider
+plugin row, so do not present its two read-oriented rows as action-provider
+certification.
+
 The report binds those outcomes to the exact plugin and relay image IDs,
 canonical signed-manifest digest, application and Python SDK versions, Git
 revision and dirty state, Docker server version, and Linux architecture. Never
@@ -55,7 +61,8 @@ The gate deliberately runs with `--network=none` and `--pull=never`. A failure
 because Docker Desktop is unavailable, the image is absent, signature or digest
 does not match, a connected invocation lacks an exact host binding, policy or
 audit fails, a deadline expires, or output exceeds a limit is expected to fail
-closed. Action permissions remain unsupported. Provider stderr is not surfaced.
+closed. Action permissions require a separate exact proposal grant; without it
+the runner rejects the invocation. Provider stderr is not surfaced.
 
 Production deployment must place Docker/containerd access in a dedicated runner
 service, configure reviewed publisher public keys, pre-pull digest-pinned images,
@@ -73,7 +80,10 @@ The durable ledger does not by itself authorize connected or side-effecting
 plugins. Read connectivity additionally requires the signed manifest, embedded
 grant, protected binding, policy, audit, broker, path/query, and limit checks.
 Never place an endpoint, credential reference, CA path, token, Docker socket, or
-control-plane token in the grant or plugin environment. Actions remain denied.
+control-plane token in the grant or plugin environment. Action mediation
+additionally requires an invocation-bound type/target/dry-run grant, current
+policy, pre-proposal audit, a completed authorized investigation, and the normal
+governed proposal service. The socket never exposes approval or execution.
 
 Operators can inspect `GET /v1/plugin-invocations/{id}/status` and request
 cooperative stop with `POST /v1/plugin-invocations/{id}/cancel`. The accepted

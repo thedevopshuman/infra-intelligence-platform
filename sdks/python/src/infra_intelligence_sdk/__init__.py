@@ -52,6 +52,9 @@ from .models import (
     LogEvidenceResult,
     OtlpLogsEvidence,
     OtlpMetricsEvidence,
+    PluginActionMediationGrant,
+    PluginActionMediationRequest,
+    PluginActionMediationResponse,
     PluginCompatibilityReport,
     PluginInvocation,
     PluginInvocationCancellationRequest,
@@ -131,6 +134,9 @@ __all__ = [
     "LogEvidenceResult",
     "OtlpLogsEvidence",
     "OtlpMetricsEvidence",
+    "PluginActionMediationGrant",
+    "PluginActionMediationRequest",
+    "PluginActionMediationResponse",
     "PluginCompatibilityReport",
     "PluginInvocation",
     "PluginInvocationCancellationRequest",
@@ -161,4 +167,4 @@ __all__ = [
     "TelemetryExportHealthReport",
     "discover_console_authentication",
 ]
-__version__ = "0.35.0"
+__version__ = "0.36.0"

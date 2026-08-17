@@ -99,10 +99,14 @@ session and canonical invocation digest before a container starts. PostgreSQL
 serializes the session request limit across replicas, retains host-created
 terminal results, serves exact completed retries without execution, and leaves
 crash-ambiguous claims closed for explicit reconciliation. The API pod still has
-no container-runtime socket, and connected or side-effecting plugin capabilities
-remain denied until mediated credentials/networking exist. Durable host-side
-plugin cancellation and administrator-only post-deadline reconciliation are
-defined by [ADR 0065](../decisions/0065-plugin-invocation-cancellation-and-reconciliation.md).
+no container-runtime socket. Read grants keep credentials and networking on the
+host under [ADR 0066](../decisions/0066-host-mediated-plugin-read-connectivity.md).
+Proposal-only action grants under
+[ADR 0070](../decisions/0070-proposal-only-plugin-action-mediation.md) can enter
+the ordinary governed approval queue but never grant approval, execution, or a
+provider credential. Durable host-side plugin cancellation and
+administrator-only post-deadline reconciliation are defined by
+[ADR 0065](../decisions/0065-plugin-invocation-cancellation-and-reconciliation.md).
 [ADR 0064](../decisions/0064-durable-plugin-invocation-ownership.md) records the
 ownership and recovery boundary.
 

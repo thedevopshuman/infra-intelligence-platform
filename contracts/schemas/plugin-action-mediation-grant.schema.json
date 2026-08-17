@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:plugin-action-mediation-grant:v1alpha1",
+  "title": "Plugin Action Mediation Grant",
+  "description": "Host-issued upper bounds for proposal-only plugin action mediation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "PluginActionMediationGrant"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "invocationId", "tenantId", "actorId", "issuedAt", "expiresAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^pag_[a-f0-9]{32}$"},
+        "invocationId": {"type": "string", "pattern": "^pin_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+        "actorId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,255}$", "not": {"const": "anonymous"}},
+        "issuedAt": {"type": "string", "format": "date-time"},
+        "expiresAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "actionTypes", "targetResourceUids", "dryRunPolicy", "limits"],
+      "properties": {
+        "operation": {"const": "governed-action-proposal"},
+        "actionTypes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {"enum": ["kubernetes.restart-workload"]}
+        },
+        "targetResourceUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}
+        },
+        "dryRunPolicy": {"enum": ["required", "allowed"]},
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxRequests", "maxProposalLifetimeSeconds"],
+          "properties": {
+            "maxRequests": {"type": "integer", "minimum": 1, "maximum": 16},
+            "maxProposalLifetimeSeconds": {"type": "integer", "minimum": 60, "maximum": 3600}
+          }
+        }
+      }
+    }
+  }
+}

@@ -21,7 +21,10 @@ and therefore covered by its canonical durable claim digest.
 `PluginMediationRequest` is untrusted plugin output. It can select only a grant,
 `GET`, one absolute path, and allowlisted query values. It has no scheme, host,
 port, headers, redirect option, method override, request body, credential field,
-or action semantics. Each template segment such as `{namespace}` matches exactly
+or action semantics. Proposal-only actions use the distinct
+[plugin action mediation contract](plugin-action-mediation-contract.md), so a
+read grant can never be interpreted as action authority. Each template segment
+such as `{namespace}` matches exactly
 one safe path segment; it cannot match a slash, empty segment, `.` or `..`.
 
 `PluginMediationResponse` is host-created. Success contains only a bounded JSON

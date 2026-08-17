@@ -1,0 +1,20 @@
+{
+  "apiVersion": "iip.plugin-runtime/v1alpha1",
+  "kind": "PluginActionMediationRequest",
+  "metadata": {
+    "id": "par_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "invocationId": "pin_4da8d7ab485b4d7f90f7b5b932c70827",
+    "grantId": "pag_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "spec": {
+    "investigationId": "inv_71c9e4a2b8d04f65a3c7e9b102d4f608",
+    "actionType": "kubernetes.restart-workload",
+    "targetResourceUid": "res_e0ae9225a316fce4c97df5c23057b97a",
+    "parameters": {
+      "namespace": "default",
+      "workloadKind": "deployment",
+      "workloadName": "api"
+    },
+    "dryRun": true
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:plugin-action-mediation-request:v1alpha1",
+  "title": "Plugin Action Mediation Request",
+  "description": "Untrusted request to create, but never approve or execute, one governed action proposal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.plugin-runtime/v1alpha1"},
+    "kind": {"const": "PluginActionMediationRequest"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "invocationId", "grantId"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^par_[a-f0-9]{32}$"},
+        "invocationId": {"type": "string", "pattern": "^pin_[a-f0-9]{32}$"},
+        "grantId": {"type": "string", "pattern": "^pag_[a-f0-9]{32}$"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["investigationId", "actionType", "targetResourceUid", "parameters", "dryRun"],
+      "properties": {
+        "investigationId": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"},
+        "actionType": {"const": "kubernetes.restart-workload"},
+        "targetResourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["namespace", "workloadKind", "workloadName"],
+          "properties": {
+            "namespace": {"type": "string", "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)*$", "maxLength": 253},
+            "workloadKind": {"enum": ["deployment", "statefulset", "daemonset"]},
+            "workloadName": {"type": "string", "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)*$", "maxLength": 253}
+          }
+        },
+        "dryRun": {"type": "boolean"}
+      }
+    }
+  }
+}

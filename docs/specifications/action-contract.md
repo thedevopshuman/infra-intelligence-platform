@@ -21,3 +21,11 @@ The terminal status values `dry-run`, `succeeded`, `failed`, and `rolled-back` c
 `ActionWorkflow` is the tenant-scoped read model for operators and SDK consumers. It does not grant authority or replace immutable source records: it reconstructs one state from the proposal and any approval, execution status, and result read in one repository snapshot. `ActionWorkflowPage` returns newest workflows first with a maximum of 100 items and an opaque cursor bound to the authenticated tenant. State precedence is terminal result, execution lifecycle, approval decision, then proposal status. Corrupt identities or relationships fail closed instead of producing a misleading queue entry.
 
 When a pending or approved proposal reaches `expiresAt` without an execution, the read model reports `expired`. This is derived at read time. The immutable proposal keeps its original status and digest so an existing approval remains reconstructable but non-executable.
+
+An isolated plugin may enter this workflow only through the proposal-only
+[plugin action mediation contract](plugin-action-mediation-contract.md). The
+host derives its idempotency key and expiry, performs an additional plugin
+policy and audit check, and calls the same `GovernedActionService.propose`
+boundary. The plugin receives only a proposal receipt; approval, execution,
+reconciliation, credentials, and provider mutation remain unavailable on the
+plugin socket.

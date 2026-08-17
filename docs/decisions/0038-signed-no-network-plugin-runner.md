@@ -37,4 +37,5 @@ the result envelope and exposes only stable failure codes.
   mediated provider proxy can enforce declared destinations and request-scoped
   leases without ambient cluster credentials.
 - Durable cross-restart invocation claims are required before action plugins or
-  other side-effecting capabilities can be enabled.
+  other side-effecting capabilities can be enabled. ADR 0070 later enables only
+  proposal creation; it does not give the container mutation authority.

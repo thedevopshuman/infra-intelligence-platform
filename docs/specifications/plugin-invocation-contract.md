@@ -43,5 +43,8 @@ cooperative cancellation, and administrator-only post-deadline reconciliation.
 `spec.mediationGrants` is an additive request-scoped extension for the
 [host-mediated read protocol](plugin-mediation-contract.md). It is covered by
 the invocation digest and carries no endpoint, credential reference, or secret.
-Side-effecting plugin capabilities still require a separately defined mediated
-action grant before they can be enabled.
+`spec.actionMediationGrants` is the distinct additive extension for
+[proposal-only action mediation](plugin-action-mediation-contract.md). It is
+also covered by the durable invocation digest and can grant only action type,
+target, dry-run policy, expiry, and count upper bounds. It never contains an
+approval, executor, credential, or mutation endpoint.

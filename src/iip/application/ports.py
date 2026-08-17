@@ -834,6 +834,22 @@ class PluginMediationGateway(Protocol):
         """Perform one exact, credential-mediated provider read and return JSON."""
 
 
+class PluginActionProposalGateway(Protocol):
+    def propose_plugin_action(
+        self,
+        actor: ActorContext,
+        *,
+        investigation_id: str,
+        action_type: str,
+        target_resource_uid: str,
+        parameters: Mapping[str, object],
+        idempotency_key: str,
+        expires_at: str,
+        dry_run: bool,
+    ) -> Mapping[str, object]:
+        """Create one governed proposal without approval or execution authority."""
+
+
 class EvidenceRedactor(Protocol):
     def redact(
         self,

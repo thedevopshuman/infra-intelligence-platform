@@ -114,6 +114,11 @@ helm-lint:
 		--set database.existingSecret=iip-database \
 		--set worker.enabled=true \
 		--set 'worker.tenants[0]=tenant-a' \
+		--set evidenceRetention.enabled=true >/dev/null
+	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set database.existingSecret=iip-database \
+		--set worker.enabled=true \
+		--set 'worker.tenants[0]=tenant-a' \
 		--set eventPublisher.mode=https-webhook \
 		--set eventPublisher.httpsWebhook.endpoint=https://events.example.test/v1/cloudevents \
 		--set eventPublisher.httpsWebhook.tokenExistingSecret=iip-event-token \
@@ -166,6 +171,15 @@ helm-lint:
 		--set investigationCompletionSlo.windowSeconds=300 \
 		--set investigationCompletionSlo.maximumCompletionSeconds=300 >/dev/null 2>&1; then \
 		echo "Helm validation accepted an investigation completion objective as long as its window" >&2; exit 1; \
+	fi
+	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set evidenceRetention.enabled=true >/dev/null 2>&1; then \
+		echo "Helm validation accepted evidence retention without a worker" >&2; exit 1; \
+	fi
+	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set evidenceRetention.ephemeralSeconds=200000 \
+		--set evidenceRetention.standardSeconds=100000 >/dev/null 2>&1; then \
+		echo "Helm validation accepted unordered evidence retention durations" >&2; exit 1; \
 	fi
 	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set ingress.enabled=true \

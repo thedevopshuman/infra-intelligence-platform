@@ -23,6 +23,7 @@ QUERY_OPERATIONS = frozenset(
         "event-delivery-health",
         "event-delivery-slo",
         "investigation-completion-slo",
+        "evidence-retention",
         "evidence-get",
         "investigation-get",
         "investigation-status",

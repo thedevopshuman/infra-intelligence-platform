@@ -408,6 +408,32 @@ export interface InvestigationCompletionSloReport {
   };
 }
 
+export interface EvidenceRetentionReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "EvidenceRetentionReport";
+  metadata: { tenantId: string; evaluatedAt: string };
+  spec: {
+    status: "disabled" | "current" | "cleanup-required";
+    mode: "observe" | "expire";
+    policy: {
+      enabled: boolean;
+      ephemeralSeconds: number;
+      standardSeconds: number;
+      extendedSeconds: number;
+      batchSize: number;
+      digest: Sha256Digest;
+    };
+    artifacts: {
+      storedBefore: number;
+      eligible: number;
+      expired: number;
+      remainingEligible: number;
+      legalHold: number;
+    };
+    auditRef?: string;
+  };
+}
+
 export interface PlatformEvent<TData extends Record<string, unknown> = Record<string, unknown>> {
   specversion: "1.0";
   id: string;

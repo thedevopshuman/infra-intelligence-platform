@@ -30,6 +30,11 @@ from iip.application.context_evidence import (
     CollectContextEvidenceCommand,
     InvalidContextEvidenceRequestError,
 )
+from iip.application.evidence_retention import (
+    EvidenceRetentionAuthorizationError,
+    EvidenceRetentionStateError,
+    GetEvidenceRetentionCommand,
+)
 from iip.application.ingest_collection import (
     CollectionConflictError,
     IngestCollectionCommand,
@@ -152,7 +157,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.35.0"
+    server_version = "IIPReference/0.36.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -259,6 +264,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if path == "/v1/operations/investigations/completion-slo":
             self._query_investigation_completion_slo(actor, parsed.query)
+            return
+        if path == "/v1/operations/evidence/retention":
+            self._query_evidence_retention(actor, parsed.query)
             return
         if path == "/v1/actions":
             self._query_actions(actor, parsed.query)
@@ -510,6 +518,32 @@ class ApiHandler(BaseHTTPRequestHandler):
                         "code": "investigation.completion-slo.unavailable"
                     }
                 },
+            )
+
+    def _query_evidence_retention(
+        self, actor: ActorContext, query: str
+    ) -> None:
+        try:
+            if query:
+                raise ValueError
+            report = self.runtime.evidence_retention.get(
+                GetEvidenceRetentionCommand(actor)
+            )
+            self._json(HTTPStatus.OK, report.to_dict())
+        except ValueError:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": "request.invalid"}},
+            )
+        except EvidenceRetentionAuthorizationError:
+            self._json(
+                HTTPStatus.FORBIDDEN,
+                {"error": {"code": "policy.denied"}},
+            )
+        except (EvidenceRetentionStateError, PersistenceError):
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "evidence.retention.unavailable"}},
             )
 
     def _query_actions(self, actor: ActorContext, query: str) -> None:
@@ -1329,6 +1363,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             "/v1/operations/investigations/completion-slo": (
                 "investigation-completion-slo"
             ),
+            "/v1/operations/evidence/retention": "evidence-retention",
             "/v1/actions": "actions-list",
         }
         operation = exact.get(path)

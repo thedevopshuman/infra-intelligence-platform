@@ -9,7 +9,9 @@ Untrusted inputs include external events, resource attributes, logs, traces, run
 
 ## Tenant invariant
 
-The authenticated gateway establishes tenant and actor context. Payload tenant fields are consistency assertions, never the authority source. Every repository key, event partition, cache entry, credential lookup, tool call, evidence record, and audit record includes tenant scope.
+The authenticated gateway establishes tenant and actor context. Payload tenant fields are consistency assertions, never the authority source. Every repository key, event partition, cache entry, credential lookup, tool call, evidence record, retention pass, and audit record includes tenant scope.
+
+Evidence artifact retention is tenant-explicit and disabled by default. Observation requires authenticated administrator and policy authority. Automatic expiration uses a fixed non-interactive system actor for only the worker-enrolled tenant; it deletes bounded artifact bodies while preserving immutable Evidence metadata and appends a value-minimized audit record in the same PostgreSQL transaction. `legal-hold` can never be expired automatically.
 
 Cross-tenant operations are a separate privileged use case with explicit policy and audit; they are not implemented by omitting the tenant predicate.
 

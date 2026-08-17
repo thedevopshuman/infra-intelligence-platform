@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.35.0",
-    "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
+    "version": "0.36.0",
+    "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence and retention observation, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -208,6 +208,22 @@
           "503": {
             "description": "The investigation completion objective state is unavailable or inconsistent",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "investigation.completion-slo.unavailable"}}}}
+          }
+        }
+      }
+    },
+    "/v1/operations/evidence/retention": {
+      "get": {
+        "operationId": "getEvidenceRetention",
+        "description": "Observe deployment-owned Evidence artifact retention policy and aggregate lifecycle state for the authenticated tenant. This endpoint never mutates storage or returns evidence identities, content, source details, or credentials.",
+        "responses": {
+          "200": {"description": "Tenant-scoped evidence artifact retention state", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/evidence-retention-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "503": {
+            "description": "Evidence retention storage state is unavailable, corrupt, or inconsistent",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "evidence.retention.unavailable"}}}}
           }
         }
       }
@@ -630,6 +646,7 @@
       "EventDeliveryHealthReport": {"$ref": "../../contracts/schemas/event-delivery-health-report.schema.json"},
       "EventDeliverySloReport": {"$ref": "../../contracts/schemas/event-delivery-slo-report.schema.json"},
       "InvestigationCompletionSloReport": {"$ref": "../../contracts/schemas/investigation-completion-slo-report.schema.json"},
+      "EvidenceRetentionReport": {"$ref": "../../contracts/schemas/evidence-retention-report.schema.json"},
       "RuntimeVersionReport": {"$ref": "../../contracts/schemas/runtime-version-report.schema.json"},
       "SessionContext": {"$ref": "../../contracts/schemas/session-context.schema.json"},
       "PageInfo": {"$ref": "../../contracts/schemas/page-info.schema.json"},

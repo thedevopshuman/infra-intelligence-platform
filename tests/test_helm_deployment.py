@@ -172,6 +172,44 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             config_map,
         )
 
+    def test_evidence_retention_is_disabled_explicit_bounded_and_worker_owned(self) -> None:
+        config_map = (CHART / "templates" / "configmap.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+        validation = (CHART / "templates" / "validation.yaml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("evidenceRetention:", values)
+        self.assertIn("  enabled: false", values)
+        for variable in (
+            "IIP_EVIDENCE_RETENTION_ENABLED",
+            "IIP_EVIDENCE_RETENTION_INTERVAL_SECONDS",
+            "IIP_EVIDENCE_RETENTION_EPHEMERAL_SECONDS",
+            "IIP_EVIDENCE_RETENTION_STANDARD_SECONDS",
+            "IIP_EVIDENCE_RETENTION_EXTENDED_SECONDS",
+            "IIP_EVIDENCE_RETENTION_BATCH_SIZE",
+        ):
+            with self.subTest(variable=variable):
+                self.assertIn(variable, config_map)
+        for value in (
+            "intervalSeconds",
+            "ephemeralSeconds",
+            "standardSeconds",
+            "extendedSeconds",
+            "batchSize",
+        ):
+            with self.subTest(value=value):
+                self.assertIn(
+                    f".Values.evidenceRetention.{value} | int64 | quote",
+                    config_map,
+                )
+        self.assertIn(
+            "worker.enabled must be true when evidenceRetention.enabled=true",
+            validation,
+        )
+
     def test_query_availability_objective_is_explicit_and_otel_visible(self) -> None:
         config_map = (CHART / "templates" / "configmap.yaml").read_text(
             encoding="utf-8"

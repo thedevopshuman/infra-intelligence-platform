@@ -9,6 +9,7 @@ import type {
   ApiErrorBody,
   ContextEvidenceRequest,
   Evidence,
+  EvidenceRetentionReport,
   EvidenceId,
   EventDeliveryHealthReport,
   EventDeliverySloReport,
@@ -158,6 +159,12 @@ export class InfrastructureIntelligenceClient {
   async getInvestigationCompletionSlo(): Promise<InvestigationCompletionSloReport> {
     return this.get<InvestigationCompletionSloReport>(
       "/v1/operations/investigations/completion-slo",
+    );
+  }
+
+  async getEvidenceRetention(): Promise<EvidenceRetentionReport> {
+    return this.get<EvidenceRetentionReport>(
+      "/v1/operations/evidence/retention",
     );
   }
 

@@ -10,6 +10,15 @@
 {{- if ge (int .Values.investigationCompletionSlo.maximumCompletionSeconds) (int .Values.investigationCompletionSlo.windowSeconds) }}
 {{- fail "investigationCompletionSlo.maximumCompletionSeconds must be less than investigationCompletionSlo.windowSeconds" }}
 {{- end }}
+{{- if gt (int .Values.evidenceRetention.ephemeralSeconds) (int .Values.evidenceRetention.standardSeconds) }}
+{{- fail "evidenceRetention.ephemeralSeconds must not exceed evidenceRetention.standardSeconds" }}
+{{- end }}
+{{- if gt (int .Values.evidenceRetention.standardSeconds) (int .Values.evidenceRetention.extendedSeconds) }}
+{{- fail "evidenceRetention.standardSeconds must not exceed evidenceRetention.extendedSeconds" }}
+{{- end }}
+{{- if and .Values.evidenceRetention.enabled (not .Values.worker.enabled) }}
+{{- fail "worker.enabled must be true when evidenceRetention.enabled=true" }}
+{{- end }}
 {{- if gt (int .Values.telemetry.traceMaxExportBatchSize) (int .Values.telemetry.traceMaxQueueSize) }}
 {{- fail "telemetry.traceMaxExportBatchSize must not exceed telemetry.traceMaxQueueSize" }}
 {{- end }}

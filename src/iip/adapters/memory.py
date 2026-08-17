@@ -795,6 +795,8 @@ class AllowTenantPolicy:
             "action:propose",
             "action:read",
             "evidence:collect",
+            "evidence-retention:expire",
+            "evidence-retention:read",
             "event-delivery-health:read",
             "event-delivery-slo:read",
             "ingestion-telemetry:read",

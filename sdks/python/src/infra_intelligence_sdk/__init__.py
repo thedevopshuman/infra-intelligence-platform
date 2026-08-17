@@ -12,6 +12,7 @@ from .models import (
     ContextEvidenceRequest,
     ContextEvidenceResult,
     Evidence,
+    EvidenceRetentionReport,
     EventDeliveryReplayCommand,
     EventDeliveryHealthReport,
     EventDeliverySloReport,
@@ -82,6 +83,7 @@ __all__ = [
     "ContextEvidenceRequest",
     "ContextEvidenceResult",
     "Evidence",
+    "EvidenceRetentionReport",
     "EventDeliveryReplayCommand",
     "EventDeliveryHealthReport",
     "EventDeliverySloReport",
@@ -139,4 +141,4 @@ __all__ = [
     "TelemetryEvidenceResult",
     "TelemetryExportHealthReport",
 ]
-__version__ = "0.29.0"
+__version__ = "0.30.0"

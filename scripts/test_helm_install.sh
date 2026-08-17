@@ -255,6 +255,16 @@ IIP_INVESTIGATION_COMPLETION_SLO_JSON=$(
 printf '%s' "$IIP_INVESTIGATION_COMPLETION_SLO_JSON" | "$IIP_TEST_PYTHON" -c \
     'import json,sys; document=json.load(sys.stdin); spec=document["spec"]; assert document["kind"] == "InvestigationCompletionSloReport"; assert document["metadata"]["tenantId"] == "helm-test"; assert spec["status"] == "no-data"; assert spec["objective"] == {"maximumCompletionSeconds":300,"minimumAttainmentBasisPoints":9900,"minimumEligibleJobs":20}; assert spec["measurement"] == {"acceptedJobs":0,"immatureJobs":0,"eligibleJobs":0,"withinObjectiveJobs":0,"lateCompletedJobs":0,"failedJobs":0,"cancelledJobs":0,"unfinishedJobs":0,"attainmentBasisPoints":None}'
 
+IIP_EVIDENCE_RETENTION_JSON=$(
+    printf '%s' "$IIP_AUTH_BEARER_TOKEN" | \
+        "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+            --namespace "$IIP_TEST_NAMESPACE" exec -i \
+            deployment/iip-infra-intelligence -- python -c \
+            'import json,sys,urllib.request; token=sys.stdin.read(); request=urllib.request.Request("http://127.0.0.1:8080/v1/operations/evidence/retention", headers={"Authorization": "Bearer " + token}); print(json.dumps(json.load(urllib.request.urlopen(request, timeout=5)), separators=(",", ":")))'
+)
+printf '%s' "$IIP_EVIDENCE_RETENTION_JSON" | "$IIP_TEST_PYTHON" -c \
+    'import json,sys; document=json.load(sys.stdin); spec=document["spec"]; assert document["kind"] == "EvidenceRetentionReport"; assert document["metadata"]["tenantId"] == "helm-test"; assert spec["status"] == "disabled"; assert spec["mode"] == "observe"; assert spec["policy"]["enabled"] is False; assert spec["artifacts"] == {"storedBefore":0,"eligible":0,"expired":0,"remainingEligible":0,"legalHold":0}'
+
 IIP_EXPECTED_MIGRATION_COUNT=$(
     rg --files src/iip/adapters/postgres/migrations -g '*.sql' | wc -l | tr -d ' '
 )
@@ -411,4 +421,4 @@ EOF
     "$IIP_TEST_PYTHON" -c \
         'import json,sys; rows=json.load(sys.stdin); assert len(rows) == 2 and str(rows[-1]["revision"]) == "2" and rows[-1]["status"] == "deployed"'
 
-echo "Helm install/upgrade test passed: immutable image -> runtime identity -> delivery health/SLO -> migrations -> TLS ingress -> backup/restore"
+echo "Helm install/upgrade test passed: immutable image -> runtime identity -> delivery/SLO/retention operations -> migrations -> TLS ingress -> backup/restore"

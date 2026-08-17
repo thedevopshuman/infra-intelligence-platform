@@ -26,6 +26,7 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | Event delivery health report | [event-delivery-health-contract.md](event-delivery-health-contract.md) | `contracts/schemas/event-delivery-health-report.schema.json` | `contracts/examples/event-delivery-health-report.json` |
 | Event delivery SLO report | [event-delivery-slo-contract.md](event-delivery-slo-contract.md) | `contracts/schemas/event-delivery-slo-report.schema.json` | `contracts/examples/event-delivery-slo-report.json` |
 | Investigation completion SLO report | [investigation-completion-slo-contract.md](investigation-completion-slo-contract.md) | `contracts/schemas/investigation-completion-slo-report.schema.json` | `contracts/examples/investigation-completion-slo-report.json` |
+| Evidence retention report | [evidence-retention-contract.md](evidence-retention-contract.md) | `contracts/schemas/evidence-retention-report.schema.json` | `contracts/examples/evidence-retention-report.json` |
 | Query availability telemetry | [query-availability-telemetry-contract.md](query-availability-telemetry-contract.md) | OTLP Metrics protobuf semantic convention | n/a |
 | Runtime version report | [runtime-version-contract.md](runtime-version-contract.md) | `contracts/schemas/runtime-version-report.schema.json` | `contracts/examples/runtime-version-report.json` |
 | Session context | [session-context-contract.md](session-context-contract.md) | `contracts/schemas/session-context.schema.json` | `contracts/examples/session-context.json` |

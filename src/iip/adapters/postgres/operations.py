@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import secrets
 from typing import Iterable, Mapping, Optional
 
@@ -15,6 +16,7 @@ from iip.application.ports import (
     ActionExecutionTransition,
     ActionWorkflowRecord,
     ActorContext,
+    EvidenceRetentionState,
     InvestigationCompletionSloState,
     InvestigationJobClaim,
     PersistenceError,
@@ -54,6 +56,10 @@ class PostgresOperationalStore:
         try:
             with self._connect() as connection:
                 connection.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (f"evidence-artifacts:{actor.tenant_id}",),
+                )
+                connection.execute(
                     """
                     INSERT INTO iip.evidence_artifacts (
                         tenant_id, evidence_id, document, artifact,
@@ -89,7 +95,11 @@ class PostgresOperationalStore:
                     "SELECT artifact FROM iip.evidence_artifacts WHERE tenant_id = %s AND evidence_id = %s",
                     (actor.tenant_id, evidence_id),
                 ).fetchone()
-            return bytes(row["artifact"]) if row is not None else None
+            return (
+                bytes(row["artifact"])
+                if row is not None and row["artifact"] is not None
+                else None
+            )
         except psycopg.Error:
             raise PersistenceError("storage.unavailable") from None
 
@@ -119,6 +129,194 @@ class PostgresOperationalStore:
                     parameters,
                 ).fetchall()
             return tuple(dict(row["document"]) for row in rows)
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def evaluate_evidence_retention(
+        self,
+        tenant_id: str,
+        evaluated_at: str,
+        *,
+        ephemeral_seconds: int,
+        standard_seconds: int,
+        extended_seconds: int,
+        limit: int,
+        expire: bool,
+        policy_digest: str,
+    ) -> EvidenceRetentionState:
+        if (
+            not isinstance(tenant_id, str)
+            or re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}", tenant_id) is None
+            or not isinstance(expire, bool)
+            or any(
+                isinstance(value, bool) or not isinstance(value, int)
+                for value in (
+                    ephemeral_seconds,
+                    standard_seconds,
+                    extended_seconds,
+                    limit,
+                )
+            )
+            or not (
+                3_600 <= ephemeral_seconds <= 2_592_000
+                and 86_400 <= standard_seconds <= 31_536_000
+                and 86_400 <= extended_seconds <= 315_360_000
+                and ephemeral_seconds <= standard_seconds <= extended_seconds
+            )
+            or not 1 <= limit <= 1000
+            or re.fullmatch(r"sha256:[a-f0-9]{64}", policy_digest) is None
+        ):
+            raise PersistenceError("storage.input-invalid")
+
+        count_statement = """
+            WITH classified AS (
+                SELECT
+                    document->'spec'->'handling'->>'retentionClass' AS class,
+                    CASE
+                        WHEN document->'spec'->'handling'->>'retentionClass'
+                             = 'legal-hold' THEN NULL
+                        ELSE COALESCE(
+                            NULLIF(
+                                document->'spec'->'handling'->>'expiresAt',
+                                ''
+                            )::timestamptz,
+                            recorded_at + CASE
+                                WHEN document->'spec'->'handling'->>'retentionClass'
+                                     = 'ephemeral'
+                                    THEN make_interval(secs => %s)
+                                WHEN document->'spec'->'handling'->>'retentionClass'
+                                     = 'standard'
+                                    THEN make_interval(secs => %s)
+                                WHEN document->'spec'->'handling'->>'retentionClass'
+                                     = 'extended'
+                                    THEN make_interval(secs => %s)
+                                ELSE NULL
+                            END
+                        )
+                    END AS effective_expiry
+                FROM iip.evidence_artifacts
+                WHERE tenant_id = %s AND artifact IS NOT NULL
+            )
+            SELECT
+                count(*) AS stored,
+                count(*) FILTER (WHERE class = 'legal-hold') AS legal_hold,
+                count(*) FILTER (WHERE effective_expiry <= %s) AS eligible,
+                count(*) FILTER (
+                    WHERE class IS NULL OR class NOT IN (
+                        'ephemeral', 'standard', 'extended', 'legal-hold'
+                    )
+                ) AS invalid
+            FROM classified
+        """
+        count_parameters = (
+            ephemeral_seconds,
+            standard_seconds,
+            extended_seconds,
+            tenant_id,
+            evaluated_at,
+        )
+        try:
+            with self._connect() as connection:
+                connection.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (f"evidence-artifacts:{tenant_id}",),
+                )
+                before = connection.execute(
+                    count_statement, count_parameters
+                ).fetchone()
+                if before is None or int(before["invalid"]):
+                    raise PersistenceError("storage.corrupt")
+                eligible = int(before["eligible"])
+                expired = 0
+                audit_ref = None
+                if expire and eligible:
+                    updated = connection.execute(
+                        """
+                        WITH candidates AS (
+                            SELECT evidence_id
+                            FROM iip.evidence_artifacts
+                            WHERE tenant_id = %s
+                              AND artifact IS NOT NULL
+                              AND document->'spec'->'handling'->>'retentionClass'
+                                  IN ('ephemeral', 'standard', 'extended')
+                              AND COALESCE(
+                                  NULLIF(
+                                      document->'spec'->'handling'->>'expiresAt',
+                                      ''
+                                  )::timestamptz,
+                                  recorded_at + CASE
+                                      WHEN document->'spec'->'handling'->>'retentionClass'
+                                           = 'ephemeral'
+                                          THEN make_interval(secs => %s)
+                                      WHEN document->'spec'->'handling'->>'retentionClass'
+                                           = 'standard'
+                                          THEN make_interval(secs => %s)
+                                      ELSE make_interval(secs => %s)
+                                  END
+                              ) <= %s
+                            ORDER BY recorded_at, evidence_id
+                            FOR UPDATE SKIP LOCKED
+                            LIMIT %s
+                        )
+                        UPDATE iip.evidence_artifacts AS evidence
+                        SET artifact = NULL, artifact_deleted_at = %s
+                        FROM candidates
+                        WHERE evidence.tenant_id = %s
+                          AND evidence.evidence_id = candidates.evidence_id
+                        RETURNING evidence.evidence_id
+                        """,
+                        (
+                            tenant_id,
+                            ephemeral_seconds,
+                            standard_seconds,
+                            extended_seconds,
+                            evaluated_at,
+                            limit,
+                            evaluated_at,
+                            tenant_id,
+                        ),
+                    ).fetchall()
+                    expired = len(updated)
+                    if expired:
+                        audit = {
+                            "apiVersion": "iip.internal/v1alpha1",
+                            "kind": "EvidenceRetentionAudit",
+                            "metadata": {
+                                "tenantId": tenant_id,
+                                "recordedAt": evaluated_at,
+                            },
+                            "spec": {
+                                "policyDigest": policy_digest,
+                                "expiredArtifacts": expired,
+                                "remainingEligibleArtifacts": eligible - expired,
+                            },
+                        }
+                        row = connection.execute(
+                            """
+                            INSERT INTO iip.audit_records (
+                                tenant_id, category, document
+                            ) VALUES (%s, 'evidence-retention-expired', %s)
+                            RETURNING audit_offset
+                            """,
+                            (tenant_id, Jsonb(audit)),
+                        ).fetchone()
+                        if row is None:
+                            raise PersistenceError("storage.unavailable")
+                        audit_ref = (
+                            f"audit://{tenant_id}/records/{row['audit_offset']}"
+                        )
+                return EvidenceRetentionState(
+                    tenant_id=tenant_id,
+                    evaluated_at=evaluated_at,
+                    stored_artifacts=int(before["stored"]),
+                    eligible_artifacts=eligible,
+                    expired_artifacts=expired,
+                    remaining_eligible_artifacts=eligible - expired,
+                    legal_hold_artifacts=int(before["legal_hold"]),
+                    audit_ref=audit_ref,
+                )
+        except PersistenceError:
+            raise
         except psycopg.Error:
             raise PersistenceError("storage.unavailable") from None
 

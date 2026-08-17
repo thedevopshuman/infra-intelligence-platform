@@ -213,6 +213,7 @@ class QueryAvailabilityHttpBoundaryTests(unittest.TestCase):
             "/v1/operations/investigations/completion-slo": (
                 "investigation-completion-slo"
             ),
+            "/v1/operations/evidence/retention": "evidence-retention",
             "/v1/evidence/ev_secret": "evidence-get",
             "/v1/investigations/inv_secret": "investigation-get",
             "/v1/investigations/inv_secret/status": "investigation-status",

@@ -825,6 +825,36 @@ class EvidenceStore(Protocol):
         """List bounded evidence metadata within one explicit tenant scope."""
 
 
+@dataclass(frozen=True)
+class EvidenceRetentionState:
+    """Value-minimized artifact-retention facts for one exact tenant."""
+
+    tenant_id: str
+    evaluated_at: str
+    stored_artifacts: int
+    eligible_artifacts: int
+    expired_artifacts: int
+    remaining_eligible_artifacts: int
+    legal_hold_artifacts: int
+    audit_ref: Optional[str] = None
+
+
+class EvidenceRetentionStore(Protocol):
+    def evaluate_evidence_retention(
+        self,
+        tenant_id: str,
+        evaluated_at: str,
+        *,
+        ephemeral_seconds: int,
+        standard_seconds: int,
+        extended_seconds: int,
+        limit: int,
+        expire: bool,
+        policy_digest: str,
+    ) -> EvidenceRetentionState:
+        """Observe or atomically expire bounded artifact bytes and append audit."""
+
+
 class InvestigationRepository(Protocol):
     def start_investigation(
         self,

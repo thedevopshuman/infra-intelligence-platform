@@ -82,6 +82,10 @@ from iip.application.log_evidence import (
     TelemetryLogsEvidenceProvider,
 )
 from iip.application.investigate import DeterministicInvestigationService
+from iip.application.evidence_retention import (
+    EvidenceRetentionPolicy,
+    EvidenceRetentionService,
+)
 from iip.application.investigation_dispatch import (
     InvestigationDispatchLimits,
     InvestigationDispatchService,
@@ -156,6 +160,7 @@ class Runtime:
     runtime_version: RuntimeVersionService
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
+    evidence_retention: EvidenceRetentionService
     kubernetes_event_evidence: KubernetesEventEvidenceService
     resource_change_evidence: ResourceChangeEvidenceService
     context_evidence: ContextEvidenceService
@@ -207,6 +212,7 @@ def build_local_runtime(
     signal_catalog: InvestigationSignalCatalog | None = None,
     readiness: ReadinessProbe | None = None,
     investigation_dispatch_limits: InvestigationDispatchLimits | None = None,
+    evidence_retention_policy: EvidenceRetentionPolicy | None = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -237,6 +243,7 @@ def build_local_runtime(
         signal_catalog,
         readiness,
         investigation_dispatch_limits,
+        evidence_retention_policy,
     )
 
 
@@ -264,6 +271,7 @@ def _compose_runtime(
     signal_catalog: InvestigationSignalCatalog | None = None,
     readiness: ReadinessProbe | None = None,
     investigation_dispatch_limits: InvestigationDispatchLimits | None = None,
+    evidence_retention_policy: EvidenceRetentionPolicy | None = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -387,6 +395,12 @@ def _compose_runtime(
         ),
         queries=queries,
         evidence=evidence,
+        evidence_retention=EvidenceRetentionService(
+            evidence_store,
+            policy,
+            clock,
+            evidence_retention_policy,
+        ),
         kubernetes_event_evidence=kubernetes_event_evidence,
         resource_change_evidence=resource_change_evidence,
         context_evidence=context_evidence,
@@ -477,6 +491,7 @@ def build_postgres_runtime(
     signal_catalog: InvestigationSignalCatalog | None = None,
     readiness_timeout_seconds: int = 2,
     investigation_dispatch_limits: InvestigationDispatchLimits | None = None,
+    evidence_retention_policy: EvidenceRetentionPolicy | None = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -514,6 +529,7 @@ def build_postgres_runtime(
         signal_catalog,
         PostgresReadinessProbe(database_url, readiness_timeout_seconds),
         investigation_dispatch_limits,
+        evidence_retention_policy,
     )
 
 
@@ -556,6 +572,7 @@ def _build_runtime_from_env(
     )
     query_availability_objectives = _query_availability_objectives_from_env()
     investigation_dispatch_limits = _investigation_dispatch_limits_from_env()
+    evidence_retention_policy = _evidence_retention_policy_from_env()
     metrics_runtime = _otel_metrics_runtime_from_env()
     try:
         traces_runtime = _otel_traces_runtime_from_env()
@@ -632,6 +649,7 @@ def _build_runtime_from_env(
                 policy=policy,
                 signal_catalog=signal_catalog,
                 investigation_dispatch_limits=investigation_dispatch_limits,
+                evidence_retention_policy=evidence_retention_policy,
             )
         auto_migrate = (
             os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
@@ -669,6 +687,7 @@ def _build_runtime_from_env(
             policy=policy,
             signal_catalog=signal_catalog,
             investigation_dispatch_limits=investigation_dispatch_limits,
+            evidence_retention_policy=evidence_retention_policy,
             readiness_timeout_seconds=_readiness_timeout_from_env(),
         )
     except Exception:
@@ -1018,6 +1037,47 @@ def _investigation_dispatch_limits_from_env() -> InvestigationDispatchLimits:
     except ValueError:
         raise ValueError("investigation.queue.configuration.invalid") from None
     return InvestigationDispatchLimits(max_outstanding_jobs_per_tenant=value)
+
+
+def _evidence_retention_policy_from_env() -> EvidenceRetentionPolicy:
+    """Build a strict, deployment-owned artifact-retention policy."""
+
+    raw_enabled = os.environ.get("IIP_EVIDENCE_RETENTION_ENABLED", "false").lower()
+    if raw_enabled not in ("false", "true"):
+        raise ValueError("evidence.retention.configuration.invalid")
+
+    defaults = EvidenceRetentionPolicy()
+
+    def value(name: str, default: int) -> int:
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            raise ValueError(
+                "evidence.retention.configuration.invalid"
+            ) from None
+
+    return EvidenceRetentionPolicy(
+        enabled=raw_enabled == "true",
+        ephemeral_seconds=value(
+            "IIP_EVIDENCE_RETENTION_EPHEMERAL_SECONDS",
+            defaults.ephemeral_seconds,
+        ),
+        standard_seconds=value(
+            "IIP_EVIDENCE_RETENTION_STANDARD_SECONDS",
+            defaults.standard_seconds,
+        ),
+        extended_seconds=value(
+            "IIP_EVIDENCE_RETENTION_EXTENDED_SECONDS",
+            defaults.extended_seconds,
+        ),
+        batch_size=value(
+            "IIP_EVIDENCE_RETENTION_BATCH_SIZE",
+            defaults.batch_size,
+        ),
+    )
 
 
 def _otel_metrics_runtime_from_env() -> Any:

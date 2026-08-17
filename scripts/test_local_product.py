@@ -143,6 +143,24 @@ def main() -> int:
             or runtime_spec.get("deployment") != {}
         ):
             raise ProductWorkflowError("local runtime identity is invalid")
+        retention = _request("/v1/operations/evidence/retention", operator)
+        retention_spec = retention.get("spec")
+        retention_artifacts = (
+            retention_spec.get("artifacts")
+            if isinstance(retention_spec, Mapping)
+            else None
+        )
+        if (
+            retention.get("kind") != "EvidenceRetentionReport"
+            or retention.get("metadata", {}).get("tenantId") != "local"
+            or not isinstance(retention_spec, Mapping)
+            or retention_spec.get("mode") != "observe"
+            or retention_spec.get("status")
+            not in {"disabled", "current", "cleanup-required"}
+            or not isinstance(retention_artifacts, Mapping)
+            or retention_artifacts.get("expired") != 0
+        ):
+            raise ProductWorkflowError("local evidence retention report is invalid")
         now = datetime.now(timezone.utc)
         suffix = secrets.token_hex(6)
         workload_name = f"product-gate-{suffix}"

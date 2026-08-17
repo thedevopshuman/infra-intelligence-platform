@@ -1,0 +1,27 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "EvidenceRetentionReport",
+  "metadata": {
+    "tenantId": "tenant-acme",
+    "evaluatedAt": "2026-08-17T16:00:00Z"
+  },
+  "spec": {
+    "status": "cleanup-required",
+    "mode": "observe",
+    "policy": {
+      "enabled": true,
+      "ephemeralSeconds": 86400,
+      "standardSeconds": 2592000,
+      "extendedSeconds": 31536000,
+      "batchSize": 100,
+      "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "artifacts": {
+      "storedBefore": 240,
+      "eligible": 12,
+      "expired": 0,
+      "remainingEligible": 12,
+      "legalHold": 3
+    }
+  }
+}

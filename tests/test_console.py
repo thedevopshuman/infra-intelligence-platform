@@ -87,6 +87,7 @@ class ConsoleHttpTests(unittest.TestCase):
         self.assertIn("Investigate newest quarantine", console)
         self.assertIn("SLO attainment", console)
         self.assertIn("Investigation reliability", console)
+        self.assertIn("Evidence retention", console)
 
         handler = object.__new__(ApiHandler)
         handler.path = "/console/app.js"
@@ -107,6 +108,7 @@ class ConsoleHttpTests(unittest.TestCase):
             "/v1/operations/investigations/completion-slo",
             script,
         )
+        self.assertIn("/v1/operations/evidence/retention", script)
         self.assertIn("Event delivery", script)
         self.assertIn('actionType === "event-delivery.requeue"', script)
         self.assertIn("exact quarantine generation", script)

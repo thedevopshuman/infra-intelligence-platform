@@ -18,6 +18,7 @@ from .models import (
     ActionWorkflowPage,
     ContextEvidenceRequest,
     Evidence,
+    EvidenceRetentionReport,
     EventDeliveryReplayCommand,
     EventDeliveryHealthReport,
     EventDeliverySloReport,
@@ -184,6 +185,13 @@ class Client:
 
         return InvestigationCompletionSloReport.from_dict(
             self._get("/v1/operations/investigations/completion-slo")
+        )
+
+    def get_evidence_retention(self) -> EvidenceRetentionReport:
+        """Observe tenant Evidence artifact retention as an administrator."""
+
+        return EvidenceRetentionReport.from_dict(
+            self._get("/v1/operations/evidence/retention")
         )
 
     def ingest_resource_collection(

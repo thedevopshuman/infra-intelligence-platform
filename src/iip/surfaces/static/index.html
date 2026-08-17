@@ -142,6 +142,24 @@
             <p class="delivery-note" id="investigation-slo-note">The rolling useful-completion objective appears after connection.</p>
           </article>
 
+          <article class="panel delivery-panel" aria-labelledby="evidence-retention-heading">
+            <div class="panel-heading">
+              <div><span class="kicker">Immutable provenance lifecycle</span><h2 id="evidence-retention-heading">Evidence retention</h2></div>
+              <div class="delivery-heading-actions">
+                <span class="status-chip neutral" id="evidence-retention-state">Policy unavailable</span>
+                <button class="text-button" id="evidence-retention-details" type="button" disabled>View policy →</button>
+              </div>
+            </div>
+            <div class="delivery-grid" aria-live="polite">
+              <div><span>Stored artifacts</span><strong id="evidence-retention-stored">—</strong></div>
+              <div><span>Eligible now</span><strong id="evidence-retention-eligible">—</strong></div>
+              <div><span>Legal hold</span><strong id="evidence-retention-legal-hold">—</strong></div>
+              <div><span>Batch limit</span><strong id="evidence-retention-batch">—</strong></div>
+              <div><span>Policy digest</span><strong id="evidence-retention-digest">—</strong></div>
+            </div>
+            <p class="delivery-note" id="evidence-retention-note">Platform administrators can inspect retention without triggering deletion.</p>
+          </article>
+
           <div class="two-column">
             <article class="panel">
               <div class="panel-heading">

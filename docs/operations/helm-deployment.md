@@ -65,7 +65,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.35.0
+  tag: 0.36.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -91,6 +91,14 @@ investigationCompletionSlo:
 
 investigationQueue:
   maxOutstandingJobsPerTenant: 1000
+
+evidenceRetention:
+  enabled: false
+  intervalSeconds: 3600
+  ephemeralSeconds: 86400
+  standardSeconds: 2592000
+  extendedSeconds: 31536000
+  batchSize: 100
 
 worker:
   enabled: true
@@ -131,6 +139,8 @@ The migration NetworkPolicy hook is created first, then the migration Job. The J
 
 `investigationQueue.maxOutstandingJobsPerTenant` bounds each tenant's durable non-terminal backlog across API replicas. Size it from measured arrival rate, completion capacity, and acceptable queue delay; do not raise it merely to hide sustained completion-SLO misses. A full tenant receives `429 investigation.queue.capacity-exceeded`; an exact idempotent resubmission still returns its existing job. Alert on sustained rejection at the ingress/API telemetry layer and investigate worker capacity or a faulty submitter.
 
+`evidenceRetention` is disabled by default. Enabling it requires the workflow worker and exact tenant enrollment. Review legal hold and backup lifecycle first, then use the [evidence retention runbook](evidence-retention.md); the administrator endpoint is observe-only and deletion remains bounded, policy-gated, tenant-serialized, and audited.
+
 The local-hashed authentication example is suitable for a controlled evaluation. The default Secret name is `iip-auth`, but the chart never creates its sensitive contents. Configure the documented OIDC boundary for production; do not place either local verifier JSON or OIDC client material directly in a values file. Serving pods always receive `IIP_DATABASE_AUTO_MIGRATE=false`; the hook is the chart's only schema authority.
 
 ## Scheduled logical backups
@@ -160,6 +170,8 @@ make test-helm-install
 ```
 
 The gate builds and loads the current image, registers its exact host-platform digest on every disposable kind node, creates an exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, and proves API readiness from inside the pod. It then authenticates without printing the generated credential and requires the runtime report, event-delivery health, and rolling publication objective to match the installed configuration. A second Helm revision adds two API replicas, a TLS Ingress declaration, and scheduled backup configuration. The gate proves immutable image selection, runtime identity, migration idempotency, and exact ingress binding; runs the installed backup CronJob on demand; verifies its persisted checksum; restores it into a separate database; confirms every packaged migration; and checks rollout and Helm history. It removes the namespace and claim, refuses non-kind contexts, and never prints generated credentials, database contents, or private keys. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
+
+The first revision additionally proves the investigation-completion objective and disabled-by-default Evidence retention report from inside the installed pod.
 
 ## Production gaps
 

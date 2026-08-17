@@ -65,3 +65,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0059](0059-backend-neutral-query-availability-telemetry.md) | Accepted | Export bounded query availability and latency semantics through OTLP metrics |
 | [0060](0060-tenant-fair-investigation-admission.md) | Accepted | Bound process and deployment-wide tenant investigation concurrency without widening authority |
 | [0061](0061-bounded-tenant-investigation-admission.md) | Accepted | Bound each tenant's outstanding investigation backlog while preserving idempotent submission |
+| [0062](0062-audited-evidence-artifact-retention.md) | Accepted | Preserve immutable Evidence metadata while expiring artifact bytes under explicit audited policy |

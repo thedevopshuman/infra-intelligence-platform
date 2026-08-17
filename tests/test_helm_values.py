@@ -84,6 +84,9 @@ class HelmValuesContractTests(unittest.TestCase):
             "eventPublisher.retryBaseSeconds must not exceed",
             "eventDeliverySlo.maximumDeliveryLatencySeconds must be less than",
             "investigationCompletionSlo.maximumCompletionSeconds must be less than",
+            "evidenceRetention.ephemeralSeconds must not exceed",
+            "evidenceRetention.standardSeconds must not exceed",
+            "worker.enabled must be true when evidenceRetention.enabled=true",
             "telemetry.traceMaxExportBatchSize must not exceed",
             "telemetry.otlpEndpoint is required",
             "auth.existingSecret is required",
@@ -98,6 +101,13 @@ class HelmValuesContractTests(unittest.TestCase):
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, guards)
+
+        retention = self.schema["properties"]["evidenceRetention"]
+        self.assertFalse(retention["additionalProperties"])
+        self.assertEqual(
+            retention["properties"]["batchSize"]["maximum"],
+            1000,
+        )
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@
     "eventDeliverySlo",
     "investigationCompletionSlo",
     "investigationQueue",
+    "evidenceRetention",
     "queryAvailabilitySlo",
     "serviceAccount",
     "podSecurityContext",
@@ -228,6 +229,26 @@
           "minimum": 1,
           "maximum": 100000
         }
+      }
+    },
+    "evidenceRetention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "intervalSeconds",
+        "ephemeralSeconds",
+        "standardSeconds",
+        "extendedSeconds",
+        "batchSize"
+      ],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "intervalSeconds": {"type": "integer", "minimum": 60, "maximum": 86400},
+        "ephemeralSeconds": {"type": "integer", "minimum": 3600, "maximum": 2592000},
+        "standardSeconds": {"type": "integer", "minimum": 86400, "maximum": 31536000},
+        "extendedSeconds": {"type": "integer", "minimum": 86400, "maximum": 315360000},
+        "batchSize": {"type": "integer", "minimum": 1, "maximum": 1000}
       }
     },
     "queryAvailabilitySlo": {

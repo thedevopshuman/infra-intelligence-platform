@@ -62,6 +62,10 @@ Delivery is at least once. A crash after external publish but before acknowledge
 
 [ADR 0044](../decisions/0044-tenant-scoped-outbox-delivery.md) makes this dispatcher executable in the tenant-explicit workflow worker. The local structured-log sink is development-only; the Helm profile offers a TLS-only, authenticated, redirect-refusing webhook whose tenant authority exactly matches worker enrollment. Publisher credentials remain mounted only in the worker, and its dedicated NetworkPolicy has no ingress. See the [event-delivery operations guide](../operations/event-delivery.md).
 
+## Evidence artifact retention
+
+Evidence artifact retention uses the same exact-tenant discipline without deleting immutable Evidence metadata. Evidence commits and cleanup passes share a namespaced tenant-keyed transaction advisory lock, so the worker selects current committed, present, expired, non-`legal-hold` artifact bodies and bounds each batch without blocking another tenant or colliding with investigation admission locks. Setting the byte column to unavailable, recording its deletion time, and appending one aggregate audit row commit atomically. [ADR 0062](../decisions/0062-audited-evidence-artifact-retention.md) and the [retention runbook](../operations/evidence-retention.md) define the lifecycle and disabled-by-default enablement gate.
+
 ## Resource queries
 
 The application query service authorizes `resource:read` before calling tenant-scoped repository ports. Neighborhood queries page the current `resource_relationships` index by deterministic edge ID, while timeline queries page immutable `resource_observations` by exclusive offset. The index records which latest resource projection asserted each canonical edge; unresolved provider references remain edge values and never create synthetic resource rows.

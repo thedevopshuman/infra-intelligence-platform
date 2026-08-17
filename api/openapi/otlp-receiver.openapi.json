@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence OTLP Receiver API",
-    "version": "0.35.0",
+    "version": "0.36.0",
     "description": "Isolated OTLP/HTTP Protobuf intake for allowlisted metrics and logs. This listener exposes no Infrastructure Intelligence control-plane operations."
   },
   "servers": [{"url": "http://localhost:4318"}],

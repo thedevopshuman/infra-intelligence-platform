@@ -159,6 +159,8 @@ them and exercises the durable customer path end to end: complete collection ing
 leased event delivery, durably queued worker investigation, immutable proposal, independent approval, one-shot
 dry-run execution, replay safety, and the paginated action queue.
 
+Evidence artifact cleanup is disabled by default. Setting `IIP_EVIDENCE_RETENTION_ENABLED=true` makes this tenant-explicit worker run bounded, audited cleanup for `local`; review the [retention runbook](evidence-retention.md) before doing so, because deleted bytes are not recoverable from live storage.
+
 `dev-down` preserves the named PostgreSQL volume. The setup never deletes local state automatically. If manual environment control is needed instead, the Compose profile requires a local-only password supplied at runtime and never committed:
 
 ```bash
@@ -218,6 +220,12 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_WORKER_TENANTS` | unset | Required comma-separated exact tenant enrollment for the workflow worker; wildcard is invalid |
 | `IIP_WORKER_ID` | pod/host name | Stable workflow-worker identity |
 | `IIP_ACTION_RECONCILIATION_BATCH_SIZE` | `100` | Maximum expired action leases scanned per enrolled tenant and timer pass |
+| `IIP_EVIDENCE_RETENTION_ENABLED` | `false` | Enable bounded artifact-byte expiration for worker-enrolled tenants only |
+| `IIP_EVIDENCE_RETENTION_INTERVAL_SECONDS` | `3600` | Worker cleanup cadence from 60–86400 seconds |
+| `IIP_EVIDENCE_RETENTION_EPHEMERAL_SECONDS` | `86400` | Default `ephemeral` lifetime when Evidence has no explicit expiry |
+| `IIP_EVIDENCE_RETENTION_STANDARD_SECONDS` | `2592000` | Default `standard` lifetime when Evidence has no explicit expiry |
+| `IIP_EVIDENCE_RETENTION_EXTENDED_SECONDS` | `31536000` | Default `extended` lifetime when Evidence has no explicit expiry |
+| `IIP_EVIDENCE_RETENTION_BATCH_SIZE` | `100` | Maximum artifact bodies expired per tenant pass |
 | `IIP_EVENT_PUBLISHER_MODE` | `disabled` | Transactional-outbox publisher; local `stdout-json` or production-oriented `https-webhook` are explicit opt-ins |
 | `IIP_EVENT_PUBLISHER_CONFIG_JSON` | unset | TLS endpoint, exact tenant IDs, mounted token/CA paths, and bounds for HTTPS publishing |
 | `IIP_OUTBOX_BATCH_SIZE` | `100` | Maximum outbox messages claimed for one tenant pass |

@@ -7,6 +7,7 @@ const state = {
   eventDeliveryHealth: null,
   eventDeliverySlo: null,
   investigationCompletionSlo: null,
+  evidenceRetention: null,
   resources: [],
   investigations: [],
   evidence: [],
@@ -299,6 +300,52 @@ async function refreshInvestigationCompletionSlo() {
   renderInvestigationCompletionSlo();
 }
 
+function renderEvidenceRetention() {
+  const report = state.evidenceRetention;
+  const spec = report?.spec;
+  const chip = $("#evidence-retention-state");
+  if (!spec) {
+    ["stored", "eligible", "legal-hold", "batch", "digest"].forEach((field) => {
+      $(`#evidence-retention-${field}`).textContent = "—";
+    });
+    chip.textContent = state.session && !hasRole("platform-admin")
+      ? "Platform admin required"
+      : "Policy unavailable";
+    chip.className = "status-chip neutral";
+    $("#evidence-retention-details").disabled = true;
+    $("#evidence-retention-note").textContent = "Platform administrators can inspect retention without triggering deletion.";
+    return;
+  }
+  const artifacts = spec.artifacts;
+  $("#evidence-retention-stored").textContent = String(artifacts.storedBefore);
+  $("#evidence-retention-eligible").textContent = String(artifacts.eligible);
+  $("#evidence-retention-legal-hold").textContent = String(artifacts.legalHold);
+  $("#evidence-retention-batch").textContent = String(spec.policy.batchSize);
+  $("#evidence-retention-digest").textContent = compactIdentity(spec.policy.digest, 8);
+  chip.textContent = spec.status;
+  chip.className = `status-chip ${spec.status === "current" ? "success" : spec.status === "cleanup-required" ? "warning" : "neutral"}`;
+  $("#evidence-retention-details").disabled = false;
+  $("#evidence-retention-note").textContent = spec.status === "disabled"
+    ? `${artifacts.eligible} artifact(s) are eligible, but automatic expiration is disabled by deployment policy.`
+    : spec.status === "cleanup-required"
+      ? `${artifacts.remainingEligible} artifact(s) remain eligible. Cleanup is bounded, tenant-scoped, and audited.`
+      : "No stored artifact is currently eligible; immutable metadata and citations remain available.";
+}
+
+async function refreshEvidenceRetention() {
+  if (!state.session || !hasRole("platform-admin")) {
+    state.evidenceRetention = null;
+    renderEvidenceRetention();
+    return;
+  }
+  try {
+    state.evidenceRetention = await api("/v1/operations/evidence/retention");
+  } catch (_error) {
+    state.evidenceRetention = null;
+  }
+  renderEvidenceRetention();
+}
+
 async function connect(token, remember) {
   state.token = token;
   try {
@@ -306,7 +353,7 @@ async function connect(token, remember) {
     if (remember) sessionStorage.setItem("iip.console.token", token);
     else sessionStorage.removeItem("iip.console.token");
     updateIdentity();
-    await Promise.all([refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshResources(), refreshActions()]);
+    await Promise.all([refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
     $("#connection-dialog").close();
     $("#connection-error").hidden = true;
     showNotice(`Connected as ${state.session.metadata.actorId} in tenant ${state.session.metadata.tenantId}.`);
@@ -1046,7 +1093,7 @@ function bindEvents() {
   $("#identity-button").addEventListener("click", () => $("#connection-dialog").showModal());
   $("#connection-close").addEventListener("click", () => $("#connection-dialog").close());
   $("#refresh-button").addEventListener("click", async () => {
-    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshResources(), refreshActions()]);
+    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
     showNotice("Live platform state refreshed.");
   });
   $("#connection-form").addEventListener("submit", async (event) => {
@@ -1114,6 +1161,14 @@ function bindEvents() {
     $("#detail-actions").hidden = true;
     $("#detail-dialog").showModal();
   });
+  $("#evidence-retention-details").addEventListener("click", () => {
+    if (!state.evidenceRetention) return;
+    $("#detail-kicker").textContent = "Evidence lifecycle policy";
+    $("#detail-title").textContent = "Tenant artifact retention";
+    $("#detail-content").textContent = JSON.stringify(state.evidenceRetention, null, 2);
+    $("#detail-actions").hidden = true;
+    $("#detail-dialog").showModal();
+  });
   $("#delivery-recovery").addEventListener("click", () => {
     if (!state.inspectedReplay || !hasRole("platform-admin")) return;
     state.pendingReplay = { ...state.inspectedReplay };
@@ -1132,6 +1187,7 @@ async function start() {
   renderRuntimeVersion();
   renderEventDeliverySlo();
   renderInvestigationCompletionSlo();
+  renderEvidenceRetention();
   await checkHealth();
   const remembered = sessionStorage.getItem("iip.console.token");
   if (remembered) {

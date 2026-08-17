@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import unittest
@@ -775,6 +776,189 @@ class PostgresOperationalStoreTests(unittest.TestCase):
         self.assertIsNone(
             reconnected.get(ActorContext("other", "another-tenant"), evidence_id)
         )
+
+    def test_evidence_retention_expires_bytes_but_preserves_metadata_and_legal_hold(self) -> None:
+        def commit(
+            actor: ActorContext,
+            digit: str,
+            retention_class: str,
+            recorded_at: str,
+            *,
+            expires_at: str | None = None,
+        ) -> str:
+            evidence_id = f"evd_{digit * 32}"
+            content = f"retention-artifact-{digit}".encode()
+            handling = {
+                "redaction": {"status": "not-required", "methods": []},
+                "sensitivity": "internal",
+                "retentionClass": retention_class,
+            }
+            if expires_at is not None:
+                handling["expiresAt"] = expires_at
+            document = {
+                "apiVersion": "iip.platform/v1alpha1",
+                "kind": "Evidence",
+                "metadata": {
+                    "id": evidence_id,
+                    "tenantId": actor.tenant_id,
+                    "recordedAt": recorded_at,
+                },
+                "spec": {
+                    "handling": handling,
+                    "artifact": {
+                        "contentHash": (
+                            "sha256:" + hashlib.sha256(content).hexdigest()
+                        ),
+                        "sizeBytes": len(content),
+                        "storageRef": (
+                            f"evidence://{actor.tenant_id}/{evidence_id}/artifact"
+                        ),
+                    },
+                },
+            }
+            self.operations.commit(actor, evidence_id, document, content)
+            return evidence_id
+
+        actor = ActorContext("operator", "local", ("platform-admin",))
+        other = ActorContext("operator", "another-tenant", ("platform-admin",))
+        expired_id = commit(
+            actor,
+            "a",
+            "ephemeral",
+            "2026-08-15T00:00:00Z",
+        )
+        future_id = commit(
+            actor,
+            "b",
+            "standard",
+            "2026-08-17T15:00:00Z",
+        )
+        hold_id = commit(
+            actor,
+            "c",
+            "legal-hold",
+            "2026-01-01T00:00:00Z",
+            expires_at="2026-01-02T00:00:00Z",
+        )
+        other_id = commit(
+            other,
+            "d",
+            "ephemeral",
+            "2026-01-01T00:00:00Z",
+        )
+        digest = "sha256:" + ("e" * 64)
+
+        observed = self.operations.evaluate_evidence_retention(
+            "local",
+            "2026-08-17T16:00:00Z",
+            ephemeral_seconds=86_400,
+            standard_seconds=2_592_000,
+            extended_seconds=31_536_000,
+            limit=1,
+            expire=False,
+            policy_digest=digest,
+        )
+        self.assertEqual(observed.stored_artifacts, 3)
+        self.assertEqual(observed.eligible_artifacts, 1)
+        self.assertEqual(observed.legal_hold_artifacts, 1)
+        self.assertIsNone(observed.audit_ref)
+
+        expired = self.operations.evaluate_evidence_retention(
+            "local",
+            "2026-08-17T16:00:00Z",
+            ephemeral_seconds=86_400,
+            standard_seconds=2_592_000,
+            extended_seconds=31_536_000,
+            limit=1,
+            expire=True,
+            policy_digest=digest,
+        )
+        self.assertEqual(expired.expired_artifacts, 1)
+        self.assertEqual(expired.remaining_eligible_artifacts, 0)
+        self.assertRegex(expired.audit_ref or "", r"^audit://local/records/[0-9]+$")
+        self.assertIsNone(self.operations.read_artifact(actor, expired_id))
+        self.assertIsNotNone(self.operations.get(actor, expired_id))
+        self.assertIsNotNone(self.operations.read_artifact(actor, future_id))
+        self.assertIsNotNone(self.operations.read_artifact(actor, hold_id))
+        self.assertIsNotNone(self.operations.read_artifact(other, other_id))
+
+        assert DATABASE_URL is not None and psycopg is not None
+        with psycopg.connect(DATABASE_URL) as connection:
+            row = connection.execute(
+                "SELECT artifact_deleted_at FROM iip.evidence_artifacts "
+                "WHERE tenant_id = 'local' AND evidence_id = %s",
+                (expired_id,),
+            ).fetchone()
+            audit = connection.execute(
+                "SELECT document FROM iip.audit_records "
+                "WHERE tenant_id = 'local' "
+                "AND category = 'evidence-retention-expired'"
+            ).fetchone()
+        self.assertIsNotNone(row[0])
+        self.assertNotIn("evd_", json.dumps(audit[0]))
+        self.assertNotIn("retention-artifact", json.dumps(audit[0]))
+
+    def test_concurrent_evidence_retention_expires_and_audits_one_batch_once(self) -> None:
+        actor = ActorContext("operator", "local", ("platform-admin",))
+        evidence_id = "evd_" + ("e" * 32)
+        content = b"one-retention-race-artifact"
+        document = {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "Evidence",
+            "metadata": {
+                "id": evidence_id,
+                "tenantId": "local",
+                "recordedAt": "2026-01-01T00:00:00Z",
+            },
+            "spec": {
+                "handling": {
+                    "redaction": {"status": "not-required", "methods": []},
+                    "sensitivity": "internal",
+                    "retentionClass": "ephemeral",
+                },
+                "artifact": {
+                    "contentHash": "sha256:" + hashlib.sha256(content).hexdigest(),
+                    "sizeBytes": len(content),
+                    "storageRef": f"evidence://local/{evidence_id}/artifact",
+                },
+            },
+        }
+        self.operations.commit(actor, evidence_id, document, content)
+        barrier = Barrier(3)
+
+        def expire():
+            barrier.wait()
+            return PostgresOperationalStore(
+                DATABASE_URL
+            ).evaluate_evidence_retention(
+                "local",
+                "2026-08-17T16:00:00Z",
+                ephemeral_seconds=86_400,
+                standard_seconds=2_592_000,
+                extended_seconds=31_536_000,
+                limit=1,
+                expire=True,
+                policy_digest="sha256:" + ("f" * 64),
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = (pool.submit(expire), pool.submit(expire))
+            barrier.wait()
+            results = tuple(future.result() for future in futures)
+
+        self.assertEqual(sum(result.expired_artifacts for result in results), 1)
+        self.assertEqual(
+            sum(result.audit_ref is not None for result in results),
+            1,
+        )
+        assert DATABASE_URL is not None and psycopg is not None
+        with psycopg.connect(DATABASE_URL) as connection:
+            count = connection.execute(
+                "SELECT count(*) FROM iip.audit_records "
+                "WHERE tenant_id = 'local' "
+                "AND category = 'evidence-retention-expired'"
+            ).fetchone()[0]
+        self.assertEqual(count, 1)
 
     def test_action_execution_claim_and_terminal_result_are_atomic(self) -> None:
         actor = ActorContext("workflow-executor", "local", ("executor",))

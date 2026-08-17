@@ -52,6 +52,7 @@ SCHEMA_MIGRATIONS = (
     "0010_event_outbox_quarantine.sql",
     "0011_event_outbox_slo_window.sql",
     "0012_investigation_job_slo_window.sql",
+    "0013_evidence_artifact_retention.sql",
 )
 
 

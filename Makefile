@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-postgres test-backup-restore test-otel test-otlp-receiver test-prometheus test-loki test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-local-product db-migrate helm-lint verify run package-chart dev-init dev-up dev-status dev-credentials dev-down
+.PHONY: help install-verify-deps validate validate-schemas test test-postgres test-backup-restore test-otel test-otlp-receiver test-prometheus test-loki test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-local-product test-helm-install db-migrate helm-lint verify run package-chart dev-init dev-up dev-status dev-credentials dev-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -20,6 +20,7 @@ help:
 	@echo "test-kubernetes-live Run the observer against an explicit local Kubernetes context"
 	@echo "test-plugin-runner Build and execute the signed no-network plugin sandbox"
 	@echo "test-local-product Exercise the customer workflow against the running Docker stack"
+	@echo "test-helm-install Build and install the chart on the explicit local kind cluster"
 	@echo "db-migrate    Apply PostgreSQL migrations using IIP_DATABASE_URL"
 	@echo "helm-lint     Lint and render the Helm chart"
 	@echo "verify        Run all local quality gates"
@@ -75,6 +76,9 @@ test-plugin-runner:
 test-local-product:
 	$(PYTHON) scripts/test_local_product.py
 
+test-helm-install:
+	IIP_DOCKER_BIN=$(DOCKER) IIP_HELM_BIN=$(HELM) IIP_TEST_PYTHON=$(PYTHON) scripts/test_helm_install.sh
+
 db-migrate:
 	PYTHONPATH=src $(PYTHON) -m iip.adapters.postgres
 
@@ -106,6 +110,11 @@ helm-lint:
 		--set networkPolicy.enabled=true \
 		--set networkPolicy.databaseEgress.enabled=true \
 		--set networkPolicy.eventPublisherEgress.enabled=true >/dev/null
+	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set database.existingSecret=iip-database \
+		--set database.migrations.enabled=true \
+		--set networkPolicy.enabled=true \
+		--set networkPolicy.databaseEgress.enabled=true >/dev/null
 
 verify: validate validate-schemas test helm-lint
 

@@ -169,7 +169,7 @@ docker compose -f deploy/docker-compose.yml ps
 
 This is the long-running development stack visible in Docker Desktop: PostgreSQL, the API, the background workflow worker, and a named database volume. It differs from `make test-postgres`, whose test container and volume are always removed on exit. The API is published only on `127.0.0.1`; both application containers run as a non-root user with read-only filesystems, dropped Linux capabilities, and `no-new-privileges`. Stop the manual stack with `docker compose -f deploy/docker-compose.yml down`; add `--volumes` only when you intentionally want to delete its local database.
 
-The API migrates the local Compose database on startup. Automatic migration is disabled by default in Helm and should be a separately controlled deployment step outside local development.
+The API migrates the local Compose database on startup. Automatic migration is disabled in Helm serving pods; `database.migrations.enabled=true` explicitly runs the isolated pre-install/pre-upgrade Job described in the [Helm deployment guide](helm-deployment.md).
 
 ### Verify or rebuild resource projections
 
@@ -195,6 +195,7 @@ This command does not alter immutable observations, events, outbox delivery stat
 ```bash
 helm lint deploy/helm/infra-intelligence
 helm template iip deploy/helm/infra-intelligence --namespace iip-system
+make test-helm-install
 ```
 
 The default image reference is a placeholder until an image pipeline exists. Do not install the chart into a production cluster.

@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.24.0"
+  tag: "0.25.0"
 
 worker:
   enabled: false
@@ -80,7 +80,17 @@ config:
 database:
   existingSecret: ""
   secretKey: database-url
-  autoMigrate: false
+  migrations:
+    enabled: false
+    backoffLimit: 2
+    activeDeadlineSeconds: 300
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
 
 auth:
   mode: local-hashed

@@ -82,7 +82,7 @@ Checkpoint age remains measurable after a complete empty reconciliation. A sourc
 - Projection maintenance requires one explicit tenant, a bounded resource count, the `platform-admin` role, and policy authorization.
 - Psycopg and SQL exceptions are translated at the adapter boundary; public HTTP responses expose only the stable `storage.unavailable` code.
 - Migrations are packaged with the adapter and serialized by a database advisory lock.
-- `IIP_DATABASE_URL` selects the PostgreSQL profile. `IIP_DATABASE_AUTO_MIGRATE` exists for local Compose only and defaults to false in Helm.
+- `IIP_DATABASE_URL` selects the PostgreSQL profile. `IIP_DATABASE_AUTO_MIGRATE` exists for local Compose only and defaults to false in Helm. The opt-in isolated migration hook documented in [ADR 0045](../decisions/0045-controlled-helm-schema-migrations.md) owns chart-driven schema mutation.
 - Production credentials come from an existing Kubernetes Secret or an external secret provider, never chart values committed to this repository.
 
 ## Backup and restore verification

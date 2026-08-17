@@ -48,3 +48,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0042](0042-dependency-aware-readiness.md) | Accepted | Separate process liveness from bounded PostgreSQL connectivity and schema readiness |
 | [0043](0043-explicit-ingestion-freshness-sampling.md) | Accepted | Evaluate explicitly enrolled tenant/source freshness automatically from a non-interactive workflow worker |
 | [0044](0044-tenant-scoped-outbox-delivery.md) | Accepted | Deliver leased tenant-scoped CloudEvents at least once through a replaceable bounded publisher |
+| [0045](0045-controlled-helm-schema-migrations.md) | Accepted | Apply packaged PostgreSQL migrations through an explicit isolated Helm hook before serving rollout |

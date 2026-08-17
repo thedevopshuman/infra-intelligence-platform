@@ -1,0 +1,43 @@
+{{- if and .Values.database.migrations.enabled .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "infra-intelligence.fullname" . }}-migration
+  labels:
+    {{- include "infra-intelligence.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "infra-intelligence.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: database-migration
+  policyTypes: ["Ingress", "Egress"]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        {{- if .Values.networkPolicy.databaseEgress.cidr }}
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.databaseEgress.cidr | quote }}
+        {{- else }}
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.databaseEgress.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.databaseEgress.podSelector | nindent 14 }}
+        {{- end }}
+      ports:
+        - port: {{ .Values.networkPolicy.databaseEgress.port }}
+          protocol: TCP
+{{- end }}

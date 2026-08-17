@@ -13,7 +13,7 @@ data:
   IIP_POLICY_CONFIG_JSON: {{ .Values.policy.externalHttp.configJson | quote }}
   IIP_CREDENTIAL_BROKER_MODE: {{ .Values.credentialBroker.mode | quote }}
   IIP_CREDENTIAL_BROKER_CONFIG_JSON: {{ .Values.credentialBroker.externalHttp.configJson | quote }}
-  IIP_DATABASE_AUTO_MIGRATE: {{ .Values.database.autoMigrate | quote }}
+  IIP_DATABASE_AUTO_MIGRATE: "false"
   IIP_READINESS_DATABASE_TIMEOUT_SECONDS: {{ .Values.probes.readiness.databaseTimeoutSeconds | quote }}
   IIP_OTEL_METRICS_ENABLED: {{ .Values.telemetry.metricsEnabled | quote }}
   IIP_OTEL_TRACES_ENABLED: {{ .Values.telemetry.tracesEnabled | quote }}

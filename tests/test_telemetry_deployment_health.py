@@ -129,6 +129,11 @@ class TelemetryDeploymentHealthServiceTests(unittest.TestCase):
                 retention_seconds=600,
             ).validate()
 
+        TelemetryExportHealthReportingConfiguration(
+            instance_id=INSTANCE_ID,
+            component="otlp-receiver",
+        ).validate()
+
     def test_repository_filters_expired_instances_and_bounds_reads(self) -> None:
         state = TelemetryExportInstanceState(
             instance_id=INSTANCE_ID,
@@ -152,6 +157,23 @@ class TelemetryDeploymentHealthServiceTests(unittest.TestCase):
             self.store.list_telemetry_export_health(
                 reported_since="2026-08-17T11:02:00Z", limit=1002
             )
+
+    def test_receiver_component_round_trips_through_deployment_report(self) -> None:
+        configuration = TelemetryExportHealthReportingConfiguration(
+            instance_id=INSTANCE_ID,
+            component="otlp-receiver",
+        )
+        TelemetryExportHealthReporter(
+            self.health,
+            self.store,
+            self.clock,
+            configuration,
+        ).report_once()
+
+        report = self.service.get(
+            GetTelemetryDeploymentHealthCommand(self.operator)
+        ).to_dict()
+        self.assertEqual(report["spec"]["instances"][0]["component"], "otlp-receiver")
 
 
 class TelemetryDeploymentHealthHttpAndSdkTests(unittest.TestCase):

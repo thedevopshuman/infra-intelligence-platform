@@ -2,7 +2,7 @@
 
 **Status:** Reference implementation
 
-The API and workflow worker can export bounded ingestion-freshness metrics, recognized query availability/latency metrics, and terminal investigation spans over OTLP/HTTP protobuf to an OpenTelemetry Collector or compatible endpoint. Each signal is optional and disabled by default. Public reports and their underlying PostgreSQL/in-memory facts remain authoritative.
+The API, workflow worker, and isolated OTLP receiver can export bounded platform metrics over OTLP/HTTP protobuf to an OpenTelemetry Collector or compatible endpoint; the API and worker can also export terminal investigation spans. Each signal is optional and disabled by default. Public reports and their underlying PostgreSQL/in-memory facts remain authoritative.
 
 This path exports IIP's own operational telemetry. It does not receive customer workload telemetry or query historical metrics. Historical queries use the separate [telemetry evidence contract](../specifications/telemetry-evidence-contract.md) and replaceable backend port, while optional tenant-bound OTLP receivers handle selected pushed customer metrics and logs. The [portability boundary](../architecture/opentelemetry-portability.md) keeps these flows distinct.
 
@@ -26,11 +26,15 @@ Each newly committed terminal report can emit one `iip.investigation.execute` sp
 | `iip.ingestion.objective.violation` | dimensionless | One bounded series per known violation, with `1` for active |
 | `iip.query.requests` | dimensionless | One increment per recognized control-plane read, classified as available, unavailable, or excluded |
 | `iip.query.duration` | seconds | Monotonic serving time for the same recognized read |
+| `iip.otlp.receiver.requests` | dimensionless | One increment per completed metrics/logs intake request, classified as available, unavailable, or excluded |
+| `iip.otlp.receiver.duration` | seconds | Monotonic serving time for the same intake request |
 | `iip.telemetry.record.failures` | dimensionless | Local instrument-recording failures; not network delivery failures |
 
 Every measurement has `iip.ingestion.status`. `IIP_OTEL_INGESTION_ATTRIBUTE_MODE` selects `none`, `source`, or `tenant-source` for identity attributes. The default `source` mode adds `iip.source.id`; choose `none` when source names are sensitive or the source count exceeds the deployment's cardinality budget. `tenant-source` must be an explicit privacy and cost decision.
 
 Query metrics use only closed operation, outcome, availability, and objective attributes. They never include raw paths, query values, tenant/actor identity, credentials, object identifiers, bodies, or error text. Invalid, unauthenticated, and denied requests are exported as `excluded`; valid successful/not-found/conflict responses are `available`; server and dependency failures are `unavailable`. The configured availability basis-point target, window, and minimum eligible count accompany each observation so the customer backend can aggregate the same semantics. See the [query availability telemetry contract](../specifications/query-availability-telemetry-contract.md) and [ADR 0059](../decisions/0059-backend-neutral-query-availability-telemetry.md).
+
+Receiver metrics use only signal, closed outcome, availability, and objective attributes. They exclude tenant/channel/SPIFFE identity, certificates, credentials, payloads, endpoints, paths, numeric status, and error text. An authenticated request rejected by the receiver rate limit is unavailable; invalid, unauthenticated, denied, or disabled requests are excluded. See the [receiver availability telemetry contract](../specifications/otlp-receiver-availability-telemetry-contract.md) and [ADR 0081](../decisions/0081-backend-neutral-otlp-receiver-availability.md).
 
 ## Docker Desktop verification
 
@@ -70,6 +74,9 @@ The API and worker use the Collector through the Compose service network and app
 | `IIP_QUERY_AVAILABILITY_SLO_WINDOW_SECONDS` | `3600` | Aggregation window carried on query metrics |
 | `IIP_QUERY_AVAILABILITY_SLO_MINIMUM_BASIS_POINTS` | `9990` | Availability target carried on query metrics |
 | `IIP_QUERY_AVAILABILITY_SLO_MINIMUM_ELIGIBLE_REQUESTS` | `100` | Sample floor carried on query metrics |
+| `IIP_OTLP_RECEIVER_SLO_WINDOW_SECONDS` | `3600` | Aggregation window carried on receiver metrics |
+| `IIP_OTLP_RECEIVER_SLO_MINIMUM_BASIS_POINTS` | `9990` | Availability target carried on receiver metrics |
+| `IIP_OTLP_RECEIVER_SLO_MINIMUM_ELIGIBLE_REQUESTS` | `100` | Sample floor carried on receiver metrics |
 | `IIP_INGESTION_MONITOR_TARGETS_JSON` | unset | Worker-only closed list of 1–1000 unique, explicitly tenant-enrolled freshness targets; omission disables sampling |
 | `IIP_INGESTION_MONITOR_INTERVAL_SECONDS` | `60` | Worker-only sampling cadence from 5–3600 seconds |
 | `OTEL_SERVICE_NAME` | `infra-intelligence-api` | OpenTelemetry service identity |
@@ -91,7 +98,7 @@ The endpoint must be explicit HTTP(S), no longer than 2048 characters, and canno
 
 ## Helm
 
-Set `telemetry.metricsEnabled` and/or `telemetry.tracesEnabled`, `telemetry.otlpEndpoint`, and the matching NetworkPolicy egress selector. If the endpoint requires headers, put their standard SDK value in an existing Secret and configure `telemetry.existingSecret`; the chart references the Secret and does not render the value. `worker.ingestionMonitorTargets` enables automatic sampling for exact tenant/source pairs, `worker.ingestionMonitorIntervalSeconds` controls its cadence, and `telemetry.workerServiceName` gives worker exports a distinct service identity. Each target tenant must also appear in `worker.tenants` or startup fails closed.
+Set `telemetry.metricsEnabled` and/or `telemetry.tracesEnabled`, `telemetry.otlpEndpoint`, and the matching NetworkPolicy egress selector. If the endpoint requires headers, put their standard SDK value in an existing Secret and configure `telemetry.existingSecret`; the chart references the Secret and does not render the value. `worker.ingestionMonitorTargets` enables automatic sampling for exact tenant/source pairs, `worker.ingestionMonitorIntervalSeconds` controls its cadence, and `telemetry.workerServiceName` and `telemetry.receiverServiceName` give worker and receiver exports distinct service identities. `otlpIngest.availabilitySlo` configures receiver metric objectives. Each target tenant must also appear in `worker.tenants` or startup fails closed.
 
 The Helm chart does not deploy a Collector because topology and backend selection belong to the customer deployment. Point it at a customer-controlled Collector so changing exporters or destinations does not require an IIP build. Configure `queryAvailabilitySlo` alongside `telemetry.metricsEnabled`; the backend computes `floor(available * 10000 / (available + unavailable))` over the declared window after the minimum eligible count. Add ingress or synthetic availability separately because an application process cannot emit when every replica is unreachable.
 
@@ -105,7 +112,7 @@ curl --fail-with-body \
   http://127.0.0.1:8080/v1/operations/telemetry/export-health
 ```
 
-The process-local report distinguishes disabled, awaiting-first-attempt, healthy, and degraded metric/trace delivery and intentionally omits the configured endpoint and provider failures. The deployment-wide operation includes recent pseudonymous API and workflow-worker heartbeats from the shared store:
+The process-local report distinguishes disabled, awaiting-first-attempt, healthy, and degraded metric/trace delivery and intentionally omits the configured endpoint and provider failures. The deployment-wide operation includes recent pseudonymous API, workflow-worker, and OTLP receiver heartbeats from the shared store:
 
 ```bash
 curl --fail-with-body \

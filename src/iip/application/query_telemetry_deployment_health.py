@@ -22,7 +22,7 @@ from iip.application.query_telemetry_export_health import (
 
 _MAX_INSTANCES = 1_000
 _INSTANCE_ID = re.compile(r"sha256:[a-f0-9]{64}")
-_COMPONENTS = frozenset({"api", "workflow-worker"})
+_COMPONENTS = frozenset({"api", "workflow-worker", "otlp-receiver"})
 
 
 @dataclass(frozen=True)

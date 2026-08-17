@@ -84,3 +84,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0078](0078-executable-oidc-issuer-compatibility-evidence.md) | Accepted | Prove OIDC/JWKS verification, cache rotation, minimized PKCE discovery, outage, and recovery over local TLS |
 | [0079](0079-executable-policy-engine-compatibility-evidence.md) | Accepted | Prove exact external policy decisions, snapshot binding, credential rotation, outage, and recovery over local TLS |
 | [0080](0080-mutual-tls-otlp-workload-identity-and-buffering.md) | Accepted | Bind OTLP channels to SPIFFE mTLS identities, commit before success, and keep durable outage queues in the customer Collector |
+| [0081](0081-backend-neutral-otlp-receiver-availability.md) | Accepted | Export privacy-bounded OTLP intake availability through the customer-selected telemetry backend |

@@ -577,6 +577,7 @@
         "investigationAttributeMode",
         "serviceName",
         "workerServiceName",
+        "receiverServiceName",
         "exportIntervalMillis",
         "exportTimeoutMillis",
         "traceScheduleDelayMillis",
@@ -605,6 +606,7 @@
         },
         "serviceName": { "$ref": "#/definitions/serviceName" },
         "workerServiceName": { "$ref": "#/definitions/serviceName" },
+        "receiverServiceName": { "$ref": "#/definitions/serviceName" },
         "exportIntervalMillis": { "$ref": "#/definitions/boundedMillis" },
         "exportTimeoutMillis": { "$ref": "#/definitions/boundedMillis" },
         "traceScheduleDelayMillis": { "$ref": "#/definitions/boundedMillis" },
@@ -700,6 +702,7 @@
         "service",
         "maxRequestsPerSecond",
         "requestBurst",
+        "availabilitySlo",
         "resources"
       ],
       "properties": {
@@ -745,6 +748,16 @@
         },
         "maxRequestsPerSecond": { "type": "integer", "minimum": 1, "maximum": 100000 },
         "requestBurst": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "availabilitySlo": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["windowSeconds", "minimumAvailabilityBasisPoints", "minimumEligibleRequests"],
+          "properties": {
+            "windowSeconds": { "type": "integer", "minimum": 300, "maximum": 2592000 },
+            "minimumAvailabilityBasisPoints": { "type": "integer", "minimum": 1, "maximum": 10000 },
+            "minimumEligibleRequests": { "type": "integer", "minimum": 1, "maximum": 1000000 }
+          }
+        },
         "resources": { "$ref": "#/definitions/resources" }
       }
     },

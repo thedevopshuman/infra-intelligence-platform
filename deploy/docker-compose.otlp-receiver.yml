@@ -14,7 +14,7 @@ services:
       - "127.0.0.1:15434:5432"
 
   api:
-    image: iip-otlp-receiver-test:0.53.0
+    image: iip-otlp-receiver-test:0.54.0
     build:
       context: ..
       dockerfile: Dockerfile
@@ -43,7 +43,7 @@ services:
       - no-new-privileges:true
 
   receiver:
-    image: iip-otlp-receiver-test:0.53.0
+    image: iip-otlp-receiver-test:0.54.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.otlp_receiver"]
     environment:
@@ -62,6 +62,14 @@ services:
       IIP_OTLP_RECEIVER_CHANNELS_JSON: ${IIP_OTLP_RECEIVER_CHANNELS_JSON:?set IIP_OTLP_RECEIVER_CHANNELS_JSON}
       IIP_OTLP_LOGS_RECEIVER_ENABLED: "true"
       IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON: ${IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON:?set IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON}
+      IIP_OTEL_METRICS_ENABLED: "true"
+      IIP_OTEL_TRACES_ENABLED: "false"
+      IIP_OTEL_INGESTION_ATTRIBUTE_MODE: none
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRIC_EXPORT_INTERVAL: "1000"
+      OTEL_METRIC_EXPORT_TIMEOUT: "1000"
+      OTEL_SERVICE_NAME: infra-intelligence-otlp-receiver-test
     depends_on:
       api:
         condition: service_healthy
@@ -81,3 +89,9 @@ services:
     cap_drop: ["ALL"]
     security_opt:
       - no-new-privileges:true
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.158.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel/collector-test.yaml:/etc/otelcol/config.yaml:ro

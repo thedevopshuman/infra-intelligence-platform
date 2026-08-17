@@ -270,7 +270,7 @@ class TelemetryExportHealthReport:
 
 @dataclass(frozen=True)
 class TelemetryDeploymentExportHealthReport:
-    """Recent API and worker OTLP delivery state for administrators."""
+    """Recent API, worker, and receiver OTLP delivery state for administrators."""
 
     payload: Mapping[str, Any]
 

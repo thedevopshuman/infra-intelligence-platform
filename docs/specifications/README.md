@@ -35,6 +35,7 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | OTLP receiver compatibility report | [otlp-receiver-compatibility-contract.md](otlp-receiver-compatibility-contract.md) | `contracts/schemas/otlp-receiver-compatibility-report.schema.json` | `contracts/examples/otlp-receiver-compatibility-report.json` |
 | Evidence retention report | [evidence-retention-contract.md](evidence-retention-contract.md) | `contracts/schemas/evidence-retention-report.schema.json` | `contracts/examples/evidence-retention-report.json` |
 | Query availability telemetry | [query-availability-telemetry-contract.md](query-availability-telemetry-contract.md) | OTLP Metrics protobuf semantic convention | n/a |
+| OTLP receiver availability telemetry | [otlp-receiver-availability-telemetry-contract.md](otlp-receiver-availability-telemetry-contract.md) | OTLP Metrics protobuf semantic convention | n/a |
 | Runtime version report | [runtime-version-contract.md](runtime-version-contract.md) | `contracts/schemas/runtime-version-report.schema.json` | `contracts/examples/runtime-version-report.json` |
 | Session context | [session-context-contract.md](session-context-contract.md) | `contracts/schemas/session-context.schema.json` | `contracts/examples/session-context.json` |
 | Console authentication | [console-authentication-contract.md](console-authentication-contract.md) | `contracts/schemas/console-authentication.schema.json` | `contracts/examples/console-authentication-local.json`, `contracts/examples/console-authentication-oidc.json` |

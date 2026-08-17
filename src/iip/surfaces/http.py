@@ -115,6 +115,7 @@ from iip.application.ports import (
 from iip.application.observe_query_availability import (
     RecordQueryAvailabilityCommand,
 )
+from iip.application.observe_otlp_receiver import RecordOtlpReceiverCommand
 from iip.application.query_actions import (
     ActionQueryAuthorizationError,
     ActionQueryError,
@@ -174,7 +175,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.53.0"
+    server_version = "IIPReference/0.54.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -1109,6 +1110,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         return token
 
     def _receive_otlp_metrics(self) -> None:
+        self._otlp_receiver_context = ("metrics", time.monotonic())
         service = self.runtime.otlp_metrics_ingestion
         if service is None:
             self._otlp_failure(HTTPStatus.NOT_FOUND, "otlp.receiver.disabled")
@@ -1178,8 +1180,15 @@ class ApiHandler(BaseHTTPRequestHandler):
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 "otlp.receiver.unavailable",
             )
+        except Exception:
+            self._finish_otlp_receiver_telemetry(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                uncaught_failure=True,
+            )
+            raise
 
     def _receive_otlp_logs(self) -> None:
+        self._otlp_receiver_context = ("logs", time.monotonic())
         service = self.runtime.otlp_logs_ingestion
         if service is None:
             self._otlp_failure(HTTPStatus.NOT_FOUND, "otlp.receiver.disabled")
@@ -1248,6 +1257,12 @@ class ApiHandler(BaseHTTPRequestHandler):
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 "otlp.receiver.unavailable",
             )
+        except Exception:
+            self._finish_otlp_receiver_telemetry(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                uncaught_failure=True,
+            )
+            raise
 
     def _authentication_failed(self, error: AuthenticationError) -> None:
         code = str(error)
@@ -1480,16 +1495,24 @@ class ApiHandler(BaseHTTPRequestHandler):
         self._otlp_response(status, Status(message=message).SerializeToString())
 
     def _otlp_response(self, status: HTTPStatus, body: bytes) -> None:
-        self.send_response(status.value)
-        self.send_header("content-type", "application/x-protobuf")
-        self._security_headers()
-        if status == HTTPStatus.UNAUTHORIZED:
-            self.send_header("WWW-Authenticate", "Bearer")
-        if status == HTTPStatus.SERVICE_UNAVAILABLE:
-            self.send_header("Retry-After", "1")
-        self.send_header("content-length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(status.value)
+            self.send_header("content-type", "application/x-protobuf")
+            self._security_headers()
+            if status == HTTPStatus.UNAUTHORIZED:
+                self.send_header("WWW-Authenticate", "Bearer")
+            if status == HTTPStatus.SERVICE_UNAVAILABLE:
+                self.send_header("Retry-After", "1")
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except Exception:
+            self._finish_otlp_receiver_telemetry(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                uncaught_failure=True,
+            )
+            raise
+        self._finish_otlp_receiver_telemetry(status)
 
     def _json(self, status: HTTPStatus, payload: Dict[str, Any]) -> None:
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
@@ -1594,6 +1617,30 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
         except Exception:
             # Optional telemetry never changes an HTTP query result.
+            return
+
+    def _finish_otlp_receiver_telemetry(
+        self,
+        status: HTTPStatus,
+        *,
+        uncaught_failure: bool = False,
+    ) -> None:
+        context = getattr(self, "_otlp_receiver_context", None)
+        if context is None:
+            return
+        self._otlp_receiver_context = None
+        signal, started_at = context
+        try:
+            self.runtime.otlp_receiver_telemetry.record(
+                RecordOtlpReceiverCommand(
+                    signal=signal,
+                    status_code=int(status),
+                    duration_seconds=max(0.0, time.monotonic() - started_at),
+                    uncaught_failure=uncaught_failure,
+                )
+            )
+        except Exception:
+            # Optional telemetry never changes an OTLP intake result.
             return
 
     def _console_asset(self, path: str) -> None:

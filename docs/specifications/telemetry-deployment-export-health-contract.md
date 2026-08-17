@@ -4,7 +4,7 @@
 
 **Machine contract:** `contracts/schemas/telemetry-deployment-export-health-report.schema.json`
 
-`TelemetryDeploymentExportHealthReport` gives an operator one bounded view of recent OpenTelemetry export outcomes from API and workflow-worker instances that share the operational store. It complements the process-local report without changing its response.
+`TelemetryDeploymentExportHealthReport` gives an operator one bounded view of recent OpenTelemetry export outcomes from API, workflow-worker, and isolated OTLP receiver instances that share the operational store. It complements the process-local report without changing its response.
 
 ## Reporting and freshness
 

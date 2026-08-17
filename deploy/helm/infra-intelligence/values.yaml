@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.53.0"
+  tag: "0.54.0"
   digest: ""
 
 worker:
@@ -203,6 +203,7 @@ telemetry:
   investigationAttributeMode: none
   serviceName: infra-intelligence-api
   workerServiceName: infra-intelligence-worker
+  receiverServiceName: infra-intelligence-otlp-receiver
   exportIntervalMillis: 60000
   exportTimeoutMillis: 10000
   traceScheduleDelayMillis: 5000
@@ -292,6 +293,10 @@ otlpIngest:
     port: 4318
   maxRequestsPerSecond: 50
   requestBurst: 100
+  availabilitySlo:
+    windowSeconds: 3600
+    minimumAvailabilityBasisPoints: 9990
+    minimumEligibleRequests: 100
   resources:
     requests:
       cpu: 50m

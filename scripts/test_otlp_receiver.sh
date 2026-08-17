@@ -51,6 +51,23 @@ IIP_TEST_OTLP_DATABASE_URL=postgresql://iip@127.0.0.1:15434/iip \
 PYTHONPATH=src:sdks/python/src \
     "$IIP_TEST_PYTHON" -m unittest tests.test_otlp_receiver_integration -v
 
+IIP_RECEIVER_METRIC_FOUND=false
+IIP_RECEIVER_METRIC_ATTEMPT=0
+while [ "$IIP_RECEIVER_METRIC_ATTEMPT" -lt 20 ]; do
+    if "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
+        -f "$IIP_COMPOSE_FILE" logs otel-collector 2>&1 \
+        | grep -q 'iip.otlp.receiver.requests'; then
+        IIP_RECEIVER_METRIC_FOUND=true
+        break
+    fi
+    IIP_RECEIVER_METRIC_ATTEMPT=$((IIP_RECEIVER_METRIC_ATTEMPT + 1))
+    sleep 1
+done
+if [ "$IIP_RECEIVER_METRIC_FOUND" != true ]; then
+    echo "Receiver availability metric did not reach the separate Collector" >&2
+    exit 1
+fi
+
 "$IIP_DOCKER_BIN" run --rm --network none --read-only \
     -e IIP_OTLP_RECEIVER_ENDPOINT=https://receiver.example.test:4318 \
     -e IIP_OTLP_CHANNEL_TOKEN=validation-only-not-a-secret \
@@ -62,4 +79,4 @@ IIP_DOCKER_BIN="$IIP_DOCKER_BIN" PYTHONPATH=src:sdks/python/src \
     "$IIP_TEST_PYTHON" scripts/write_otlp_receiver_compatibility_report.py \
     --report dist/otlp-receiver-compatibility-report.json
 
-echo "Official OTLP/HTTP exporters delivered metrics and logs to the isolated receiver"
+echo "Official OTLP/HTTP exporters delivered customer signals and receiver availability telemetry across separate boundaries"

@@ -131,6 +131,16 @@ helm-lint:
 		--set database.existingSecret=iip-database \
 		--set otlpReceiver.enabled=true \
 		--set otlpReceiver.channelsExistingSecret=iip-otlp-metrics \
+		--set telemetry.metricsEnabled=true \
+		--set telemetry.otlpEndpoint=http://otel-collector.observability:4318 \
+		--set networkPolicy.enabled=true \
+		--set networkPolicy.databaseEgress.enabled=true \
+		--set networkPolicy.otlpReceiverIngress.enabled=true \
+		--set networkPolicy.otlpEgress.enabled=true >/dev/null
+	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set database.existingSecret=iip-database \
+		--set otlpReceiver.enabled=true \
+		--set otlpReceiver.channelsExistingSecret=iip-otlp-metrics \
 		--set otlpIngest.tls.mode=mutual-spiffe \
 		--set otlpIngest.tls.serverExistingSecret=iip-otlp-server-tls \
 		--set otlpIngest.tls.clientCaExistingSecret=iip-otlp-client-ca \
@@ -177,6 +187,16 @@ helm-lint:
 		--set networkPolicy.ingressController.enabled=true >/dev/null
 	@if $(HELM) lint deploy/helm/infra-intelligence --set replicaCount=0 >/dev/null 2>&1; then \
 		echo "Helm values schema accepted an invalid replica count" >&2; exit 1; \
+	fi
+	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set database.existingSecret=iip-database \
+		--set otlpReceiver.enabled=true \
+		--set otlpReceiver.channelsExistingSecret=iip-otlp-metrics \
+		--set telemetry.metricsEnabled=true \
+		--set telemetry.otlpEndpoint=http://otel-collector.observability:4318 \
+		--set networkPolicy.enabled=true \
+		--set networkPolicy.databaseEgress.enabled=true >/dev/null 2>&1; then \
+		echo "Helm validation accepted receiver telemetry without Collector egress" >&2; exit 1; \
 	fi
 	@if $(HELM) lint deploy/helm/infra-intelligence --set unknownCustomerSetting=true >/dev/null 2>&1; then \
 		echo "Helm values schema accepted an unknown setting" >&2; exit 1; \

@@ -35,9 +35,9 @@ flowchart LR
 
 The `IngestionFreshnessReport` remains the authoritative point-in-time product result. Its application service offers the same bounded measurements to a provider-neutral sink after a successful evaluation. The OpenTelemetry adapter maps them to synchronous instruments, while the official SDK's periodic reader performs OTLP/HTTP network export. A terminal `InvestigationReport` similarly drives one bounded execution span only after its report and lifecycle status are durable. OpenTelemetry packages are confined to `adapters` and composition; neither `domain` nor the use cases import them.
 
-The adapters use the [standard exporter endpoint configuration](https://opentelemetry.io/docs/specs/otel/protocol/exporter/), including `OTEL_EXPORTER_OTLP_ENDPOINT` and signal-specific variables. The recommended target is a customer-controlled [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/), which can route to a different open-source or commercial backend without an IIP code change. [ADR 0013](../decisions/0013-otlp-http-ingestion-metrics-export.md) records the metrics selection, [ADR 0031](../decisions/0031-otlp-investigation-trace-export.md) records the trace privacy/cardinality boundary, and the [operations guide](../operations/opentelemetry-export.md) lists the signals and configuration.
+The adapters use the [standard exporter endpoint configuration](https://opentelemetry.io/docs/specs/otel/protocol/exporter/), including `OTEL_EXPORTER_OTLP_ENDPOINT` and signal-specific variables. The recommended target is a customer-controlled [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/), which can route to a different open-source or commercial backend without an IIP code change. [ADR 0013](../decisions/0013-otlp-http-ingestion-metrics-export.md) records the metrics selection, [ADR 0031](../decisions/0031-otlp-investigation-trace-export.md) records the trace privacy/cardinality boundary, [ADR 0081](../decisions/0081-backend-neutral-otlp-receiver-availability.md) records receiver request availability, and the [operations guide](../operations/opentelemetry-export.md) lists the signals and configuration.
 
-Export is disabled by default, asynchronous, and observational. Endpoint unavailability does not roll back ingestion, block an investigation, or change report results. The reference adapter has bounded timeouts, SDK retry behavior, local recording-failure counting, controlled dimensions, recent deployment-wide API/worker delivery health through a failure-isolated shared-store heartbeat, and rolling per-signal export-attempt attainment from bounded counter samples. It does not provide a durable queue, Collector queue/loss SLI, regional aggregation, or burn-rate alerting; those are required before production enablement.
+Export is disabled by default, asynchronous, and observational. Endpoint unavailability does not roll back ingestion, block an investigation, or change report results. The reference adapter has bounded timeouts, SDK retry behavior, local recording-failure counting, controlled dimensions, recent deployment-wide API/worker/receiver delivery health through a failure-isolated shared-store heartbeat, and rolling per-signal export-attempt attainment from bounded counter samples. Receiver request counter/histogram observations use the same exporter but never include customer identity or payload data. It does not provide a durable queue, Collector queue/loss SLI, regional aggregation, or burn-rate alerting; those are required before production enablement.
 
 ## Customer telemetry evidence
 
@@ -84,6 +84,8 @@ multi-signal reasoning, and expanded-signal decisions belong to the Phase 2
 telemetry-evidence slice. ADR 0080 now fixes the local production receiver
 profile: CA-verified SPIFFE mTLS plus a separate tenant-bound channel credential,
 PostgreSQL commit before success, and a customer-Collector persistent sending
-queue for pre-receiver buffering. Customer PKI interoperability, automated
-rotation, queue loss objectives, delivery health, and receiver SLO decisions
-remain Phase 3 operational-hardening gates.
+queue for pre-receiver buffering. Receiver HTTP availability semantics and
+backend-neutral export are accepted in ADR 0081. Customer PKI interoperability,
+automated rotation, transport/queue loss objectives, regional aggregation,
+burn-rate policy, and notification routing remain Phase 3 operational-hardening
+gates.

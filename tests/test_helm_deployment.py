@@ -36,6 +36,42 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn("appProtocol:", service)
         self.assertIn("}}https{{", service)
 
+    def test_otlp_receiver_observability_is_backend_neutral_and_network_bounded(self) -> None:
+        deployment = (
+            CHART / "templates" / "otlp-receiver-deployment.yaml"
+        ).read_text(encoding="utf-8")
+        network_policy = (
+            CHART / "templates" / "networkpolicy.yaml"
+        ).read_text(encoding="utf-8")
+        validation = (CHART / "templates" / "validation.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+
+        for required in (
+            "IIP_OTEL_METRICS_ENABLED",
+            "IIP_OTEL_TRACES_ENABLED",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "OTEL_SERVICE_NAME",
+            "telemetry.receiverServiceName",
+            "OTEL_EXPORTER_OTLP_HEADERS",
+            "IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS",
+            "IIP_OTLP_RECEIVER_SLO_WINDOW_SECONDS",
+            "IIP_OTLP_RECEIVER_SLO_MINIMUM_BASIS_POINTS",
+            "IIP_OTLP_RECEIVER_SLO_MINIMUM_ELIGIBLE_REQUESTS",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, deployment)
+        self.assertIn("receiverServiceName: infra-intelligence-otlp-receiver", values)
+        self.assertIn("availabilitySlo:", values)
+        self.assertGreaterEqual(
+            network_policy.count("networkPolicy.otlpEgress.enabled"), 3
+        )
+        self.assertIn(
+            "networkPolicy.otlpEgress.enabled is required for OTLP receiver telemetry export",
+            validation,
+        )
+
     def test_every_application_workload_uses_one_digest_aware_image_helper(self) -> None:
         for name in (
             "deployment.yaml",

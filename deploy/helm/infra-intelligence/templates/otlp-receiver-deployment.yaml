@@ -66,6 +66,49 @@ spec:
               value: "false"
             - name: IIP_READINESS_DATABASE_TIMEOUT_SECONDS
               value: {{ .Values.probes.readiness.databaseTimeoutSeconds | quote }}
+            - name: IIP_OTEL_METRICS_ENABLED
+              value: {{ .Values.telemetry.metricsEnabled | quote }}
+            - name: IIP_OTEL_TRACES_ENABLED
+              value: "false"
+            - name: IIP_OTEL_INGESTION_ATTRIBUTE_MODE
+              value: "none"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.telemetry.otlpEndpoint | quote }}
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: {{ .Values.telemetry.protocol | quote }}
+            - name: OTEL_METRIC_EXPORT_INTERVAL
+              value: {{ .Values.telemetry.exportIntervalMillis | quote }}
+            - name: OTEL_METRIC_EXPORT_TIMEOUT
+              value: {{ .Values.telemetry.exportTimeoutMillis | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.telemetry.receiverServiceName | quote }}
+            - name: IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS
+              value: {{ .Values.telemetry.healthReportIntervalSeconds | quote }}
+            - name: IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS
+              value: {{ .Values.telemetry.healthStaleAfterSeconds | quote }}
+            - name: IIP_TELEMETRY_HEALTH_RETENTION_SECONDS
+              value: {{ .Values.telemetry.healthRetentionSeconds | quote }}
+            - name: IIP_TELEMETRY_EXPORT_SLO_WINDOW_SECONDS
+              value: {{ .Values.telemetry.exportSloWindowSeconds | quote }}
+            - name: IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS
+              value: {{ .Values.telemetry.exportSloMinimumAttainmentBasisPoints | quote }}
+            - name: IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ELIGIBLE_ATTEMPTS
+              value: {{ .Values.telemetry.exportSloMinimumEligibleAttempts | quote }}
+            - name: IIP_TELEMETRY_EXPORT_SLO_RETENTION_SECONDS
+              value: {{ .Values.telemetry.exportSloRetentionSeconds | quote }}
+            - name: IIP_OTLP_RECEIVER_SLO_WINDOW_SECONDS
+              value: {{ .Values.otlpIngest.availabilitySlo.windowSeconds | quote }}
+            - name: IIP_OTLP_RECEIVER_SLO_MINIMUM_BASIS_POINTS
+              value: {{ .Values.otlpIngest.availabilitySlo.minimumAvailabilityBasisPoints | quote }}
+            - name: IIP_OTLP_RECEIVER_SLO_MINIMUM_ELIGIBLE_REQUESTS
+              value: {{ .Values.otlpIngest.availabilitySlo.minimumEligibleRequests | quote }}
+            {{- if .Values.telemetry.existingSecret }}
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetry.existingSecret | quote }}
+                  key: {{ .Values.telemetry.headersSecretKey | quote }}
+            {{- end }}
             - name: IIP_POLICY_MODE
               value: {{ .Values.policy.mode | quote }}
             - name: IIP_POLICY_CONFIG_JSON

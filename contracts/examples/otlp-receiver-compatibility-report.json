@@ -14,7 +14,7 @@
       "containerRuntime": "docker",
       "containerRuntimeVersion": "28.3.3",
       "pythonVersion": "3.14.0",
-      "applicationVersion": "0.53.0",
+      "applicationVersion": "0.54.0",
       "collectorVersion": "0.158.0",
       "collectorImageDigest": "sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5"
     },

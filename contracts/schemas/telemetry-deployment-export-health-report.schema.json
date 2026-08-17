@@ -68,7 +68,7 @@
       ],
       "properties": {
         "instanceId": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
-        "component": {"type": "string", "enum": ["api", "workflow-worker"]},
+        "component": {"type": "string", "enum": ["api", "workflow-worker", "otlp-receiver"]},
         "startedAt": {"type": "string", "format": "date-time"},
         "lastReportedAt": {"type": "string", "format": "date-time"},
         "freshness": {"type": "string", "enum": ["current", "stale"]},

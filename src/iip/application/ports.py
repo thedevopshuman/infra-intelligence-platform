@@ -204,6 +204,19 @@ class QueryAvailabilityMeasurement:
 
 
 @dataclass(frozen=True)
+class OtlpReceiverMeasurement:
+    """Privacy-bounded OTLP intake outcome offered to a telemetry sink."""
+
+    signal: str
+    outcome: str
+    availability: str
+    duration_seconds: float
+    objective_window_seconds: int
+    objective_minimum_availability_basis_points: int
+    objective_minimum_eligible_requests: int
+
+
+@dataclass(frozen=True)
 class InvestigationExecutionMeasurement:
     """Bounded terminal facts offered to an observational telemetry sink."""
 
@@ -715,6 +728,13 @@ class QueryAvailabilitySink(Protocol):
         self, measurement: QueryAvailabilityMeasurement
     ) -> None:
         """Record one bounded query outcome without becoming serving authority."""
+
+
+class OtlpReceiverTelemetrySink(Protocol):
+    def record_otlp_receiver(
+        self, measurement: OtlpReceiverMeasurement
+    ) -> None:
+        """Record one bounded intake outcome without becoming serving authority."""
 
 
 class InvestigationTelemetrySink(Protocol):

@@ -11,8 +11,8 @@
       "retentionSeconds": 600
     },
     "summary": {
-      "includedInstances": 2,
-      "currentInstances": 1,
+      "includedInstances": 3,
+      "currentInstances": 2,
       "staleInstances": 1,
       "truncated": false
     },
@@ -70,6 +70,36 @@
             "signal": "traces",
             "enabled": true,
             "status": "awaiting-first-attempt",
+            "attempts": 0,
+            "successes": 0,
+            "failures": 0,
+            "consecutiveFailures": 0
+          }
+        ]
+      },
+      {
+        "instanceId": "sha256:9db42dd1b25726cc2b90c830beb0c8c0d5c9c60a545c0a134e9a2ecb0cb183e8",
+        "component": "otlp-receiver",
+        "startedAt": "2026-08-17T11:45:03Z",
+        "lastReportedAt": "2026-08-17T12:02:06Z",
+        "freshness": "current",
+        "status": "healthy",
+        "signals": [
+          {
+            "signal": "metrics",
+            "enabled": true,
+            "status": "healthy",
+            "attempts": 16,
+            "successes": 16,
+            "failures": 0,
+            "consecutiveFailures": 0,
+            "lastAttemptAt": "2026-08-17T12:02:00Z",
+            "lastSuccessAt": "2026-08-17T12:02:00Z"
+          },
+          {
+            "signal": "traces",
+            "enabled": false,
+            "status": "disabled",
             "attempts": 0,
             "successes": 0,
             "failures": 0,

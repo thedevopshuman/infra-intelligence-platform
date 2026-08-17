@@ -330,7 +330,7 @@ export interface TelemetryExportHealthReport {
 
 export interface TelemetryDeploymentExportHealthInstance {
   instanceId: Sha256Digest;
-  component: "api" | "workflow-worker";
+  component: "api" | "workflow-worker" | "otlp-receiver";
   startedAt: string;
   lastReportedAt: string;
   freshness: "current" | "stale";

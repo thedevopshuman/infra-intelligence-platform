@@ -107,8 +107,19 @@ interactive identity configuration or ambient service-account token, and
 applies per-channel process admission. If NetworkPolicy is enabled, both
 `networkPolicy.databaseEgress` and an exact
 `networkPolicy.otlpReceiverIngress` must be configured. Automated CA/channel
-rotation, distributed gateway admission, queue sizing, and receiver-specific
-SLO objectives remain customer production decisions.
+rotation, distributed gateway admission, and queue sizing remain customer
+production decisions.
+
+When `telemetry.metricsEnabled` is true, the receiver exports privacy-bounded
+request availability and duration through the same customer-selected outbound
+OTLP boundary as the API and worker. Configure `telemetry.otlpEndpoint`,
+`telemetry.receiverServiceName`, optional protected `telemetry.existingSecret`,
+`otlpIngest.availabilitySlo`, and `networkPolicy.otlpEgress`. The endpoint must
+be a customer Collector or compatible backend and must not point back to this
+IIP intake listener, which would create a telemetry loop. The deployment health
+operation then reports `otlp-receiver` exporter heartbeats. TLS handshake
+failures still require Collector/ingress or synthetic telemetry because no HTTP
+handler exists for a rejected handshake.
 
 For one-process development compatibility only, set `IIP_OTLP_RECEIVER_MODE=shared` on the control API. Helm deliberately never enables this mode.
 

@@ -71,6 +71,7 @@ from iip.application.ports import (
     InvestigationSignalCatalog,
     InvestigationTelemetrySink,
     KubernetesEventsBackend,
+    OtlpReceiverTelemetrySink,
     PolicyConfigurationError,
     PolicyDecisionPoint,
     QueryAvailabilitySink,
@@ -108,6 +109,10 @@ from iip.application.observe_ingestion import (
 from iip.application.observe_query_availability import (
     QueryAvailabilityObjectives,
     QueryAvailabilityService,
+)
+from iip.application.observe_otlp_receiver import (
+    OtlpReceiverObjectives,
+    OtlpReceiverTelemetryService,
 )
 from iip.application.plugin_sessions import PluginSessionService
 from iip.application.plugin_invocations import PluginInvocationLifecycleService
@@ -173,6 +178,7 @@ class Runtime:
     event_delivery_slo: EventDeliverySloService
     investigation_completion_slo: InvestigationCompletionSloService
     query_availability: QueryAvailabilityService
+    otlp_receiver_telemetry: OtlpReceiverTelemetryService
     telemetry_export_health: TelemetryExportHealthService
     telemetry_deployment_health: TelemetryDeploymentHealthService
     telemetry_export_slo: TelemetryExportSloService
@@ -240,6 +246,8 @@ def build_local_runtime(
     telemetry_health_reporting: (
         TelemetryExportHealthReportingConfiguration | None
     ) = None,
+    otlp_receiver_objectives: OtlpReceiverObjectives | None = None,
+    otlp_receiver_telemetry_sink: OtlpReceiverTelemetrySink | None = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -273,6 +281,8 @@ def build_local_runtime(
         investigation_dispatch_limits,
         evidence_retention_policy,
         telemetry_health_reporting,
+        otlp_receiver_objectives,
+        otlp_receiver_telemetry_sink,
     )
 
 
@@ -305,6 +315,8 @@ def _compose_runtime(
     telemetry_health_reporting: (
         TelemetryExportHealthReportingConfiguration | None
     ) = None,
+    otlp_receiver_objectives: OtlpReceiverObjectives | None = None,
+    otlp_receiver_telemetry_sink: OtlpReceiverTelemetrySink | None = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -441,6 +453,10 @@ def _compose_runtime(
         query_availability=QueryAvailabilityService(
             query_availability_sink,
             query_availability_objectives,
+        ),
+        otlp_receiver_telemetry=OtlpReceiverTelemetryService(
+            otlp_receiver_telemetry_sink,
+            otlp_receiver_objectives,
         ),
         telemetry_export_health=TelemetryExportHealthService(
             health_reader,
@@ -582,6 +598,8 @@ def build_postgres_runtime(
     telemetry_health_reporting: (
         TelemetryExportHealthReportingConfiguration | None
     ) = None,
+    otlp_receiver_objectives: OtlpReceiverObjectives | None = None,
+    otlp_receiver_telemetry_sink: OtlpReceiverTelemetrySink | None = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -622,6 +640,8 @@ def build_postgres_runtime(
         investigation_dispatch_limits,
         evidence_retention_policy,
         telemetry_health_reporting,
+        otlp_receiver_objectives,
+        otlp_receiver_telemetry_sink,
     )
 
 
@@ -688,6 +708,7 @@ def _build_runtime_from_env(
         _investigation_completion_slo_objectives_from_env()
     )
     query_availability_objectives = _query_availability_objectives_from_env()
+    otlp_receiver_objectives = _otlp_receiver_objectives_from_env()
     telemetry_export_slo_objectives = _telemetry_export_slo_objectives_from_env()
     investigation_dispatch_limits = _investigation_dispatch_limits_from_env()
     evidence_retention_policy = _evidence_retention_policy_from_env()
@@ -783,6 +804,12 @@ def _build_runtime_from_env(
                 investigation_dispatch_limits=investigation_dispatch_limits,
                 evidence_retention_policy=evidence_retention_policy,
                 telemetry_health_reporting=telemetry_health_reporting,
+                otlp_receiver_objectives=otlp_receiver_objectives,
+                otlp_receiver_telemetry_sink=(
+                    metrics_runtime.receiver_sink
+                    if metrics_runtime is not None
+                    else None
+                ),
             )
         auto_migrate = (
             os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
@@ -823,6 +850,12 @@ def _build_runtime_from_env(
             investigation_dispatch_limits=investigation_dispatch_limits,
             evidence_retention_policy=evidence_retention_policy,
             telemetry_health_reporting=telemetry_health_reporting,
+            otlp_receiver_objectives=otlp_receiver_objectives,
+            otlp_receiver_telemetry_sink=(
+                metrics_runtime.receiver_sink
+                if metrics_runtime is not None
+                else None
+            ),
             readiness_timeout_seconds=_readiness_timeout_from_env(),
         )
     except Exception:
@@ -844,22 +877,42 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
     auto_migrate = (
         os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower() == "true"
     )
-    return build_postgres_runtime(
-        database_url,
-        authenticator=DenyAllAuthenticator(),
-        migrate=auto_migrate,
-        ingestion_objectives=_ingestion_objectives_from_env(),
-        event_delivery_slo_objectives=_event_delivery_slo_objectives_from_env(),
-        investigation_completion_slo_objectives=(
-            _investigation_completion_slo_objectives_from_env()
-        ),
-        query_availability_objectives=_query_availability_objectives_from_env(),
-        telemetry_export_slo_objectives=_telemetry_export_slo_objectives_from_env(),
-        otlp_metrics_receiver=metrics_receiver,
-        otlp_logs_receiver=logs_receiver,
-        policy=_policy_from_env(),
-        readiness_timeout_seconds=_readiness_timeout_from_env(),
-    )
+    metrics_runtime = _otel_metrics_runtime_from_env()
+    try:
+        telemetry_export_slo_objectives = _telemetry_export_slo_objectives_from_env()
+        telemetry_health_reporting = (
+            _telemetry_health_reporting_from_env("otlp-receiver")
+            if metrics_runtime is not None
+            else None
+        )
+        return build_postgres_runtime(
+            database_url,
+            authenticator=DenyAllAuthenticator(),
+            migrate=auto_migrate,
+            ingestion_objectives=_ingestion_objectives_from_env(),
+            event_delivery_slo_objectives=_event_delivery_slo_objectives_from_env(),
+            investigation_completion_slo_objectives=(
+                _investigation_completion_slo_objectives_from_env()
+            ),
+            query_availability_objectives=_query_availability_objectives_from_env(),
+            telemetry_export_slo_objectives=telemetry_export_slo_objectives,
+            otlp_metrics_receiver=metrics_receiver,
+            otlp_logs_receiver=logs_receiver,
+            telemetry_runtime=metrics_runtime,
+            telemetry_health_reporting=telemetry_health_reporting,
+            otlp_receiver_objectives=_otlp_receiver_objectives_from_env(),
+            otlp_receiver_telemetry_sink=(
+                metrics_runtime.receiver_sink
+                if metrics_runtime is not None
+                else None
+            ),
+            policy=_policy_from_env(),
+            readiness_timeout_seconds=_readiness_timeout_from_env(),
+        )
+    except Exception:
+        if metrics_runtime is not None:
+            metrics_runtime.shutdown()
+        raise
 
 
 def _readiness_timeout_from_env() -> int:
@@ -1226,6 +1279,35 @@ def _query_availability_objectives_from_env() -> QueryAvailabilityObjectives:
         ),
         minimum_eligible_requests=value(
             "IIP_QUERY_AVAILABILITY_SLO_MINIMUM_ELIGIBLE_REQUESTS",
+            defaults.minimum_eligible_requests,
+        ),
+    )
+
+
+def _otlp_receiver_objectives_from_env() -> OtlpReceiverObjectives:
+    def value(name: str, default: int) -> int:
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            raise ValueError(
+                "otlp.receiver.availability.configuration.invalid"
+            ) from None
+
+    defaults = OtlpReceiverObjectives()
+    return OtlpReceiverObjectives(
+        window_seconds=value(
+            "IIP_OTLP_RECEIVER_SLO_WINDOW_SECONDS",
+            defaults.window_seconds,
+        ),
+        minimum_availability_basis_points=value(
+            "IIP_OTLP_RECEIVER_SLO_MINIMUM_BASIS_POINTS",
+            defaults.minimum_availability_basis_points,
+        ),
+        minimum_eligible_requests=value(
+            "IIP_OTLP_RECEIVER_SLO_MINIMUM_ELIGIBLE_REQUESTS",
             defaults.minimum_eligible_requests,
         ),
     )

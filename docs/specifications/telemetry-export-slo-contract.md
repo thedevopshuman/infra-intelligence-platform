@@ -8,7 +8,7 @@
 
 ## Measurement semantics
 
-API and workflow-worker reporters append bounded samples of cumulative `metrics` and `traces` exporter counters. The store calculates non-negative deltas between consecutive samples for the same pseudonymous process and signal. A process that starts inside the window contributes its counters from zero; otherwise its first in-window sample is a baseline unless a retained predecessor exists. Attempts are attributed to the later sample, so boundary precision is the configured reporting interval.
+API, workflow-worker, and OTLP receiver reporters append bounded samples of cumulative `metrics` and `traces` exporter counters. The store calculates non-negative deltas between consecutive samples for the same pseudonymous process and signal. A process that starts inside the window contributes its counters from zero; otherwise its first in-window sample is a baseline unless a retained predecessor exists. Attempts are attributed to the later sample, so boundary precision is the configured reporting interval.
 
 Each signal is assessed independently:
 

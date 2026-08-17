@@ -23,6 +23,7 @@ from iip.adapters.evidence import (
     SystemClock,
     UuidEvidenceIdGenerator,
 )
+from iip.adapters.health import AlwaysReadyProbe
 from iip.adapters.memory import AllowTenantPolicy, InMemoryResourceStore
 from iip.adapters.operations import InMemoryOperationalStore
 from iip.adapters.policy import ExternalHttpPolicyDecisionPoint
@@ -53,6 +54,7 @@ from iip.application.ports import (
     KubernetesEventsBackend,
     PolicyConfigurationError,
     PolicyDecisionPoint,
+    ReadinessProbe,
     ResourceRepository,
     SourceCheckpointRepository,
     TelemetryMetricsBackend,
@@ -120,6 +122,7 @@ class Runtime:
     operational_store: Any
     investigation_jobs: Any
     evidence_store: Any
+    readiness: ReadinessProbe
     telemetry_runtime: Any = None
 
     def force_flush_telemetry(self, timeout_millis: int = 10_000) -> bool:
@@ -147,6 +150,7 @@ def build_local_runtime(
     telemetry_runtime: Any = None,
     action_executor: ActionExecutor | None = None,
     policy: PolicyDecisionPoint | None = None,
+    readiness: ReadinessProbe | None = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -170,6 +174,7 @@ def build_local_runtime(
         telemetry_runtime,
         action_executor,
         policy,
+        readiness,
     )
 
 
@@ -190,6 +195,7 @@ def _compose_runtime(
     telemetry_runtime: Any = None,
     action_executor: ActionExecutor | None = None,
     configured_policy: PolicyDecisionPoint | None = None,
+    readiness: ReadinessProbe | None = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -318,6 +324,7 @@ def _compose_runtime(
         operational_store=operational,
         investigation_jobs=operational,
         evidence_store=evidence_store,
+        readiness=readiness or AlwaysReadyProbe(),
         telemetry_runtime=telemetry_runtime,
     )
 
@@ -339,10 +346,15 @@ def build_postgres_runtime(
     telemetry_runtime: Any = None,
     action_executor: ActionExecutor | None = None,
     policy: PolicyDecisionPoint | None = None,
+    readiness_timeout_seconds: int = 2,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
-    from iip.adapters.postgres import PostgresOperationalStore, PostgresResourceStore
+    from iip.adapters.postgres import (
+        PostgresOperationalStore,
+        PostgresReadinessProbe,
+        PostgresResourceStore,
+    )
 
     store = PostgresResourceStore(database_url)
     if migrate:
@@ -365,6 +377,7 @@ def build_postgres_runtime(
         telemetry_runtime,
         action_executor,
         policy,
+        PostgresReadinessProbe(database_url, readiness_timeout_seconds),
     )
 
 
@@ -470,6 +483,7 @@ def build_runtime_from_env(*, include_action_executor: bool = True) -> Runtime:
             telemetry_runtime=telemetry_runtime,
             action_executor=action_executor,
             policy=policy,
+            readiness_timeout_seconds=_readiness_timeout_from_env(),
         )
     except Exception:
         if telemetry_runtime is not None:
@@ -498,7 +512,19 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
         otlp_metrics_receiver=metrics_receiver,
         otlp_logs_receiver=logs_receiver,
         policy=_policy_from_env(),
+        readiness_timeout_seconds=_readiness_timeout_from_env(),
     )
+
+
+def _readiness_timeout_from_env() -> int:
+    raw = os.environ.get("IIP_READINESS_DATABASE_TIMEOUT_SECONDS", "2")
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError("readiness.database.configuration.invalid") from None
+    if value < 1 or value > 10:
+        raise ValueError("readiness.database.configuration.invalid")
+    return value
 
 
 def build_investigation_worker_from_env(runtime: Runtime) -> InvestigationWorker:

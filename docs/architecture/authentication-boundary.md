@@ -27,7 +27,7 @@ sequenceDiagram
 
 ## HTTP behavior
 
-- `/healthz` and `/readyz` are public and reveal only process status.
+- `/healthz` and `/readyz` are public and reveal only process liveness or a generic dependency-readiness result; no identity, tenant, endpoint, schema, or provider detail is returned.
 - Every `/v1` operation requires exactly one syntactically valid Bearer credential.
 - Missing credentials return HTTP 401 with `authentication.required`.
 - Malformed, unknown, or rejected credentials return HTTP 401 with `authentication.invalid`.

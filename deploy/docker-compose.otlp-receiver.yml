@@ -12,22 +12,23 @@ services:
       retries: 20
 
   api:
-    image: iip-otlp-receiver-test:0.21.0
+    image: iip-otlp-receiver-test:0.22.0
     build:
       context: ..
       dockerfile: Dockerfile
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
       IIP_DATABASE_AUTO_MIGRATE: "true"
+      IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
       IIP_AUTH_IDENTITIES_JSON: ${IIP_AUTH_IDENTITIES_JSON:?set IIP_AUTH_IDENTITIES_JSON}
       IIP_OTLP_RECEIVER_MODE: disabled
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=1)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=3)"]
       interval: 2s
-      timeout: 2s
+      timeout: 4s
       retries: 20
     ports:
       - "127.0.0.1:18080:8080"
@@ -40,12 +41,13 @@ services:
       - no-new-privileges:true
 
   receiver:
-    image: iip-otlp-receiver-test:0.21.0
+    image: iip-otlp-receiver-test:0.22.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.otlp_receiver"]
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
       IIP_DATABASE_AUTO_MIGRATE: "false"
+      IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
       IIP_OTLP_HTTP_PORT: "4318"
       IIP_OTLP_MAX_REQUESTS_PER_SECOND: "50"
       IIP_OTLP_REQUEST_BURST: "100"
@@ -57,9 +59,9 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4318/readyz', timeout=1)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4318/readyz', timeout=3)"]
       interval: 2s
-      timeout: 2s
+      timeout: 4s
       retries: 20
     ports:
       - "127.0.0.1:18081:4318"

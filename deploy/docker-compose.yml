@@ -15,13 +15,14 @@ services:
       - postgres-data:/var/lib/postgresql
 
   api:
-    image: iip-local-platform:0.21.0
+    image: iip-local-platform:0.22.0
     build:
       context: ..
       dockerfile: Dockerfile
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
       IIP_DATABASE_AUTO_MIGRATE: "true"
+      IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
       IIP_AUTH_IDENTITIES_JSON: ${IIP_AUTH_IDENTITIES_JSON:?set IIP_AUTH_IDENTITIES_JSON}
       IIP_OTLP_RECEIVER_MODE: disabled
       IIP_OTEL_METRICS_ENABLED: ${IIP_OTEL_METRICS_ENABLED:-false}
@@ -53,9 +54,9 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=2)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=3)"]
       interval: 5s
-      timeout: 3s
+      timeout: 4s
       retries: 20
       start_period: 10s
     restart: unless-stopped
@@ -70,7 +71,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-local-platform:0.21.0
+    image: iip-local-platform:0.22.0
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip

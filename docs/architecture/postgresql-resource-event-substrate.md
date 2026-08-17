@@ -92,3 +92,5 @@ The [operator procedure and recorded measurement](../operations/postgresql-backu
 ## Verification profiles
 
 `make verify` runs all dependency, contract, unit, SDK, and Helm gates; PostgreSQL tests skip when no database URL is present. `make test-postgres` uses Docker Desktop to start an ephemeral PostgreSQL 18.4 container on localhost, runs the integration suite, and removes the container and volume. `make test-backup-restore` uses a separately named disposable Compose project and emits measured integrity, recovery-point-age, and recovery-readiness evidence. CI supplies the same database major version through a service container and therefore runs the integration tests as part of `make verify`.
+
+Every PostgreSQL-backed HTTP process uses a fresh bounded `SELECT` against `iip.schema_migrations` for `/readyz` and requires the latest migration packaged with its image. `/healthz` remains process-only, and readiness never owns schema mutation. `IIP_READINESS_DATABASE_TIMEOUT_SECONDS` is restricted to one through ten seconds; the Helm probe timeout is configured separately and must exceed it.

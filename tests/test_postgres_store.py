@@ -12,10 +12,15 @@ from unittest.mock import patch
 try:
     import psycopg
 
-    from iip.adapters.postgres import PostgresOperationalStore, PostgresResourceStore
+    from iip.adapters.postgres import (
+        PostgresOperationalStore,
+        PostgresReadinessProbe,
+        PostgresResourceStore,
+    )
 except ModuleNotFoundError:
     psycopg = None
     PostgresOperationalStore = None
+    PostgresReadinessProbe = None
     PostgresResourceStore = None
 
 from iip.adapters.evidence import (
@@ -150,6 +155,10 @@ class PostgresResourceStoreTests(unittest.TestCase):
                 """
             )
         self.service = ResourceIngestionService(self.store, AllowTenantPolicy())
+
+    def test_readiness_requires_the_applied_schema(self) -> None:
+        assert DATABASE_URL is not None and PostgresReadinessProbe is not None
+        PostgresReadinessProbe(DATABASE_URL).check()
 
     def test_reconciliation_membership_and_tombstone_are_durable(self) -> None:
         actor = ActorContext("collector", "local")

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.21.0",
+    "version": "0.22.0",
     "description": "Executable control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral evidence, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -19,7 +19,10 @@
       "get": {
         "operationId": "ready",
         "security": [],
-        "responses": {"200": {"description": "Process is ready"}}
+        "responses": {
+          "200": {"description": "Process and required durable dependencies are ready"},
+          "503": {"description": "A required dependency or schema migration is unavailable"}
+        }
       }
     },
     "/v1/session": {

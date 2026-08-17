@@ -90,7 +90,12 @@ from iip.application.plugin_sessions import (
     OpenPluginSessionCommand,
     PluginHandshakeError,
 )
-from iip.application.ports import ActorContext, AuthenticationError, PersistenceError
+from iip.application.ports import (
+    ActorContext,
+    AuthenticationError,
+    PersistenceError,
+    ReadinessError,
+)
 from iip.application.query_actions import (
     ActionQueryAuthorizationError,
     ActionQueryError,
@@ -120,7 +125,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.21.0"
+    server_version = "IIPReference/0.22.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -136,8 +141,11 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path in self._console_assets:
             self._console_asset(path)
             return
-        if path in ("/healthz", "/readyz"):
+        if path == "/healthz":
             self._json(HTTPStatus.OK, {"status": "ok"})
+            return
+        if path == "/readyz":
+            self._readiness()
             return
         segments = path.strip("/").split("/")
         is_resource_query = (
@@ -864,6 +872,20 @@ class ApiHandler(BaseHTTPRequestHandler):
         if code not in ("authentication.required", "authentication.invalid"):
             code = "authentication.invalid"
         self._json(HTTPStatus.UNAUTHORIZED, {"error": {"code": code}})
+
+    def _readiness(self) -> None:
+        try:
+            self.runtime.readiness.check()
+        except ReadinessError:
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "status": "unavailable",
+                    "error": {"code": "readiness.unavailable"},
+                },
+            )
+            return
+        self._json(HTTPStatus.OK, {"status": "ok"})
 
     def _admit_otlp_channel(self, channel_id: str) -> bool:
         """Allow the shared compatibility receiver without process-level throttling."""

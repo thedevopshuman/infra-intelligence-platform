@@ -45,3 +45,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0039](0039-tenant-scoped-investigation-dispatch.md) | Accepted | Dispatch investigations through renewable tenant-scoped PostgreSQL worker leases without extending execution budgets |
 | [0040](0040-action-timers-and-fail-closed-reconciliation.md) | Accepted | Reconcile expired action attempts atomically without replay and derive proposal expiry without mutation |
 | [0041](0041-isolated-otlp-receiver-process.md) | Accepted | Isolate tenant-bound OTLP intake in a dedicated process, listener, credential, and network boundary |
+| [0042](0042-dependency-aware-readiness.md) | Accepted | Separate process liveness from bounded PostgreSQL connectivity and schema readiness |

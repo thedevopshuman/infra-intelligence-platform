@@ -145,7 +145,7 @@ The supported local onboarding path generates 256-bit Bearer tokens for three se
 make dev-up
 ```
 
-This starts PostgreSQL, the API, and a tenant-explicit workflow worker, waits for the serving health checks, and prints the console URL plus the `local-operator` token. The worker dispatches investigations and performs non-executing action timer reconciliation. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties. Run `make dev-credentials` when exercising the console approval workflow; that explicit command prints all three identities from the protected mode-`0600` file. Useful lifecycle commands are:
+This starts PostgreSQL, the API, and a tenant-explicit workflow worker, waits until the API proves both database connectivity and the latest packaged schema migration, and prints the console URL plus the `local-operator` token. `/healthz` remains process-only while `/readyz` is the serving gate. The worker dispatches investigations and performs non-executing action timer reconciliation. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties. Run `make dev-credentials` when exercising the console approval workflow; that explicit command prints all three identities from the protected mode-`0600` file. Useful lifecycle commands are:
 
 ```bash
 make dev-status

@@ -17,6 +17,10 @@ class PersistenceError(RuntimeError):
     """Provider-neutral durable-store failure with a stable external code."""
 
 
+class ReadinessError(RuntimeError):
+    """A required runtime dependency cannot safely serve requests."""
+
+
 class AuthenticationError(PermissionError):
     """Credential authentication failure with a stable external code."""
 
@@ -27,6 +31,11 @@ class AuthenticationConfigurationError(RuntimeError):
 
 class PolicyConfigurationError(RuntimeError):
     """Fail-closed policy-adapter configuration error."""
+
+
+class ReadinessProbe(Protocol):
+    def check(self) -> None:
+        """Return only when required dependencies are ready for traffic."""
 
 
 @dataclass(frozen=True)

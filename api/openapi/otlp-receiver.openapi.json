@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence OTLP Receiver API",
-    "version": "0.21.0",
+    "version": "0.22.0",
     "description": "Isolated OTLP/HTTP Protobuf intake for allowlisted metrics and logs. This listener exposes no Infrastructure Intelligence control-plane operations."
   },
   "servers": [{"url": "http://localhost:4318"}],
@@ -19,7 +19,10 @@
       "get": {
         "operationId": "receiverReady",
         "security": [],
-        "responses": {"200": {"description": "Receiver process is ready"}}
+        "responses": {
+          "200": {"description": "Receiver and required durable dependencies are ready"},
+          "503": {"description": "The database or required schema migration is unavailable"}
+        }
       }
     },
     "/v1/metrics": {

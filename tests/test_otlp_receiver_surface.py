@@ -12,7 +12,7 @@ from iip.application.ingest_otlp_metrics import OtlpReceiverConfigurationError
 from iip.bootstrap import build_local_runtime, build_otlp_receiver_runtime_from_env
 from iip.surfaces.otlp_receiver import OtlpReceiverHandler, TokenBucketRateLimiter
 
-from test_otlp_receiver import CHANNEL_TOKEN, ingest_fixture, receiver_config
+from tests.test_otlp_receiver import CHANNEL_TOKEN, ingest_fixture, receiver_config
 
 
 class _Clock:
@@ -24,8 +24,15 @@ class _Clock:
 
 
 class DedicatedOtlpSurfaceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.runtime = build_local_runtime()
+
+    def tearDown(self) -> None:
+        self.runtime.close()
+
     def _handler(self, path: str) -> tuple[OtlpReceiverHandler, list[int], BytesIO]:
         handler = object.__new__(OtlpReceiverHandler)
+        handler.runtime = self.runtime
         handler.path = path
         handler.headers = {}
         output = BytesIO()

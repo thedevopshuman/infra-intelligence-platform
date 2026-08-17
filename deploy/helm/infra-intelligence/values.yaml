@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.21.0"
+  tag: "0.22.0"
 
 worker:
   enabled: false
@@ -193,6 +193,8 @@ probes:
   readiness:
     initialDelaySeconds: 2
     periodSeconds: 5
+    timeoutSeconds: 3
+    databaseTimeoutSeconds: 2
 
 networkPolicy:
   enabled: false

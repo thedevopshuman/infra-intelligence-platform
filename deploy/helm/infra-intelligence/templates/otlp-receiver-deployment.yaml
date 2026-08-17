@@ -55,6 +55,8 @@ spec:
                   key: {{ .Values.database.secretKey | quote }}
             - name: IIP_DATABASE_AUTO_MIGRATE
               value: "false"
+            - name: IIP_READINESS_DATABASE_TIMEOUT_SECONDS
+              value: {{ .Values.probes.readiness.databaseTimeoutSeconds | quote }}
             - name: IIP_POLICY_MODE
               value: {{ .Values.policy.mode | quote }}
             - name: IIP_POLICY_CONFIG_JSON
@@ -101,6 +103,7 @@ spec:
               port: otlp-http
             initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
           resources:
             {{- toYaml .Values.otlpIngest.resources | nindent 12 }}
           volumeMounts:

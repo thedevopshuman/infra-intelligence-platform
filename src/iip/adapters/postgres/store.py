@@ -36,7 +36,7 @@ from iip.domain.models import (
 )
 
 
-_MIGRATIONS = (
+SCHEMA_MIGRATIONS = (
     "0001_resource_event_substrate.sql",
     "0002_resource_relationship_index.sql",
     "0003_operational_workflows.sql",
@@ -95,7 +95,7 @@ class PostgresResourceStore:
                 ).fetchall()
             }
             migration_root = resources.files("iip.adapters.postgres").joinpath("migrations")
-            for version in _MIGRATIONS:
+            for version in SCHEMA_MIGRATIONS:
                 if version in applied:
                     continue
                 sql = migration_root.joinpath(version).read_text(encoding="utf-8")

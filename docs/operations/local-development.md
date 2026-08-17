@@ -6,7 +6,7 @@
 
 - Python 3.11 or newer
 - Helm 3 or newer
-- Optional: Docker Desktop for PostgreSQL, OpenTelemetry Collector, OTLP receiver, Prometheus/Loki integration tests, and the durable local stack
+- Optional: Docker Desktop for PostgreSQL, credential-broker TLS, OpenTelemetry Collector, OTLP receiver, Prometheus/Loki integration tests, and the durable local stack
 - Optional: Docker Desktop, kind, and `kubectl` for live Kubernetes collection and Event evidence tests
 
 Install the pinned verification-only Python dependencies:
@@ -32,6 +32,14 @@ make test-postgres
 ```
 
 This starts an ephemeral PostgreSQL 18.4 container bound to `127.0.0.1:55432`, runs only the PostgreSQL integration suite, and removes its container and volume on exit.
+
+Exercise the external credential-broker client over a real local TLS socket with:
+
+```bash
+make test-credential-broker
+```
+
+The isolated target creates a fresh standards-complete test certificate chain and signed workload identities; proves exact policy, rotation, revocation, audit, outage, and recovery behavior; writes a source-bound secret-free compatibility report under `dist/`; and removes its fixture container and network. It does not install or emulate a production credential issuer. See the [credential-broker guide](credential-broker.md) for the customer qualification boundary.
 
 Run the separate end-to-end recovery measurement with:
 
@@ -96,7 +104,7 @@ IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-live
 
 The kind cluster runs as containers inside Docker Desktop. Docker Desktop's separate built-in Kubernetes feature is not required for this workflow and should normally remain disabled to avoid an unnecessary second context and control plane.
 
-The target seeds `deploy/kubernetes/dev/seed-incident.yaml`, whose intentionally nonexistent image produces a real `ErrImagePull`/`ImagePullBackOff`. It verifies that the observer returns a complete canonical graph and an unhealthy Pod with only the safe waiting reason. It then deletes only the harmless reconciliation-probe ConfigMap, resumes from every committed per-path cursor, relists the complete scope, and requires one host-generated tombstone. This local transport does not use the external credential-broker client and does not replace the future isolated plugin runner.
+The target seeds `deploy/kubernetes/dev/seed-incident.yaml`, whose intentionally nonexistent image produces a real `ErrImagePull`/`ImagePullBackOff`. It verifies that the observer returns a complete canonical graph and an unhealthy Pod with only the safe waiting reason. It then deletes only the harmless reconciliation-probe ConfigMap, resumes from every committed per-path cursor, relists the complete scope, and requires one host-generated tombstone. This local transport uses neither the external credential-broker client nor the isolated plugin runner; it tests the explicit host-side `kubectl` development path only.
 
 ## Run the reference API
 

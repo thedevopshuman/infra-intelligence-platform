@@ -1,6 +1,6 @@
 # External credential broker
 
-**Status:** Executable client and deployment boundary; external issuer required
+**Status:** Executable client, local TLS compatibility profile, and deployment boundary; external issuer required
 
 The external broker client exchanges authenticated, exact request scope for a short-lived provider Bearer lease. It is shared by the Prometheus, Kubernetes Event evidence, and explicitly selected Kubernetes action adapters and implements the protected [credential lease contract](../specifications/credential-lease-contract.md). [ADR 0022](../decisions/0022-external-workload-identity-credential-broker.md) fixes its authority and secret-handling semantics.
 
@@ -69,9 +69,17 @@ The broker must validate the token issuer, exact audience, expected service-acco
 
 ## Local conformance
 
-The default verification gate uses an in-memory transport and temporary rotating identity-token file. It checks schema compatibility, exact request construction, rotation, response correlation, expiry/lifetime/skew rules, redaction, stable errors, and shared composition without contacting a real issuer.
+The default `make verify` gate uses an in-memory transport and temporary rotating identity-token file. It checks schema compatibility, exact request construction, rotation, response correlation, expiry/lifetime/skew rules, redaction, stable errors, and shared composition without contacting an issuer.
 
-Before production, add an environment-specific interoperability gate for the selected issuer and identity system. It must prove invalid audience/subject rejection, cross-tenant denial, scope escalation denial, rotation without restart, revocation, audit completeness, broker outage behavior, and recovery objectives.
+Run the isolated real-transport profile with Docker Desktop:
+
+```bash
+make test-credential-broker
+```
+
+The target generates an ephemeral CA/server certificate chain and signed test-only workload tokens, starts a non-root read-only broker fixture over HTTPS, and exercises the production external client. It proves issuer/audience/subject/expiry enforcement, exact-scope issuance, cross-tenant and scope-escalation denial, rotation without a client restart, previous-token revocation, untrusted-CA denial, value-minimized audit completeness, stable fail-closed outage behavior, recovery, and secret redaction. It writes source-bound aggregate evidence to `dist/credential-broker-compatibility-report.json`, then removes the isolated Compose project. The fixture has no product bootstrap path and is not a production credential issuer.
+
+Before production, repeat an environment-specific interoperability gate against the selected customer issuer, broker, identity system, audit sink, certificate lifecycle, and availability topology. Passing the local profile does not qualify those external systems.
 
 ## Rollback
 

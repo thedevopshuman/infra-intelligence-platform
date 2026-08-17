@@ -89,7 +89,9 @@ REQUIRED_PATHS = (
     "docs/specifications/investigation-completion-slo-contract.md",
     "docs/decisions/0074-executable-investigation-capacity-evidence.md",
     "docs/decisions/0076-deterministic-seasonal-telemetry-baseline.md",
+    "docs/decisions/0077-executable-credential-broker-compatibility-evidence.md",
     "docs/specifications/investigation-capacity-contract.md",
+    "docs/specifications/credential-broker-compatibility-contract.md",
     "docs/decisions/0059-backend-neutral-query-availability-telemetry.md",
     "docs/specifications/query-availability-telemetry-contract.md",
     "docs/decisions/0062-audited-evidence-artifact-retention.md",
@@ -128,6 +130,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/release-manifest.schema.json",
     "contracts/schemas/credential-lease-request.schema.json",
     "contracts/schemas/credential-lease.schema.json",
+    "contracts/schemas/credential-broker-compatibility-report.schema.json",
     "contracts/schemas/integration-config.schema.json",
     "contracts/schemas/action-proposal.schema.json",
     "contracts/schemas/action-approval.schema.json",
@@ -190,6 +193,7 @@ REQUIRED_PATHS = (
     "contracts/examples/evidence-retention-report.json",
     "contracts/examples/credential-lease-request.json",
     "contracts/examples/credential-lease.json",
+    "contracts/examples/credential-broker-compatibility-report.json",
     "contracts/examples/kubernetes-event-evidence-request.json",
     "contracts/examples/kubernetes-event-evidence-result.json",
     "contracts/examples/telemetry-evidence-request.json",
@@ -358,6 +362,10 @@ REQUIRED_PATHS = (
     "scripts/run_plugin_runner_conformance.py",
     "scripts/run_capacity_certification.py",
     "scripts/test_capacity.sh",
+    "scripts/run_credential_broker_compatibility.py",
+    "deploy/docker-compose.credential-broker.yml",
+    "tests/fixtures/credential_broker_fixture.py",
+    "tests/test_credential_broker_compatibility.py",
     "sdks/typescript/package-lock.json",
     "tests/test_authentication.py",
     "tests/test_console_authentication.py",
@@ -766,6 +774,75 @@ def validate_plugin_compatibility_example(
         "overallStatus": "compatible" if incompatible == 0 else "incompatible",
     }:
         fail(errors, "plugin compatibility summary must match its profile results")
+
+
+CREDENTIAL_BROKER_COMPATIBILITY_CHECKS = (
+    "ca-verified-tls",
+    "untrusted-ca-denial",
+    "workload-jwt-authentication",
+    "audience-denial",
+    "subject-denial",
+    "exact-scope-lease",
+    "cross-tenant-denial",
+    "scope-escalation-denial",
+    "rotation-without-restart",
+    "revocation",
+    "audit-completeness",
+    "broker-outage-fail-closed",
+    "broker-recovery",
+    "secret-redaction",
+)
+
+
+def validate_credential_broker_compatibility_document(
+    report: object, errors: List[str]
+) -> None:
+    """Check the closed profile and derived compatibility summary."""
+
+    if not isinstance(report, dict):
+        fail(errors, "credential broker compatibility report must be an object")
+        return
+    spec = report.get("spec")
+    checks = spec.get("checks") if isinstance(spec, dict) else None
+    summary = spec.get("summary") if isinstance(spec, dict) else None
+    if not isinstance(checks, list) or not isinstance(summary, dict):
+        fail(errors, "credential broker compatibility report must contain checks and summary")
+        return
+    check_ids = tuple(
+        check.get("id") if isinstance(check, dict) else None for check in checks
+    )
+    if check_ids != CREDENTIAL_BROKER_COMPATIBILITY_CHECKS:
+        fail(errors, "credential broker compatibility checks must match the closed profile")
+    passed = sum(
+        1
+        for check in checks
+        if isinstance(check, dict)
+        and check.get("status") == "passed"
+        and "errorCode" not in check
+    )
+    failed = len(checks) - passed
+    status = "compatible" if failed == 0 else "incompatible"
+    if spec.get("status") != status:
+        fail(errors, "credential broker compatibility status must match its checks")
+    if summary != {
+        "totalChecks": len(checks),
+        "passedChecks": passed,
+        "failedChecks": failed,
+        "overallStatus": status,
+    }:
+        fail(errors, "credential broker compatibility summary must match its checks")
+
+
+def validate_credential_broker_compatibility_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "credential-broker-compatibility-report.json"
+    )
+    validate_credential_broker_compatibility_document(documents.get(path), errors)
 
 
 def validate_plugin_action_mediation_examples(
@@ -3040,6 +3117,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("ingestion-freshness-report.json", "IngestionFreshnessReport"),
         ("investigation-capacity-report.json", "InvestigationCapacityReport"),
         (
+            "credential-broker-compatibility-report.json",
+            "CredentialBrokerCompatibilityReport",
+        ),
+        (
             "telemetry-export-health-report.json",
             "TelemetryExportHealthReport",
         ),
@@ -3084,6 +3165,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_evaluation_scenario(documents, errors)
     validate_plugin_mediation_examples(documents, errors)
     validate_plugin_compatibility_example(documents, errors)
+    validate_credential_broker_compatibility_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
 
     policy_request = documents.get(example_dir / "policy-decision-request.json")

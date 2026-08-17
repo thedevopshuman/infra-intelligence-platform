@@ -69,7 +69,7 @@ Fixed-period seasonal rules extend that same one-query boundary. Two to twelve m
 ## Pending implementation decisions
 
 - whether later pushed signals use immutable Evidence only, customer storage forwarding, or a hybrid policy;
-- a production credential issuer/interoperability gate plus additional historical log and metric adapters;
+- a production credential issuer and customer-specific interoperability qualification plus additional historical log and metric adapters; the local real-TLS broker-client profile is delivered;
 - federated receiver workload identity or mTLS, token rotation, distributed gateway admission, and durable buffering for self-hosted, customer-hosted, and managed deployments;
 - retention, sampling, cardinality budgets, and regional/data-residency controls;
 - queue durability and the division of retry, batching, and end-to-end delivery-SLO ownership between the official SDK and a sidecar/customer Collector;

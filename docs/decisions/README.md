@@ -80,3 +80,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0074](0074-executable-investigation-capacity-evidence.md) | Accepted | Bind large-tenant queue isolation and overload measurements to an executable PostgreSQL profile |
 | [0075](0075-bounded-adaptive-signal-replanning.md) | Accepted | Promote one accepted investigation signal into capacity released by a provider gap |
 | [0076](0076-deterministic-seasonal-telemetry-baseline.md) | Accepted | Compare matching prior metric periods from one committed artifact |
+| [0077](0077-executable-credential-broker-compatibility-evidence.md) | Accepted | Prove the external broker client over local TLS, signed workload identity, exact policy, rotation, audit, and recovery |

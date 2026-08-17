@@ -73,6 +73,18 @@ service:
   port: 80
   targetPort: http
 
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: ""
+  path: /
+  pathType: Prefix
+  tls:
+    existingSecret: ""
+  tlsRedirectAnnotation: ""
+  tlsRedirectValue: "true"
+
 config:
   httpHost: 0.0.0.0
   httpPort: 8080
@@ -230,6 +242,12 @@ networkPolicy:
   enabled: false
   ingressNamespaceSelector:
     kubernetes.io/metadata.name: iip-system
+  ingressController:
+    enabled: false
+    namespaceSelector:
+      kubernetes.io/metadata.name: ingress-nginx
+    podSelector:
+      app.kubernetes.io/component: controller
   otlpReceiverIngress:
     enabled: false
     namespaceSelector:

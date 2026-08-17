@@ -29,3 +29,26 @@
 {{- if and .Values.otlpLogsReceiver.enabled (not .Values.otlpLogsReceiver.channelsExistingSecret) }}
 {{- fail "otlpLogsReceiver.channelsExistingSecret is required when the logs receiver is enabled" }}
 {{- end }}
+{{- if .Values.ingress.enabled }}
+{{- if not .Values.ingress.className }}
+{{- fail "ingress.className is required when ingress is enabled" }}
+{{- end }}
+{{- if not .Values.ingress.host }}
+{{- fail "ingress.host is required when ingress is enabled" }}
+{{- end }}
+{{- if not .Values.ingress.tls.existingSecret }}
+{{- fail "ingress.tls.existingSecret is required when ingress is enabled" }}
+{{- end }}
+{{- if not .Values.ingress.tlsRedirectAnnotation }}
+{{- fail "ingress.tlsRedirectAnnotation is required when ingress is enabled" }}
+{{- end }}
+{{- if not .Values.networkPolicy.enabled }}
+{{- fail "networkPolicy.enabled must be true when ingress is enabled" }}
+{{- end }}
+{{- if not .Values.networkPolicy.ingressController.enabled }}
+{{- fail "networkPolicy.ingressController.enabled must be true when ingress is enabled" }}
+{{- end }}
+{{- if or (not .Values.networkPolicy.ingressController.namespaceSelector) (not .Values.networkPolicy.ingressController.podSelector) }}
+{{- fail "networkPolicy.ingressController selectors must be explicit when ingress is enabled" }}
+{{- end }}
+{{- end }}

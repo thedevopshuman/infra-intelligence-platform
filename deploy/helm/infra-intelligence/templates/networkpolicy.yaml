@@ -15,6 +15,14 @@ spec:
         - namespaceSelector:
             matchLabels:
               {{- toYaml .Values.networkPolicy.ingressNamespaceSelector | nindent 14 }}
+        {{- if .Values.networkPolicy.ingressController.enabled }}
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingressController.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingressController.podSelector | nindent 14 }}
+        {{- end }}
       ports:
         - port: http
           protocol: TCP

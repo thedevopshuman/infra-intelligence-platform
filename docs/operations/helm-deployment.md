@@ -2,7 +2,7 @@
 
 **Status:** Executable self-hosted reference path
 
-The chart can install the control-plane API against an existing PostgreSQL database and apply packaged schema migrations through a separately authorized hook. It does not create a production database, identity provider, ingress, certificate, or image registry.
+The chart can install the control-plane API against an existing PostgreSQL database, apply packaged schema migrations through a separately authorized hook, and optionally declare a TLS-only Ingress binding. It does not create a production database, identity provider, ingress controller, certificate/private key, or image registry.
 
 ## Required inputs
 
@@ -30,6 +30,31 @@ helm template iip deploy/helm/infra-intelligence \
 ```
 
 The chart intentionally exposes only `ClusterIP` Services and keeps service-account token automounting disabled. Put any later external access behind a separately reviewed authenticated TLS boundary; do not turn the internal HTTP Service into an internet-facing load balancer.
+
+## Authenticated TLS ingress
+
+The optional Ingress keeps the backend Service internal and requires the customer's existing TLS Secret and controller. Configure the exact controller class, DNS host, TLS redirect annotation, and controller NetworkPolicy selectors, for example:
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  host: iip.example.com
+  tls:
+    existingSecret: iip-console-tls
+  tlsRedirectAnnotation: nginx.ingress.kubernetes.io/force-ssl-redirect
+
+networkPolicy:
+  enabled: true
+  ingressController:
+    enabled: true
+    namespaceSelector:
+      kubernetes.io/metadata.name: ingress-nginx
+    podSelector:
+      app.kubernetes.io/component: controller
+```
+
+The chart sets the selected redirect annotation to `"true"` and does not permit `NodePort` or `LoadBalancer` Services. Before customer use, independently verify HTTPS-only routing, the full certificate chain and rotation, maximum request/header/time settings, controller availability, source-IP behavior, and the OIDC issuer/origin configuration. Bearer or OIDC authentication remains enforced by the application after TLS termination.
 
 ## Fresh durable install
 
@@ -91,8 +116,8 @@ With Docker Desktop and the explicit `kind-iip-dev` context available, run:
 make test-helm-install
 ```
 
-The gate builds and loads the current image, creates a disposable exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, proves API readiness from inside the pod, and removes the namespace. It refuses non-kind contexts and never prints generated credentials. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
+The gate builds and loads the current image, creates a disposable exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, and proves API readiness from inside the pod. It then performs a second Helm revision with two API replicas and a TLS Ingress declaration, proving the hook remains idempotent and the exact class, host, existing TLS Secret, redirect policy, NetworkPolicy peer, rollout, and Helm history are preserved. It removes the namespace, refuses non-kind contexts, and never prints generated credentials or private keys. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
 
 ## Production gaps
 
-This proves deployment mechanics, not production certification. The local release path now generates verified SBOM/provenance evidence, but organizational image signing, external secret-controller integration, ingress/TLS, high availability, zero-downtime migration compatibility, capacity tests, database failover, scheduled backups, disaster recovery, and environment-specific policy remain release and customer gates.
+This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance evidence and the chart declares a guarded TLS Ingress, but organizational image signing, external secret-controller integration, controller-specific TLS conformance, high availability, zero-downtime migration compatibility, capacity tests, database failover, scheduled backups, disaster recovery, and environment-specific policy remain release and customer gates.

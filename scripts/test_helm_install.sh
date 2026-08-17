@@ -9,6 +9,7 @@ IIP_TEST_PYTHON=${IIP_TEST_PYTHON:-python3}
 IIP_KUBE_CONTEXT=${IIP_KUBE_CONTEXT:-kind-iip-dev}
 IIP_TEST_NAMESPACE=${IIP_TEST_NAMESPACE:-iip-helm-install-test}
 IIP_KEEP_TEST_NAMESPACE=${IIP_KEEP_TEST_NAMESPACE:-false}
+IIP_TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/iip-helm-install.XXXXXX")
 
 case "$IIP_KUBE_CONTEXT" in
     kind-*) ;;
@@ -30,15 +31,21 @@ if ! "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" get namespace >/dev/null 2
     exit 2
 fi
 
-cleanup() {
+cleanup_namespace() {
     if [ "$IIP_KEEP_TEST_NAMESPACE" != "true" ]; then
         "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" delete namespace \
             "$IIP_TEST_NAMESPACE" --ignore-not-found --wait=false >/dev/null 2>&1 || true
     fi
 }
+
+cleanup() {
+    cleanup_namespace
+    rm -f "$IIP_TEST_TEMP_DIR/tls.crt" "$IIP_TEST_TEMP_DIR/tls.key"
+    rmdir "$IIP_TEST_TEMP_DIR" >/dev/null 2>&1 || true
+}
 trap cleanup EXIT INT TERM
 
-cleanup
+cleanup_namespace
 attempt=0
 while "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" get namespace \
     "$IIP_TEST_NAMESPACE" >/dev/null 2>&1; do
@@ -75,6 +82,15 @@ IIP_AUTH_IDENTITIES_JSON=$(printf '%s' \
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
     create secret generic iip-auth \
     --from-literal="identities-json=$IIP_AUTH_IDENTITIES_JSON" >/dev/null
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+    -subj "/CN=iip.helm.test" \
+    -addext "subjectAltName=DNS:iip.helm.test" \
+    -keyout "$IIP_TEST_TEMP_DIR/tls.key" \
+    -out "$IIP_TEST_TEMP_DIR/tls.crt" >/dev/null 2>&1
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    create secret tls iip-tls \
+    --cert="$IIP_TEST_TEMP_DIR/tls.crt" \
+    --key="$IIP_TEST_TEMP_DIR/tls.key" >/dev/null
 
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
     apply -f - >/dev/null <<EOF
@@ -161,4 +177,58 @@ if [ "$IIP_APPLIED_MIGRATION" != "$IIP_EXPECTED_MIGRATION" ]; then
     exit 1
 fi
 
-echo "Helm install test passed: migration hook -> schema readiness -> API available"
+IIP_EXPECTED_MIGRATION_COUNT=$(
+    rg --files src/iip/adapters/postgres/migrations -g '*.sql' | wc -l | tr -d ' '
+)
+
+"$IIP_HELM_BIN" upgrade --install iip deploy/helm/infra-intelligence \
+    --kube-context "$IIP_KUBE_CONTEXT" \
+    --namespace "$IIP_TEST_NAMESPACE" \
+    --set image.repository=iip-local-platform \
+    --set "image.tag=$IIP_APP_VERSION" \
+    --set image.pullPolicy=Never \
+    --set replicaCount=2 \
+    --set database.existingSecret=iip-database \
+    --set database.migrations.enabled=true \
+    --set auth.existingSecret=iip-auth \
+    --set ingress.enabled=true \
+    --set ingress.className=iip-conformance \
+    --set ingress.host=iip.helm.test \
+    --set ingress.tls.existingSecret=iip-tls \
+    --set ingress.tlsRedirectAnnotation=example.test/force-tls \
+    --set networkPolicy.enabled=true \
+    --set networkPolicy.databaseEgress.enabled=true \
+    --set-string "networkPolicy.databaseEgress.namespaceSelector.kubernetes\\.io/metadata\\.name=$IIP_TEST_NAMESPACE" \
+    --set networkPolicy.ingressController.enabled=true \
+    --wait --timeout 180s >/dev/null
+
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    wait --for=condition=complete job/iip-infra-intelligence-migrate \
+    --timeout=30s >/dev/null
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    rollout status deployment/iip-infra-intelligence --timeout=120s >/dev/null
+IIP_APPLIED_MIGRATION_COUNT=$(
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" exec deployment/iip-postgres -- \
+        psql -U iip -d iip -Atc 'SELECT count(*) FROM iip.schema_migrations'
+)
+if [ "$IIP_APPLIED_MIGRATION_COUNT" != "$IIP_EXPECTED_MIGRATION_COUNT" ]; then
+    echo "Helm upgrade duplicated or omitted schema migrations" >&2
+    exit 1
+fi
+IIP_INGRESS_BINDING=$(
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" get ingress/iip-infra-intelligence \
+        -o 'jsonpath={.spec.ingressClassName}|{.spec.tls[0].hosts[0]}|{.spec.tls[0].secretName}|{.metadata.annotations.example\.test/force-tls}'
+)
+if [ "$IIP_INGRESS_BINDING" != "iip-conformance|iip.helm.test|iip-tls|true" ]; then
+    echo "Helm upgrade did not preserve the explicit TLS ingress binding" >&2
+    exit 1
+fi
+"$IIP_HELM_BIN" history iip \
+    --kube-context "$IIP_KUBE_CONTEXT" \
+    --namespace "$IIP_TEST_NAMESPACE" --output json |
+    "$IIP_TEST_PYTHON" -c \
+        'import json,sys; rows=json.load(sys.stdin); assert len(rows) == 2 and str(rows[-1]["revision"]) == "2" and rows[-1]["status"] == "deployed"'
+
+echo "Helm install/upgrade test passed: migration hook -> readiness -> TLS ingress binding -> idempotent upgrade"

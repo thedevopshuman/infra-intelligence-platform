@@ -123,6 +123,14 @@ helm-lint:
 		--set database.migrations.enabled=true \
 		--set networkPolicy.enabled=true \
 		--set networkPolicy.databaseEgress.enabled=true >/dev/null
+	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set ingress.enabled=true \
+		--set ingress.className=nginx \
+		--set ingress.host=iip.example.test \
+		--set ingress.tls.existingSecret=iip-tls \
+		--set ingress.tlsRedirectAnnotation=nginx.ingress.kubernetes.io/force-ssl-redirect \
+		--set networkPolicy.enabled=true \
+		--set networkPolicy.ingressController.enabled=true >/dev/null
 	@if $(HELM) lint deploy/helm/infra-intelligence --set replicaCount=0 >/dev/null 2>&1; then \
 		echo "Helm values schema accepted an invalid replica count" >&2; exit 1; \
 	fi
@@ -136,6 +144,14 @@ helm-lint:
 		--set worker.heartbeatSeconds=30 \
 		--set worker.leaseSeconds=30 >/dev/null 2>&1; then \
 		echo "Helm validation accepted a heartbeat that cannot renew its lease" >&2; exit 1; \
+	fi
+	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set ingress.enabled=true \
+		--set ingress.className=nginx \
+		--set ingress.host=iip.example.test \
+		--set networkPolicy.enabled=true \
+		--set networkPolicy.ingressController.enabled=true >/dev/null 2>&1; then \
+		echo "Helm validation accepted ingress without TLS and redirect policy" >&2; exit 1; \
 	fi
 
 verify: validate validate-schemas test test-typescript helm-lint

@@ -61,6 +61,8 @@ class HelmValuesContractTests(unittest.TestCase):
             "credentialBroker.externalHttp.configJson is required",
             "otlpReceiver.channelsExistingSecret is required",
             "otlpLogsReceiver.channelsExistingSecret is required",
+            "ingress.tls.existingSecret is required",
+            "ingress.tlsRedirectAnnotation is required",
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, guards)

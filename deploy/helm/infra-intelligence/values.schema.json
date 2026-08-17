@@ -13,6 +13,7 @@
     "podSecurityContext",
     "securityContext",
     "service",
+    "ingress",
     "config",
     "database",
     "auth",
@@ -224,6 +225,51 @@
         "type": { "const": "ClusterIP" },
         "port": { "$ref": "#/definitions/port" },
         "targetPort": { "const": "http" }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "className",
+        "annotations",
+        "host",
+        "path",
+        "pathType",
+        "tls",
+        "tlsRedirectAnnotation",
+        "tlsRedirectValue"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^$|^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+        },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "host": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^$|^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+        },
+        "path": { "type": "string", "pattern": "^/", "maxLength": 1024 },
+        "pathType": { "type": "string", "enum": ["Prefix", "Exact"] },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["existingSecret"],
+          "properties": {
+            "existingSecret": { "$ref": "#/definitions/optionalName" }
+          }
+        },
+        "tlsRedirectAnnotation": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^$|^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+        },
+        "tlsRedirectValue": { "type": "string", "minLength": 1, "maxLength": 256 }
       }
     },
     "config": {
@@ -493,6 +539,7 @@
       "required": [
         "enabled",
         "ingressNamespaceSelector",
+        "ingressController",
         "otlpReceiverIngress",
         "databaseEgress",
         "otlpEgress",
@@ -507,6 +554,16 @@
       "properties": {
         "enabled": { "type": "boolean" },
         "ingressNamespaceSelector": { "$ref": "#/definitions/stringMap" },
+        "ingressController": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "namespaceSelector", "podSelector"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "namespaceSelector": { "$ref": "#/definitions/stringMap" },
+            "podSelector": { "$ref": "#/definitions/stringMap" }
+          }
+        },
         "otlpReceiverIngress": {
           "type": "object",
           "additionalProperties": false,

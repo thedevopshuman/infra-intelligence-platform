@@ -9,6 +9,31 @@ CHART = ROOT / "deploy" / "helm" / "infra-intelligence"
 
 
 class HelmMigrationBoundaryTests(unittest.TestCase):
+    def test_ingress_requires_tls_redirect_and_exact_controller_ingress(self) -> None:
+        ingress = (CHART / "templates" / "ingress.yaml").read_text(encoding="utf-8")
+        validation = (CHART / "templates" / "validation.yaml").read_text(
+            encoding="utf-8"
+        )
+        network_policy = (CHART / "templates" / "networkpolicy.yaml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("ingressClassName", ingress)
+        self.assertIn("tls.existingSecret", ingress)
+        self.assertIn("tlsRedirectAnnotation", ingress)
+        self.assertIn("service.port", ingress)
+        for required in (
+            "ingress.tls.existingSecret is required",
+            "ingress.tlsRedirectAnnotation is required",
+            "networkPolicy.enabled must be true when ingress is enabled",
+            "networkPolicy.ingressController.enabled must be true",
+            "networkPolicy.ingressController selectors must be explicit",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, validation)
+        self.assertIn("networkPolicy.ingressController.namespaceSelector", network_policy)
+        self.assertIn("networkPolicy.ingressController.podSelector", network_policy)
+
     def test_serving_pods_cannot_enable_automatic_migrations(self) -> None:
         config_map = (CHART / "templates" / "configmap.yaml").read_text(
             encoding="utf-8"
@@ -61,6 +86,11 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn('IIP_AUTH_VERIFIER="sha256:$(openssl rand -hex 32)"', script)
         self.assertIn('basename "$IIP_EXPECTED_MIGRATION"', script)
         self.assertNotIn('basename "$IIP_EXPECTED_MIGRATION" .sql', script)
+        self.assertEqual(script.count('"$IIP_HELM_BIN" upgrade --install iip'), 2)
+        self.assertIn("--set replicaCount=2", script)
+        self.assertIn("--set ingress.tls.existingSecret=iip-tls", script)
+        self.assertIn("SELECT count(*) FROM iip.schema_migrations", script)
+        self.assertIn('"$IIP_HELM_BIN" history iip', script)
         self.assertTrue((ROOT / "scripts" / "test_helm_install.sh").stat().st_mode & 0o111)
 
 

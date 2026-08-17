@@ -51,3 +51,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0045](0045-controlled-helm-schema-migrations.md) | Accepted | Apply packaged PostgreSQL migrations through an explicit isolated Helm hook before serving rollout |
 | [0046](0046-strict-helm-values-contract.md) | Accepted | Reject unknown, unsafe, and internally inconsistent Helm configuration before rollout |
 | [0047](0047-attested-release-bundle.md) | Accepted | Bind install artifacts to one clean revision with checksums, SPDX SBOM, and SLSA provenance |
+| [0048](0048-explicit-tls-ingress-and-upgrade-conformance.md) | Accepted | Keep Services internal while declaring exact TLS ingress and proving migration-safe Helm upgrades |

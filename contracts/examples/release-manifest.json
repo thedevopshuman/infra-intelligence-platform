@@ -3,7 +3,7 @@
   "kind": "ReleaseManifest",
   "metadata": {
     "version": "0.25.0",
-    "chartVersion": "0.24.0",
+    "chartVersion": "0.25.0",
     "pythonSdkVersion": "0.22.0",
     "typescriptSdkVersion": "0.22.0",
     "revision": "0123456789abcdef0123456789abcdef01234567",
@@ -20,7 +20,7 @@
         "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       {
-        "path": "infra-intelligence-0.24.0.tgz",
+        "path": "infra-intelligence-0.25.0.tgz",
         "role": "helm-chart",
         "mediaType": "application/vnd.cncf.helm.chart.content.v1.tar+gzip",
         "sizeBytes": 32768,

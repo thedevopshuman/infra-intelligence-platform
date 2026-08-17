@@ -1,0 +1,53 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "OidcIssuerCompatibilityReport",
+  "metadata": {
+    "id": "oir_11111111111111111111111111111111",
+    "generatedAt": "2026-08-17T19:00:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "compatible",
+    "environment": {
+      "platform": "linux/arm64",
+      "containerRuntime": "docker",
+      "containerRuntimeVersion": "28.3.3",
+      "pythonVersion": "3.12.11",
+      "applicationVersion": "0.51.0"
+    },
+    "profile": {
+      "name": "local-oidc-rs256-jwks-v1",
+      "tokenAlgorithm": "RS256",
+      "browserFlow": "authorization-code-pkce-s256",
+      "cacheSeconds": 30,
+      "minimumRefreshIntervalSeconds": 5
+    },
+    "checks": [
+      {"id": "ca-verified-tls", "status": "passed"},
+      {"id": "untrusted-ca-denial", "status": "passed"},
+      {"id": "rs256-jwks-authentication", "status": "passed"},
+      {"id": "issuer-denial", "status": "passed"},
+      {"id": "audience-denial", "status": "passed"},
+      {"id": "expiry-and-issued-at-denial", "status": "passed"},
+      {"id": "claim-shape-denial", "status": "passed"},
+      {"id": "tenant-role-derivation", "status": "passed"},
+      {"id": "header-indirection-denial", "status": "passed"},
+      {"id": "pkce-discovery-minimization", "status": "passed"},
+      {"id": "jwks-cache", "status": "passed"},
+      {"id": "unknown-kid-refresh-throttle", "status": "passed"},
+      {"id": "key-rotation-without-restart", "status": "passed"},
+      {"id": "removed-key-denial", "status": "passed"},
+      {"id": "redirect-denial", "status": "passed"},
+      {"id": "expired-cache-outage-fail-closed", "status": "passed"},
+      {"id": "issuer-recovery", "status": "passed"},
+      {"id": "secret-redaction", "status": "passed"}
+    ],
+    "summary": {
+      "totalChecks": 18,
+      "passedChecks": 18,
+      "failedChecks": 0,
+      "overallStatus": "compatible"
+    }
+  }
+}

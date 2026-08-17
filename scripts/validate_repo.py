@@ -90,8 +90,10 @@ REQUIRED_PATHS = (
     "docs/decisions/0074-executable-investigation-capacity-evidence.md",
     "docs/decisions/0076-deterministic-seasonal-telemetry-baseline.md",
     "docs/decisions/0077-executable-credential-broker-compatibility-evidence.md",
+    "docs/decisions/0078-executable-oidc-issuer-compatibility-evidence.md",
     "docs/specifications/investigation-capacity-contract.md",
     "docs/specifications/credential-broker-compatibility-contract.md",
+    "docs/specifications/oidc-issuer-compatibility-contract.md",
     "docs/decisions/0059-backend-neutral-query-availability-telemetry.md",
     "docs/specifications/query-availability-telemetry-contract.md",
     "docs/decisions/0062-audited-evidence-artifact-retention.md",
@@ -120,6 +122,7 @@ REQUIRED_PATHS = (
     "docs/operations/kubernetes-event-evidence.md",
     "docs/operations/kubernetes-actions.md",
     "docs/operations/credential-broker.md",
+    "docs/operations/oidc-identity.md",
     "docs/operations/otlp-metrics-receiver.md",
     "docs/operations/log-evidence.md",
     "docs/operations/resource-change-evidence.md",
@@ -131,6 +134,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/credential-lease-request.schema.json",
     "contracts/schemas/credential-lease.schema.json",
     "contracts/schemas/credential-broker-compatibility-report.schema.json",
+    "contracts/schemas/oidc-issuer-compatibility-report.schema.json",
     "contracts/schemas/integration-config.schema.json",
     "contracts/schemas/action-proposal.schema.json",
     "contracts/schemas/action-approval.schema.json",
@@ -194,6 +198,7 @@ REQUIRED_PATHS = (
     "contracts/examples/credential-lease-request.json",
     "contracts/examples/credential-lease.json",
     "contracts/examples/credential-broker-compatibility-report.json",
+    "contracts/examples/oidc-issuer-compatibility-report.json",
     "contracts/examples/kubernetes-event-evidence-request.json",
     "contracts/examples/kubernetes-event-evidence-result.json",
     "contracts/examples/telemetry-evidence-request.json",
@@ -363,9 +368,14 @@ REQUIRED_PATHS = (
     "scripts/run_capacity_certification.py",
     "scripts/test_capacity.sh",
     "scripts/run_credential_broker_compatibility.py",
+    "scripts/run_oidc_issuer_compatibility.py",
+    "scripts/compatibility_tls.py",
     "deploy/docker-compose.credential-broker.yml",
+    "deploy/docker-compose.oidc-issuer.yml",
     "tests/fixtures/credential_broker_fixture.py",
+    "tests/fixtures/oidc_issuer_fixture.py",
     "tests/test_credential_broker_compatibility.py",
+    "tests/test_oidc_issuer_compatibility.py",
     "sdks/typescript/package-lock.json",
     "tests/test_authentication.py",
     "tests/test_console_authentication.py",
@@ -843,6 +853,79 @@ def validate_credential_broker_compatibility_example(
         / "credential-broker-compatibility-report.json"
     )
     validate_credential_broker_compatibility_document(documents.get(path), errors)
+
+
+OIDC_ISSUER_COMPATIBILITY_CHECKS = (
+    "ca-verified-tls",
+    "untrusted-ca-denial",
+    "rs256-jwks-authentication",
+    "issuer-denial",
+    "audience-denial",
+    "expiry-and-issued-at-denial",
+    "claim-shape-denial",
+    "tenant-role-derivation",
+    "header-indirection-denial",
+    "pkce-discovery-minimization",
+    "jwks-cache",
+    "unknown-kid-refresh-throttle",
+    "key-rotation-without-restart",
+    "removed-key-denial",
+    "redirect-denial",
+    "expired-cache-outage-fail-closed",
+    "issuer-recovery",
+    "secret-redaction",
+)
+
+
+def validate_oidc_issuer_compatibility_document(
+    report: object, errors: List[str]
+) -> None:
+    """Check the closed OIDC profile and its derived summary."""
+
+    if not isinstance(report, dict):
+        fail(errors, "OIDC issuer compatibility report must be an object")
+        return
+    spec = report.get("spec")
+    checks = spec.get("checks") if isinstance(spec, dict) else None
+    summary = spec.get("summary") if isinstance(spec, dict) else None
+    if not isinstance(checks, list) or not isinstance(summary, dict):
+        fail(errors, "OIDC issuer compatibility report must contain checks and summary")
+        return
+    check_ids = tuple(
+        check.get("id") if isinstance(check, dict) else None for check in checks
+    )
+    if check_ids != OIDC_ISSUER_COMPATIBILITY_CHECKS:
+        fail(errors, "OIDC issuer compatibility checks must match the closed profile")
+    passed = sum(
+        1
+        for check in checks
+        if isinstance(check, dict)
+        and check.get("status") == "passed"
+        and "errorCode" not in check
+    )
+    failed = len(checks) - passed
+    status = "compatible" if failed == 0 else "incompatible"
+    if spec.get("status") != status:
+        fail(errors, "OIDC issuer compatibility status must match its checks")
+    if summary != {
+        "totalChecks": len(checks),
+        "passedChecks": passed,
+        "failedChecks": failed,
+        "overallStatus": status,
+    }:
+        fail(errors, "OIDC issuer compatibility summary must match its checks")
+
+
+def validate_oidc_issuer_compatibility_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "oidc-issuer-compatibility-report.json"
+    )
+    validate_oidc_issuer_compatibility_document(documents.get(path), errors)
 
 
 def validate_plugin_action_mediation_examples(
@@ -3121,6 +3204,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CredentialBrokerCompatibilityReport",
         ),
         (
+            "oidc-issuer-compatibility-report.json",
+            "OidcIssuerCompatibilityReport",
+        ),
+        (
             "telemetry-export-health-report.json",
             "TelemetryExportHealthReport",
         ),
@@ -3166,6 +3253,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_plugin_mediation_examples(documents, errors)
     validate_plugin_compatibility_example(documents, errors)
     validate_credential_broker_compatibility_example(documents, errors)
+    validate_oidc_issuer_compatibility_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
 
     policy_request = documents.get(example_dir / "policy-decision-request.json")

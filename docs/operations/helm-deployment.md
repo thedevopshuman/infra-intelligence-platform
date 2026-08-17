@@ -84,7 +84,7 @@ networkPolicy:
 
 The browser calls the token endpoint directly. Its CORS policy must allow the exact console origin, `POST`, and the `content-type` header without cookies. The authorization and token endpoint URLs must not contain query strings, fragments, or embedded credentials. The console's CSP adds only the configured token endpoint origin to `connect-src`; server-side NetworkPolicy independently controls JWKS access from the API pod.
 
-Before rollout, verify the public `GET /v1/authentication/console` response, redirect registration, MFA and consent behavior, token audience and lifetime, tenant/role claim mapping, CORS denial for other origins, logout expectations, key rotation, revocation expectations, and failure behavior. The platform keeps no refresh token, ID token, identity-provider password, or server session.
+Before rollout, run `make test-oidc` to certify the shipped verifier's local real-TLS profile, then qualify the selected issuer and browser flow using the [OIDC runbook](oidc-identity.md). Verify the public `GET /v1/authentication/console` response, redirect registration, MFA and consent behavior, token audience and lifetime, tenant/role claim mapping, CORS denial for other origins, logout expectations, key and certificate rotation, revocation expectations, outage, and recovery. The platform keeps no refresh token, ID token, identity-provider password, or server session.
 
 ## Fresh durable install
 
@@ -93,7 +93,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.50.0
+  tag: 0.51.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:

@@ -129,6 +129,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     ),
     "otlp-metrics-evidence.schema.json": ("otlp-metrics-evidence.json",),
     "otlp-logs-evidence.schema.json": ("otlp-logs-evidence.json",),
+    "oidc-issuer-compatibility-report.schema.json": (
+        "oidc-issuer-compatibility-report.json",
+    ),
     "telemetry-evidence-request.schema.json": ("telemetry-evidence-request.json",),
     "telemetry-evidence-result.schema.json": ("telemetry-evidence-result.json",),
     "plugin-manifest.schema.json": ("plugin-manifest.json",),

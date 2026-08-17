@@ -6,7 +6,7 @@
 
 - Python 3.11 or newer
 - Helm 3 or newer
-- Optional: Docker Desktop for PostgreSQL, credential-broker TLS, OpenTelemetry Collector, OTLP receiver, Prometheus/Loki integration tests, and the durable local stack
+- Optional: Docker Desktop for PostgreSQL, OIDC/JWKS and credential-broker TLS, OpenTelemetry Collector, OTLP receiver, Prometheus/Loki integration tests, and the durable local stack
 - Optional: Docker Desktop, kind, and `kubectl` for live Kubernetes collection and Event evidence tests
 
 Install the pinned verification-only Python dependencies:
@@ -40,6 +40,14 @@ make test-credential-broker
 ```
 
 The isolated target creates a fresh standards-complete test certificate chain and signed workload identities; proves exact policy, rotation, revocation, audit, outage, and recovery behavior; writes a source-bound secret-free compatibility report under `dist/`; and removes its fixture container and network. It does not install or emulate a production credential issuer. See the [credential-broker guide](credential-broker.md) for the customer qualification boundary.
+
+Exercise the production-facing OIDC/JWKS verifier over real local TLS with:
+
+```bash
+make test-oidc
+```
+
+The target keeps ephemeral private signing keys on the host, serves only rotating public JWKs from its isolated container, verifies exact token/claim/cache/redirect/outage behavior, and removes the fixture afterward. It does not exercise a real authorization/token endpoint. See the [OIDC qualification runbook](oidc-identity.md) for the customer browser and issuer gate.
 
 Run the separate end-to-end recovery measurement with:
 

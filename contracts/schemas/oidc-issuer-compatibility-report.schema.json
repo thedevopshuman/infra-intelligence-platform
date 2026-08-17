@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:oidc-issuer-compatibility-report:v1alpha1",
+  "title": "OIDC Issuer Compatibility Report",
+  "description": "Source-bound real-TLS evidence for the OIDC/JWKS authenticator and minimized browser PKCE discovery profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "OidcIssuerCompatibilityReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^oir_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "environment", "profile", "checks", "summary"],
+      "properties": {
+        "status": {"enum": ["compatible", "incompatible"]},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["platform", "containerRuntime", "containerRuntimeVersion", "pythonVersion", "applicationVersion"],
+          "properties": {
+            "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+            "containerRuntime": {"const": "docker"},
+            "containerRuntimeVersion": {"type": "string", "minLength": 1, "maxLength": 64},
+            "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+            "applicationVersion": {"$ref": "#/$defs/semver"}
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "tokenAlgorithm", "browserFlow", "cacheSeconds", "minimumRefreshIntervalSeconds"],
+          "properties": {
+            "name": {"const": "local-oidc-rs256-jwks-v1"},
+            "tokenAlgorithm": {"const": "RS256"},
+            "browserFlow": {"const": "authorization-code-pkce-s256"},
+            "cacheSeconds": {"const": 30},
+            "minimumRefreshIntervalSeconds": {"const": 5}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 18,
+          "maxItems": 18,
+          "prefixItems": [
+            {"$ref": "#/$defs/caVerifiedTlsCheck"},
+            {"$ref": "#/$defs/untrustedCaDenialCheck"},
+            {"$ref": "#/$defs/rs256JwksAuthenticationCheck"},
+            {"$ref": "#/$defs/issuerDenialCheck"},
+            {"$ref": "#/$defs/audienceDenialCheck"},
+            {"$ref": "#/$defs/expiryAndIssuedAtDenialCheck"},
+            {"$ref": "#/$defs/claimShapeDenialCheck"},
+            {"$ref": "#/$defs/tenantRoleDerivationCheck"},
+            {"$ref": "#/$defs/headerIndirectionDenialCheck"},
+            {"$ref": "#/$defs/pkceDiscoveryMinimizationCheck"},
+            {"$ref": "#/$defs/jwksCacheCheck"},
+            {"$ref": "#/$defs/unknownKidRefreshThrottleCheck"},
+            {"$ref": "#/$defs/keyRotationWithoutRestartCheck"},
+            {"$ref": "#/$defs/removedKeyDenialCheck"},
+            {"$ref": "#/$defs/redirectDenialCheck"},
+            {"$ref": "#/$defs/expiredCacheOutageFailClosedCheck"},
+            {"$ref": "#/$defs/issuerRecoveryCheck"},
+            {"$ref": "#/$defs/secretRedactionCheck"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 18},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 18},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 18},
+            "overallStatus": {"enum": ["compatible", "incompatible"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "caVerifiedTlsCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "ca-verified-tls"}}}]},
+    "untrustedCaDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "untrusted-ca-denial"}}}]},
+    "rs256JwksAuthenticationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "rs256-jwks-authentication"}}}]},
+    "issuerDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "issuer-denial"}}}]},
+    "audienceDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "audience-denial"}}}]},
+    "expiryAndIssuedAtDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "expiry-and-issued-at-denial"}}}]},
+    "claimShapeDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "claim-shape-denial"}}}]},
+    "tenantRoleDerivationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "tenant-role-derivation"}}}]},
+    "headerIndirectionDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "header-indirection-denial"}}}]},
+    "pkceDiscoveryMinimizationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "pkce-discovery-minimization"}}}]},
+    "jwksCacheCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "jwks-cache"}}}]},
+    "unknownKidRefreshThrottleCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "unknown-kid-refresh-throttle"}}}]},
+    "keyRotationWithoutRestartCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "key-rotation-without-restart"}}}]},
+    "removedKeyDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "removed-key-denial"}}}]},
+    "redirectDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "redirect-denial"}}}]},
+    "expiredCacheOutageFailClosedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "expired-cache-outage-fail-closed"}}}]},
+    "issuerRecoveryCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "issuer-recovery"}}}]},
+    "secretRedactionCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "secret-redaction"}}}]}
+  }
+}

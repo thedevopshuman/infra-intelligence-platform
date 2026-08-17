@@ -7,7 +7,6 @@ import argparse
 import base64
 import hashlib
 import hmac
-import ipaddress
 import json
 import os
 import platform
@@ -18,12 +17,6 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Mapping
-
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -41,6 +34,7 @@ from iip.application.ports import CredentialLeaseRequest  # noqa: E402
 
 import validate_schemas  # noqa: E402
 import validate_repo  # noqa: E402
+from compatibility_tls import write_tls_material  # noqa: E402
 
 
 COMPOSE_FILE = ROOT / "deploy" / "docker-compose.credential-broker.yml"
@@ -132,107 +126,11 @@ def write_fixture(directory: Path) -> dict[str, object]:
     os.chmod(directory / "policy.json", 0o644)
     os.chmod(directory / "audit.jsonl", 0o666)
 
-    now = utc_now()
-    ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    ca_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "IIP test CA")])
-    ca_certificate = (
-        x509.CertificateBuilder()
-        .subject_name(ca_name)
-        .issuer_name(ca_name)
-        .public_key(ca_key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(now - timedelta(minutes=1))
-        .not_valid_after(now + timedelta(hours=1))
-        .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
-        .add_extension(
-            x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key()),
-            critical=False,
-        )
-        .add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
-            critical=False,
-        )
-        .add_extension(
-            x509.KeyUsage(
-                digital_signature=False,
-                content_commitment=False,
-                key_encipherment=False,
-                data_encipherment=False,
-                key_agreement=False,
-                key_cert_sign=True,
-                crl_sign=True,
-                encipher_only=False,
-                decipher_only=False,
-            ),
-            critical=True,
-        )
-        .sign(ca_key, hashes.SHA256())
+    write_tls_material(
+        directory,
+        common_name="credential-broker.fixture",
+        dns_name="credential-broker.fixture",
     )
-    server_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    server_name = x509.Name(
-        [x509.NameAttribute(NameOID.COMMON_NAME, "credential-broker.fixture")]
-    )
-    server_certificate = (
-        x509.CertificateBuilder()
-        .subject_name(server_name)
-        .issuer_name(ca_name)
-        .public_key(server_key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(now - timedelta(minutes=1))
-        .not_valid_after(now + timedelta(hours=1))
-        .add_extension(
-            x509.SubjectAlternativeName(
-                [
-                    x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
-                    x509.DNSName("credential-broker.fixture"),
-                ]
-            ),
-            critical=False,
-        )
-        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
-        .add_extension(
-            x509.SubjectKeyIdentifier.from_public_key(server_key.public_key()),
-            critical=False,
-        )
-        .add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
-            critical=False,
-        )
-        .add_extension(
-            x509.KeyUsage(
-                digital_signature=True,
-                content_commitment=False,
-                key_encipherment=True,
-                data_encipherment=False,
-                key_agreement=False,
-                key_cert_sign=False,
-                crl_sign=False,
-                encipher_only=False,
-                decipher_only=False,
-            ),
-            critical=True,
-        )
-        .add_extension(
-            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
-            critical=False,
-        )
-        .sign(ca_key, hashes.SHA256())
-    )
-    (directory / "ca.crt").write_bytes(
-        ca_certificate.public_bytes(serialization.Encoding.PEM)
-    )
-    (directory / "server.crt").write_bytes(
-        server_certificate.public_bytes(serialization.Encoding.PEM)
-    )
-    (directory / "server.key").write_bytes(
-        server_key.private_bytes(
-            serialization.Encoding.PEM,
-            serialization.PrivateFormat.PKCS8,
-            serialization.NoEncryption(),
-        )
-    )
-    for name in ("ca.crt", "server.crt", "server.key"):
-        os.chmod(directory / name, 0o644)
     return policy
 
 

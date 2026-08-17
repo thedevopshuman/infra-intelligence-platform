@@ -107,7 +107,6 @@ then proves the access token through the same `/v1/session` verifier used by
 every API call. [ADR 0063](../decisions/0063-console-oidc-authorization-code-pkce.md)
 records the accepted browser boundary.
 
-The platform does not issue OIDC tokens or hold an OAuth client secret. Customer
-issuer enrollment, exact redirect registration, token-endpoint CORS, claim
-mapping governance, MFA/session/logout policy, revocation behavior, and
-workload identity configuration stay with the deployment's identity provider.
+The local real-TLS profile in [ADR 0078](../decisions/0078-executable-oidc-issuer-compatibility-evidence.md) proves the shipped transport and verifier across CA trust, redirect denial, exact claims, cache/refresh behavior, key rotation/removal, expired-cache outage, recovery, and minimized PKCE discovery. It is source-bound release evidence against a disposable public-JWKS fixture, not customer identity-provider qualification.
+
+The platform does not issue OIDC tokens or hold an OAuth client secret. Customer issuer enrollment, exact redirect registration, token-endpoint CORS, claim mapping governance, MFA/session/logout policy, revocation behavior, and workload identity configuration stay with the deployment's identity provider. Follow the [OIDC qualification runbook](../operations/oidc-identity.md) before rollout.

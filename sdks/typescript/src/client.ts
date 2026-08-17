@@ -29,6 +29,7 @@ import type {
   ResourceUid,
   SessionContext,
   TelemetryEvidenceRequest,
+  TelemetryExportHealthReport,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -124,6 +125,12 @@ export class InfrastructureIntelligenceClient {
   async getIngestionFreshness(sourceId: string): Promise<IngestionFreshnessReport> {
     const query = new URLSearchParams({ sourceId });
     return this.get<IngestionFreshnessReport>(`/v1/telemetry/ingestion?${query}`);
+  }
+
+  async getTelemetryExportHealth(): Promise<TelemetryExportHealthReport> {
+    return this.get<TelemetryExportHealthReport>(
+      "/v1/operations/telemetry/export-health",
+    );
   }
 
   async ingestResourceCollection(

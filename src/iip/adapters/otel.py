@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from threading import Lock
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 from urllib.parse import urlsplit
 
 from iip.application.ports import (
     IngestionFreshnessMeasurement,
     InvestigationExecutionMeasurement,
+    TelemetryExportSignalState,
 )
 
 
@@ -26,10 +27,189 @@ _INVESTIGATION_ATTRIBUTE_MODES = frozenset(
     {"none", "investigation", "tenant-investigation"}
 )
 _MAX_ENDPOINT_LENGTH = 2048
+_MAX_COUNTER = 9_007_199_254_740_991
+_SIGNALS = ("metrics", "traces")
 
 
 class OpenTelemetryConfigurationError(RuntimeError):
     """Fail-closed OTLP configuration error without input disclosure."""
+
+
+class TelemetryExportHealthState:
+    """Thread-safe, bounded delivery outcomes for backend-neutral OTLP signals."""
+
+    def __init__(self, enabled_signals: Iterable[str] = ()) -> None:
+        enabled = frozenset(enabled_signals)
+        if not enabled.issubset(_SIGNALS):
+            raise ValueError("telemetry.export-health.signal-invalid")
+        self._lock = Lock()
+        self._states: dict[str, dict[str, Any]] = {
+            signal: {
+                "enabled": signal in enabled,
+                "attempts": 0,
+                "successes": 0,
+                "failures": 0,
+                "consecutive_failures": 0,
+                "last_attempt_at": None,
+                "last_success_at": None,
+                "last_failure_at": None,
+                "last_failure_code": None,
+                "healthy": False,
+            }
+            for signal in _SIGNALS
+        }
+
+    def record_success(self, signal: str) -> None:
+        observed_at = self._now()
+        with self._lock:
+            state = self._enabled(signal)
+            if state["attempts"] < _MAX_COUNTER:
+                state["attempts"] += 1
+                state["successes"] += 1
+            state["consecutive_failures"] = 0
+            state["last_attempt_at"] = observed_at
+            state["last_success_at"] = observed_at
+            state["healthy"] = True
+
+    def record_failure(
+        self,
+        signal: str,
+        code: str = "telemetry.export.failed",
+    ) -> None:
+        if code not in (
+            "telemetry.export.exception",
+            "telemetry.export.rejected",
+        ):
+            code = "telemetry.export.failed"
+        observed_at = self._now()
+        with self._lock:
+            state = self._enabled(signal)
+            if state["attempts"] < _MAX_COUNTER:
+                state["attempts"] += 1
+                state["failures"] += 1
+            state["consecutive_failures"] = min(
+                state["consecutive_failures"] + 1,
+                state["failures"],
+            )
+            state["last_attempt_at"] = observed_at
+            state["last_failure_at"] = observed_at
+            state["last_failure_code"] = code
+            state["healthy"] = False
+
+    def read_export_health(self) -> tuple[TelemetryExportSignalState, ...]:
+        with self._lock:
+            result = []
+            for signal in _SIGNALS:
+                state = self._states[signal]
+                status = (
+                    "disabled"
+                    if not state["enabled"]
+                    else "awaiting-first-attempt"
+                    if state["attempts"] == 0
+                    else "healthy"
+                    if state["healthy"]
+                    else "degraded"
+                )
+                result.append(
+                    TelemetryExportSignalState(
+                        signal=signal,
+                        enabled=state["enabled"],
+                        status=status,
+                        attempts=state["attempts"],
+                        successes=state["successes"],
+                        failures=state["failures"],
+                        consecutive_failures=state["consecutive_failures"],
+                        last_attempt_at=state["last_attempt_at"],
+                        last_success_at=state["last_success_at"],
+                        last_failure_at=state["last_failure_at"],
+                        last_failure_code=state["last_failure_code"],
+                    )
+                )
+            return tuple(result)
+
+    def _enabled(self, signal: str) -> dict[str, Any]:
+        state = self._states.get(signal)
+        if state is None or not state["enabled"]:
+            raise ValueError("telemetry.export-health.signal-disabled")
+        return state
+
+    @staticmethod
+    def _now() -> str:
+        return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+class DisabledTelemetryExportHealthReader(TelemetryExportHealthState):
+    """Report explicit disabled state when no exporter is composed."""
+
+    def __init__(self) -> None:
+        super().__init__()
+
+
+class TrackingMetricExporter:
+    """Decorate an OpenTelemetry metric exporter with delivery outcomes."""
+
+    def __init__(self, delegate: Any, health: TelemetryExportHealthState) -> None:
+        self._delegate = delegate
+        self._health = health
+        self._preferred_temporality = getattr(
+            delegate, "_preferred_temporality", None
+        )
+        self._preferred_aggregation = getattr(
+            delegate, "_preferred_aggregation", None
+        )
+
+    def export(
+        self,
+        metrics_data: Any,
+        timeout_millis: float = 10_000,
+        **kwargs: Any,
+    ) -> Any:
+        try:
+            result = self._delegate.export(
+                metrics_data,
+                timeout_millis=timeout_millis,
+                **kwargs,
+            )
+        except Exception:
+            self._health.record_failure("metrics", "telemetry.export.exception")
+            raise
+        if getattr(result, "name", None) == "SUCCESS":
+            self._health.record_success("metrics")
+        else:
+            self._health.record_failure("metrics", "telemetry.export.rejected")
+        return result
+
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:
+        return bool(self._delegate.force_flush(timeout_millis=timeout_millis))
+
+    def shutdown(self, timeout_millis: float = 30_000, **kwargs: Any) -> None:
+        self._delegate.shutdown(timeout_millis=timeout_millis, **kwargs)
+
+
+class TrackingSpanExporter:
+    """Decorate an OpenTelemetry span exporter with delivery outcomes."""
+
+    def __init__(self, delegate: Any, health: TelemetryExportHealthState) -> None:
+        self._delegate = delegate
+        self._health = health
+
+    def export(self, spans: Any) -> Any:
+        try:
+            result = self._delegate.export(spans)
+        except Exception:
+            self._health.record_failure("traces", "telemetry.export.exception")
+            raise
+        if getattr(result, "name", None) == "SUCCESS":
+            self._health.record_success("traces")
+        else:
+            self._health.record_failure("traces", "telemetry.export.rejected")
+        return result
+
+    def force_flush(self, timeout_millis: int = 30_000) -> bool:
+        return bool(self._delegate.force_flush(timeout_millis=timeout_millis))
+
+    def shutdown(self) -> None:
+        self._delegate.shutdown()
 
 
 @dataclass(frozen=True)
@@ -438,12 +618,17 @@ class OtlpMetricsRuntime:
 
     sink: OpenTelemetryIngestionSink
     provider: Any
+    health: TelemetryExportHealthState | None = None
 
     def force_flush(self, timeout_millis: int = 10_000) -> bool:
         return bool(self.provider.force_flush(timeout_millis=timeout_millis))
 
     def shutdown(self, timeout_millis: int = 30_000) -> None:
         self.provider.shutdown(timeout_millis=timeout_millis)
+
+    def read_export_health(self) -> tuple[TelemetryExportSignalState, ...]:
+        health = self.health or TelemetryExportHealthState(("metrics",))
+        return health.read_export_health()
 
 
 @dataclass(frozen=True)
@@ -452,6 +637,7 @@ class OtlpTracesRuntime:
 
     sink: OpenTelemetryInvestigationSink
     provider: Any
+    health: TelemetryExportHealthState | None = None
 
     def force_flush(self, timeout_millis: int = 10_000) -> bool:
         return bool(self.provider.force_flush(timeout_millis=timeout_millis))
@@ -459,6 +645,10 @@ class OtlpTracesRuntime:
     def shutdown(self, timeout_millis: int = 30_000) -> None:
         del timeout_millis
         self.provider.shutdown()
+
+    def read_export_health(self) -> tuple[TelemetryExportSignalState, ...]:
+        health = self.health or TelemetryExportHealthState(("traces",))
+        return health.read_export_health()
 
 
 @dataclass(frozen=True)
@@ -483,9 +673,19 @@ class CompositeTelemetryRuntime:
             except Exception:
                 continue
 
+    def read_export_health(self) -> tuple[TelemetryExportSignalState, ...]:
+        selected: dict[str, TelemetryExportSignalState] = {}
+        for part in self.parts:
+            for state in part.read_export_health():
+                existing = selected.get(state.signal)
+                if existing is None or (state.enabled and not existing.enabled):
+                    selected[state.signal] = state
+        return tuple(selected[signal] for signal in _SIGNALS)
+
 
 def build_otlp_metrics_runtime(
     configuration: OtlpMetricsConfiguration,
+    health: TelemetryExportHealthState | None = None,
 ) -> OtlpMetricsRuntime:
     """Compose the official OTLP/HTTP SDK entirely inside the adapter layer."""
 
@@ -498,7 +698,11 @@ def build_otlp_metrics_runtime(
         from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
         from opentelemetry.sdk.resources import Resource
 
-        exporter = OTLPMetricExporter(endpoint=configuration.endpoint)
+        export_health = health or TelemetryExportHealthState(("metrics",))
+        exporter = TrackingMetricExporter(
+            OTLPMetricExporter(endpoint=configuration.endpoint),
+            export_health,
+        )
         reader = PeriodicExportingMetricReader(
             exporter,
             export_interval_millis=configuration.export_interval_millis,
@@ -508,17 +712,21 @@ def build_otlp_metrics_runtime(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.25.0",
+                    "service.version": "0.26.0",
                 }
             ),
             metric_readers=(reader,),
         )
-        meter = provider.get_meter("iip.ingestion", "0.25.0")
+        meter = provider.get_meter("iip.ingestion", "0.26.0")
         sink = OpenTelemetryIngestionSink(
             meter,
             attribute_mode=configuration.attribute_mode,
         )
-        return OtlpMetricsRuntime(sink=sink, provider=provider)
+        return OtlpMetricsRuntime(
+            sink=sink,
+            provider=provider,
+            health=export_health,
+        )
     except OpenTelemetryConfigurationError:
         raise
     except Exception:
@@ -529,6 +737,7 @@ def build_otlp_metrics_runtime(
 
 def build_otlp_traces_runtime(
     configuration: OtlpTracesConfiguration,
+    health: TelemetryExportHealthState | None = None,
 ) -> OtlpTracesRuntime:
     """Compose the official OTLP/HTTP trace SDK inside the adapter layer."""
 
@@ -541,12 +750,16 @@ def build_otlp_traces_runtime(
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-        exporter = OTLPSpanExporter(endpoint=configuration.endpoint)
+        export_health = health or TelemetryExportHealthState(("traces",))
+        exporter = TrackingSpanExporter(
+            OTLPSpanExporter(endpoint=configuration.endpoint),
+            export_health,
+        )
         provider = TracerProvider(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.25.0",
+                    "service.version": "0.26.0",
                 }
             )
         )
@@ -559,12 +772,16 @@ def build_otlp_traces_runtime(
                 max_export_batch_size=configuration.max_export_batch_size,
             )
         )
-        tracer = provider.get_tracer("iip.investigation", "0.25.0")
+        tracer = provider.get_tracer("iip.investigation", "0.26.0")
         sink = OpenTelemetryInvestigationSink(
             tracer,
             attribute_mode=configuration.attribute_mode,
         )
-        return OtlpTracesRuntime(sink=sink, provider=provider)
+        return OtlpTracesRuntime(
+            sink=sink,
+            provider=provider,
+            health=export_health,
+        )
     except OpenTelemetryConfigurationError:
         raise
     except Exception:

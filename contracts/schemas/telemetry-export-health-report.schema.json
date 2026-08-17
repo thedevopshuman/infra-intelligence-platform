@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:telemetry-export-health-report:v1alpha1",
+  "title": "Infrastructure Intelligence Telemetry Export Health Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "TelemetryExportHealthReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evaluatedAt"],
+      "properties": {
+        "evaluatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "signals"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["disabled", "awaiting-first-attempt", "healthy", "degraded"]
+        },
+        "signals": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {"$ref": "#/$defs/metricsSignal"},
+            {"$ref": "#/$defs/tracesSignal"}
+          ],
+          "items": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "counter": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signal",
+        "enabled",
+        "status",
+        "attempts",
+        "successes",
+        "failures",
+        "consecutiveFailures"
+      ],
+      "properties": {
+        "signal": {"type": "string", "enum": ["metrics", "traces"]},
+        "enabled": {"type": "boolean"},
+        "status": {
+          "type": "string",
+          "enum": ["disabled", "awaiting-first-attempt", "healthy", "degraded"]
+        },
+        "attempts": {"$ref": "#/$defs/counter"},
+        "successes": {"$ref": "#/$defs/counter"},
+        "failures": {"$ref": "#/$defs/counter"},
+        "consecutiveFailures": {"$ref": "#/$defs/counter"},
+        "lastAttemptAt": {"type": "string", "format": "date-time"},
+        "lastSuccessAt": {"type": "string", "format": "date-time"},
+        "lastFailureAt": {"type": "string", "format": "date-time"},
+        "lastFailureCode": {
+          "type": "string",
+          "enum": [
+            "telemetry.export.exception",
+            "telemetry.export.failed",
+            "telemetry.export.rejected"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "disabled"}}},
+          "then": {
+            "properties": {
+              "enabled": {"const": false},
+              "attempts": {"const": 0},
+              "successes": {"const": 0},
+              "failures": {"const": 0},
+              "consecutiveFailures": {"const": 0}
+            },
+            "not": {
+              "anyOf": [
+                {"required": ["lastAttemptAt"]},
+                {"required": ["lastSuccessAt"]},
+                {"required": ["lastFailureAt"]},
+                {"required": ["lastFailureCode"]}
+              ]
+            }
+          }
+        },
+        {
+          "if": {"properties": {"status": {"const": "awaiting-first-attempt"}}},
+          "then": {
+            "properties": {
+              "enabled": {"const": true},
+              "attempts": {"const": 0},
+              "successes": {"const": 0},
+              "failures": {"const": 0},
+              "consecutiveFailures": {"const": 0}
+            },
+            "not": {
+              "anyOf": [
+                {"required": ["lastAttemptAt"]},
+                {"required": ["lastSuccessAt"]},
+                {"required": ["lastFailureAt"]},
+                {"required": ["lastFailureCode"]}
+              ]
+            }
+          }
+        },
+        {
+          "if": {"properties": {"status": {"const": "healthy"}}},
+          "then": {
+            "properties": {
+              "enabled": {"const": true},
+              "successes": {"minimum": 1},
+              "consecutiveFailures": {"const": 0}
+            },
+            "required": ["lastAttemptAt", "lastSuccessAt"]
+          }
+        },
+        {
+          "if": {"properties": {"status": {"const": "degraded"}}},
+          "then": {
+            "properties": {
+              "enabled": {"const": true},
+              "failures": {"minimum": 1},
+              "consecutiveFailures": {"minimum": 1}
+            },
+            "required": ["lastAttemptAt", "lastFailureAt", "lastFailureCode"]
+          }
+        }
+      ]
+    },
+    "metricsSignal": {
+      "allOf": [
+        {"$ref": "#/$defs/signal"},
+        {"properties": {"signal": {"const": "metrics"}}}
+      ]
+    },
+    "tracesSignal": {
+      "allOf": [
+        {"$ref": "#/$defs/signal"},
+        {"properties": {"signal": {"const": "traces"}}}
+      ]
+    }
+  }
+}

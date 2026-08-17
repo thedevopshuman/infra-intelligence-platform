@@ -5,6 +5,8 @@ IIP_DOCKER_BIN=${IIP_DOCKER_BIN:-docker}
 IIP_TEST_PYTHON=${IIP_TEST_PYTHON:-python3}
 IIP_COMPOSE_FILE=deploy/docker-compose.otel.yml
 IIP_COMPOSE_PROJECT=iip-otel-test
+IIP_OTEL_TEST_PORT=${IIP_OTEL_TEST_PORT:-24318}
+export IIP_OTEL_TEST_PORT
 
 cleanup() {
     "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
@@ -35,8 +37,8 @@ until "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
     sleep 1
 done
 
-IIP_TEST_OTEL_ENDPOINT=http://127.0.0.1:14318/v1/metrics \
-IIP_TEST_OTEL_TRACES_ENDPOINT=http://127.0.0.1:14318/v1/traces \
+IIP_TEST_OTEL_ENDPOINT="http://127.0.0.1:$IIP_OTEL_TEST_PORT/v1/metrics" \
+IIP_TEST_OTEL_TRACES_ENDPOINT="http://127.0.0.1:$IIP_OTEL_TEST_PORT/v1/traces" \
 PYTHONPATH=src:sdks/python/src \
     "$IIP_TEST_PYTHON" -m unittest tests.test_otel_collector -v
 
@@ -68,4 +70,9 @@ until "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
     sleep 1
 done
 
-echo "OTLP integration test received IIP metrics and investigation traces"
+IIP_DOCKER_BIN="$IIP_DOCKER_BIN" \
+IIP_OTEL_TEST_PORT="$IIP_OTEL_TEST_PORT" \
+PYTHONPATH=.:src:sdks/python/src \
+    "$IIP_TEST_PYTHON" scripts/test_otel_export_health.py
+
+echo "OTLP integration test received IIP signals and proved delivery-health recovery"

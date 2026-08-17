@@ -110,6 +110,11 @@ from iip.application.query_resources import (
     ResourceNotFoundError,
     ResourceTimelineResult,
 )
+from iip.application.query_telemetry_export_health import (
+    GetTelemetryExportHealthCommand,
+    TelemetryExportHealthAuthorizationError,
+    TelemetryExportHealthStateError,
+)
 from iip.application.resource_change_evidence import (
     CollectResourceChangeEvidenceCommand,
     InvalidResourceChangeEvidenceRequestError,
@@ -125,7 +130,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.25.0"
+    server_version = "IIPReference/0.26.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -194,6 +199,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if path == "/v1/telemetry/ingestion":
             self._query_ingestion_telemetry(actor, parsed.query)
+            return
+        if path == "/v1/operations/telemetry/export-health":
+            self._query_telemetry_export_health(actor, parsed.query)
             return
         if path == "/v1/actions":
             self._query_actions(actor, parsed.query)
@@ -322,6 +330,32 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json(
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 {"error": {"code": "storage.unavailable"}},
+            )
+
+    def _query_telemetry_export_health(
+        self, actor: ActorContext, query: str
+    ) -> None:
+        try:
+            if query:
+                raise ValueError
+            report = self.runtime.telemetry_export_health.get(
+                GetTelemetryExportHealthCommand(actor)
+            )
+            self._json(HTTPStatus.OK, report.to_dict())
+        except ValueError:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": "request.invalid"}},
+            )
+        except TelemetryExportHealthAuthorizationError:
+            self._json(
+                HTTPStatus.FORBIDDEN,
+                {"error": {"code": "policy.denied"}},
+            )
+        except TelemetryExportHealthStateError:
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "telemetry.export-health.unavailable"}},
             )
 
     def _query_actions(self, actor: ActorContext, query: str) -> None:

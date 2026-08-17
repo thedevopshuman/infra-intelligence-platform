@@ -21,6 +21,7 @@ ENV_PATH = STATE_DIR / "local.env"
 CREDENTIALS_PATH = STATE_DIR / "local-credentials.json"
 COMPOSE_PATH = ROOT / "deploy" / "docker-compose.yml"
 PROJECT = "iip-local"
+_LOCAL_OPERATOR_ROLES = ("developer", "platform-admin")
 
 
 def _token_identity(actor_id: str, roles: Sequence[str]) -> tuple[dict[str, object], dict[str, object]]:
@@ -45,6 +46,7 @@ def create_local_configuration() -> tuple[Path, Path, bool]:
     """Create protected local-only configuration, or preserve the existing pair."""
 
     if ENV_PATH.exists() and CREDENTIALS_PATH.exists():
+        _ensure_local_operator_roles()
         return ENV_PATH, CREDENTIALS_PATH, False
     if ENV_PATH.exists() or CREDENTIALS_PATH.exists():
         raise RuntimeError("local configuration is incomplete; restore or remove both .iip files")
@@ -54,7 +56,7 @@ def create_local_configuration() -> tuple[Path, Path, bool]:
     identities: list[dict[str, object]] = []
     credentials: list[dict[str, object]] = []
     for actor, roles in (
-        ("local-operator", ("developer",)),
+        ("local-operator", _LOCAL_OPERATOR_ROLES),
         ("local-approver", ("approver",)),
         ("local-executor", ("executor",)),
     ):
@@ -85,6 +87,59 @@ def create_local_configuration() -> tuple[Path, Path, bool]:
     os.chmod(ENV_PATH, stat.S_IRUSR | stat.S_IWUSR)
     os.chmod(CREDENTIALS_PATH, stat.S_IRUSR | stat.S_IWUSR)
     return ENV_PATH, CREDENTIALS_PATH, True
+
+
+def _ensure_local_operator_roles() -> None:
+    """Add the non-secret local operations role to configurations from older releases."""
+
+    try:
+        credentials = json.loads(CREDENTIALS_PATH.read_text(encoding="utf-8"))
+        environment_lines = ENV_PATH.read_text(encoding="utf-8").splitlines()
+        identity_index = next(
+            index
+            for index, line in enumerate(environment_lines)
+            if line.startswith("IIP_AUTH_IDENTITIES_JSON=")
+        )
+        verifiers = json.loads(environment_lines[identity_index].partition("=")[2])
+        credential_identities = credentials["identities"]
+        verifier_identities = verifiers["identities"]
+        credential = next(
+            item
+            for item in credential_identities
+            if item.get("actorId") == "local-operator"
+        )
+        verifier = next(
+            item
+            for item in verifier_identities
+            if item.get("actorId") == "local-operator"
+        )
+        if not isinstance(credential.get("roles"), list) or not isinstance(
+            verifier.get("roles"), list
+        ):
+            raise TypeError
+    except (OSError, json.JSONDecodeError, KeyError, StopIteration, TypeError) as exc:
+        raise RuntimeError("local configuration is unreadable") from exc
+
+    expected = list(_LOCAL_OPERATOR_ROLES)
+    if credential["roles"] == expected and verifier["roles"] == expected:
+        return
+    if set(credential["roles"]) != {"developer"} or set(verifier["roles"]) != {
+        "developer"
+    }:
+        raise RuntimeError("local operator roles do not match a supported release")
+    credential["roles"] = expected
+    verifier["roles"] = expected
+    environment_lines[identity_index] = "IIP_AUTH_IDENTITIES_JSON=" + json.dumps(
+        verifiers,
+        separators=(",", ":"),
+    )
+    ENV_PATH.write_text("\n".join(environment_lines) + "\n", encoding="utf-8")
+    CREDENTIALS_PATH.write_text(
+        json.dumps(credentials, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    os.chmod(ENV_PATH, stat.S_IRUSR | stat.S_IWUSR)
+    os.chmod(CREDENTIALS_PATH, stat.S_IRUSR | stat.S_IWUSR)
 
 
 def load_credentials() -> Mapping[str, object]:

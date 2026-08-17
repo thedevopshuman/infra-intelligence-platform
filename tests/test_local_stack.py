@@ -48,6 +48,10 @@ class LocalStackConfigurationTests(unittest.TestCase):
             [identity["actorId"] for identity in identities],
             ["local-operator", "local-approver", "local-executor"],
         )
+        self.assertEqual(
+            identities[0]["roles"],
+            ["developer", "platform-admin"],
+        )
         self.assertNotIn(tokens[0], environment)
         self.assertIn("tokenSha256", environment)
         self.assertNotIn("bearerToken", environment)
@@ -63,6 +67,35 @@ class LocalStackConfigurationTests(unittest.TestCase):
         credentials_path.unlink()
         with self.assertRaisesRegex(RuntimeError, "incomplete"):
             local_stack.create_local_configuration()
+
+    def test_existing_developer_operator_is_upgraded_without_rotating_token(self) -> None:
+        env_path, credentials_path, _ = local_stack.create_local_configuration()
+        credentials = json.loads(credentials_path.read_text(encoding="utf-8"))
+        token = credentials["identities"][0]["bearerToken"]
+        credentials["identities"][0]["roles"] = ["developer"]
+        credentials_path.write_text(json.dumps(credentials), encoding="utf-8")
+        lines = env_path.read_text(encoding="utf-8").splitlines()
+        index = next(
+            index
+            for index, line in enumerate(lines)
+            if line.startswith("IIP_AUTH_IDENTITIES_JSON=")
+        )
+        verifiers = json.loads(lines[index].partition("=")[2])
+        verifiers["identities"][0]["roles"] = ["developer"]
+        lines[index] = "IIP_AUTH_IDENTITIES_JSON=" + json.dumps(
+            verifiers, separators=(",", ":")
+        )
+        env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        _, _, created = local_stack.create_local_configuration()
+
+        upgraded = json.loads(credentials_path.read_text(encoding="utf-8"))
+        self.assertFalse(created)
+        self.assertEqual(upgraded["identities"][0]["bearerToken"], token)
+        self.assertEqual(
+            upgraded["identities"][0]["roles"],
+            ["developer", "platform-admin"],
+        )
 
     def test_compose_uses_explicit_project_env_and_file_without_shell(self) -> None:
         local_stack.create_local_configuration()

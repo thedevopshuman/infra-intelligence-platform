@@ -81,6 +81,18 @@ Set `telemetry.metricsEnabled` and/or `telemetry.tracesEnabled`, `telemetry.otlp
 
 The Helm chart does not deploy a Collector because topology and backend selection belong to the customer deployment. Point it at a customer-controlled Collector so changing exporters or destinations does not require an IIP build.
 
+## Delivery health
+
+Every completed exporter attempt updates bounded process-local state. An authenticated identity with the `platform-admin` role and policy approval can read it with:
+
+```bash
+curl --fail-with-body \
+  -H "Authorization: Bearer $IIP_OPERATOR_TOKEN" \
+  http://127.0.0.1:8080/v1/operations/telemetry/export-health
+```
+
+The report distinguishes disabled, awaiting-first-attempt, healthy, and degraded metric/trace delivery. It intentionally omits the configured endpoint and provider failures. It describes only the API process that answered. In a multi-replica deployment, query each API pod directly through an operator-only path because counters are process-local and reset on restart. The current worker has no HTTP operations listener; use Collector/SDK operational telemetry and logs for worker exports until deployment-wide aggregation is implemented. `/readyz` remains independent, so telemetry backend failure does not interrupt customer workflows.
+
 ## Production gaps
 
-The reference adapters and automatic sampler are failure-isolated but not a complete production telemetry pipeline. Production enablement still requires Collector and exporter queue/delivery monitoring, a defined loss objective, reviewed cardinality budgets, TLS/authentication policy, regional routing, and representative load tests. The trace queue is bounded but not durable. Background SDK delivery failures are not reflected in `iip.telemetry.record.failures`; monitor the Collector and SDK logs/telemetry until an explicit export-health contract is implemented.
+The reference adapters and automatic sampler are failure-isolated but not a complete production telemetry pipeline. Production enablement still requires Collector-side queue/delivery monitoring, a defined loss objective, reviewed cardinality budgets, TLS/authentication policy, regional routing, and representative load tests. The trace queue is bounded but not durable. The process-local report describes latest exporter outcomes; it is not durable, cluster-wide, or a measured availability window.

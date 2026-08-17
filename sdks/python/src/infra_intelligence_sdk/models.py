@@ -245,6 +245,28 @@ class IngestionFreshnessReport:
 
 
 @dataclass(frozen=True)
+class TelemetryExportHealthReport:
+    """Process-local OTLP metric and trace delivery state for operators."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "TelemetryExportHealthReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="TelemetryExportHealthReport",
+                label="telemetry export health report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class SessionContext:
     """Non-secret identity context derived from the client's credential."""
 

@@ -61,6 +61,7 @@ from .models import (
     SessionContext,
     TelemetryEvidenceRequest,
     TelemetryEvidenceResult,
+    TelemetryExportHealthReport,
 )
 
 __all__ = [
@@ -124,5 +125,6 @@ __all__ = [
     "SessionContext",
     "TelemetryEvidenceRequest",
     "TelemetryEvidenceResult",
+    "TelemetryExportHealthReport",
 ]
-__version__ = "0.22.0"
+__version__ = "0.23.0"

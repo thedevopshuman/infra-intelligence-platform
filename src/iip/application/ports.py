@@ -161,6 +161,23 @@ class InvestigationExecutionMeasurement:
 
 
 @dataclass(frozen=True)
+class TelemetryExportSignalState:
+    """Bounded, provider-neutral delivery state for one telemetry signal."""
+
+    signal: str
+    enabled: bool
+    status: str
+    attempts: int
+    successes: int
+    failures: int
+    consecutive_failures: int
+    last_attempt_at: Optional[str] = None
+    last_success_at: Optional[str] = None
+    last_failure_at: Optional[str] = None
+    last_failure_code: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class ReconciliationSnapshot:
     """Last complete resource membership for one tenant-scoped source."""
 
@@ -561,6 +578,11 @@ class InvestigationTelemetrySink(Protocol):
         self, measurement: InvestigationExecutionMeasurement
     ) -> None:
         """Record terminal execution facts without becoming workflow authority."""
+
+
+class TelemetryExportHealthReader(Protocol):
+    def read_export_health(self) -> Iterable[TelemetryExportSignalState]:
+        """Return bounded process-local delivery state without provider details."""
 
 
 class ReconciliationRepository(Protocol):

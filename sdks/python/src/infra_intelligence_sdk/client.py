@@ -35,6 +35,7 @@ from .models import (
     ResourceTimeline,
     SessionContext,
     TelemetryEvidenceRequest,
+    TelemetryExportHealthReport,
 )
 
 
@@ -140,6 +141,13 @@ class Client:
         query = urlencode({"sourceId": source_id})
         return IngestionFreshnessReport.from_dict(
             self._get(f"/v1/telemetry/ingestion?{query}")
+        )
+
+    def get_telemetry_export_health(self) -> TelemetryExportHealthReport:
+        """Read process-local delivery outcomes as a platform administrator."""
+
+        return TelemetryExportHealthReport.from_dict(
+            self._get("/v1/operations/telemetry/export-health")
         )
 
     def ingest_resource_collection(

@@ -31,6 +31,7 @@ from iip.adapters.evidence import (
 )
 from iip.adapters.health import AlwaysReadyProbe
 from iip.adapters.memory import AllowTenantPolicy, InMemoryResourceStore
+from iip.adapters.otel import DisabledTelemetryExportHealthReader
 from iip.adapters.operations import InMemoryOperationalStore
 from iip.adapters.policy import ExternalHttpPolicyDecisionPoint
 from iip.application.action_reconciliation import ActionReconciliationService
@@ -88,6 +89,9 @@ from iip.application.observe_ingestion import (
 from iip.application.plugin_sessions import PluginSessionService
 from iip.application.query_actions import ActionWorkflowQueryService
 from iip.application.query_resources import ResourceQueryService
+from iip.application.query_telemetry_export_health import (
+    TelemetryExportHealthService,
+)
 from iip.application.resource_change_evidence import (
     ResourceChangeEvidenceService,
     ResourceHistoryChangeEvidenceProvider,
@@ -115,6 +119,7 @@ class Runtime:
     ingestion: ResourceIngestionService
     collection_ingestion: ResourceCollectionIngestionService
     ingestion_telemetry: IngestionFreshnessService
+    telemetry_export_health: TelemetryExportHealthService
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
     kubernetes_event_evidence: KubernetesEventEvidenceService
@@ -295,6 +300,16 @@ def _compose_runtime(
             clock,
             ingestion_objectives,
             ingestion_telemetry_sink,
+        ),
+        telemetry_export_health=TelemetryExportHealthService(
+            (
+                telemetry_runtime
+                if telemetry_runtime is not None
+                and callable(getattr(telemetry_runtime, "read_export_health", None))
+                else DisabledTelemetryExportHealthReader()
+            ),
+            policy,
+            clock,
         ),
         queries=queries,
         evidence=evidence,

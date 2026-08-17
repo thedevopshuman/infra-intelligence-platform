@@ -247,6 +247,39 @@ export interface IngestionFreshnessReport {
   };
 }
 
+export type TelemetryExportSignalStatus =
+  | "disabled"
+  | "awaiting-first-attempt"
+  | "healthy"
+  | "degraded";
+
+export interface TelemetryExportSignalHealth {
+  signal: "metrics" | "traces";
+  enabled: boolean;
+  status: TelemetryExportSignalStatus;
+  attempts: number;
+  successes: number;
+  failures: number;
+  consecutiveFailures: number;
+  lastAttemptAt?: string;
+  lastSuccessAt?: string;
+  lastFailureAt?: string;
+  lastFailureCode?:
+    | "telemetry.export.exception"
+    | "telemetry.export.failed"
+    | "telemetry.export.rejected";
+}
+
+export interface TelemetryExportHealthReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "TelemetryExportHealthReport";
+  metadata: { evaluatedAt: string };
+  spec: {
+    status: TelemetryExportSignalStatus;
+    signals: [TelemetryExportSignalHealth, TelemetryExportSignalHealth];
+  };
+}
+
 export interface PlatformEvent<TData extends Record<string, unknown> = Record<string, unknown>> {
   specversion: "1.0";
   id: string;

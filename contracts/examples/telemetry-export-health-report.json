@@ -1,0 +1,36 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "TelemetryExportHealthReport",
+  "metadata": {
+    "evaluatedAt": "2026-08-17T12:00:10Z"
+  },
+  "spec": {
+    "status": "degraded",
+    "signals": [
+      {
+        "signal": "metrics",
+        "enabled": true,
+        "status": "healthy",
+        "attempts": 24,
+        "successes": 24,
+        "failures": 0,
+        "consecutiveFailures": 0,
+        "lastAttemptAt": "2026-08-17T12:00:05Z",
+        "lastSuccessAt": "2026-08-17T12:00:05Z"
+      },
+      {
+        "signal": "traces",
+        "enabled": true,
+        "status": "degraded",
+        "attempts": 12,
+        "successes": 10,
+        "failures": 2,
+        "consecutiveFailures": 2,
+        "lastAttemptAt": "2026-08-17T12:00:08Z",
+        "lastSuccessAt": "2026-08-17T11:59:10Z",
+        "lastFailureAt": "2026-08-17T12:00:08Z",
+        "lastFailureCode": "telemetry.export.rejected"
+      }
+    ]
+  }
+}

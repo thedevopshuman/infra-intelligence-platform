@@ -5,4 +5,4 @@ services:
     volumes:
       - ./otel/collector-test.yaml:/etc/otelcol/config.yaml:ro
     ports:
-      - "127.0.0.1:14318:4318"
+      - "127.0.0.1:${IIP_OTEL_TEST_PORT:-24318}:4318"

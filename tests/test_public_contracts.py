@@ -60,6 +60,7 @@ from infra_intelligence_sdk import (
     SessionContext,
     TelemetryEvidenceRequest,
     TelemetryEvidenceResult,
+    TelemetryExportHealthReport,
 )
 
 
@@ -119,6 +120,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         freshness = IngestionFreshnessReport.from_dict(
             example("ingestion-freshness-report.json")
+        )
+        export_health = TelemetryExportHealthReport.from_dict(
+            example("telemetry-export-health-report.json")
         )
         session = SessionContext.from_dict(example("session-context.json"))
         collection_request = ResourceCollectionRequest.from_dict(
@@ -274,6 +278,9 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(investigation_job_status.state, "running")
         self.assertEqual(investigation_job_status.attempts, 1)
         self.assertEqual(freshness.to_dict()["kind"], "IngestionFreshnessReport")
+        self.assertEqual(
+            export_health.to_dict()["kind"], "TelemetryExportHealthReport"
+        )
         self.assertEqual(session.to_dict()["kind"], "SessionContext")
         self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")
         self.assertEqual(collection_result.to_dict()["kind"], "ResourceCollectionResult")

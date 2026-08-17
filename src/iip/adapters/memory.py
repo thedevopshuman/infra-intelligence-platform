@@ -555,6 +555,7 @@ class AllowTenantPolicy:
             "resource-projection:rebuild",
             "resource:ingest",
             "resource:read",
+            "telemetry-export-health:read",
         ):
             return PolicyDecision(False, "action.unsupported")
         return PolicyDecision(True, "development.allow")

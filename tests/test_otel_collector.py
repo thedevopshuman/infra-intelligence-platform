@@ -34,6 +34,9 @@ class OtlpCollectorIntegrationTests(unittest.TestCase):
             runtime.sink.record_ingestion_freshness(measurement())
             self.assertTrue(runtime.force_flush(5_000))
             self.assertEqual(runtime.sink.record_failures, 0)
+            metrics = runtime.read_export_health()[0]
+            self.assertEqual(metrics.status, "healthy")
+            self.assertGreaterEqual(metrics.successes, 1)
         finally:
             runtime.shutdown(5_000)
 
@@ -56,6 +59,9 @@ class OtlpCollectorIntegrationTests(unittest.TestCase):
             )
             self.assertTrue(runtime.force_flush(5_000))
             self.assertEqual(runtime.sink.record_failures, 0)
+            traces = runtime.read_export_health()[1]
+            self.assertEqual(traces.status, "healthy")
+            self.assertGreaterEqual(traces.successes, 1)
         finally:
             runtime.shutdown(5_000)
 

@@ -73,6 +73,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "ingestion-freshness-report.schema.json": (
         "ingestion-freshness-report.json",
     ),
+    "telemetry-export-health-report.schema.json": (
+        "telemetry-export-health-report.json",
+    ),
     "integration-config.schema.json": ("integration-config.json",),
     "log-evidence-request.schema.json": ("log-evidence-request.json",),
     "log-evidence-result.schema.json": ("log-evidence-result.json",),

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -84,6 +85,10 @@ from iip.application.query_resources import ResourceQueryService
 from iip.application.resource_change_evidence import (
     ResourceChangeEvidenceService,
     ResourceHistoryChangeEvidenceProvider,
+)
+from iip.application.sample_ingestion import (
+    IngestionFreshnessSampler,
+    IngestionMonitorTarget,
 )
 from iip.application.rebuild_projections import ProjectionRebuildService
 from iip.application.telemetry_evidence import (
@@ -392,7 +397,26 @@ def build_projection_maintenance(database_url: str) -> ProjectionRebuildService:
 def build_runtime_from_env(*, include_action_executor: bool = True) -> Runtime:
     """Select a runtime profile from process configuration at the composition root."""
 
-    authenticator = _authenticator_from_env()
+    return _build_runtime_from_env(
+        _authenticator_from_env(),
+        include_action_executor=include_action_executor,
+    )
+
+
+def build_workflow_worker_runtime_from_env() -> Runtime:
+    """Compose a worker without interactive identity credentials or action impact."""
+
+    return _build_runtime_from_env(
+        DenyAllAuthenticator(),
+        include_action_executor=False,
+    )
+
+
+def _build_runtime_from_env(
+    authenticator: Authenticator,
+    *,
+    include_action_executor: bool,
+) -> Runtime:
     policy = _policy_from_env()
     objectives = _ingestion_objectives_from_env()
     metrics_runtime = _otel_metrics_runtime_from_env()
@@ -568,6 +592,43 @@ def build_action_reconciler_from_env(runtime: Runtime) -> ActionReconciliationSe
         worker_id=worker_id,
         batch_size=batch_size,
     )
+
+
+def build_ingestion_freshness_sampler_from_env(
+    runtime: Runtime,
+    allowed_tenants: tuple[str, ...],
+) -> IngestionFreshnessSampler | None:
+    """Compose explicitly enrolled automatic freshness targets for one worker."""
+
+    raw = os.environ.get("IIP_INGESTION_MONITOR_TARGETS_JSON")
+    if raw is None or raw == "":
+        return None
+    try:
+        payload = json.loads(raw)
+        items = payload["targets"]
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != {"targets"}
+            or not isinstance(items, list)
+            or not 1 <= len(items) <= 1000
+        ):
+            raise ValueError
+        targets = tuple(
+            IngestionMonitorTarget(
+                tenant_id=item["tenantId"],
+                source_id=item["sourceId"],
+            )
+            for item in items
+            if isinstance(item, dict)
+            and set(item) == {"tenantId", "sourceId"}
+        )
+        if len(targets) != len(items) or any(
+            target.tenant_id not in allowed_tenants for target in targets
+        ):
+            raise ValueError
+        return IngestionFreshnessSampler(runtime.ingestion_telemetry, targets)
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        raise ValueError("ingestion.monitor.configuration.invalid") from None
 
 
 def _authenticator_from_env() -> Authenticator:

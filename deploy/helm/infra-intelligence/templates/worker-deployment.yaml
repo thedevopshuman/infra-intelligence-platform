@@ -12,18 +12,20 @@ spec:
   replicas: {{ .Values.worker.replicaCount }}
   selector:
     matchLabels:
-      {{- include "infra-intelligence.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: {{ include "infra-intelligence.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
       app.kubernetes.io/component: workflow-worker
   template:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       labels:
-        {{- include "infra-intelligence.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: {{ include "infra-intelligence.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: workflow-worker
     spec:
       serviceAccountName: {{ include "infra-intelligence.serviceAccountName" . }}
-      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      automountServiceAccountToken: false
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       {{- with .Values.imagePullSecrets }}
@@ -64,13 +66,14 @@ spec:
               value: {{ .Values.worker.maxAttempts | quote }}
             - name: IIP_ACTION_RECONCILIATION_BATCH_SIZE
               value: {{ .Values.worker.actionReconciliationBatchSize | quote }}
-            {{- if .Values.auth.existingSecret }}
-            - name: IIP_AUTH_IDENTITIES_JSON
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.auth.existingSecret | quote }}
-                  key: {{ .Values.auth.secretKey | quote }}
+            {{- if .Values.worker.ingestionMonitorTargets }}
+            - name: IIP_INGESTION_MONITOR_TARGETS_JSON
+              value: {{ dict "targets" .Values.worker.ingestionMonitorTargets | toJson | quote }}
+            - name: IIP_INGESTION_MONITOR_INTERVAL_SECONDS
+              value: {{ .Values.worker.ingestionMonitorIntervalSeconds | quote }}
             {{- end }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.telemetry.workerServiceName | quote }}
             {{- if .Values.telemetry.existingSecret }}
             - name: OTEL_EXPORTER_OTLP_HEADERS
               valueFrom:
@@ -121,11 +124,6 @@ spec:
               readOnly: true
             {{- end }}
             {{- end }}
-            {{- if and (eq .Values.auth.mode "oidc") .Values.auth.oidc.caBundleExistingSecret }}
-            - name: oidc-ca
-              mountPath: {{ .Values.auth.oidc.caBundleMountPath | quote }}
-              readOnly: true
-            {{- end }}
             {{- if eq .Values.policy.mode "external-http" }}
             {{- if .Values.policy.externalHttp.bearerTokenExistingSecret }}
             - name: policy-token
@@ -167,14 +165,6 @@ spec:
               - key: {{ .Values.credentialBroker.externalHttp.caBundleSecretKey | quote }}
                 path: ca.crt
         {{- end }}
-        {{- end }}
-        {{- if and (eq .Values.auth.mode "oidc") .Values.auth.oidc.caBundleExistingSecret }}
-        - name: oidc-ca
-          secret:
-            secretName: {{ .Values.auth.oidc.caBundleExistingSecret | quote }}
-            items:
-              - key: {{ .Values.auth.oidc.caBundleSecretKey | quote }}
-                path: ca.crt
         {{- end }}
         {{- if and (eq .Values.policy.mode "external-http") .Values.policy.externalHttp.bearerTokenExistingSecret }}
         - name: policy-token

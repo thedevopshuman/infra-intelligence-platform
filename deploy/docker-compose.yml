@@ -15,7 +15,7 @@ services:
       - postgres-data:/var/lib/postgresql
 
   api:
-    image: iip-local-platform:0.22.0
+    image: iip-local-platform:0.23.0
     build:
       context: ..
       dockerfile: Dockerfile
@@ -71,12 +71,12 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-local-platform:0.22.0
+    image: iip-local-platform:0.23.0
+    pull_policy: never
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
       IIP_DATABASE_AUTO_MIGRATE: "false"
-      IIP_AUTH_IDENTITIES_JSON: ${IIP_AUTH_IDENTITIES_JSON:?set IIP_AUTH_IDENTITIES_JSON}
       IIP_WORKER_ID: local-workflow-worker
       IIP_WORKER_TENANTS: local
       IIP_WORKER_LEASE_SECONDS: ${IIP_WORKER_LEASE_SECONDS:-30}
@@ -84,6 +84,16 @@ services:
       IIP_WORKER_RETRY_SECONDS: ${IIP_WORKER_RETRY_SECONDS:-5}
       IIP_WORKER_MAX_ATTEMPTS: ${IIP_WORKER_MAX_ATTEMPTS:-8}
       IIP_ACTION_RECONCILIATION_BATCH_SIZE: ${IIP_ACTION_RECONCILIATION_BATCH_SIZE:-100}
+      IIP_INGESTION_MONITOR_TARGETS_JSON: '{"targets":[{"tenantId":"local","sourceId":"kubernetes-local"}]}'
+      IIP_INGESTION_MONITOR_INTERVAL_SECONDS: ${IIP_INGESTION_MONITOR_INTERVAL_SECONDS:-60}
+      IIP_OTEL_METRICS_ENABLED: ${IIP_OTEL_METRICS_ENABLED:-false}
+      IIP_OTEL_TRACES_ENABLED: ${IIP_OTEL_TRACES_ENABLED:-false}
+      IIP_OTEL_INGESTION_ATTRIBUTE_MODE: ${IIP_OTEL_INGESTION_ATTRIBUTE_MODE:-source}
+      IIP_OTEL_INVESTIGATION_ATTRIBUTE_MODE: ${IIP_OTEL_INVESTIGATION_ATTRIBUTE_MODE:-none}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+      OTEL_SERVICE_NAME: infra-intelligence-worker
       IIP_TELEMETRY_METRICS_BACKEND: ${IIP_TELEMETRY_METRICS_BACKEND:-no-data}
       IIP_TELEMETRY_LOGS_BACKEND: ${IIP_TELEMETRY_LOGS_BACKEND:-no-data}
       IIP_PROMETHEUS_INTEGRATIONS_JSON: ${IIP_PROMETHEUS_INTEGRATIONS_JSON:-}

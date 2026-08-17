@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import secrets
 import sys
@@ -107,41 +108,105 @@ def main() -> int:
         now = datetime.now(timezone.utc)
         suffix = secrets.token_hex(6)
         workload_name = f"product-gate-{suffix}"
-        resource = _request(
-            "/v1/resources",
+        sequence = int(now.timestamp() * 1000)
+        stream_id = "obs_0f4e8c2a6b1d4975a3c9e7f102d468ab"
+        request_id = _identifier("col")
+        scope = {
+            "provider": "kubernetes",
+            "integrationId": "kubernetes-local",
+            "rootExternalId": "cluster-local",
+            "parameters": {"namespaces": ["default"]},
+        }
+        scope_digest = "sha256:" + hashlib.sha256(
+            json.dumps(scope, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        resource_document = {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "Resource",
+            "metadata": {
+                "tenantId": "local",
+                "observedAt": now.isoformat().replace("+00:00", "Z"),
+                "observation": {
+                    "sourceId": "kubernetes-local",
+                    "streamId": stream_id,
+                    "sequence": sequence,
+                    "mode": "incremental",
+                    "resourceVersion": str(sequence),
+                },
+                "labels": {"environment": "local-product-gate"},
+            },
+            "spec": {
+                "provider": "kubernetes",
+                "type": "apps/deployment",
+                "externalId": f"cluster-local/default/{workload_name}",
+                "displayName": workload_name,
+                "attributes": {
+                    "namespace": "default",
+                    "providerUid": secrets.token_hex(16),
+                    "replicas": 2,
+                    "availableReplicas": 1,
+                },
+                "relationships": [],
+            },
+            "status": {"health": "degraded", "lifecycle": "active"},
+        }
+        collection = _request(
+            "/v1/collections/ingest",
             operator,
             method="POST",
             body={
-                "apiVersion": "iip.platform/v1alpha1",
-                "kind": "Resource",
-                "metadata": {
-                    "tenantId": "local",
-                    "observedAt": now.isoformat().replace("+00:00", "Z"),
-                    "observation": {
+                "request": {
+                    "apiVersion": "iip.platform/v1alpha1",
+                    "kind": "ResourceCollectionRequest",
+                    "metadata": {
+                        "requestId": request_id,
+                        "tenantId": "local",
+                        "actorId": "local-operator",
+                        "requestedAt": now.isoformat().replace("+00:00", "Z"),
+                    },
+                    "spec": {
                         "sourceId": "kubernetes-local",
-                        "streamId": _identifier("obs"),
-                        "sequence": int(now.timestamp() * 1000),
+                        "streamId": stream_id,
                         "mode": "incremental",
-                        "resourceVersion": str(int(now.timestamp() * 1000)),
+                        "startSequence": sequence,
+                        "scope": scope,
+                        "limits": {
+                            "maxResources": 10,
+                            "maxOutputBytes": 1048576,
+                        },
+                        "deadline": (now + timedelta(minutes=5))
+                        .isoformat()
+                        .replace("+00:00", "Z"),
                     },
-                    "labels": {"environment": "local-product-gate"},
                 },
-                "spec": {
-                    "provider": "kubernetes",
-                    "type": "apps/deployment",
-                    "externalId": f"cluster-local/default/{workload_name}",
-                    "displayName": workload_name,
-                    "attributes": {
-                        "namespace": "default",
-                        "providerUid": secrets.token_hex(16),
-                        "replicas": 2,
-                        "availableReplicas": 1,
+                "result": {
+                    "apiVersion": "iip.platform/v1alpha1",
+                    "kind": "ResourceCollectionResult",
+                    "metadata": {
+                        "requestId": request_id,
+                        "tenantId": "local",
+                        "sourceId": "kubernetes-local",
+                        "createdAt": now.isoformat().replace("+00:00", "Z"),
                     },
-                    "relationships": [],
+                    "spec": {
+                        "observations": [resource_document],
+                        "completion": {
+                            "status": "complete",
+                            "resourceCount": 1,
+                            "nextSequence": sequence + 1,
+                            "checkpoint": f"local-product-gate:{sequence}",
+                            "scopeDigest": scope_digest,
+                        },
+                    },
                 },
-                "status": {"health": "degraded", "lifecycle": "active"},
             },
         )
+        items = collection.get("items")
+        if not isinstance(items, list) or len(items) != 1:
+            raise ProductWorkflowError("collection ingestion returned invalid resources")
+        resource = items[0]
+        if not isinstance(resource, Mapping):
+            raise ProductWorkflowError("collection ingestion returned invalid resource")
         resource_uid = str(resource.get("metadata", {}).get("uid", ""))
         if not resource_uid.startswith("res_"):
             raise ProductWorkflowError("resource ingestion did not return a canonical UID")
@@ -265,7 +330,7 @@ def main() -> int:
         if proposal_id not in item_ids:
             raise ProductWorkflowError("terminal workflow is missing from the action queue")
         print(
-            "local product workflow passed: resource → queued worker investigation → proposal → "
+            "local product workflow passed: collection → queued worker investigation → proposal → "
             "independent approval → one-shot dry-run → queue"
         )
         print(f"action: {proposal_id}")

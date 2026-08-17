@@ -145,7 +145,7 @@ The supported local onboarding path generates 256-bit Bearer tokens for three se
 make dev-up
 ```
 
-This starts PostgreSQL, the API, and a tenant-explicit workflow worker, waits until the API proves both database connectivity and the latest packaged schema migration, and prints the console URL plus the `local-operator` token. `/healthz` remains process-only while `/readyz` is the serving gate. The worker dispatches investigations and performs non-executing action timer reconciliation. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties. Run `make dev-credentials` when exercising the console approval workflow; that explicit command prints all three identities from the protected mode-`0600` file. Useful lifecycle commands are:
+This starts PostgreSQL, the API, and a tenant-explicit workflow worker, waits until the API proves both database connectivity and the latest packaged schema migration, and prints the console URL plus the `local-operator` token. `/healthz` remains process-only while `/readyz` is the serving gate. The worker dispatches investigations, performs non-executing action timer reconciliation, and samples the enrolled `local/kubernetes-local` ingestion source every 60 seconds. It has no interactive identity Secret and does not compose an action executor. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties. Run `make dev-credentials` when exercising the console approval workflow; that explicit command prints all three identities from the protected mode-`0600` file. Useful lifecycle commands are:
 
 ```bash
 make dev-status
@@ -155,7 +155,7 @@ make dev-down
 ```
 
 `make test-local-product` reads the protected local credentials without printing
-them and exercises the durable customer path end to end: resource ingestion,
+them and exercises the durable customer path end to end: complete collection ingestion,
 durably queued worker investigation, immutable proposal, independent approval, one-shot
 dry-run execution, replay safety, and the paginated action queue.
 
@@ -217,6 +217,8 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_WORKER_TENANTS` | unset | Required comma-separated exact tenant enrollment for the workflow worker; wildcard is invalid |
 | `IIP_WORKER_ID` | pod/host name | Stable workflow-worker identity |
 | `IIP_ACTION_RECONCILIATION_BATCH_SIZE` | `100` | Maximum expired action leases scanned per enrolled tenant and timer pass |
+| `IIP_INGESTION_MONITOR_TARGETS_JSON` | unset | Worker-only closed target list; each target tenant must be explicitly enrolled; omission disables sampling |
+| `IIP_INGESTION_MONITOR_INTERVAL_SECONDS` | `60` | Worker-only automatic freshness cadence from 5–3600 seconds |
 | `IIP_INGESTION_MAX_CHECKPOINT_AGE_SECONDS` | `300` | Local maximum age of the last complete committed collection |
 | `IIP_INGESTION_MAX_OBSERVATION_AGE_SECONDS` | `300` | Local maximum age of the latest accepted source observation |
 | `IIP_INGESTION_MAX_DELAY_SECONDS` | `60` | Local maximum provider-observation to platform-recording delay |

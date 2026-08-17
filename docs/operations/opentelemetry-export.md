@@ -2,7 +2,7 @@
 
 **Status:** Reference implementation
 
-The API can export bounded ingestion-freshness metrics and terminal investigation spans over OTLP/HTTP protobuf to an OpenTelemetry Collector or compatible endpoint. Each signal is optional and disabled by default. Public reports and their underlying PostgreSQL/in-memory facts remain authoritative.
+The API and workflow worker can export bounded ingestion-freshness metrics and terminal investigation spans over OTLP/HTTP protobuf to an OpenTelemetry Collector or compatible endpoint. Each signal is optional and disabled by default. Public reports and their underlying PostgreSQL/in-memory facts remain authoritative.
 
 This path exports IIP's own operational telemetry. It does not receive customer workload telemetry or query historical metrics. Historical queries use the separate [telemetry evidence contract](../specifications/telemetry-evidence-contract.md) and replaceable backend port, while optional tenant-bound OTLP receivers handle selected pushed customer metrics and logs. The [portability boundary](../architecture/opentelemetry-portability.md) keeps these flows distinct.
 
@@ -46,7 +46,7 @@ export IIP_OTEL_TRACES_ENABLED=true
 docker compose --profile telemetry -f deploy/docker-compose.yml up --build --detach
 ```
 
-The API uses the Collector through the Compose service network and appends `/v1/metrics` or `/v1/traces` to the standard base endpoint. A successful authenticated freshness request records metrics; a newly committed terminal investigation records a span. The test Collector logs detailed payloads, so it is development-only and must not receive sensitive production attributes.
+The API and worker use the Collector through the Compose service network and append `/v1/metrics` or `/v1/traces` to the standard base endpoint. A successful authenticated freshness request records metrics; the worker also samples the explicitly enrolled local source every 60 seconds. A newly committed terminal investigation records a span. The test Collector logs detailed payloads, so it is development-only and must not receive sensitive production attributes.
 
 ## Runtime configuration
 
@@ -63,6 +63,8 @@ The API uses the Collector through the Compose service network and appends `/v1/
 | `OTEL_EXPORTER_OTLP_HEADERS` | unset | SDK header configuration supplied through protected runtime configuration |
 | `IIP_OTEL_INGESTION_ATTRIBUTE_MODE` | `source` | `none`, `source`, or `tenant-source` |
 | `IIP_OTEL_INVESTIGATION_ATTRIBUTE_MODE` | `none` | `none`, `investigation`, or `tenant-investigation` |
+| `IIP_INGESTION_MONITOR_TARGETS_JSON` | unset | Worker-only closed list of 1–1000 unique, explicitly tenant-enrolled freshness targets; omission disables sampling |
+| `IIP_INGESTION_MONITOR_INTERVAL_SECONDS` | `60` | Worker-only sampling cadence from 5–3600 seconds |
 | `OTEL_SERVICE_NAME` | `infra-intelligence-api` | OpenTelemetry service identity |
 | `OTEL_METRIC_EXPORT_INTERVAL` | `60000` | SDK export interval in milliseconds |
 | `OTEL_METRIC_EXPORT_TIMEOUT` | `10000` | SDK export timeout in milliseconds |
@@ -75,10 +77,10 @@ The endpoint must be explicit HTTP(S), no longer than 2048 characters, and canno
 
 ## Helm
 
-Set `telemetry.metricsEnabled` and/or `telemetry.tracesEnabled`, `telemetry.otlpEndpoint`, and the matching NetworkPolicy egress selector. If the endpoint requires headers, put their standard SDK value in an existing Secret and configure `telemetry.existingSecret`; the chart references the Secret and does not render the value.
+Set `telemetry.metricsEnabled` and/or `telemetry.tracesEnabled`, `telemetry.otlpEndpoint`, and the matching NetworkPolicy egress selector. If the endpoint requires headers, put their standard SDK value in an existing Secret and configure `telemetry.existingSecret`; the chart references the Secret and does not render the value. `worker.ingestionMonitorTargets` enables automatic sampling for exact tenant/source pairs, `worker.ingestionMonitorIntervalSeconds` controls its cadence, and `telemetry.workerServiceName` gives worker exports a distinct service identity. Each target tenant must also appear in `worker.tenants` or startup fails closed.
 
 The Helm chart does not deploy a Collector because topology and backend selection belong to the customer deployment. Point it at a customer-controlled Collector so changing exporters or destinations does not require an IIP build.
 
 ## Production gaps
 
-The reference adapters are failure-isolated but not a complete production telemetry pipeline. Production enablement still requires an automatic freshness sampling schedule, Collector and exporter queue/delivery monitoring, a defined loss objective, reviewed cardinality budgets, TLS/authentication policy, regional routing, and representative load tests. The trace queue is bounded but not durable. Background SDK delivery failures are not reflected in `iip.telemetry.record.failures`; monitor the Collector and SDK logs/telemetry until an explicit export-health contract is implemented.
+The reference adapters and automatic sampler are failure-isolated but not a complete production telemetry pipeline. Production enablement still requires Collector and exporter queue/delivery monitoring, a defined loss objective, reviewed cardinality budgets, TLS/authentication policy, regional routing, and representative load tests. The trace queue is bounded but not durable. Background SDK delivery failures are not reflected in `iip.telemetry.record.failures`; monitor the Collector and SDK logs/telemetry until an explicit export-health contract is implemented.

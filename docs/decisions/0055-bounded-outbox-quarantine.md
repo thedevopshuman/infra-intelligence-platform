@@ -14,7 +14,7 @@ Give each delivery a configured attempt budget. The attempt count increments whe
 
 Add an application-owned read model that returns exact-tenant pending, in-flight, retrying, and quarantined counts plus a bounded newest-first quarantine summary. Require the `platform-admin` role and policy decision before storage access. Return only CloudEvents identity/routing metadata, attempt count, quarantine time, and stable error code—never event data, destination details, credentials, provider output, or exception text.
 
-Do not add an ungoverned requeue endpoint. A later recovery workflow must preserve at-least-once semantics while adding explicit policy, idempotency, audit, operator intent, and compatibility with customer receivers.
+Do not add an ungoverned requeue endpoint. [ADR 0056](0056-governed-event-delivery-replay.md) adds recovery through the existing one-shot action workflow while preserving at-least-once semantics, policy, idempotency, audit, operator intent, and an exact quarantine-generation precondition.
 
 ## Consequences
 
@@ -22,4 +22,4 @@ Do not add an ungoverned requeue endpoint. A later recovery workflow must preser
 - operators can distinguish ordinary backlog from terminal delivery failures without database access;
 - the immutable event log remains the recovery source of truth while the outbox row records delivery disposition;
 - quarantine does not imply event deletion and does not weaken consumer deduplication requirements;
-- broker selection, governed replay, retention, multi-destination fan-out, and measured delivery SLO windows remain separate decisions.
+- broker selection, bulk or automatic replay, retention, multi-destination fan-out, receiver certification, and measured delivery SLO windows remain separate decisions.

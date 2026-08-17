@@ -513,6 +513,43 @@ class PostgresResourceStoreTests(unittest.TestCase):
             self.store.get_event_delivery_state("another-tenant").quarantined_events,
             0,
         )
+        quarantine = self.store.get_quarantined_outbox(
+            "local",
+            message.message_id,
+        )
+        self.assertIsNotNone(quarantine)
+        assert quarantine is not None
+        self.assertEqual(quarantine.event_id, message.event.event_id)
+        self.assertIsNone(
+            self.store.get_quarantined_outbox(
+                "another-tenant",
+                message.message_id,
+            )
+        )
+        self.assertFalse(
+            self.store.requeue_quarantined_outbox(
+                "local",
+                message.message_id,
+                expected_event_id="stale-event-generation",
+                expected_quarantined_at=quarantine.quarantined_at,
+                expected_attempts=quarantine.attempts,
+            )
+        )
+        self.assertTrue(
+            self.store.requeue_quarantined_outbox(
+                "local",
+                message.message_id,
+                expected_event_id=quarantine.event_id,
+                expected_quarantined_at=quarantine.quarantined_at,
+                expected_attempts=quarantine.attempts,
+            )
+        )
+        self.assertIsNone(
+            self.store.get_quarantined_outbox("local", message.message_id)
+        )
+        replayed = tuple(self.store.claim_outbox("local", "worker-2"))
+        self.assertEqual(len(replayed), 1)
+        self.assertEqual(replayed[0].attempts, 1)
 
     def test_relationship_index_and_timeline_pages_track_latest_projection(self) -> None:
         target_payload = resource_payload()

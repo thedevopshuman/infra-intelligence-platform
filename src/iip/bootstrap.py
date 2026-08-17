@@ -9,7 +9,11 @@ from typing import Any
 
 from . import __version__
 
-from iip.adapters.actions import KubernetesRestartDryRunExecutor
+from iip.adapters.actions import (
+    ActionExecutorRouter,
+    EventDeliveryReplayExecutor,
+    KubernetesRestartDryRunExecutor,
+)
 from iip.adapters.auth import (
     DenyAllAuthenticator,
     HashedBearerAuthenticator,
@@ -360,10 +364,14 @@ def _compose_runtime(
             store,
             policy,
             operational,
-            action_executor or KubernetesRestartDryRunExecutor(),
+            ActionExecutorRouter(
+                action_executor or KubernetesRestartDryRunExecutor(),
+                EventDeliveryReplayExecutor(store),
+            ),
             operational,
             clock,
             operational,
+            store,
         ),
         action_queries=ActionWorkflowQueryService(operational, policy, clock),
         plugin_sessions=PluginSessionService(policy, operational, clock),

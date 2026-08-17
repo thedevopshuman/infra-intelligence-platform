@@ -1373,35 +1373,58 @@ export interface IntegrationConfig {
   };
 }
 
+export interface KubernetesRestartActionParameters {
+  namespace: string;
+  workloadKind: "deployment" | "statefulset" | "daemonset";
+  workloadName: string;
+}
+
+export interface EventDeliveryReplayParameters {
+  outboxId: number;
+  eventId: string;
+  quarantinedAt: string;
+  attempts: number;
+}
+
+interface ActionProposalCommonSpec {
+  investigationId: InvestigationId;
+  investigationDigest?: Sha256Digest;
+  targetResourceUid: ResourceUid;
+  targetDigest?: Sha256Digest;
+  risk: "low" | "medium" | "high" | "critical";
+  dryRun: boolean;
+  idempotencyKey: string;
+  expiresAt: string;
+  policyDecision: {
+    allowed: boolean;
+    reasonCode: string;
+    policySnapshotRef: string;
+    inputDigest?: Sha256Digest;
+  };
+}
+
+export type ActionProposalSpec = ActionProposalCommonSpec & (
+  | {
+      actionType: "kubernetes.restart-workload";
+      integrationId?: string;
+      providerObjectUid?: string;
+      parameters: KubernetesRestartActionParameters;
+      reversible: true;
+    }
+  | {
+      actionType: "event-delivery.requeue";
+      integrationId?: never;
+      providerObjectUid?: never;
+      parameters: EventDeliveryReplayParameters;
+      reversible: false;
+    }
+);
+
 export interface ActionProposal {
   apiVersion: "iip.platform/v1alpha1";
   kind: "ActionProposal";
   metadata: { id: ActionId; tenantId: string; actorId: string; createdAt: string };
-  spec: {
-    investigationId: InvestigationId;
-    investigationDigest?: Sha256Digest;
-    integrationId?: string;
-    actionType: string;
-    targetResourceUid: ResourceUid;
-    targetDigest?: Sha256Digest;
-    providerObjectUid?: string;
-    parameters: {
-      namespace: string;
-      workloadKind: "deployment" | "statefulset" | "daemonset";
-      workloadName: string;
-    };
-    risk: "low" | "medium" | "high" | "critical";
-    reversible: true;
-    dryRun: boolean;
-    idempotencyKey: string;
-    expiresAt: string;
-    policyDecision: {
-      allowed: boolean;
-      reasonCode: string;
-      policySnapshotRef: string;
-      inputDigest?: Sha256Digest;
-    };
-  };
+  spec: ActionProposalSpec;
   status: "pending-approval" | "denied" | "expired";
 }
 

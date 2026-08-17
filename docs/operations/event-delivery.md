@@ -66,8 +66,12 @@ The token Secret must contain the configured key, `token` by default. The option
 | `IIP_OUTBOX_RETRY_MAX_SECONDS` | `300` | Backoff cap, no smaller than the base and no larger than 3600 seconds |
 | `IIP_OUTBOX_MAX_ATTEMPTS` | `8` | Final failed attempt moves the tenant-scoped row into terminal quarantine, 1–1000 |
 
+## Quarantine recovery
+
+After the configured final failure, the owned row is quarantined with platform time and `event.publisher.unavailable`; it is excluded from normal claims and ingestion pending counts. Inspect exact-tenant backlog and bounded value-minimized quarantine metadata with `GET /v1/operations/events/delivery-health?limit=50` as a `platform-admin`. The endpoint never returns event data, destination configuration, credentials, or provider responses. Quarantine is not deletion, and there is no automatic or ungoverned requeue endpoint.
+
+After repairing and validating the customer receiver, run an investigation with `maxAuthority: propose` over the quarantined event's `subject`. Propose `event-delivery.requeue` using the exact `outboxId`, `eventId`, `quarantinedAt`, and `attempts` returned by the health report. Dry-run is the default. A different `approver` must review it, and an `executor` performs the single live attempt only when the immutable proposal explicitly sets `dryRun: false`. Success preserves the CloudEvents ID and resets the finite delivery-attempt cycle. A stale proposal fails without changing the row. The receiver must deduplicate `(tenantid, source, id)` because replay does not weaken at-least-once semantics.
+
 ## Remaining production work
 
-After the configured final failure, the owned row is quarantined with platform time and `event.publisher.unavailable`; it is excluded from normal claims and ingestion pending counts. Inspect exact-tenant backlog and bounded value-minimized quarantine metadata with `GET /v1/operations/events/delivery-health?limit=50` as a `platform-admin`. The endpoint never returns event data, destination configuration, credentials, or provider responses. Quarantine is not deletion, and there is intentionally no automatic or ungoverned requeue endpoint.
-
-The webhook is one replaceable publisher, not a claim that HTTP replaces a broker. A production decision still needs measured throughput and failure evidence, governed replay, delivery latency/error SLOs, payload retention rules, and customer interoperability tests. Kafka, NATS JetStream, cloud queues, or another transport can implement the same application port without changing ingestion.
+The webhook is one replaceable publisher, not a claim that HTTP replaces a broker. A production decision still needs measured throughput and failure evidence, delivery latency/error SLOs, payload retention rules, bulk-recovery policy, and customer interoperability tests. Kafka, NATS JetStream, cloud queues, or another transport can implement the same application port without changing ingestion.

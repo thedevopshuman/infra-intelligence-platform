@@ -16,6 +16,7 @@ from iip.application.ports import (
     ActorContext,
     AuditSink,
     Clock,
+    EventOutbox,
     InvestigationRepository,
     PersistenceError,
     PolicyDecisionPoint,
@@ -57,7 +58,9 @@ class ExecuteActionCommand:
 class GovernedActionService:
     """Enforce policy, approval, idempotency, expiry, execution, and audit."""
 
-    SUPPORTED_ACTION = "kubernetes.restart-workload"
+    KUBERNETES_RESTART = "kubernetes.restart-workload"
+    EVENT_DELIVERY_REQUEUE = "event-delivery.requeue"
+    SUPPORTED_ACTIONS = {KUBERNETES_RESTART, EVENT_DELIVERY_REQUEUE}
     EXECUTION_LEASE_SECONDS = 300
     _DNS_LABEL = r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?"
     _DNS_SUBDOMAIN = re.compile(rf"{_DNS_LABEL}(?:\.{_DNS_LABEL})*")
@@ -79,6 +82,7 @@ class GovernedActionService:
         audit: AuditSink,
         clock: Clock,
         investigations: InvestigationRepository,
+        outbox: EventOutbox | None = None,
     ) -> None:
         self._resources = resources
         self._policy = policy
@@ -87,10 +91,16 @@ class GovernedActionService:
         self._audit = audit
         self._clock = clock
         self._investigations = investigations
+        self._outbox = outbox
 
     def propose(self, command: ProposeActionCommand) -> Mapping[str, object]:
-        if command.action_type != self.SUPPORTED_ACTION:
+        if command.action_type not in self.SUPPORTED_ACTIONS:
             raise ActionWorkflowError("action.type.unsupported")
+        if (
+            command.action_type == self.EVENT_DELIVERY_REQUEUE
+            and "platform-admin" not in command.actor.roles
+        ):
+            raise ActionWorkflowError("action.replay.role-required")
         if not 8 <= len(command.idempotency_key) <= 128:
             raise ActionWorkflowError("action.idempotency-key.invalid")
         target = self._resources.get(
@@ -98,8 +108,16 @@ class GovernedActionService:
         )
         if target is None:
             raise ActionWorkflowError("action.target.unavailable")
-        parameters = self._validated_parameters(command.parameters, target)
-        integration_id, provider_object_uid = self._target_binding(target)
+        parameters = self._validated_parameters(
+            command.actor,
+            command.action_type,
+            command.parameters,
+            target,
+        )
+        integration_id: str | None = None
+        provider_object_uid: str | None = None
+        if command.action_type == self.KUBERNETES_RESTART:
+            integration_id, provider_object_uid = self._target_binding(target)
         investigation_request = self._investigations.get_investigation_request(
             command.actor, command.investigation_id
         )
@@ -124,8 +142,9 @@ class GovernedActionService:
             "parameters": parameters,
             "dryRun": command.dry_run,
             "expiresAt": command.expires_at,
-            "integrationId": integration_id,
         }
+        if integration_id is not None:
+            intended["integrationId"] = integration_id
         if provider_object_uid is not None:
             intended["providerObjectUid"] = provider_object_uid
         if existing is not None:
@@ -134,17 +153,19 @@ class GovernedActionService:
 
         target_digest = canonical_digest(target.to_dict())
         investigation_digest = canonical_digest(investigation_report)
-        policy_input = {
+        policy_input: dict[str, object] = {
             "tenantId": command.actor.tenant_id,
             "investigationDigest": investigation_digest,
             "actionType": command.action_type,
             "targetResourceUid": command.target_resource_uid,
             "targetDigest": target_digest,
-            "integrationId": integration_id,
-            "providerObjectUid": provider_object_uid,
             "parameters": parameters,
             "dryRun": command.dry_run,
         }
+        if integration_id is not None:
+            policy_input["integrationId"] = integration_id
+        if provider_object_uid is not None:
+            policy_input["providerObjectUid"] = provider_object_uid
         decision = self._policy.decide(command.actor, "action:propose", policy_input)
         material = f"{command.actor.tenant_id}\x1f{command.idempotency_key}".encode()
         proposal_id = "act_" + hashlib.sha256(material).hexdigest()[:32]
@@ -161,8 +182,14 @@ class GovernedActionService:
                 **intended,
                 "investigationDigest": investigation_digest,
                 "targetDigest": target_digest,
-                "risk": "low" if command.dry_run else "medium",
-                "reversible": True,
+                "risk": (
+                    "low"
+                    if command.dry_run
+                    else "high"
+                    if command.action_type == self.EVENT_DELIVERY_REQUEUE
+                    else "medium"
+                ),
+                "reversible": command.action_type == self.KUBERNETES_RESTART,
                 "idempotencyKey": command.idempotency_key,
                 "expiresAt": command.expires_at,
                 "policyDecision": {
@@ -305,9 +332,22 @@ class GovernedActionService:
             raise ActionWorkflowError("action.proposal.expired")
         target_uid = str(proposal_spec["targetResourceUid"])
         target = self._resources.get(command.actor.tenant_id, target_uid)
-        if target is None or target.lifecycle != "active":
+        action_type = proposal_spec.get("actionType")
+        if (
+            target is None
+            or action_type not in self.SUPPORTED_ACTIONS
+            or (
+                action_type == self.KUBERNETES_RESTART
+                and target.lifecycle != "active"
+            )
+        ):
             raise ActionWorkflowError("action.target.unavailable")
-        self._validated_parameters(proposal_spec.get("parameters"), target)
+        self._validated_parameters(
+            command.actor,
+            str(action_type),
+            proposal_spec.get("parameters"),
+            target,
+        )
         policy_input = {
             "tenantId": command.actor.tenant_id,
             "proposalId": command.proposal_id,
@@ -563,8 +603,16 @@ class GovernedActionService:
             raise ActionWorkflowError("action.executor.output-invalid")
 
     def _validated_parameters(
-        self, parameters: object, target: Resource
+        self,
+        actor: ActorContext,
+        action_type: str,
+        parameters: object,
+        target: Resource,
     ) -> dict[str, object]:
+        if action_type == self.EVENT_DELIVERY_REQUEUE:
+            return self._validated_replay_parameters(actor, parameters, target)
+        if action_type != self.KUBERNETES_RESTART:
+            raise ActionWorkflowError("action.type.unsupported")
         if not isinstance(parameters, Mapping) or set(parameters) != {
             "namespace",
             "workloadKind",
@@ -597,6 +645,58 @@ class GovernedActionService:
             "namespace": namespace,
             "workloadKind": workload_kind,
             "workloadName": workload_name,
+        }
+
+    def _validated_replay_parameters(
+        self,
+        actor: ActorContext,
+        parameters: object,
+        target: Resource,
+    ) -> dict[str, object]:
+        if self._outbox is None:
+            raise ActionWorkflowError("action.target.unavailable")
+        if not isinstance(parameters, Mapping) or set(parameters) != {
+            "outboxId",
+            "eventId",
+            "quarantinedAt",
+            "attempts",
+        }:
+            raise ActionWorkflowError("action.parameters.invalid")
+        outbox_id = parameters.get("outboxId")
+        event_id = parameters.get("eventId")
+        quarantined_at = parameters.get("quarantinedAt")
+        attempts = parameters.get("attempts")
+        if (
+            isinstance(outbox_id, bool)
+            or not isinstance(outbox_id, int)
+            or not 1 <= outbox_id <= 9_007_199_254_740_991
+            or not isinstance(event_id, str)
+            or not 1 <= len(event_id) <= 128
+            or not isinstance(quarantined_at, str)
+            or isinstance(attempts, bool)
+            or not isinstance(attempts, int)
+            or not 1 <= attempts <= 1000
+        ):
+            raise ActionWorkflowError("action.parameters.invalid")
+        self._parse_time(quarantined_at)
+        quarantine = self._outbox.get_quarantined_outbox(
+            actor.tenant_id,
+            outbox_id,
+        )
+        if quarantine is None:
+            raise ActionWorkflowError("action.target.unavailable")
+        if (
+            quarantine.event_id != event_id
+            or quarantine.quarantined_at != quarantined_at
+            or quarantine.attempts != attempts
+            or quarantine.subject != target.identity.uid
+        ):
+            raise ActionWorkflowError("action.parameters.target-mismatch")
+        return {
+            "outboxId": outbox_id,
+            "eventId": event_id,
+            "quarantinedAt": quarantined_at,
+            "attempts": attempts,
         }
 
     @classmethod

@@ -11,6 +11,7 @@ import type {
   Evidence,
   EvidenceId,
   EventDeliveryHealthReport,
+  EventDeliveryReplayParameters,
   IngestionFreshnessReport,
   InvestigationId,
   InvestigationCancellationRequest,
@@ -232,18 +233,39 @@ export class InfrastructureIntelligenceClient {
 
   async proposeAction(command: {
     investigationId: InvestigationId;
-    actionType: "kubernetes.restart-workload";
     targetResourceUid: ResourceUid;
-    parameters: {
-      namespace: string;
-      workloadKind: "deployment" | "statefulset" | "daemonset";
-      workloadName: string;
-    };
+    idempotencyKey: string;
+    expiresAt: string;
+    dryRun?: boolean;
+  } & (
+    | {
+        actionType: "kubernetes.restart-workload";
+        parameters: {
+          namespace: string;
+          workloadKind: "deployment" | "statefulset" | "daemonset";
+          workloadName: string;
+        };
+      }
+    | {
+        actionType: "event-delivery.requeue";
+        parameters: EventDeliveryReplayParameters;
+      }
+  )): Promise<ActionProposal> {
+    return this.post<ActionProposal>("/v1/actions/proposals", command);
+  }
+
+  async proposeEventDeliveryReplay(command: {
+    investigationId: InvestigationId;
+    targetResourceUid: ResourceUid;
+    parameters: EventDeliveryReplayParameters;
     idempotencyKey: string;
     expiresAt: string;
     dryRun?: boolean;
   }): Promise<ActionProposal> {
-    return this.post<ActionProposal>("/v1/actions/proposals", command);
+    return this.proposeAction({
+      ...command,
+      actionType: "event-delivery.requeue",
+    });
   }
 
   async decideAction(

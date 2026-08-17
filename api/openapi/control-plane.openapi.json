@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.29.0",
+    "version": "0.30.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -476,8 +476,8 @@
     "/v1/actions/proposals": {
       "post": {
         "operationId": "proposeAction",
-        "description": "Create an immutable proposal bound to a completed investigation, the exact target resource digest, its accepted observation integration, and the observed provider object UID when available.",
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "additionalProperties": false, "required": ["investigationId", "actionType", "targetResourceUid", "parameters", "idempotencyKey", "expiresAt"], "properties": {"investigationId": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"}, "actionType": {"const": "kubernetes.restart-workload"}, "targetResourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}, "parameters": {"type": "object", "additionalProperties": false, "required": ["namespace", "workloadKind", "workloadName"], "properties": {"namespace": {"type": "string", "maxLength": 253}, "workloadKind": {"type": "string", "enum": ["deployment", "statefulset", "daemonset"]}, "workloadName": {"type": "string", "maxLength": 253}}}, "idempotencyKey": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{8,128}$"}, "expiresAt": {"type": "string", "format": "date-time"}, "dryRun": {"type": "boolean", "default": true}}}}}},
+        "description": "Create an immutable proposal bound to a completed investigation and exact target digest. Kubernetes restart parameters bind provider identity; event-delivery replay parameters bind one terminal quarantine generation and require platform-admin proposal authority.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"oneOf": [{"$ref": "#/components/schemas/KubernetesRestartActionCommand"}, {"$ref": "#/components/schemas/EventDeliveryReplayActionCommand"}]}}}},
         "responses": {
           "201": {"description": "Immutable action proposal", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/action-proposal.schema.json"}}}},
           "400": {"$ref": "#/components/responses/InvalidRequest"},
@@ -616,6 +616,34 @@
       "InvestigationStatus": {"$ref": "../../contracts/schemas/investigation-status.schema.json"},
       "InvestigationJobStatus": {"$ref": "../../contracts/schemas/investigation-job-status.schema.json"},
       "IntegrationConfig": {"$ref": "../../contracts/schemas/integration-config.schema.json"},
+      "KubernetesRestartActionCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["investigationId", "actionType", "targetResourceUid", "parameters", "idempotencyKey", "expiresAt"],
+        "properties": {
+          "investigationId": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"},
+          "actionType": {"const": "kubernetes.restart-workload"},
+          "targetResourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
+          "parameters": {"type": "object", "additionalProperties": false, "required": ["namespace", "workloadKind", "workloadName"], "properties": {"namespace": {"type": "string", "maxLength": 253}, "workloadKind": {"type": "string", "enum": ["deployment", "statefulset", "daemonset"]}, "workloadName": {"type": "string", "maxLength": 253}}},
+          "idempotencyKey": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{8,128}$"},
+          "expiresAt": {"type": "string", "format": "date-time"},
+          "dryRun": {"type": "boolean", "default": true}
+        }
+      },
+      "EventDeliveryReplayActionCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["investigationId", "actionType", "targetResourceUid", "parameters", "idempotencyKey", "expiresAt"],
+        "properties": {
+          "investigationId": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"},
+          "actionType": {"const": "event-delivery.requeue"},
+          "targetResourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
+          "parameters": {"type": "object", "additionalProperties": false, "required": ["outboxId", "eventId", "quarantinedAt", "attempts"], "properties": {"outboxId": {"type": "integer", "minimum": 1, "maximum": 9007199254740991}, "eventId": {"type": "string", "minLength": 1, "maxLength": 128}, "quarantinedAt": {"type": "string", "format": "date-time"}, "attempts": {"type": "integer", "minimum": 1, "maximum": 1000}}},
+          "idempotencyKey": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{8,128}$"},
+          "expiresAt": {"type": "string", "format": "date-time"},
+          "dryRun": {"type": "boolean", "default": true}
+        }
+      },
       "ActionProposal": {"$ref": "../../contracts/schemas/action-proposal.schema.json"},
       "ActionApproval": {"$ref": "../../contracts/schemas/action-approval.schema.json"},
       "ActionExecutionStatus": {"$ref": "../../contracts/schemas/action-execution-status.schema.json"},

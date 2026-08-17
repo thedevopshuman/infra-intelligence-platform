@@ -2,7 +2,7 @@
 
 **Status:** v1alpha1
 
-An `ActionProposal` is an immutable, idempotent request for a narrow reversible operation. It contains a policy decision, expiry, risk, dry-run mode, and target but no execution credential. The proposal must bind to a completed, non-failed investigation whose accepted request granted `propose` authority and whose scope contains the target. The service records the investigation, target, and exact policy-input digests.
+An `ActionProposal` is an immutable, idempotent request for a narrow governed operation. It contains a policy decision, expiry, risk, dry-run mode, reversibility declaration, and target but no execution credential. The proposal must bind to a completed, non-failed investigation whose accepted request granted `propose` authority and whose scope contains the target. The service records the investigation, target, and exact policy-input digests.
 
 A distinct actor records `ActionApproval`; self-approval is rejected by the application service regardless of payload contents. Approval binds the decision to the exact proposal digest. Execution requires a third actor with the `executor` role and performs another current policy decision over the proposal digest, approval, immutable parameters, and current target digest.
 
@@ -10,7 +10,9 @@ A distinct actor records `ActionApproval`; self-approval is rejected by the appl
 
 The tenant-explicit workflow timer finds expired execution leases in bounded order. Each still-expired transition and its `action-execution-reconciliation-required` audit record commit atomically. Multiple timer replicas are safe: only the process that changes `executing` to `manual-reconciliation-required` records the audit event. The timer has no executor dependency and cannot call a provider.
 
-The only accepted parameter shape for `kubernetes.restart-workload` is `namespace`, `workloadKind`, and `workloadName`. Unknown keys are rejected, and all three values must match the canonical target resource identity. The service derives `integrationId` from the accepted observation source. When the observer supplied Kubernetes `metadata.uid`, the proposal also binds `providerObjectUid`; the live-capable adapter requires it so a deleted-and-recreated name cannot receive an old approval.
+The accepted parameter shape for `kubernetes.restart-workload` is `namespace`, `workloadKind`, and `workloadName`. Unknown keys are rejected, and all three values must match the canonical target resource identity. The service derives `integrationId` from the accepted observation source. When the observer supplied Kubernetes `metadata.uid`, the proposal also binds `providerObjectUid`; the live-capable adapter requires it so a deleted-and-recreated name cannot receive an old approval.
+
+The accepted parameter shape for `event-delivery.requeue` is `outboxId`, `eventId`, `quarantinedAt`, and `attempts`. It requires a `platform-admin` proposer and binds one exact quarantine generation to the investigation target. It has no integration or provider-object binding, is non-reversible, and is high risk when live. Dry-run verifies that the generation still matches without changing it. Live execution atomically requeues only that generation, resets its finite delivery-attempt cycle, preserves the CloudEvents ID, and returns a stable precondition failure if any fact changed. Receiver deduplication remains mandatory.
 
 Dry-run is the default. The default executor performs no network request or mutation. The explicitly selected Kubernetes API executor uses request-scoped credentials and server-side `dryRun=All`; live behavior additionally requires both `dryRun: false` on the immutable proposal and `liveExecutionEnabled: true` in protected integration configuration. Duplicate idempotency keys return the original proposal/result and a claimed execution can never be claimed again.
 

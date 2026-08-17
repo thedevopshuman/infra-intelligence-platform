@@ -289,6 +289,9 @@ td small { display: block; max-width: 310px; margin-top: 4px; overflow: hidden; 
 .json-card dl { display: grid; grid-template-columns: 150px 1fr; gap: 10px; margin: 0; }
 .json-card dt { color: var(--muted-2); font-size: 9px; }
 .json-card dd { margin: 0; overflow-wrap: anywhere; color: #d8e0ea; font-size: 10px; }
+.replay-binding { display: grid; gap: 5px; margin: 0 0 16px; padding: 13px; background: #0b111a; border: 1px solid var(--line-soft); border-radius: 10px; }
+.replay-binding span, .replay-binding small { color: var(--muted-2); font-size: 9px; }
+.replay-binding strong { overflow-wrap: anywhere; color: #d8e0ea; font-size: 10px; }
 
 .guardrail-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
 .guardrail { padding: 20px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 13px; }
@@ -317,6 +320,8 @@ code { color: var(--cyan); font-family: ui-monospace, SFMono-Regular, Menlo, mon
 .detail-dialog { width: min(820px, calc(100vw - 28px)); max-width: none; }
 .detail-card { max-height: min(760px, calc(100vh - 38px)); overflow: hidden; background: #0d141e; border: 1px solid #2a3a4e; border-radius: 16px; box-shadow: var(--shadow); }
 .detail-card pre { max-height: calc(100vh - 145px); margin: 0; padding: 22px; overflow: auto; color: #c4d4df; font: 10px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.detail-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 22px; border-top: 1px solid var(--line-soft); }
+.detail-actions p { margin: 0; color: var(--muted); font-size: 10px; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 

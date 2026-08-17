@@ -137,7 +137,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.29.0"
+    server_version = "IIPReference/0.30.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),

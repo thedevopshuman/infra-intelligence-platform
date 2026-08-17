@@ -1,0 +1,26 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ActionResult",
+  "metadata": {
+    "id": "act_77777777777777777777777777777777",
+    "tenantId": "tenant-acme",
+    "completedAt": "2026-08-17T13:08:00Z"
+  },
+  "spec": {
+    "proposalDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    "approvalId": "apr_88888888888888888888888888888888",
+    "outcome": "succeeded",
+    "idempotencyKey": "incident-71c9-requeue-event-1042",
+    "execution": {
+      "provider": "iip-event-outbox",
+      "operationRef": "event-delivery://tenant-acme/outbox/1042"
+    },
+    "verification": {
+      "status": "passed",
+      "summary": "The exact approved quarantine generation was requeued with a fresh bounded delivery-attempt budget."
+    },
+    "auditRef": "audit://tenant-acme/actions/act_77777777777777777777777777777777",
+    "executionStatusRef": "action://tenant-acme/act_77777777777777777777777777777777/execution",
+    "executionPolicyInputDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+  }
+}

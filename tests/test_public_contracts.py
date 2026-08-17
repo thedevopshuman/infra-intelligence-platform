@@ -17,6 +17,7 @@ from infra_intelligence_sdk import (
     ContextEvidenceResult,
     Evidence,
     EventDeliveryHealthReport,
+    EventDeliveryReplayCommand,
     EvaluationScenario,
     InvestigationReport,
     InvestigationRequest,
@@ -154,11 +155,17 @@ class PublicContractSdkTests(unittest.TestCase):
         scenario = EvaluationScenario.from_dict(example("evaluation-scenario.json"))
         integration = IntegrationConfig.from_dict(example("integration-config.json"))
         proposal = ActionProposal.from_dict(example("action-proposal.json"))
+        replay_proposal = ActionProposal.from_dict(
+            example("action-proposal-event-delivery-replay.json")
+        )
         approval = ActionApproval.from_dict(example("action-approval.json"))
         execution_status = ActionExecutionStatus.from_dict(
             example("action-execution-status.json")
         )
         action_result = ActionResult.from_dict(example("action-result.json"))
+        replay_result = ActionResult.from_dict(
+            example("action-result-event-delivery-replay.json")
+        )
         action_workflow = ActionWorkflow.from_dict(example("action-workflow.json"))
         action_workflow_page = ActionWorkflowPage.from_dict(
             example("action-workflow-page.json")
@@ -326,11 +333,31 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(scenario.to_dict()["kind"], "EvaluationScenario")
         self.assertEqual(integration.to_dict()["kind"], "IntegrationConfig")
         self.assertEqual(proposal.to_dict()["kind"], "ActionProposal")
+        self.assertEqual(
+            replay_proposal.to_dict()["spec"]["actionType"],
+            "event-delivery.requeue",
+        )
+        replay_command = EventDeliveryReplayCommand(
+            investigation_id=replay_proposal.to_dict()["spec"]["investigationId"],
+            target_resource_uid=replay_proposal.to_dict()["spec"]["targetResourceUid"],
+            outbox_id=replay_proposal.to_dict()["spec"]["parameters"]["outboxId"],
+            event_id=replay_proposal.to_dict()["spec"]["parameters"]["eventId"],
+            quarantined_at=replay_proposal.to_dict()["spec"]["parameters"]["quarantinedAt"],
+            attempts=replay_proposal.to_dict()["spec"]["parameters"]["attempts"],
+            idempotency_key=replay_proposal.to_dict()["spec"]["idempotencyKey"],
+            expires_at=replay_proposal.to_dict()["spec"]["expiresAt"],
+            dry_run=replay_proposal.to_dict()["spec"]["dryRun"],
+        )
+        self.assertEqual(
+            replay_command.to_dict()["actionType"],
+            "event-delivery.requeue",
+        )
         self.assertEqual(approval.to_dict()["kind"], "ActionApproval")
         self.assertEqual(
             execution_status.to_dict()["kind"], "ActionExecutionStatus"
         )
         self.assertEqual(action_result.to_dict()["kind"], "ActionResult")
+        self.assertEqual(replay_result.to_dict()["spec"]["outcome"], "succeeded")
         self.assertEqual(action_workflow.to_dict()["kind"], "ActionWorkflow")
         self.assertEqual(
             action_workflow_page.to_dict()["kind"], "ActionWorkflowPage"

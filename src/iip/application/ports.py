@@ -595,6 +595,24 @@ class EventOutbox(Protocol):
     ) -> EventDeliveryState:
         """Return exact-tenant backlog and bounded quarantine facts."""
 
+    def get_quarantined_outbox(
+        self,
+        tenant_id: str,
+        message_id: int,
+    ) -> Optional[QuarantinedOutboxMessage]:
+        """Return one value-minimized quarantined row from an exact tenant."""
+
+    def requeue_quarantined_outbox(
+        self,
+        tenant_id: str,
+        message_id: int,
+        *,
+        expected_event_id: str,
+        expected_quarantined_at: str,
+        expected_attempts: int,
+    ) -> bool:
+        """Atomically requeue one exact quarantine generation when all facts match."""
+
 
 class SourceCheckpointRepository(Protocol):
     def get_checkpoint(self, tenant_id: str, source_id: str) -> Optional[SourceCheckpoint]:

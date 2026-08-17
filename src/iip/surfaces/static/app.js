@@ -12,6 +12,8 @@ const state = {
   actionCursor: null,
   selectedActionId: null,
   activeInvestigationId: null,
+  pendingReplay: null,
+  inspectedReplay: null,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -295,12 +297,15 @@ function renderMetrics() {
 }
 
 function renderResourceOptions() {
+  const replayMode = $("#action-type").value === "event-delivery.requeue";
   const targets = [
     [$("#investigation-resource"), state.resources, "Choose a resource"],
     [
       $("#action-resource"),
-      state.resources.filter((resource) => resource.spec.provider === "kubernetes" && ["apps/deployment", "apps/statefulset", "apps/daemonset"].includes(resource.spec.type)),
-      "Choose an observed Kubernetes workload",
+      replayMode
+        ? state.resources
+        : state.resources.filter((resource) => resource.spec.provider === "kubernetes" && ["apps/deployment", "apps/statefulset", "apps/daemonset"].includes(resource.spec.type)),
+      replayMode ? "Choose the event subject resource" : "Choose an observed Kubernetes workload",
     ],
   ];
   targets.forEach(([select, resources, prompt]) => {
@@ -317,12 +322,35 @@ function renderResourceOptions() {
     });
     if ([...select.options].some((option) => option.value === selected)) select.value = selected;
   });
+  if (replayMode && state.pendingReplay && [...$("#action-resource").options].some((option) => option.value === state.pendingReplay.subject)) {
+    $("#action-resource").value = state.pendingReplay.subject;
+  }
+}
+
+function renderActionProposalMode() {
+  const replayMode = $("#action-type").value === "event-delivery.requeue";
+  $("#action-form-title").textContent = replayMode
+    ? "Recover one quarantined event"
+    : "Prepare a bounded restart";
+  $("#action-form-note").textContent = replayMode
+    ? "The proposal binds one exact quarantine generation. A different identity must approve it before one-shot execution."
+    : "The proposal is bound to a completed investigation and the exact observed workload. A separate identity must approve it.";
+  $("#action-resource-label").textContent = replayMode ? "Event subject resource" : "Target workload";
+  $("#replay-binding").hidden = !replayMode;
+  $("#replay-binding-value").textContent = state.pendingReplay
+    ? `Outbox ${state.pendingReplay.outboxId} · ${compactIdentity(state.pendingReplay.eventId, 18)} · attempt ${state.pendingReplay.attempts}`
+    : "Choose a quarantined event from Overview";
+  $("#action-dry-run-help").textContent = replayMode
+    ? "Dry-run verifies the exact generation. Live replay is high risk, preserves the event ID, and requires receiver deduplication."
+    : "The default executor performs no mutation. Live execution requires protected server configuration too.";
+  renderResourceOptions();
 }
 
 function showDetail(title, kicker, payload) {
   $("#detail-title").textContent = title;
   $("#detail-kicker").textContent = kicker;
   $("#detail-content").textContent = JSON.stringify(payload, null, 2);
+  $("#detail-actions").hidden = true;
   $("#detail-dialog").showModal();
 }
 
@@ -636,6 +664,10 @@ async function runInvestigation(event) {
     if (payload.spec.maxAuthority === "propose") {
       $("#action-investigation-id").value = report.metadata.id;
       $("#action-resource").value = resourceUid;
+      if (state.pendingReplay?.subject === resourceUid) {
+        $("#action-type").value = "event-delivery.requeue";
+        renderActionProposalMode();
+      }
     }
     renderInvestigation(report);
     renderMetrics();
@@ -709,7 +741,9 @@ function renderActionRows() {
     const stateCell = node("td");
     stateCell.append(node("span", `status-chip ${actionStatusClass(workflow.spec.state)}`, workflow.spec.state));
     row.append(stateCell);
-    row.append(node("td", "", proposal.spec.parameters.workloadName));
+    row.append(node("td", "", proposal.spec.actionType === "event-delivery.requeue"
+      ? `Outbox ${proposal.spec.parameters.outboxId}`
+      : proposal.spec.parameters.workloadName));
     row.append(node("td", "", proposal.spec.dryRun ? "Dry-run" : "Live"));
     row.append(node("td", "", formatDate(proposal.metadata.createdAt)));
     const actions = node("td", "row-actions");
@@ -730,11 +764,14 @@ function renderActionWorkflow(workflow) {
   const stateChip = $("#action-state");
   stateChip.textContent = workflowState;
   stateChip.className = `status-chip ${actionStatusClass(workflowState)}`;
+  const target = proposal.spec.actionType === "event-delivery.requeue"
+    ? `Outbox ${proposal.spec.parameters.outboxId} · ${compactIdentity(proposal.spec.parameters.eventId, 18)}`
+    : `${proposal.spec.parameters.namespace}/${proposal.spec.parameters.workloadKind}/${proposal.spec.parameters.workloadName}`;
   renderLookup($("#action-result"), [
     ["Action ID", workflow.metadata.id],
     ["Proposer", proposal.metadata.actorId],
     ["Investigation", proposal.spec.investigationId],
-    ["Target", `${proposal.spec.parameters.namespace}/${proposal.spec.parameters.workloadKind}/${proposal.spec.parameters.workloadName}`],
+    ["Target", target],
     ["Mode", proposal.spec.dryRun ? "Non-mutating dry-run" : "Explicit live request"],
     ["Risk / reversible", `${proposal.spec.risk} / ${String(proposal.spec.reversible)}`],
     ["Expires", formatDate(proposal.spec.expiresAt)],
@@ -803,17 +840,33 @@ async function proposeAction(event) {
   const resource = state.resources.find((item) => item.metadata.uid === $("#action-resource").value);
   const investigationId = $("#action-investigation-id").value.trim();
   if (!resource || !investigationId) return;
-  const workloadKinds = {
-    "apps/deployment": "deployment",
-    "apps/statefulset": "statefulset",
-    "apps/daemonset": "daemonset",
-  };
-  const workloadKind = workloadKinds[resource.spec.type];
-  const namespace = resource.spec.attributes?.namespace;
-  const workloadName = resource.spec.externalId?.split("/").pop();
-  if (!workloadKind || typeof namespace !== "string" || !workloadName) {
-    showNotice("The selected resource does not have a safe Kubernetes workload identity.", "error");
-    return;
+  const actionType = $("#action-type").value;
+  let parameters;
+  if (actionType === "event-delivery.requeue") {
+    if (!hasRole("platform-admin") || !state.pendingReplay || state.pendingReplay.subject !== resource.metadata.uid) {
+      showNotice("Choose a current quarantined event and investigate its exact subject as a platform administrator.", "error");
+      return;
+    }
+    parameters = {
+      outboxId: state.pendingReplay.outboxId,
+      eventId: state.pendingReplay.eventId,
+      quarantinedAt: state.pendingReplay.quarantinedAt,
+      attempts: state.pendingReplay.attempts,
+    };
+  } else {
+    const workloadKinds = {
+      "apps/deployment": "deployment",
+      "apps/statefulset": "statefulset",
+      "apps/daemonset": "daemonset",
+    };
+    const workloadKind = workloadKinds[resource.spec.type];
+    const namespace = resource.spec.attributes?.namespace;
+    const workloadName = resource.spec.externalId?.split("/").pop();
+    if (!workloadKind || typeof namespace !== "string" || !workloadName) {
+      showNotice("The selected resource does not have a safe Kubernetes workload identity.", "error");
+      return;
+    }
+    parameters = { namespace, workloadKind, workloadName };
   }
   const button = event.submitter;
   button.disabled = true;
@@ -821,9 +874,9 @@ async function proposeAction(event) {
   const expiresAt = new Date(Date.now() + 30 * 60_000).toISOString();
   const payload = {
     investigationId,
-    actionType: "kubernetes.restart-workload",
+    actionType,
     targetResourceUid: resource.metadata.uid,
-    parameters: { namespace, workloadKind, workloadName },
+    parameters,
     idempotencyKey: `console-${investigationId.slice(4, 12)}-${identifier("act", 16)}`,
     expiresAt,
     dryRun: $("#action-dry-run").checked,
@@ -832,6 +885,10 @@ async function proposeAction(event) {
     const proposal = await api("/v1/actions/proposals", { method: "POST", body: JSON.stringify(payload) });
     await refreshActions();
     await selectAction(proposal.metadata.id);
+    if (actionType === "event-delivery.requeue") {
+      state.pendingReplay = null;
+      renderActionProposalMode();
+    }
     showNotice("Proposal committed. A different approver identity can now review it.");
   } catch (error) {
     showNotice(`Proposal failed (${error.message}).`, "error");
@@ -875,6 +932,7 @@ async function executeSelectedAction() {
       body: "{}",
     });
     await selectAction(state.selectedActionId);
+    await refreshEventDeliveryHealth();
     showNotice("Execution reached a durable terminal result. Duplicate delivery cannot repeat impact.");
   } catch (error) {
     showNotice(`Execution failed (${error.message}).`, "error");
@@ -918,6 +976,7 @@ function bindEvents() {
     lookupEvidence($("#evidence-id").value.trim());
   });
   $("#action-proposal-form").addEventListener("submit", proposeAction);
+  $("#action-type").addEventListener("change", renderActionProposalMode);
   $("#action-refresh").addEventListener("click", () => refreshActions());
   $("#action-load-more").addEventListener("click", () => refreshActions(true));
   $("#action-approve").addEventListener("click", () => decideSelectedAction("approved"));
@@ -929,6 +988,7 @@ function bindEvents() {
     $("#detail-kicker").textContent = "Runtime identity";
     $("#detail-title").textContent = "Verified version report";
     $("#detail-content").textContent = JSON.stringify(state.runtimeVersion, null, 2);
+    $("#detail-actions").hidden = true;
     $("#detail-dialog").showModal();
   });
   $("#delivery-details").addEventListener("click", () => {
@@ -936,13 +996,25 @@ function bindEvents() {
     $("#detail-kicker").textContent = "Event delivery";
     $("#detail-title").textContent = "Tenant outbox and quarantine";
     $("#detail-content").textContent = JSON.stringify(state.eventDeliveryHealth, null, 2);
+    state.inspectedReplay = state.eventDeliveryHealth.spec?.quarantine?.items?.[0] || null;
+    $("#detail-actions").hidden = !state.inspectedReplay || !hasRole("platform-admin");
     $("#detail-dialog").showModal();
+  });
+  $("#delivery-recovery").addEventListener("click", () => {
+    if (!state.inspectedReplay || !hasRole("platform-admin")) return;
+    state.pendingReplay = { ...state.inspectedReplay };
+    $("#detail-dialog").close();
+    prepareInvestigation(state.pendingReplay.subject);
+    $("#investigation-question").value = `Why did event ${state.pendingReplay.eventId} exhaust delivery retries, and is the receiver ready for an idempotent replay?`;
+    $("#allow-proposal").checked = true;
+    showNotice("Recovery scope prepared. Run the investigation before creating a replay proposal.");
   });
 }
 
 async function start() {
   bindEvents();
   renderResources();
+  renderActionProposalMode();
   renderRuntimeVersion();
   await checkHealth();
   const remembered = sessionStorage.getItem("iip.console.token");

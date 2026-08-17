@@ -82,6 +82,9 @@ class ConsoleHttpTests(unittest.TestCase):
             "What this control plane is serving",
             handler.wfile.getvalue().decode("utf-8"),
         )
+        console = handler.wfile.getvalue().decode("utf-8")
+        self.assertIn("Quarantined event replay", console)
+        self.assertIn("Investigate newest quarantine", console)
 
         handler = object.__new__(ApiHandler)
         handler.path = "/console/app.js"
@@ -98,6 +101,8 @@ class ConsoleHttpTests(unittest.TestCase):
         self.assertIn("resource.change", script)
         self.assertIn("/v1/operations/events/delivery-health?limit=20", script)
         self.assertIn("Event delivery", script)
+        self.assertIn('actionType === "event-delivery.requeue"', script)
+        self.assertIn("exact quarantine generation", script)
 
     def test_session_is_derived_from_the_credential(self) -> None:
         with patch.dict(

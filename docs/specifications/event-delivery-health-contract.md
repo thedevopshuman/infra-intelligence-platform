@@ -14,7 +14,7 @@
 
 `GET /v1/operations/events/delivery-health?limit=50` requires Bearer authentication, the `platform-admin` role, and policy approval for `event-delivery-health:read`. The authenticated tenant is the only storage scope; no tenant parameter is accepted.
 
-This contract is read-only. Requeueing a quarantined event can cause a duplicate external effect and therefore requires a separate future governed workflow with policy evaluation, idempotency, audit, and explicit recovery semantics. Database edits and automatic quarantine replay are not part of this contract.
+This contract is read-only. Requeueing can cause a duplicate external effect and therefore uses the separate `event-delivery.requeue` governed action with investigation context, policy evaluation, idempotency, independent approval, one-shot execution, audit, and an exact quarantine-generation precondition. Database edits and automatic or bulk replay are not part of this contract.
 
 | HTTP status | Code | Meaning |
 | --- | --- | --- |

@@ -366,23 +366,95 @@ class InMemoryResourceStore:
                 quarantined_events=len(quarantined),
                 oldest_pending_event_recorded_at=oldest,
                 quarantined=tuple(
-                    QuarantinedOutboxMessage(
-                        message_id=entry.message_id,
-                        tenant_id=entry.event.tenant_id,
-                        event_id=entry.event.event_id,
-                        event_source=entry.event.source,
-                        event_type=entry.event.event_type,
-                        subject=entry.event.subject,
-                        attempts=entry.attempts,
-                        quarantined_at=entry.quarantined_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
-                        last_error_code=str(entry.last_error_code),
-                    )
+                    self._quarantined_message(entry)
                     for entry in quarantined[:quarantine_limit]
                     if entry.quarantined_at is not None
                 ),
             )
+
+    def get_quarantined_outbox(
+        self,
+        tenant_id: str,
+        message_id: int,
+    ) -> Optional[QuarantinedOutboxMessage]:
+        if (
+            isinstance(message_id, bool)
+            or not isinstance(message_id, int)
+            or message_id < 1
+        ):
+            raise ValueError("message_id must be a positive integer")
+        with self._lock:
+            entry = self._outbox.get(message_id)
+            if (
+                entry is None
+                or entry.event.tenant_id != tenant_id
+                or entry.quarantined_at is None
+            ):
+                return None
+            return self._quarantined_message(entry)
+
+    def requeue_quarantined_outbox(
+        self,
+        tenant_id: str,
+        message_id: int,
+        *,
+        expected_event_id: str,
+        expected_quarantined_at: str,
+        expected_attempts: int,
+    ) -> bool:
+        if (
+            isinstance(message_id, bool)
+            or not isinstance(message_id, int)
+            or message_id < 1
+            or not isinstance(expected_event_id, str)
+            or not isinstance(expected_quarantined_at, str)
+            or isinstance(expected_attempts, bool)
+            or not isinstance(expected_attempts, int)
+        ):
+            raise ValueError("event delivery replay preconditions are invalid")
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            entry = self._outbox.get(message_id)
+            quarantined_at = (
+                entry.quarantined_at.isoformat().replace("+00:00", "Z")
+                if entry is not None and entry.quarantined_at is not None
+                else None
+            )
+            if (
+                entry is None
+                or entry.event.tenant_id != tenant_id
+                or entry.event.event_id != expected_event_id
+                or quarantined_at != expected_quarantined_at
+                or entry.attempts != expected_attempts
+                or entry.published
+            ):
+                return False
+            entry.attempts = 0
+            entry.claimed_by = None
+            entry.claim_expires_at = None
+            entry.available_at = now
+            entry.last_error_code = None
+            entry.quarantined_at = None
+            return True
+
+    @staticmethod
+    def _quarantined_message(
+        entry: _MemoryOutboxEntry,
+    ) -> QuarantinedOutboxMessage:
+        assert entry.quarantined_at is not None
+        return QuarantinedOutboxMessage(
+            message_id=entry.message_id,
+            tenant_id=entry.event.tenant_id,
+            event_id=entry.event.event_id,
+            event_source=entry.event.source,
+            event_type=entry.event.event_type,
+            subject=entry.event.subject,
+            attempts=entry.attempts,
+            quarantined_at=entry.quarantined_at.isoformat().replace(
+                "+00:00", "Z"
+            ),
+            last_error_code=str(entry.last_error_code),
+        )
 
     def get_checkpoint(self, tenant_id: str, source_id: str) -> Optional[SourceCheckpoint]:
         with self._lock:

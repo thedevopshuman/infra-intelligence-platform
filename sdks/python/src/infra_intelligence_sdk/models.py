@@ -2246,8 +2246,39 @@ class IntegrationConfig:
 
 
 @dataclass(frozen=True)
+class EventDeliveryReplayCommand:
+    """Typed command for one exact governed quarantine-generation replay."""
+
+    investigation_id: str
+    target_resource_uid: str
+    outbox_id: int
+    event_id: str
+    quarantined_at: str
+    attempts: int
+    idempotency_key: str
+    expires_at: str
+    dry_run: bool = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "investigationId": self.investigation_id,
+            "actionType": "event-delivery.requeue",
+            "targetResourceUid": self.target_resource_uid,
+            "parameters": {
+                "outboxId": self.outbox_id,
+                "eventId": self.event_id,
+                "quarantinedAt": self.quarantined_at,
+                "attempts": self.attempts,
+            },
+            "idempotencyKey": self.idempotency_key,
+            "expiresAt": self.expires_at,
+            "dryRun": self.dry_run,
+        }
+
+
+@dataclass(frozen=True)
 class ActionProposal:
-    """Immutable proposal for one reversible governed operation."""
+    """Immutable proposal for one governed operation."""
 
     payload: Mapping[str, Any]
 

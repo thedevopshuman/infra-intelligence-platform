@@ -1,0 +1,35 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ActionProposal",
+  "metadata": {
+    "id": "act_77777777777777777777777777777777",
+    "tenantId": "tenant-acme",
+    "actorId": "incident-operator",
+    "createdAt": "2026-08-17T13:05:00Z"
+  },
+  "spec": {
+    "investigationId": "inv_71c9e4a2b8d04f65a3c7e9b102d4f608",
+    "investigationDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "actionType": "event-delivery.requeue",
+    "targetResourceUid": "res_e0ae9225a316fce4c97df5c23057b97a",
+    "targetDigest": "sha256:9062a9611ca8400b1dd0c31bd2b8e4f26e40d9234d8c7da148296753849c7c3c",
+    "parameters": {
+      "outboxId": 1042,
+      "eventId": "evt_3b03ac5bb4d94fd3b574ebee8ed5c14f",
+      "quarantinedAt": "2026-08-17T12:58:45Z",
+      "attempts": 8
+    },
+    "risk": "high",
+    "reversible": false,
+    "dryRun": false,
+    "idempotencyKey": "incident-71c9-requeue-event-1042",
+    "expiresAt": "2026-08-17T13:35:00Z",
+    "policyDecision": {
+      "allowed": true,
+      "reasonCode": "policy.action.replay-allowed",
+      "policySnapshotRef": "policy://tenant-acme/snapshots/action-replay-v1",
+      "inputDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  },
+  "status": "pending-approval"
+}

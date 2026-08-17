@@ -678,6 +678,107 @@ class PostgresResourceStore:
         )
 
     @_translate_database_errors
+    def get_quarantined_outbox(
+        self,
+        tenant_id: str,
+        message_id: int,
+    ) -> Optional[QuarantinedOutboxMessage]:
+        if (
+            isinstance(message_id, bool)
+            or not isinstance(message_id, int)
+            or message_id < 1
+        ):
+            raise ValueError("message_id must be a positive integer")
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT outbox.outbox_id, outbox.tenant_id, outbox.attempts,
+                       outbox.quarantined_at, outbox.last_error_code,
+                       events.document->>'id' AS event_id,
+                       events.document->>'source' AS event_source,
+                       events.document->>'type' AS event_type,
+                       events.document->>'subject' AS subject
+                FROM iip.event_outbox AS outbox
+                JOIN iip.event_log AS events
+                  ON events.tenant_id = outbox.tenant_id
+                 AND events.event_offset = outbox.event_offset
+                WHERE outbox.tenant_id = %s
+                  AND outbox.outbox_id = %s
+                  AND outbox.quarantined_at IS NOT NULL
+                """,
+                (tenant_id, message_id),
+            ).fetchone()
+        return self._quarantined_message_from_row(row) if row is not None else None
+
+    @_translate_database_errors
+    def requeue_quarantined_outbox(
+        self,
+        tenant_id: str,
+        message_id: int,
+        *,
+        expected_event_id: str,
+        expected_quarantined_at: str,
+        expected_attempts: int,
+    ) -> bool:
+        if (
+            isinstance(message_id, bool)
+            or not isinstance(message_id, int)
+            or message_id < 1
+            or not isinstance(expected_event_id, str)
+            or not isinstance(expected_quarantined_at, str)
+            or isinstance(expected_attempts, bool)
+            or not isinstance(expected_attempts, int)
+        ):
+            raise ValueError("event delivery replay preconditions are invalid")
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                UPDATE iip.event_outbox AS outbox
+                SET attempts = 0,
+                    claimed_by = NULL,
+                    claim_expires_at = NULL,
+                    available_at = clock_timestamp(),
+                    last_error_code = NULL,
+                    quarantined_at = NULL
+                FROM iip.event_log AS events
+                WHERE outbox.tenant_id = %s
+                  AND outbox.outbox_id = %s
+                  AND outbox.quarantined_at = %s::timestamptz
+                  AND outbox.attempts = %s
+                  AND outbox.published_at IS NULL
+                  AND events.tenant_id = outbox.tenant_id
+                  AND events.event_offset = outbox.event_offset
+                  AND events.document->>'id' = %s
+                RETURNING outbox.outbox_id
+                """,
+                (
+                    tenant_id,
+                    message_id,
+                    expected_quarantined_at,
+                    expected_attempts,
+                    expected_event_id,
+                ),
+            ).fetchone()
+        return row is not None
+
+    @classmethod
+    def _quarantined_message_from_row(
+        cls,
+        row: Mapping[str, object],
+    ) -> QuarantinedOutboxMessage:
+        return QuarantinedOutboxMessage(
+            message_id=row["outbox_id"],  # type: ignore[arg-type]
+            tenant_id=row["tenant_id"],  # type: ignore[arg-type]
+            event_id=row["event_id"],  # type: ignore[arg-type]
+            event_source=row["event_source"],  # type: ignore[arg-type]
+            event_type=row["event_type"],  # type: ignore[arg-type]
+            subject=row["subject"],  # type: ignore[arg-type]
+            attempts=row["attempts"],  # type: ignore[arg-type]
+            quarantined_at=cls._rfc3339(row["quarantined_at"]),
+            last_error_code=row["last_error_code"],  # type: ignore[arg-type]
+        )
+
+    @_translate_database_errors
     def get_checkpoint(self, tenant_id: str, source_id: str) -> Optional[SourceCheckpoint]:
         with self._connect() as connection:
             row = connection.execute(

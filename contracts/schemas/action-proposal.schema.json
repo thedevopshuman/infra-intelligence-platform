@@ -25,21 +25,21 @@
         "investigationId": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"},
         "investigationDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "integrationId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
-        "actionType": {"const": "kubernetes.restart-workload"},
+        "actionType": {
+          "type": "string",
+          "enum": ["kubernetes.restart-workload", "event-delivery.requeue"]
+        },
         "targetResourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
         "targetDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "providerObjectUid": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,252}$"},
         "parameters": {
-          "type": "object", "additionalProperties": false,
-          "required": ["namespace", "workloadKind", "workloadName"],
-          "properties": {
-            "namespace": {"type": "string", "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)*$", "maxLength": 253},
-            "workloadKind": {"type": "string", "enum": ["deployment", "statefulset", "daemonset"]},
-            "workloadName": {"type": "string", "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)*$", "maxLength": 253}
-          }
+          "oneOf": [
+            {"$ref": "#/$defs/kubernetesRestartParameters"},
+            {"$ref": "#/$defs/eventDeliveryReplayParameters"}
+          ]
         },
         "risk": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
-        "reversible": {"const": true},
+        "reversible": {"type": "boolean"},
         "dryRun": {"type": "boolean"},
         "idempotencyKey": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{8,128}$"},
         "expiresAt": {"type": "string", "format": "date-time"},
@@ -62,6 +62,69 @@
       "if": {"properties": {"status": {"const": "denied"}}},
       "then": {"properties": {"spec": {"properties": {"policyDecision": {"properties": {"allowed": {"const": false}}}}}}},
       "else": {"properties": {"spec": {"properties": {"policyDecision": {"properties": {"allowed": {"const": true}}}}}}}
+    },
+    {
+      "if": {
+        "properties": {
+          "spec": {"properties": {"actionType": {"const": "kubernetes.restart-workload"}}}
+        }
+      },
+      "then": {
+        "properties": {
+          "spec": {
+            "properties": {
+              "parameters": {"$ref": "#/$defs/kubernetesRestartParameters"},
+              "reversible": {"const": true}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "spec": {"properties": {"actionType": {"const": "event-delivery.requeue"}}}
+        }
+      },
+      "then": {
+        "properties": {
+          "spec": {
+            "properties": {
+              "parameters": {"$ref": "#/$defs/eventDeliveryReplayParameters"},
+              "reversible": {"const": false}
+            },
+            "not": {
+              "anyOf": [
+                {"required": ["integrationId"]},
+                {"required": ["providerObjectUid"]}
+              ]
+            }
+          }
+        }
+      }
     }
-  ]
+  ],
+  "$defs": {
+    "kubernetesRestartParameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "workloadKind", "workloadName"],
+      "properties": {
+        "namespace": {"type": "string", "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)*$", "maxLength": 253},
+        "workloadKind": {"type": "string", "enum": ["deployment", "statefulset", "daemonset"]},
+        "workloadName": {"type": "string", "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)*$", "maxLength": 253}
+      }
+    },
+    "eventDeliveryReplayParameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outboxId", "eventId", "quarantinedAt", "attempts"],
+      "properties": {
+        "outboxId": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "eventId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "quarantinedAt": {"type": "string", "format": "date-time"},
+        "attempts": {"type": "integer", "minimum": 1, "maximum": 1000}
+      }
+    }
+  }
 }

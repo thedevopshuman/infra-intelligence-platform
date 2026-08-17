@@ -18,6 +18,7 @@ from .models import (
     ActionWorkflowPage,
     ContextEvidenceRequest,
     Evidence,
+    EventDeliveryReplayCommand,
     EventDeliveryHealthReport,
     IngestionFreshnessReport,
     InvestigationReport,
@@ -305,6 +306,14 @@ class Client:
 
     def propose_action(self, command: Mapping[str, Any]) -> ActionProposal:
         return ActionProposal.from_dict(self._post("/v1/actions/proposals", command))
+
+    def propose_event_delivery_replay(
+        self,
+        command: EventDeliveryReplayCommand,
+    ) -> ActionProposal:
+        """Propose a dry-run or live replay of one exact quarantine generation."""
+
+        return self.propose_action(command.to_dict())
 
     def decide_action(
         self, proposal_id: str, decision: str, rationale: str

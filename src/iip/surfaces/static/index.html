@@ -200,7 +200,7 @@
         <section class="view" id="view-actions" data-title="Actions" data-eyebrow="Governed operations" hidden>
           <div class="section-intro"><div><h2>Guardrails before change</h2><p>Proposal, independent approval, execution, and verification remain separate, auditable steps.</p></div></div>
           <div class="guardrail-grid">
-            <article class="guardrail"><span>01</span><h3>Propose</h3><p>Bind a reversible action to an investigation and an idempotency key.</p></article>
+            <article class="guardrail"><span>01</span><h3>Propose</h3><p>Bind a bounded action to an investigation, exact target, and idempotency key.</p></article>
             <article class="guardrail"><span>02</span><h3>Approve</h3><p>A different authenticated actor reviews scope, rationale, and policy.</p></article>
             <article class="guardrail"><span>03</span><h3>Execute</h3><p>Policy is checked again; duplicate delivery cannot duplicate impact.</p></article>
             <article class="guardrail"><span>04</span><h3>Verify</h3><p>The outcome and evidence are written to the immutable audit trail.</p></article>
@@ -208,11 +208,13 @@
           <div class="action-workbench">
             <form class="panel form-panel" id="action-proposal-form">
               <span class="kicker">New governed proposal</span>
-              <h2>Prepare a bounded restart</h2>
-              <p>The proposal is bound to a completed investigation and the exact observed workload. A separate identity must approve it.</p>
+              <h2 id="action-form-title">Prepare a bounded restart</h2>
+              <p id="action-form-note">The proposal is bound to a completed investigation and the exact observed workload. A separate identity must approve it.</p>
+              <label>Operation<select id="action-type"><option value="kubernetes.restart-workload">Kubernetes workload restart</option><option value="event-delivery.requeue">Quarantined event replay</option></select></label>
               <label>Investigation ID<input id="action-investigation-id" required pattern="inv_[a-f0-9]{32}" placeholder="inv_…"></label>
-              <label>Target workload<select id="action-resource" required><option value="">Choose an observed Kubernetes workload</option></select></label>
-              <label class="check-row"><input id="action-dry-run" type="checkbox" checked><span><strong>Non-mutating dry-run</strong><small>The default executor performs no mutation. Live execution requires protected server configuration too.</small></span></label>
+              <label><span id="action-resource-label">Target workload</span><select id="action-resource" required><option value="">Choose an observed Kubernetes workload</option></select></label>
+              <div class="replay-binding" id="replay-binding" hidden><span>Exact quarantine generation</span><strong id="replay-binding-value">Choose a quarantined event from Overview</strong><small>Outbox ID, event ID, quarantine time, and attempts are frozen into the proposal.</small></div>
+              <label class="check-row"><input id="action-dry-run" type="checkbox" checked><span><strong>Non-mutating dry-run</strong><small id="action-dry-run-help">The default executor performs no mutation. Live execution requires protected server configuration too.</small></span></label>
               <button class="button primary wide" type="submit">Create proposal</button>
             </form>
             <article class="panel result-panel">
@@ -237,7 +239,7 @@
                 <tbody id="action-rows"></tbody>
               </table>
             </div>
-            <div id="action-empty" class="empty-state"><div class="empty-icon">↯</div><h3>No governed actions yet</h3><p>Run an investigation with proposal authority, then create a bounded restart above.</p></div>
+            <div id="action-empty" class="empty-state"><div class="empty-icon">↯</div><h3>No governed actions yet</h3><p>Run an investigation with proposal authority, then create a bounded operation above.</p></div>
             <div class="queue-footer"><button class="button subtle" id="action-load-more" type="button" hidden>Load more</button></div>
           </article>
         </section>
@@ -263,6 +265,7 @@
       <div class="detail-card">
         <div class="panel-heading"><div><span class="kicker" id="detail-kicker">Resource detail</span><h2 id="detail-title">Detail</h2></div><button class="dialog-close" id="detail-close" type="button" aria-label="Close detail">×</button></div>
         <pre id="detail-content"></pre>
+        <div class="detail-actions" id="detail-actions" hidden><p>Recovery starts with an evidence-backed investigation and remains dry-run by default.</p><button class="button primary" id="delivery-recovery" type="button">Investigate newest quarantine</button></div>
       </div>
     </dialog>
   </body>

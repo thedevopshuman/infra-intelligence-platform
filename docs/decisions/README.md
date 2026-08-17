@@ -54,3 +54,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0048](0048-explicit-tls-ingress-and-upgrade-conformance.md) | Accepted | Keep Services internal while declaring exact TLS ingress and proving migration-safe Helm upgrades |
 | [0049](0049-least-authority-scheduled-logical-backups.md) | Accepted | Schedule checksum-complete logical backups with database-and-PVC-only authority |
 | [0050](0050-immutable-application-image-identity.md) | Accepted | Resolve every application workload from one immutable OCI digest when configured |
+| [0051](0051-immutable-ci-execution-dependencies.md) | Accepted | Pin third-party CI actions and service images to reviewed immutable revisions |

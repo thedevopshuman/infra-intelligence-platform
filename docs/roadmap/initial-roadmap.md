@@ -19,7 +19,7 @@ Delivered:
 - resource, event, agent, and plugin `v1alpha1` contracts and examples;
 - runnable resource-ingestion vertical slice with ports/adapters;
 - Python and TypeScript SDK boundaries;
-- Helm/Kubernetes deployment skeleton, strict customer values contract, immutable application image selection, controlled schema-migration hook, guarded existing-certificate TLS Ingress, least-authority scheduled logical backups, install/upgrade/recovery quality gates, and an attested unsigned release bundle.
+- Helm/Kubernetes deployment skeleton, strict customer values contract, immutable application image selection, controlled schema-migration hook, guarded existing-certificate TLS Ingress, least-authority scheduled logical backups, immutable bounded CI dependencies, install/upgrade/recovery quality gates, and an attested unsigned release bundle.
 
 Exit gate: `make verify` passes and a new contributor can trace resource ingress through authorization, storage, and event emission.
 

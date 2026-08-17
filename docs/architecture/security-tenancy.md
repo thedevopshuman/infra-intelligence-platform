@@ -58,6 +58,10 @@ Log bodies receive confidential handling by default and remain untrusted after r
 
 Plugins are signed artifacts with immutable version and digest, explicit network/secret/resource/action permissions, protocol compatibility, resource limits, and an audit identity. Default execution is out-of-process. A crash, timeout, or malformed response fails the capability closed without destabilizing the control plane.
 
+## Build and CI authority
+
+CI has read-only repository permission, does not persist checkout credentials, and runs within a fixed deadline on an explicit runner generation. Third-party Actions are referenced by reviewed commit SHA and service containers by OCI digest; comments retain human-readable release versions. Automated dependency checks may propose pull requests but never bypass review or verification. Release publication and signing require separate organizational identities that are not present in this repository.
+
 ## Audit minimum
 
 Record actor, tenant, action, target, request/correlation/causation IDs, manifest and plugin versions, policy input hash and decision, tool input/output hashes, evidence references, approval identity, idempotency key, result, and timestamps. Never record raw secrets.

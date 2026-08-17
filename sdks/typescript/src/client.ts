@@ -10,6 +10,7 @@ import type {
   ContextEvidenceRequest,
   Evidence,
   EvidenceId,
+  EventDeliveryHealthReport,
   IngestionFreshnessReport,
   InvestigationId,
   InvestigationCancellationRequest,
@@ -135,6 +136,13 @@ export class InfrastructureIntelligenceClient {
   async getTelemetryExportHealth(): Promise<TelemetryExportHealthReport> {
     return this.get<TelemetryExportHealthReport>(
       "/v1/operations/telemetry/export-health",
+    );
+  }
+
+  async getEventDeliveryHealth(limit = 50): Promise<EventDeliveryHealthReport> {
+    const query = new URLSearchParams({ limit: String(limit) });
+    return this.get<EventDeliveryHealthReport>(
+      `/v1/operations/events/delivery-health?${query}`,
     );
   }
 

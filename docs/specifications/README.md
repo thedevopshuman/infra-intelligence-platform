@@ -23,6 +23,7 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | Repository/runbook context result | [context-evidence-contract.md](context-evidence-contract.md) | `contracts/schemas/context-evidence-result.schema.json` | `contracts/examples/context-evidence-result.json` |
 | Ingestion freshness report | [ingestion-freshness-contract.md](ingestion-freshness-contract.md) | `contracts/schemas/ingestion-freshness-report.schema.json` | `contracts/examples/ingestion-freshness-report.json` |
 | Telemetry export health report | [telemetry-export-health-contract.md](telemetry-export-health-contract.md) | `contracts/schemas/telemetry-export-health-report.schema.json` | `contracts/examples/telemetry-export-health-report.json` |
+| Event delivery health report | [event-delivery-health-contract.md](event-delivery-health-contract.md) | `contracts/schemas/event-delivery-health-report.schema.json` | `contracts/examples/event-delivery-health-report.json` |
 | Runtime version report | [runtime-version-contract.md](runtime-version-contract.md) | `contracts/schemas/runtime-version-report.schema.json` | `contracts/examples/runtime-version-report.json` |
 | Session context | [session-context-contract.md](session-context-contract.md) | `contracts/schemas/session-context.schema.json` | `contracts/examples/session-context.json` |
 | Page information | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/page-info.schema.json` | `contracts/examples/page-info.json` |

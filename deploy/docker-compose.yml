@@ -15,12 +15,12 @@ services:
       - postgres-data:/var/lib/postgresql
 
   api:
-    image: iip-local-platform:0.28.0
+    image: iip-local-platform:0.29.0
     build:
       context: ..
       dockerfile: Dockerfile
       args:
-        IIP_IMAGE_VERSION: "0.28.0"
+        IIP_IMAGE_VERSION: "0.29.0"
         IIP_IMAGE_REVISION: development
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
@@ -75,7 +75,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-local-platform:0.28.0
+    image: iip-local-platform:0.29.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:
@@ -93,6 +93,7 @@ services:
       IIP_OUTBOX_LEASE_SECONDS: ${IIP_OUTBOX_LEASE_SECONDS:-30}
       IIP_OUTBOX_RETRY_BASE_SECONDS: ${IIP_OUTBOX_RETRY_BASE_SECONDS:-5}
       IIP_OUTBOX_RETRY_MAX_SECONDS: ${IIP_OUTBOX_RETRY_MAX_SECONDS:-300}
+      IIP_OUTBOX_MAX_ATTEMPTS: ${IIP_OUTBOX_MAX_ATTEMPTS:-8}
       IIP_INGESTION_MONITOR_TARGETS_JSON: '{"targets":[{"tenantId":"local","sourceId":"kubernetes-local"}]}'
       IIP_INGESTION_MONITOR_INTERVAL_SECONDS: ${IIP_INGESTION_MONITOR_INTERVAL_SECONDS:-60}
       IIP_OTEL_METRICS_ENABLED: ${IIP_OTEL_METRICS_ENABLED:-false}

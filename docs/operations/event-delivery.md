@@ -64,7 +64,10 @@ The token Secret must contain the configured key, `token` by default. The option
 | `IIP_OUTBOX_LEASE_SECONDS` | `30` | Delivery ownership lease, 5–300 seconds |
 | `IIP_OUTBOX_RETRY_BASE_SECONDS` | `5` | Initial failed-delivery delay, 1–300 seconds |
 | `IIP_OUTBOX_RETRY_MAX_SECONDS` | `300` | Backoff cap, no smaller than the base and no larger than 3600 seconds |
+| `IIP_OUTBOX_MAX_ATTEMPTS` | `8` | Final failed attempt moves the tenant-scoped row into terminal quarantine, 1–1000 |
 
 ## Remaining production work
 
-The webhook is one replaceable publisher, not a claim that HTTP replaces a broker. A production decision still needs measured throughput and failure evidence, dead-letter/quarantine policy, delivery latency/error telemetry, payload retention rules, and customer interoperability tests. Kafka, NATS JetStream, cloud queues, or another transport can implement the same application port without changing ingestion.
+After the configured final failure, the owned row is quarantined with platform time and `event.publisher.unavailable`; it is excluded from normal claims and ingestion pending counts. Inspect exact-tenant backlog and bounded value-minimized quarantine metadata with `GET /v1/operations/events/delivery-health?limit=50` as a `platform-admin`. The endpoint never returns event data, destination configuration, credentials, or provider responses. Quarantine is not deletion, and there is intentionally no automatic or ungoverned requeue endpoint.
+
+The webhook is one replaceable publisher, not a claim that HTTP replaces a broker. A production decision still needs measured throughput and failure evidence, governed replay, delivery latency/error SLOs, payload retention rules, and customer interoperability tests. Kafka, NATS JetStream, cloud queues, or another transport can implement the same application port without changing ingestion.

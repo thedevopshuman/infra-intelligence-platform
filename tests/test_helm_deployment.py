@@ -108,6 +108,14 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             self.assertIn("investigationSignalCatalog.existingSecret", template)
             self.assertIn("investigationSignalCatalog.secretKey", template)
 
+    def test_event_delivery_retry_budget_is_explicit(self) -> None:
+        worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("IIP_OUTBOX_MAX_ATTEMPTS", worker)
+        self.assertIn(".Values.eventPublisher.maxAttempts", worker)
+
     def test_migration_hook_has_database_only_authority(self) -> None:
         template = (CHART / "templates" / "migration-job.yaml").read_text(
             encoding="utf-8"
@@ -149,6 +157,7 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertNotIn("current-context", script)
         self.assertNotIn("echo \"$IIP_DB_PASSWORD\"", script)
         self.assertIn("IIP_AUTH_BEARER_TOKEN=$(openssl rand -hex 32)", script)
+        self.assertIn('\\"developer\\",\\"platform-admin\\"', script)
         self.assertIn("openssl dgst -sha256 -hex", script)
         self.assertIn("awk '{print $NF}'", script)
         self.assertIn("build --provenance=false", script)
@@ -158,6 +167,8 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn('basename "$IIP_EXPECTED_MIGRATION"', script)
         self.assertNotIn('basename "$IIP_EXPECTED_MIGRATION" .sql', script)
         self.assertIn("/v1/system/version", script)
+        self.assertIn("/v1/operations/events/delivery-health?limit=10", script)
+        self.assertIn('document["kind"] == "EventDeliveryHealthReport"', script)
         self.assertIn('printf \'%s\' "$IIP_AUTH_BEARER_TOKEN"', script)
         self.assertIn('"helmChartVersion":chart,"imageDigest":digest', script)
         self.assertEqual(script.count('"$IIP_HELM_BIN" upgrade --install iip'), 2)

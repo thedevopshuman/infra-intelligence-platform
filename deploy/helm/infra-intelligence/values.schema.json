@@ -128,6 +128,7 @@
         "leaseSeconds",
         "retryBaseSeconds",
         "retryMaxSeconds",
+        "maxAttempts",
         "httpsWebhook"
       ],
       "properties": {
@@ -136,6 +137,7 @@
         "leaseSeconds": { "type": "integer", "minimum": 5, "maximum": 300 },
         "retryBaseSeconds": { "type": "integer", "minimum": 1, "maximum": 300 },
         "retryMaxSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
+        "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 1000 },
         "httpsWebhook": {
           "type": "object",
           "additionalProperties": false,

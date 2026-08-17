@@ -1,0 +1,34 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "EventDeliveryHealthReport",
+  "metadata": {
+    "tenantId": "tenant-acme",
+    "evaluatedAt": "2026-08-17T13:00:00Z"
+  },
+  "spec": {
+    "status": "degraded",
+    "delivery": {
+      "pendingEvents": 3,
+      "inFlightEvents": 1,
+      "retryingEvents": 2,
+      "quarantinedEvents": 1,
+      "oldestPendingEventAgeSeconds": 95
+    },
+    "quarantine": {
+      "limit": 50,
+      "hasMore": false,
+      "items": [
+        {
+          "outboxId": 1042,
+          "eventId": "evt_3b03ac5bb4d94fd3b574ebee8ed5c14f",
+          "eventSource": "urn:iip:resource-ingestion",
+          "eventType": "io.iip.resource.observed.v1",
+          "subject": "res_e0ae9225a316fce4c97df5c23057b97a",
+          "attempts": 8,
+          "quarantinedAt": "2026-08-17T12:58:45Z",
+          "lastErrorCode": "event.publisher.unavailable"
+        }
+      ]
+    }
+  }
+}

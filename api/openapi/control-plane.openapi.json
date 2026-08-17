@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.28.0",
+    "version": "0.29.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -152,6 +152,30 @@
           "503": {
             "description": "The process-local exporter health reader returned inconsistent state",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "telemetry.export-health.unavailable"}}}}
+          }
+        }
+      }
+    },
+    "/v1/operations/events/delivery-health": {
+      "get": {
+        "operationId": "getEventDeliveryHealth",
+        "description": "Return exact-tenant transactional-outbox backlog and value-minimized quarantine state to an authenticated platform administrator. The report contains no event data, credentials, destination details, provider responses, or exception text.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "minimum": 1, "maximum": 50, "default": 50}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Tenant-scoped backlog and bounded newest-first quarantine state", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/event-delivery-health-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "503": {
+            "description": "The event delivery state is unavailable or inconsistent",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "event.delivery-health.unavailable"}}}}
           }
         }
       }
@@ -570,6 +594,7 @@
       "ResourceTimeline": {"$ref": "../../contracts/schemas/resource-timeline.schema.json"},
       "IngestionFreshnessReport": {"$ref": "../../contracts/schemas/ingestion-freshness-report.schema.json"},
       "TelemetryExportHealthReport": {"$ref": "../../contracts/schemas/telemetry-export-health-report.schema.json"},
+      "EventDeliveryHealthReport": {"$ref": "../../contracts/schemas/event-delivery-health-report.schema.json"},
       "RuntimeVersionReport": {"$ref": "../../contracts/schemas/runtime-version-report.schema.json"},
       "SessionContext": {"$ref": "../../contracts/schemas/session-context.schema.json"},
       "PageInfo": {"$ref": "../../contracts/schemas/page-info.schema.json"},

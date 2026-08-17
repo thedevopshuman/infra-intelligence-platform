@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "infra-intelligence-sdk"
-version = "0.25.0"
+version = "0.26.0"
 description = "Python client boundary for the Infrastructure Intelligence Platform"
 requires-python = ">=3.11"
 dependencies = []

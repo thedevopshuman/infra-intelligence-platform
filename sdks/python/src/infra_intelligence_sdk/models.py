@@ -267,6 +267,28 @@ class TelemetryExportHealthReport:
 
 
 @dataclass(frozen=True)
+class EventDeliveryHealthReport:
+    """Tenant-scoped outbox backlog and quarantine state for operators."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "EventDeliveryHealthReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="EventDeliveryHealthReport",
+                label="event delivery health report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class RuntimeVersionReport:
     """Authenticated application, contract, storage, build, and deployment identity."""
 

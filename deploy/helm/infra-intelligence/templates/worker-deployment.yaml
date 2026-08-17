@@ -83,6 +83,8 @@ spec:
               value: {{ .Values.eventPublisher.retryBaseSeconds | quote }}
             - name: IIP_OUTBOX_RETRY_MAX_SECONDS
               value: {{ .Values.eventPublisher.retryMaxSeconds | quote }}
+            - name: IIP_OUTBOX_MAX_ATTEMPTS
+              value: {{ .Values.eventPublisher.maxAttempts | quote }}
             {{- if eq .Values.eventPublisher.mode "https-webhook" }}
             - name: IIP_EVENT_PUBLISHER_CONFIG_JSON
               {{- if .Values.eventPublisher.httpsWebhook.caBundleExistingSecret }}

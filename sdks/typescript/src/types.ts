@@ -301,6 +301,40 @@ export interface TelemetryExportHealthReport {
   };
 }
 
+export type EventDeliveryHealthStatus = "healthy" | "backlogged" | "degraded";
+
+export interface QuarantinedEventDelivery {
+  outboxId: number;
+  eventId: string;
+  eventSource: string;
+  eventType: `io.iip.${string}.v${number}`;
+  subject: string;
+  attempts: number;
+  quarantinedAt: string;
+  lastErrorCode: "event.publisher.unavailable";
+}
+
+export interface EventDeliveryHealthReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "EventDeliveryHealthReport";
+  metadata: { tenantId: string; evaluatedAt: string };
+  spec: {
+    status: EventDeliveryHealthStatus;
+    delivery: {
+      pendingEvents: number;
+      inFlightEvents: number;
+      retryingEvents: number;
+      quarantinedEvents: number;
+      oldestPendingEventAgeSeconds?: number;
+    };
+    quarantine: {
+      limit: number;
+      hasMore: boolean;
+      items: QuarantinedEventDelivery[];
+    };
+  };
+}
+
 export interface PlatformEvent<TData extends Record<string, unknown> = Record<string, unknown>> {
   specversion: "1.0";
   id: string;

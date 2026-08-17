@@ -10,8 +10,10 @@ from typing import Dict, Iterable, Mapping, Optional
 
 from iip.application.ports import (
     ActorContext,
+    EventDeliveryState,
     OutboxMessage,
     PolicyDecision,
+    QuarantinedOutboxMessage,
     ReconciliationSnapshot,
     ResourceObservationRecord,
     ResourceWriteResult,
@@ -40,6 +42,7 @@ class _MemoryOutboxEntry:
     available_at: datetime = datetime.min.replace(tzinfo=timezone.utc)
     published: bool = False
     last_error_code: Optional[str] = None
+    quarantined_at: Optional[datetime] = None
 
 
 class InMemoryResourceStore:
@@ -220,7 +223,11 @@ class InMemoryResourceStore:
             for entry in self._outbox.values():
                 if len(claimed) == limit:
                     break
-                if entry.event.tenant_id != tenant_id or entry.published:
+                if (
+                    entry.event.tenant_id != tenant_id
+                    or entry.published
+                    or entry.quarantined_at is not None
+                ):
                     continue
                 if entry.available_at > now:
                     continue
@@ -247,6 +254,7 @@ class InMemoryResourceStore:
                 or entry.claim_expires_at is None
                 or entry.claim_expires_at <= datetime.now(timezone.utc)
                 or entry.published
+                or entry.quarantined_at is not None
             ):
                 return False
             entry.published = True
@@ -275,6 +283,7 @@ class InMemoryResourceStore:
                 or entry.claim_expires_at is None
                 or entry.claim_expires_at <= datetime.now(timezone.utc)
                 or entry.published
+                or entry.quarantined_at is not None
             ):
                 return False
             entry.claimed_by = None
@@ -284,6 +293,96 @@ class InMemoryResourceStore:
             )
             entry.last_error_code = error_code
             return True
+
+    def quarantine_outbox(
+        self,
+        tenant_id: str,
+        worker_id: str,
+        message_id: int,
+        error_code: str,
+    ) -> bool:
+        self._validate_error_code(error_code)
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            entry = self._outbox.get(message_id)
+            if (
+                entry is None
+                or entry.event.tenant_id != tenant_id
+                or entry.claimed_by != worker_id
+                or entry.claim_expires_at is None
+                or entry.claim_expires_at <= now
+                or entry.published
+                or entry.quarantined_at is not None
+            ):
+                return False
+            entry.claimed_by = None
+            entry.claim_expires_at = None
+            entry.last_error_code = error_code
+            entry.quarantined_at = now
+            return True
+
+    def get_event_delivery_state(
+        self,
+        tenant_id: str,
+        *,
+        quarantine_limit: int = 50,
+    ) -> EventDeliveryState:
+        self._validate_page(0, quarantine_limit)
+        if quarantine_limit > 50:
+            raise ValueError("quarantine_limit must be between 1 and 50")
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            tenant_entries = tuple(
+                entry
+                for entry in self._outbox.values()
+                if entry.event.tenant_id == tenant_id
+            )
+            pending = tuple(
+                entry
+                for entry in tenant_entries
+                if not entry.published and entry.quarantined_at is None
+            )
+            quarantined = sorted(
+                (
+                    entry
+                    for entry in tenant_entries
+                    if entry.quarantined_at is not None
+                ),
+                key=lambda entry: (entry.quarantined_at, entry.message_id),
+                reverse=True,
+            )
+            oldest = min((entry.created_at for entry in pending), default=None)
+            return EventDeliveryState(
+                tenant_id=tenant_id,
+                pending_events=len(pending),
+                in_flight_events=sum(
+                    entry.claim_expires_at is not None
+                    and entry.claim_expires_at > now
+                    for entry in pending
+                ),
+                retrying_events=sum(
+                    entry.last_error_code is not None for entry in pending
+                ),
+                quarantined_events=len(quarantined),
+                oldest_pending_event_recorded_at=oldest,
+                quarantined=tuple(
+                    QuarantinedOutboxMessage(
+                        message_id=entry.message_id,
+                        tenant_id=entry.event.tenant_id,
+                        event_id=entry.event.event_id,
+                        event_source=entry.event.source,
+                        event_type=entry.event.event_type,
+                        subject=entry.event.subject,
+                        attempts=entry.attempts,
+                        quarantined_at=entry.quarantined_at.isoformat().replace(
+                            "+00:00", "Z"
+                        ),
+                        last_error_code=str(entry.last_error_code),
+                    )
+                    for entry in quarantined[:quarantine_limit]
+                    if entry.quarantined_at is not None
+                ),
+            )
 
     def get_checkpoint(self, tenant_id: str, source_id: str) -> Optional[SourceCheckpoint]:
         with self._lock:
@@ -311,6 +410,7 @@ class InMemoryResourceStore:
                 if (
                     entry.event.tenant_id == tenant_id
                     and not entry.published
+                    and entry.quarantined_at is None
                     and isinstance(observation, Mapping)
                     and observation.get("sourceId") == source_id
                 ):
@@ -550,6 +650,7 @@ class AllowTenantPolicy:
             "action:propose",
             "action:read",
             "evidence:collect",
+            "event-delivery-health:read",
             "ingestion-telemetry:read",
             "plugin:open-session",
             "resource-projection:rebuild",

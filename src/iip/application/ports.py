@@ -101,6 +101,34 @@ class OutboxMessage:
 
 
 @dataclass(frozen=True)
+class QuarantinedOutboxMessage:
+    """Value-minimized terminal delivery record for one exact tenant."""
+
+    message_id: int
+    tenant_id: str
+    event_id: str
+    event_source: str
+    event_type: str
+    subject: str
+    attempts: int
+    quarantined_at: str
+    last_error_code: str
+
+
+@dataclass(frozen=True)
+class EventDeliveryState:
+    """Bounded tenant-scoped outbox health facts returned by storage."""
+
+    tenant_id: str
+    pending_events: int
+    in_flight_events: int
+    retrying_events: int
+    quarantined_events: int
+    oldest_pending_event_recorded_at: Optional[str]
+    quarantined: tuple[QuarantinedOutboxMessage, ...]
+
+
+@dataclass(frozen=True)
 class SourceCheckpoint:
     """Last explicitly committed cursor for a tenant-scoped source."""
 
@@ -549,6 +577,23 @@ class EventOutbox(Protocol):
         retry_after_seconds: int = 0,
     ) -> bool:
         """Release a leased message using a stable, non-sensitive error code."""
+
+    def quarantine_outbox(
+        self,
+        tenant_id: str,
+        worker_id: str,
+        message_id: int,
+        error_code: str,
+    ) -> bool:
+        """Terminally quarantine a message only while the worker owns its lease."""
+
+    def get_event_delivery_state(
+        self,
+        tenant_id: str,
+        *,
+        quarantine_limit: int = 50,
+    ) -> EventDeliveryState:
+        """Return exact-tenant backlog and bounded quarantine facts."""
 
 
 class SourceCheckpointRepository(Protocol):

@@ -85,6 +85,7 @@ def main() -> None:
                                     "claimed": delivery.claimed,
                                     "delivered": delivery.delivered,
                                     "released": delivery.released,
+                                    "quarantined": delivery.quarantined,
                                     "ambiguous": delivery.ambiguous,
                                 },
                                 separators=(",", ":"),

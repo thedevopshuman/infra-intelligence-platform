@@ -387,8 +387,21 @@ def main() -> int:
         if proposal_id not in item_ids:
             raise ProductWorkflowError("terminal workflow is missing from the action queue")
         _wait_for_event_delivery(operator)
+        delivery_health = _request(
+            "/v1/operations/events/delivery-health?limit=20", operator
+        )
+        delivery_spec = delivery_health.get("spec")
+        if (
+            delivery_health.get("kind") != "EventDeliveryHealthReport"
+            or delivery_health.get("metadata", {}).get("tenantId") != "local"
+            or not isinstance(delivery_spec, Mapping)
+            or delivery_spec.get("status") != "healthy"
+            or delivery_spec.get("delivery", {}).get("pendingEvents") != 0
+            or delivery_spec.get("delivery", {}).get("quarantinedEvents") != 0
+        ):
+            raise ProductWorkflowError("local event delivery health is invalid")
         print(
-            "local product workflow passed: runtime identity → collection → event delivery → queued worker "
+            "local product workflow passed: runtime identity → collection → event delivery health → queued worker "
             "investigation → proposal → independent approval → one-shot dry-run → queue"
         )
         print(f"action: {proposal_id}")

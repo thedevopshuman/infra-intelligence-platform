@@ -47,6 +47,7 @@ class _Outbox:
         self.claims = []
         self.acknowledgements = []
         self.releases = []
+        self.quarantines = []
 
     def claim_outbox(self, tenant_id, worker_id, *, limit, lease_seconds):
         self.claims.append((tenant_id, worker_id, limit, lease_seconds))
@@ -73,6 +74,14 @@ class _Outbox:
                 error_code,
                 retry_after_seconds,
             )
+        )
+        return self.release
+
+    def quarantine_outbox(
+        self, tenant_id, worker_id, message_id, error_code
+    ):
+        self.quarantines.append(
+            (tenant_id, worker_id, message_id, error_code)
         )
         return self.release
 
@@ -125,6 +134,34 @@ class EventDeliveryServiceTests(unittest.TestCase):
             ],
         )
 
+    def test_final_failure_is_quarantined_and_never_released(self) -> None:
+        outbox = _Outbox((OutboxMessage(7, event("event-terminal"), 8),))
+        service = EventDeliveryService(
+            outbox,
+            _Publisher(("event-terminal",)),
+            worker_id="worker-1",
+            max_attempts=8,
+        )
+
+        summary = service.run_once("tenant-a")
+
+        self.assertEqual(
+            (summary.claimed, summary.released, summary.quarantined, summary.ambiguous),
+            (1, 0, 1, 0),
+        )
+        self.assertEqual(outbox.releases, [])
+        self.assertEqual(
+            outbox.quarantines,
+            [
+                (
+                    "tenant-a",
+                    "worker-1",
+                    7,
+                    "event.publisher.unavailable",
+                )
+            ],
+        )
+
     def test_lost_lease_is_ambiguous_and_cross_tenant_claim_is_corrupt(self) -> None:
         outbox = _Outbox(
             (OutboxMessage(1, event("event-a"), 1),), acknowledge=False
@@ -161,6 +198,15 @@ class EventDeliveryServiceTests(unittest.TestCase):
                         retry_base_seconds=retry_base,
                         retry_max_seconds=retry_max,
                     )
+        with self.assertRaisesRegex(
+            ValueError, "event.delivery.configuration.invalid"
+        ):
+            EventDeliveryService(
+                _Outbox(()),
+                _Publisher(),
+                worker_id="worker-1",
+                max_attempts=0,
+            )
         service = EventDeliveryService(
             _Outbox(()), _Publisher(), worker_id="worker-1"
         )

@@ -92,6 +92,7 @@ from iip.application.observe_ingestion import (
 )
 from iip.application.plugin_sessions import PluginSessionService
 from iip.application.query_actions import ActionWorkflowQueryService
+from iip.application.query_event_delivery_health import EventDeliveryHealthService
 from iip.application.query_resources import ResourceQueryService
 from iip.application.query_runtime_version import (
     RuntimeVersionIdentity,
@@ -127,6 +128,7 @@ class Runtime:
     ingestion: ResourceIngestionService
     collection_ingestion: ResourceCollectionIngestionService
     ingestion_telemetry: IngestionFreshnessService
+    event_delivery_health: EventDeliveryHealthService
     telemetry_export_health: TelemetryExportHealthService
     runtime_version: RuntimeVersionService
     queries: ResourceQueryService
@@ -314,6 +316,7 @@ def _compose_runtime(
             ingestion_objectives,
             ingestion_telemetry_sink,
         ),
+        event_delivery_health=EventDeliveryHealthService(store, policy, clock),
         telemetry_export_health=TelemetryExportHealthService(
             (
                 telemetry_runtime
@@ -696,6 +699,7 @@ def build_event_delivery_from_env(
         lease_seconds=integer("IIP_OUTBOX_LEASE_SECONDS", 30),
         retry_base_seconds=integer("IIP_OUTBOX_RETRY_BASE_SECONDS", 5),
         retry_max_seconds=integer("IIP_OUTBOX_RETRY_MAX_SECONDS", 300),
+        max_attempts=integer("IIP_OUTBOX_MAX_ATTEMPTS", 8),
     )
 
 

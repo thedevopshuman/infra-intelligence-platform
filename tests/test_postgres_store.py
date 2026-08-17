@@ -466,6 +466,54 @@ class PostgresResourceStoreTests(unittest.TestCase):
             )
         )
 
+    def test_outbox_quarantine_is_terminal_tenant_scoped_and_value_minimized(self) -> None:
+        stored = self.service.execute(
+            IngestResourceCommand(
+                ActorContext("collector", "local"),
+                resource_payload(),
+                checkpoint_ready=True,
+            )
+        )
+        message = tuple(self.store.claim_outbox("local", "worker-1"))[0]
+
+        self.assertFalse(
+            self.store.quarantine_outbox(
+                "another-tenant",
+                "worker-1",
+                message.message_id,
+                "event.publisher.unavailable",
+            )
+        )
+        self.assertTrue(
+            self.store.quarantine_outbox(
+                "local",
+                "worker-1",
+                message.message_id,
+                "event.publisher.unavailable",
+            )
+        )
+        self.assertEqual(tuple(self.store.claim_outbox("local", "worker-2")), ())
+
+        state = self.store.get_event_delivery_state("local")
+        self.assertEqual(state.pending_events, 0)
+        self.assertEqual(state.quarantined_events, 1)
+        self.assertEqual(state.quarantined[0].subject, stored.identity.uid)
+        self.assertFalse(hasattr(state.quarantined[0], "event"))
+        self.assertEqual(state.quarantined[0].attempts, 1)
+        self.assertEqual(
+            state.quarantined[0].last_error_code,
+            "event.publisher.unavailable",
+        )
+        source = self.store.get_source_ingestion_state(
+            "local", "kubernetes-local"
+        )
+        self.assertEqual(source.pending_event_count, 0)
+        self.assertIsNone(source.oldest_pending_event_recorded_at)
+        self.assertEqual(
+            self.store.get_event_delivery_state("another-tenant").quarantined_events,
+            0,
+        )
+
     def test_relationship_index_and_timeline_pages_track_latest_projection(self) -> None:
         target_payload = resource_payload()
         target_payload["spec"]["type"] = "core/configmap"

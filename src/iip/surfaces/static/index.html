@@ -103,6 +103,23 @@
             </div>
           </article>
 
+          <article class="panel delivery-panel" aria-labelledby="delivery-heading">
+            <div class="panel-heading">
+              <div><span class="kicker">Durable event path</span><h2 id="delivery-heading">Event delivery</h2></div>
+              <div class="delivery-heading-actions">
+                <span class="status-chip neutral" id="delivery-state">Connect to inspect</span>
+                <button class="text-button" id="delivery-details" type="button" disabled>View quarantine →</button>
+              </div>
+            </div>
+            <div class="delivery-grid" aria-live="polite">
+              <div><span>Pending</span><strong id="delivery-pending">—</strong></div>
+              <div><span>In flight</span><strong id="delivery-inflight">—</strong></div>
+              <div><span>Retrying</span><strong id="delivery-retrying">—</strong></div>
+              <div><span>Quarantined</span><strong id="delivery-quarantined">—</strong></div>
+            </div>
+            <p class="delivery-note" id="delivery-note">Platform administrators can inspect exact-tenant backlog without exposing event payloads.</p>
+          </article>
+
           <div class="two-column">
             <article class="panel">
               <div class="panel-heading">

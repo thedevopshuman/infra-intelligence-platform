@@ -24,6 +24,7 @@ class EventDeliverySummary:
     claimed: int = 0
     delivered: int = 0
     released: int = 0
+    quarantined: int = 0
     ambiguous: int = 0
 
 
@@ -40,6 +41,7 @@ class EventDeliveryService:
         lease_seconds: int = 30,
         retry_base_seconds: int = 5,
         retry_max_seconds: int = 300,
+        max_attempts: int = 8,
     ) -> None:
         if (
             not isinstance(worker_id, str)
@@ -52,6 +54,8 @@ class EventDeliveryService:
             or not 1 <= retry_base_seconds <= 300
             or isinstance(retry_max_seconds, bool)
             or not retry_base_seconds <= retry_max_seconds <= 3600
+            or isinstance(max_attempts, bool)
+            or not 1 <= max_attempts <= 1000
         ):
             raise ValueError("event.delivery.configuration.invalid")
         self._outbox = outbox
@@ -61,6 +65,7 @@ class EventDeliveryService:
         self._lease_seconds = lease_seconds
         self._retry_base_seconds = retry_base_seconds
         self._retry_max_seconds = retry_max_seconds
+        self._max_attempts = max_attempts
 
     def run_once(self, tenant_id: str) -> EventDeliverySummary:
         if (
@@ -77,22 +82,32 @@ class EventDeliveryService:
                 lease_seconds=self._lease_seconds,
             )
         )
-        delivered = released = ambiguous = 0
+        delivered = released = quarantined = ambiguous = 0
         for message in messages:
             if message.event.tenant_id != tenant_id:
                 raise PersistenceError("storage.corrupt")
             try:
                 self._publisher.publish(message.event)
             except EventPublicationError:
-                did_release = self._outbox.release_outbox(
-                    tenant_id,
-                    self._worker_id,
-                    message.message_id,
-                    "event.publisher.unavailable",
-                    retry_after_seconds=self._retry_delay(message.attempts),
-                )
-                released += int(did_release)
-                ambiguous += int(not did_release)
+                if message.attempts >= self._max_attempts:
+                    did_quarantine = self._outbox.quarantine_outbox(
+                        tenant_id,
+                        self._worker_id,
+                        message.message_id,
+                        "event.publisher.unavailable",
+                    )
+                    quarantined += int(did_quarantine)
+                    ambiguous += int(not did_quarantine)
+                else:
+                    did_release = self._outbox.release_outbox(
+                        tenant_id,
+                        self._worker_id,
+                        message.message_id,
+                        "event.publisher.unavailable",
+                        retry_after_seconds=self._retry_delay(message.attempts),
+                    )
+                    released += int(did_release)
+                    ambiguous += int(not did_release)
                 continue
             did_acknowledge = self._outbox.acknowledge_outbox(
                 tenant_id,
@@ -105,6 +120,7 @@ class EventDeliveryService:
             claimed=len(messages),
             delivered=delivered,
             released=released,
+            quarantined=quarantined,
             ambiguous=ambiguous,
         )
 

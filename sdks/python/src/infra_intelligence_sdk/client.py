@@ -18,6 +18,7 @@ from .models import (
     ActionWorkflowPage,
     ContextEvidenceRequest,
     Evidence,
+    EventDeliveryHealthReport,
     IngestionFreshnessReport,
     InvestigationReport,
     InvestigationJobStatus,
@@ -154,6 +155,16 @@ class Client:
 
         return TelemetryExportHealthReport.from_dict(
             self._get("/v1/operations/telemetry/export-health")
+        )
+
+    def get_event_delivery_health(
+        self, *, limit: int = 50
+    ) -> EventDeliveryHealthReport:
+        """Read tenant outbox backlog and bounded quarantine as an administrator."""
+
+        query = urlencode({"limit": str(limit)})
+        return EventDeliveryHealthReport.from_dict(
+            self._get(f"/v1/operations/events/delivery-health?{query}")
         )
 
     def ingest_resource_collection(

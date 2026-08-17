@@ -101,6 +101,12 @@ from iip.application.query_actions import (
     ActionQueryError,
     ActionWorkflowNotFoundError,
 )
+from iip.application.query_event_delivery_health import (
+    EventDeliveryHealthAuthorizationError,
+    EventDeliveryHealthInputError,
+    EventDeliveryHealthStateError,
+    GetEventDeliveryHealthCommand,
+)
 from iip.application.query_resources import (
     InvalidCursorError,
     InvalidQueryError,
@@ -131,7 +137,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.28.0"
+    server_version = "IIPReference/0.29.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -215,6 +221,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if path == "/v1/operations/telemetry/export-health":
             self._query_telemetry_export_health(actor, parsed.query)
+            return
+        if path == "/v1/operations/events/delivery-health":
+            self._query_event_delivery_health(actor, parsed.query)
             return
         if path == "/v1/actions":
             self._query_actions(actor, parsed.query)
@@ -369,6 +378,47 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json(
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 {"error": {"code": "telemetry.export-health.unavailable"}},
+            )
+
+    def _query_event_delivery_health(
+        self, actor: ActorContext, query: str
+    ) -> None:
+        try:
+            try:
+                parameters = parse_qs(
+                    query,
+                    keep_blank_values=True,
+                    max_num_fields=2,
+                )
+            except ValueError:
+                raise EventDeliveryHealthInputError("request.invalid") from None
+            if set(parameters).difference({"limit"}):
+                raise EventDeliveryHealthInputError("request.invalid")
+            values = parameters.get("limit", ["50"])
+            if len(values) != 1 or not values[0]:
+                raise EventDeliveryHealthInputError("request.invalid")
+            try:
+                limit = int(values[0])
+            except ValueError:
+                raise EventDeliveryHealthInputError("request.invalid") from None
+            report = self.runtime.event_delivery_health.get(
+                GetEventDeliveryHealthCommand(actor, limit)
+            )
+            self._json(HTTPStatus.OK, report.to_dict())
+        except EventDeliveryHealthInputError:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": "request.invalid"}},
+            )
+        except EventDeliveryHealthAuthorizationError:
+            self._json(
+                HTTPStatus.FORBIDDEN,
+                {"error": {"code": "policy.denied"}},
+            )
+        except (EventDeliveryHealthStateError, PersistenceError):
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "event.delivery-health.unavailable"}},
             )
 
     def _query_actions(self, actor: ActorContext, query: str) -> None:

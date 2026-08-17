@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.28.0"
+  tag: "0.29.0"
   digest: ""
 
 worker:
@@ -31,6 +31,7 @@ eventPublisher:
   leaseSeconds: 30
   retryBaseSeconds: 5
   retryMaxSeconds: 300
+  maxAttempts: 8
   httpsWebhook:
     endpoint: ""
     timeoutSeconds: 5

@@ -4,6 +4,7 @@ const state = {
   token: "",
   session: null,
   runtimeVersion: null,
+  eventDeliveryHealth: null,
   resources: [],
   investigations: [],
   evidence: [],
@@ -154,6 +155,51 @@ async function refreshRuntimeVersion() {
   renderRuntimeVersion();
 }
 
+function renderEventDeliveryHealth() {
+  const report = state.eventDeliveryHealth;
+  const spec = report?.spec;
+  const chip = $("#delivery-state");
+  if (!spec) {
+    ["pending", "inflight", "retrying", "quarantined"].forEach((field) => {
+      $(`#delivery-${field}`).textContent = "—";
+    });
+    chip.textContent = state.session && !hasRole("platform-admin")
+      ? "Platform admin required"
+      : state.session ? "Unavailable" : "Connect to inspect";
+    chip.className = "status-chip neutral";
+    $("#delivery-details").disabled = true;
+    $("#delivery-note").textContent = "Platform administrators can inspect exact-tenant backlog without exposing event payloads.";
+    return;
+  }
+  const delivery = spec.delivery;
+  $("#delivery-pending").textContent = String(delivery.pendingEvents);
+  $("#delivery-inflight").textContent = String(delivery.inFlightEvents);
+  $("#delivery-retrying").textContent = String(delivery.retryingEvents);
+  $("#delivery-quarantined").textContent = String(delivery.quarantinedEvents);
+  chip.textContent = spec.status;
+  chip.className = `status-chip ${spec.status === "healthy" ? "success" : spec.status === "degraded" ? "danger" : "warning"}`;
+  $("#delivery-details").disabled = false;
+  $("#delivery-note").textContent = delivery.pendingEvents
+    ? `Oldest pending event: ${delivery.oldestPendingEventAgeSeconds ?? 0}s. Automatic retries remain bounded.`
+    : delivery.quarantinedEvents
+      ? "Automatic delivery stopped for quarantined events; inspect provenance before governed recovery."
+      : "The tenant outbox is drained and no events are quarantined.";
+}
+
+async function refreshEventDeliveryHealth() {
+  if (!state.session || !hasRole("platform-admin")) {
+    state.eventDeliveryHealth = null;
+    renderEventDeliveryHealth();
+    return;
+  }
+  try {
+    state.eventDeliveryHealth = await api("/v1/operations/events/delivery-health?limit=20");
+  } catch (_error) {
+    state.eventDeliveryHealth = null;
+  }
+  renderEventDeliveryHealth();
+}
+
 async function connect(token, remember) {
   state.token = token;
   try {
@@ -161,7 +207,7 @@ async function connect(token, remember) {
     if (remember) sessionStorage.setItem("iip.console.token", token);
     else sessionStorage.removeItem("iip.console.token");
     updateIdentity();
-    await Promise.all([refreshRuntimeVersion(), refreshResources(), refreshActions()]);
+    await Promise.all([refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshResources(), refreshActions()]);
     $("#connection-dialog").close();
     $("#connection-error").hidden = true;
     showNotice(`Connected as ${state.session.metadata.actorId} in tenant ${state.session.metadata.tenantId}.`);
@@ -844,7 +890,7 @@ function bindEvents() {
   $("#identity-button").addEventListener("click", () => $("#connection-dialog").showModal());
   $("#connection-close").addEventListener("click", () => $("#connection-dialog").close());
   $("#refresh-button").addEventListener("click", async () => {
-    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshResources(), refreshActions()]);
+    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshResources(), refreshActions()]);
     showNotice("Live platform state refreshed.");
   });
   $("#connection-form").addEventListener("submit", async (event) => {
@@ -883,6 +929,13 @@ function bindEvents() {
     $("#detail-kicker").textContent = "Runtime identity";
     $("#detail-title").textContent = "Verified version report";
     $("#detail-content").textContent = JSON.stringify(state.runtimeVersion, null, 2);
+    $("#detail-dialog").showModal();
+  });
+  $("#delivery-details").addEventListener("click", () => {
+    if (!state.eventDeliveryHealth) return;
+    $("#detail-kicker").textContent = "Event delivery";
+    $("#detail-title").textContent = "Tenant outbox and quarantine";
+    $("#detail-content").textContent = JSON.stringify(state.eventDeliveryHealth, null, 2);
     $("#detail-dialog").showModal();
   });
 }

@@ -22,4 +22,4 @@ Docker Compose uses `stdout-json` as an explicit development sink so the local p
 - Source freshness can now distinguish a healthy downstream delivery path from a real backlog.
 - Multiple workers can compete safely with `SKIP LOCKED`; slow or failed messages do not block the rest of a claimed batch.
 - Event payloads written by the local sink can contain infrastructure identifiers, so Docker logs remain development data and must not be treated as a production event archive.
-- Permanent delivery failures currently retry with capped delay. Dead-letter policy, broker-specific batching, delivery SLO telemetry, and multi-destination fan-out remain future work.
+- [ADR 0055](0055-bounded-outbox-quarantine.md) now stops permanent delivery failures at a finite attempt budget and exposes a value-minimized operator report. Governed replay, broker-specific batching, delivery SLO telemetry, and multi-destination fan-out remain future work.

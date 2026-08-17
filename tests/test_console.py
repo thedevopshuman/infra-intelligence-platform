@@ -96,6 +96,8 @@ class ConsoleHttpTests(unittest.TestCase):
         self.assertIn("Reviewed catalog", script)
         self.assertIn("protected-catalog", script)
         self.assertIn("resource.change", script)
+        self.assertIn("/v1/operations/events/delivery-health?limit=20", script)
+        self.assertIn("Event delivery", script)
 
     def test_session_is_derived_from_the_credential(self) -> None:
         with patch.dict(

@@ -15,9 +15,11 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from iip.application.ports import (
+    EventDeliveryState,
     OutboxMessage,
     PersistenceError,
     ProjectionRebuildResult,
+    QuarantinedOutboxMessage,
     ReconciliationSnapshot,
     ResourceObservationRecord,
     ResourceWriteResult,
@@ -46,6 +48,7 @@ SCHEMA_MIGRATIONS = (
     "0007_investigation_lifecycle.sql",
     "0008_action_execution_lifecycle.sql",
     "0009_investigation_jobs.sql",
+    "0010_event_outbox_quarantine.sql",
 )
 
 
@@ -457,6 +460,7 @@ class PostgresResourceStore:
                     FROM iip.event_outbox
                     WHERE tenant_id = %s
                       AND published_at IS NULL
+                      AND quarantined_at IS NULL
                       AND available_at <= clock_timestamp()
                       AND (
                           claim_expires_at IS NULL
@@ -511,6 +515,7 @@ class PostgresResourceStore:
                   AND claimed_by = %s
                   AND claim_expires_at > clock_timestamp()
                   AND published_at IS NULL
+                  AND quarantined_at IS NULL
                 RETURNING outbox_id
                 """,
                 (tenant_id, message_id, worker_id),
@@ -543,6 +548,7 @@ class PostgresResourceStore:
                   AND claimed_by = %s
                   AND claim_expires_at > clock_timestamp()
                   AND published_at IS NULL
+                  AND quarantined_at IS NULL
                 RETURNING outbox_id
                 """,
                 (
@@ -554,6 +560,122 @@ class PostgresResourceStore:
                 ),
             ).fetchone()
         return row is not None
+
+    @_translate_database_errors
+    def quarantine_outbox(
+        self,
+        tenant_id: str,
+        worker_id: str,
+        message_id: int,
+        error_code: str,
+    ) -> bool:
+        self._validate_error_code(error_code)
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                UPDATE iip.event_outbox
+                SET claimed_by = NULL,
+                    claim_expires_at = NULL,
+                    quarantined_at = clock_timestamp(),
+                    last_error_code = %s
+                WHERE tenant_id = %s
+                  AND outbox_id = %s
+                  AND claimed_by = %s
+                  AND claim_expires_at > clock_timestamp()
+                  AND published_at IS NULL
+                  AND quarantined_at IS NULL
+                RETURNING outbox_id
+                """,
+                (error_code, tenant_id, message_id, worker_id),
+            ).fetchone()
+        return row is not None
+
+    @_translate_database_errors
+    def get_event_delivery_state(
+        self,
+        tenant_id: str,
+        *,
+        quarantine_limit: int = 50,
+    ) -> EventDeliveryState:
+        if (
+            isinstance(quarantine_limit, bool)
+            or not isinstance(quarantine_limit, int)
+            or not 1 <= quarantine_limit <= 50
+        ):
+            raise ValueError("quarantine_limit must be between 1 and 50")
+        with self._connect() as connection:
+            summary = connection.execute(
+                """
+                SELECT
+                    count(*) FILTER (
+                        WHERE published_at IS NULL AND quarantined_at IS NULL
+                    ) AS pending_events,
+                    count(*) FILTER (
+                        WHERE published_at IS NULL
+                          AND quarantined_at IS NULL
+                          AND claim_expires_at > clock_timestamp()
+                    ) AS in_flight_events,
+                    count(*) FILTER (
+                        WHERE published_at IS NULL
+                          AND quarantined_at IS NULL
+                          AND last_error_code IS NOT NULL
+                    ) AS retrying_events,
+                    count(*) FILTER (
+                        WHERE quarantined_at IS NOT NULL
+                    ) AS quarantined_events,
+                    min(created_at) FILTER (
+                        WHERE published_at IS NULL AND quarantined_at IS NULL
+                    ) AS oldest_pending_event_recorded_at
+                FROM iip.event_outbox
+                WHERE tenant_id = %s
+                """,
+                (tenant_id,),
+            ).fetchone()
+            rows = connection.execute(
+                """
+                SELECT outbox.outbox_id, outbox.tenant_id, outbox.attempts,
+                       outbox.quarantined_at, outbox.last_error_code,
+                       events.document->>'id' AS event_id,
+                       events.document->>'source' AS event_source,
+                       events.document->>'type' AS event_type,
+                       events.document->>'subject' AS subject
+                FROM iip.event_outbox AS outbox
+                JOIN iip.event_log AS events
+                  ON events.tenant_id = outbox.tenant_id
+                 AND events.event_offset = outbox.event_offset
+                WHERE outbox.tenant_id = %s
+                  AND outbox.quarantined_at IS NOT NULL
+                ORDER BY outbox.quarantined_at DESC, outbox.outbox_id DESC
+                LIMIT %s
+                """,
+                (tenant_id, quarantine_limit),
+            ).fetchall()
+        return EventDeliveryState(
+            tenant_id=tenant_id,
+            pending_events=summary["pending_events"],
+            in_flight_events=summary["in_flight_events"],
+            retrying_events=summary["retrying_events"],
+            quarantined_events=summary["quarantined_events"],
+            oldest_pending_event_recorded_at=(
+                self._rfc3339(summary["oldest_pending_event_recorded_at"])
+                if summary["oldest_pending_event_recorded_at"] is not None
+                else None
+            ),
+            quarantined=tuple(
+                QuarantinedOutboxMessage(
+                    message_id=row["outbox_id"],
+                    tenant_id=row["tenant_id"],
+                    event_id=row["event_id"],
+                    event_source=row["event_source"],
+                    event_type=row["event_type"],
+                    subject=row["subject"],
+                    attempts=row["attempts"],
+                    quarantined_at=self._rfc3339(row["quarantined_at"]),
+                    last_error_code=row["last_error_code"],
+                )
+                for row in rows
+            ),
+        )
 
     @_translate_database_errors
     def get_checkpoint(self, tenant_id: str, source_id: str) -> Optional[SourceCheckpoint]:
@@ -622,6 +744,7 @@ class PostgresResourceStore:
                      AND events.event_offset = outbox.event_offset
                     WHERE outbox.tenant_id = checkpoint.tenant_id
                       AND outbox.published_at IS NULL
+                      AND outbox.quarantined_at IS NULL
                       AND events.document->'data'->'observation'->>'sourceId'
                           = checkpoint.source_id
                 ) AS pending

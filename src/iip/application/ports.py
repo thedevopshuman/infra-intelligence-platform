@@ -779,6 +779,61 @@ class CredentialBroker(Protocol):
         """Issue one request-scoped credential lease to an adapter."""
 
 
+@dataclass(frozen=True, repr=False)
+class PluginMediationBinding:
+    """Protected host binding for one public, invocation-scoped read grant."""
+
+    tenant_id: str
+    plugin_id: str
+    plugin_version: str
+    grant_id: str
+    integration_id: str
+    provider: str
+    destination: str
+    credential_name: str
+    endpoint: str
+    credential_ref: str
+    ca_bundle_path: Optional[str]
+    path_templates: tuple[str, ...]
+    query_keys: tuple[str, ...]
+    scopes: tuple[str, ...]
+    max_requests: int
+    max_response_bytes: int
+
+    def __repr__(self) -> str:
+        return (
+            "PluginMediationBinding(tenant_id="
+            f"{self.tenant_id!r}, plugin_id={self.plugin_id!r}, "
+            f"plugin_version={self.plugin_version!r}, grant_id={self.grant_id!r}, "
+            "endpoint=<protected>, credential_ref=<protected>)"
+        )
+
+
+class PluginMediationBindingRegistry(Protocol):
+    def resolve_plugin_mediation_binding(
+        self,
+        actor: ActorContext,
+        plugin_id: str,
+        plugin_version: str,
+        grant_id: str,
+    ) -> Optional[PluginMediationBinding]:
+        """Resolve protected authority only for one exact tenant and plugin grant."""
+
+
+class PluginMediationGateway(Protocol):
+    def fetch_plugin_json(
+        self,
+        actor: ActorContext,
+        binding: PluginMediationBinding,
+        *,
+        path: str,
+        query: Mapping[str, tuple[str, ...]],
+        deadline: str,
+        max_response_bytes: int,
+    ) -> object:
+        """Perform one exact, credential-mediated provider read and return JSON."""
+
+
 class EvidenceRedactor(Protocol):
     def redact(
         self,

@@ -10,6 +10,8 @@ export type PluginSessionId = `psn_${string}`;
 export type PluginInvocationId = `pin_${string}`;
 export type PluginInvocationCancellationId = `pcn_${string}`;
 export type PluginInvocationReconciliationId = `prc_${string}`;
+export type PluginMediationGrantId = `pmg_${string}`;
+export type PluginMediationRequestId = `pmr_${string}`;
 export type Sha256Digest = `sha256:${string}`;
 export type ResourceLifecycle =
   | "active"
@@ -1748,8 +1750,89 @@ export interface PluginInvocation {
     capability: string;
     method: string;
     input: Record<string, unknown>;
+    mediationGrants?: PluginMediationGrant[];
   };
 }
+
+export interface PluginMediationGrant {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PluginMediationGrant";
+  metadata: {
+    id: PluginMediationGrantId;
+    invocationId: PluginInvocationId;
+    tenantId: string;
+    actorId: string;
+    issuedAt: string;
+    expiresAt: string;
+  };
+  spec: {
+    integrationId: string;
+    provider: string;
+    destination: string;
+    credentialName: string;
+    operation: "http-json-read";
+    pathTemplates: string[];
+    queryKeys: string[];
+    scopes: string[];
+    limits: { maxRequests: number; maxResponseBytes: number };
+  };
+}
+
+export interface PluginMediationRequest {
+  apiVersion: "iip.plugin-runtime/v1alpha1";
+  kind: "PluginMediationRequest";
+  metadata: {
+    id: PluginMediationRequestId;
+    invocationId: PluginInvocationId;
+    grantId: PluginMediationGrantId;
+  };
+  spec: {
+    method: "GET";
+    path: string;
+    query: Record<string, string | string[]>;
+  };
+}
+
+export interface PluginMediationResponseBase {
+  apiVersion: "iip.plugin-runtime/v1alpha1";
+  kind: "PluginMediationResponse";
+  metadata: {
+    requestId: PluginMediationRequestId;
+    invocationId: PluginInvocationId;
+    completedAt: string;
+  };
+}
+
+export type PluginMediationResponse = PluginMediationResponseBase & {
+  spec:
+    | {
+        status: "succeeded";
+        mediaType: "application/json";
+        body: Record<string, unknown> | unknown[];
+        bodyDigest: Sha256Digest;
+        bodyBytes: number;
+        error?: never;
+      }
+    | {
+        status: "failed";
+        error: {
+          code:
+            | "plugin.mediation.audit-unavailable"
+            | "plugin.mediation.credential-unavailable"
+            | "plugin.mediation.deadline-exceeded"
+            | "plugin.mediation.denied"
+            | "plugin.mediation.limit-exceeded"
+            | "plugin.mediation.provider-unavailable"
+            | "plugin.mediation.request-invalid"
+            | "plugin.mediation.response-invalid"
+            | "plugin.mediation.response-too-large";
+        };
+        mediaType?: never;
+        body?: never;
+        bodyDigest?: never;
+        bodyBytes?: never;
+      };
+};
 
 export interface PluginInvocationResult {
   apiVersion: "iip.platform/v1alpha1";

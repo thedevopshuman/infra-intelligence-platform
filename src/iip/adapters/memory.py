@@ -803,6 +803,7 @@ class AllowTenantPolicy:
             "investigation-completion-slo:read",
             "plugin:open-session",
             "plugin:get-invocation",
+            "plugin:mediate-read",
             "plugin:cancel-invocation",
             "plugin:reconcile-invocation",
             "resource-projection:rebuild",

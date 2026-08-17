@@ -73,6 +73,14 @@ bounded CPU, memory, PIDs, files, temporary storage, deadline, input, stdout, an
 stderr. Every call has a request ID and structured error code. Raw exceptions
 and credentials never cross the boundary.
 
+An invocation may additionally carry [host-mediated read grants](plugin-mediation-contract.md).
+The container still uses `--network=none`; a fresh Unix-domain socket lets it
+select only an approved path template and query keys for a declared destination.
+The host rechecks protected binding, policy, audit, deadline, count, response
+size, and broker scope for each read. Manifest `network` and `secrets` entries
+remain upper bounds and never become ambient container authority. Action
+mediation remains unsupported.
+
 ## Compatibility
 
 Plugin versions are immutable. Patch releases fix behavior without contract change; minor releases add backward-compatible capabilities; major releases may break plugin-specific methods. Plugin protocol changes have their own compatibility range independent of plugin semantic version.

@@ -2,6 +2,7 @@
 
 from .client import Client, discover_console_authentication
 from .errors import ApiError
+from .mediation import PluginMediationClient, PluginMediationClientError
 from .models import (
     ActionApproval,
     ActionExecutionStatus,
@@ -57,6 +58,9 @@ from .models import (
     PluginInvocationResult,
     PluginInvocationStatus,
     PluginManifest,
+    PluginMediationGrant,
+    PluginMediationRequest,
+    PluginMediationResponse,
     PluginSession,
     PolicyDecision,
     PolicyDecisionRequest,
@@ -132,6 +136,11 @@ __all__ = [
     "PluginInvocationResult",
     "PluginInvocationStatus",
     "PluginManifest",
+    "PluginMediationClient",
+    "PluginMediationClientError",
+    "PluginMediationGrant",
+    "PluginMediationRequest",
+    "PluginMediationResponse",
     "PluginSession",
     "PolicyDecision",
     "PolicyDecisionRequest",
@@ -150,4 +159,4 @@ __all__ = [
     "TelemetryExportHealthReport",
     "discover_console_authentication",
 ]
-__version__ = "0.33.0"
+__version__ = "0.34.0"

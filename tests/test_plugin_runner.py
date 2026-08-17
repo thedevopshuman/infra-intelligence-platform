@@ -107,6 +107,7 @@ class RecordingTransport:
         timeout_seconds,
         max_output_bytes,
         cancellation_requested=None,
+        mediation_handler=None,
     ):
         self.calls.append(
             {
@@ -115,6 +116,7 @@ class RecordingTransport:
                 "timeout": timeout_seconds,
                 "maximum": max_output_bytes,
                 "cancellationConfigured": cancellation_requested is not None,
+                "mediationConfigured": mediation_handler is not None,
             }
         )
         if isinstance(self.output, bytes):
@@ -131,6 +133,7 @@ class FailingTransport(RecordingTransport):
         timeout_seconds,
         max_output_bytes,
         cancellation_requested=None,
+        mediation_handler=None,
     ):
         super().run(
             image_reference,
@@ -138,6 +141,7 @@ class FailingTransport(RecordingTransport):
             timeout_seconds=timeout_seconds,
             max_output_bytes=max_output_bytes,
             cancellation_requested=cancellation_requested,
+            mediation_handler=mediation_handler,
         )
         raise PluginRunnerError("plugin.runtime.deadline-exceeded")
 
@@ -151,6 +155,7 @@ class LeakyTransport(RecordingTransport):
         timeout_seconds,
         max_output_bytes,
         cancellation_requested=None,
+        mediation_handler=None,
     ):
         raise PluginRunnerError("provider secret and stack detail")
 
@@ -219,6 +224,38 @@ class SignedDockerPluginRunnerTests(unittest.TestCase):
                     self.runner(trust).run(
                         self.actor, manifest, session, invocation, TOKEN
                     )
+
+    def test_connected_permissions_require_and_receive_bound_mediation(self) -> None:
+        manifest, trust = signed_fixture()
+        manifest["spec"]["permissions"]["network"] = [
+            "kubernetes.default.svc:443"
+        ]
+        manifest["spec"]["permissions"]["secrets"] = ["kubernetes-token"]
+        session, invocation = scoped_documents(manifest)
+        invocation["spec"]["mediationGrants"] = [{"hostCreated": True}]
+        transport = RecordingTransport()
+
+        class Bound:
+            def handle(self, request):
+                return request
+
+        class Mediation:
+            def bind(self, actor, selected_manifest, selected_invocation):
+                self.bound = (actor, selected_manifest, selected_invocation)
+                return Bound()
+
+        mediation = Mediation()
+        runner = SignedDockerPluginRunner(
+            trust,
+            transport=transport,
+            mediation=mediation,
+            now=lambda: NOW,
+        )
+        result = runner.run(self.actor, manifest, session, invocation, TOKEN)
+
+        self.assertEqual(result["spec"]["status"], "succeeded")
+        self.assertTrue(transport.calls[0]["mediationConfigured"])
+        self.assertEqual(mediation.bound[2], invocation)
 
     def test_wrong_token_cross_tenant_expiry_and_unknown_method_fail_closed(self) -> None:
         manifest, trust = signed_fixture()

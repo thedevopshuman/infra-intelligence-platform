@@ -1,0 +1,28 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PluginMediationGrant",
+  "metadata": {
+    "id": "pmg_5f2ab8de42a7498ba9b23b331101acdf",
+    "invocationId": "pin_4da8d7ab485b4d7f90f7b5b932c70827",
+    "tenantId": "local",
+    "actorId": "plugin-host",
+    "issuedAt": "2026-08-14T12:44:30Z",
+    "expiresAt": "2026-08-14T12:45:00Z"
+  },
+  "spec": {
+    "integrationId": "kubernetes-local",
+    "provider": "kubernetes",
+    "destination": "kubernetes.default.svc:443",
+    "credentialName": "kubernetes.projected-service-account-token",
+    "operation": "http-json-read",
+    "pathTemplates": [
+      "/api/v1/namespaces/{namespace}/pods"
+    ],
+    "queryKeys": ["continue", "fieldSelector", "labelSelector", "limit"],
+    "scopes": ["kubernetes:read"],
+    "limits": {
+      "maxRequests": 8,
+      "maxResponseBytes": 1048576
+    }
+  }
+}

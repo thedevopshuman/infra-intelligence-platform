@@ -2620,6 +2620,95 @@ class PluginInvocation:
         return dict(self.payload)
 
 
+def _validate_plugin_runtime_envelope(
+    payload: Mapping[str, Any], *, kind: str, label: str
+) -> Dict[str, Any]:
+    if payload.get("apiVersion") != "iip.plugin-runtime/v1alpha1":
+        raise ValueError(f"unsupported {label} apiVersion")
+    if payload.get("kind") != kind:
+        raise ValueError(f"{label} kind must be {kind}")
+    if not isinstance(payload.get("metadata"), Mapping):
+        raise ValueError(f"{label} metadata must be an object")
+    if not isinstance(payload.get("spec"), Mapping):
+        raise ValueError(f"{label} spec must be an object")
+    return dict(payload)
+
+
+@dataclass(frozen=True)
+class PluginMediationGrant:
+    """Host-issued metadata for one invocation-scoped provider read grant."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PluginMediationGrant":
+        return cls(
+            _validate_envelope(
+                payload, kind="PluginMediationGrant", label="plugin mediation grant"
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class PluginMediationRequest:
+    """One destination-free JSON GET request for the invocation-local socket."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PluginMediationRequest":
+        return cls(
+            _validate_plugin_runtime_envelope(
+                payload,
+                kind="PluginMediationRequest",
+                label="plugin mediation request",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class PluginMediationResponse:
+    """Bounded JSON provider data or a stable host-created failure."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PluginMediationResponse":
+        return cls(
+            _validate_plugin_runtime_envelope(
+                payload,
+                kind="PluginMediationResponse",
+                label="plugin mediation response",
+            )
+        )
+
+    @property
+    def succeeded(self) -> bool:
+        spec = self.payload.get("spec")
+        return isinstance(spec, Mapping) and spec.get("status") == "succeeded"
+
+    @property
+    def body(self) -> object:
+        spec = self.payload.get("spec")
+        return spec.get("body") if isinstance(spec, Mapping) else None
+
+    @property
+    def error_code(self) -> Optional[str]:
+        spec = self.payload.get("spec")
+        error = spec.get("error") if isinstance(spec, Mapping) else None
+        code = error.get("code") if isinstance(error, Mapping) else None
+        return code if isinstance(code, str) else None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
 @dataclass(frozen=True)
 class PluginInvocationResult:
     """Durably replayable host result with output or a stable terminal error."""

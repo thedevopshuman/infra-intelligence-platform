@@ -8,3 +8,7 @@ dist
 docs
 tests
 deploy
+!deploy/
+deploy/*
+!deploy/plugin-mediation-bridge/
+!deploy/plugin-mediation-bridge/bridge.py

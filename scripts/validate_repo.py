@@ -95,7 +95,9 @@ REQUIRED_PATHS = (
     "docs/specifications/console-authentication-contract.md",
     "docs/decisions/0064-durable-plugin-invocation-ownership.md",
     "docs/decisions/0065-plugin-invocation-cancellation-and-reconciliation.md",
+    "docs/decisions/0066-host-mediated-plugin-read-connectivity.md",
     "docs/specifications/plugin-invocation-lifecycle-contract.md",
+    "docs/specifications/plugin-mediation-contract.md",
     "docs/operations/evidence-retention.md",
     "docs/operations/event-delivery.md",
     "docs/operations/helm-deployment.md",
@@ -143,6 +145,9 @@ REQUIRED_PATHS = (
     "contracts/schemas/plugin-invocation-status.schema.json",
     "contracts/schemas/plugin-invocation-cancellation-request.schema.json",
     "contracts/schemas/plugin-invocation-reconciliation-request.schema.json",
+    "contracts/schemas/plugin-mediation-grant.schema.json",
+    "contracts/schemas/plugin-mediation-request.schema.json",
+    "contracts/schemas/plugin-mediation-response.schema.json",
     "contracts/schemas/evidence.schema.json",
     "contracts/schemas/evidence-retention-report.schema.json",
     "contracts/schemas/kubernetes-event-evidence-request.schema.json",
@@ -190,6 +195,10 @@ REQUIRED_PATHS = (
     "contracts/examples/plugin-invocation-status.json",
     "contracts/examples/plugin-invocation-cancellation-request.json",
     "contracts/examples/plugin-invocation-reconciliation-request.json",
+    "contracts/examples/plugin-invocation-mediated.json",
+    "contracts/examples/plugin-mediation-grant.json",
+    "contracts/examples/plugin-mediation-request.json",
+    "contracts/examples/plugin-mediation-response.json",
     "contracts/examples/policy-decision-request.json",
     "contracts/examples/policy-decision.json",
     "contracts/examples/investigation-request.json",
@@ -363,6 +372,8 @@ REQUIRED_PATHS = (
     "deploy/kubernetes-actions/integrations.example.json",
     "deploy/kubernetes-actions/rbac.yaml",
     "deploy/kubernetes/dev/action-executor-fixture.yaml",
+    "deploy/plugin-mediation-bridge/Dockerfile",
+    "deploy/plugin-mediation-bridge/bridge.py",
     "deploy/otlp/receiver-channels.example.json",
     "deploy/otlp/log-receiver-channels.example.json",
     "scripts/test_kubernetes_live.sh",
@@ -543,6 +554,111 @@ def validate_versioned_envelope(
         document.get("spec"), dict
     ):
         fail(errors, f"{filename} must contain metadata and spec objects")
+
+
+def validate_plugin_mediation_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check authority binding and response integrity across mediation examples."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    manifest = documents.get(example_dir / "plugin-manifest.json")
+    invocation = documents.get(example_dir / "plugin-invocation-mediated.json")
+    grant = documents.get(example_dir / "plugin-mediation-grant.json")
+    request = documents.get(example_dir / "plugin-mediation-request.json")
+    response = documents.get(example_dir / "plugin-mediation-response.json")
+    if not all(isinstance(item, dict) for item in (manifest, invocation, grant, request, response)):
+        fail(errors, "plugin mediation examples must be objects")
+        return
+    assert isinstance(manifest, dict)
+    assert isinstance(invocation, dict)
+    assert isinstance(grant, dict)
+    assert isinstance(request, dict)
+    assert isinstance(response, dict)
+    for name, document, kind in (
+        ("plugin-mediation-request.json", request, "PluginMediationRequest"),
+        ("plugin-mediation-response.json", response, "PluginMediationResponse"),
+    ):
+        if (
+            document.get("apiVersion") != "iip.plugin-runtime/v1alpha1"
+            or document.get("kind") != kind
+            or not isinstance(document.get("metadata"), dict)
+            or not isinstance(document.get("spec"), dict)
+        ):
+            fail(errors, f"{name} has the wrong private protocol envelope")
+    validate_versioned_envelope(
+        invocation,
+        filename="plugin-invocation-mediated.json",
+        kind="PluginInvocation",
+        errors=errors,
+    )
+    validate_versioned_envelope(
+        grant,
+        filename="plugin-mediation-grant.json",
+        kind="PluginMediationGrant",
+        errors=errors,
+    )
+    invocation_metadata = invocation["metadata"]
+    invocation_spec = invocation["spec"]
+    grant_metadata = grant["metadata"]
+    grant_spec = grant["spec"]
+    request_metadata = request["metadata"]
+    response_metadata = response["metadata"]
+    response_spec = response["spec"]
+    permissions = manifest["spec"]["permissions"]
+    if invocation_spec.get("manifestDigest") != canonical_digest(manifest):
+        fail(errors, "mediated plugin invocation manifestDigest must match its manifest")
+    if invocation_spec.get("mediationGrants") != [grant]:
+        fail(errors, "mediated plugin invocation must embed the canonical grant")
+    if len(
+        {
+            invocation_metadata.get("id"),
+            grant_metadata.get("invocationId"),
+            request_metadata.get("invocationId"),
+            response_metadata.get("invocationId"),
+        }
+    ) != 1:
+        fail(errors, "plugin mediation examples must identify one invocation")
+    if request_metadata.get("grantId") != grant_metadata.get("id"):
+        fail(errors, "plugin mediation request must identify its embedded grant")
+    if response_metadata.get("requestId") != request_metadata.get("id"):
+        fail(errors, "plugin mediation response must identify its request")
+    if len(
+        {
+            invocation_metadata.get("tenantId"),
+            grant_metadata.get("tenantId"),
+        }
+    ) != 1 or len(
+        {
+            invocation_metadata.get("actorId"),
+            grant_metadata.get("actorId"),
+        }
+    ) != 1:
+        fail(errors, "plugin mediation grant must retain invocation tenant and actor")
+    issued = parse_timestamp(grant_metadata.get("issuedAt"))
+    expires = parse_timestamp(grant_metadata.get("expiresAt"))
+    created = parse_timestamp(invocation_metadata.get("createdAt"))
+    deadline = parse_timestamp(invocation_metadata.get("deadline"))
+    completed = parse_timestamp(response_metadata.get("completedAt"))
+    if None in (issued, expires, created, deadline, completed) or not (
+        created <= issued <= completed <= expires <= deadline
+    ):
+        fail(errors, "plugin mediation timestamps must fit the invocation deadline")
+    if (
+        grant_spec.get("destination") not in permissions.get("network", [])
+        or grant_spec.get("credentialName") not in permissions.get("secrets", [])
+        or permissions.get("actions")
+    ):
+        fail(errors, "plugin mediation grant must stay within read-only manifest permissions")
+    body = response_spec.get("body")
+    if response_spec.get("status") == "succeeded":
+        encoded = json.dumps(
+            body, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        if response_spec.get("bodyBytes") != len(encoded):
+            fail(errors, "plugin mediation response bodyBytes must match canonical JSON")
+        if response_spec.get("bodyDigest") != "sha256:" + hashlib.sha256(encoded).hexdigest():
+            fail(errors, "plugin mediation response bodyDigest must match canonical JSON")
 
 
 def validate_collection_examples(
@@ -2533,6 +2649,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_otlp_metrics_evidence_example(documents, errors)
     validate_otlp_logs_evidence_example(documents, errors)
     validate_evaluation_scenario(documents, errors)
+    validate_plugin_mediation_examples(documents, errors)
 
     policy_request = documents.get(example_dir / "policy-decision-request.json")
     policy_decision = documents.get(example_dir / "policy-decision.json")

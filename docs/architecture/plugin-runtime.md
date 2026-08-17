@@ -12,12 +12,18 @@ platform verifies trust and authority in this order:
    method, deadline, and limits to an active `PluginSession`;
 4. atomically claim the tenant/request ID against the persisted session and
    canonical invocation digest;
-5. start the already-present image by immutable digest with Docker networking
-   disabled and no host mounts, inherited plugin environment, or credentials;
-6. enforce read-only root, non-root UID, dropped capabilities,
+5. when the invocation carries an approved read grant, bind it to protected
+   endpoint/credential configuration, live policy, audit, deadline, and limits;
+6. start the already-present image by immutable digest with Docker networking
+   disabled, no inherited plugin environment or credentials, and at most one
+   fresh invocation-local mediation-socket volume shared through the
+   digest-pinned, no-network, non-root relay;
+7. mediate each allowed JSON `GET` on the host through an exact broker lease and
+   direct no-redirect TLS request, returning no provider headers or credentials;
+8. enforce read-only root, non-root UID, dropped capabilities,
    `no-new-privileges`, CPU, memory/swap, PID, file-descriptor, temporary storage,
    wall-time, input, stdout, and stderr limits;
-7. wrap one bounded JSON object in a host-created `PluginInvocationResult` and
+9. wrap one bounded JSON object in a host-created `PluginInvocationResult` and
    pass it to the owning contract validator before application use.
 
 The Docker client uses `--pull=never`. Artifact acquisition and signature review
@@ -38,10 +44,13 @@ machine only for no-impact conformance and is not restart durable. Network,
 secret, and action declarations remain denied. Before any side-effecting or
 externally connected plugin is enabled, the platform must add a mediated
 network/credential proxy whose grants are narrower than the manifest and
-session. Direct Docker socket access belongs only to a dedicated runner
+session. Read-only network and credential declarations are enabled only through
+the [invocation-scoped mediation boundary](../specifications/plugin-mediation-contract.md);
+action declarations remain denied. Direct Docker socket access belongs only to a dedicated runner
 deployment, never the API pod.
 
-The Kubernetes observer container is an offline conformance artifact: it accepts
-one invocation over stdin and normalizes a bundled provider fixture. Its separate
-live development transport still requires explicit kubeconfig and context and
-does not run under this no-network production profile.
+The Kubernetes observer container accepts one invocation over stdin. Offline
+tests can normalize a bundled provider fixture; the signed-runner conformance
+path instead reads the fixture through the real invocation-local socket while
+the container remains on Docker's `none` network. Its separate live development
+transport still requires explicit kubeconfig and context.

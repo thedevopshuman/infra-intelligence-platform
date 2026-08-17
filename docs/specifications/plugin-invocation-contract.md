@@ -40,5 +40,8 @@ ambiguous and therefore non-replayable. [ADR 0064](../decisions/0064-durable-plu
 defines these ownership semantics. The [plugin invocation lifecycle
 contract](plugin-invocation-lifecycle-contract.md) adds durable status,
 cooperative cancellation, and administrator-only post-deadline reconciliation.
-Connected or side-effecting plugin capabilities still require mediated network,
-credential, and action grants before they can be enabled.
+`spec.mediationGrants` is an additive request-scoped extension for the
+[host-mediated read protocol](plugin-mediation-contract.md). It is covered by
+the invocation digest and carries no endpoint, credential reference, or secret.
+Side-effecting plugin capabilities still require a separately defined mediated
+action grant before they can be enabled.

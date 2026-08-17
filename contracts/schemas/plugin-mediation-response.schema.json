@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:plugin-mediation-response:v1alpha1",
+  "title": "Infrastructure Intelligence Plugin Mediation Response",
+  "description": "Bounded host-created JSON response or stable failure. Provider headers and credential material never cross this boundary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.plugin-runtime/v1alpha1"},
+    "kind": {"const": "PluginMediationResponse"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "invocationId", "completedAt"],
+      "properties": {
+        "requestId": {"type": "string", "pattern": "^pmr_[a-f0-9]{32}$"},
+        "invocationId": {"type": "string", "pattern": "^pin_[a-f0-9]{32}$"},
+        "completedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "mediaType", "body", "bodyDigest", "bodyBytes"],
+          "properties": {
+            "status": {"const": "succeeded"},
+            "mediaType": {"const": "application/json"},
+            "body": {"oneOf": [{"type": "object"}, {"type": "array"}]},
+            "bodyDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+            "bodyBytes": {"type": "integer", "minimum": 2, "maximum": 4194304}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "error"],
+          "properties": {
+            "status": {"const": "failed"},
+            "error": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["code"],
+              "properties": {
+                "code": {"type": "string", "enum": ["plugin.mediation.audit-unavailable", "plugin.mediation.credential-unavailable", "plugin.mediation.deadline-exceeded", "plugin.mediation.denied", "plugin.mediation.limit-exceeded", "plugin.mediation.provider-unavailable", "plugin.mediation.request-invalid", "plugin.mediation.response-invalid", "plugin.mediation.response-too-large"]}
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

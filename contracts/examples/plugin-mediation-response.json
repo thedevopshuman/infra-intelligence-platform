@@ -1,0 +1,24 @@
+{
+  "apiVersion": "iip.plugin-runtime/v1alpha1",
+  "kind": "PluginMediationResponse",
+  "metadata": {
+    "requestId": "pmr_b7f6399d889f45dfb8635e18b89a0231",
+    "invocationId": "pin_4da8d7ab485b4d7f90f7b5b932c70827",
+    "completedAt": "2026-08-14T12:44:32Z"
+  },
+  "spec": {
+    "status": "succeeded",
+    "mediaType": "application/json",
+    "body": {
+      "apiVersion": "v1",
+      "items": [],
+      "kind": "PodList",
+      "metadata": {
+        "continue": "",
+        "resourceVersion": "12345"
+      }
+    },
+    "bodyDigest": "sha256:baa30a80b4f5899de006e940352bce542ffd57f77b5c94986531804af8347edd",
+    "bodyBytes": 100
+  }
+}

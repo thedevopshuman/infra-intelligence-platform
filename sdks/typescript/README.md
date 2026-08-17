@@ -35,6 +35,12 @@ Resource observer integrations use the exported `ResourceCollectionRequest`, `Re
 
 `PluginInvocationStatus`, `PluginInvocationCancellationRequest`, and `PluginInvocationReconciliationRequest` model durable execution state. `getPluginInvocationStatus`, `cancelPluginInvocation`, and `reconcilePluginInvocation` use the authenticated control-plane lifecycle; reconciliation is administrator-only, post-deadline, and never replays the invocation.
 
+`PluginMediationGrant`, `PluginMediationRequest`, and `PluginMediationResponse`
+describe the private invocation-local runner protocol without exposing server
+internals, provider endpoints, credential references, or secrets. The
+TypeScript package intentionally provides types only because Unix-domain socket
+transport is runtime-specific.
+
 Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. The server derives tenant, actor, and roles after credential verification; the SDK does not send caller-controlled identity headers.
 
 Version 0.4 adds opaque provider cursor resume fields, ingestion-freshness telemetry, backend-neutral telemetry evidence, the stored `OtlpMetricsEvidence` artifact type, and `InvestigationTelemetrySelection`. Investigation candidates reuse the public metric query and limit types while identity, resources, time range, and deadline remain inherited server-side. OTLP transport is intentionally not reimplemented by this client; use a standard OpenTelemetry SDK/Collector and the separately provisioned channel credential.
@@ -46,3 +52,5 @@ Version 0.6 adds `InvestigationTelemetryBaselineComparison` and `InvestigationTe
 Version 0.7 adds `KubernetesEventEvidenceRequest`, `KubernetesEventEvidenceResult`, investigation event selection/assessment types, and `collectKubernetesEventEvidence`. These types contain normalized scope and facts only—never kubeconfig, credentials, endpoints, or Kubernetes client objects.
 
 Version 0.33 adds plugin invocation status, cancellation, and reconciliation types and client methods.
+
+Version 0.34 adds invocation-scoped plugin mediation grant, request, and response types.

@@ -30,7 +30,13 @@
         "manifestDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "capability": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
         "method": {"type": "string", "pattern": "^[a-z][a-z0-9.-]{1,63}$"},
-        "input": {"type": "object"}
+        "input": {"type": "object"},
+        "mediationGrants": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {"$ref": "urn:iip:contracts:plugin-mediation-grant:v1alpha1"}
+        }
       }
     }
   }

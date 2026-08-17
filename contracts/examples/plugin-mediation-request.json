@@ -1,0 +1,17 @@
+{
+  "apiVersion": "iip.plugin-runtime/v1alpha1",
+  "kind": "PluginMediationRequest",
+  "metadata": {
+    "id": "pmr_b7f6399d889f45dfb8635e18b89a0231",
+    "invocationId": "pin_4da8d7ab485b4d7f90f7b5b932c70827",
+    "grantId": "pmg_5f2ab8de42a7498ba9b23b331101acdf"
+  },
+  "spec": {
+    "method": "GET",
+    "path": "/api/v1/namespaces/default/pods",
+    "query": {
+      "fieldSelector": "status.phase!=Succeeded",
+      "limit": "100"
+    }
+  }
+}

@@ -116,7 +116,10 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "telemetry-evidence-request.schema.json": ("telemetry-evidence-request.json",),
     "telemetry-evidence-result.schema.json": ("telemetry-evidence-result.json",),
     "plugin-manifest.schema.json": ("plugin-manifest.json",),
-    "plugin-invocation.schema.json": ("plugin-invocation.json",),
+    "plugin-invocation.schema.json": (
+        "plugin-invocation.json",
+        "plugin-invocation-mediated.json",
+    ),
     "plugin-invocation-result.schema.json": (
         "plugin-invocation-result.json",
         "plugin-invocation-result-failed.json",
@@ -129,6 +132,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "plugin-invocation-reconciliation-request.json",
     ),
     "plugin-session.schema.json": ("plugin-session.json",),
+    "plugin-mediation-grant.schema.json": ("plugin-mediation-grant.json",),
+    "plugin-mediation-request.schema.json": ("plugin-mediation-request.json",),
+    "plugin-mediation-response.schema.json": ("plugin-mediation-response.json",),
     "policy-decision-request.schema.json": ("policy-decision-request.json",),
     "policy-decision.schema.json": ("policy-decision.json",),
     "page-info.schema.json": ("page-info.json",),

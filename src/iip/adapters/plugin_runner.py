@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -22,6 +23,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from iip.application.investigate import canonical_digest
+from iip.application.plugin_mediation import PluginMediationError, PluginMediationService
 from iip.application.ports import (
     ActorContext,
     PersistenceError,
@@ -65,6 +67,7 @@ class PluginRunnerConfiguration:
     pids_limit: int = 64
     tmpfs_megabytes: int = 16
     max_input_bytes: int = 1_048_576
+    mediation_bridge_image_reference: str | None = None
 
     def validate(self) -> None:
         if (
@@ -86,6 +89,11 @@ class PluginRunnerConfiguration:
             or isinstance(self.max_input_bytes, bool)
             or not isinstance(self.max_input_bytes, int)
             or not 1024 <= self.max_input_bytes <= 16_777_216
+            or self.mediation_bridge_image_reference is not None
+            and (
+                not isinstance(self.mediation_bridge_image_reference, str)
+                or _OCI_REFERENCE.fullmatch(self.mediation_bridge_image_reference) is None
+            )
         ):
             raise PluginRunnerError("plugin.runner.configuration-invalid")
 
@@ -226,6 +234,8 @@ class PluginContainerTransport(Protocol):
         timeout_seconds: int,
         max_output_bytes: int,
         cancellation_requested: Callable[[], bool] | None = None,
+        mediation_handler: Callable[[Mapping[str, object]], Mapping[str, object]]
+        | None = None,
     ) -> bytes:
         """Execute one invocation in a bounded container and return stdout."""
 
@@ -247,9 +257,16 @@ class DockerCliPluginTransport:
         timeout_seconds: int,
         max_output_bytes: int,
         cancellation_requested: Callable[[], bool] | None = None,
+        mediation_handler: Callable[[Mapping[str, object]], Mapping[str, object]]
+        | None = None,
     ) -> bytes:
-        with tempfile.TemporaryDirectory(prefix="iip-plugin-") as directory:
+        with tempfile.TemporaryDirectory(prefix="iip-plugin-", dir="/tmp") as directory:
             cidfile = Path(directory) / "container.id"
+            mediation_bridge = (
+                _DockerPluginMediationBridge(self._configuration, mediation_handler)
+                if mediation_handler is not None
+                else None
+            )
             command = [
                 self._configuration.docker_binary,
                 "run",
@@ -273,8 +290,11 @@ class DockerCliPluginTransport:
                 ),
                 "--log-driver=none",
                 f"--cidfile={cidfile}",
-                image_reference,
             ]
+            if mediation_bridge is not None:
+                mediation_bridge.start()
+                command.append(mediation_bridge.plugin_mount)
+            command.append(image_reference)
             try:
                 process = subprocess.Popen(
                     command,
@@ -284,6 +304,8 @@ class DockerCliPluginTransport:
                     env=_docker_environment(),
                 )
             except OSError:
+                if mediation_bridge is not None:
+                    mediation_bridge.close()
                 raise PluginRunnerError("plugin.runtime.unavailable") from None
             try:
                 assert process.stdin is not None
@@ -307,6 +329,8 @@ class DockerCliPluginTransport:
             finally:
                 if process.poll() is None:
                     self._stop(process, cidfile)
+                if mediation_bridge is not None:
+                    mediation_bridge.close()
 
     def _bounded_output(
         self,
@@ -382,6 +406,208 @@ class DockerCliPluginTransport:
                 )
             except (OSError, subprocess.TimeoutExpired):
                 pass
+
+
+class _DockerPluginMediationBridge:
+    """Host-owned stdio bridge to a socket in a fresh Docker volume."""
+
+    MAX_MESSAGE_BYTES = 4_194_304
+
+    def __init__(
+        self,
+        configuration: PluginRunnerConfiguration,
+        handler: Callable[[Mapping[str, object]], Mapping[str, object]],
+    ) -> None:
+        self._configuration = configuration
+        self._handler = handler
+        self._volume = "iip-plugin-mediation-" + uuid.uuid4().hex
+        self._container_name = self._volume + "-bridge"
+        self._process: subprocess.Popen[bytes] | None = None
+        self._thread: threading.Thread | None = None
+
+    @property
+    def plugin_mount(self) -> str:
+        return (
+            f"--mount=type=volume,source={self._volume},"
+            "target=/run/iip-mediation,readonly"
+        )
+
+    def start(self) -> None:
+        image = self._configuration.mediation_bridge_image_reference
+        if image is None:
+            raise PluginRunnerError("plugin.mediation.bridge-unavailable")
+        self._docker(("volume", "create", self._volume), capture=False)
+        try:
+            self._initialize_volume(image)
+        except PluginRunnerError:
+            self.close()
+            raise
+        command = [
+            self._configuration.docker_binary,
+            "run",
+            "--rm",
+            "--interactive",
+            f"--name={self._container_name}",
+            "--pull=never",
+            "--network=none",
+            "--read-only",
+            "--user=65532:65532",
+            "--cap-drop=ALL",
+            "--security-opt=no-new-privileges",
+            "--label=iip.plugin-mediation-bridge=true",
+            "--pids-limit=32",
+            "--memory=64m",
+            "--memory-swap=64m",
+            "--cpus=0.25",
+            "--ulimit=nofile=128:128",
+            "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=4m",
+            "--log-driver=none",
+            f"--mount=type=volume,source={self._volume},target=/run/iip-mediation",
+            image,
+        ]
+        try:
+            self._process = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                env=_docker_environment(),
+            )
+            ready = self._read_ready(self._process)
+            if ready != {"status": "ready"}:
+                raise PluginRunnerError("plugin.mediation.bridge-unavailable")
+            self._thread = threading.Thread(
+                target=self._relay,
+                name="iip-plugin-mediation-relay",
+                daemon=True,
+            )
+            self._thread.start()
+        except PluginRunnerError:
+            self.close()
+            raise
+        except OSError:
+            self.close()
+            raise PluginRunnerError("plugin.mediation.bridge-unavailable") from None
+
+    def close(self) -> None:
+        if self._process is not None:
+            self._docker(
+                ("kill", self._container_name),
+                capture=False,
+                ignore_failure=True,
+            )
+            try:
+                self._process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                try:
+                    self._process.kill()
+                except OSError:
+                    pass
+        if self._thread is not None:
+            self._thread.join(timeout=2)
+        self._docker(
+            ("volume", "rm", "--force", self._volume),
+            capture=False,
+            ignore_failure=True,
+        )
+
+    def _relay(self) -> None:
+        assert self._process is not None
+        assert self._process.stdout is not None
+        assert self._process.stdin is not None
+        while self._process.poll() is None:
+            try:
+                line = self._process.stdout.readline(self.MAX_MESSAGE_BYTES + 2)
+                if not line:
+                    return
+                if len(line) > self.MAX_MESSAGE_BYTES + 1 or not line.endswith(b"\n"):
+                    return
+                request = json.loads(line)
+                if not isinstance(request, dict):
+                    return
+                response = self._handler(request)
+                if not isinstance(response, Mapping):
+                    return
+                encoded = _canonical_bytes(response)
+                if len(encoded) > self.MAX_MESSAGE_BYTES:
+                    return
+                self._process.stdin.write(encoded + b"\n")
+                self._process.stdin.flush()
+            except (BrokenPipeError, OSError, TypeError, ValueError, json.JSONDecodeError):
+                return
+
+    def _initialize_volume(self, image: str) -> None:
+        command = [
+            self._configuration.docker_binary,
+            "run",
+            "--rm",
+            "--pull=never",
+            "--network=none",
+            "--read-only",
+            "--user=0:0",
+            "--cap-drop=ALL",
+            "--security-opt=no-new-privileges",
+            "--pids-limit=16",
+            "--memory=32m",
+            "--memory-swap=32m",
+            "--cpus=0.1",
+            "--log-driver=none",
+            f"--mount=type=volume,source={self._volume},target=/run/iip-mediation",
+            image,
+            "--initialize",
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+                check=False,
+                env=_docker_environment(),
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            raise PluginRunnerError("plugin.mediation.bridge-unavailable") from None
+        if completed.returncode != 0:
+            raise PluginRunnerError("plugin.mediation.bridge-unavailable")
+
+    @staticmethod
+    def _read_ready(process: subprocess.Popen[bytes]) -> object:
+        assert process.stdout is not None
+        selector = selectors.DefaultSelector()
+        selector.register(process.stdout, selectors.EVENT_READ)
+        try:
+            events = selector.select(5)
+            if not events:
+                raise PluginRunnerError("plugin.mediation.bridge-unavailable")
+            line = process.stdout.readline(1024)
+            if not line.endswith(b"\n"):
+                raise PluginRunnerError("plugin.mediation.bridge-unavailable")
+            return json.loads(line)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise PluginRunnerError("plugin.mediation.bridge-unavailable") from None
+        finally:
+            selector.close()
+
+    def _docker(
+        self,
+        arguments: tuple[str, ...],
+        *,
+        capture: bool,
+        ignore_failure: bool = False,
+    ) -> None:
+        try:
+            completed = subprocess.run(
+                [self._configuration.docker_binary, *arguments],
+                stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+                check=False,
+                env=_docker_environment(),
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            raise PluginRunnerError("plugin.mediation.bridge-unavailable") from None
+        if completed.returncode != 0 and not ignore_failure:
+            raise PluginRunnerError("plugin.mediation.bridge-unavailable")
 
 
 class InMemoryPluginExecutionLedger:
@@ -667,6 +893,7 @@ class SignedDockerPluginRunner:
         configuration: PluginRunnerConfiguration | None = None,
         transport: PluginContainerTransport | None = None,
         ledger: PluginInvocationLedger | None = None,
+        mediation: PluginMediationService | None = None,
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -675,6 +902,7 @@ class SignedDockerPluginRunner:
         self._trust_store = trust_store
         self._transport = transport or DockerCliPluginTransport(self._configuration)
         self._ledger = ledger or InMemoryPluginExecutionLedger()
+        self._mediation = mediation
         self._now = now
         self._monotonic = monotonic
 
@@ -691,10 +919,22 @@ class SignedDockerPluginRunner:
             actor, manifest, session, invocation, capability_token
         )
         permissions = manifest["spec"]["permissions"]
-        if not isinstance(permissions, Mapping) or any(
-            permissions.get(name) for name in ("network", "secrets", "actions")
-        ):
+        if not isinstance(permissions, Mapping) or permissions.get("actions"):
             raise PluginRunnerError("plugin.permission.unsupported")
+        mediation_handler = None
+        declared_connectivity = bool(
+            permissions.get("network") or permissions.get("secrets")
+        )
+        has_grants = "mediationGrants" in spec
+        if declared_connectivity or has_grants:
+            if self._mediation is None or not has_grants:
+                raise PluginRunnerError("plugin.permission.unsupported")
+            try:
+                mediation_handler = self._mediation.bind(
+                    actor, manifest, invocation
+                ).handle
+            except PluginMediationError as error:
+                raise PluginRunnerError(str(error)) from None
         payload = _canonical_bytes(invocation) + b"\n"
         if len(payload) > self._configuration.max_input_bytes:
             raise PluginRunnerError("plugin.input.too-large")
@@ -733,15 +973,24 @@ class SignedDockerPluginRunner:
             )
         else:
             try:
-                output_bytes = self._transport.run(
-                    image_reference,
-                    payload,
-                    timeout_seconds=limits["maxWallTimeSeconds"],
-                    max_output_bytes=limits["maxOutputBytes"],
-                    cancellation_requested=lambda: self._cancellation_requested(
+                transport_arguments = {
+                    "timeout_seconds": limits["maxWallTimeSeconds"],
+                    "max_output_bytes": limits["maxOutputBytes"],
+                    "cancellation_requested": lambda: self._cancellation_requested(
                         actor, str(metadata["id"]), request_digest
                     ),
-                )
+                }
+                if mediation_handler is None:
+                    output_bytes = self._transport.run(
+                        image_reference, payload, **transport_arguments
+                    )
+                else:
+                    output_bytes = self._transport.run(
+                        image_reference,
+                        payload,
+                        mediation_handler=mediation_handler,
+                        **transport_arguments,
+                    )
                 try:
                     output = json.loads(output_bytes)
                 except (UnicodeDecodeError, json.JSONDecodeError):
@@ -935,7 +1184,16 @@ class SignedDockerPluginRunner:
                 or set(metadata)
                 != {"id", "sessionId", "tenantId", "actorId", "createdAt", "deadline"}
                 or set(spec)
-                != {"manifestDigest", "capability", "method", "input"}
+                not in (
+                    {"manifestDigest", "capability", "method", "input"},
+                    {
+                        "manifestDigest",
+                        "capability",
+                        "method",
+                        "input",
+                        "mediationGrants",
+                    },
+                )
                 or session.get("apiVersion") != "iip.platform/v1alpha1"
                 or session.get("kind") != "PluginSession"
                 or session.get("status") != "ready"

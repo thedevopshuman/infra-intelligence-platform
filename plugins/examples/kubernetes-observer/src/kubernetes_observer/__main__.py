@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
 from typing import Sequence
+
+from infra_intelligence_sdk import PluginMediationClient, PluginMediationRequest
 
 from .collector import canonical_digest, collect
 from .live import LiveCollectionError, list_objects, watch_then_list_objects
@@ -26,6 +29,7 @@ def parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
+    mediation_grants: list[object] = []
     try:
         if args.stdio:
             if args.request is not None or args.live_context is not None:
@@ -45,11 +49,53 @@ def main(argv: Sequence[str] | None = None) -> int:
             ):
                 raise ValueError("invalid invocation")
             request = invocation["spec"]["input"]
+            candidate_grants = invocation["spec"].get("mediationGrants", [])
+            if not isinstance(candidate_grants, list):
+                raise ValueError("invalid mediation grants")
+            mediation_grants = candidate_grants
         else:
             if args.request is None:
                 raise ValueError("fixture and live modes require --request")
             request = json.loads(args.request.read_text(encoding="utf-8"))
-        if args.objects is not None:
+        if mediation_grants:
+            grant = mediation_grants[0]
+            grant_metadata = grant.get("metadata") if isinstance(grant, dict) else None
+            request_spec = request.get("spec") if isinstance(request, dict) else None
+            scope = request_spec.get("scope") if isinstance(request_spec, dict) else None
+            parameters = scope.get("parameters") if isinstance(scope, dict) else None
+            namespaces = parameters.get("namespaces") if isinstance(parameters, dict) else None
+            if (
+                not isinstance(grant_metadata, dict)
+                or not isinstance(grant_metadata.get("id"), str)
+                or not isinstance(namespaces, list)
+                or len(namespaces) != 1
+                or not isinstance(namespaces[0], str)
+            ):
+                raise ValueError("mediated collection scope is invalid")
+            identity = f"{invocation['metadata']['id']}\x1f{grant_metadata['id']}".encode()
+            mediated_request = PluginMediationRequest.from_dict(
+                {
+                    "apiVersion": "iip.plugin-runtime/v1alpha1",
+                    "kind": "PluginMediationRequest",
+                    "metadata": {
+                        "id": "pmr_" + hashlib.sha256(identity).hexdigest()[:32],
+                        "invocationId": invocation["metadata"]["id"],
+                        "grantId": grant_metadata["id"],
+                    },
+                    "spec": {
+                        "method": "GET",
+                        "path": f"/api/v1/namespaces/{namespaces[0]}/pods",
+                        "query": {"limit": "500"},
+                    },
+                }
+            )
+            mediated_response = PluginMediationClient().request(mediated_request)
+            if not mediated_response.succeeded or not isinstance(
+                mediated_response.body, dict
+            ):
+                raise ValueError("mediated collection failed")
+            objects = mediated_response.body
+        elif args.objects is not None:
             if args.kubeconfig is not None:
                 raise ValueError("kubeconfig is only valid with live collection")
             objects = json.loads(args.objects.read_text(encoding="utf-8"))

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:plugin-mediation-grant:v1alpha1",
+  "title": "Infrastructure Intelligence Plugin Mediation Grant",
+  "description": "Request-scoped public authority metadata for one host-mediated read channel. It contains no endpoint URL, credential reference, or secret value.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "PluginMediationGrant"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "invocationId", "tenantId", "actorId", "issuedAt", "expiresAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^pmg_[a-f0-9]{32}$"},
+        "invocationId": {"type": "string", "pattern": "^pin_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"},
+        "actorId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/@-]{0,255}$", "not": {"const": "anonymous"}},
+        "issuedAt": {"type": "string", "format": "date-time"},
+        "expiresAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["integrationId", "provider", "destination", "credentialName", "operation", "pathTemplates", "queryKeys", "scopes", "limits"],
+      "properties": {
+        "integrationId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "provider": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{1,63}$"},
+        "destination": {"type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?:[1-9][0-9]{0,4}$", "maxLength": 260},
+        "credentialName": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "operation": {"const": "http-json-read"},
+        "pathTemplates": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^/(?:[A-Za-z0-9._~-]+|\\{[a-z][A-Za-z0-9]{0,31}\\})(?:/(?:[A-Za-z0-9._~-]+|\\{[a-z][A-Za-z0-9]{0,31}\\}))*$", "maxLength": 512}
+        },
+        "queryKeys": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,63}$"}
+        },
+        "scopes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,63}:[a-z][a-z0-9._/-]{0,63}$"}
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxRequests", "maxResponseBytes"],
+          "properties": {
+            "maxRequests": {"type": "integer", "minimum": 1, "maximum": 64},
+            "maxResponseBytes": {"type": "integer", "minimum": 1024, "maximum": 4194304}
+          }
+        }
+      }
+    }
+  }
+}

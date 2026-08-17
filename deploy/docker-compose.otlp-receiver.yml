@@ -10,9 +10,11 @@ services:
       interval: 2s
       timeout: 2s
       retries: 20
+    ports:
+      - "127.0.0.1:15434:5432"
 
   api:
-    image: iip-otlp-receiver-test:0.52.0
+    image: iip-otlp-receiver-test:0.53.0
     build:
       context: ..
       dockerfile: Dockerfile
@@ -41,7 +43,7 @@ services:
       - no-new-privileges:true
 
   receiver:
-    image: iip-otlp-receiver-test:0.52.0
+    image: iip-otlp-receiver-test:0.53.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.otlp_receiver"]
     environment:
@@ -49,6 +51,11 @@ services:
       IIP_DATABASE_AUTO_MIGRATE: "false"
       IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
       IIP_OTLP_HTTP_PORT: "4318"
+      IIP_OTLP_TLS_MODE: mutual-spiffe
+      IIP_OTLP_TLS_CERTIFICATE_PATH: /tls/server.crt
+      IIP_OTLP_TLS_PRIVATE_KEY_PATH: /tls/server.key
+      IIP_OTLP_TLS_CLIENT_CA_PATH: /tls/ca.crt
+      IIP_OTLP_MTLS_IDENTITIES_JSON: ${IIP_OTLP_MTLS_IDENTITIES_JSON:?set IIP_OTLP_MTLS_IDENTITIES_JSON}
       IIP_OTLP_MAX_REQUESTS_PER_SECOND: "50"
       IIP_OTLP_REQUEST_BURST: "100"
       IIP_OTLP_RECEIVER_ENABLED: "true"
@@ -58,8 +65,10 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    volumes:
+      - ${IIP_OTLP_MTLS_FIXTURE_DIR:?set IIP_OTLP_MTLS_FIXTURE_DIR}:/tls:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4318/readyz', timeout=3)"]
+      test: ["CMD", "python", "-c", "import ssl,urllib.request; urllib.request.urlopen('https://127.0.0.1:4318/readyz',context=ssl.create_default_context(cafile='/tls/ca.crt'),timeout=3)"]
       interval: 2s
       timeout: 4s
       retries: 20

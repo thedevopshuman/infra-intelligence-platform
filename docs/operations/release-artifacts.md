@@ -12,10 +12,16 @@ make test-capacity PYTHON=.venv/bin/python
 make test-credential-broker PYTHON=.venv/bin/python
 make test-oidc PYTHON=.venv/bin/python
 make test-policy-engine PYTHON=.venv/bin/python
+make test-otlp-receiver PYTHON=.venv/bin/python
 make release-bundle PYTHON=.venv/bin/python
 ```
 
-Retain the clean-revision capacity, credential-broker, OIDC-issuer, and policy-engine compatibility reports under `dist/` beside the release candidate as environment-specific evidence. They are deliberately not embedded in the portable bundle because their PostgreSQL, host, container-runtime, and fixture measurements describe the certification environment, not every installation target.
+Retain the clean-revision capacity, credential-broker, OIDC-issuer,
+policy-engine, and OTLP-receiver compatibility reports under `dist/` beside the
+release candidate as environment-specific evidence. They are deliberately not
+embedded in the portable bundle because their PostgreSQL, host,
+container-runtime, PKI fixture, and Collector measurements describe the
+certification environment, not every installation target.
 
 The default build produces `linux/amd64` and `linux/arm64` manifests for both the control plane and the trusted plugin-mediation bridge. BuildKit attaches an in-toto SPDX SBOM and SLSA v1 provenance statement to every platform inside each OCI layout. The base-image index and SBOM generator are digest pinned; dependency updates must intentionally update those pins and pass the normal verification gates.
 
@@ -38,7 +44,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.52.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.53.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 

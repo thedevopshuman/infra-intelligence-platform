@@ -8,6 +8,15 @@
 {{- if and .Values.otlpLogsReceiver.enabled (not .Values.otlpLogsReceiver.channelsExistingSecret) }}
 {{- fail "otlpLogsReceiver.channelsExistingSecret is required when the logs receiver is enabled" }}
 {{- end }}
+{{- if and (ne .Values.otlpIngest.tls.mode "disabled") (not .Values.otlpIngest.tls.serverExistingSecret) }}
+{{- fail "otlpIngest.tls.serverExistingSecret is required when receiver TLS is enabled" }}
+{{- end }}
+{{- if and (eq .Values.otlpIngest.tls.mode "mutual-spiffe") (not .Values.otlpIngest.tls.clientCaExistingSecret) }}
+{{- fail "otlpIngest.tls.clientCaExistingSecret is required in mutual-spiffe mode" }}
+{{- end }}
+{{- if and (eq .Values.otlpIngest.tls.mode "mutual-spiffe") (not .Values.otlpIngest.tls.identitiesExistingSecret) }}
+{{- fail "otlpIngest.tls.identitiesExistingSecret is required in mutual-spiffe mode" }}
+{{- end }}
 {{- if and .Values.networkPolicy.enabled (not .Values.networkPolicy.databaseEgress.enabled) }}
 {{- fail "networkPolicy.databaseEgress.enabled is required for an isolated OTLP receiver" }}
 {{- end }}
@@ -65,6 +74,23 @@ spec:
               value: {{ .Values.otlpIngest.httpHost | quote }}
             - name: IIP_OTLP_HTTP_PORT
               value: {{ .Values.otlpIngest.httpPort | quote }}
+            - name: IIP_OTLP_TLS_MODE
+              value: {{ .Values.otlpIngest.tls.mode | quote }}
+            {{- if ne .Values.otlpIngest.tls.mode "disabled" }}
+            - name: IIP_OTLP_TLS_CERTIFICATE_PATH
+              value: {{ printf "%s/tls.crt" .Values.otlpIngest.tls.serverMountPath | quote }}
+            - name: IIP_OTLP_TLS_PRIVATE_KEY_PATH
+              value: {{ printf "%s/tls.key" .Values.otlpIngest.tls.serverMountPath | quote }}
+            {{- end }}
+            {{- if eq .Values.otlpIngest.tls.mode "mutual-spiffe" }}
+            - name: IIP_OTLP_TLS_CLIENT_CA_PATH
+              value: {{ printf "%s/ca.crt" .Values.otlpIngest.tls.clientCaMountPath | quote }}
+            - name: IIP_OTLP_MTLS_IDENTITIES_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.otlpIngest.tls.identitiesExistingSecret | quote }}
+                  key: {{ .Values.otlpIngest.tls.identitiesSecretKey | quote }}
+            {{- end }}
             - name: IIP_OTLP_MAX_REQUESTS_PER_SECOND
               value: {{ .Values.otlpIngest.maxRequestsPerSecond | quote }}
             - name: IIP_OTLP_REQUEST_BURST
@@ -95,12 +121,14 @@ spec:
             httpGet:
               path: /healthz
               port: otlp-http
+              scheme: {{ if eq .Values.otlpIngest.tls.mode "disabled" }}HTTP{{ else }}HTTPS{{ end }}
             initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
           readinessProbe:
             httpGet:
               path: /readyz
               port: otlp-http
+              scheme: {{ if eq .Values.otlpIngest.tls.mode "disabled" }}HTTP{{ else }}HTTPS{{ end }}
             initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
             timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
@@ -109,6 +137,16 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if ne .Values.otlpIngest.tls.mode "disabled" }}
+            - name: otlp-server-tls
+              mountPath: {{ .Values.otlpIngest.tls.serverMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- if eq .Values.otlpIngest.tls.mode "mutual-spiffe" }}
+            - name: otlp-client-ca
+              mountPath: {{ .Values.otlpIngest.tls.clientCaMountPath | quote }}
+              readOnly: true
+            {{- end }}
             {{- if eq .Values.policy.mode "external-http" }}
             {{- if .Values.policy.externalHttp.bearerTokenExistingSecret }}
             - name: policy-token
@@ -124,6 +162,24 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if ne .Values.otlpIngest.tls.mode "disabled" }}
+        - name: otlp-server-tls
+          secret:
+            secretName: {{ .Values.otlpIngest.tls.serverExistingSecret | quote }}
+            items:
+              - key: {{ .Values.otlpIngest.tls.certificateSecretKey | quote }}
+                path: tls.crt
+              - key: {{ .Values.otlpIngest.tls.privateKeySecretKey | quote }}
+                path: tls.key
+        {{- end }}
+        {{- if eq .Values.otlpIngest.tls.mode "mutual-spiffe" }}
+        - name: otlp-client-ca
+          secret:
+            secretName: {{ .Values.otlpIngest.tls.clientCaExistingSecret | quote }}
+            items:
+              - key: {{ .Values.otlpIngest.tls.clientCaSecretKey | quote }}
+                path: ca.crt
+        {{- end }}
         {{- if and (eq .Values.policy.mode "external-http") .Values.policy.externalHttp.bearerTokenExistingSecret }}
         - name: policy-token
           secret:

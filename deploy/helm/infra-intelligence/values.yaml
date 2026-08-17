@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.52.0"
+  tag: "0.53.0"
   digest: ""
 
 worker:
@@ -276,6 +276,17 @@ otlpIngest:
   replicaCount: 1
   httpHost: 0.0.0.0
   httpPort: 4318
+  tls:
+    mode: disabled
+    serverExistingSecret: ""
+    certificateSecretKey: tls.crt
+    privateKeySecretKey: tls.key
+    serverMountPath: /var/run/iip-otlp-tls
+    clientCaExistingSecret: ""
+    clientCaSecretKey: ca.crt
+    clientCaMountPath: /var/run/iip-otlp-client-ca
+    identitiesExistingSecret: ""
+    identitiesSecretKey: otlp-client-identities-json
   service:
     type: ClusterIP
     port: 4318

@@ -174,7 +174,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.52.0"
+    server_version = "IIPReference/0.53.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -1125,6 +1125,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 raise OtlpReceiverAuthenticationError(code) from None
             channel = service.authenticate_bearer(token)
             validate_channel_context(channel)
+            self._authorize_otlp_transport(channel.channel_id)
             if not self._admit_otlp_channel(channel.channel_id):
                 self._otlp_failure(
                     HTTPStatus.TOO_MANY_REQUESTS,
@@ -1195,6 +1196,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 raise OtlpReceiverAuthenticationError(code) from None
             channel = service.authenticate_bearer(token)
             validate_logs_channel_context(channel)
+            self._authorize_otlp_transport(channel.channel_id)
             if not self._admit_otlp_channel(channel.channel_id):
                 self._otlp_failure(
                     HTTPStatus.TOO_MANY_REQUESTS,
@@ -1272,6 +1274,11 @@ class ApiHandler(BaseHTTPRequestHandler):
 
         del channel_id
         return True
+
+    def _authorize_otlp_transport(self, channel_id: str) -> None:
+        """Keep transport identity optional only for shared development mode."""
+
+        del channel_id
 
     def _stored_document(
         self,

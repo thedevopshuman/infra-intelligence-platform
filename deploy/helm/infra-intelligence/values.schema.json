@@ -696,6 +696,7 @@
         "replicaCount",
         "httpHost",
         "httpPort",
+        "tls",
         "service",
         "maxRequestsPerSecond",
         "requestBurst",
@@ -705,6 +706,34 @@
         "replicaCount": { "$ref": "#/definitions/replicas" },
         "httpHost": { "type": "string", "enum": ["0.0.0.0", "::"] },
         "httpPort": { "$ref": "#/definitions/port" },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "serverExistingSecret",
+            "certificateSecretKey",
+            "privateKeySecretKey",
+            "serverMountPath",
+            "clientCaExistingSecret",
+            "clientCaSecretKey",
+            "clientCaMountPath",
+            "identitiesExistingSecret",
+            "identitiesSecretKey"
+          ],
+          "properties": {
+            "mode": { "type": "string", "enum": ["disabled", "server", "mutual-spiffe"] },
+            "serverExistingSecret": { "$ref": "#/definitions/optionalName" },
+            "certificateSecretKey": { "$ref": "#/definitions/nonEmptyString" },
+            "privateKeySecretKey": { "$ref": "#/definitions/nonEmptyString" },
+            "serverMountPath": { "$ref": "#/definitions/absolutePath" },
+            "clientCaExistingSecret": { "$ref": "#/definitions/optionalName" },
+            "clientCaSecretKey": { "$ref": "#/definitions/nonEmptyString" },
+            "clientCaMountPath": { "$ref": "#/definitions/absolutePath" },
+            "identitiesExistingSecret": { "$ref": "#/definitions/optionalName" },
+            "identitiesSecretKey": { "$ref": "#/definitions/nonEmptyString" }
+          }
+        },
         "service": {
           "type": "object",
           "additionalProperties": false,

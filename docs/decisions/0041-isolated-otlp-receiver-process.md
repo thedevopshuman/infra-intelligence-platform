@@ -2,6 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2026-08-17
+**Amended by:** [ADR 0080](0080-mutual-tls-otlp-workload-identity-and-buffering.md)
 
 ## Context
 

@@ -61,9 +61,12 @@ Create a random channel token of at least 32 characters. Store only its SHA-256 
 ```bash
 export IIP_OTLP_LOGS_RECEIVER_ENABLED=true
 export IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON="$(tr -d '\n' < deploy/otlp/log-receiver-channels.example.json)"
-export OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://localhost:4318/v1/logs
+export OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://localhost:4318/v1/logs
 export OTEL_EXPORTER_OTLP_LOGS_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_LOGS_HEADERS="Authorization=Bearer%20<channel-token>"
+export OTEL_EXPORTER_OTLP_CERTIFICATE=/protected/server-ca/ca.crt
+export OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE=/protected/client/tls.crt
+export OTEL_EXPORTER_OTLP_CLIENT_KEY=/protected/client/tls.key
 ```
 
 The configured resource must already exist in the bound tenant. Each payload must provide an allowlisted string `service.name`; the matching service profile maps only approved attributes. Unknown services and attributes never expand tenant, integration, resource, sensitivity, or retention authority.
@@ -74,7 +77,16 @@ Each protected channel fixes request/artifact bytes, record count, mapped attrib
 
 String bodies may contain secrets or hostile instructions. They are treated as confidential untrusted text and redacted before hashing/persistence. Do not route unrestricted production logs into this receiver. Use a Collector to filter service pipelines and inject the channel authorization header outside application workloads.
 
-Metrics and logs share a dedicated OTLP intake process, not the control-plane listener. The receiver exposes no console or control operations, has independent channel secrets, and applies per-channel request admission before body reads. When Helm NetworkPolicy is enabled, `networkPolicy.otlpReceiverIngress` applies to both signals; restrict it to the trusted Collector/gateway namespace and pods, and configure `networkPolicy.databaseEgress`. Federated workload identity or mTLS, distributed rate enforcement, durable buffering, deletion/data-residency controls, and receiver-specific SLOs remain required.
+Metrics and logs share a dedicated OTLP intake process, not the control-plane
+listener. The production profile requires both a CA-verified SPIFFE client
+certificate bound to the exact channel and the independent channel Bearer
+credential before body reads. When Helm NetworkPolicy is enabled,
+`networkPolicy.otlpReceiverIngress` applies to both signals; restrict it to the
+trusted Collector/gateway namespace and pods, and configure database egress.
+Use the validated persistent Collector queue in the
+[receiver runbook](otlp-metrics-receiver.md) for outage buffering. Distributed
+rate enforcement, deletion/data-residency controls, and receiver-specific SLOs
+remain customer decisions.
 
 ## Helm and Docker verification
 

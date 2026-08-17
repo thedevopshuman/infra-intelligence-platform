@@ -114,6 +114,60 @@ action, immutable snapshot semantics, credential and certificate rotation,
 revocation, response bounds, audit delivery, outage, failover, and recovery.
 Never use the permissive local policy mode in a production deployment.
 
+## Mutual-TLS OTLP intake
+
+The OTLP listener is a separate Deployment and ClusterIP Service. Production
+enablement requires a server keypair, a client CA, a protected SPIFFE identity
+registry, tenant-bound channel configuration, and exact Collector ingress. A
+representative values fragment is:
+
+```yaml
+database:
+  existingSecret: iip-database
+
+otlpReceiver:
+  enabled: true
+  channelsExistingSecret: iip-otlp-metrics-channels
+
+otlpLogsReceiver:
+  enabled: true
+  channelsExistingSecret: iip-otlp-logs-channels
+
+otlpIngest:
+  tls:
+    mode: mutual-spiffe
+    serverExistingSecret: iip-otlp-server-tls
+    clientCaExistingSecret: iip-otlp-client-ca
+    identitiesExistingSecret: iip-otlp-client-identities
+
+networkPolicy:
+  enabled: true
+  databaseEgress:
+    enabled: true
+    cidr: 10.20.30.40/32
+    port: 5432
+  otlpReceiverIngress:
+    enabled: true
+    namespaceSelector:
+      kubernetes.io/metadata.name: observability
+    podSelector:
+      app.kubernetes.io/name: customer-collector
+```
+
+The server Secret uses the configured `tls.crt` and `tls.key` keys. The client
+CA Secret contains `ca.crt`; the identity Secret contains
+`otlp-client-identities-json` in the shape of
+[`client-identities.example.json`](../../deploy/otlp/client-identities.example.json).
+The chart mounts these only into the receiver. Health probes use HTTPS without
+a client certificate and reveal only stable status. Every OTLP POST still
+requires both the client certificate and channel Bearer credential.
+
+Run `make test-otlp-receiver` before promotion. It writes a source-bound report
+after real official-exporter, mTLS/SPIFFE, PostgreSQL durability, and Collector
+persistent-queue checks. Production Collectors should adapt the validated
+[`collector-to-iip.example.yaml`](../../deploy/otel/collector-to-iip.example.yaml)
+and mount its queue directory on a durable volume.
+
 ## Fresh durable install
 
 Create the database and identity Secrets through the cluster's secret-management workflow, then use a protected values file similar to:
@@ -121,7 +175,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.52.0
+  tag: 0.53.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:

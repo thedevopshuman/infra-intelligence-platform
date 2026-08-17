@@ -129,6 +129,14 @@ helm-lint:
 		--set networkPolicy.otlpReceiverIngress.enabled=true >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
+		--set otlpReceiver.enabled=true \
+		--set otlpReceiver.channelsExistingSecret=iip-otlp-metrics \
+		--set otlpIngest.tls.mode=mutual-spiffe \
+		--set otlpIngest.tls.serverExistingSecret=iip-otlp-server-tls \
+		--set otlpIngest.tls.clientCaExistingSecret=iip-otlp-client-ca \
+		--set otlpIngest.tls.identitiesExistingSecret=iip-otlp-identities >/dev/null
+	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set database.existingSecret=iip-database \
 		--set worker.enabled=true \
 		--set 'worker.tenants[0]=tenant-a' \
 		--set 'worker.ingestionMonitorTargets[0].tenantId=tenant-a' \

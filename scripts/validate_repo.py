@@ -92,10 +92,12 @@ REQUIRED_PATHS = (
     "docs/decisions/0077-executable-credential-broker-compatibility-evidence.md",
     "docs/decisions/0078-executable-oidc-issuer-compatibility-evidence.md",
     "docs/decisions/0079-executable-policy-engine-compatibility-evidence.md",
+    "docs/decisions/0080-mutual-tls-otlp-workload-identity-and-buffering.md",
     "docs/specifications/investigation-capacity-contract.md",
     "docs/specifications/credential-broker-compatibility-contract.md",
     "docs/specifications/oidc-issuer-compatibility-contract.md",
     "docs/specifications/policy-engine-compatibility-contract.md",
+    "docs/specifications/otlp-receiver-compatibility-contract.md",
     "docs/decisions/0059-backend-neutral-query-availability-telemetry.md",
     "docs/specifications/query-availability-telemetry-contract.md",
     "docs/decisions/0062-audited-evidence-artifact-retention.md",
@@ -139,6 +141,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/credential-broker-compatibility-report.schema.json",
     "contracts/schemas/oidc-issuer-compatibility-report.schema.json",
     "contracts/schemas/policy-engine-compatibility-report.schema.json",
+    "contracts/schemas/otlp-receiver-compatibility-report.schema.json",
     "contracts/schemas/integration-config.schema.json",
     "contracts/schemas/action-proposal.schema.json",
     "contracts/schemas/action-approval.schema.json",
@@ -204,6 +207,7 @@ REQUIRED_PATHS = (
     "contracts/examples/credential-broker-compatibility-report.json",
     "contracts/examples/oidc-issuer-compatibility-report.json",
     "contracts/examples/policy-engine-compatibility-report.json",
+    "contracts/examples/otlp-receiver-compatibility-report.json",
     "contracts/examples/kubernetes-event-evidence-request.json",
     "contracts/examples/kubernetes-event-evidence-result.json",
     "contracts/examples/telemetry-evidence-request.json",
@@ -375,6 +379,7 @@ REQUIRED_PATHS = (
     "scripts/run_credential_broker_compatibility.py",
     "scripts/run_oidc_issuer_compatibility.py",
     "scripts/run_policy_engine_compatibility.py",
+    "scripts/write_otlp_receiver_compatibility_report.py",
     "scripts/compatibility_tls.py",
     "deploy/docker-compose.credential-broker.yml",
     "deploy/docker-compose.oidc-issuer.yml",
@@ -385,6 +390,7 @@ REQUIRED_PATHS = (
     "tests/test_credential_broker_compatibility.py",
     "tests/test_oidc_issuer_compatibility.py",
     "tests/test_policy_engine_compatibility.py",
+    "tests/test_otlp_receiver_compatibility.py",
     "sdks/typescript/package-lock.json",
     "tests/test_authentication.py",
     "tests/test_console_authentication.py",
@@ -437,6 +443,11 @@ REQUIRED_PATHS = (
     "deploy/plugin-mediation-bridge/bridge.py",
     "deploy/otlp/receiver-channels.example.json",
     "deploy/otlp/log-receiver-channels.example.json",
+    "deploy/otlp/client-identities.example.json",
+    "deploy/otel/collector-to-iip.example.yaml",
+    "src/iip/surfaces/otlp_tls.py",
+    "scripts/write_otlp_mtls_fixture.py",
+    "tests/test_otlp_tls.py",
     "scripts/test_kubernetes_live.sh",
     "scripts/run_reference_workflow.py",
     "scripts/backup_restore_experiment.py",
@@ -576,8 +587,26 @@ def validate_authentication_boundary(
     allowed_receiver_paths = {"/healthz", "/readyz", "/v1/metrics", "/v1/logs"}
     if not isinstance(receiver_paths, dict) or set(receiver_paths) != allowed_receiver_paths:
         fail(errors, "OTLP receiver OpenAPI must expose only health and OTLP routes")
-    if receiver.get("security") != [{"otlpChannelBearerAuth": []}]:
-        fail(errors, "OTLP receiver OpenAPI must require channel Bearer authentication")
+    if receiver.get("security") != [
+        {"otlpChannelBearerAuth": [], "otlpMutualTLS": []}
+    ]:
+        fail(
+            errors,
+            "OTLP receiver OpenAPI must require channel Bearer and mutual TLS",
+        )
+    receiver_components = receiver.get("components")
+    receiver_schemes = (
+        receiver_components.get("securitySchemes")
+        if isinstance(receiver_components, dict)
+        else None
+    )
+    mutual_tls = (
+        receiver_schemes.get("otlpMutualTLS")
+        if isinstance(receiver_schemes, dict)
+        else None
+    )
+    if not isinstance(mutual_tls, dict) or mutual_tls.get("type") != "mutualTLS":
+        fail(errors, "OTLP receiver OpenAPI mutualTLS scheme is missing or invalid")
 
 
 def canonical_digest(document: object) -> str:
@@ -1008,6 +1037,76 @@ def validate_policy_engine_compatibility_example(
         / "policy-engine-compatibility-report.json"
     )
     validate_policy_engine_compatibility_document(documents.get(path), errors)
+
+
+OTLP_RECEIVER_COMPATIBILITY_CHECKS = (
+    "isolated-route-surface",
+    "server-ca-verified-tls",
+    "plaintext-denial",
+    "client-ca-validation",
+    "spiffe-workload-identity",
+    "channel-identity-binding",
+    "bearer-channel-authentication",
+    "control-credential-denial",
+    "official-metrics-exporter",
+    "official-logs-exporter",
+    "certificate-rotation-without-restart",
+    "health-probe-minimization",
+    "durable-evidence-commit",
+    "collector-persistent-queue-config",
+    "secret-redaction",
+)
+
+
+def validate_otlp_receiver_compatibility_document(
+    report: object, errors: List[str]
+) -> None:
+    """Check the closed OTLP receiver profile and its derived summary."""
+
+    if not isinstance(report, dict):
+        fail(errors, "OTLP receiver compatibility report must be an object")
+        return
+    spec = report.get("spec")
+    checks = spec.get("checks") if isinstance(spec, dict) else None
+    summary = spec.get("summary") if isinstance(spec, dict) else None
+    if not isinstance(checks, list) or not isinstance(summary, dict):
+        fail(errors, "OTLP receiver compatibility report must contain checks and summary")
+        return
+    check_ids = tuple(
+        check.get("id") if isinstance(check, dict) else None for check in checks
+    )
+    if check_ids != OTLP_RECEIVER_COMPATIBILITY_CHECKS:
+        fail(errors, "OTLP receiver compatibility checks must match the closed profile")
+    passed = sum(
+        1
+        for check in checks
+        if isinstance(check, dict)
+        and check.get("status") == "passed"
+        and "errorCode" not in check
+    )
+    failed = len(checks) - passed
+    status = "compatible" if failed == 0 else "incompatible"
+    if spec.get("status") != status:
+        fail(errors, "OTLP receiver compatibility status must match its checks")
+    if summary != {
+        "totalChecks": len(checks),
+        "passedChecks": passed,
+        "failedChecks": failed,
+        "overallStatus": status,
+    }:
+        fail(errors, "OTLP receiver compatibility summary must match its checks")
+
+
+def validate_otlp_receiver_compatibility_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "otlp-receiver-compatibility-report.json"
+    )
+    validate_otlp_receiver_compatibility_document(documents.get(path), errors)
 
 
 def validate_plugin_action_mediation_examples(
@@ -3227,6 +3326,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("plugin-manifest.json", "Plugin"),
         ("plugin-action-mediation-grant.json", "PluginActionMediationGrant"),
         ("plugin-compatibility-report.json", "PluginCompatibilityReport"),
+        (
+            "otlp-receiver-compatibility-report.json",
+            "OtlpReceiverCompatibilityReport",
+        ),
         ("plugin-invocation.json", "PluginInvocation"),
         ("plugin-invocation-result.json", "PluginInvocationResult"),
         ("plugin-invocation-result-failed.json", "PluginInvocationResult"),
@@ -3341,6 +3444,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_credential_broker_compatibility_example(documents, errors)
     validate_oidc_issuer_compatibility_example(documents, errors)
     validate_policy_engine_compatibility_example(documents, errors)
+    validate_otlp_receiver_compatibility_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
 
     policy_request = documents.get(example_dir / "policy-decision-request.json")

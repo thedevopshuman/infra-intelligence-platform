@@ -1,0 +1,8 @@
+{
+  "identities": [
+    {
+      "spiffeId": "spiffe://customer.example/observability/collector",
+      "channelIds": ["metrics-production", "logs-production"]
+    }
+  ]
+}

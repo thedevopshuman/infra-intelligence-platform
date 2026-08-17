@@ -53,6 +53,15 @@
 {{- if and .Values.otlpLogsReceiver.enabled (not .Values.otlpLogsReceiver.channelsExistingSecret) }}
 {{- fail "otlpLogsReceiver.channelsExistingSecret is required when the logs receiver is enabled" }}
 {{- end }}
+{{- if and (ne .Values.otlpIngest.tls.mode "disabled") (not .Values.otlpIngest.tls.serverExistingSecret) }}
+{{- fail "otlpIngest.tls.serverExistingSecret is required when receiver TLS is enabled" }}
+{{- end }}
+{{- if and (eq .Values.otlpIngest.tls.mode "mutual-spiffe") (not .Values.otlpIngest.tls.clientCaExistingSecret) }}
+{{- fail "otlpIngest.tls.clientCaExistingSecret is required in mutual-spiffe mode" }}
+{{- end }}
+{{- if and (eq .Values.otlpIngest.tls.mode "mutual-spiffe") (not .Values.otlpIngest.tls.identitiesExistingSecret) }}
+{{- fail "otlpIngest.tls.identitiesExistingSecret is required in mutual-spiffe mode" }}
+{{- end }}
 {{- if .Values.backup.enabled }}
 {{- if not .Values.database.existingSecret }}
 {{- fail "database.existingSecret is required when backup.enabled=true" }}

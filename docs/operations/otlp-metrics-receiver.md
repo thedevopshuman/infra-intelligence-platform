@@ -1,8 +1,11 @@
-# OTLP metrics receiver
+# OTLP metrics and logs receiver
 
-**Status:** Executable reference receiver; disabled by default
+**Status:** Executable mutual-TLS reference receiver; disabled by default
 
-The optional receiver accepts a deliberately selected customer metric stream through standard OTLP/HTTP binary Protobuf and records each non-empty export as immutable, normalized Evidence. It is independent of both outbound platform telemetry and the Prometheus historical-query adapter.
+The optional receiver accepts deliberately selected customer metric and log
+streams through standard OTLP/HTTP binary Protobuf and records each non-empty
+export as immutable, normalized Evidence. It is independent of both outbound
+platform telemetry and historical-query adapters.
 
 ## Enable locally
 
@@ -15,22 +18,54 @@ export IIP_OTLP_RECEIVER_CHANNELS_JSON="$(tr -d '\n' < deploy/otlp/receiver-chan
 
 The example resource reference is the deterministic UID of `contracts/examples/resource.json`. The resource must already exist in the configured tenant or the receiver rejects the export without persistence.
 
-The production-shaped receiver requires the shared durable database and runs on its own listener:
+The production-shaped receiver requires the shared durable database, a server
+keypair, a client CA, an exact SPIFFE-to-channel registry, and runs on its own
+listener. Keep all of these values in protected secret-manager or mounted-file
+state:
 
 ```bash
 export IIP_DATABASE_URL=postgresql://...
+export IIP_OTLP_TLS_MODE=mutual-spiffe
+export IIP_OTLP_TLS_CERTIFICATE_PATH=/protected/server/tls.crt
+export IIP_OTLP_TLS_PRIVATE_KEY_PATH=/protected/server/tls.key
+export IIP_OTLP_TLS_CLIENT_CA_PATH=/protected/client-ca/ca.crt
+export IIP_OTLP_MTLS_IDENTITIES_JSON="$(tr -d '\n' < /protected/client-identities.json)"
 PYTHONPATH=src python3 -m iip.surfaces.otlp_receiver
 ```
 
 Point an OTLP/HTTP exporter at the receiver:
 
 ```bash
-export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:4318/v1/metrics
+export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://localhost:4318/v1/metrics
 export OTEL_EXPORTER_OTLP_METRICS_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_METRICS_HEADERS="Authorization=Bearer%20<channel-token>"
+export OTEL_EXPORTER_OTLP_CERTIFICATE=/protected/server-ca/ca.crt
+export OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE=/protected/client/tls.crt
+export OTEL_EXPORTER_OTLP_CLIENT_KEY=/protected/client/tls.key
 ```
 
-Header environment-variable escaping varies by SDK. For production, prefer a customer Collector that injects the receiver authorization header and sends only the selected metric pipeline.
+Header and TLS environment-variable names vary by SDK. For production, use a
+customer Collector that injects the receiver authorization header and sends
+only the selected pipelines. [`collector-to-iip.example.yaml`](../../deploy/otel/collector-to-iip.example.yaml)
+is validated against the digest-pinned Collector Contrib 0.158.0 image. Its
+`file_storage` persistent sending queue retries receiver outages without making
+the receiver stateful. Mount `/var/lib/otelcol/iip` on customer-managed durable
+storage and alert on queue growth and disk exhaustion; without a persistent
+volume the queue does not survive pod replacement.
+
+## Production workload identity
+
+Every OTLP POST in `mutual-spiffe` mode must satisfy two independent checks:
+
+- a client certificate chains to the configured client CA, contains exactly one
+  URI SAN, and that SPIFFE ID is mapped to the selected channel; and
+- the Bearer token matches the SHA-256 verifier for that tenant-bound channel.
+
+The receiver validates both before reading the request body. Rotating a client
+certificate with the same SPIFFE ID preserves its configured authority without
+a receiver restart. A different SPIFFE ID or channel needs an explicit protected
+registry change. `/healthz` and `/readyz` are server-TLS verified but do not
+require a client certificate because they reveal only stable status.
 
 ## Protected channel configuration
 
@@ -57,15 +92,35 @@ Successful non-empty exports produce an `OtlpMetricsEvidence` JSON artifact behi
 
 The Docker integration starts PostgreSQL, the control API, and the receiver as separate containers. It passes `IIP_OTLP_RECEIVER_ENABLED` and `IIP_OTLP_RECEIVER_CHANNELS_JSON` only to the receiver. Keep the latter in shell/secret-manager state; do not commit a populated document.
 
-For Helm, set `otlpReceiver.enabled: true`, `database.existingSecret`, and `otlpReceiver.channelsExistingSecret`. The secret value must contain the complete JSON document under the configured key. The chart never puts channel configuration in a ConfigMap or mounts it into the control-plane pod.
+For Helm, set `otlpReceiver.enabled: true`, `database.existingSecret`, and
+`otlpReceiver.channelsExistingSecret`. Then select
+`otlpIngest.tls.mode: mutual-spiffe` and reference existing Secrets through
+`serverExistingSecret`, `clientCaExistingSecret`, and
+`identitiesExistingSecret`. The identity Secret value follows
+[`client-identities.example.json`](../../deploy/otlp/client-identities.example.json).
+The chart never puts channel or identity configuration in a ConfigMap or mounts
+it into the control-plane pod.
 
-The chart creates a dedicated receiver Deployment and Service on OTLP/HTTP port `4318`. It exposes no console or control-plane operation, has no interactive identity configuration or ambient service-account token, and applies per-channel process admission from `otlpIngest.maxRequestsPerSecond` and `otlpIngest.requestBurst`. If NetworkPolicy is enabled, both `networkPolicy.databaseEgress` and an exact `networkPolicy.otlpReceiverIngress` must be configured. Federated workload identity or mTLS, automated channel rotation, distributed gateway admission, and durable buffering remain production deployment decisions.
+The chart creates a dedicated receiver Deployment and ClusterIP Service on
+OTLP/HTTP port `4318`. It exposes no console or control-plane operation, has no
+interactive identity configuration or ambient service-account token, and
+applies per-channel process admission. If NetworkPolicy is enabled, both
+`networkPolicy.databaseEgress` and an exact
+`networkPolicy.otlpReceiverIngress` must be configured. Automated CA/channel
+rotation, distributed gateway admission, queue sizing, and receiver-specific
+SLO objectives remain customer production decisions.
 
 For one-process development compatibility only, set `IIP_OTLP_RECEIVER_MODE=shared` on the control API. Helm deliberately never enables this mode.
 
 ## Verification
 
-`make verify` covers Protobuf normalization, channel/control-plane credential separation, gzip and post-decompression limits, tenant/resource binding, redaction, immutable persistence, separate OpenAPI documents, SDK types, and Helm rendering. The Docker gate sends real exports from the official Python exporters into the isolated receiver and verifies route separation:
+`make verify` covers Protobuf normalization, channel/control-plane credential
+separation, TLS/SPIFFE policy, gzip and post-decompression limits,
+tenant/resource binding, redaction, immutable persistence, separate OpenAPI
+documents, SDK types, and Helm rendering. The Docker gate sends real exports
+from the official Python exporters, tests certificate and credential denial,
+queries PostgreSQL, validates the persistent Collector queue configuration, and
+writes `dist/otlp-receiver-compatibility-report.json`:
 
 ```bash
 make test-otlp-receiver

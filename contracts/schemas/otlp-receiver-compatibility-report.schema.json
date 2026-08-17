@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:otlp-receiver-compatibility-report:v1alpha1",
+  "title": "OTLP Receiver Compatibility Report",
+  "description": "Source-bound evidence for the isolated mutual-TLS OTLP receiver profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "OtlpReceiverCompatibilityReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^orc_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "environment", "profile", "checks", "summary"],
+      "properties": {
+        "status": {"enum": ["compatible", "incompatible"]},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["platform", "containerRuntime", "containerRuntimeVersion", "pythonVersion", "applicationVersion", "collectorVersion", "collectorImageDigest"],
+          "properties": {
+            "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+            "containerRuntime": {"const": "docker"},
+            "containerRuntimeVersion": {"type": "string", "minLength": 1, "maxLength": 64},
+            "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+            "applicationVersion": {"$ref": "#/$defs/semver"},
+            "collectorVersion": {"const": "0.158.0"},
+            "collectorImageDigest": {"const": "sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5"}
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "transport", "workloadIdentity", "channelCredential", "commitBoundary", "preReceiverBuffering"],
+          "properties": {
+            "name": {"const": "local-mutual-spiffe-otlp-http-v1"},
+            "transport": {"const": "https-otlp-http-protobuf"},
+            "workloadIdentity": {"const": "x509-spiffe-uri-san"},
+            "channelCredential": {"const": "tenant-bound-bearer-sha256"},
+            "commitBoundary": {"const": "postgresql-before-success"},
+            "preReceiverBuffering": {"const": "collector-persistent-sending-queue"}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 15,
+          "maxItems": 15,
+          "prefixItems": [
+            {"$ref": "#/$defs/isolatedRouteSurfaceCheck"},
+            {"$ref": "#/$defs/serverCaVerifiedTlsCheck"},
+            {"$ref": "#/$defs/plaintextDenialCheck"},
+            {"$ref": "#/$defs/clientCaValidationCheck"},
+            {"$ref": "#/$defs/spiffeWorkloadIdentityCheck"},
+            {"$ref": "#/$defs/channelIdentityBindingCheck"},
+            {"$ref": "#/$defs/bearerChannelAuthenticationCheck"},
+            {"$ref": "#/$defs/controlCredentialDenialCheck"},
+            {"$ref": "#/$defs/officialMetricsExporterCheck"},
+            {"$ref": "#/$defs/officialLogsExporterCheck"},
+            {"$ref": "#/$defs/certificateRotationWithoutRestartCheck"},
+            {"$ref": "#/$defs/healthProbeMinimizationCheck"},
+            {"$ref": "#/$defs/durableEvidenceCommitCheck"},
+            {"$ref": "#/$defs/collectorPersistentQueueConfigCheck"},
+            {"$ref": "#/$defs/secretRedactionCheck"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 15},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 15},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 15},
+            "overallStatus": {"enum": ["compatible", "incompatible"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {"id": {"type": "string"}, "status": {"enum": ["passed", "failed"]}, "errorCode": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$", "maxLength": 128}},
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "isolatedRouteSurfaceCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "isolated-route-surface"}}}]},
+    "serverCaVerifiedTlsCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "server-ca-verified-tls"}}}]},
+    "plaintextDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "plaintext-denial"}}}]},
+    "clientCaValidationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "client-ca-validation"}}}]},
+    "spiffeWorkloadIdentityCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "spiffe-workload-identity"}}}]},
+    "channelIdentityBindingCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "channel-identity-binding"}}}]},
+    "bearerChannelAuthenticationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "bearer-channel-authentication"}}}]},
+    "controlCredentialDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "control-credential-denial"}}}]},
+    "officialMetricsExporterCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "official-metrics-exporter"}}}]},
+    "officialLogsExporterCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "official-logs-exporter"}}}]},
+    "certificateRotationWithoutRestartCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "certificate-rotation-without-restart"}}}]},
+    "healthProbeMinimizationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "health-probe-minimization"}}}]},
+    "durableEvidenceCommitCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "durable-evidence-commit"}}}]},
+    "collectorPersistentQueueConfigCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "collector-persistent-queue-config"}}}]},
+    "secretRedactionCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "secret-redaction"}}}]}
+  }
+}

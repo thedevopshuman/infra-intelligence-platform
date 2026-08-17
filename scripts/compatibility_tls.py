@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Mapping
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -19,8 +21,9 @@ def write_tls_material(
     common_name: str,
     dns_name: str,
     ip_address: str = "127.0.0.1",
+    client_identities: Mapping[str, str] | None = None,
 ) -> None:
-    """Write a one-hour CA/server chain readable by an unprivileged container."""
+    """Write a one-hour CA/server chain and optional URI-SAN client identities."""
 
     now = datetime.now(timezone.utc)
     ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -125,3 +128,74 @@ def write_tls_material(
     )
     for name in ("ca.crt", "server.crt", "server.key"):
         os.chmod(directory / name, 0o644)
+
+    for prefix, uri_san in (client_identities or {}).items():
+        if (
+            re.fullmatch(r"[a-z][a-z0-9-]{0,63}", prefix) is None
+            or not uri_san.startswith("spiffe://")
+            or len(uri_san) > 2048
+        ):
+            raise ValueError("invalid compatibility client identity")
+        client_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        client_name = x509.Name(
+            [x509.NameAttribute(NameOID.COMMON_NAME, f"{prefix}.fixture")]
+        )
+        client_certificate = (
+            x509.CertificateBuilder()
+            .subject_name(client_name)
+            .issuer_name(ca_name)
+            .public_key(client_key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(minutes=1))
+            .not_valid_after(now + timedelta(hours=1))
+            .add_extension(
+                x509.SubjectAlternativeName(
+                    [x509.UniformResourceIdentifier(uri_san)]
+                ),
+                critical=False,
+            )
+            .add_extension(
+                x509.BasicConstraints(ca=False, path_length=None), critical=True
+            )
+            .add_extension(
+                x509.SubjectKeyIdentifier.from_public_key(client_key.public_key()),
+                critical=False,
+            )
+            .add_extension(
+                x509.AuthorityKeyIdentifier.from_issuer_public_key(
+                    ca_key.public_key()
+                ),
+                critical=False,
+            )
+            .add_extension(
+                x509.KeyUsage(
+                    digital_signature=True,
+                    content_commitment=False,
+                    key_encipherment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=False,
+                    crl_sign=False,
+                    encipher_only=False,
+                    decipher_only=False,
+                ),
+                critical=True,
+            )
+            .add_extension(
+                x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]),
+                critical=False,
+            )
+            .sign(ca_key, hashes.SHA256())
+        )
+        (directory / f"{prefix}.crt").write_bytes(
+            client_certificate.public_bytes(serialization.Encoding.PEM)
+        )
+        (directory / f"{prefix}.key").write_bytes(
+            client_key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            )
+        )
+        os.chmod(directory / f"{prefix}.crt", 0o644)
+        os.chmod(directory / f"{prefix}.key", 0o600)

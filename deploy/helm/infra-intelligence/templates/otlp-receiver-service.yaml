@@ -16,4 +16,5 @@ spec:
       port: {{ .Values.otlpIngest.service.port }}
       targetPort: otlp-http
       protocol: TCP
+      appProtocol: {{ if eq .Values.otlpIngest.tls.mode "disabled" }}http{{ else }}https{{ end }}
 {{- end }}

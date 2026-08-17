@@ -9,6 +9,33 @@ CHART = ROOT / "deploy" / "helm" / "infra-intelligence"
 
 
 class HelmMigrationBoundaryTests(unittest.TestCase):
+    def test_otlp_receiver_mutual_tls_is_secret_backed_and_probe_safe(self) -> None:
+        deployment = (
+            CHART / "templates" / "otlp-receiver-deployment.yaml"
+        ).read_text(encoding="utf-8")
+        service = (CHART / "templates" / "otlp-receiver-service.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("mode: disabled", values)
+        for required in (
+            "IIP_OTLP_TLS_MODE",
+            "IIP_OTLP_TLS_CERTIFICATE_PATH",
+            "IIP_OTLP_TLS_PRIVATE_KEY_PATH",
+            "IIP_OTLP_TLS_CLIENT_CA_PATH",
+            "IIP_OTLP_MTLS_IDENTITIES_JSON",
+            "identitiesExistingSecret",
+            "clientCaExistingSecret",
+            "serverExistingSecret",
+            "scheme: {{ if eq .Values.otlpIngest.tls.mode \"disabled\" }}HTTP{{ else }}HTTPS{{ end }}",
+            "automountServiceAccountToken: false",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, deployment)
+        self.assertIn("appProtocol:", service)
+        self.assertIn("}}https{{", service)
+
     def test_every_application_workload_uses_one_digest_aware_image_helper(self) -> None:
         for name in (
             "deployment.yaml",

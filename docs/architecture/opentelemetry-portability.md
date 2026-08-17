@@ -70,10 +70,20 @@ Fixed-period seasonal rules extend that same one-query boundary. Two to twelve m
 
 - whether later pushed signals use immutable Evidence only, customer storage forwarding, or a hybrid policy;
 - a production credential issuer and customer-specific interoperability qualification plus additional historical log and metric adapters; the local real-TLS broker-client profile is delivered;
-- federated receiver workload identity or mTLS, token rotation, distributed gateway admission, and durable buffering for self-hosted, customer-hosted, and managed deployments;
+- customer-PKI receiver identity portability beyond the accepted mutual-TLS
+  SPIFFE profile, automated token/CA rotation, distributed gateway admission,
+  and measured persistent-queue sizing/loss objectives for self-hosted,
+  customer-hosted, and managed deployments;
 - retention, sampling, cardinality budgets, and regional/data-residency controls;
 - queue durability and the division of retry, batching, and end-to-end delivery-SLO ownership between the official SDK and a sidecar/customer Collector;
 - the cadence and ownership of automatic freshness evaluation and production SLO windows;
 - calendar-aware or learned baselines, minimum sample counts, and multi-signal reasoning.
 
-External-broker, additional backend, federated receiver identity, learned/calendar-aware baseline and broader multi-signal reasoning, and expanded-signal decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, durable buffering, and SLO decisions belong to the Phase 3 operational-hardening gate. The current freshness API, outbound metric projection, terminal investigation traces, normalized historical metric/log query boundaries, Prometheus and Loki adapters, isolated tenant-bound OTLP metrics/logs receivers, deterministic metric/log investigation selection, and unit-aware threshold/explicit/rolling/seasonal baseline and log-count assessment are deliberately useful before those production selections.
+External-broker, additional backend, learned/calendar-aware baseline and broader
+multi-signal reasoning, and expanded-signal decisions belong to the Phase 2
+telemetry-evidence slice. ADR 0080 now fixes the local production receiver
+profile: CA-verified SPIFFE mTLS plus a separate tenant-bound channel credential,
+PostgreSQL commit before success, and a customer-Collector persistent sending
+queue for pre-receiver buffering. Customer PKI interoperability, automated
+rotation, queue loss objectives, delivery health, and receiver SLO decisions
+remain Phase 3 operational-hardening gates.

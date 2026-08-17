@@ -1,0 +1,52 @@
+extensions:
+  file_storage/iip:
+    directory: /var/lib/otelcol/iip
+    create_directory: true
+    compaction:
+      on_start: true
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    send_batch_size: 512
+    timeout: 5s
+
+exporters:
+  otlphttp/iip:
+    endpoint: ${env:IIP_OTLP_RECEIVER_ENDPOINT}
+    headers:
+      Authorization: Bearer ${env:IIP_OTLP_CHANNEL_TOKEN}
+    tls:
+      ca_file: /var/run/iip-otlp/ca.crt
+      cert_file: /var/run/iip-otlp/tls.crt
+      key_file: /var/run/iip-otlp/tls.key
+      min_version: "1.2"
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 10000
+      storage: file_storage/iip
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+
+service:
+  extensions: [file_storage/iip]
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/iip]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/iip]

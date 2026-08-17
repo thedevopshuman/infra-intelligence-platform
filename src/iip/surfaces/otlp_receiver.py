@@ -12,6 +12,11 @@ from urllib.parse import urlparse
 
 from iip.bootstrap import build_otlp_receiver_runtime_from_env
 from iip.surfaces.http import ApiHandler
+from iip.surfaces.otlp_tls import (
+    OtlpTlsConfiguration,
+    SpiffeClientIdentityRegistry,
+    peer_certificate,
+)
 
 
 class TokenBucketRateLimiter:
@@ -52,8 +57,9 @@ class TokenBucketRateLimiter:
 class OtlpReceiverHandler(ApiHandler):
     """Expose only health and selected OTLP signal endpoints."""
 
-    server_version = "IIPOtlpReceiver/0.52.0"
+    server_version = "IIPOtlpReceiver/0.53.0"
     rate_limiter = TokenBucketRateLimiter(50, 100)
+    client_identities: SpiffeClientIdentityRegistry | None = None
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         path = urlparse(self.path).path
@@ -78,6 +84,12 @@ class OtlpReceiverHandler(ApiHandler):
     def _admit_otlp_channel(self, channel_id: str) -> bool:
         return self.rate_limiter.admit(channel_id)
 
+    def _authorize_otlp_transport(self, channel_id: str) -> None:
+        identities = self.client_identities
+        if identities is None:
+            return
+        identities.authorize(peer_certificate(self.connection), channel_id)
+
 
 def _bounded_integer(name: str, default: int, maximum: int) -> int:
     try:
@@ -96,12 +108,17 @@ def main() -> None:
     port = _bounded_integer("IIP_OTLP_HTTP_PORT", 4318, 65_535)
     rate = _bounded_integer("IIP_OTLP_MAX_REQUESTS_PER_SECOND", 50, 100_000)
     burst = _bounded_integer("IIP_OTLP_REQUEST_BURST", 100, 100_000)
+    tls = OtlpTlsConfiguration.from_environment()
+    ssl_context = tls.ssl_context()
     runtime = build_otlp_receiver_runtime_from_env()
     try:
         OtlpReceiverHandler.runtime = runtime
         OtlpReceiverHandler.rate_limiter = TokenBucketRateLimiter(rate, burst)
+        OtlpReceiverHandler.client_identities = tls.client_identities
         server = ThreadingHTTPServer((host, port), OtlpReceiverHandler)
-        print(f"IIP OTLP receiver listening on http://{host}:{port}")
+        if ssl_context is not None:
+            server.socket = ssl_context.wrap_socket(server.socket, server_side=True)
+        print(f"IIP OTLP receiver listening on {tls.scheme}://{host}:{port}")
         try:
             server.serve_forever()
         except KeyboardInterrupt:

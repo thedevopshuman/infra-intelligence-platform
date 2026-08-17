@@ -7,6 +7,7 @@ const state = {
   runtimeVersion: null,
   telemetryDeploymentHealth: null,
   telemetryExportSlo: null,
+  telemetryExportBurnRate: null,
   eventDeliveryHealth: null,
   eventDeliverySlo: null,
   investigationCompletionSlo: null,
@@ -494,6 +495,44 @@ async function refreshTelemetryExportSlo() {
   renderTelemetryExportSlo();
 }
 
+function renderTelemetryExportBurnRate() {
+  const spec = state.telemetryExportBurnRate?.spec;
+  const chip = $("#telemetry-burn-rate-state");
+  const renderSignal = (name) => {
+    const signal = spec?.signals?.find((item) => item.signal === name);
+    if (!signal) return "—";
+    if (signal.long.burnRateHundredths === null) return signal.status;
+    return `${(signal.long.burnRateHundredths / 100).toFixed(2)}x`;
+  };
+  $("#telemetry-burn-rate-metrics").textContent = renderSignal("metrics");
+  $("#telemetry-burn-rate-traces").textContent = renderSignal("traces");
+  if (!spec) {
+    chip.textContent = state.session && !hasRole("platform-admin")
+      ? "Platform admin required"
+      : "Burn rate unavailable";
+    chip.className = "status-chip neutral";
+    $("#telemetry-burn-rate-details").disabled = true;
+    return;
+  }
+  chip.textContent = `Burn ${spec.status}`;
+  chip.className = `status-chip ${spec.status === "sustainable" ? "success" : spec.status === "critical" ? "danger" : ["no-data", "insufficient-data", "elevated"].includes(spec.status) ? "warning" : "neutral"}`;
+  $("#telemetry-burn-rate-details").disabled = false;
+}
+
+async function refreshTelemetryExportBurnRate() {
+  if (!state.session || !hasRole("platform-admin")) {
+    state.telemetryExportBurnRate = null;
+    renderTelemetryExportBurnRate();
+    return;
+  }
+  try {
+    state.telemetryExportBurnRate = await api("/v1/operations/telemetry/export-burn-rate");
+  } catch (_error) {
+    state.telemetryExportBurnRate = null;
+  }
+  renderTelemetryExportBurnRate();
+}
+
 function renderEventDeliveryHealth() {
   const report = state.eventDeliveryHealth;
   const spec = report?.spec;
@@ -687,7 +726,7 @@ async function connect(token, remember) {
     if (remember) sessionStorage.setItem(REMEMBERED_TOKEN_KEY, token);
     else sessionStorage.removeItem(REMEMBERED_TOKEN_KEY);
     updateIdentity();
-    await Promise.all([refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
+    await Promise.all([refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshTelemetryExportBurnRate(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
     $("#connection-dialog").close();
     $("#connection-error").hidden = true;
     showNotice(`Connected as ${state.session.metadata.actorId} in tenant ${state.session.metadata.tenantId}.`);
@@ -1558,7 +1597,7 @@ function bindEvents() {
   $("#identity-button").addEventListener("click", () => $("#connection-dialog").showModal());
   $("#connection-close").addEventListener("click", () => $("#connection-dialog").close());
   $("#refresh-button").addEventListener("click", async () => {
-    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
+    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshTelemetryExportBurnRate(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
     showNotice("Live platform state refreshed.");
   });
   $("#connection-form").addEventListener("submit", async (event) => {
@@ -1644,6 +1683,14 @@ function bindEvents() {
     $("#detail-actions").hidden = true;
     $("#detail-dialog").showModal();
   });
+  $("#telemetry-burn-rate-details").addEventListener("click", () => {
+    if (!state.telemetryExportBurnRate) return;
+    $("#detail-kicker").textContent = "Portable observability path";
+    $("#detail-title").textContent = "Telemetry export burn rate";
+    $("#detail-content").textContent = JSON.stringify(state.telemetryExportBurnRate, null, 2);
+    $("#detail-actions").hidden = true;
+    $("#detail-dialog").showModal();
+  });
   $("#delivery-details").addEventListener("click", () => {
     if (!state.eventDeliveryHealth) return;
     $("#detail-kicker").textContent = "Event delivery";
@@ -1695,6 +1742,7 @@ async function start() {
   renderRuntimeVersion();
   renderTelemetryDeploymentHealth();
   renderTelemetryExportSlo();
+  renderTelemetryExportBurnRate();
   renderEventDeliverySlo();
   renderInvestigationCompletionSlo();
   renderEvidenceRetention();

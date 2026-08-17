@@ -23,6 +23,7 @@ QUERY_OPERATIONS = frozenset(
         "telemetry-export-health",
         "telemetry-deployment-export-health",
         "telemetry-export-slo",
+        "telemetry-export-burn-rate",
         "event-delivery-health",
         "event-delivery-slo",
         "investigation-completion-slo",

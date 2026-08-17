@@ -313,6 +313,28 @@ class TelemetryExportSloReport:
 
 
 @dataclass(frozen=True)
+class TelemetryExportBurnRateReport:
+    """Multi-window deployment OTLP export-attempt burn rate for administrators."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "TelemetryExportBurnRateReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="TelemetryExportBurnRateReport",
+                label="telemetry export burn-rate report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class EventDeliveryHealthReport:
     """Tenant-scoped outbox backlog and quarantine state for operators."""
 

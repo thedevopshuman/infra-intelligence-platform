@@ -48,6 +48,7 @@ from .models import (
     TelemetryDeploymentExportHealthReport,
     TelemetryExportHealthReport,
     TelemetryExportSloReport,
+    TelemetryExportBurnRateReport,
 )
 
 
@@ -220,6 +221,13 @@ class Client:
 
         return TelemetryExportSloReport.from_dict(
             self._get("/v1/operations/telemetry/export-slo")
+        )
+
+    def get_telemetry_export_burn_rate(self) -> TelemetryExportBurnRateReport:
+        """Read multi-window deployment export burn rate as an administrator."""
+
+        return TelemetryExportBurnRateReport.from_dict(
+            self._get("/v1/operations/telemetry/export-burn-rate")
         )
 
     def get_event_delivery_health(

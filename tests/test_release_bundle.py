@@ -21,7 +21,7 @@ from scripts.release_bundle import (
 )
 
 
-VERSION = "0.54.0"
+VERSION = "0.55.0"
 CHART_VERSION = "0.56.0"
 SDK_VERSION = "0.42.0"
 REVISION = "0123456789abcdef0123456789abcdef01234567"

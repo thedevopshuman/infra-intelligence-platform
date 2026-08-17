@@ -591,6 +591,11 @@
         "exportSloMinimumAttainmentBasisPoints",
         "exportSloMinimumEligibleAttempts",
         "exportSloRetentionSeconds",
+        "exportBurnRateShortWindowSeconds",
+        "exportBurnRateLongWindowSeconds",
+        "exportBurnRateMinimumAttainmentBasisPoints",
+        "exportBurnRateMinimumEligibleAttempts",
+        "exportBurnRateCriticalHundredths",
         "existingSecret",
         "headersSecretKey"
       ],
@@ -620,6 +625,11 @@
         "exportSloMinimumAttainmentBasisPoints": { "type": "integer", "minimum": 1, "maximum": 10000 },
         "exportSloMinimumEligibleAttempts": { "type": "integer", "minimum": 1, "maximum": 1000000 },
         "exportSloRetentionSeconds": { "type": "integer", "minimum": 600, "maximum": 2592000 },
+        "exportBurnRateShortWindowSeconds": { "type": "integer", "minimum": 300, "maximum": 2592000 },
+        "exportBurnRateLongWindowSeconds": { "type": "integer", "minimum": 300, "maximum": 2592000 },
+        "exportBurnRateMinimumAttainmentBasisPoints": { "type": "integer", "minimum": 1, "maximum": 9999 },
+        "exportBurnRateMinimumEligibleAttempts": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "exportBurnRateCriticalHundredths": { "type": "integer", "minimum": 101, "maximum": 1000000 },
         "existingSecret": { "$ref": "#/definitions/optionalName" },
         "headersSecretKey": { "$ref": "#/definitions/nonEmptyString" }
       }

@@ -141,6 +141,10 @@ from iip.application.query_telemetry_export_slo import (
     TelemetryExportSloObjectives,
     TelemetryExportSloService,
 )
+from iip.application.query_telemetry_export_burn_rate import (
+    TelemetryExportBurnRateObjectives,
+    TelemetryExportBurnRateService,
+)
 from iip.application.report_telemetry_export_health import (
     TelemetryExportHealthReporter,
     TelemetryExportHealthReportingConfiguration,
@@ -182,6 +186,7 @@ class Runtime:
     telemetry_export_health: TelemetryExportHealthService
     telemetry_deployment_health: TelemetryDeploymentHealthService
     telemetry_export_slo: TelemetryExportSloService
+    telemetry_export_burn_rate: TelemetryExportBurnRateService
     runtime_version: RuntimeVersionService
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
@@ -227,6 +232,9 @@ def build_local_runtime(
     investigation_completion_slo_objectives: InvestigationCompletionSloObjectives | None = None,
     query_availability_objectives: QueryAvailabilityObjectives | None = None,
     telemetry_export_slo_objectives: TelemetryExportSloObjectives | None = None,
+    telemetry_export_burn_rate_objectives: (
+        TelemetryExportBurnRateObjectives | None
+    ) = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     query_availability_sink: QueryAvailabilitySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
@@ -264,6 +272,7 @@ def build_local_runtime(
         investigation_completion_slo_objectives,
         query_availability_objectives,
         telemetry_export_slo_objectives,
+        telemetry_export_burn_rate_objectives,
         ingestion_telemetry_sink,
         query_availability_sink,
         investigation_telemetry_sink,
@@ -296,6 +305,9 @@ def _compose_runtime(
     investigation_completion_slo_objectives: InvestigationCompletionSloObjectives | None = None,
     query_availability_objectives: QueryAvailabilityObjectives | None = None,
     telemetry_export_slo_objectives: TelemetryExportSloObjectives | None = None,
+    telemetry_export_burn_rate_objectives: (
+        TelemetryExportBurnRateObjectives | None
+    ) = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     query_availability_sink: QueryAvailabilitySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
@@ -327,6 +339,13 @@ def _compose_runtime(
         < telemetry_export_slo_objectives.window_seconds
     ):
         raise ValueError("telemetry.export-slo.configuration.invalid")
+    if (
+        telemetry_health_reporting is not None
+        and telemetry_export_burn_rate_objectives is not None
+        and telemetry_health_reporting.sample_retention_seconds
+        < telemetry_export_burn_rate_objectives.long_window_seconds
+    ):
+        raise ValueError("telemetry.export-burn-rate.configuration.invalid")
     policy = configured_policy or AllowTenantPolicy()
     clock = SystemClock()
     ingestion = ResourceIngestionService(store, policy)
@@ -484,6 +503,12 @@ def _compose_runtime(
             clock,
             telemetry_export_slo_objectives,
         ),
+        telemetry_export_burn_rate=TelemetryExportBurnRateService(
+            operational,
+            policy,
+            clock,
+            telemetry_export_burn_rate_objectives,
+        ),
         runtime_version=RuntimeVersionService(
             _runtime_version_identity_from_env(),
             clock,
@@ -579,6 +604,9 @@ def build_postgres_runtime(
     investigation_completion_slo_objectives: InvestigationCompletionSloObjectives | None = None,
     query_availability_objectives: QueryAvailabilityObjectives | None = None,
     telemetry_export_slo_objectives: TelemetryExportSloObjectives | None = None,
+    telemetry_export_burn_rate_objectives: (
+        TelemetryExportBurnRateObjectives | None
+    ) = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     query_availability_sink: QueryAvailabilitySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
@@ -623,6 +651,7 @@ def build_postgres_runtime(
         investigation_completion_slo_objectives,
         query_availability_objectives,
         telemetry_export_slo_objectives,
+        telemetry_export_burn_rate_objectives,
         ingestion_telemetry_sink,
         query_availability_sink,
         investigation_telemetry_sink,
@@ -710,6 +739,9 @@ def _build_runtime_from_env(
     query_availability_objectives = _query_availability_objectives_from_env()
     otlp_receiver_objectives = _otlp_receiver_objectives_from_env()
     telemetry_export_slo_objectives = _telemetry_export_slo_objectives_from_env()
+    telemetry_export_burn_rate_objectives = (
+        _telemetry_export_burn_rate_objectives_from_env()
+    )
     investigation_dispatch_limits = _investigation_dispatch_limits_from_env()
     evidence_retention_policy = _evidence_retention_policy_from_env()
     metrics_runtime = _otel_metrics_runtime_from_env()
@@ -736,6 +768,12 @@ def _build_runtime_from_env(
         < telemetry_export_slo_objectives.window_seconds
     ):
         raise ValueError("telemetry.export-slo.configuration.invalid")
+    if (
+        telemetry_health_reporting is not None
+        and telemetry_health_reporting.sample_retention_seconds
+        < telemetry_export_burn_rate_objectives.long_window_seconds
+    ):
+        raise ValueError("telemetry.export-burn-rate.configuration.invalid")
     database_url = os.environ.get("IIP_DATABASE_URL")
     try:
         receiver_mode = os.environ.get("IIP_OTLP_RECEIVER_MODE", "disabled")
@@ -778,6 +816,9 @@ def _build_runtime_from_env(
                 ),
                 query_availability_objectives=query_availability_objectives,
                 telemetry_export_slo_objectives=telemetry_export_slo_objectives,
+                telemetry_export_burn_rate_objectives=(
+                    telemetry_export_burn_rate_objectives
+                ),
                 ingestion_telemetry_sink=(
                     metrics_runtime.sink
                     if metrics_runtime is not None
@@ -826,6 +867,9 @@ def _build_runtime_from_env(
             ),
             query_availability_objectives=query_availability_objectives,
             telemetry_export_slo_objectives=telemetry_export_slo_objectives,
+            telemetry_export_burn_rate_objectives=(
+                telemetry_export_burn_rate_objectives
+            ),
             ingestion_telemetry_sink=(
                 metrics_runtime.sink if metrics_runtime is not None else None
             ),
@@ -880,6 +924,9 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
     metrics_runtime = _otel_metrics_runtime_from_env()
     try:
         telemetry_export_slo_objectives = _telemetry_export_slo_objectives_from_env()
+        telemetry_export_burn_rate_objectives = (
+            _telemetry_export_burn_rate_objectives_from_env()
+        )
         telemetry_health_reporting = (
             _telemetry_health_reporting_from_env("otlp-receiver")
             if metrics_runtime is not None
@@ -896,6 +943,9 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
             ),
             query_availability_objectives=_query_availability_objectives_from_env(),
             telemetry_export_slo_objectives=telemetry_export_slo_objectives,
+            telemetry_export_burn_rate_objectives=(
+                telemetry_export_burn_rate_objectives
+            ),
             otlp_metrics_receiver=metrics_receiver,
             otlp_logs_receiver=logs_receiver,
             telemetry_runtime=metrics_runtime,
@@ -1253,6 +1303,45 @@ def _telemetry_export_slo_objectives_from_env() -> TelemetryExportSloObjectives:
         minimum_eligible_attempts=value(
             "IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ELIGIBLE_ATTEMPTS",
             defaults.minimum_eligible_attempts,
+        ),
+    )
+
+
+def _telemetry_export_burn_rate_objectives_from_env() -> (
+    TelemetryExportBurnRateObjectives
+):
+    def value(name: str, default: int) -> int:
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            raise ValueError(
+                "telemetry.export-burn-rate.configuration.invalid"
+            ) from None
+
+    defaults = TelemetryExportBurnRateObjectives()
+    return TelemetryExportBurnRateObjectives(
+        short_window_seconds=value(
+            "IIP_TELEMETRY_EXPORT_BURN_RATE_SHORT_WINDOW_SECONDS",
+            defaults.short_window_seconds,
+        ),
+        long_window_seconds=value(
+            "IIP_TELEMETRY_EXPORT_BURN_RATE_LONG_WINDOW_SECONDS",
+            defaults.long_window_seconds,
+        ),
+        minimum_attainment_basis_points=value(
+            "IIP_TELEMETRY_EXPORT_BURN_RATE_MINIMUM_ATTAINMENT_BASIS_POINTS",
+            defaults.minimum_attainment_basis_points,
+        ),
+        minimum_eligible_attempts=value(
+            "IIP_TELEMETRY_EXPORT_BURN_RATE_MINIMUM_ELIGIBLE_ATTEMPTS",
+            defaults.minimum_eligible_attempts,
+        ),
+        critical_burn_rate_hundredths=value(
+            "IIP_TELEMETRY_EXPORT_BURN_RATE_CRITICAL_HUNDREDTHS",
+            defaults.critical_burn_rate_hundredths,
         ),
     )
 

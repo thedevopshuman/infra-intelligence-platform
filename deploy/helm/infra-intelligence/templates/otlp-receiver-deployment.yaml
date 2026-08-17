@@ -96,6 +96,16 @@ spec:
               value: {{ .Values.telemetry.exportSloMinimumEligibleAttempts | quote }}
             - name: IIP_TELEMETRY_EXPORT_SLO_RETENTION_SECONDS
               value: {{ .Values.telemetry.exportSloRetentionSeconds | quote }}
+            - name: IIP_TELEMETRY_EXPORT_BURN_RATE_SHORT_WINDOW_SECONDS
+              value: {{ .Values.telemetry.exportBurnRateShortWindowSeconds | quote }}
+            - name: IIP_TELEMETRY_EXPORT_BURN_RATE_LONG_WINDOW_SECONDS
+              value: {{ .Values.telemetry.exportBurnRateLongWindowSeconds | quote }}
+            - name: IIP_TELEMETRY_EXPORT_BURN_RATE_MINIMUM_ATTAINMENT_BASIS_POINTS
+              value: {{ .Values.telemetry.exportBurnRateMinimumAttainmentBasisPoints | quote }}
+            - name: IIP_TELEMETRY_EXPORT_BURN_RATE_MINIMUM_ELIGIBLE_ATTEMPTS
+              value: {{ .Values.telemetry.exportBurnRateMinimumEligibleAttempts | quote }}
+            - name: IIP_TELEMETRY_EXPORT_BURN_RATE_CRITICAL_HUNDREDTHS
+              value: {{ .Values.telemetry.exportBurnRateCriticalHundredths | quote }}
             - name: IIP_OTLP_RECEIVER_SLO_WINDOW_SECONDS
               value: {{ .Values.otlpIngest.availabilitySlo.windowSeconds | quote }}
             - name: IIP_OTLP_RECEIVER_SLO_MINIMUM_BASIS_POINTS

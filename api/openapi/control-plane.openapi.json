@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.54.0",
+    "version": "0.55.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence and retention observation, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions and invocation lifecycles. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -195,6 +195,22 @@
           "503": {
             "description": "Telemetry export samples are unavailable or inconsistent",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "telemetry.export-slo.unavailable"}}}}
+          }
+        }
+      }
+    },
+    "/v1/operations/telemetry/export-burn-rate": {
+      "get": {
+        "operationId": "getTelemetryExportBurnRate",
+        "description": "Return a deployment-wide multi-window error-budget burn rate calculated from the same bounded pseudonymous samples as the export SLO report. The operation is administrator and policy protected and exposes no tenant telemetry, workload identity, exporter configuration, credentials, or provider details.",
+        "responses": {
+          "200": {"description": "Sampled metrics and traces export burn rate", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/telemetry-export-burn-rate-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "503": {
+            "description": "Telemetry export samples are unavailable or inconsistent",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "telemetry.export-burn-rate.unavailable"}}}}
           }
         }
       }

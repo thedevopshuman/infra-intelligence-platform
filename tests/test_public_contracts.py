@@ -77,6 +77,7 @@ from infra_intelligence_sdk import (
     TelemetryDeploymentExportHealthReport,
     TelemetryExportHealthReport,
     TelemetryExportSloReport,
+    TelemetryExportBurnRateReport,
 )
 
 
@@ -160,6 +161,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         telemetry_export_slo = TelemetryExportSloReport.from_dict(
             example("telemetry-export-slo-report.json")
+        )
+        telemetry_export_burn_rate = TelemetryExportBurnRateReport.from_dict(
+            example("telemetry-export-burn-rate-report.json")
         )
         event_delivery_health = EventDeliveryHealthReport.from_dict(
             example("event-delivery-health-report.json")
@@ -399,6 +403,10 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             telemetry_export_slo.to_dict()["kind"],
             "TelemetryExportSloReport",
+        )
+        self.assertEqual(
+            telemetry_export_burn_rate.to_dict()["kind"],
+            "TelemetryExportBurnRateReport",
         )
         self.assertEqual(
             event_delivery_health.to_dict()["kind"],

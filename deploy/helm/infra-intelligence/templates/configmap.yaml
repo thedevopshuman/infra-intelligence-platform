@@ -55,6 +55,11 @@ data:
   IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS: {{ .Values.telemetry.exportSloMinimumAttainmentBasisPoints | quote }}
   IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ELIGIBLE_ATTEMPTS: {{ .Values.telemetry.exportSloMinimumEligibleAttempts | quote }}
   IIP_TELEMETRY_EXPORT_SLO_RETENTION_SECONDS: {{ .Values.telemetry.exportSloRetentionSeconds | quote }}
+  IIP_TELEMETRY_EXPORT_BURN_RATE_SHORT_WINDOW_SECONDS: {{ .Values.telemetry.exportBurnRateShortWindowSeconds | quote }}
+  IIP_TELEMETRY_EXPORT_BURN_RATE_LONG_WINDOW_SECONDS: {{ .Values.telemetry.exportBurnRateLongWindowSeconds | quote }}
+  IIP_TELEMETRY_EXPORT_BURN_RATE_MINIMUM_ATTAINMENT_BASIS_POINTS: {{ .Values.telemetry.exportBurnRateMinimumAttainmentBasisPoints | quote }}
+  IIP_TELEMETRY_EXPORT_BURN_RATE_MINIMUM_ELIGIBLE_ATTEMPTS: {{ .Values.telemetry.exportBurnRateMinimumEligibleAttempts | quote }}
+  IIP_TELEMETRY_EXPORT_BURN_RATE_CRITICAL_HUNDREDTHS: {{ .Values.telemetry.exportBurnRateCriticalHundredths | quote }}
   OTEL_SERVICE_NAME: {{ .Values.telemetry.serviceName | quote }}
   IIP_TELEMETRY_METRICS_BACKEND: {{ .Values.telemetryEvidence.backend | quote }}
   IIP_TELEMETRY_LOGS_BACKEND: {{ .Values.logEvidence.backend | quote }}

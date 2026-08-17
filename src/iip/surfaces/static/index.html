@@ -114,6 +114,8 @@
                 <button class="text-button" id="telemetry-health-details" type="button" disabled>View instances →</button>
                 <span class="status-chip neutral" id="telemetry-slo-state">SLO unavailable</span>
                 <button class="text-button" id="telemetry-slo-details" type="button" disabled>View SLO →</button>
+                <span class="status-chip neutral" id="telemetry-burn-rate-state">Burn rate unavailable</span>
+                <button class="text-button" id="telemetry-burn-rate-details" type="button" disabled>View burn rate →</button>
               </div>
             </div>
             <div class="delivery-grid" aria-live="polite">
@@ -124,6 +126,8 @@
               <div><span>Trace exporters</span><strong id="telemetry-health-traces">—</strong></div>
               <div><span>Metric export SLO</span><strong id="telemetry-slo-metrics">—</strong></div>
               <div><span>Trace export SLO</span><strong id="telemetry-slo-traces">—</strong></div>
+              <div><span>Metric burn rate</span><strong id="telemetry-burn-rate-metrics">—</strong></div>
+              <div><span>Trace burn rate</span><strong id="telemetry-burn-rate-traces">—</strong></div>
             </div>
             <p class="delivery-note" id="telemetry-health-note">Platform administrators can verify API and worker export outcomes without exposing endpoints or credentials.</p>
           </article>

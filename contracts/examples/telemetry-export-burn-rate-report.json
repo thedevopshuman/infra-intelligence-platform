@@ -1,0 +1,73 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "TelemetryExportBurnRateReport",
+  "metadata": {
+    "evaluatedAt": "2026-08-17T14:00:00Z"
+  },
+  "spec": {
+    "status": "sustainable",
+    "objective": {
+      "minimumAttainmentBasisPoints": 9900,
+      "minimumEligibleAttempts": 20,
+      "criticalBurnRateHundredths": 600
+    },
+    "windows": {
+      "short": {
+        "durationSeconds": 3600,
+        "start": "2026-08-17T13:00:00Z",
+        "end": "2026-08-17T14:00:00Z"
+      },
+      "long": {
+        "durationSeconds": 21600,
+        "start": "2026-08-17T08:00:00Z",
+        "end": "2026-08-17T14:00:00Z"
+      }
+    },
+    "signals": [
+      {
+        "signal": "metrics",
+        "status": "sustainable",
+        "short": {
+          "status": "sustainable",
+          "enabledObservations": 120,
+          "eligibleAttempts": 120,
+          "successfulAttempts": 119,
+          "failedAttempts": 1,
+          "attainmentBasisPoints": 9916,
+          "burnRateHundredths": 83
+        },
+        "long": {
+          "status": "sustainable",
+          "enabledObservations": 720,
+          "eligibleAttempts": 720,
+          "successfulAttempts": 714,
+          "failedAttempts": 6,
+          "attainmentBasisPoints": 9916,
+          "burnRateHundredths": 83
+        }
+      },
+      {
+        "signal": "traces",
+        "status": "disabled",
+        "short": {
+          "status": "disabled",
+          "enabledObservations": 0,
+          "eligibleAttempts": 0,
+          "successfulAttempts": 0,
+          "failedAttempts": 0,
+          "attainmentBasisPoints": null,
+          "burnRateHundredths": null
+        },
+        "long": {
+          "status": "disabled",
+          "enabledObservations": 0,
+          "eligibleAttempts": 0,
+          "successfulAttempts": 0,
+          "failedAttempts": 0,
+          "attainmentBasisPoints": null,
+          "burnRateHundredths": null
+        }
+      }
+    ]
+  }
+}

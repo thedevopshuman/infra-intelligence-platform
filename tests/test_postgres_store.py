@@ -32,6 +32,11 @@ from iip.adapters.evidence import (
     UuidEvidenceIdGenerator,
 )
 from iip.adapters.memory import AllowTenantPolicy
+from iip.application.query_telemetry_export_burn_rate import (
+    GetTelemetryExportBurnRateCommand,
+    TelemetryExportBurnRateObjectives,
+    TelemetryExportBurnRateService,
+)
 from iip.application.action_reconciliation import ActionReconciliationService
 from iip.application.collect_evidence import CollectEvidenceCommand, EvidenceCollectionService
 from iip.application.ingest_collection import (
@@ -803,6 +808,31 @@ class PostgresOperationalStoreTests(unittest.TestCase):
         self.assertEqual(slo.signals[0].successful_attempts, 1)
         self.assertIsInstance(slo.signals[0].eligible_attempts, int)
         self.assertIsInstance(slo.signals[0].successful_attempts, int)
+        class FixedClock:
+            def now(self) -> str:
+                return "2026-08-17T12:05:00Z"
+
+        burn_rate_service = TelemetryExportBurnRateService(
+            reconnected,
+            AllowTenantPolicy(),
+            FixedClock(),
+            TelemetryExportBurnRateObjectives(
+                short_window_seconds=300,
+                long_window_seconds=3_600,
+                minimum_eligible_attempts=1,
+            ),
+        )
+        burn_rate = burn_rate_service.get(
+            GetTelemetryExportBurnRateCommand(
+                ActorContext("operator", "local", ("platform-admin",))
+            )
+        ).to_dict()
+        metrics_signal = burn_rate["spec"]["signals"][0]
+        self.assertEqual(metrics_signal["signal"], "metrics")
+        self.assertEqual(metrics_signal["short"]["eligibleAttempts"], 1)
+        self.assertEqual(metrics_signal["short"]["successfulAttempts"], 1)
+        self.assertEqual(metrics_signal["status"], "sustainable")
+
         reconnected.retire_telemetry_export_health(instance_id)
         self.assertEqual(
             reconnected.list_telemetry_export_health(

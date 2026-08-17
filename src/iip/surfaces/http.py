@@ -160,6 +160,11 @@ from iip.application.query_telemetry_export_slo import (
     TelemetryExportSloAuthorizationError,
     TelemetryExportSloStateError,
 )
+from iip.application.query_telemetry_export_burn_rate import (
+    GetTelemetryExportBurnRateCommand,
+    TelemetryExportBurnRateAuthorizationError,
+    TelemetryExportBurnRateStateError,
+)
 from iip.application.resource_change_evidence import (
     CollectResourceChangeEvidenceCommand,
     InvalidResourceChangeEvidenceRequestError,
@@ -175,7 +180,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.54.0"
+    server_version = "IIPReference/0.55.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -291,6 +296,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if path == "/v1/operations/telemetry/export-slo":
             self._query_telemetry_export_slo(actor, parsed.query)
+            return
+        if path == "/v1/operations/telemetry/export-burn-rate":
+            self._query_telemetry_export_burn_rate(actor, parsed.query)
             return
         if path == "/v1/operations/events/delivery-health":
             self._query_event_delivery_health(actor, parsed.query)
@@ -535,6 +543,32 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json(
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 {"error": {"code": "telemetry.export-slo.unavailable"}},
+            )
+
+    def _query_telemetry_export_burn_rate(
+        self, actor: ActorContext, query: str
+    ) -> None:
+        try:
+            if query:
+                raise ValueError
+            report = self.runtime.telemetry_export_burn_rate.get(
+                GetTelemetryExportBurnRateCommand(actor)
+            )
+            self._json(HTTPStatus.OK, report.to_dict())
+        except ValueError:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": "request.invalid"}},
+            )
+        except TelemetryExportBurnRateAuthorizationError:
+            self._json(
+                HTTPStatus.FORBIDDEN,
+                {"error": {"code": "policy.denied"}},
+            )
+        except (TelemetryExportBurnRateStateError, PersistenceError):
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "telemetry.export-burn-rate.unavailable"}},
             )
 
     def _query_event_delivery_health(
@@ -1547,6 +1581,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "telemetry-deployment-export-health"
             ),
             "/v1/operations/telemetry/export-slo": "telemetry-export-slo",
+            "/v1/operations/telemetry/export-burn-rate": (
+                "telemetry-export-burn-rate"
+            ),
             "/v1/operations/events/delivery-health": "event-delivery-health",
             "/v1/operations/events/delivery-slo": "event-delivery-slo",
             "/v1/operations/investigations/completion-slo": (

@@ -93,6 +93,11 @@ The API and worker use the Collector through the Compose service network and app
 | `IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS` | `9900` | Required per-signal successful-attempt proportion |
 | `IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ELIGIBLE_ATTEMPTS` | `20` | Per-signal attempt floor before meeting/breached |
 | `IIP_TELEMETRY_EXPORT_SLO_RETENTION_SECONDS` | `604800` | Sample retention; must cover the configured SLO window |
+| `IIP_TELEMETRY_EXPORT_BURN_RATE_SHORT_WINDOW_SECONDS` | `3600` | Fast burn-rate window, 300–2,592,000 seconds |
+| `IIP_TELEMETRY_EXPORT_BURN_RATE_LONG_WINDOW_SECONDS` | `21600` | Slow burn-rate window; must exceed the short window and stay within sample retention |
+| `IIP_TELEMETRY_EXPORT_BURN_RATE_MINIMUM_ATTAINMENT_BASIS_POINTS` | `9900` | Shared rolling-SLO objective the burn rate is measured against |
+| `IIP_TELEMETRY_EXPORT_BURN_RATE_MINIMUM_ELIGIBLE_ATTEMPTS` | `20` | Per-window, per-signal attempt floor before insufficient-data |
+| `IIP_TELEMETRY_EXPORT_BURN_RATE_CRITICAL_HUNDREDTHS` | `600` | Burn rate (×100) at or above which a window is critical; `100` is sustainable |
 
 The endpoint must be explicit HTTP(S), no longer than 2048 characters, and cannot contain user information, a query, or a fragment. Use `OTEL_EXPORTER_OTLP_HEADERS` or deployment-native authentication instead of embedding credentials in a URL.
 
@@ -130,6 +135,16 @@ curl --fail-with-body \
 
 The SLO reports disabled, no-data, insufficient-data, meeting, or breached without exposing tenant telemetry or backend details. `/readyz` remains independent, so telemetry backend failure or health-report write failure does not interrupt customer workflows.
 
+The same bounded samples also drive a multi-window burn-rate report, so an operator can see budget consumption accelerating before a single long window finally reports `breached`:
+
+```bash
+curl --fail-with-body \
+  -H "Authorization: Bearer $IIP_OPERATOR_TOKEN" \
+  http://127.0.0.1:8080/v1/operations/telemetry/export-burn-rate
+```
+
+Each signal reports a `short` and `long` window burn rate scaled by 100 (`100` is sustainable, matching the shared rolling-SLO objective's allowed failure rate). A signal reaches `critical` only when both windows independently cross the configured threshold; a lone critical window reports `elevated` instead, so a brief blip cannot page alone. See the [burn-rate contract](../specifications/telemetry-export-burn-rate-contract.md) and [ADR 0082](../decisions/0082-multi-window-telemetry-export-burn-rate.md). This report still measures only IIP-to-Collector export attempts; it says nothing about Collector-to-backend queue depth or loss.
+
 ## Production gaps
 
-The reference adapters and automatic sampler are failure-isolated but not a complete production telemetry pipeline. Production enablement still requires Collector-side queue/delivery monitoring, an end-to-end loss objective, reviewed cardinality budgets, TLS/authentication policy, regional routing, representative load tests, ingress/synthetic availability, burn-rate rules, and notification routing. The trace queue is bounded but not durable. The sampled SLO covers recent control-plane and worker SDK export attempts, not Collector queue durability, desired replica membership, backend ingestion, or regional aggregation. Query SLO aggregation belongs to the customer telemetry backend and must account for Collector/export loss before making a production claim.
+The reference adapters and automatic sampler are failure-isolated but not a complete production telemetry pipeline. Production enablement still requires Collector-side queue/delivery monitoring, an end-to-end loss objective, reviewed cardinality budgets, TLS/authentication policy, regional routing, representative load tests, ingress/synthetic availability, and notification routing. The trace queue is bounded but not durable. The sampled SLO and burn-rate reports cover recent control-plane and worker SDK export attempts, not Collector queue durability, desired replica membership, backend ingestion, or regional aggregation. Query SLO aggregation belongs to the customer telemetry backend and must account for Collector/export loss before making a production claim.

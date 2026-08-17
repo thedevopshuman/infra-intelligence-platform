@@ -43,6 +43,7 @@ import type {
   TelemetryDeploymentExportHealthReport,
   TelemetryExportHealthReport,
   TelemetryExportSloReport,
+  TelemetryExportBurnRateReport,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -290,6 +291,12 @@ export class InfrastructureIntelligenceClient {
   async getTelemetryExportSlo(): Promise<TelemetryExportSloReport> {
     return this.get<TelemetryExportSloReport>(
       "/v1/operations/telemetry/export-slo",
+    );
+  }
+
+  async getTelemetryExportBurnRate(): Promise<TelemetryExportBurnRateReport> {
+    return this.get<TelemetryExportBurnRateReport>(
+      "/v1/operations/telemetry/export-burn-rate",
     );
   }
 

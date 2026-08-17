@@ -391,6 +391,50 @@ export interface TelemetryExportSloReport {
   };
 }
 
+export type TelemetryExportBurnRateStatus =
+  | "disabled"
+  | "no-data"
+  | "insufficient-data"
+  | "sustainable"
+  | "elevated"
+  | "critical";
+
+export interface TelemetryExportBurnRateWindowObservation {
+  status: TelemetryExportBurnRateStatus;
+  enabledObservations: number;
+  eligibleAttempts: number;
+  successfulAttempts: number;
+  failedAttempts: number;
+  attainmentBasisPoints: number | null;
+  burnRateHundredths: number | null;
+}
+
+export interface TelemetryExportBurnRateSignal {
+  signal: "metrics" | "traces";
+  status: TelemetryExportBurnRateStatus;
+  short: TelemetryExportBurnRateWindowObservation;
+  long: TelemetryExportBurnRateWindowObservation;
+}
+
+export interface TelemetryExportBurnRateReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "TelemetryExportBurnRateReport";
+  metadata: { evaluatedAt: string };
+  spec: {
+    status: TelemetryExportBurnRateStatus;
+    objective: {
+      minimumAttainmentBasisPoints: number;
+      minimumEligibleAttempts: number;
+      criticalBurnRateHundredths: number;
+    };
+    windows: {
+      short: { durationSeconds: number; start: string; end: string };
+      long: { durationSeconds: number; start: string; end: string };
+    };
+    signals: [TelemetryExportBurnRateSignal, TelemetryExportBurnRateSignal];
+  };
+}
+
 export type EventDeliveryHealthStatus = "healthy" | "backlogged" | "degraded";
 
 export interface QuarantinedEventDelivery {

@@ -213,6 +213,9 @@ class QueryAvailabilityHttpBoundaryTests(unittest.TestCase):
                 "telemetry-deployment-export-health"
             ),
             "/v1/operations/telemetry/export-slo": "telemetry-export-slo",
+            "/v1/operations/telemetry/export-burn-rate": (
+                "telemetry-export-burn-rate"
+            ),
             "/v1/operations/events/delivery-health": "event-delivery-health",
             "/v1/operations/events/delivery-slo": "event-delivery-slo",
             "/v1/operations/investigations/completion-slo": (

@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.54.0"
+  tag: "0.55.0"
   digest: ""
 
 worker:
@@ -217,6 +217,11 @@ telemetry:
   exportSloMinimumAttainmentBasisPoints: 9900
   exportSloMinimumEligibleAttempts: 20
   exportSloRetentionSeconds: 604800
+  exportBurnRateShortWindowSeconds: 3600
+  exportBurnRateLongWindowSeconds: 21600
+  exportBurnRateMinimumAttainmentBasisPoints: 9900
+  exportBurnRateMinimumEligibleAttempts: 20
+  exportBurnRateCriticalHundredths: 600
   existingSecret: ""
   headersSecretKey: otlp-headers
 

@@ -109,6 +109,8 @@
               <div class="delivery-heading-actions">
                 <span class="status-chip neutral" id="delivery-state">Connect to inspect</span>
                 <button class="text-button" id="delivery-details" type="button" disabled>View quarantine →</button>
+                <span class="status-chip neutral" id="delivery-slo-state">SLO unavailable</span>
+                <button class="text-button" id="delivery-slo-details" type="button" disabled>View SLO →</button>
               </div>
             </div>
             <div class="delivery-grid" aria-live="polite">
@@ -116,8 +118,10 @@
               <div><span>In flight</span><strong id="delivery-inflight">—</strong></div>
               <div><span>Retrying</span><strong id="delivery-retrying">—</strong></div>
               <div><span>Quarantined</span><strong id="delivery-quarantined">—</strong></div>
+              <div><span>SLO attainment</span><strong id="delivery-slo-attainment">—</strong></div>
             </div>
             <p class="delivery-note" id="delivery-note">Platform administrators can inspect exact-tenant backlog without exposing event payloads.</p>
+            <p class="delivery-note" id="delivery-slo-note">The rolling publication objective appears after connection.</p>
           </article>
 
           <div class="two-column">

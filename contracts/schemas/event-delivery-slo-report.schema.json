@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:event-delivery-slo-report:v1alpha1",
+  "title": "Infrastructure Intelligence Event Delivery SLO Report",
+  "description": "Tenant-scoped rolling publication-path objective calculated from durable transport-neutral outbox outcomes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "EventDeliverySloReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId", "evaluatedAt"],
+      "properties": {
+        "tenantId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"},
+        "evaluatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "window", "objective", "measurement"],
+      "properties": {
+        "status": {"type": "string", "enum": ["no-data", "insufficient-data", "meeting", "breached"]},
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["durationSeconds", "start", "end", "maturityCutoff"],
+          "properties": {
+            "durationSeconds": {"type": "integer", "minimum": 300, "maximum": 2592000},
+            "start": {"type": "string", "format": "date-time"},
+            "end": {"type": "string", "format": "date-time"},
+            "maturityCutoff": {"type": "string", "format": "date-time"}
+          }
+        },
+        "objective": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maximumDeliveryLatencySeconds", "minimumAttainmentBasisPoints", "minimumEligibleEvents"],
+          "properties": {
+            "maximumDeliveryLatencySeconds": {"type": "integer", "minimum": 1, "maximum": 86400},
+            "minimumAttainmentBasisPoints": {"type": "integer", "minimum": 1, "maximum": 10000},
+            "minimumEligibleEvents": {"type": "integer", "minimum": 1, "maximum": 1000000}
+          }
+        },
+        "measurement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["createdEvents", "immatureEvents", "eligibleEvents", "withinObjectiveEvents", "lateDeliveredEvents", "undeliveredEvents", "quarantinedEvents", "attainmentBasisPoints"],
+          "properties": {
+            "createdEvents": {"$ref": "#/$defs/counter"},
+            "immatureEvents": {"$ref": "#/$defs/counter"},
+            "eligibleEvents": {"$ref": "#/$defs/counter"},
+            "withinObjectiveEvents": {"$ref": "#/$defs/counter"},
+            "lateDeliveredEvents": {"$ref": "#/$defs/counter"},
+            "undeliveredEvents": {"$ref": "#/$defs/counter"},
+            "quarantinedEvents": {"$ref": "#/$defs/counter"},
+            "attainmentBasisPoints": {
+              "oneOf": [
+                {"type": "integer", "minimum": 0, "maximum": 10000},
+                {"type": "null"}
+              ]
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "no-data"}}},
+          "then": {
+            "properties": {
+              "measurement": {
+                "properties": {
+                  "eligibleEvents": {"const": 0},
+                  "withinObjectiveEvents": {"const": 0},
+                  "lateDeliveredEvents": {"const": 0},
+                  "undeliveredEvents": {"const": 0},
+                  "quarantinedEvents": {"const": 0},
+                  "attainmentBasisPoints": {"type": "null"}
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"status": {"enum": ["insufficient-data", "meeting", "breached"]}}},
+          "then": {
+            "properties": {
+              "measurement": {
+                "properties": {
+                  "eligibleEvents": {"minimum": 1},
+                  "attainmentBasisPoints": {"type": "integer"}
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "counter": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}
+  }
+}

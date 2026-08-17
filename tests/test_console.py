@@ -85,6 +85,7 @@ class ConsoleHttpTests(unittest.TestCase):
         console = handler.wfile.getvalue().decode("utf-8")
         self.assertIn("Quarantined event replay", console)
         self.assertIn("Investigate newest quarantine", console)
+        self.assertIn("SLO attainment", console)
 
         handler = object.__new__(ApiHandler)
         handler.path = "/console/app.js"
@@ -100,9 +101,20 @@ class ConsoleHttpTests(unittest.TestCase):
         self.assertIn("protected-catalog", script)
         self.assertIn("resource.change", script)
         self.assertIn("/v1/operations/events/delivery-health?limit=20", script)
+        self.assertIn("/v1/operations/events/delivery-slo", script)
         self.assertIn("Event delivery", script)
         self.assertIn('actionType === "event-delivery.requeue"', script)
         self.assertIn("exact quarantine generation", script)
+
+        handler = object.__new__(ApiHandler)
+        handler.path = "/console/app.css"
+        handler.headers = Message()
+        self._wire_response(handler)
+        handler.do_GET()
+        self.assertIn(
+            ".detail-actions[hidden] { display: none; }",
+            handler.wfile.getvalue().decode("utf-8"),
+        )
 
     def test_session_is_derived_from_the_credential(self) -> None:
         with patch.dict(

@@ -15,17 +15,21 @@ services:
       - postgres-data:/var/lib/postgresql
 
   api:
-    image: iip-local-platform:0.30.0
+    image: iip-local-platform:0.31.0
     build:
       context: ..
       dockerfile: Dockerfile
       args:
-        IIP_IMAGE_VERSION: "0.30.0"
+        IIP_IMAGE_VERSION: "0.31.0"
         IIP_IMAGE_REVISION: development
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
       IIP_DATABASE_AUTO_MIGRATE: "true"
       IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
+      IIP_EVENT_DELIVERY_SLO_WINDOW_SECONDS: ${IIP_EVENT_DELIVERY_SLO_WINDOW_SECONDS:-3600}
+      IIP_EVENT_DELIVERY_SLO_MAXIMUM_LATENCY_SECONDS: ${IIP_EVENT_DELIVERY_SLO_MAXIMUM_LATENCY_SECONDS:-60}
+      IIP_EVENT_DELIVERY_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS: ${IIP_EVENT_DELIVERY_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS:-9900}
+      IIP_EVENT_DELIVERY_SLO_MINIMUM_ELIGIBLE_EVENTS: ${IIP_EVENT_DELIVERY_SLO_MINIMUM_ELIGIBLE_EVENTS:-20}
       IIP_AUTH_IDENTITIES_JSON: ${IIP_AUTH_IDENTITIES_JSON:?set IIP_AUTH_IDENTITIES_JSON}
       IIP_OTLP_RECEIVER_MODE: disabled
       IIP_OTEL_METRICS_ENABLED: ${IIP_OTEL_METRICS_ENABLED:-false}
@@ -75,7 +79,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-local-platform:0.30.0
+    image: iip-local-platform:0.31.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:

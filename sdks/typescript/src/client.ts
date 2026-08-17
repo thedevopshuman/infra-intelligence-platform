@@ -11,6 +11,7 @@ import type {
   Evidence,
   EvidenceId,
   EventDeliveryHealthReport,
+  EventDeliverySloReport,
   EventDeliveryReplayParameters,
   IngestionFreshnessReport,
   InvestigationId,
@@ -144,6 +145,12 @@ export class InfrastructureIntelligenceClient {
     const query = new URLSearchParams({ limit: String(limit) });
     return this.get<EventDeliveryHealthReport>(
       `/v1/operations/events/delivery-health?${query}`,
+    );
+  }
+
+  async getEventDeliverySlo(): Promise<EventDeliverySloReport> {
+    return this.get<EventDeliverySloReport>(
+      "/v1/operations/events/delivery-slo",
     );
   }
 

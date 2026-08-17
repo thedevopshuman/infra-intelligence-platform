@@ -400,8 +400,31 @@ def main() -> int:
             or delivery_spec.get("delivery", {}).get("quarantinedEvents") != 0
         ):
             raise ProductWorkflowError("local event delivery health is invalid")
+        delivery_slo = _request(
+            "/v1/operations/events/delivery-slo", operator
+        )
+        slo_spec = delivery_slo.get("spec")
+        measurement = (
+            slo_spec.get("measurement") if isinstance(slo_spec, Mapping) else None
+        )
+        objective = (
+            slo_spec.get("objective") if isinstance(slo_spec, Mapping) else None
+        )
+        if (
+            delivery_slo.get("kind") != "EventDeliverySloReport"
+            or delivery_slo.get("metadata", {}).get("tenantId") != "local"
+            or not isinstance(measurement, Mapping)
+            or not isinstance(objective, Mapping)
+            or objective.get("maximumDeliveryLatencySeconds") != 60
+            or objective.get("minimumAttainmentBasisPoints") != 9900
+            or measurement.get("createdEvents", 0) < 1
+            or measurement.get("createdEvents")
+            != measurement.get("eligibleEvents", 0)
+            + measurement.get("immatureEvents", 0)
+        ):
+            raise ProductWorkflowError("local event delivery SLO is invalid")
         print(
-            "local product workflow passed: runtime identity → collection → event delivery health → queued worker "
+            "local product workflow passed: runtime identity → collection → event delivery health/SLO → queued worker "
             "investigation → proposal → independent approval → one-shot dry-run → queue"
         )
         print(f"action: {proposal_id}")

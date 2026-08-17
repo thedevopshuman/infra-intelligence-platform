@@ -1,0 +1,32 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "EventDeliverySloReport",
+  "metadata": {
+    "tenantId": "tenant-acme",
+    "evaluatedAt": "2026-08-17T13:00:00Z"
+  },
+  "spec": {
+    "status": "meeting",
+    "window": {
+      "durationSeconds": 3600,
+      "start": "2026-08-17T12:00:00Z",
+      "end": "2026-08-17T13:00:00Z",
+      "maturityCutoff": "2026-08-17T12:59:00Z"
+    },
+    "objective": {
+      "maximumDeliveryLatencySeconds": 60,
+      "minimumAttainmentBasisPoints": 9900,
+      "minimumEligibleEvents": 20
+    },
+    "measurement": {
+      "createdEvents": 102,
+      "immatureEvents": 2,
+      "eligibleEvents": 100,
+      "withinObjectiveEvents": 99,
+      "lateDeliveredEvents": 0,
+      "undeliveredEvents": 1,
+      "quarantinedEvents": 1,
+      "attainmentBasisPoints": 9900
+    }
+  }
+}

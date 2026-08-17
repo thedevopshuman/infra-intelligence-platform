@@ -17,6 +17,7 @@ from infra_intelligence_sdk import (
     ContextEvidenceResult,
     Evidence,
     EventDeliveryHealthReport,
+    EventDeliverySloReport,
     EventDeliveryReplayCommand,
     EvaluationScenario,
     InvestigationReport,
@@ -136,6 +137,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         event_delivery_health = EventDeliveryHealthReport.from_dict(
             example("event-delivery-health-report.json")
+        )
+        event_delivery_slo = EventDeliverySloReport.from_dict(
+            example("event-delivery-slo-report.json")
         )
         runtime_version = RuntimeVersionReport.from_dict(
             example("runtime-version-report.json")
@@ -313,6 +317,10 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             event_delivery_health.to_dict()["kind"],
             "EventDeliveryHealthReport",
+        )
+        self.assertEqual(
+            event_delivery_slo.to_dict()["kind"],
+            "EventDeliverySloReport",
         )
         self.assertEqual(
             runtime_version.to_dict()["kind"], "RuntimeVersionReport"

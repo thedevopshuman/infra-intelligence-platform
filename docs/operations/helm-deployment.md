@@ -19,7 +19,7 @@ The default repository and tag are placeholders. Set `image.repository` to the p
 
 ## Validate configuration before access
 
-The chart's `values.schema.json` is a closed customer configuration contract. Unknown keys, unsupported modes, unsafe Service exposure, relaxed container security, and out-of-range settings fail schema validation. Render-time guards also reject invalid relationships such as a heartbeat that cannot renew its lease, telemetry export without an OTLP endpoint, or backup scheduling without existing storage and database-only NetworkPolicy.
+The chart's `values.schema.json` is a closed customer configuration contract. Unknown keys, unsupported modes, unsafe Service exposure, relaxed container security, and out-of-range settings fail schema validation. Render-time guards also reject invalid relationships such as a heartbeat that cannot renew its lease, an event-delivery latency objective as long as its measurement window, telemetry export without an OTLP endpoint, or backup scheduling without existing storage and database-only NetworkPolicy.
 
 Run both checks against the exact protected values file before installation:
 
@@ -65,7 +65,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.30.0
+  tag: 0.31.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -76,6 +76,12 @@ database:
 auth:
   mode: local-hashed
   existingSecret: iip-auth
+
+eventDeliverySlo:
+  windowSeconds: 3600
+  maximumDeliveryLatencySeconds: 60
+  minimumAttainmentBasisPoints: 9900
+  minimumEligibleEvents: 20
 
 networkPolicy:
   enabled: true
@@ -125,7 +131,7 @@ With Docker Desktop and the explicit `kind-iip-dev` context available, run:
 make test-helm-install
 ```
 
-The gate builds and loads the current image, registers its exact host-platform digest on every disposable kind node, creates an exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, and proves API readiness from inside the pod. It then authenticates without printing the generated credential and requires the runtime report to match the application version, contract version, migration, chart, and exact installed digest. A second Helm revision adds two API replicas, a TLS Ingress declaration, and scheduled backup configuration. The gate proves immutable image selection, runtime identity, migration idempotency, and exact ingress binding; runs the installed backup CronJob on demand; verifies its persisted checksum; restores it into a separate database; confirms every packaged migration; and checks rollout and Helm history. It removes the namespace and claim, refuses non-kind contexts, and never prints generated credentials, database contents, or private keys. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
+The gate builds and loads the current image, registers its exact host-platform digest on every disposable kind node, creates an exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, and proves API readiness from inside the pod. It then authenticates without printing the generated credential and requires the runtime report, event-delivery health, and rolling publication objective to match the installed configuration. A second Helm revision adds two API replicas, a TLS Ingress declaration, and scheduled backup configuration. The gate proves immutable image selection, runtime identity, migration idempotency, and exact ingress binding; runs the installed backup CronJob on demand; verifies its persisted checksum; restores it into a separate database; confirms every packaged migration; and checks rollout and Helm history. It removes the namespace and claim, refuses non-kind contexts, and never prints generated credentials, database contents, or private keys. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
 
 ## Production gaps
 

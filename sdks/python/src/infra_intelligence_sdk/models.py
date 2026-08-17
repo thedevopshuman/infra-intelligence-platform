@@ -289,6 +289,28 @@ class EventDeliveryHealthReport:
 
 
 @dataclass(frozen=True)
+class EventDeliverySloReport:
+    """Tenant-scoped rolling publication objective for operators."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "EventDeliverySloReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="EventDeliverySloReport",
+                label="event delivery SLO report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class RuntimeVersionReport:
     """Authenticated application, contract, storage, build, and deployment identity."""
 

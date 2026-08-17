@@ -20,6 +20,7 @@ from .models import (
     Evidence,
     EventDeliveryReplayCommand,
     EventDeliveryHealthReport,
+    EventDeliverySloReport,
     IngestionFreshnessReport,
     InvestigationReport,
     InvestigationJobStatus,
@@ -166,6 +167,13 @@ class Client:
         query = urlencode({"limit": str(limit)})
         return EventDeliveryHealthReport.from_dict(
             self._get(f"/v1/operations/events/delivery-health?{query}")
+        )
+
+    def get_event_delivery_slo(self) -> EventDeliverySloReport:
+        """Read the configured rolling publication objective as an administrator."""
+
+        return EventDeliverySloReport.from_dict(
+            self._get("/v1/operations/events/delivery-slo")
         )
 
     def ingest_resource_collection(

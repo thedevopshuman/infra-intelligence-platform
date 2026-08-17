@@ -14,6 +14,7 @@ from .models import (
     Evidence,
     EventDeliveryReplayCommand,
     EventDeliveryHealthReport,
+    EventDeliverySloReport,
     EvaluationScenario,
     IngestionFreshnessReport,
     InvestigationReport,
@@ -82,6 +83,7 @@ __all__ = [
     "Evidence",
     "EventDeliveryReplayCommand",
     "EventDeliveryHealthReport",
+    "EventDeliverySloReport",
     "EvaluationScenario",
     "IngestionFreshnessReport",
     "InvestigationReport",
@@ -135,4 +137,4 @@ __all__ = [
     "TelemetryEvidenceResult",
     "TelemetryExportHealthReport",
 ]
-__version__ = "0.27.0"
+__version__ = "0.28.0"

@@ -5,6 +5,7 @@ const state = {
   session: null,
   runtimeVersion: null,
   eventDeliveryHealth: null,
+  eventDeliverySlo: null,
   resources: [],
   investigations: [],
   evidence: [],
@@ -202,6 +203,53 @@ async function refreshEventDeliveryHealth() {
   renderEventDeliveryHealth();
 }
 
+function basisPoints(value) {
+  return value === null || value === undefined ? "—" : `${(value / 100).toFixed(2)}%`;
+}
+
+function renderEventDeliverySlo() {
+  const report = state.eventDeliverySlo;
+  const spec = report?.spec;
+  const chip = $("#delivery-slo-state");
+  if (!spec) {
+    $("#delivery-slo-attainment").textContent = "—";
+    chip.textContent = state.session && !hasRole("platform-admin")
+      ? "SLO admin required"
+      : state.session ? "SLO unavailable" : "SLO unavailable";
+    chip.className = "status-chip neutral";
+    $("#delivery-slo-details").disabled = true;
+    $("#delivery-slo-note").textContent = "The rolling publication objective appears after connection.";
+    return;
+  }
+  const measurement = spec.measurement;
+  const objective = spec.objective;
+  $("#delivery-slo-attainment").textContent = basisPoints(measurement.attainmentBasisPoints);
+  chip.textContent = spec.status;
+  chip.className = `status-chip ${spec.status === "meeting" ? "success" : spec.status === "breached" ? "danger" : spec.status === "insufficient-data" ? "warning" : "neutral"}`;
+  $("#delivery-slo-details").disabled = false;
+  if (spec.status === "no-data") {
+    $("#delivery-slo-note").textContent = "No events have matured past the configured publication deadline in this window.";
+  } else if (spec.status === "insufficient-data") {
+    $("#delivery-slo-note").textContent = `${measurement.eligibleEvents}/${objective.minimumEligibleEvents} mature events; more samples are required before an SLO verdict.`;
+  } else {
+    $("#delivery-slo-note").textContent = `${basisPoints(measurement.attainmentBasisPoints)} attained vs ${basisPoints(objective.minimumAttainmentBasisPoints)} required across the ${Math.round(spec.window.durationSeconds / 60)} minute window.`;
+  }
+}
+
+async function refreshEventDeliverySlo() {
+  if (!state.session || !hasRole("platform-admin")) {
+    state.eventDeliverySlo = null;
+    renderEventDeliverySlo();
+    return;
+  }
+  try {
+    state.eventDeliverySlo = await api("/v1/operations/events/delivery-slo");
+  } catch (_error) {
+    state.eventDeliverySlo = null;
+  }
+  renderEventDeliverySlo();
+}
+
 async function connect(token, remember) {
   state.token = token;
   try {
@@ -209,7 +257,7 @@ async function connect(token, remember) {
     if (remember) sessionStorage.setItem("iip.console.token", token);
     else sessionStorage.removeItem("iip.console.token");
     updateIdentity();
-    await Promise.all([refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshResources(), refreshActions()]);
+    await Promise.all([refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshResources(), refreshActions()]);
     $("#connection-dialog").close();
     $("#connection-error").hidden = true;
     showNotice(`Connected as ${state.session.metadata.actorId} in tenant ${state.session.metadata.tenantId}.`);
@@ -932,7 +980,7 @@ async function executeSelectedAction() {
       body: "{}",
     });
     await selectAction(state.selectedActionId);
-    await refreshEventDeliveryHealth();
+    await Promise.all([refreshEventDeliveryHealth(), refreshEventDeliverySlo()]);
     showNotice("Execution reached a durable terminal result. Duplicate delivery cannot repeat impact.");
   } catch (error) {
     showNotice(`Execution failed (${error.message}).`, "error");
@@ -948,7 +996,7 @@ function bindEvents() {
   $("#identity-button").addEventListener("click", () => $("#connection-dialog").showModal());
   $("#connection-close").addEventListener("click", () => $("#connection-dialog").close());
   $("#refresh-button").addEventListener("click", async () => {
-    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshResources(), refreshActions()]);
+    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshResources(), refreshActions()]);
     showNotice("Live platform state refreshed.");
   });
   $("#connection-form").addEventListener("submit", async (event) => {
@@ -1000,6 +1048,14 @@ function bindEvents() {
     $("#detail-actions").hidden = !state.inspectedReplay || !hasRole("platform-admin");
     $("#detail-dialog").showModal();
   });
+  $("#delivery-slo-details").addEventListener("click", () => {
+    if (!state.eventDeliverySlo) return;
+    $("#detail-kicker").textContent = "Event delivery objective";
+    $("#detail-title").textContent = "Rolling publication SLO";
+    $("#detail-content").textContent = JSON.stringify(state.eventDeliverySlo, null, 2);
+    $("#detail-actions").hidden = true;
+    $("#detail-dialog").showModal();
+  });
   $("#delivery-recovery").addEventListener("click", () => {
     if (!state.inspectedReplay || !hasRole("platform-admin")) return;
     state.pendingReplay = { ...state.inspectedReplay };
@@ -1016,6 +1072,7 @@ async function start() {
   renderResources();
   renderActionProposalMode();
   renderRuntimeVersion();
+  renderEventDeliverySlo();
   await checkHealth();
   const remembered = sessionStorage.getItem("iip.console.token");
   if (remembered) {

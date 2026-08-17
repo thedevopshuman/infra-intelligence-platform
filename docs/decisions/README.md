@@ -60,3 +60,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0054](0054-protected-investigation-signal-catalog.md) | Accepted | Freeze tenant-bound reviewed signal candidates without granting query, credential, or scope authority |
 | [0055](0055-bounded-outbox-quarantine.md) | Accepted | Stop permanent publication failures at a finite tenant-scoped quarantine boundary |
 | [0056](0056-governed-event-delivery-replay.md) | Accepted | Recover one exact quarantine generation through the existing one-shot governed-action chain |
+| [0057](0057-event-delivery-slo-semantics.md) | Accepted | Measure rolling transport-neutral publication objectives from durable outbox outcomes |

@@ -10,6 +10,7 @@ from typing import Dict, Iterable, Mapping, Optional
 
 from iip.application.ports import (
     ActorContext,
+    EventDeliverySloState,
     EventDeliveryState,
     OutboxMessage,
     PolicyDecision,
@@ -40,7 +41,7 @@ class _MemoryOutboxEntry:
     claimed_by: Optional[str] = None
     claim_expires_at: Optional[datetime] = None
     available_at: datetime = datetime.min.replace(tzinfo=timezone.utc)
-    published: bool = False
+    published_at: Optional[datetime] = None
     last_error_code: Optional[str] = None
     quarantined_at: Optional[datetime] = None
 
@@ -225,7 +226,7 @@ class InMemoryResourceStore:
                     break
                 if (
                     entry.event.tenant_id != tenant_id
-                    or entry.published
+                    or entry.published_at is not None
                     or entry.quarantined_at is not None
                 ):
                     continue
@@ -253,11 +254,11 @@ class InMemoryResourceStore:
                 or entry.claimed_by != worker_id
                 or entry.claim_expires_at is None
                 or entry.claim_expires_at <= datetime.now(timezone.utc)
-                or entry.published
+                or entry.published_at is not None
                 or entry.quarantined_at is not None
             ):
                 return False
-            entry.published = True
+            entry.published_at = datetime.now(timezone.utc)
             entry.claimed_by = None
             entry.claim_expires_at = None
             return True
@@ -282,7 +283,7 @@ class InMemoryResourceStore:
                 or entry.claimed_by != worker_id
                 or entry.claim_expires_at is None
                 or entry.claim_expires_at <= datetime.now(timezone.utc)
-                or entry.published
+                or entry.published_at is not None
                 or entry.quarantined_at is not None
             ):
                 return False
@@ -311,7 +312,7 @@ class InMemoryResourceStore:
                 or entry.claimed_by != worker_id
                 or entry.claim_expires_at is None
                 or entry.claim_expires_at <= now
-                or entry.published
+                or entry.published_at is not None
                 or entry.quarantined_at is not None
             ):
                 return False
@@ -340,7 +341,7 @@ class InMemoryResourceStore:
             pending = tuple(
                 entry
                 for entry in tenant_entries
-                if not entry.published and entry.quarantined_at is None
+                if entry.published_at is None and entry.quarantined_at is None
             )
             quarantined = sorted(
                 (
@@ -371,6 +372,78 @@ class InMemoryResourceStore:
                     if entry.quarantined_at is not None
                 ),
             )
+
+    def get_event_delivery_slo_state(
+        self,
+        tenant_id: str,
+        *,
+        window_start: str,
+        window_end: str,
+        maturity_cutoff: str,
+        latency_objective_seconds: int,
+    ) -> EventDeliverySloState:
+        if (
+            isinstance(latency_objective_seconds, bool)
+            or not isinstance(latency_objective_seconds, int)
+            or not 1 <= latency_objective_seconds <= 86_400
+        ):
+            raise ValueError("latency_objective_seconds is invalid")
+        try:
+            start = datetime.fromisoformat(window_start.replace("Z", "+00:00"))
+            end = datetime.fromisoformat(window_end.replace("Z", "+00:00"))
+            cutoff = datetime.fromisoformat(
+                maturity_cutoff.replace("Z", "+00:00")
+            )
+        except (AttributeError, TypeError, ValueError):
+            raise ValueError("event delivery SLO window is invalid") from None
+        if (
+            start.tzinfo is None
+            or end.tzinfo is None
+            or cutoff.tzinfo is None
+            or not start < cutoff < end
+            or int((end - cutoff).total_seconds()) != latency_objective_seconds
+        ):
+            raise ValueError("event delivery SLO window is invalid")
+
+        with self._lock:
+            cohort = []
+            for entry in self._outbox.values():
+                if entry.event.tenant_id != tenant_id:
+                    continue
+                created_at = datetime.fromisoformat(
+                    entry.created_at.replace("Z", "+00:00")
+                )
+                if start <= created_at <= end:
+                    cohort.append((entry, created_at))
+            eligible = [item for item in cohort if item[1] <= cutoff]
+            within = []
+            late = []
+            undelivered = []
+            for entry, created_at in eligible:
+                if entry.published_at is None:
+                    undelivered.append(entry)
+                elif entry.published_at <= created_at + timedelta(
+                    seconds=latency_objective_seconds
+                ):
+                    within.append(entry)
+                else:
+                    late.append(entry)
+
+        return EventDeliverySloState(
+            tenant_id=tenant_id,
+            window_start=window_start,
+            window_end=window_end,
+            maturity_cutoff=maturity_cutoff,
+            created_events=len(cohort),
+            immature_events=len(cohort) - len(eligible),
+            eligible_events=len(eligible),
+            within_objective_events=len(within),
+            late_delivered_events=len(late),
+            undelivered_events=len(undelivered),
+            quarantined_events=sum(
+                entry.quarantined_at is not None for entry in undelivered
+            ),
+        )
 
     def get_quarantined_outbox(
         self,
@@ -426,7 +499,7 @@ class InMemoryResourceStore:
                 or entry.event.event_id != expected_event_id
                 or quarantined_at != expected_quarantined_at
                 or entry.attempts != expected_attempts
-                or entry.published
+                or entry.published_at is not None
             ):
                 return False
             entry.attempts = 0
@@ -481,7 +554,7 @@ class InMemoryResourceStore:
                 observation = entry.event.data.get("observation")
                 if (
                     entry.event.tenant_id == tenant_id
-                    and not entry.published
+                    and entry.published_at is None
                     and entry.quarantined_at is None
                     and isinstance(observation, Mapping)
                     and observation.get("sourceId") == source_id
@@ -723,6 +796,7 @@ class AllowTenantPolicy:
             "action:read",
             "evidence:collect",
             "event-delivery-health:read",
+            "event-delivery-slo:read",
             "ingestion-telemetry:read",
             "plugin:open-session",
             "resource-projection:rebuild",

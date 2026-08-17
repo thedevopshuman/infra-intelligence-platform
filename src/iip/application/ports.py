@@ -129,6 +129,23 @@ class EventDeliveryState:
 
 
 @dataclass(frozen=True)
+class EventDeliverySloState:
+    """Aggregate durable publication outcomes for one exact tenant window."""
+
+    tenant_id: str
+    window_start: str
+    window_end: str
+    maturity_cutoff: str
+    created_events: int
+    immature_events: int
+    eligible_events: int
+    within_objective_events: int
+    late_delivered_events: int
+    undelivered_events: int
+    quarantined_events: int
+
+
+@dataclass(frozen=True)
 class SourceCheckpoint:
     """Last explicitly committed cursor for a tenant-scoped source."""
 
@@ -594,6 +611,17 @@ class EventOutbox(Protocol):
         quarantine_limit: int = 50,
     ) -> EventDeliveryState:
         """Return exact-tenant backlog and bounded quarantine facts."""
+
+    def get_event_delivery_slo_state(
+        self,
+        tenant_id: str,
+        *,
+        window_start: str,
+        window_end: str,
+        maturity_cutoff: str,
+        latency_objective_seconds: int,
+    ) -> EventDeliverySloState:
+        """Return aggregate outcomes for one exact tenant and mature cohort."""
 
     def get_quarantined_outbox(
         self,

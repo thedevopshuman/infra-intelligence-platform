@@ -15,6 +15,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from iip.application.ports import (
+    EventDeliverySloState,
     EventDeliveryState,
     OutboxMessage,
     PersistenceError,
@@ -49,6 +50,7 @@ SCHEMA_MIGRATIONS = (
     "0008_action_execution_lifecycle.sql",
     "0009_investigation_jobs.sql",
     "0010_event_outbox_quarantine.sql",
+    "0011_event_outbox_slo_window.sql",
 )
 
 
@@ -675,6 +677,81 @@ class PostgresResourceStore:
                 )
                 for row in rows
             ),
+        )
+
+    @_translate_database_errors
+    def get_event_delivery_slo_state(
+        self,
+        tenant_id: str,
+        *,
+        window_start: str,
+        window_end: str,
+        maturity_cutoff: str,
+        latency_objective_seconds: int,
+    ) -> EventDeliverySloState:
+        if (
+            isinstance(latency_objective_seconds, bool)
+            or not isinstance(latency_objective_seconds, int)
+            or not 1 <= latency_objective_seconds <= 86_400
+        ):
+            raise ValueError("latency_objective_seconds is invalid")
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                WITH cohort AS (
+                    SELECT created_at, published_at, quarantined_at,
+                           created_at <= %s::timestamptz AS eligible,
+                           created_at + make_interval(secs => %s) AS deadline
+                    FROM iip.event_outbox
+                    WHERE tenant_id = %s
+                      AND created_at >= %s::timestamptz
+                      AND created_at <= %s::timestamptz
+                )
+                SELECT
+                    count(*) AS created_events,
+                    count(*) FILTER (WHERE NOT eligible) AS immature_events,
+                    count(*) FILTER (WHERE eligible) AS eligible_events,
+                    count(*) FILTER (
+                        WHERE eligible
+                          AND published_at IS NOT NULL
+                          AND published_at <= deadline
+                    ) AS within_objective_events,
+                    count(*) FILTER (
+                        WHERE eligible
+                          AND published_at IS NOT NULL
+                          AND published_at > deadline
+                    ) AS late_delivered_events,
+                    count(*) FILTER (
+                        WHERE eligible AND published_at IS NULL
+                    ) AS undelivered_events,
+                    count(*) FILTER (
+                        WHERE eligible
+                          AND published_at IS NULL
+                          AND quarantined_at IS NOT NULL
+                    ) AS quarantined_events
+                FROM cohort
+                """,
+                (
+                    maturity_cutoff,
+                    latency_objective_seconds,
+                    tenant_id,
+                    window_start,
+                    window_end,
+                ),
+            ).fetchone()
+        assert row is not None
+        return EventDeliverySloState(
+            tenant_id=tenant_id,
+            window_start=window_start,
+            window_end=window_end,
+            maturity_cutoff=maturity_cutoff,
+            created_events=row["created_events"],
+            immature_events=row["immature_events"],
+            eligible_events=row["eligible_events"],
+            within_objective_events=row["within_objective_events"],
+            late_delivered_events=row["late_delivered_events"],
+            undelivered_events=row["undelivered_events"],
+            quarantined_events=row["quarantined_events"],
         )
 
     @_translate_database_errors

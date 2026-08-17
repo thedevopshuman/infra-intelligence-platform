@@ -5,6 +5,7 @@ import json
 import os
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Barrier
 from unittest.mock import patch
@@ -465,6 +466,30 @@ class PostgresResourceStoreTests(unittest.TestCase):
                 "local", "worker-2", retried[0].message_id
             )
         )
+        window_end = datetime.now(timezone.utc) + timedelta(seconds=3)
+        cutoff = window_end - timedelta(seconds=1)
+        start = window_end - timedelta(minutes=5)
+        slo = self.store.get_event_delivery_slo_state(
+            "local",
+            window_start=start.isoformat().replace("+00:00", "Z"),
+            window_end=window_end.isoformat().replace("+00:00", "Z"),
+            maturity_cutoff=cutoff.isoformat().replace("+00:00", "Z"),
+            latency_objective_seconds=1,
+        )
+        self.assertEqual(slo.created_events, 2)
+        self.assertEqual(slo.eligible_events, 2)
+        self.assertEqual(slo.within_objective_events, 1)
+        self.assertEqual(slo.late_delivered_events, 0)
+        self.assertEqual(slo.undelivered_events, 1)
+        self.assertEqual(slo.quarantined_events, 0)
+        other = self.store.get_event_delivery_slo_state(
+            "another-tenant",
+            window_start=slo.window_start,
+            window_end=slo.window_end,
+            maturity_cutoff=slo.maturity_cutoff,
+            latency_objective_seconds=1,
+        )
+        self.assertEqual(other.created_events, 0)
 
     def test_outbox_quarantine_is_terminal_tenant_scoped_and_value_minimized(self) -> None:
         stored = self.service.execute(

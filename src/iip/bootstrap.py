@@ -97,6 +97,10 @@ from iip.application.observe_ingestion import (
 from iip.application.plugin_sessions import PluginSessionService
 from iip.application.query_actions import ActionWorkflowQueryService
 from iip.application.query_event_delivery_health import EventDeliveryHealthService
+from iip.application.query_event_delivery_slo import (
+    EventDeliverySloObjectives,
+    EventDeliverySloService,
+)
 from iip.application.query_resources import ResourceQueryService
 from iip.application.query_runtime_version import (
     RuntimeVersionIdentity,
@@ -133,6 +137,7 @@ class Runtime:
     collection_ingestion: ResourceCollectionIngestionService
     ingestion_telemetry: IngestionFreshnessService
     event_delivery_health: EventDeliveryHealthService
+    event_delivery_slo: EventDeliverySloService
     telemetry_export_health: TelemetryExportHealthService
     runtime_version: RuntimeVersionService
     queries: ResourceQueryService
@@ -170,6 +175,7 @@ def build_local_runtime(
     authenticator: Authenticator | None = None,
     *,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
+    event_delivery_slo_objectives: EventDeliverySloObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
@@ -195,6 +201,7 @@ def build_local_runtime(
         evidence_store,
         authenticator or DenyAllAuthenticator(),
         ingestion_objectives,
+        event_delivery_slo_objectives,
         ingestion_telemetry_sink,
         investigation_telemetry_sink,
         telemetry_metrics_backend,
@@ -217,6 +224,7 @@ def _compose_runtime(
     evidence_store: Any,
     authenticator: Authenticator,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
+    event_delivery_slo_objectives: EventDeliverySloObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
@@ -321,6 +329,12 @@ def _compose_runtime(
             ingestion_telemetry_sink,
         ),
         event_delivery_health=EventDeliveryHealthService(store, policy, clock),
+        event_delivery_slo=EventDeliverySloService(
+            store,
+            policy,
+            clock,
+            event_delivery_slo_objectives,
+        ),
         telemetry_export_health=TelemetryExportHealthService(
             (
                 telemetry_runtime
@@ -408,6 +422,7 @@ def build_postgres_runtime(
     authenticator: Authenticator | None = None,
     migrate: bool = False,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
+    event_delivery_slo_objectives: EventDeliverySloObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
@@ -440,6 +455,7 @@ def build_postgres_runtime(
         operational,
         authenticator or DenyAllAuthenticator(),
         ingestion_objectives,
+        event_delivery_slo_objectives,
         ingestion_telemetry_sink,
         investigation_telemetry_sink,
         telemetry_metrics_backend,
@@ -489,6 +505,7 @@ def _build_runtime_from_env(
 ) -> Runtime:
     policy = _policy_from_env()
     objectives = _ingestion_objectives_from_env()
+    event_delivery_slo_objectives = _event_delivery_slo_objectives_from_env()
     metrics_runtime = _otel_metrics_runtime_from_env()
     try:
         traces_runtime = _otel_traces_runtime_from_env()
@@ -536,6 +553,7 @@ def _build_runtime_from_env(
             return build_local_runtime(
                 authenticator,
                 ingestion_objectives=objectives,
+                event_delivery_slo_objectives=event_delivery_slo_objectives,
                 ingestion_telemetry_sink=(
                     metrics_runtime.sink
                     if metrics_runtime is not None
@@ -564,6 +582,7 @@ def _build_runtime_from_env(
             authenticator=authenticator,
             migrate=auto_migrate,
             ingestion_objectives=objectives,
+            event_delivery_slo_objectives=event_delivery_slo_objectives,
             ingestion_telemetry_sink=(
                 metrics_runtime.sink if metrics_runtime is not None else None
             ),
@@ -606,6 +625,7 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
         authenticator=DenyAllAuthenticator(),
         migrate=auto_migrate,
         ingestion_objectives=_ingestion_objectives_from_env(),
+        event_delivery_slo_objectives=_event_delivery_slo_objectives_from_env(),
         otlp_metrics_receiver=metrics_receiver,
         otlp_logs_receiver=logs_receiver,
         policy=_policy_from_env(),
@@ -816,6 +836,39 @@ def _ingestion_objectives_from_env() -> IngestionFreshnessObjectives:
     )
     objectives.validate()
     return objectives
+
+
+def _event_delivery_slo_objectives_from_env() -> EventDeliverySloObjectives:
+    def value(name: str, default: int) -> int:
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            raise ValueError(
+                "event.delivery-slo.configuration.invalid"
+            ) from None
+
+    defaults = EventDeliverySloObjectives()
+    return EventDeliverySloObjectives(
+        window_seconds=value(
+            "IIP_EVENT_DELIVERY_SLO_WINDOW_SECONDS",
+            defaults.window_seconds,
+        ),
+        maximum_delivery_latency_seconds=value(
+            "IIP_EVENT_DELIVERY_SLO_MAXIMUM_LATENCY_SECONDS",
+            defaults.maximum_delivery_latency_seconds,
+        ),
+        minimum_attainment_basis_points=value(
+            "IIP_EVENT_DELIVERY_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS",
+            defaults.minimum_attainment_basis_points,
+        ),
+        minimum_eligible_events=value(
+            "IIP_EVENT_DELIVERY_SLO_MINIMUM_ELIGIBLE_EVENTS",
+            defaults.minimum_eligible_events,
+        ),
+    )
 
 
 def _otel_metrics_runtime_from_env() -> Any:

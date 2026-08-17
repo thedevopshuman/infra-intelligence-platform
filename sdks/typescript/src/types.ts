@@ -335,6 +335,42 @@ export interface EventDeliveryHealthReport {
   };
 }
 
+export type EventDeliverySloStatus =
+  | "no-data"
+  | "insufficient-data"
+  | "meeting"
+  | "breached";
+
+export interface EventDeliverySloReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "EventDeliverySloReport";
+  metadata: { tenantId: string; evaluatedAt: string };
+  spec: {
+    status: EventDeliverySloStatus;
+    window: {
+      durationSeconds: number;
+      start: string;
+      end: string;
+      maturityCutoff: string;
+    };
+    objective: {
+      maximumDeliveryLatencySeconds: number;
+      minimumAttainmentBasisPoints: number;
+      minimumEligibleEvents: number;
+    };
+    measurement: {
+      createdEvents: number;
+      immatureEvents: number;
+      eligibleEvents: number;
+      withinObjectiveEvents: number;
+      lateDeliveredEvents: number;
+      undeliveredEvents: number;
+      quarantinedEvents: number;
+      attainmentBasisPoints: number | null;
+    };
+  };
+}
+
 export interface PlatformEvent<TData extends Record<string, unknown> = Record<string, unknown>> {
   specversion: "1.0";
   id: string;

@@ -116,6 +116,22 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn("IIP_OUTBOX_MAX_ATTEMPTS", worker)
         self.assertIn(".Values.eventPublisher.maxAttempts", worker)
 
+    def test_event_delivery_slo_objective_is_explicit_and_api_visible(self) -> None:
+        config_map = (CHART / "templates" / "configmap.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("eventDeliverySlo:", values)
+        for variable in (
+            "IIP_EVENT_DELIVERY_SLO_WINDOW_SECONDS",
+            "IIP_EVENT_DELIVERY_SLO_MAXIMUM_LATENCY_SECONDS",
+            "IIP_EVENT_DELIVERY_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS",
+            "IIP_EVENT_DELIVERY_SLO_MINIMUM_ELIGIBLE_EVENTS",
+        ):
+            with self.subTest(variable=variable):
+                self.assertIn(variable, config_map)
+
     def test_migration_hook_has_database_only_authority(self) -> None:
         template = (CHART / "templates" / "migration-job.yaml").read_text(
             encoding="utf-8"
@@ -169,6 +185,8 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn("/v1/system/version", script)
         self.assertIn("/v1/operations/events/delivery-health?limit=10", script)
         self.assertIn('document["kind"] == "EventDeliveryHealthReport"', script)
+        self.assertIn("/v1/operations/events/delivery-slo", script)
+        self.assertIn('document["kind"] == "EventDeliverySloReport"', script)
         self.assertIn('printf \'%s\' "$IIP_AUTH_BEARER_TOKEN"', script)
         self.assertIn('"helmChartVersion":chart,"imageDigest":digest', script)
         self.assertEqual(script.count('"$IIP_HELM_BIN" upgrade --install iip'), 2)

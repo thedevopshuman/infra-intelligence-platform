@@ -31,6 +31,8 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 `Client.get_event_delivery_health` gives a platform administrator the credential-tenant's bounded outbox backlog and quarantine summary. It exposes CloudEvents identity metadata and stable failure codes, never event payloads, provider responses, or destination configuration.
 
+`Client.get_event_delivery_slo` returns the deployment-configured rolling publication objective. It contains mature-cohort aggregate counts and integer-basis-point attainment only; it does not claim downstream receiver processing.
+
 `EventDeliveryReplayCommand` and `Client.propose_event_delivery_replay` bind one exact quarantine generation into the normal investigation, independent approval, policy, audit, and one-shot execution workflow. Dry-run is the default; live replay preserves the CloudEvents ID so receivers must remain idempotent.
 
 Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. Supply a Bearer credential; the authenticated server derives tenant, actor, and roles from that credential. The SDK never sends identity assertion headers.

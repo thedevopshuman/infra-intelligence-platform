@@ -235,6 +235,16 @@ IIP_EVENT_DELIVERY_HEALTH_JSON=$(
 printf '%s' "$IIP_EVENT_DELIVERY_HEALTH_JSON" | "$IIP_TEST_PYTHON" -c \
     'import json,sys; document=json.load(sys.stdin); spec=document["spec"]; assert document["kind"] == "EventDeliveryHealthReport"; assert document["metadata"]["tenantId"] == "helm-test"; assert spec["status"] == "healthy"; assert spec["delivery"] == {"pendingEvents":0,"inFlightEvents":0,"retryingEvents":0,"quarantinedEvents":0}; assert spec["quarantine"] == {"limit":10,"hasMore":False,"items":[]}'
 
+IIP_EVENT_DELIVERY_SLO_JSON=$(
+    printf '%s' "$IIP_AUTH_BEARER_TOKEN" | \
+        "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+            --namespace "$IIP_TEST_NAMESPACE" exec -i \
+            deployment/iip-infra-intelligence -- python -c \
+            'import json,sys,urllib.request; token=sys.stdin.read(); request=urllib.request.Request("http://127.0.0.1:8080/v1/operations/events/delivery-slo", headers={"Authorization": "Bearer " + token}); print(json.dumps(json.load(urllib.request.urlopen(request, timeout=5)), separators=(",", ":")))'
+)
+printf '%s' "$IIP_EVENT_DELIVERY_SLO_JSON" | "$IIP_TEST_PYTHON" -c \
+    'import json,sys; document=json.load(sys.stdin); spec=document["spec"]; assert document["kind"] == "EventDeliverySloReport"; assert document["metadata"]["tenantId"] == "helm-test"; assert spec["status"] == "no-data"; assert spec["objective"] == {"maximumDeliveryLatencySeconds":60,"minimumAttainmentBasisPoints":9900,"minimumEligibleEvents":20}; assert spec["measurement"] == {"createdEvents":0,"immatureEvents":0,"eligibleEvents":0,"withinObjectiveEvents":0,"lateDeliveredEvents":0,"undeliveredEvents":0,"quarantinedEvents":0,"attainmentBasisPoints":None}'
+
 IIP_EXPECTED_MIGRATION_COUNT=$(
     rg --files src/iip/adapters/postgres/migrations -g '*.sql' | wc -l | tr -d ' '
 )
@@ -391,4 +401,4 @@ EOF
     "$IIP_TEST_PYTHON" -c \
         'import json,sys; rows=json.load(sys.stdin); assert len(rows) == 2 and str(rows[-1]["revision"]) == "2" and rows[-1]["status"] == "deployed"'
 
-echo "Helm install/upgrade test passed: immutable image -> runtime identity -> migrations -> TLS ingress -> backup/restore"
+echo "Helm install/upgrade test passed: immutable image -> runtime identity -> delivery health/SLO -> migrations -> TLS ingress -> backup/restore"

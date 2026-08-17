@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.30.0"
+  tag: "0.31.0"
   digest: ""
 
 worker:
@@ -42,6 +42,12 @@ eventPublisher:
     caBundleExistingSecret: ""
     caBundleSecretKey: ca.crt
     caBundleMountPath: /var/run/iip-event-publisher-ca
+
+eventDeliverySlo:
+  windowSeconds: 3600
+  maximumDeliveryLatencySeconds: 60
+  minimumAttainmentBasisPoints: 9900
+  minimumEligibleEvents: 20
 
 imagePullSecrets: []
 nameOverride: ""

@@ -158,6 +158,11 @@ helm-lint:
 		echo "Helm validation accepted a heartbeat that cannot renew its lease" >&2; exit 1; \
 	fi
 	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set eventDeliverySlo.windowSeconds=300 \
+		--set eventDeliverySlo.maximumDeliveryLatencySeconds=300 >/dev/null 2>&1; then \
+		echo "Helm validation accepted an event-delivery latency objective as long as its window" >&2; exit 1; \
+	fi
+	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set ingress.enabled=true \
 		--set ingress.className=nginx \
 		--set ingress.host=iip.example.test \

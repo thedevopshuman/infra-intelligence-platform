@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.30.0",
+    "version": "0.31.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -176,6 +176,22 @@
           "503": {
             "description": "The event delivery state is unavailable or inconsistent",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "event.delivery-health.unavailable"}}}}
+          }
+        }
+      }
+    },
+    "/v1/operations/events/delivery-slo": {
+      "get": {
+        "operationId": "getEventDeliverySlo",
+        "description": "Return the deployment-configured rolling publication-path objective for the authenticated tenant. Each durable outbox row is counted once after its latency deadline; the report contains aggregate counts only and is transport-neutral.",
+        "responses": {
+          "200": {"description": "Tenant-scoped rolling delivery-objective report", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/event-delivery-slo-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "503": {
+            "description": "The delivery objective state is unavailable or inconsistent",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "event.delivery-slo.unavailable"}}}}
           }
         }
       }
@@ -595,6 +611,7 @@
       "IngestionFreshnessReport": {"$ref": "../../contracts/schemas/ingestion-freshness-report.schema.json"},
       "TelemetryExportHealthReport": {"$ref": "../../contracts/schemas/telemetry-export-health-report.schema.json"},
       "EventDeliveryHealthReport": {"$ref": "../../contracts/schemas/event-delivery-health-report.schema.json"},
+      "EventDeliverySloReport": {"$ref": "../../contracts/schemas/event-delivery-slo-report.schema.json"},
       "RuntimeVersionReport": {"$ref": "../../contracts/schemas/runtime-version-report.schema.json"},
       "SessionContext": {"$ref": "../../contracts/schemas/session-context.schema.json"},
       "PageInfo": {"$ref": "../../contracts/schemas/page-info.schema.json"},

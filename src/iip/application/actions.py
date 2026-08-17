@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Mapping
 
+from iip.application.action_reconciliation import build_uncertain_execution_status
 from iip.application.investigate import canonical_digest
 from iip.application.ports import (
     ActionExecutor,
@@ -474,43 +475,32 @@ class GovernedActionService:
         now = self._clock.now()
         if self._parse_time(str(spec.get("leaseExpiresAt"))) > self._parse_time(now):
             raise ActionWorkflowError("action.execution.in-progress")
-        uncertain: dict[str, object] = {
-            "apiVersion": "iip.platform/v1alpha1",
-            "kind": "ActionExecutionStatus",
-            "metadata": {
-                "id": command.proposal_id,
-                "tenantId": command.actor.tenant_id,
-                "updatedAt": now,
-            },
-            "spec": {
-                "proposalDigest": spec.get("proposalDigest"),
-                "approvalId": spec.get("approvalId"),
-                "state": "manual-reconciliation-required",
-                "attempt": spec.get("attempt", 1),
-                "executorActorId": spec.get("executorActorId"),
-                "startedAt": spec.get("startedAt"),
-                "completedAt": now,
-                "summary": (
-                    "The execution lease expired without a terminal result. The "
-                    "operation will not be replayed automatically because impact is unknown."
-                ),
-                "policyDecision": spec.get("policyDecision"),
-            },
-        }
-        resolved = self._repository.mark_action_execution_uncertain(
-            command.actor, command.proposal_id, now, uncertain
-        )
-        resolved_spec = resolved.get("spec")
-        if isinstance(resolved_spec, Mapping) and resolved_spec.get("state") == "executing":
-            raise ActionWorkflowError("action.execution.in-progress")
-        self._audit.append_audit(
+        uncertain = build_uncertain_execution_status(current, now)
+        transition = self._repository.reconcile_expired_action_execution(
             command.actor,
-            "action-execution-reconciliation-required",
+            command.proposal_id,
+            now,
+            uncertain,
             {
                 "proposalId": command.proposal_id,
                 "proposalDigest": spec.get("proposalDigest"),
+                "observedAt": now,
+                "workerActorId": command.actor.actor_id,
+                "reasonCode": "action.execution.lease-expired",
             },
         )
+        resolved_spec = transition.status.get("spec")
+        if isinstance(resolved_spec, Mapping) and resolved_spec.get("state") == "executing":
+            raise ActionWorkflowError("action.execution.in-progress")
+        if (
+            isinstance(resolved_spec, Mapping)
+            and resolved_spec.get("state") != "manual-reconciliation-required"
+        ):
+            result = self._repository.get_action_result(
+                command.actor, command.proposal_id
+            )
+            if result is not None:
+                return result
         raise ActionWorkflowError("action.execution.reconciliation-required")
 
     @staticmethod

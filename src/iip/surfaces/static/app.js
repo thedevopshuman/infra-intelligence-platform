@@ -594,7 +594,7 @@ function hasRole(role) {
 
 function actionStatusClass(value) {
   if (["succeeded", "dry-run", "approved"].includes(value)) return "success";
-  if (["failed", "rejected", "denied", "manual-reconciliation-required"].includes(value)) return "danger";
+  if (["failed", "rejected", "denied", "expired", "manual-reconciliation-required"].includes(value)) return "danger";
   return "warning";
 }
 

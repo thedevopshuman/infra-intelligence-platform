@@ -46,4 +46,4 @@ With the local static broker, also provide `IIP_KUBERNETES_ACTIONS_CREDENTIALS_J
 
 `succeeded` means the new controller generation became ready. `rolled-back` means restart verification failed but the previous annotation was restored and observed on the exact UID. `failed` includes a stable `errorCode`; when rollback was attempted it includes `rollback.status` and a bounded summary.
 
-No action is automatically retried. If the process disappears outside a trusted terminal result, the durable lifecycle becomes `manual-reconciliation-required`. Compare the workload UID, generation, annotation, rollout state, proposal digest, approval, and audit records before issuing a new proposal.
+No action is automatically retried. If the process disappears outside a trusted terminal result, the tenant-explicit workflow timer atomically changes the expired durable lifecycle to `manual-reconciliation-required` and appends one audit record. The timer has no executor and cannot repeat provider impact. Compare the workload UID, generation, annotation, rollout state, proposal digest, approval, and audit records before issuing a new proposal.

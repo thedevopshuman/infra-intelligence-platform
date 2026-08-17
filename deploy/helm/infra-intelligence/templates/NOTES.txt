@@ -3,7 +3,8 @@ The foundation API service is available inside the cluster at:
   http://{{ include "infra-intelligence.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}
 
 The API fails closed unless its configured authentication mode has valid protected configuration.
-For durable background investigations, set worker.enabled=true, database.existingSecret,
-and at least one exact worker.tenants entry. The worker has no wildcard tenant mode.
+For durable background investigations and non-replaying action timers, set
+worker.enabled=true, database.existingSecret, and at least one exact
+worker.tenants entry. The workflow worker has no wildcard tenant mode.
 Production rollout still requires customer-specific identity, policy, credential-broker,
 network-policy, telemetry, storage recovery, and SLO validation.

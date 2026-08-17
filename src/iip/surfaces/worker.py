@@ -1,4 +1,4 @@
-"""Process surface for tenant-explicit investigation job workers."""
+"""Process surface for tenant-explicit durable workflow workers."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import signal
 from threading import Event
 
 from iip.bootstrap import (
+    build_action_reconciler_from_env,
     build_investigation_worker_from_env,
     build_runtime_from_env,
 )
@@ -19,20 +20,21 @@ def configured_tenants() -> tuple[str, ...]:
     if not tenants or len(tenants) != len(set(tenants)) or any(
         len(value) > 128 for value in tenants
     ):
-        raise ValueError("investigation.worker.tenants.required")
+        raise ValueError("workflow.worker.tenants.required")
     return tenants
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run durable investigation jobs")
+    parser = argparse.ArgumentParser(description="Run durable tenant workflow timers")
     parser.add_argument(
         "--once",
         action="store_true",
-        help="Claim at most one job per configured tenant and exit",
+        help="Process one bounded pass per configured tenant and exit",
     )
     arguments = parser.parse_args()
-    runtime = build_runtime_from_env()
+    runtime = build_runtime_from_env(include_action_executor=False)
     worker = build_investigation_worker_from_env(runtime)
+    action_reconciler = build_action_reconciler_from_env(runtime)
     tenants = configured_tenants()
     stopped = Event()
 
@@ -49,6 +51,8 @@ def main() -> None:
                     break
                 result = worker.run_once(tenant_id)
                 worked = worked or result is not None
+                reconciliation = action_reconciler.run_once(tenant_id)
+                worked = worked or reconciliation.transitioned > 0
             if arguments.once:
                 break
             if not worked:

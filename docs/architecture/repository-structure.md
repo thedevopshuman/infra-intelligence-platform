@@ -30,7 +30,7 @@ flowchart TD
 | `sdks` | Public client types, transport, errors | Public contracts | Server internals |
 | `plugins` | Separately versioned extension behavior | Plugin protocol and public contracts | Server internals or ambient process state |
 
-The reference code under `src/iip` proves these directions. Future languages or services keep the same ownership even when process boundaries change. `src/iip/surfaces/worker.py` is the deployable investigation-worker surface: its claim/retry/cancellation sequence stays in `application`, PostgreSQL lease mechanics stay in `adapters`, and concrete construction stays in `bootstrap.py`.
+The reference code under `src/iip` proves these directions. Future languages or services keep the same ownership even when process boundaries change. `src/iip/surfaces/worker.py` is the deployable workflow-worker surface: investigation claim/retry/cancellation and non-replaying action reconciliation stay in `application`, PostgreSQL lease mechanics stay in `adapters`, and concrete construction stays in `bootstrap.py`.
 
 The Kubernetes observer under `plugins/examples/` is the first executable proof of the plugin boundary. It imports only the public Python SDK, consumes versioned resource collection and invocation contracts, supports an offline stdio container plus an explicit bounded `kubectl` per-type list/watch development transport with full-reconciliation recovery, and passes the signed no-network runner gate. The runner is a concrete adapter; it never moves container or trust behavior into the plugin, application, or domain packages. The repository validator applies the same no-server-internals rule to all Python plugin packages.
 

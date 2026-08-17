@@ -15,6 +15,7 @@ from iip.application.ports import (
     ActionRepository,
     ActionWorkflowRecord,
     ActorContext,
+    Clock,
     PersistenceError,
     PolicyDecisionPoint,
 )
@@ -42,9 +43,11 @@ class ActionWorkflowQueryService:
         self,
         repository: ActionRepository,
         policy: PolicyDecisionPoint,
+        clock: Clock,
     ) -> None:
         self._repository = repository
         self._policy = policy
+        self._clock = clock
 
     def get(self, actor: ActorContext, proposal_id: str) -> Mapping[str, object]:
         self._validate_action_id(proposal_id)
@@ -104,14 +107,13 @@ class ActionWorkflowQueryService:
         if not decision.allowed:
             raise ActionQueryAuthorizationError(decision.reason_code)
 
-    @classmethod
     def _workflow(
-        cls, actor: ActorContext, record: ActionWorkflowRecord
+        self, actor: ActorContext, record: ActionWorkflowRecord
     ) -> Mapping[str, object]:
-        metadata = cls._proposal_metadata(record)
+        metadata = self._proposal_metadata(record)
         proposal_id = str(metadata["id"])
-        cls._validate_related(actor, proposal_id, record)
-        state = cls._state(record)
+        self._validate_related(actor, proposal_id, record)
+        state = self._state(record, self._clock.now())
         spec: dict[str, object] = {
             "state": state,
             "proposal": dict(record.proposal),
@@ -209,8 +211,8 @@ class ActionWorkflowQueryService:
             ):
                 raise PersistenceError("storage.corrupt")
 
-    @staticmethod
-    def _state(record: ActionWorkflowRecord) -> str:
+    @classmethod
+    def _state(cls, record: ActionWorkflowRecord, observed_at: str) -> str:
         if record.result is not None:
             spec = record.result.get("spec")
             outcome = spec.get("outcome") if isinstance(spec, Mapping) else None
@@ -226,13 +228,32 @@ class ActionWorkflowQueryService:
         if record.approval is not None:
             spec = record.approval.get("spec")
             decision = spec.get("decision") if isinstance(spec, Mapping) else None
-            if decision in ("approved", "rejected"):
-                return str(decision)
+            if decision == "rejected":
+                return "rejected"
+            if decision == "approved":
+                return "expired" if cls._proposal_expired(record, observed_at) else "approved"
             raise PersistenceError("storage.corrupt")
         status = record.proposal.get("status")
-        if status in ("pending-approval", "denied"):
-            return str(status)
+        if status == "denied":
+            return "denied"
+        if status == "pending-approval":
+            return "expired" if cls._proposal_expired(record, observed_at) else status
         raise PersistenceError("storage.corrupt")
+
+    @staticmethod
+    def _proposal_expired(record: ActionWorkflowRecord, observed_at: str) -> bool:
+        spec = record.proposal.get("spec")
+        expires_at = spec.get("expiresAt") if isinstance(spec, Mapping) else None
+        if not isinstance(expires_at, str):
+            raise PersistenceError("storage.corrupt")
+        try:
+            expiry = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            observed = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            raise PersistenceError("storage.corrupt") from None
+        if expiry.tzinfo is None or observed.tzinfo is None:
+            raise PersistenceError("storage.corrupt")
+        return expiry <= observed
 
     @staticmethod
     def _validate_action_id(proposal_id: str) -> None:

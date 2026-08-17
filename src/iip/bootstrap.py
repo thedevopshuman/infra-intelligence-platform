@@ -26,6 +26,7 @@ from iip.adapters.evidence import (
 from iip.adapters.memory import AllowTenantPolicy, InMemoryResourceStore
 from iip.adapters.operations import InMemoryOperationalStore
 from iip.adapters.policy import ExternalHttpPolicyDecisionPoint
+from iip.application.action_reconciliation import ActionReconciliationService
 from iip.application.actions import GovernedActionService
 from iip.application.collect_evidence import EvidenceCollectionService
 from iip.application.context_evidence import ContextEvidenceProvider, ContextEvidenceService
@@ -312,7 +313,7 @@ def _compose_runtime(
             clock,
             operational,
         ),
-        action_queries=ActionWorkflowQueryService(operational, policy),
+        action_queries=ActionWorkflowQueryService(operational, policy, clock),
         plugin_sessions=PluginSessionService(policy, operational, clock),
         operational_store=operational,
         investigation_jobs=operational,
@@ -375,7 +376,7 @@ def build_projection_maintenance(database_url: str) -> ProjectionRebuildService:
     return ProjectionRebuildService(PostgresResourceStore(database_url), AllowTenantPolicy())
 
 
-def build_runtime_from_env() -> Runtime:
+def build_runtime_from_env(*, include_action_executor: bool = True) -> Runtime:
     """Select a runtime profile from process configuration at the composition root."""
 
     authenticator = _authenticator_from_env()
@@ -397,7 +398,11 @@ def build_runtime_from_env() -> Runtime:
         otlp_metrics_receiver = _otlp_metrics_receiver_from_env()
         otlp_logs_receiver = _otlp_logs_receiver_from_env()
         credential_broker = _credential_broker_from_env()
-        action_executor = _kubernetes_action_executor_from_env(credential_broker)
+        action_executor = (
+            _kubernetes_action_executor_from_env(credential_broker)
+            if include_action_executor
+            else None
+        )
         telemetry_metrics_backend = _telemetry_metrics_backend_from_env(
             credential_broker
         )
@@ -483,6 +488,24 @@ def build_investigation_worker_from_env(runtime: Runtime) -> InvestigationWorker
         heartbeat_seconds=integer("IIP_WORKER_HEARTBEAT_SECONDS", 10),
         retry_seconds=integer("IIP_WORKER_RETRY_SECONDS", 5),
         max_attempts=integer("IIP_WORKER_MAX_ATTEMPTS", 8),
+    )
+
+
+def build_action_reconciler_from_env(runtime: Runtime) -> ActionReconciliationService:
+    """Compose the non-executing governed-action timer for a workflow worker."""
+
+    worker_id = os.environ.get("IIP_WORKER_ID") or os.environ.get("HOSTNAME")
+    if worker_id is None:
+        raise ValueError("action.reconciler.configuration.required")
+    try:
+        batch_size = int(os.environ.get("IIP_ACTION_RECONCILIATION_BATCH_SIZE", "100"))
+    except ValueError:
+        raise ValueError("action.reconciler.configuration.invalid") from None
+    return ActionReconciliationService(
+        runtime.operational_store,
+        SystemClock(),
+        worker_id=worker_id,
+        batch_size=batch_size,
     )
 
 

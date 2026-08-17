@@ -11,6 +11,7 @@ from threading import RLock
 from typing import Mapping, Optional
 
 from iip.application.ports import (
+    ActionExecutionTransition,
     ActionWorkflowRecord,
     ActorContext,
     InvestigationJobClaim,
@@ -521,13 +522,46 @@ class InMemoryOperationalStore:
             value = self._action_executions.get((actor.tenant_id, proposal_id))
             return copy.deepcopy(value) if value is not None else None
 
-    def mark_action_execution_uncertain(
+    def list_expired_action_executions(
+        self,
+        actor: ActorContext,
+        observed_at: str,
+        *,
+        limit: int,
+    ) -> tuple[Mapping[str, object], ...]:
+        if isinstance(limit, bool) or not 1 <= limit <= 500:
+            raise PersistenceError("storage.input-invalid")
+        observed = self._parse_time(observed_at)
+        with self._lock:
+            candidates: list[tuple[datetime, str, dict[str, object]]] = []
+            for (tenant_id, proposal_id), document in self._action_executions.items():
+                if tenant_id != actor.tenant_id:
+                    continue
+                spec = document.get("spec")
+                if not isinstance(spec, Mapping):
+                    raise PersistenceError("storage.corrupt")
+                if spec.get("state") != "executing":
+                    continue
+                lease = spec.get("leaseExpiresAt")
+                if not isinstance(lease, str):
+                    raise PersistenceError("storage.corrupt")
+                parsed_lease = self._parse_time(lease)
+                if parsed_lease <= observed:
+                    candidates.append((parsed_lease, proposal_id, document))
+            candidates.sort(key=lambda item: (item[0], item[1]))
+            return tuple(
+                copy.deepcopy(document)
+                for _, _, document in candidates[:limit]
+            )
+
+    def reconcile_expired_action_execution(
         self,
         actor: ActorContext,
         proposal_id: str,
         observed_at: str,
         document: Mapping[str, object],
-    ) -> Mapping[str, object]:
+        audit_document: Mapping[str, object],
+    ) -> ActionExecutionTransition:
         self._assert_tenant(actor, document)
         key = (actor.tenant_id, proposal_id)
         with self._lock:
@@ -543,7 +577,21 @@ class InMemoryOperationalStore:
                 <= self._parse_time(observed_at)
             ):
                 self._action_executions[key] = copy.deepcopy(dict(document))
-            return copy.deepcopy(self._action_executions[key])
+                self._audit.append(
+                    (
+                        actor.tenant_id,
+                        "action-execution-reconciliation-required",
+                        copy.deepcopy(dict(audit_document)),
+                    )
+                )
+                return ActionExecutionTransition(
+                    status=copy.deepcopy(self._action_executions[key]),
+                    transitioned=True,
+                )
+            return ActionExecutionTransition(
+                status=copy.deepcopy(self._action_executions[key]),
+                transitioned=False,
+            )
 
     def commit_action_result(
         self,

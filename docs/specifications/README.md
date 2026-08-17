@@ -50,7 +50,7 @@ The platform exposes contracts at three levels:
 | Action approval | [action-contract.md](action-contract.md) | `contracts/schemas/action-approval.schema.json` | `contracts/examples/action-approval.json` |
 | Action execution status | [action-contract.md](action-contract.md) | `contracts/schemas/action-execution-status.schema.json` | `contracts/examples/action-execution-status.json` |
 | Action result | [action-contract.md](action-contract.md) | `contracts/schemas/action-result.schema.json` | `contracts/examples/action-result.json` |
-| Action workflow | [action-contract.md](action-contract.md) | `contracts/schemas/action-workflow.schema.json` | `contracts/examples/action-workflow.json` |
+| Action workflow | [action-contract.md](action-contract.md) | `contracts/schemas/action-workflow.schema.json` | `contracts/examples/action-workflow.json`, `contracts/examples/action-workflow-expired.json` |
 | Action workflow page | [action-contract.md](action-contract.md) | `contracts/schemas/action-workflow-page.schema.json` | `contracts/examples/action-workflow-page.json` |
 | Plugin session | [plugin-session-contract.md](plugin-session-contract.md) | `contracts/schemas/plugin-session.schema.json` | `contracts/examples/plugin-session.json` |
 | Policy decision request | [policy-contract.md](policy-contract.md) | `contracts/schemas/policy-decision-request.schema.json` | `contracts/examples/policy-decision-request.json` |

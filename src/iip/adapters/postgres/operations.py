@@ -12,6 +12,7 @@ from psycopg.types.json import Jsonb
 
 from iip.application.investigate import canonical_digest
 from iip.application.ports import (
+    ActionExecutionTransition,
     ActionWorkflowRecord,
     ActorContext,
     InvestigationJobClaim,
@@ -806,13 +807,41 @@ class PostgresOperationalStore:
             (actor.tenant_id, proposal_id),
         )
 
-    def mark_action_execution_uncertain(
+    def list_expired_action_executions(
+        self,
+        actor: ActorContext,
+        observed_at: str,
+        *,
+        limit: int,
+    ) -> tuple[Mapping[str, object], ...]:
+        if isinstance(limit, bool) or not 1 <= limit <= 500:
+            raise PersistenceError("storage.input-invalid")
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT document
+                    FROM iip.action_executions
+                    WHERE tenant_id = %s
+                      AND state = 'executing'
+                      AND lease_expires_at <= %s
+                    ORDER BY lease_expires_at, proposal_id
+                    LIMIT %s
+                    """,
+                    (actor.tenant_id, observed_at, limit),
+                ).fetchall()
+            return tuple(dict(row["document"]) for row in rows)
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def reconcile_expired_action_execution(
         self,
         actor: ActorContext,
         proposal_id: str,
         observed_at: str,
         document: Mapping[str, object],
-    ) -> Mapping[str, object]:
+        audit_document: Mapping[str, object],
+    ) -> ActionExecutionTransition:
         self._assert_tenant(actor, document)
         metadata = document.get("metadata")
         spec = document.get("spec")
@@ -841,7 +870,16 @@ class PostgresOperationalStore:
                         observed_at,
                     ),
                 ).fetchone()
-                if row is None:
+                transitioned = row is not None
+                if transitioned:
+                    connection.execute(
+                        """
+                        INSERT INTO iip.audit_records (tenant_id, category, document)
+                        VALUES (%s, 'action-execution-reconciliation-required', %s)
+                        """,
+                        (actor.tenant_id, Jsonb(dict(audit_document))),
+                    )
+                else:
                     row = connection.execute(
                         """
                         SELECT document
@@ -852,7 +890,10 @@ class PostgresOperationalStore:
                     ).fetchone()
             if row is None:
                 raise PersistenceError("storage.not-found")
-            return dict(row["document"])
+            return ActionExecutionTransition(
+                status=dict(row["document"]),
+                transitioned=transitioned,
+            )
         except PersistenceError:
             raise
         except psycopg.Error:

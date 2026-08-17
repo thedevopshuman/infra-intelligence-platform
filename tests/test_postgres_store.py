@@ -25,6 +25,7 @@ from iip.adapters.evidence import (
     UuidEvidenceIdGenerator,
 )
 from iip.adapters.memory import AllowTenantPolicy
+from iip.application.action_reconciliation import ActionReconciliationService
 from iip.application.collect_evidence import CollectEvidenceCommand, EvidenceCollectionService
 from iip.application.ingest_collection import (
     IngestCollectionCommand,
@@ -718,6 +719,60 @@ class PostgresOperationalStoreTests(unittest.TestCase):
             ),
             (),
         )
+
+    def test_expired_action_reconciliation_and_audit_are_atomic_and_idempotent(self) -> None:
+        actor = ActorContext("workflow-executor", "local", ("executor",))
+        proposal = json.loads(
+            (ROOT / "contracts/examples/action-proposal.json").read_text()
+        )
+        approval = json.loads(
+            (ROOT / "contracts/examples/action-approval.json").read_text()
+        )
+        running = json.loads(
+            (ROOT / "contracts/examples/action-execution-status.json").read_text()
+        )
+        running["metadata"]["updatedAt"] = running["spec"]["startedAt"]
+        running["spec"]["state"] = "executing"
+        running["spec"]["leaseExpiresAt"] = "2026-08-14T13:07:59Z"
+        for field in ("completedAt", "operationRef", "summary"):
+            running["spec"].pop(field, None)
+        self.operations.commit_proposal(actor, proposal)
+        self.operations.commit_approval(actor, approval)
+        self.assertTrue(self.operations.claim_action_execution(actor, running))
+        clock = type(
+            "FixedClock",
+            (),
+            {"now": lambda _self: "2026-08-14T13:08:00Z"},
+        )()
+        service = ActionReconciliationService(
+            self.operations,
+            clock,
+            worker_id="postgres-reconciler",
+        )
+
+        first = service.run_once("local")
+        second = service.run_once("local")
+
+        self.assertEqual((first.scanned, first.transitioned), (1, 1))
+        self.assertEqual((second.scanned, second.transitioned), (0, 0))
+        status = self.operations.get_action_execution_status(
+            actor, proposal["metadata"]["id"]
+        )
+        self.assertEqual(
+            status["spec"]["state"], "manual-reconciliation-required"
+        )
+        assert DATABASE_URL is not None and psycopg is not None
+        with psycopg.connect(DATABASE_URL) as connection:
+            count = connection.execute(
+                """
+                SELECT count(*)
+                FROM iip.audit_records
+                WHERE tenant_id = %s
+                  AND category = 'action-execution-reconciliation-required'
+                """,
+                (actor.tenant_id,),
+            ).fetchone()[0]
+        self.assertEqual(count, 1)
 
     def test_investigation_lifecycle_is_durable_and_transitions_atomically(self) -> None:
         actor = ActorContext("developer", "local")

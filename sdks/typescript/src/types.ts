@@ -1347,6 +1347,7 @@ export interface ActionResult {
 export type ActionWorkflowState =
   | "pending-approval"
   | "denied"
+  | "expired"
   | "approved"
   | "rejected"
   | "executing"

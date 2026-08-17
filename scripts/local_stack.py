@@ -146,7 +146,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             _, _, created = create_local_configuration()
             if created:
                 print("Created protected local configuration.")
-            compose(("up", "--build", "--detach", "--wait", "--wait-timeout", "180"))
+            compose(
+                (
+                    "up",
+                    "--build",
+                    "--detach",
+                    "--remove-orphans",
+                    "--wait",
+                    "--wait-timeout",
+                    "180",
+                )
+            )
             print("Infrastructure Intelligence local stack is ready in Docker Desktop.")
             print_credentials()
         elif args.command == "status":

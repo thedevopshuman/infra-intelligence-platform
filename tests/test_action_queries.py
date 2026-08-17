@@ -44,7 +44,14 @@ class ActionWorkflowQueryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.store = InMemoryOperationalStore()
         self.actor = ActorContext("operator", "local", ("developer",))
-        self.service = ActionWorkflowQueryService(self.store, AllowTenantPolicy())
+        self.clock = type(
+            "FixedClock",
+            (),
+            {"now": lambda _self: "2026-08-14T13:15:00Z"},
+        )()
+        self.service = ActionWorkflowQueryService(
+            self.store, AllowTenantPolicy(), self.clock
+        )
 
     def proposal(self, digit: str, created_at: str) -> dict:
         proposal = copy.deepcopy(example("action-proposal.json"))
@@ -102,6 +109,27 @@ class ActionWorkflowQueryTests(unittest.TestCase):
         self.assertEqual(workflow["spec"]["approval"], approval)
         assert_schema(self, "action-workflow.schema.json", workflow)
 
+    def test_workflow_derives_expiry_without_mutating_the_proposal(self) -> None:
+        pending = self.proposal("7", "2026-08-14T13:00:00Z")
+        self.store.commit_proposal(self.actor, pending)
+        approved = self.proposal("8", "2026-08-14T13:01:00Z")
+        self.store.commit_proposal(self.actor, approved)
+        approval = copy.deepcopy(example("action-approval.json"))
+        approval["metadata"]["id"] = "apr_" + "8" * 32
+        approval["spec"]["proposalId"] = approved["metadata"]["id"]
+        approval["spec"]["proposalDigest"] = canonical_digest(approved)
+        self.store.commit_approval(self.actor, approval)
+        self.clock.now = lambda: "2026-08-14T13:31:00Z"  # type: ignore[method-assign]
+
+        pending_workflow = self.service.get(self.actor, pending["metadata"]["id"])
+        approved_workflow = self.service.get(self.actor, approved["metadata"]["id"])
+
+        self.assertEqual(pending_workflow["spec"]["state"], "expired")
+        self.assertEqual(approved_workflow["spec"]["state"], "expired")
+        self.assertEqual(pending_workflow["spec"]["proposal"]["status"], "pending-approval")
+        assert_schema(self, "action-workflow.schema.json", pending_workflow)
+        assert_schema(self, "action-workflow.schema.json", approved_workflow)
+
     def test_terminal_state_prefers_result_and_rejects_corrupt_relationships(self) -> None:
         record = ActionWorkflowRecord(
             proposal=example("action-proposal.json"),
@@ -153,7 +181,7 @@ class ActionWorkflowQueryTests(unittest.TestCase):
                 del actor, action, resource
                 return PolicyDecision(False, "test.denied")
 
-        service = ActionWorkflowQueryService(self.store, DenyPolicy())
+        service = ActionWorkflowQueryService(self.store, DenyPolicy(), self.clock)
 
         with self.assertRaises(ActionQueryAuthorizationError):
             service.list(self.actor)

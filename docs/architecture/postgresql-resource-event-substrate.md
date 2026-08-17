@@ -54,6 +54,8 @@ The HTTP surface never sets the safe-checkpoint signal. A collector workflow may
 
 Investigation jobs use the same explicit-tenant and `SKIP LOCKED` discipline in a separate table. Public job status never contains private claim ownership. Renewable dispatch leases coordinate delivery only; the immutable request's execution lease and wall-time budget remain separate. See [ADR 0039](../decisions/0039-tenant-scoped-investigation-dispatch.md).
 
+Action timers query only exact-tenant `executing` rows whose stored lease has expired. The conditional state update and one audit insert share a PostgreSQL transaction, so competing workflow workers produce one fail-closed transition and one audit record. No new execution claim or provider call is possible from this repository operation. See [ADR 0040](../decisions/0040-action-timers-and-fail-closed-reconciliation.md).
+
 Workers claim messages within one explicit tenant scope. Claims increment the attempt count and create a bounded lease. Parallel workers skip active leases. Successful delivery acknowledges the row using tenant, worker identity, and message ID. A failure releases it with a stable error code and bounded retry delay; provider exception text is never persisted.
 
 Delivery is at least once. A crash after external publish but before acknowledgement can redeliver, so downstream transports and consumers use the CloudEvents identity `(tenantid, source, id)` for idempotency.

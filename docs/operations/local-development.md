@@ -145,7 +145,7 @@ The supported local onboarding path generates 256-bit Bearer tokens for three se
 make dev-up
 ```
 
-This starts PostgreSQL, the API, and a tenant-explicit investigation worker, waits for the serving health checks, and prints the console URL plus the `local-operator` token. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties. Run `make dev-credentials` when exercising the console approval workflow; that explicit command prints all three identities from the protected mode-`0600` file. Useful lifecycle commands are:
+This starts PostgreSQL, the API, and a tenant-explicit workflow worker, waits for the serving health checks, and prints the console URL plus the `local-operator` token. The worker dispatches investigations and performs non-executing action timer reconciliation. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties. Run `make dev-credentials` when exercising the console approval workflow; that explicit command prints all three identities from the protected mode-`0600` file. Useful lifecycle commands are:
 
 ```bash
 make dev-status
@@ -167,7 +167,7 @@ docker compose -f deploy/docker-compose.yml up --build --detach
 docker compose -f deploy/docker-compose.yml ps
 ```
 
-This is the long-running development stack visible in Docker Desktop: PostgreSQL, the API, the background investigation worker, and a named database volume. It differs from `make test-postgres`, whose test container and volume are always removed on exit. The API is published only on `127.0.0.1`; both application containers run as a non-root user with read-only filesystems, dropped Linux capabilities, and `no-new-privileges`. Stop the manual stack with `docker compose -f deploy/docker-compose.yml down`; add `--volumes` only when you intentionally want to delete its local database.
+This is the long-running development stack visible in Docker Desktop: PostgreSQL, the API, the background workflow worker, and a named database volume. It differs from `make test-postgres`, whose test container and volume are always removed on exit. The API is published only on `127.0.0.1`; both application containers run as a non-root user with read-only filesystems, dropped Linux capabilities, and `no-new-privileges`. Stop the manual stack with `docker compose -f deploy/docker-compose.yml down`; add `--volumes` only when you intentionally want to delete its local database.
 
 The API migrates the local Compose database on startup. Automatic migration is disabled by default in Helm and should be a separately controlled deployment step outside local development.
 
@@ -214,6 +214,9 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_CREDENTIAL_BROKER_CONFIG_JSON` | unset | Required non-secret HTTPS/trust/workload-token-path/lease bounds when external mode is selected |
 | `IIP_DATABASE_URL` | unset | Select the PostgreSQL profile when set |
 | `IIP_DATABASE_AUTO_MIGRATE` | `false` | Apply packaged migrations at startup; local Compose only |
+| `IIP_WORKER_TENANTS` | unset | Required comma-separated exact tenant enrollment for the workflow worker; wildcard is invalid |
+| `IIP_WORKER_ID` | pod/host name | Stable workflow-worker identity |
+| `IIP_ACTION_RECONCILIATION_BATCH_SIZE` | `100` | Maximum expired action leases scanned per enrolled tenant and timer pass |
 | `IIP_INGESTION_MAX_CHECKPOINT_AGE_SECONDS` | `300` | Local maximum age of the last complete committed collection |
 | `IIP_INGESTION_MAX_OBSERVATION_AGE_SECONDS` | `300` | Local maximum age of the latest accepted source observation |
 | `IIP_INGESTION_MAX_DELAY_SECONDS` | `60` | Local maximum provider-observation to platform-recording delay |

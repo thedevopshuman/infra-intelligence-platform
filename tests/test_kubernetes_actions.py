@@ -15,7 +15,7 @@ from iip.adapters.kubernetes_actions import (
     build_kubernetes_action_executor_from_environment,
 )
 from iip.application.ports import ActorContext, CredentialLease
-from iip.bootstrap import _kubernetes_action_executor_from_env
+from iip.bootstrap import _kubernetes_action_executor_from_env, build_runtime_from_env
 
 
 def iso(value: datetime) -> str:
@@ -373,6 +373,30 @@ class KubernetesActionConfigurationTests(unittest.TestCase):
             selected = _kubernetes_action_executor_from_env(broker)
 
         self.assertIsInstance(selected, KubernetesRestartExecutor)
+
+    def test_workflow_runtime_does_not_compose_live_action_authority(self) -> None:
+        environment = {
+            "IIP_AUTH_IDENTITIES_JSON": json.dumps(
+                {
+                    "identities": [
+                        {
+                            "tokenSha256": "sha256:" + "0" * 64,
+                            "actorId": "worker-bootstrap-test",
+                            "tenantId": "local",
+                            "roles": ["developer"],
+                        }
+                    ]
+                }
+            ),
+            "IIP_KUBERNETES_ACTION_EXECUTOR": "ambient-client",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            runtime = build_runtime_from_env(include_action_executor=False)
+            runtime.close()
+            with self.assertRaisesRegex(
+                KubernetesActionsConfigurationError, "configuration.invalid"
+            ):
+                build_runtime_from_env()
 
 
 if __name__ == "__main__":

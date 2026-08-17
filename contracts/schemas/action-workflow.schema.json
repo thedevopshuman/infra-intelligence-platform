@@ -28,6 +28,7 @@
           "enum": [
             "pending-approval",
             "denied",
+            "expired",
             "approved",
             "rejected",
             "executing",
@@ -53,6 +54,10 @@
     {
       "if": {"properties": {"spec": {"properties": {"state": {"enum": ["approved", "rejected"]}}}}},
       "then": {"properties": {"spec": {"required": ["approval"], "not": {"anyOf": [{"required": ["executionStatus"]}, {"required": ["result"]}]}}}}
+    },
+    {
+      "if": {"properties": {"spec": {"properties": {"state": {"const": "expired"}}}}},
+      "then": {"properties": {"spec": {"not": {"anyOf": [{"required": ["executionStatus"]}, {"required": ["result"]}]}}}}
     },
     {
       "if": {"properties": {"spec": {"properties": {"state": {"enum": ["executing", "manual-reconciliation-required"]}}}}},

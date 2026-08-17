@@ -7,20 +7,20 @@ metadata:
   name: {{ include "infra-intelligence.fullname" . }}-worker
   labels:
     {{- include "infra-intelligence.labels" . | nindent 4 }}
-    app.kubernetes.io/component: investigation-worker
+    app.kubernetes.io/component: workflow-worker
 spec:
   replicas: {{ .Values.worker.replicaCount }}
   selector:
     matchLabels:
       {{- include "infra-intelligence.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: investigation-worker
+      app.kubernetes.io/component: workflow-worker
   template:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       labels:
         {{- include "infra-intelligence.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: investigation-worker
+        app.kubernetes.io/component: workflow-worker
     spec:
       serviceAccountName: {{ include "infra-intelligence.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
@@ -31,7 +31,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-        - name: investigation-worker
+        - name: workflow-worker
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["python", "-m", "iip.surfaces.worker"]
@@ -62,6 +62,8 @@ spec:
               value: {{ .Values.worker.retrySeconds | quote }}
             - name: IIP_WORKER_MAX_ATTEMPTS
               value: {{ .Values.worker.maxAttempts | quote }}
+            - name: IIP_ACTION_RECONCILIATION_BATCH_SIZE
+              value: {{ .Values.worker.actionReconciliationBatchSize | quote }}
             {{- if .Values.auth.existingSecret }}
             - name: IIP_AUTH_IDENTITIES_JSON
               valueFrom:

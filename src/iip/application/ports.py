@@ -797,6 +797,14 @@ class ActionWorkflowRecord:
     result: Optional[Mapping[str, object]] = None
 
 
+@dataclass(frozen=True)
+class ActionExecutionTransition:
+    """Result of one atomic fail-closed action reconciliation attempt."""
+
+    status: Mapping[str, object]
+    transitioned: bool
+
+
 class ActionRepository(Protocol):
     def get_proposal_by_key(
         self, actor: ActorContext, idempotency_key: str
@@ -853,14 +861,24 @@ class ActionRepository(Protocol):
     ) -> Optional[Mapping[str, object]]:
         """Resolve the durable execution lifecycle for one proposal."""
 
-    def mark_action_execution_uncertain(
+    def list_expired_action_executions(
+        self,
+        actor: ActorContext,
+        observed_at: str,
+        *,
+        limit: int,
+    ) -> Iterable[Mapping[str, object]]:
+        """List bounded exact-tenant execution leases eligible for reconciliation."""
+
+    def reconcile_expired_action_execution(
         self,
         actor: ActorContext,
         proposal_id: str,
         observed_at: str,
         document: Mapping[str, object],
-    ) -> Mapping[str, object]:
-        """Fail an expired execution lease closed without replaying its side effect."""
+        audit_document: Mapping[str, object],
+    ) -> ActionExecutionTransition:
+        """Atomically fail an expired lease closed and append its audit record once."""
 
     def commit_action_result(
         self,

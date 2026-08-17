@@ -70,3 +70,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0064](0064-durable-plugin-invocation-ownership.md) | Accepted | Claim plugin requests durably before execution and replay only stored terminal results |
 | [0065](0065-plugin-invocation-cancellation-and-reconciliation.md) | Accepted | Persist cooperative plugin cancellation and close post-deadline ambiguity without replay |
 | [0066](0066-host-mediated-plugin-read-connectivity.md) | Accepted | Keep plugins offline while mediating invocation-scoped, policy-checked provider reads |
+| [0067](0067-attested-plugin-mediation-bridge-image.md) | Accepted | Ship the trusted mediation relay as a separately attested release image |

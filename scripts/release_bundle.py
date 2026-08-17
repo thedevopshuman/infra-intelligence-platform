@@ -207,13 +207,25 @@ def _artifact_specs(
     chart_version: str,
     python_sdk_version: str,
     typescript_sdk_version: str,
+    *,
+    include_mediation_bridge: bool = True,
 ) -> tuple[tuple[str, str, str], ...]:
-    return (
+    image_specs = [
         (
             f"infra-intelligence-control-plane-{version}.oci.tar",
             "control-plane-image",
             "application/vnd.oci.image.layout.v1.tar",
         ),
+    ]
+    if include_mediation_bridge:
+        image_specs.append(
+            (
+                f"infra-intelligence-plugin-mediation-bridge-{version}.oci.tar",
+                "plugin-mediation-bridge-image",
+                "application/vnd.oci.image.layout.v1.tar",
+            )
+        )
+    return tuple(image_specs) + (
         (
             f"infra-intelligence-{chart_version}.tgz",
             "helm-chart",
@@ -277,12 +289,19 @@ def finalize_bundle(
             }
         )
 
-    image_path = bundle / f"infra-intelligence-control-plane-{version}.oci.tar"
-    image = dict(inspect_oci_image(image_path))
-    actual_platforms = [item["name"] for item in image["platforms"]]
-    if sorted(platforms) != actual_platforms:
-        raise ReleaseBundleError("release.image.platform.mismatch")
-    image["path"] = image_path.name
+    def image_entry(filename: str) -> dict[str, Any]:
+        image_path = bundle / filename
+        image = dict(inspect_oci_image(image_path))
+        actual_platforms = [item["name"] for item in image["platforms"]]
+        if sorted(platforms) != actual_platforms:
+            raise ReleaseBundleError("release.image.platform.mismatch")
+        image["path"] = image_path.name
+        return image
+
+    image = image_entry(f"infra-intelligence-control-plane-{version}.oci.tar")
+    mediation_bridge_image = image_entry(
+        f"infra-intelligence-plugin-mediation-bridge-{version}.oci.tar"
+    )
 
     manifest: Mapping[str, Any] = {
         "apiVersion": "iip.dev/v1alpha1",
@@ -296,7 +315,11 @@ def finalize_bundle(
             "sourceDate": source_date,
             "signatureStatus": "unsigned",
         },
-        "spec": {"artifacts": artifacts, "image": image},
+        "spec": {
+            "artifacts": artifacts,
+            "image": image,
+            "pluginMediationBridgeImage": mediation_bridge_image,
+        },
     }
     manifest_path = bundle / "release-manifest.json"
     manifest_path.write_text(
@@ -390,11 +413,27 @@ def verify_bundle(bundle: Path) -> Mapping[str, Any]:
     artifacts = spec.get("artifacts")
     if not isinstance(artifacts, list):
         raise ReleaseBundleError("release.manifest.invalid")
+    bridge_image = spec.get("pluginMediationBridgeImage")
+    bridge_declared = "pluginMediationBridgeImage" in spec
+    version_match = re.match(
+        r"^([0-9]+)\.([0-9]+)\.([0-9]+)", metadata["version"]
+    )
+    assert version_match is not None
+    bridge_required = tuple(int(part) for part in version_match.groups()) >= (0, 41, 0)
+    if bridge_required and not bridge_declared:
+        raise ReleaseBundleError("release.manifest.invalid")
+    if bridge_declared and (
+        not isinstance(bridge_image, dict)
+        or not isinstance(bridge_image.get("path"), str)
+        or not isinstance(bridge_image.get("platforms"), list)
+    ):
+        raise ReleaseBundleError("release.manifest.invalid")
     expected_specs = _artifact_specs(
         metadata["version"],
         metadata["chartVersion"],
         metadata["pythonSdkVersion"],
         metadata["typescriptSdkVersion"],
+        include_mediation_bridge=bridge_declared,
     )
     expected_artifacts = {
         filename: (role, media_type)
@@ -410,6 +449,24 @@ def verify_bundle(bundle: Path) -> Mapping[str, Any]:
     expected_image_path = f"infra-intelligence-control-plane-{metadata['version']}.oci.tar"
     if image["path"] != expected_image_path:
         raise ReleaseBundleError("release.manifest.invalid")
+    if bridge_declared:
+        assert isinstance(bridge_image, dict)
+        expected_bridge_path = (
+            "infra-intelligence-plugin-mediation-bridge-"
+            f"{metadata['version']}.oci.tar"
+        )
+        if bridge_image["path"] != expected_bridge_path:
+            raise ReleaseBundleError("release.manifest.invalid")
+        bridge_platforms = bridge_image["platforms"]
+        if (
+            any(
+                not isinstance(item, dict) or not isinstance(item.get("name"), str)
+                for item in bridge_platforms
+            )
+            or [item["name"] for item in bridge_platforms]
+            != [item["name"] for item in declared_platforms]
+        ):
+            raise ReleaseBundleError("release.image.platform.mismatch")
     expected_lines = _expected_checksum_lines(bundle, manifest)
     if checksum_lines != expected_lines:
         raise ReleaseBundleError("release.checksums.invalid")
@@ -419,6 +476,13 @@ def verify_bundle(bundle: Path) -> Mapping[str, Any]:
         "platforms"
     ) != inspected["platforms"]:
         raise ReleaseBundleError("release.image.metadata-mismatch")
+    if bridge_declared:
+        assert isinstance(bridge_image, dict)
+        inspected_bridge = inspect_oci_image(bundle / bridge_image["path"])
+        if bridge_image.get("indexDigest") != inspected_bridge[
+            "indexDigest"
+        ] or bridge_image.get("platforms") != inspected_bridge["platforms"]:
+            raise ReleaseBundleError("release.image.metadata-mismatch")
     return manifest
 
 

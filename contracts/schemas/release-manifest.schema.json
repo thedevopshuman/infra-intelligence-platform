@@ -38,51 +38,11 @@
         "artifacts": {
           "type": "array",
           "minItems": 5,
-          "maxItems": 5,
+          "maxItems": 6,
           "items": { "$ref": "#/$defs/artifact" }
         },
-        "image": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["path", "indexDigest", "platforms"],
-          "properties": {
-            "path": { "$ref": "#/$defs/fileName" },
-            "indexDigest": { "$ref": "#/$defs/digest" },
-            "platforms": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 8,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["name", "manifestDigest", "attestations"],
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "pattern": "^linux/[a-z0-9_]+(?:/[a-z0-9.]+)?$"
-                  },
-                  "manifestDigest": { "$ref": "#/$defs/digest" },
-                  "attestations": {
-                    "type": "array",
-                    "minItems": 2,
-                    "maxItems": 2,
-                    "uniqueItems": true,
-                    "items": {
-                      "enum": [
-                        "https://spdx.dev/Document",
-                        "https://slsa.dev/provenance/v1"
-                      ]
-                    },
-                    "allOf": [
-                      { "contains": { "const": "https://spdx.dev/Document" } },
-                      { "contains": { "const": "https://slsa.dev/provenance/v1" } }
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        }
+        "image": { "$ref": "#/$defs/image" },
+        "pluginMediationBridgeImage": { "$ref": "#/$defs/image" }
       }
     }
   },
@@ -98,6 +58,48 @@
       "maxLength": 255,
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
     },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "indexDigest", "platforms"],
+      "properties": {
+        "path": { "$ref": "#/$defs/fileName" },
+        "indexDigest": { "$ref": "#/$defs/digest" },
+        "platforms": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "manifestDigest", "attestations"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^linux/[a-z0-9_]+(?:/[a-z0-9.]+)?$"
+              },
+              "manifestDigest": { "$ref": "#/$defs/digest" },
+              "attestations": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "https://spdx.dev/Document",
+                    "https://slsa.dev/provenance/v1"
+                  ]
+                },
+                "allOf": [
+                  { "contains": { "const": "https://spdx.dev/Document" } },
+                  { "contains": { "const": "https://slsa.dev/provenance/v1" } }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "artifact": {
       "type": "object",
       "additionalProperties": false,
@@ -107,6 +109,7 @@
         "role": {
           "enum": [
             "control-plane-image",
+            "plugin-mediation-bridge-image",
             "helm-chart",
             "public-contracts",
             "python-sdk-source",

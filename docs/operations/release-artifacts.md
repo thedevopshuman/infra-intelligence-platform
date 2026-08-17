@@ -10,13 +10,14 @@ The release builder refuses a dirty worktree. With Docker Desktop, Buildx, Helm,
 make release-bundle PYTHON=.venv/bin/python
 ```
 
-The default build produces `linux/amd64` and `linux/arm64` image manifests. BuildKit attaches an in-toto SPDX SBOM and SLSA v1 provenance statement to each platform inside the OCI layout. The base-image index and SBOM generator are digest pinned; dependency updates must intentionally update those pins and pass the normal verification gates.
+The default build produces `linux/amd64` and `linux/arm64` manifests for both the control plane and the trusted plugin-mediation bridge. BuildKit attaches an in-toto SPDX SBOM and SLSA v1 provenance statement to every platform inside each OCI layout. The base-image index and SBOM generator are digest pinned; dependency updates must intentionally update those pins and pass the normal verification gates.
 
 The build also writes the exact committed source revision into the OCI image label and the process environment. Once deployed, authenticated users can compare `GET /v1/system/version` with the manifest revision; Helm deployments additionally report the configured chart version and immutable OCI digest. A development build explicitly reports `development` and does not claim unverifiable release identity.
 
 The directory under `dist/iip-<version>-<revision>/` contains:
 
 - the multi-platform control-plane OCI image archive;
+- the separately multi-platform, no-network plugin-mediation bridge OCI image archive;
 - the Helm chart, including its strict values schema;
 - public JSON Schemas, examples, specifications, and OpenAPI documents;
 - a Python SDK source package and a compiled npm package;
@@ -30,20 +31,20 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.40.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.41.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 
-Verification does not trust the manifest by itself. It recalculates each byte length and SHA-256 digest, compares the exact checksum file, traverses content-addressed OCI descriptors, matches declared platform digests, and requires both accepted attestation predicates per platform. A modified artifact, omitted platform, missing SBOM, missing provenance statement, or rewritten manifest fails closed with a stable release error.
+Verification does not trust the manifest by itself. It recalculates each byte length and SHA-256 digest, compares the exact checksum file, traverses both content-addressed OCI descriptor graphs, matches declared platform digests, requires the same platform set, and requires both accepted attestation predicates per platform. A current bundle with a missing bridge, modified artifact, omitted platform, missing SBOM, missing provenance statement, or rewritten manifest fails closed with a stable release error.
 
 ## Production promotion boundary
 
 The local bundle is explicitly unsigned. It proves artifact integrity and build evidence, not who published it. Once repository hosting and organizational release identity are accepted, production promotion must:
 
 1. rerun all local, PostgreSQL, kind, and customer workflow gates against the release revision;
-2. publish the OCI index and Helm chart to immutable registry digests;
-3. sign the OCI digest with the accepted organizational identity;
-4. verify the signature, identity, issuer, and transparency evidence under a checked-in policy;
+2. publish both OCI indexes and the Helm chart to immutable registry digests;
+3. sign both OCI digests with the accepted organizational identity;
+4. verify both signatures, identities, issuers, and transparency evidence under a checked-in policy;
 5. scan the attached SBOM under a documented vulnerability exception policy;
 6. distribute only the verified digest and matching manifest/checksums through a trusted release channel.
 

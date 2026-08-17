@@ -87,6 +87,16 @@ git archive --format=tar.gz \
     --output "type=oci,dest=$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-control-plane-$IIP_RELEASE_VERSION.oci.tar" \
     .
 
+"$IIP_RELEASE_DOCKER_BIN" buildx build \
+    --platform "$IIP_RELEASE_PLATFORMS" \
+    --build-arg "IIP_IMAGE_VERSION=$IIP_RELEASE_VERSION" \
+    --build-arg "IIP_IMAGE_REVISION=$IIP_RELEASE_REVISION" \
+    --attest "type=sbom,generator=$IIP_RELEASE_SBOM_GENERATOR" \
+    --provenance=mode=max \
+    --output "type=oci,dest=$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-plugin-mediation-bridge-$IIP_RELEASE_VERSION.oci.tar" \
+    -f deploy/plugin-mediation-bridge/Dockerfile \
+    .
+
 "$IIP_RELEASE_PYTHON" scripts/release_bundle.py finalize \
     "$IIP_RELEASE_BUNDLE_ABSOLUTE" \
     --version "$IIP_RELEASE_VERSION" \

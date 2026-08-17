@@ -21,8 +21,8 @@ from scripts.release_bundle import (
 )
 
 
-VERSION = "0.40.0"
-CHART_VERSION = "0.42.0"
+VERSION = "0.41.0"
+CHART_VERSION = "0.43.0"
 SDK_VERSION = "0.34.0"
 REVISION = "0123456789abcdef0123456789abcdef01234567"
 SOURCE_DATE = "2026-08-17T04:45:00+00:00"
@@ -139,6 +139,10 @@ class ReleaseBundleTests(unittest.TestCase):
         write_oci_fixture(
             self.bundle / f"infra-intelligence-control-plane-{VERSION}.oci.tar"
         )
+        write_oci_fixture(
+            self.bundle
+            / f"infra-intelligence-plugin-mediation-bridge-{VERSION}.oci.tar"
+        )
         for filename in (
             f"infra-intelligence-{CHART_VERSION}.tgz",
             f"infra-intelligence-contracts-{VERSION}.tar.gz",
@@ -172,7 +176,26 @@ class ReleaseBundleTests(unittest.TestCase):
             [item["name"] for item in manifest["spec"]["image"]["platforms"]],
             list(PLATFORMS),
         )
-        self.assertEqual(len(manifest["spec"]["artifacts"]), 5)
+        self.assertEqual(
+            [
+                item["name"]
+                for item in manifest["spec"]["pluginMediationBridgeImage"][
+                    "platforms"
+                ]
+            ],
+            list(PLATFORMS),
+        )
+        self.assertEqual(len(manifest["spec"]["artifacts"]), 6)
+
+    def test_current_release_requires_mediation_bridge_metadata(self) -> None:
+        self.finalize()
+        manifest_path = self.bundle / "release-manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["spec"].pop("pluginMediationBridgeImage")
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        with self.assertRaisesRegex(ReleaseBundleError, "release.manifest.invalid"):
+            verify_bundle(self.bundle)
 
     def test_modified_artifact_fails_digest_verification(self) -> None:
         self.finalize()
@@ -192,6 +215,18 @@ class ReleaseBundleTests(unittest.TestCase):
             ReleaseBundleError, "release.image.attestation.required"
         ):
             inspect_oci_image(image)
+
+    def test_mediation_bridge_without_sbom_fails_closed(self) -> None:
+        image = (
+            self.bundle
+            / f"infra-intelligence-plugin-mediation-bridge-{VERSION}.oci.tar"
+        )
+        write_oci_fixture(image, include_sbom=False)
+
+        with self.assertRaisesRegex(
+            ReleaseBundleError, "release.image.attestation.required"
+        ):
+            self.finalize()
 
 
 if __name__ == "__main__":

@@ -49,6 +49,12 @@ the [invocation-scoped mediation boundary](../specifications/plugin-mediation-co
 action declarations remain denied. Direct Docker socket access belongs only to a dedicated runner
 deployment, never the API pod.
 
+The trusted relay is released as its own multi-platform OCI layout alongside the
+control plane. Its artifact entry, platform digests, SPDX SBOM, and SLSA
+provenance are independently verified by the release manifest. A production
+runner must publish and pin that verified bridge digest; it must not rebuild the
+relay from a mutable working tree during plugin invocation.
+
 The Kubernetes observer container accepts one invocation over stdin. Offline
 tests can normalize a bundled provider fixture; the signed-runner conformance
 path instead reads the fixture through the real invocation-local socket while

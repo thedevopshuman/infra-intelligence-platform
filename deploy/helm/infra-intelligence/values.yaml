@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.33.0"
+  tag: "0.34.0"
   digest: ""
 
 worker:
@@ -14,6 +14,8 @@ worker:
   heartbeatSeconds: 10
   retrySeconds: 5
   maxAttempts: 8
+  investigationConcurrency: 4
+  maxTenantInvestigationConcurrency: 1
   actionReconciliationBatchSize: 100
   ingestionMonitorTargets: []
   ingestionMonitorIntervalSeconds: 60

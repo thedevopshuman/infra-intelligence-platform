@@ -116,6 +116,17 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn("IIP_OUTBOX_MAX_ATTEMPTS", worker)
         self.assertIn(".Values.eventPublisher.maxAttempts", worker)
 
+    def test_worker_investigation_concurrency_is_explicit_and_bounded(self) -> None:
+        worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("investigationConcurrency: 4", values)
+        self.assertIn("maxTenantInvestigationConcurrency: 1", values)
+        self.assertIn("IIP_WORKER_INVESTIGATION_CONCURRENCY", worker)
+        self.assertIn("IIP_WORKER_MAX_TENANT_CONCURRENCY", worker)
+
     def test_event_delivery_slo_objective_is_explicit_and_api_visible(self) -> None:
         config_map = (CHART / "templates" / "configmap.yaml").read_text(
             encoding="utf-8"

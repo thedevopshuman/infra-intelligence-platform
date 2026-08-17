@@ -65,7 +65,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.33.0
+  tag: 0.34.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -88,6 +88,12 @@ investigationCompletionSlo:
   maximumCompletionSeconds: 300
   minimumAttainmentBasisPoints: 9900
   minimumEligibleJobs: 20
+
+worker:
+  enabled: true
+  tenants: [tenant-a, tenant-b]
+  investigationConcurrency: 4
+  maxTenantInvestigationConcurrency: 1
 
 queryAvailabilitySlo:
   windowSeconds: 3600
@@ -117,6 +123,8 @@ helm upgrade --install iip deploy/helm/infra-intelligence \
 ```
 
 The migration NetworkPolicy hook is created first, then the migration Job. The Job receives only the database Secret and runs every packaged migration under an advisory lock. The serving Deployment rolls out only after the hook succeeds. `/readyz` independently opens a bounded database connection and verifies the latest migration recorded by the new image. After rollout, compare the authenticated runtime report's application, required migration, source revision, chart version, and image digest with the promoted release evidence.
+
+`worker.investigationConcurrency` bounds simultaneous investigation tasks in each worker pod. `worker.maxTenantInvestigationConcurrency` is enforced from durable unexpired leases across all replicas; keep its default of one until measured tenant workloads justify a larger share. The process scheduler gives each enrolled tenant at most one local task and rotates polling order. These controls do not replace resource requests/limits, completion-SLO monitoring, or deliberate tenant sharding when the enrolled tenant count is much larger than available process slots.
 
 The local-hashed authentication example is suitable for a controlled evaluation. The default Secret name is `iip-auth`, but the chart never creates its sensitive contents. Configure the documented OIDC boundary for production; do not place either local verifier JSON or OIDC client material directly in a values file. Serving pods always receive `IIP_DATABASE_AUTO_MIGRATE=false`; the hook is the chart's only schema authority.
 
@@ -150,4 +158,4 @@ The gate builds and loads the current image, registers its exact host-platform d
 
 ## Production gaps
 
-This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance evidence; the chart declares guarded TLS ingress and schedules logical backups; and the kind gate restores one. Organizational image signing, external secret-controller integration, controller-specific TLS conformance, high availability, zero-downtime migration compatibility, capacity tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.
+This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance evidence; the chart declares guarded TLS ingress and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; and the kind gate restores one. Organizational image signing, external secret-controller integration, controller-specific TLS conformance, high availability, zero-downtime migration compatibility, sustained capacity and overload tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.

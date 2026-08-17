@@ -77,6 +77,8 @@
         "heartbeatSeconds",
         "retrySeconds",
         "maxAttempts",
+        "investigationConcurrency",
+        "maxTenantInvestigationConcurrency",
         "actionReconciliationBatchSize",
         "ingestionMonitorTargets",
         "ingestionMonitorIntervalSeconds",
@@ -95,6 +97,16 @@
         "heartbeatSeconds": { "type": "integer", "minimum": 0, "maximum": 299 },
         "retrySeconds": { "type": "integer", "minimum": 1, "maximum": 300 },
         "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "investigationConcurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "maxTenantInvestigationConcurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
         "actionReconciliationBatchSize": {
           "type": "integer",
           "minimum": 1,

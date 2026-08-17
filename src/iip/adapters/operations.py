@@ -277,8 +277,24 @@ class InMemoryOperationalStore:
         worker_id: str,
         now: str,
         lease_expires_at: str,
+        *,
+        max_tenant_concurrency: int = 1,
     ) -> Optional[InvestigationJobClaim]:
+        if (
+            isinstance(max_tenant_concurrency, bool)
+            or not isinstance(max_tenant_concurrency, int)
+            or not 1 <= max_tenant_concurrency <= 64
+        ):
+            raise PersistenceError("storage.input-invalid")
         with self._lock:
+            active = sum(
+                1
+                for (candidate_tenant, _), entry in self._investigation_jobs.items()
+                if candidate_tenant == tenant_id
+                and self._job_has_live_lease(entry, now)
+            )
+            if active >= max_tenant_concurrency:
+                return None
             candidates = []
             for (candidate_tenant, investigation_id), entry in self._investigation_jobs.items():
                 if candidate_tenant != tenant_id:
@@ -327,6 +343,17 @@ class InMemoryOperationalStore:
                 claim_token=claim_token,
                 attempts=attempts,
             )
+
+    @staticmethod
+    def _job_has_live_lease(entry: Mapping[str, object], now: str) -> bool:
+        status = entry.get("status")
+        spec = status.get("spec") if isinstance(status, Mapping) else None
+        return bool(
+            isinstance(spec, Mapping)
+            and spec.get("state") in {"running", "cancellation-requested"}
+            and entry.get("leaseExpiresAt") is not None
+            and str(entry["leaseExpiresAt"]) > now
+        )
 
     def heartbeat_investigation_job(
         self,

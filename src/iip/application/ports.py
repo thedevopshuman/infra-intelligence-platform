@@ -930,8 +930,10 @@ class InvestigationJobRepository(Protocol):
         worker_id: str,
         now: str,
         lease_expires_at: str,
+        *,
+        max_tenant_concurrency: int = 1,
     ) -> Optional[InvestigationJobClaim]:
-        """Claim one ready or abandoned job from one explicitly named tenant."""
+        """Claim within one tenant and its deployment-wide live-lease cap."""
 
     def heartbeat_investigation_job(
         self,

@@ -22,6 +22,8 @@ Job state is `queued`, `running`, `cancellation-requested`, `completed`, `failed
 
 Workers claim within one explicitly configured tenant. A claim uses an unexposed random token, is atomic under competing workers, and can be renewed only by its owner. An expired dispatch lease may be reclaimed. This lease protects delivery; it does not extend `maxWallTimeSeconds` or the investigation's separate non-renewable execution lease. If a worker crashes after investigation execution starts, a replacement observes the live execution lease and retries later; after that lease expires, the existing conservative recovery path produces a failed report without repeating tools.
 
+Worker processes schedule claim attempts through bounded slots, keep at most one process-local task in flight per enrolled tenant, and rotate tenant consideration between polls. The repository independently enforces the configured maximum number of unexpired `running` or `cancellation-requested` leases for that exact tenant across all replicas. Admission is serialized only within one tenant; an expired lease does not consume the limit. The defaults are four process slots and one live investigation per tenant. These deployment controls do not change the public job document, execution budget, retry count, policy, or tenant enrollment.
+
 `GET /v1/investigation-jobs/{investigationId}` returns dispatch state. `POST /v1/investigation-jobs/{investigationId}/cancel` uses the existing cancellation envelope. Queued work becomes terminal without executing; claimed work records intent in both job and investigation lifecycle state. Cancellation wins terminal races, while already committed Evidence remains immutable.
 
 ## Cancellation
@@ -44,3 +46,4 @@ Cancellation is cooperative: an in-flight provider call must return or honor its
 - dispatch claims always include an exact tenant predicate and never enumerate tenants implicitly;
 - a dispatch heartbeat cannot overwrite a concurrent cancellation; and
 - retry exhaustion terminates with a stable code instead of retrying indefinitely.
+- one tenant cannot exceed its configured deployment-wide live-lease cap.

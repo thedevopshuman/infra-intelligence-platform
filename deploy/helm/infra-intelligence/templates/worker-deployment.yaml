@@ -71,6 +71,10 @@ spec:
               value: {{ .Values.worker.retrySeconds | quote }}
             - name: IIP_WORKER_MAX_ATTEMPTS
               value: {{ .Values.worker.maxAttempts | quote }}
+            - name: IIP_WORKER_INVESTIGATION_CONCURRENCY
+              value: {{ .Values.worker.investigationConcurrency | quote }}
+            - name: IIP_WORKER_MAX_TENANT_CONCURRENCY
+              value: {{ .Values.worker.maxTenantInvestigationConcurrency | quote }}
             - name: IIP_ACTION_RECONCILIATION_BATCH_SIZE
               value: {{ .Values.worker.actionReconciliationBatchSize | quote }}
             - name: IIP_EVENT_PUBLISHER_MODE

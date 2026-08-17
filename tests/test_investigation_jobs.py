@@ -197,6 +197,40 @@ class InvestigationJobTests(unittest.TestCase):
         )
         self.assertEqual(status["spec"]["attempts"], 2)
 
+    def test_live_claim_cap_prevents_one_tenant_from_consuming_all_slots(self) -> None:
+        self.dispatch.submit(SubmitInvestigationJobCommand(self.actor, self.request))
+        second = copy.deepcopy(self.request)
+        second["metadata"]["id"] = f"inv_{'b' * 32}"
+        self.dispatch.submit(SubmitInvestigationJobCommand(self.actor, second))
+
+        first = self.store.claim_investigation_job(
+            "local",
+            "worker-a",
+            self.clock.now(),
+            iso(self.clock.value + timedelta(seconds=10)),
+            max_tenant_concurrency=1,
+        )
+        blocked = self.store.claim_investigation_job(
+            "local",
+            "worker-b",
+            self.clock.now(),
+            iso(self.clock.value + timedelta(seconds=10)),
+            max_tenant_concurrency=1,
+        )
+
+        self.assertIsNotNone(first)
+        self.assertIsNone(blocked)
+        self.clock.advance(11)
+        self.assertIsNotNone(
+            self.store.claim_investigation_job(
+                "local",
+                "worker-b",
+                self.clock.now(),
+                iso(self.clock.value + timedelta(seconds=10)),
+                max_tenant_concurrency=1,
+            )
+        )
+
     def test_cancellation_cannot_be_overwritten_by_a_stale_heartbeat(self) -> None:
         self.dispatch.submit(SubmitInvestigationJobCommand(self.actor, self.request))
         claim = self.store.claim_investigation_job(

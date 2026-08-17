@@ -728,6 +728,9 @@ def build_investigation_worker_from_env(runtime: Runtime) -> InvestigationWorker
         heartbeat_seconds=integer("IIP_WORKER_HEARTBEAT_SECONDS", 10),
         retry_seconds=integer("IIP_WORKER_RETRY_SECONDS", 5),
         max_attempts=integer("IIP_WORKER_MAX_ATTEMPTS", 8),
+        max_tenant_concurrency=integer(
+            "IIP_WORKER_MAX_TENANT_CONCURRENCY", 1
+        ),
     )
 
 

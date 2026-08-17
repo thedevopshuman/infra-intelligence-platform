@@ -1073,6 +1073,79 @@ class PostgresOperationalStoreTests(unittest.TestCase):
             0,
         )
 
+    def test_concurrent_job_claims_enforce_the_tenant_live_lease_cap(self) -> None:
+        actor = ActorContext("developer", "local", ("developer",))
+        for digit in ("a", "b"):
+            request = json.loads(
+                (ROOT / "contracts/examples/investigation-request.json").read_text()
+            )
+            investigation_id = f"inv_{digit * 32}"
+            request["metadata"]["id"] = investigation_id
+            queued = InvestigationDispatchService.queued_status(
+                actor,
+                investigation_id,
+                request,
+                "2026-08-17T12:00:00Z",
+                attempts=0,
+            )
+            self.operations.enqueue_investigation_job(
+                actor, investigation_id, request, queued
+            )
+
+        barrier = Barrier(3)
+
+        def claim(worker_id: str):
+            barrier.wait()
+            return self.operations.claim_investigation_job(
+                "local",
+                worker_id,
+                "2026-08-17T12:00:01Z",
+                "2026-08-17T12:00:31Z",
+                max_tenant_concurrency=1,
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = tuple(
+                pool.submit(claim, worker_id)
+                for worker_id in ("worker-a", "worker-b")
+            )
+            barrier.wait()
+            claims = tuple(future.result() for future in futures)
+
+        self.assertEqual(sum(claim is not None for claim in claims), 1)
+
+        other_actor = ActorContext("developer", "another-tenant", ("developer",))
+        other_request = json.loads(
+            (ROOT / "contracts/examples/investigation-request.json").read_text()
+        )
+        other_id = f"inv_{'c' * 32}"
+        other_request["metadata"].update(
+            {
+                "id": other_id,
+                "tenantId": other_actor.tenant_id,
+                "actorId": other_actor.actor_id,
+            }
+        )
+        other_queued = InvestigationDispatchService.queued_status(
+            other_actor,
+            other_id,
+            other_request,
+            "2026-08-17T12:00:00Z",
+            attempts=0,
+        )
+        self.operations.enqueue_investigation_job(
+            other_actor, other_id, other_request, other_queued
+        )
+        self.assertIsNotNone(
+            self.operations.claim_investigation_job(
+                "another-tenant",
+                "worker-c",
+                "2026-08-17T12:00:01Z",
+                "2026-08-17T12:00:31Z",
+                max_tenant_concurrency=1,
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

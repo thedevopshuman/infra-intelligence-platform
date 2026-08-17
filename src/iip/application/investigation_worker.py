@@ -38,6 +38,7 @@ class InvestigationWorker:
         heartbeat_seconds: int = 10,
         retry_seconds: int = 5,
         max_attempts: int = 8,
+        max_tenant_concurrency: int = 1,
     ) -> None:
         if not worker_id or len(worker_id) > 128:
             raise ValueError("investigation.worker.configuration.invalid")
@@ -47,6 +48,12 @@ class InvestigationWorker:
             raise ValueError("investigation.worker.configuration.invalid")
         if not 1 <= retry_seconds <= 300 or not 1 <= max_attempts <= 20:
             raise ValueError("investigation.worker.configuration.invalid")
+        if (
+            isinstance(max_tenant_concurrency, bool)
+            or not isinstance(max_tenant_concurrency, int)
+            or not 1 <= max_tenant_concurrency <= 64
+        ):
+            raise ValueError("investigation.worker.configuration.invalid")
         self._repository = repository
         self._investigations = investigations
         self._clock = clock
@@ -55,6 +62,7 @@ class InvestigationWorker:
         self._heartbeat_seconds = heartbeat_seconds
         self._retry_seconds = retry_seconds
         self._max_attempts = max_attempts
+        self._max_tenant_concurrency = max_tenant_concurrency
 
     def run_once(self, tenant_id: str) -> InvestigationWorkerResult | None:
         if not tenant_id or len(tenant_id) > 128:
@@ -65,6 +73,7 @@ class InvestigationWorker:
             self._worker_id,
             now,
             self._after(now, self._lease_seconds),
+            max_tenant_concurrency=self._max_tenant_concurrency,
         )
         if claim is None:
             return None

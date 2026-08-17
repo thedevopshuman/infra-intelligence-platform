@@ -6,7 +6,7 @@
     "evaluatedAt": "2026-08-17T15:00:00Z"
   },
   "spec": {
-    "application": {"version": "0.33.0"},
+    "application": {"version": "0.34.0"},
     "contracts": {"apiVersion": "iip.platform/v1alpha1"},
     "storage": {"requiredMigration": "0012_investigation_job_slo_window.sql"},
     "build": {
@@ -14,7 +14,7 @@
       "revision": "0123456789abcdef0123456789abcdef01234567"
     },
     "deployment": {
-      "helmChartVersion": "0.35.0",
+      "helmChartVersion": "0.36.0",
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     }
   }

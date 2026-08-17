@@ -444,10 +444,39 @@ class PostgresOperationalStore:
         worker_id: str,
         now: str,
         lease_expires_at: str,
+        *,
+        max_tenant_concurrency: int = 1,
     ) -> Optional[InvestigationJobClaim]:
+        if (
+            isinstance(max_tenant_concurrency, bool)
+            or not isinstance(max_tenant_concurrency, int)
+            or not 1 <= max_tenant_concurrency <= 64
+        ):
+            raise PersistenceError("storage.input-invalid")
         claim_token = secrets.token_hex(32)
         try:
             with self._connect() as connection:
+                # Serialize admission only within this tenant. Different tenants
+                # retain independent claim throughput across worker replicas.
+                connection.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (tenant_id,),
+                )
+                active = connection.execute(
+                    """
+                    SELECT count(*) AS active
+                    FROM iip.investigation_jobs
+                    WHERE tenant_id = %s
+                      AND state IN ('running', 'cancellation-requested')
+                      AND lease_expires_at > %s
+                    """,
+                    (tenant_id, now),
+                ).fetchone()
+                if (
+                    active is not None
+                    and int(active["active"]) >= max_tenant_concurrency
+                ):
+                    return None
                 row = connection.execute(
                     """
                     SELECT investigation_id, actor_id, actor_roles,

@@ -62,6 +62,11 @@ class HelmValuesContractTests(unittest.TestCase):
         )
         self.assertIn("existingSecret: iip-auth", self.values)
         self.assertIn('digest: ""', self.values)
+        worker = properties["worker"]["properties"]
+        self.assertEqual(worker["investigationConcurrency"]["maximum"], 64)
+        self.assertEqual(
+            worker["maxTenantInvestigationConcurrency"]["maximum"], 64
+        )
 
     def test_cross_field_guards_fail_before_a_workload_is_rendered(self) -> None:
         guards = (CHART / "templates" / "validation.yaml").read_text(

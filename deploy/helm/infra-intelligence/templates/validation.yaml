@@ -1,0 +1,31 @@
+{{- if and .Values.worker.enabled (ge (int .Values.worker.heartbeatSeconds) (int .Values.worker.leaseSeconds)) }}
+{{- fail "worker.heartbeatSeconds must be less than worker.leaseSeconds" }}
+{{- end }}
+{{- if gt (int .Values.eventPublisher.retryBaseSeconds) (int .Values.eventPublisher.retryMaxSeconds) }}
+{{- fail "eventPublisher.retryBaseSeconds must not exceed eventPublisher.retryMaxSeconds" }}
+{{- end }}
+{{- if gt (int .Values.telemetry.traceMaxExportBatchSize) (int .Values.telemetry.traceMaxQueueSize) }}
+{{- fail "telemetry.traceMaxExportBatchSize must not exceed telemetry.traceMaxQueueSize" }}
+{{- end }}
+{{- if and (or .Values.telemetry.metricsEnabled .Values.telemetry.tracesEnabled) (not .Values.telemetry.otlpEndpoint) }}
+{{- fail "telemetry.otlpEndpoint is required when telemetry export is enabled" }}
+{{- end }}
+{{- if eq .Values.auth.mode "local-hashed" }}
+{{- if not .Values.auth.existingSecret }}
+{{- fail "auth.existingSecret is required in local-hashed mode" }}
+{{- end }}
+{{- else if eq .Values.auth.oidc.configJson "{}" }}
+{{- fail "auth.oidc.configJson must contain a reviewed OIDC configuration in oidc mode" }}
+{{- end }}
+{{- if and (eq .Values.policy.mode "external-http") (eq .Values.policy.externalHttp.configJson "{}") }}
+{{- fail "policy.externalHttp.configJson is required in external-http mode" }}
+{{- end }}
+{{- if and (eq .Values.credentialBroker.mode "external-http") (eq .Values.credentialBroker.externalHttp.configJson "{}") }}
+{{- fail "credentialBroker.externalHttp.configJson is required in external-http mode" }}
+{{- end }}
+{{- if and .Values.otlpReceiver.enabled (not .Values.otlpReceiver.channelsExistingSecret) }}
+{{- fail "otlpReceiver.channelsExistingSecret is required when the metrics receiver is enabled" }}
+{{- end }}
+{{- if and .Values.otlpLogsReceiver.enabled (not .Values.otlpLogsReceiver.channelsExistingSecret) }}
+{{- fail "otlpLogsReceiver.channelsExistingSecret is required when the logs receiver is enabled" }}
+{{- end }}

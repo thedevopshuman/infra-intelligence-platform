@@ -94,7 +94,7 @@ database:
 
 auth:
   mode: local-hashed
-  existingSecret: ""
+  existingSecret: iip-auth
   secretKey: identities-json
   oidc:
     configJson: '{}'

@@ -15,6 +15,22 @@ Before installation, provide:
 
 The default repository and tag are placeholders. Pin a released image digest in production rather than relying on a mutable tag.
 
+## Validate configuration before access
+
+The chart's `values.schema.json` is a closed customer configuration contract. Unknown keys, unsupported modes, unsafe Service exposure, relaxed container security, and out-of-range settings fail schema validation. Render-time guards also reject invalid relationships such as a heartbeat that cannot renew its lease or telemetry export without an OTLP endpoint.
+
+Run both checks against the exact protected values file before installation:
+
+```bash
+helm lint deploy/helm/infra-intelligence \
+  --values /protected/path/iip-values.yaml
+helm template iip deploy/helm/infra-intelligence \
+  --namespace iip-system \
+  --values /protected/path/iip-values.yaml >/dev/null
+```
+
+The chart intentionally exposes only `ClusterIP` Services and keeps service-account token automounting disabled. Put any later external access behind a separately reviewed authenticated TLS boundary; do not turn the internal HTTP Service into an internet-facing load balancer.
+
 ## Fresh durable install
 
 Create the database and identity Secrets through the cluster's secret-management workflow, then use a protected values file similar to:
@@ -53,7 +69,7 @@ helm upgrade --install iip deploy/helm/infra-intelligence \
 
 The migration NetworkPolicy hook is created first, then the migration Job. The Job receives only the database Secret and runs every packaged migration under an advisory lock. The serving Deployment rolls out only after the hook succeeds. `/readyz` independently opens a bounded database connection and verifies the latest migration recorded by the new image.
 
-The local-hashed authentication example is suitable for a controlled evaluation. Configure the documented OIDC boundary for production; do not place either local verifier JSON or OIDC client material directly in a values file. Serving pods always receive `IIP_DATABASE_AUTO_MIGRATE=false`; the hook is the chart's only schema authority.
+The local-hashed authentication example is suitable for a controlled evaluation. The default Secret name is `iip-auth`, but the chart never creates its sensitive contents. Configure the documented OIDC boundary for production; do not place either local verifier JSON or OIDC client material directly in a values file. Serving pods always receive `IIP_DATABASE_AUTO_MIGRATE=false`; the hook is the chart's only schema authority.
 
 ## Upgrade procedure
 

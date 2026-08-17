@@ -72,6 +72,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0043-explicit-ingestion-freshness-sampling.md",
     "docs/decisions/0044-tenant-scoped-outbox-delivery.md",
     "docs/decisions/0045-controlled-helm-schema-migrations.md",
+    "docs/decisions/0046-strict-helm-values-contract.md",
     "docs/operations/event-delivery.md",
     "docs/operations/helm-deployment.md",
     "docs/operations/opentelemetry-export.md",
@@ -233,6 +234,7 @@ REQUIRED_PATHS = (
     "tests/test_ingestion_sampling.py",
     "tests/test_event_delivery.py",
     "tests/test_helm_deployment.py",
+    "tests/test_helm_values.py",
     "scripts/test_helm_install.sh",
     "tests/test_authentication.py",
     "tests/test_readiness.py",
@@ -288,8 +290,10 @@ REQUIRED_PATHS = (
     "api/openapi/control-plane.openapi.json",
     "api/openapi/otlp-receiver.openapi.json",
     "deploy/helm/infra-intelligence/Chart.yaml",
+    "deploy/helm/infra-intelligence/values.schema.json",
     "deploy/helm/infra-intelligence/templates/migration-job.yaml",
     "deploy/helm/infra-intelligence/templates/migration-networkpolicy.yaml",
+    "deploy/helm/infra-intelligence/templates/validation.yaml",
 )
 
 LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")

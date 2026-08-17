@@ -38,3 +38,7 @@ host; it is not a universal support or interoperability claim.
 - Live customer provider/credential-broker qualification, multi-host release
   certification, proposal-only action-provider certification, and
   support-policy publication remain separate gates.
+
+**Later update:** [ADR 0071](0071-executable-action-provider-compatibility-profile.md)
+adds local exact-host proposal-only action-provider certification. Customer
+plugin/provider qualification and multi-host support claims remain separate.

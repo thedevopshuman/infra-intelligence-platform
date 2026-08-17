@@ -167,4 +167,4 @@ __all__ = [
     "TelemetryExportHealthReport",
     "discover_console_authentication",
 ]
-__version__ = "0.36.0"
+__version__ = "0.37.0"

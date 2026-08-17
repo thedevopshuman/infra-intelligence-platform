@@ -9,7 +9,11 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from infra_intelligence_sdk import PluginMediationClient, PluginMediationRequest
+from infra_intelligence_sdk import (
+    PluginActionMediationRequest,
+    PluginMediationClient,
+    PluginMediationRequest,
+)
 
 from .collector import canonical_digest, collect
 from .live import LiveCollectionError, list_objects, watch_then_list_objects
@@ -42,12 +46,47 @@ def main(argv: Sequence[str] | None = None) -> int:
                 not isinstance(invocation, dict)
                 or invocation.get("apiVersion") != "iip.platform/v1alpha1"
                 or invocation.get("kind") != "PluginInvocation"
+                or not isinstance(invocation.get("metadata"), dict)
                 or not isinstance(invocation.get("spec"), dict)
-                or invocation["spec"].get("capability") != "resource-observer"
-                or invocation["spec"].get("method") != "collect"
                 or not isinstance(invocation["spec"].get("input"), dict)
             ):
                 raise ValueError("invalid invocation")
+            if (
+                invocation["spec"].get("capability") == "action-provider"
+                and invocation["spec"].get("method") == "propose-restart"
+            ):
+                action_grants = invocation["spec"].get("actionMediationGrants")
+                if not isinstance(action_grants, list) or len(action_grants) != 1:
+                    raise ValueError("action mediation grant is required")
+                grant = action_grants[0]
+                grant_metadata = grant.get("metadata") if isinstance(grant, dict) else None
+                action_request = PluginActionMediationRequest.from_dict(
+                    invocation["spec"]["input"]
+                )
+                request_metadata = action_request.payload.get("metadata")
+                if (
+                    not isinstance(grant_metadata, dict)
+                    or not isinstance(request_metadata, dict)
+                    or request_metadata.get("invocationId")
+                    != invocation["metadata"].get("id")
+                    or request_metadata.get("grantId") != grant_metadata.get("id")
+                ):
+                    raise ValueError("action mediation identity is invalid")
+                response = PluginMediationClient().propose_action(action_request)
+                print(
+                    json.dumps(
+                        response.to_dict(),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    )
+                )
+                return 0 if response.proposed else 1
+            if (
+                invocation["spec"].get("capability") != "resource-observer"
+                or invocation["spec"].get("method") != "collect"
+            ):
+                raise ValueError("unsupported invocation interface")
             request = invocation["spec"]["input"]
             candidate_grants = invocation["spec"].get("mediationGrants", [])
             if not isinstance(candidate_grants, list):

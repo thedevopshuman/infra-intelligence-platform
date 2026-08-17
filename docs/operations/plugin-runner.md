@@ -26,7 +26,7 @@ capability, interface, publisher, entrypoint, or configuration change therefore
 fails publisher verification. Legacy image-only signatures remain parseable for
 migration inventory but must be re-signed before execution.
 
-The conformance session makes two independent invocations against the same
+The conformance session makes three independent invocations against the same
 signed image. `offline-fixture` proves public SDK/stdin framing and the golden
 result without a mediation socket. `host-mediated-read` declares the Kubernetes
 API as a manifest upper bound, embeds one exact read grant, and uses a protected
@@ -36,11 +36,13 @@ the Docker bind, framing, path/query grant, policy, pre-egress audit, count
 limit, and no-network execution together. It does not claim live customer
 credential or Kubernetes interoperability.
 
-The proposal-only action mediation boundary is covered by schema, SDK socket,
-service, runner-routing, policy, audit, grant, idempotency, and governed-proposal
-tests. The current Docker matrix does not yet contain an external action-provider
-plugin row, so do not present its two read-oriented rows as action-provider
-certification.
+`host-mediated-action-proposal` signs a separate action-provider manifest with
+no network, secret, or resource authority, invokes the public Python SDK over
+the relay, and routes the request through policy, audit, idempotency, and the
+real governed action service. The gate verifies the resulting record is pending
+independent approval and that no approval or execution result exists. This is
+local fixture-backed action-provider protocol conformance, not customer-plugin
+or live-mutation certification.
 
 The report binds those outcomes to the exact plugin and relay image IDs,
 canonical signed-manifest digest, application and Python SDK versions, Git

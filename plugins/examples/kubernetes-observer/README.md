@@ -1,8 +1,8 @@
 # Kubernetes observer example
 
-This package is a runnable, read-only resource-observer example. It consumes the public resource collection request contract, normalizes a Kubernetes `List` document, and returns the public collection result contract without importing server internals.
+This package is a runnable Kubernetes integration example. Its primary public manifest is a read-only resource observer: it consumes the public resource collection request contract, normalizes a Kubernetes `List` document, and returns the public collection result contract without importing server internals. The same SDK-only image also exposes a `propose-restart` conformance method under a separately generated and signed action-provider manifest.
 
-The fixture CLI proves normalization, ordering, tenancy propagation, bounded output, reconciliation completion, and secret omission. An explicit `kubectl` development transport lists each resource type independently, returns a provider cursor map, resumes bounded watches from host-committed state, and recovers expired watches through a fresh full reconciliation. The signed runner provides a separate offline stdio conformance path with capability-token verification and process isolation; live credential/network mediation remains host/runtime work.
+The fixture CLI proves normalization, ordering, tenancy propagation, bounded output, reconciliation completion, and secret omission. An explicit `kubectl` development transport lists each resource type independently, returns a provider cursor map, resumes bounded watches from host-committed state, and recovers expired watches through a fresh full reconciliation. The signed runner provides separate offline, host-mediated read, and proposal-only action conformance paths with capability-token verification and process isolation. The action path can create only a pending governed proposal and receives no approval or execution authority; live credential/network and customer-provider qualification remain host/runtime work.
 
 ## Run the conformance fixture
 
@@ -17,8 +17,8 @@ PYTHONPATH=sdks/python/src:plugins/examples/kubernetes-observer/src \
 
 The result must exactly match `fixtures/expected-result.json`. `make verify` runs this comparison and validates every returned resource against the shared JSON Schemas.
 
-To build, sign with an ephemeral test key, and run the container by immutable
-digest in the no-network sandbox:
+To build, sign three least-authority manifests with an ephemeral test key, and
+run the container by immutable digest in the no-network sandbox:
 
 ```bash
 make test-plugin-runner

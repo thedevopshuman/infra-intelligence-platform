@@ -67,3 +67,7 @@ claim for architectures or provider integrations that were not exercised.
 Version 0.36 adds proposal-only plugin action mediation grant/request/response
 models and `PluginMediationClient.propose_action`. The method cannot approve or
 execute the returned proposal.
+
+Version 0.37 extends `PluginCompatibilityReport` with the separately signed
+action-provider profile and closed checks proving the host stored only a pending
+governed proposal. It remains exact-host evidence, not a customer support claim.

@@ -107,5 +107,8 @@ Plugin versions are immutable. Patch releases fix behavior without contract chan
 Compatibility claims use the executable
 [`PluginCompatibilityReport`](plugin-compatibility-contract.md), not only a
 manifest range. A report binds exact image/manifest digests and host/SDK/runtime
-identity to separately named offline and host-mediated profiles. It describes
-only the architecture and integrations actually exercised.
+identity to separately named offline, mediated-read, and proposal-only
+action-provider profiles. The action row proves that a signed isolated process
+can reach the normal pending-approval queue without receiving approval or
+execution authority. It describes only the architecture and integrations
+actually exercised.

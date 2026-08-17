@@ -64,4 +64,7 @@ The Kubernetes observer container accepts one invocation over stdin. Offline
 tests can normalize a bundled provider fixture; the signed-runner conformance
 path instead reads the fixture through the real invocation-local socket while
 the container remains on Docker's `none` network. Its separate live development
-transport still requires explicit kubeconfig and context.
+transport still requires explicit kubeconfig and context. A separately signed
+action-provider profile uses the same image and SDK to send one proposal request
+through the trusted relay; conformance verifies the real governed action store
+contains only a pending proposal, never an approval or execution result.

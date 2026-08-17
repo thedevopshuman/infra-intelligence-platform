@@ -118,6 +118,13 @@ Exit gate: a plugin built only from public docs/SDK passes conformance and runs 
 
 Reference slice delivered: session, invocation/result, status, cancellation, reconciliation, read mediation, proposal-only action mediation, and executable compatibility-report contracts; declared-capability subset enforcement; token reference/digest handling; expiry and limit framing; authenticated status/cancel/reconcile APIs and SDKs; live observer transport; Ed25519 publisher trust; digest-pinned pre-pulled OCI artifacts; a real out-of-process Docker conformance runner with no general network or container credentials, read-only non-root execution, bounded CPU/memory/swap/PIDs/files/tmpfs/time/input/output; exact-tenant PostgreSQL request claims that bind canonical content, serialize session limits across replicas, survive restarts, retain terminal results, replay only completed results, propagate durable cooperative cancellation, and allow policy-approved platform administrators to close post-deadline ambiguity without replay; request-scoped host-mediated JSON reads through a fresh Unix socket, protected destination/credential bindings, exact path/query limits, per-read policy and pre-egress audit, brokered host-only leases, direct no-redirect TLS, and bounded header-free JSON responses; proposal-only action grants bound to manifest type, target, dry-run policy, derived idempotency/expiry, current policy, pre-proposal audit, and the standard investigation-scoped governed action queue; a separately attested multi-platform bridge image in the verified release bundle; plus a Docker-enabled CI matrix that binds exact source, host, SDK, protocol, plugin, relay, offline, and mediated-read outcomes. Remaining: live customer provider and credential-broker interoperability qualification, customer action-provider interoperability, cancellation propagation into future owning integration workflows, multi-host customer certification, design-partner deployment, and public governance/legal decisions.
 
+The local compatibility matrix now also includes a separately signed
+`host-mediated-action-proposal` row. It exercises an isolated SDK-only action
+provider through the trusted relay and real governed action service, then proves
+the result remains pending approval with no approval or execution record.
+`Customer action-provider interoperability` above now means qualification of a
+real customer-owned plugin and environment; the local protocol gate is delivered.
+
 ## Parallel track — company and brand
 
 This track never blocks technical discovery but must complete before a public launch:

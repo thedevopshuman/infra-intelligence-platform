@@ -700,8 +700,12 @@ def validate_plugin_compatibility_example(
     if len(names) != len(profiles) or len(set(names)) != len(names):
         fail(errors, "plugin compatibility profile names must be unique")
         return
-    if set(names) != {"offline-fixture", "host-mediated-read"}:
-        fail(errors, "repository compatibility report must cover both runner profiles")
+    if set(names) != {
+        "offline-fixture",
+        "host-mediated-read",
+        "host-mediated-action-proposal",
+    }:
+        fail(errors, "repository compatibility report must cover all runner profiles")
     manifest_digests = [
         profile.get("manifestDigest")
         for profile in profiles
@@ -712,6 +716,16 @@ def validate_plugin_compatibility_example(
     compatible = 0
     for profile in profiles:
         assert isinstance(profile, dict)
+        expected_interface = (
+            ("action-provider", "propose-restart")
+            if profile.get("name") == "host-mediated-action-proposal"
+            else ("resource-observer", "collect")
+        )
+        if (profile.get("capability"), profile.get("method")) != expected_interface:
+            fail(
+                errors,
+                f"plugin compatibility {profile.get('name')} interface is inconsistent",
+            )
         checks = profile.get("checks")
         if not isinstance(checks, list):
             continue

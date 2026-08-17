@@ -104,7 +104,10 @@ host under [ADR 0066](../decisions/0066-host-mediated-plugin-read-connectivity.m
 Proposal-only action grants under
 [ADR 0070](../decisions/0070-proposal-only-plugin-action-mediation.md) can enter
 the ordinary governed approval queue but never grant approval, execution, or a
-provider credential. Durable host-side plugin cancellation and
+provider credential. The exact-host Docker profile in
+[ADR 0071](../decisions/0071-executable-action-provider-compatibility-profile.md)
+executes that path through an isolated SDK-only process and proves host state
+stops at a pending proposal. Durable host-side plugin cancellation and
 administrator-only post-deadline reconciliation are defined by
 [ADR 0065](../decisions/0065-plugin-invocation-cancellation-and-reconciliation.md).
 [ADR 0064](../decisions/0064-durable-plugin-invocation-ownership.md) records the

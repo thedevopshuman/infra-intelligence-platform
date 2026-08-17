@@ -47,5 +47,13 @@ result through the existing authenticated action APIs and SDKs. Python plugins
 use `PluginMediationClient.propose_action`; TypeScript exposes transport-neutral
 contract types.
 
+The executable `host-mediated-action-proposal` compatibility profile runs that
+Python SDK call inside the signed no-network container, through the trusted
+relay and real governed action service. Its positive row additionally proves
+the resulting proposal is pending approval and that no approval or execution
+record was created. This is local protocol conformance, not live customer or
+mutation-environment certification.
+
 [ADR 0070](../decisions/0070-proposal-only-plugin-action-mediation.md) defines
-the authority and separation-of-duties boundary.
+the authority and separation-of-duties boundary; [ADR 0071](../decisions/0071-executable-action-provider-compatibility-profile.md)
+defines its executable compatibility evidence.

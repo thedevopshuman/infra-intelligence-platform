@@ -1758,7 +1758,11 @@ export type PluginCompatibilityCheckId =
   | "golden-result"
   | "invocation-local-socket"
   | "host-mediated-read"
-  | "credentials-host-only";
+  | "credentials-host-only"
+  | "host-mediated-action-proposal"
+  | "governed-proposal-queue"
+  | "approval-not-granted"
+  | "execution-not-granted";
 
 export interface PluginCompatibilityReport {
   apiVersion: "iip.platform/v1alpha1";
@@ -1787,7 +1791,12 @@ export interface PluginCompatibilityReport {
       mediationBridgeDigest: Sha256Digest;
     };
     profiles: Array<{
-      name: "offline-fixture" | "host-mediated-read";
+      name:
+        | "offline-fixture"
+        | "host-mediated-read"
+        | "host-mediated-action-proposal";
+      capability?: PluginCapability;
+      method?: string;
       manifestDigest: Sha256Digest;
       result: "compatible" | "incompatible";
       checks: Array<

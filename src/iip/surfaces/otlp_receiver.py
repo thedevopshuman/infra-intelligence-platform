@@ -52,7 +52,7 @@ class TokenBucketRateLimiter:
 class OtlpReceiverHandler(ApiHandler):
     """Expose only health and selected OTLP signal endpoints."""
 
-    server_version = "IIPOtlpReceiver/0.43.0"
+    server_version = "IIPOtlpReceiver/0.44.0"
     rate_limiter = TokenBucketRateLimiter(50, 100)
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract

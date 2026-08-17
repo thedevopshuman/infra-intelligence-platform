@@ -15,12 +15,12 @@ services:
       - postgres-data:/var/lib/postgresql
 
   api:
-    image: iip-local-platform:0.43.0
+    image: iip-local-platform:0.44.0
     build:
       context: ..
       dockerfile: Dockerfile
       args:
-        IIP_IMAGE_VERSION: "0.43.0"
+        IIP_IMAGE_VERSION: "0.44.0"
         IIP_IMAGE_REVISION: development
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
@@ -92,7 +92,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-local-platform:0.43.0
+    image: iip-local-platform:0.44.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:

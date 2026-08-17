@@ -28,6 +28,7 @@ class PluginCompatibilityReportTests(unittest.TestCase):
             }
         }
         mediated_session = {"spec": {"manifestDigest": "sha256:" + "d" * 64}}
+        action_session = {"spec": {"manifestDigest": "sha256:" + "e" * 64}}
         image_id = "sha256:" + "b" * 64
         bridge_image_id = "sha256:" + "c" * 64
         git_results = (
@@ -47,6 +48,7 @@ class PluginCompatibilityReportTests(unittest.TestCase):
                 manifest=manifest,
                 offline_session=offline_session,
                 mediated_session=mediated_session,
+                action_session=action_session,
                 image_id=image_id,
                 bridge_image_id=bridge_image_id,
             )
@@ -59,13 +61,20 @@ class PluginCompatibilityReportTests(unittest.TestCase):
         )
         self.assertEqual(
             [profile["name"] for profile in report["spec"]["profiles"]],
-            ["offline-fixture", "host-mediated-read"],
+            [
+                "offline-fixture",
+                "host-mediated-read",
+                "host-mediated-action-proposal",
+            ],
         )
         self.assertEqual(
             report["spec"]["profiles"][1]["manifestDigest"],
             mediated_session["spec"]["manifestDigest"],
         )
         self.assertEqual(report["spec"]["summary"]["overallStatus"], "compatible")
+        self.assertEqual(
+            report["spec"]["profiles"][2]["capability"], "action-provider"
+        )
         conformance.validate_contract(
             "plugin-compatibility-report.schema.json",
             report,
@@ -83,6 +92,20 @@ class PluginCompatibilityReportTests(unittest.TestCase):
                 {"unexpected": True},
                 profile="offline-fixture",
             )
+
+    def test_action_result_validation_requires_a_proposal_receipt(self) -> None:
+        result = json.loads(
+            (EXAMPLES / "plugin-invocation-result.json").read_text(encoding="utf-8")
+        )
+        result["spec"]["output"] = json.loads(
+            (EXAMPLES / "plugin-action-mediation-response.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        receipt = conformance.validate_action_result(result)
+
+        self.assertEqual(receipt["spec"]["status"], "proposed")
 
     def test_check_status_and_stable_error_code_are_a_closed_union(self) -> None:
         example = json.loads(

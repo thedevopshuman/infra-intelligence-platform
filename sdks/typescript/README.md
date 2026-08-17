@@ -61,3 +61,6 @@ for untested architectures or provider integrations.
 
 Version 0.36 adds proposal-only plugin action mediation grant, request, and
 response types. Approval and execution remain separate control-plane contracts.
+
+Version 0.37 adds the action-provider compatibility profile and its closed
+proposal-queue, no-approval, and no-execution check identifiers.

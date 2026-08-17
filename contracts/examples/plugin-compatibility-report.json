@@ -12,8 +12,8 @@
       "platform": "linux/arm64",
       "containerRuntime": "docker",
       "containerRuntimeVersion": "29.7.2",
-      "applicationVersion": "0.43.0",
-      "sdk": {"language": "python", "version": "0.36.0"}
+      "applicationVersion": "0.44.0",
+      "sdk": {"language": "python", "version": "0.37.0"}
     },
     "plugin": {
       "id": "kubernetes-observer",
@@ -27,6 +27,8 @@
     "profiles": [
       {
         "name": "offline-fixture",
+        "capability": "resource-observer",
+        "method": "collect",
         "manifestDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "result": "compatible",
         "checks": [
@@ -42,6 +44,8 @@
       },
       {
         "name": "host-mediated-read",
+        "capability": "resource-observer",
+        "method": "collect",
         "manifestDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         "result": "compatible",
         "checks": [
@@ -58,11 +62,33 @@
           {"id": "host-mediated-read", "status": "passed"},
           {"id": "credentials-host-only", "status": "passed"}
         ]
+      },
+      {
+        "name": "host-mediated-action-proposal",
+        "capability": "action-provider",
+        "method": "propose-restart",
+        "manifestDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "result": "compatible",
+        "checks": [
+          {"id": "manifest-schema", "status": "passed"},
+          {"id": "publisher-signature", "status": "passed"},
+          {"id": "immutable-plugin-artifact", "status": "passed"},
+          {"id": "immutable-mediation-bridge", "status": "passed"},
+          {"id": "no-network-sandbox", "status": "passed"},
+          {"id": "bounded-sandbox", "status": "passed"},
+          {"id": "input-contract", "status": "passed"},
+          {"id": "output-contract", "status": "passed"},
+          {"id": "invocation-local-socket", "status": "passed"},
+          {"id": "host-mediated-action-proposal", "status": "passed"},
+          {"id": "governed-proposal-queue", "status": "passed"},
+          {"id": "approval-not-granted", "status": "passed"},
+          {"id": "execution-not-granted", "status": "passed"}
+        ]
       }
     ],
     "summary": {
-      "totalProfiles": 2,
-      "compatibleProfiles": 2,
+      "totalProfiles": 3,
+      "compatibleProfiles": 3,
       "incompatibleProfiles": 0,
       "overallStatus": "compatible"
     }

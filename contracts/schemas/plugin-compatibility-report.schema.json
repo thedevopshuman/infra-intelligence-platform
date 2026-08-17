@@ -137,7 +137,11 @@
             "golden-result",
             "invocation-local-socket",
             "host-mediated-read",
-            "credentials-host-only"
+            "credentials-host-only",
+            "host-mediated-action-proposal",
+            "governed-proposal-queue",
+            "approval-not-granted",
+            "execution-not-granted"
           ]
         },
         "status": {"enum": ["passed", "failed"]},
@@ -164,7 +168,17 @@
       "additionalProperties": false,
       "required": ["name", "manifestDigest", "result", "checks"],
       "properties": {
-        "name": {"enum": ["offline-fixture", "host-mediated-read"]},
+        "name": {"enum": ["offline-fixture", "host-mediated-read", "host-mediated-action-proposal"]},
+        "capability": {
+          "enum": [
+            "resource-observer",
+            "event-source",
+            "evidence-provider",
+            "action-provider",
+            "surface"
+          ]
+        },
+        "method": {"type": "string", "pattern": "^[a-z][a-z0-9.-]{1,63}$"},
         "manifestDigest": {"$ref": "#/$defs/digest"},
         "result": {"enum": ["compatible", "incompatible"]},
         "checks": {

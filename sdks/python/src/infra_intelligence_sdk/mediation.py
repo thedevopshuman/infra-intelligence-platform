@@ -88,7 +88,6 @@ class PluginMediationClient:
                 connection.settimeout(self._timeout_seconds)
                 connection.connect(self._socket_path)
                 connection.sendall(body + b"\n")
-                connection.shutdown(socket.SHUT_WR)
                 received = bytearray()
                 while b"\n" not in received:
                     chunk = connection.recv(65_536)

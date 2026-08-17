@@ -82,6 +82,7 @@ from .models import (
     TelemetryEvidenceResult,
     TelemetryDeploymentExportHealthReport,
     TelemetryExportHealthReport,
+    TelemetryExportSloReport,
 )
 
 __all__ = [
@@ -167,6 +168,7 @@ __all__ = [
     "TelemetryEvidenceResult",
     "TelemetryDeploymentExportHealthReport",
     "TelemetryExportHealthReport",
+    "TelemetryExportSloReport",
     "discover_console_authentication",
 ]
-__version__ = "0.38.0"
+__version__ = "0.39.0"

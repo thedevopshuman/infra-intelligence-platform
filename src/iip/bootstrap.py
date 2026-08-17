@@ -132,6 +132,10 @@ from iip.application.query_runtime_version import (
 from iip.application.query_telemetry_export_health import (
     TelemetryExportHealthService,
 )
+from iip.application.query_telemetry_export_slo import (
+    TelemetryExportSloObjectives,
+    TelemetryExportSloService,
+)
 from iip.application.report_telemetry_export_health import (
     TelemetryExportHealthReporter,
     TelemetryExportHealthReportingConfiguration,
@@ -171,6 +175,7 @@ class Runtime:
     query_availability: QueryAvailabilityService
     telemetry_export_health: TelemetryExportHealthService
     telemetry_deployment_health: TelemetryDeploymentHealthService
+    telemetry_export_slo: TelemetryExportSloService
     runtime_version: RuntimeVersionService
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
@@ -215,6 +220,7 @@ def build_local_runtime(
     event_delivery_slo_objectives: EventDeliverySloObjectives | None = None,
     investigation_completion_slo_objectives: InvestigationCompletionSloObjectives | None = None,
     query_availability_objectives: QueryAvailabilityObjectives | None = None,
+    telemetry_export_slo_objectives: TelemetryExportSloObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     query_availability_sink: QueryAvailabilitySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
@@ -249,6 +255,7 @@ def build_local_runtime(
         event_delivery_slo_objectives,
         investigation_completion_slo_objectives,
         query_availability_objectives,
+        telemetry_export_slo_objectives,
         ingestion_telemetry_sink,
         query_availability_sink,
         investigation_telemetry_sink,
@@ -278,6 +285,7 @@ def _compose_runtime(
     event_delivery_slo_objectives: EventDeliverySloObjectives | None = None,
     investigation_completion_slo_objectives: InvestigationCompletionSloObjectives | None = None,
     query_availability_objectives: QueryAvailabilityObjectives | None = None,
+    telemetry_export_slo_objectives: TelemetryExportSloObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     query_availability_sink: QueryAvailabilitySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
@@ -300,6 +308,13 @@ def _compose_runtime(
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
+    if (
+        telemetry_health_reporting is not None
+        and telemetry_export_slo_objectives is not None
+        and telemetry_health_reporting.sample_retention_seconds
+        < telemetry_export_slo_objectives.window_seconds
+    ):
+        raise ValueError("telemetry.export-slo.configuration.invalid")
     policy = configured_policy or AllowTenantPolicy()
     clock = SystemClock()
     ingestion = ResourceIngestionService(store, policy)
@@ -447,6 +462,12 @@ def _compose_runtime(
                 else 600
             ),
         ),
+        telemetry_export_slo=TelemetryExportSloService(
+            operational,
+            policy,
+            clock,
+            telemetry_export_slo_objectives,
+        ),
         runtime_version=RuntimeVersionService(
             _runtime_version_identity_from_env(),
             clock,
@@ -541,6 +562,7 @@ def build_postgres_runtime(
     event_delivery_slo_objectives: EventDeliverySloObjectives | None = None,
     investigation_completion_slo_objectives: InvestigationCompletionSloObjectives | None = None,
     query_availability_objectives: QueryAvailabilityObjectives | None = None,
+    telemetry_export_slo_objectives: TelemetryExportSloObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     query_availability_sink: QueryAvailabilitySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
@@ -582,6 +604,7 @@ def build_postgres_runtime(
         event_delivery_slo_objectives,
         investigation_completion_slo_objectives,
         query_availability_objectives,
+        telemetry_export_slo_objectives,
         ingestion_telemetry_sink,
         query_availability_sink,
         investigation_telemetry_sink,
@@ -665,6 +688,7 @@ def _build_runtime_from_env(
         _investigation_completion_slo_objectives_from_env()
     )
     query_availability_objectives = _query_availability_objectives_from_env()
+    telemetry_export_slo_objectives = _telemetry_export_slo_objectives_from_env()
     investigation_dispatch_limits = _investigation_dispatch_limits_from_env()
     evidence_retention_policy = _evidence_retention_policy_from_env()
     metrics_runtime = _otel_metrics_runtime_from_env()
@@ -685,6 +709,12 @@ def _build_runtime_from_env(
         if telemetry_runtime is not None
         else None
     )
+    if (
+        telemetry_health_reporting is not None
+        and telemetry_health_reporting.sample_retention_seconds
+        < telemetry_export_slo_objectives.window_seconds
+    ):
+        raise ValueError("telemetry.export-slo.configuration.invalid")
     database_url = os.environ.get("IIP_DATABASE_URL")
     try:
         receiver_mode = os.environ.get("IIP_OTLP_RECEIVER_MODE", "disabled")
@@ -726,6 +756,7 @@ def _build_runtime_from_env(
                     investigation_completion_slo_objectives
                 ),
                 query_availability_objectives=query_availability_objectives,
+                telemetry_export_slo_objectives=telemetry_export_slo_objectives,
                 ingestion_telemetry_sink=(
                     metrics_runtime.sink
                     if metrics_runtime is not None
@@ -767,6 +798,7 @@ def _build_runtime_from_env(
                 investigation_completion_slo_objectives
             ),
             query_availability_objectives=query_availability_objectives,
+            telemetry_export_slo_objectives=telemetry_export_slo_objectives,
             ingestion_telemetry_sink=(
                 metrics_runtime.sink if metrics_runtime is not None else None
             ),
@@ -822,6 +854,7 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
             _investigation_completion_slo_objectives_from_env()
         ),
         query_availability_objectives=_query_availability_objectives_from_env(),
+        telemetry_export_slo_objectives=_telemetry_export_slo_objectives_from_env(),
         otlp_metrics_receiver=metrics_receiver,
         otlp_logs_receiver=logs_receiver,
         policy=_policy_from_env(),
@@ -870,6 +903,9 @@ def _telemetry_health_reporting_from_env(
         ),
         retention_seconds=integer(
             "IIP_TELEMETRY_HEALTH_RETENTION_SECONDS", 600
+        ),
+        sample_retention_seconds=integer(
+            "IIP_TELEMETRY_EXPORT_SLO_RETENTION_SECONDS", 604_800
         ),
     )
     configuration.validate()
@@ -1135,6 +1171,35 @@ def _investigation_completion_slo_objectives_from_env() -> InvestigationCompleti
         minimum_eligible_jobs=value(
             "IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ELIGIBLE_JOBS",
             defaults.minimum_eligible_jobs,
+        ),
+    )
+
+
+def _telemetry_export_slo_objectives_from_env() -> TelemetryExportSloObjectives:
+    def value(name: str, default: int) -> int:
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            raise ValueError(
+                "telemetry.export-slo.configuration.invalid"
+            ) from None
+
+    defaults = TelemetryExportSloObjectives()
+    return TelemetryExportSloObjectives(
+        window_seconds=value(
+            "IIP_TELEMETRY_EXPORT_SLO_WINDOW_SECONDS",
+            defaults.window_seconds,
+        ),
+        minimum_attainment_basis_points=value(
+            "IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS",
+            defaults.minimum_attainment_basis_points,
+        ),
+        minimum_eligible_attempts=value(
+            "IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ELIGIBLE_ATTEMPTS",
+            defaults.minimum_eligible_attempts,
         ),
     )
 

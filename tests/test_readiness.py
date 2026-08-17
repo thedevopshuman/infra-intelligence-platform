@@ -63,7 +63,7 @@ class PostgresReadinessProbeTests(unittest.TestCase):
         self.assertEqual(connect.call_args.kwargs["connect_timeout"], 3)
         query, parameters = connection.execute.call_args.args
         self.assertIn("iip.schema_migrations", query)
-        self.assertEqual(parameters, ("0016_telemetry_export_health.sql",))
+        self.assertEqual(parameters, ("0017_telemetry_export_slo_samples.sql",))
 
     def test_database_error_or_old_schema_fails_closed(self) -> None:
         probe = PostgresReadinessProbe("postgresql://database.example/iip")

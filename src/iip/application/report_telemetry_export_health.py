@@ -29,6 +29,7 @@ class TelemetryExportHealthReportingConfiguration:
     interval_seconds: int = 30
     stale_after_seconds: int = 120
     retention_seconds: int = 600
+    sample_retention_seconds: int = 604_800
 
     def validate(self) -> None:
         if (
@@ -37,12 +38,17 @@ class TelemetryExportHealthReportingConfiguration:
             or isinstance(self.interval_seconds, bool)
             or isinstance(self.stale_after_seconds, bool)
             or isinstance(self.retention_seconds, bool)
+            or isinstance(self.sample_retention_seconds, bool)
             or not isinstance(self.interval_seconds, int)
             or not isinstance(self.stale_after_seconds, int)
             or not isinstance(self.retention_seconds, int)
+            or not isinstance(self.sample_retention_seconds, int)
             or not 5 <= self.interval_seconds <= 300
             or not self.interval_seconds * 2 <= self.stale_after_seconds <= 3_600
             or not self.stale_after_seconds * 2 <= self.retention_seconds <= 86_400
+            or not self.retention_seconds
+            <= self.sample_retention_seconds
+            <= 2_592_000
         ):
             raise ValueError("telemetry.export-health.reporting.configuration.invalid")
 
@@ -78,6 +84,9 @@ class TelemetryExportHealthReporter:
             ),
             expire_before=self._shift(
                 reported_at, -self.configuration.retention_seconds
+            ),
+            sample_expire_before=self._shift(
+                reported_at, -self.configuration.sample_retention_seconds
             ),
         )
 

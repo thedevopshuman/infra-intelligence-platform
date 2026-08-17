@@ -82,6 +82,10 @@ The API and worker use the Collector through the Compose service network and app
 | `IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS` | `30` | Internal API/worker exporter-health heartbeat interval |
 | `IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS` | `120` | Age at which a missed internal heartbeat degrades deployment health |
 | `IIP_TELEMETRY_HEALTH_RETENTION_SECONDS` | `600` | Bounded crashed-instance visibility and cleanup window |
+| `IIP_TELEMETRY_EXPORT_SLO_WINDOW_SECONDS` | `3600` | Rolling sampled exporter-attempt window, 300–2,592,000 seconds |
+| `IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS` | `9900` | Required per-signal successful-attempt proportion |
+| `IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ELIGIBLE_ATTEMPTS` | `20` | Per-signal attempt floor before meeting/breached |
+| `IIP_TELEMETRY_EXPORT_SLO_RETENTION_SECONDS` | `604800` | Sample retention; must cover the configured SLO window |
 
 The endpoint must be explicit HTTP(S), no longer than 2048 characters, and cannot contain user information, a query, or a fragment. Use `OTEL_EXPORTER_OTLP_HEADERS` or deployment-native authentication instead of embedding credentials in a URL.
 
@@ -109,8 +113,16 @@ curl --fail-with-body \
   http://127.0.0.1:8080/v1/operations/telemetry/deployment-export-health
 ```
 
-Missed heartbeats become stale and degrade the deployment report; graceful stops retire immediately. Counters remain per process and reset on restart. `/readyz` remains independent, so telemetry backend failure or health-report write failure does not interrupt customer workflows.
+Missed heartbeats become stale and degrade the deployment report; graceful stops retire immediately. Counters remain per process and reset on restart. Bounded historical samples turn their monotonic deltas into a rolling per-signal objective:
+
+```bash
+curl --fail-with-body \
+  -H "Authorization: Bearer $IIP_OPERATOR_TOKEN" \
+  http://127.0.0.1:8080/v1/operations/telemetry/export-slo
+```
+
+The SLO reports disabled, no-data, insufficient-data, meeting, or breached without exposing tenant telemetry or backend details. `/readyz` remains independent, so telemetry backend failure or health-report write failure does not interrupt customer workflows.
 
 ## Production gaps
 
-The reference adapters and automatic sampler are failure-isolated but not a complete production telemetry pipeline. Production enablement still requires Collector-side queue/delivery monitoring, a defined loss objective, reviewed cardinality budgets, TLS/authentication policy, regional routing, representative load tests, ingress/synthetic availability, burn-rate rules, and notification routing. The trace queue is bounded but not durable. The deployment report covers recent control-plane and worker SDK outcomes, not Collector queue durability, desired replica membership, long-term exporter SLO windows, or regional aggregation. Query SLO aggregation belongs to the customer telemetry backend and must account for Collector/export loss before making a production claim.
+The reference adapters and automatic sampler are failure-isolated but not a complete production telemetry pipeline. Production enablement still requires Collector-side queue/delivery monitoring, an end-to-end loss objective, reviewed cardinality budgets, TLS/authentication policy, regional routing, representative load tests, ingress/synthetic availability, burn-rate rules, and notification routing. The trace queue is bounded but not durable. The sampled SLO covers recent control-plane and worker SDK export attempts, not Collector queue durability, desired replica membership, backend ingestion, or regional aggregation. Query SLO aggregation belongs to the customer telemetry backend and must account for Collector/export loss before making a production claim.

@@ -27,6 +27,8 @@ Resource observer integrations use the exported `ResourceCollectionRequest`, `Re
 
 `getRuntimeVersion` returns the authenticated non-secret application, contract, required storage migration, build revision, Helm chart, and immutable image identity reported by the answering process. Optional deployment evidence is omitted rather than guessed from a mutable tag.
 
+`getTelemetryExportHealth` reads process-local exporter outcomes, `getTelemetryDeploymentExportHealth` reads recent pseudonymous API/worker health, and `getTelemetryExportSlo` reads rolling sampled metrics/traces export-attempt attainment. These operations never expose endpoints, headers, credentials, payloads, provider responses, or raw workload identity.
+
 `getEventDeliveryHealth` returns the authenticated tenant's bounded outbox backlog and quarantine summary to a platform administrator. Event payloads, provider responses, credentials, and destination configuration are deliberately absent.
 
 `getEventDeliverySlo` returns the deployment-configured rolling publication objective with mature-cohort aggregate counts and integer-basis-point attainment. It measures publisher acknowledgement, not downstream receiver processing.

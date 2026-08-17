@@ -586,6 +586,10 @@
         "healthReportIntervalSeconds",
         "healthStaleAfterSeconds",
         "healthRetentionSeconds",
+        "exportSloWindowSeconds",
+        "exportSloMinimumAttainmentBasisPoints",
+        "exportSloMinimumEligibleAttempts",
+        "exportSloRetentionSeconds",
         "existingSecret",
         "headersSecretKey"
       ],
@@ -610,6 +614,10 @@
         "healthReportIntervalSeconds": { "type": "integer", "minimum": 5, "maximum": 300 },
         "healthStaleAfterSeconds": { "type": "integer", "minimum": 10, "maximum": 3600 },
         "healthRetentionSeconds": { "type": "integer", "minimum": 20, "maximum": 86400 },
+        "exportSloWindowSeconds": { "type": "integer", "minimum": 300, "maximum": 2592000 },
+        "exportSloMinimumAttainmentBasisPoints": { "type": "integer", "minimum": 1, "maximum": 10000 },
+        "exportSloMinimumEligibleAttempts": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "exportSloRetentionSeconds": { "type": "integer", "minimum": 600, "maximum": 2592000 },
         "existingSecret": { "$ref": "#/definitions/optionalName" },
         "headersSecretKey": { "$ref": "#/definitions/nonEmptyString" }
       }

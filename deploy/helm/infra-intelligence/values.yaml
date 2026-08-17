@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.45.0"
+  tag: "0.46.0"
   digest: ""
 
 worker:
@@ -212,6 +212,10 @@ telemetry:
   healthReportIntervalSeconds: 30
   healthStaleAfterSeconds: 120
   healthRetentionSeconds: 600
+  exportSloWindowSeconds: 3600
+  exportSloMinimumAttainmentBasisPoints: 9900
+  exportSloMinimumEligibleAttempts: 20
+  exportSloRetentionSeconds: 604800
   existingSecret: ""
   headersSecretKey: otlp-headers
 

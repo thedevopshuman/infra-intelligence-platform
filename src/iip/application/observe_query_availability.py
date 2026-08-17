@@ -22,6 +22,7 @@ QUERY_OPERATIONS = frozenset(
         "ingestion-freshness",
         "telemetry-export-health",
         "telemetry-deployment-export-health",
+        "telemetry-export-slo",
         "event-delivery-health",
         "event-delivery-slo",
         "investigation-completion-slo",

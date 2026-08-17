@@ -19,7 +19,7 @@ The default repository and tag are placeholders. Set `image.repository` to the p
 
 ## Validate configuration before access
 
-The chart's `values.schema.json` is a closed customer configuration contract. Unknown keys, unsupported modes, unsafe Service exposure, relaxed container security, and out-of-range settings fail schema validation. Render-time guards also reject invalid relationships such as a heartbeat that cannot renew its lease, an exporter-health stale threshold shorter than two reports, an event-delivery latency objective as long as its measurement window, telemetry export without an OTLP endpoint, or backup scheduling without existing storage and database-only NetworkPolicy.
+The chart's `values.schema.json` is a closed customer configuration contract. Unknown keys, unsupported modes, unsafe Service exposure, relaxed container security, and out-of-range settings fail schema validation. Render-time guards also reject invalid relationships such as a heartbeat that cannot renew its lease, an exporter-health stale threshold shorter than two reports, exporter-SLO retention shorter than its window, an event-delivery latency objective as long as its measurement window, telemetry export without an OTLP endpoint, or backup scheduling without existing storage and database-only NetworkPolicy.
 
 Run both checks against the exact protected values file before installation:
 
@@ -93,7 +93,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.45.0
+  tag: 0.46.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:

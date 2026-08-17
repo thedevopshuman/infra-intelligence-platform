@@ -1,0 +1,43 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "TelemetryExportSloReport",
+  "metadata": {
+    "evaluatedAt": "2026-08-17T14:00:00Z"
+  },
+  "spec": {
+    "status": "meeting",
+    "window": {
+      "durationSeconds": 3600,
+      "start": "2026-08-17T13:00:00Z",
+      "end": "2026-08-17T14:00:00Z"
+    },
+    "objective": {
+      "minimumAttainmentBasisPoints": 9900,
+      "minimumEligibleAttempts": 20
+    },
+    "observation": {
+      "observedInstances": 2,
+      "observedSamples": 240
+    },
+    "signals": [
+      {
+        "signal": "metrics",
+        "status": "meeting",
+        "enabledObservations": 240,
+        "eligibleAttempts": 120,
+        "successfulAttempts": 119,
+        "failedAttempts": 1,
+        "attainmentBasisPoints": 9916
+      },
+      {
+        "signal": "traces",
+        "status": "disabled",
+        "enabledObservations": 0,
+        "eligibleAttempts": 0,
+        "successfulAttempts": 0,
+        "failedAttempts": 0,
+        "attainmentBasisPoints": null
+      }
+    ]
+  }
+}

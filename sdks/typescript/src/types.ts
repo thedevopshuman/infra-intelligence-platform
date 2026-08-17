@@ -358,6 +358,39 @@ export interface TelemetryDeploymentExportHealthReport {
   };
 }
 
+export type TelemetryExportSloStatus =
+  | "disabled"
+  | "no-data"
+  | "insufficient-data"
+  | "meeting"
+  | "breached";
+
+export interface TelemetryExportSloSignal {
+  signal: "metrics" | "traces";
+  status: TelemetryExportSloStatus;
+  enabledObservations: number;
+  eligibleAttempts: number;
+  successfulAttempts: number;
+  failedAttempts: number;
+  attainmentBasisPoints: number | null;
+}
+
+export interface TelemetryExportSloReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "TelemetryExportSloReport";
+  metadata: { evaluatedAt: string };
+  spec: {
+    status: TelemetryExportSloStatus;
+    window: { durationSeconds: number; start: string; end: string };
+    objective: {
+      minimumAttainmentBasisPoints: number;
+      minimumEligibleAttempts: number;
+    };
+    observation: { observedInstances: number; observedSamples: number };
+    signals: [TelemetryExportSloSignal, TelemetryExportSloSignal];
+  };
+}
+
 export type EventDeliveryHealthStatus = "healthy" | "backlogged" | "degraded";
 
 export interface QuarantinedEventDelivery {

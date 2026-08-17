@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.45.0",
+    "version": "0.46.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence and retention observation, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions and invocation lifecycles. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -179,6 +179,22 @@
           "503": {
             "description": "Shared telemetry health state is unavailable or inconsistent",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "telemetry.export-health.unavailable"}}}}
+          }
+        }
+      }
+    },
+    "/v1/operations/telemetry/export-slo": {
+      "get": {
+        "operationId": "getTelemetryExportSlo",
+        "description": "Return a deployment-wide rolling OTLP export-attempt objective calculated from bounded pseudonymous samples. The operation is administrator and policy protected and exposes no tenant telemetry, workload identity, exporter configuration, credentials, or provider details.",
+        "responses": {
+          "200": {"description": "Sampled metrics and traces export reliability", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/telemetry-export-slo-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "503": {
+            "description": "Telemetry export samples are unavailable or inconsistent",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "telemetry.export-slo.unavailable"}}}}
           }
         }
       }
@@ -720,6 +736,7 @@
       "IngestionFreshnessReport": {"$ref": "../../contracts/schemas/ingestion-freshness-report.schema.json"},
       "TelemetryExportHealthReport": {"$ref": "../../contracts/schemas/telemetry-export-health-report.schema.json"},
       "TelemetryDeploymentExportHealthReport": {"$ref": "../../contracts/schemas/telemetry-deployment-export-health-report.schema.json"},
+      "TelemetryExportSloReport": {"$ref": "../../contracts/schemas/telemetry-export-slo-report.schema.json"},
       "EventDeliveryHealthReport": {"$ref": "../../contracts/schemas/event-delivery-health-report.schema.json"},
       "EventDeliverySloReport": {"$ref": "../../contracts/schemas/event-delivery-slo-report.schema.json"},
       "InvestigationCompletionSloReport": {"$ref": "../../contracts/schemas/investigation-completion-slo-report.schema.json"},

@@ -116,6 +116,7 @@ class ConsoleHttpTests(unittest.TestCase):
         self.assertIn(
             "/v1/operations/telemetry/deployment-export-health", script
         )
+        self.assertIn("/v1/operations/telemetry/export-slo", script)
         self.assertIn("Event delivery", script)
         self.assertIn('actionType === "event-delivery.requeue"', script)
         self.assertIn("exact quarantine generation", script)

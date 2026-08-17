@@ -112,6 +112,8 @@
               <div class="delivery-heading-actions">
                 <span class="status-chip neutral" id="telemetry-health-state">Connect to inspect</span>
                 <button class="text-button" id="telemetry-health-details" type="button" disabled>View instances →</button>
+                <span class="status-chip neutral" id="telemetry-slo-state">SLO unavailable</span>
+                <button class="text-button" id="telemetry-slo-details" type="button" disabled>View SLO →</button>
               </div>
             </div>
             <div class="delivery-grid" aria-live="polite">
@@ -120,6 +122,8 @@
               <div><span>Stale</span><strong id="telemetry-health-stale">—</strong></div>
               <div><span>Metric exporters</span><strong id="telemetry-health-metrics">—</strong></div>
               <div><span>Trace exporters</span><strong id="telemetry-health-traces">—</strong></div>
+              <div><span>Metric export SLO</span><strong id="telemetry-slo-metrics">—</strong></div>
+              <div><span>Trace export SLO</span><strong id="telemetry-slo-traces">—</strong></div>
             </div>
             <p class="delivery-note" id="telemetry-health-note">Platform administrators can verify API and worker export outcomes without exposing endpoints or credentials.</p>
           </article>

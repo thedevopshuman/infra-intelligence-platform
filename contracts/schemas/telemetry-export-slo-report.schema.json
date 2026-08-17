@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:telemetry-export-slo-report:v1alpha1",
+  "title": "Infrastructure Intelligence Telemetry Export SLO Report",
+  "description": "Deployment-wide rolling objective calculated from sampled OTLP exporter attempt outcomes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "TelemetryExportSloReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evaluatedAt"],
+      "properties": {
+        "evaluatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "window", "objective", "observation", "signals"],
+      "properties": {
+        "status": {"$ref": "#/$defs/status"},
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["durationSeconds", "start", "end"],
+          "properties": {
+            "durationSeconds": {"type": "integer", "minimum": 300, "maximum": 2592000},
+            "start": {"type": "string", "format": "date-time"},
+            "end": {"type": "string", "format": "date-time"}
+          }
+        },
+        "objective": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["minimumAttainmentBasisPoints", "minimumEligibleAttempts"],
+          "properties": {
+            "minimumAttainmentBasisPoints": {"type": "integer", "minimum": 1, "maximum": 10000},
+            "minimumEligibleAttempts": {"type": "integer", "minimum": 1, "maximum": 1000000}
+          }
+        },
+        "observation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["observedInstances", "observedSamples"],
+          "properties": {
+            "observedInstances": {"$ref": "#/$defs/counter"},
+            "observedSamples": {"$ref": "#/$defs/counter"}
+          }
+        },
+        "signals": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {"allOf": [{"$ref": "#/$defs/signal"}, {"properties": {"signal": {"const": "metrics"}}}]},
+            {"allOf": [{"$ref": "#/$defs/signal"}, {"properties": {"signal": {"const": "traces"}}}]}
+          ],
+          "items": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "counter": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "status": {
+      "type": "string",
+      "enum": ["disabled", "no-data", "insufficient-data", "meeting", "breached"]
+    },
+    "signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signal",
+        "status",
+        "enabledObservations",
+        "eligibleAttempts",
+        "successfulAttempts",
+        "failedAttempts",
+        "attainmentBasisPoints"
+      ],
+      "properties": {
+        "signal": {"type": "string", "enum": ["metrics", "traces"]},
+        "status": {"$ref": "#/$defs/status"},
+        "enabledObservations": {"$ref": "#/$defs/counter"},
+        "eligibleAttempts": {"$ref": "#/$defs/counter"},
+        "successfulAttempts": {"$ref": "#/$defs/counter"},
+        "failedAttempts": {"$ref": "#/$defs/counter"},
+        "attainmentBasisPoints": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0, "maximum": 10000},
+            {"type": "null"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"enum": ["disabled", "no-data"]}}},
+          "then": {
+            "properties": {
+              "eligibleAttempts": {"const": 0},
+              "successfulAttempts": {"const": 0},
+              "failedAttempts": {"const": 0},
+              "attainmentBasisPoints": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"status": {"enum": ["insufficient-data", "meeting", "breached"]}}},
+          "then": {
+            "properties": {
+              "enabledObservations": {"minimum": 1},
+              "eligibleAttempts": {"minimum": 1},
+              "attainmentBasisPoints": {"type": "integer"}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

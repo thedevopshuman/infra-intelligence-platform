@@ -47,6 +47,7 @@ from .models import (
     TelemetryEvidenceRequest,
     TelemetryDeploymentExportHealthReport,
     TelemetryExportHealthReport,
+    TelemetryExportSloReport,
 )
 
 
@@ -212,6 +213,13 @@ class Client:
 
         return TelemetryDeploymentExportHealthReport.from_dict(
             self._get("/v1/operations/telemetry/deployment-export-health")
+        )
+
+    def get_telemetry_export_slo(self) -> TelemetryExportSloReport:
+        """Read rolling deployment export reliability as an administrator."""
+
+        return TelemetryExportSloReport.from_dict(
+            self._get("/v1/operations/telemetry/export-slo")
         )
 
     def get_event_delivery_health(

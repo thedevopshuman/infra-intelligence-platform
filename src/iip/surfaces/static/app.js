@@ -6,6 +6,7 @@ const state = {
   consoleAuthentication: null,
   runtimeVersion: null,
   telemetryDeploymentHealth: null,
+  telemetryExportSlo: null,
   eventDeliveryHealth: null,
   eventDeliverySlo: null,
   investigationCompletionSlo: null,
@@ -455,6 +456,44 @@ async function refreshTelemetryDeploymentHealth() {
   renderTelemetryDeploymentHealth();
 }
 
+function renderTelemetryExportSlo() {
+  const spec = state.telemetryExportSlo?.spec;
+  const chip = $("#telemetry-slo-state");
+  const renderSignal = (name) => {
+    const signal = spec?.signals?.find((item) => item.signal === name);
+    if (!signal) return "—";
+    if (signal.attainmentBasisPoints === null) return signal.status;
+    return `${(signal.attainmentBasisPoints / 100).toFixed(2)}%`;
+  };
+  $("#telemetry-slo-metrics").textContent = renderSignal("metrics");
+  $("#telemetry-slo-traces").textContent = renderSignal("traces");
+  if (!spec) {
+    chip.textContent = state.session && !hasRole("platform-admin")
+      ? "Platform admin required"
+      : state.session ? "SLO unavailable" : "SLO unavailable";
+    chip.className = "status-chip neutral";
+    $("#telemetry-slo-details").disabled = true;
+    return;
+  }
+  chip.textContent = `SLO ${spec.status}`;
+  chip.className = `status-chip ${spec.status === "meeting" ? "success" : spec.status === "breached" ? "danger" : ["no-data", "insufficient-data"].includes(spec.status) ? "warning" : "neutral"}`;
+  $("#telemetry-slo-details").disabled = false;
+}
+
+async function refreshTelemetryExportSlo() {
+  if (!state.session || !hasRole("platform-admin")) {
+    state.telemetryExportSlo = null;
+    renderTelemetryExportSlo();
+    return;
+  }
+  try {
+    state.telemetryExportSlo = await api("/v1/operations/telemetry/export-slo");
+  } catch (_error) {
+    state.telemetryExportSlo = null;
+  }
+  renderTelemetryExportSlo();
+}
+
 function renderEventDeliveryHealth() {
   const report = state.eventDeliveryHealth;
   const spec = report?.spec;
@@ -648,7 +687,7 @@ async function connect(token, remember) {
     if (remember) sessionStorage.setItem(REMEMBERED_TOKEN_KEY, token);
     else sessionStorage.removeItem(REMEMBERED_TOKEN_KEY);
     updateIdentity();
-    await Promise.all([refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
+    await Promise.all([refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
     $("#connection-dialog").close();
     $("#connection-error").hidden = true;
     showNotice(`Connected as ${state.session.metadata.actorId} in tenant ${state.session.metadata.tenantId}.`);
@@ -1519,7 +1558,7 @@ function bindEvents() {
   $("#identity-button").addEventListener("click", () => $("#connection-dialog").showModal());
   $("#connection-close").addEventListener("click", () => $("#connection-dialog").close());
   $("#refresh-button").addEventListener("click", async () => {
-    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
+    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
     showNotice("Live platform state refreshed.");
   });
   $("#connection-form").addEventListener("submit", async (event) => {
@@ -1597,6 +1636,14 @@ function bindEvents() {
     $("#detail-actions").hidden = true;
     $("#detail-dialog").showModal();
   });
+  $("#telemetry-slo-details").addEventListener("click", () => {
+    if (!state.telemetryExportSlo) return;
+    $("#detail-kicker").textContent = "Portable observability path";
+    $("#detail-title").textContent = "Telemetry export SLO";
+    $("#detail-content").textContent = JSON.stringify(state.telemetryExportSlo, null, 2);
+    $("#detail-actions").hidden = true;
+    $("#detail-dialog").showModal();
+  });
   $("#delivery-details").addEventListener("click", () => {
     if (!state.eventDeliveryHealth) return;
     $("#detail-kicker").textContent = "Event delivery";
@@ -1647,6 +1694,7 @@ async function start() {
   renderActionProposalMode();
   renderRuntimeVersion();
   renderTelemetryDeploymentHealth();
+  renderTelemetryExportSlo();
   renderEventDeliverySlo();
   renderInvestigationCompletionSlo();
   renderEvidenceRetention();

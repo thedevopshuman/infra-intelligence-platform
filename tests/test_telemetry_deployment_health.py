@@ -138,7 +138,9 @@ class TelemetryDeploymentHealthServiceTests(unittest.TestCase):
             signals=self.health.read_export_health(),
         )
         self.store.record_telemetry_export_health(
-            state, expire_before="2026-08-17T10:00:00Z"
+            state,
+            expire_before="2026-08-17T10:00:00Z",
+            sample_expire_before="2026-08-10T10:00:00Z",
         )
         self.assertEqual(
             self.store.list_telemetry_export_health(
@@ -174,6 +176,7 @@ class TelemetryDeploymentHealthHttpAndSdkTests(unittest.TestCase):
                 signals=health.read_export_health(),
             ),
             expire_before="2026-08-17T11:00:00Z",
+            sample_expire_before="2026-08-10T11:00:00Z",
         )
         handler.path = "/v1/operations/telemetry/deployment-export-health"
         handler.headers = {"authorization": f"Bearer {TOKEN}"}

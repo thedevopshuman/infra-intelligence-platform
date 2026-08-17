@@ -20,6 +20,9 @@ from iip.application.ports import (
     PersistenceError,
     PluginInvocationClaim,
     TelemetryExportInstanceState,
+    TelemetryExportSignalState,
+    TelemetryExportSloSignalState,
+    TelemetryExportSloState,
 )
 
 
@@ -40,6 +43,9 @@ class InMemoryOperationalStore:
         self._sessions: dict[tuple[str, str], dict[str, object]] = {}
         self._plugin_invocations: dict[tuple[str, str], dict[str, object]] = {}
         self._telemetry_export_health: dict[str, TelemetryExportInstanceState] = {}
+        self._telemetry_export_health_samples: dict[
+            tuple[str, str], TelemetryExportInstanceState
+        ] = {}
         self._audit: list[tuple[str, str, dict[str, object]]] = []
         self._lock = RLock()
 
@@ -48,6 +54,7 @@ class InMemoryOperationalStore:
         state: TelemetryExportInstanceState,
         *,
         expire_before: str,
+        sample_expire_before: str,
     ) -> None:
         with self._lock:
             self._telemetry_export_health = {
@@ -56,6 +63,14 @@ class InMemoryOperationalStore:
                 if item.last_reported_at >= expire_before
             }
             self._telemetry_export_health[state.instance_id] = copy.deepcopy(state)
+            self._telemetry_export_health_samples = {
+                key: item
+                for key, item in self._telemetry_export_health_samples.items()
+                if item.last_reported_at >= sample_expire_before
+            }
+            self._telemetry_export_health_samples.setdefault(
+                (state.instance_id, state.last_reported_at), copy.deepcopy(state)
+            )
 
     def list_telemetry_export_health(
         self,
@@ -81,6 +96,119 @@ class InMemoryOperationalStore:
     def retire_telemetry_export_health(self, instance_id: str) -> None:
         with self._lock:
             self._telemetry_export_health.pop(instance_id, None)
+
+    def get_telemetry_export_slo_state(
+        self,
+        *,
+        window_start: str,
+        window_end: str,
+    ) -> TelemetryExportSloState:
+        try:
+            start = datetime.fromisoformat(window_start.replace("Z", "+00:00"))
+            end = datetime.fromisoformat(window_end.replace("Z", "+00:00"))
+        except (AttributeError, TypeError, ValueError):
+            raise PersistenceError("storage.input-invalid") from None
+        if start.tzinfo is None or end.tzinfo is None or start >= end:
+            raise PersistenceError("storage.input-invalid")
+
+        with self._lock:
+            all_samples = tuple(self._telemetry_export_health_samples.values())
+        grouped: dict[str, list[TelemetryExportInstanceState]] = {}
+        for sample in all_samples:
+            observed_at = datetime.fromisoformat(
+                sample.last_reported_at.replace("Z", "+00:00")
+            )
+            if observed_at <= end:
+                grouped.setdefault(sample.instance_id, []).append(sample)
+
+        selected: list[TelemetryExportInstanceState] = []
+        for samples in grouped.values():
+            ordered = sorted(samples, key=lambda item: item.last_reported_at)
+            before = [item for item in ordered if item.last_reported_at < window_start]
+            if before:
+                selected.append(before[-1])
+            selected.extend(
+                item
+                for item in ordered
+                if window_start <= item.last_reported_at <= window_end
+            )
+        return self._aggregate_telemetry_export_samples(
+            tuple(selected), window_start=window_start, window_end=window_end
+        )
+
+    @staticmethod
+    def _aggregate_telemetry_export_samples(
+        samples: tuple[TelemetryExportInstanceState, ...],
+        *,
+        window_start: str,
+        window_end: str,
+    ) -> TelemetryExportSloState:
+        counters = {
+            signal: {
+                "enabled": 0,
+                "attempts": 0,
+                "successes": 0,
+                "failures": 0,
+            }
+            for signal in ("metrics", "traces")
+        }
+        in_window = tuple(
+            item
+            for item in samples
+            if window_start <= item.last_reported_at <= window_end
+        )
+        by_instance: dict[str, list[TelemetryExportInstanceState]] = {}
+        for item in samples:
+            by_instance.setdefault(item.instance_id, []).append(item)
+        for instance_samples in by_instance.values():
+            previous: dict[str, TelemetryExportSignalState] = {}
+            for item in sorted(
+                instance_samples, key=lambda sample: sample.last_reported_at
+            ):
+                by_signal = {signal.signal: signal for signal in item.signals}
+                if set(by_signal) != {"metrics", "traces"}:
+                    raise PersistenceError("storage.corrupt")
+                in_current_window = window_start <= item.last_reported_at <= window_end
+                for signal_name, signal in by_signal.items():
+                    prior = previous.get(signal_name)
+                    if in_current_window:
+                        counters[signal_name]["enabled"] += int(signal.enabled)
+                        if prior is not None:
+                            attempts = signal.attempts - prior.attempts
+                            successes = signal.successes - prior.successes
+                            failures = signal.failures - prior.failures
+                        elif item.started_at >= window_start:
+                            attempts = signal.attempts
+                            successes = signal.successes
+                            failures = signal.failures
+                        else:
+                            attempts = successes = failures = 0
+                        if (
+                            min(attempts, successes, failures) < 0
+                            or attempts != successes + failures
+                        ):
+                            raise PersistenceError("storage.corrupt")
+                        counters[signal_name]["attempts"] += attempts
+                        counters[signal_name]["successes"] += successes
+                        counters[signal_name]["failures"] += failures
+                    previous[signal_name] = signal
+
+        return TelemetryExportSloState(
+            window_start=window_start,
+            window_end=window_end,
+            observed_instances=len({item.instance_id for item in in_window}),
+            observed_samples=len(in_window),
+            signals=tuple(
+                TelemetryExportSloSignalState(
+                    signal=signal,
+                    enabled_observations=values["enabled"],
+                    eligible_attempts=values["attempts"],
+                    successful_attempts=values["successes"],
+                    failed_attempts=values["failures"],
+                )
+                for signal, values in counters.items()
+            ),
+        )
 
     def start_investigation(
         self,

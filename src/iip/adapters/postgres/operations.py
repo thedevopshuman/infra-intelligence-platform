@@ -24,6 +24,8 @@ from iip.application.ports import (
     PluginInvocationClaim,
     TelemetryExportInstanceState,
     TelemetryExportSignalState,
+    TelemetryExportSloSignalState,
+    TelemetryExportSloState,
 )
 
 
@@ -43,6 +45,7 @@ class PostgresOperationalStore:
         state: TelemetryExportInstanceState,
         *,
         expire_before: str,
+        sample_expire_before: str,
     ) -> None:
         signals = [
             {
@@ -83,6 +86,10 @@ class PostgresOperationalStore:
                     (expire_before,),
                 )
                 connection.execute(
+                    "DELETE FROM iip.telemetry_export_health_samples WHERE observed_at < %s",
+                    (sample_expire_before,),
+                )
+                connection.execute(
                     """
                     INSERT INTO iip.telemetry_export_health (
                         instance_id, component, started_at, last_reported_at, signals
@@ -94,6 +101,21 @@ class PostgresOperationalStore:
                         signals = EXCLUDED.signals
                     WHERE iip.telemetry_export_health.started_at = EXCLUDED.started_at
                       AND iip.telemetry_export_health.last_reported_at <= EXCLUDED.last_reported_at
+                    """,
+                    (
+                        state.instance_id,
+                        state.component,
+                        state.started_at,
+                        state.last_reported_at,
+                        Jsonb(signals),
+                    ),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO iip.telemetry_export_health_samples (
+                        instance_id, component, started_at, observed_at, signals
+                    ) VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (instance_id, observed_at) DO NOTHING
                     """,
                     (
                         state.instance_id,
@@ -139,6 +161,179 @@ class PostgresOperationalStore:
                 )
         except psycopg.Error:
             raise PersistenceError("storage.unavailable") from None
+
+    def get_telemetry_export_slo_state(
+        self,
+        *,
+        window_start: str,
+        window_end: str,
+    ) -> TelemetryExportSloState:
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    WITH before_window AS (
+                        SELECT DISTINCT ON (instance_id)
+                               instance_id, started_at, observed_at, signals
+                        FROM iip.telemetry_export_health_samples
+                        WHERE observed_at < %s::timestamptz
+                        ORDER BY instance_id, observed_at DESC
+                    ),
+                    window_samples AS (
+                        SELECT instance_id, started_at, observed_at, signals
+                        FROM iip.telemetry_export_health_samples
+                        WHERE observed_at >= %s::timestamptz
+                          AND observed_at <= %s::timestamptz
+                    ),
+                    selected AS (
+                        SELECT * FROM before_window
+                        UNION ALL
+                        SELECT * FROM window_samples
+                    ),
+                    expanded AS (
+                        SELECT selected.instance_id,
+                               selected.started_at,
+                               selected.observed_at,
+                               signal->>'signal' AS signal,
+                               (signal->>'enabled')::boolean AS enabled,
+                               (signal->>'attempts')::bigint AS attempts,
+                               (signal->>'successes')::bigint AS successes,
+                               (signal->>'failures')::bigint AS failures
+                        FROM selected
+                        CROSS JOIN LATERAL jsonb_array_elements(signals) AS signal
+                    ),
+                    sequenced AS (
+                        SELECT *,
+                               lag(attempts) OVER sequence AS prior_attempts,
+                               lag(successes) OVER sequence AS prior_successes,
+                               lag(failures) OVER sequence AS prior_failures
+                        FROM expanded
+                        WINDOW sequence AS (
+                            PARTITION BY instance_id, signal ORDER BY observed_at
+                        )
+                    ),
+                    deltas AS (
+                        SELECT *,
+                               CASE
+                                   WHEN observed_at < %s::timestamptz THEN 0
+                                   WHEN prior_attempts IS NOT NULL
+                                       THEN attempts - prior_attempts
+                                   WHEN started_at >= %s::timestamptz THEN attempts
+                                   ELSE 0
+                               END AS attempt_delta,
+                               CASE
+                                   WHEN observed_at < %s::timestamptz THEN 0
+                                   WHEN prior_successes IS NOT NULL
+                                       THEN successes - prior_successes
+                                   WHEN started_at >= %s::timestamptz THEN successes
+                                   ELSE 0
+                               END AS success_delta,
+                               CASE
+                                   WHEN observed_at < %s::timestamptz THEN 0
+                                   WHEN prior_failures IS NOT NULL
+                                       THEN failures - prior_failures
+                                   WHEN started_at >= %s::timestamptz THEN failures
+                                   ELSE 0
+                               END AS failure_delta
+                        FROM sequenced
+                    ),
+                    signals(signal) AS (VALUES ('metrics'), ('traces')),
+                    window_counts AS (
+                        SELECT count(DISTINCT instance_id) AS observed_instances,
+                               count(*) AS observed_samples
+                        FROM window_samples
+                    )
+                    SELECT signals.signal,
+                           window_counts.observed_instances,
+                           window_counts.observed_samples,
+                           count(deltas.instance_id) FILTER (
+                               WHERE deltas.observed_at >= %s::timestamptz
+                           ) AS signal_observations,
+                           count(deltas.instance_id) FILTER (
+                               WHERE deltas.observed_at >= %s::timestamptz
+                                 AND deltas.enabled
+                           ) AS enabled_observations,
+                           coalesce(sum(deltas.attempt_delta) FILTER (
+                               WHERE deltas.observed_at >= %s::timestamptz
+                           ), 0) AS eligible_attempts,
+                           coalesce(sum(deltas.success_delta) FILTER (
+                               WHERE deltas.observed_at >= %s::timestamptz
+                           ), 0) AS successful_attempts,
+                           coalesce(sum(deltas.failure_delta) FILTER (
+                               WHERE deltas.observed_at >= %s::timestamptz
+                           ), 0) AS failed_attempts,
+                           count(deltas.instance_id) FILTER (
+                               WHERE deltas.observed_at >= %s::timestamptz
+                                 AND (
+                                     deltas.attempts <> deltas.successes + deltas.failures
+                                     OR deltas.attempt_delta < 0
+                                     OR deltas.success_delta < 0
+                                     OR deltas.failure_delta < 0
+                                     OR deltas.attempt_delta
+                                        <> deltas.success_delta + deltas.failure_delta
+                                 )
+                           ) AS invalid_observations
+                    FROM signals
+                    CROSS JOIN window_counts
+                    LEFT JOIN deltas ON deltas.signal = signals.signal
+                    GROUP BY signals.signal,
+                             window_counts.observed_instances,
+                             window_counts.observed_samples
+                    ORDER BY signals.signal
+                    """,
+                    (
+                        window_start,
+                        window_start,
+                        window_end,
+                        window_start,
+                        window_start,
+                        window_start,
+                        window_start,
+                        window_start,
+                        window_start,
+                        window_start,
+                        window_start,
+                        window_start,
+                        window_start,
+                        window_start,
+                        window_start,
+                    ),
+                ).fetchall()
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+        if (
+            len(rows) != 2
+            or any(row["invalid_observations"] for row in rows)
+            or any(
+                row["signal_observations"] != row["observed_samples"]
+                for row in rows
+            )
+        ):
+            raise PersistenceError("storage.corrupt")
+        observed_instances = rows[0]["observed_instances"]
+        observed_samples = rows[0]["observed_samples"]
+        if any(
+            row["observed_instances"] != observed_instances
+            or row["observed_samples"] != observed_samples
+            for row in rows
+        ):
+            raise PersistenceError("storage.corrupt")
+        return TelemetryExportSloState(
+            window_start=window_start,
+            window_end=window_end,
+            observed_instances=observed_instances,
+            observed_samples=observed_samples,
+            signals=tuple(
+                TelemetryExportSloSignalState(
+                    signal=row["signal"],
+                    enabled_observations=row["enabled_observations"],
+                    eligible_attempts=int(row["eligible_attempts"]),
+                    successful_attempts=int(row["successful_attempts"]),
+                    failed_attempts=int(row["failed_attempts"]),
+                )
+                for row in rows
+            ),
+        )
 
     @staticmethod
     def _telemetry_export_state(

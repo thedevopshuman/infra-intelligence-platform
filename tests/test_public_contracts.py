@@ -73,6 +73,7 @@ from infra_intelligence_sdk import (
     TelemetryEvidenceResult,
     TelemetryDeploymentExportHealthReport,
     TelemetryExportHealthReport,
+    TelemetryExportSloReport,
 )
 
 
@@ -144,6 +145,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         deployment_export_health = TelemetryDeploymentExportHealthReport.from_dict(
             example("telemetry-deployment-export-health-report.json")
+        )
+        telemetry_export_slo = TelemetryExportSloReport.from_dict(
+            example("telemetry-export-slo-report.json")
         )
         event_delivery_health = EventDeliveryHealthReport.from_dict(
             example("event-delivery-health-report.json")
@@ -351,6 +355,10 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             deployment_export_health.to_dict()["kind"],
             "TelemetryDeploymentExportHealthReport",
+        )
+        self.assertEqual(
+            telemetry_export_slo.to_dict()["kind"],
+            "TelemetryExportSloReport",
         )
         self.assertEqual(
             event_delivery_health.to_dict()["kind"],

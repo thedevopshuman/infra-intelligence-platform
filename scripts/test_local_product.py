@@ -180,6 +180,25 @@ def main() -> int:
             raise ProductWorkflowError(
                 "local deployment telemetry health is invalid"
             )
+        telemetry_slo = _request(
+            "/v1/operations/telemetry/export-slo", operator
+        )
+        telemetry_slo_spec = telemetry_slo.get("spec")
+        if (
+            telemetry_slo.get("kind") != "TelemetryExportSloReport"
+            or "tenantId" in telemetry_slo.get("metadata", {})
+            or not isinstance(telemetry_slo_spec, Mapping)
+            or telemetry_slo_spec.get("status")
+            not in (
+                "disabled",
+                "no-data",
+                "insufficient-data",
+                "meeting",
+                "breached",
+            )
+            or not isinstance(telemetry_slo_spec.get("signals"), list)
+        ):
+            raise ProductWorkflowError("local telemetry export SLO is invalid")
         retention = _request("/v1/operations/evidence/retention", operator)
         retention_spec = retention.get("spec")
         retention_artifacts = (

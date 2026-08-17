@@ -740,7 +740,8 @@ class PostgresOperationalStoreTests(unittest.TestCase):
         with psycopg.connect(DATABASE_URL) as connection:
             connection.execute(
                 """
-                TRUNCATE iip.telemetry_export_health, iip.audit_records, iip.plugin_invocations,
+                TRUNCATE iip.telemetry_export_health_samples,
+                         iip.telemetry_export_health, iip.audit_records, iip.plugin_invocations,
                          iip.plugin_sessions,
                          iip.action_results, iip.action_executions,
                          iip.action_approvals,
@@ -782,6 +783,7 @@ class PostgresOperationalStoreTests(unittest.TestCase):
         self.operations.record_telemetry_export_health(
             state,
             expire_before="2026-08-17T11:50:00Z",
+            sample_expire_before="2026-08-10T11:50:00Z",
         )
 
         reconnected = PostgresOperationalStore(DATABASE_URL)
@@ -791,6 +793,16 @@ class PostgresOperationalStoreTests(unittest.TestCase):
             ),
             (state,),
         )
+        slo = reconnected.get_telemetry_export_slo_state(
+            window_start="2026-08-17T12:00:00Z",
+            window_end="2026-08-17T13:00:00Z",
+        )
+        self.assertEqual(slo.observed_instances, 1)
+        self.assertEqual(slo.observed_samples, 1)
+        self.assertEqual(slo.signals[0].eligible_attempts, 1)
+        self.assertEqual(slo.signals[0].successful_attempts, 1)
+        self.assertIsInstance(slo.signals[0].eligible_attempts, int)
+        self.assertIsInstance(slo.signals[0].successful_attempts, int)
         reconnected.retire_telemetry_export_health(instance_id)
         self.assertEqual(
             reconnected.list_telemetry_export_health(

@@ -257,12 +257,20 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             "healthReportIntervalSeconds: 30",
             "healthStaleAfterSeconds: 120",
             "healthRetentionSeconds: 600",
+            "exportSloWindowSeconds: 3600",
+            "exportSloMinimumAttainmentBasisPoints: 9900",
+            "exportSloMinimumEligibleAttempts: 20",
+            "exportSloRetentionSeconds: 604800",
         ):
             self.assertIn(setting, values)
         for variable in (
             "IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS",
             "IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS",
             "IIP_TELEMETRY_HEALTH_RETENTION_SECONDS",
+            "IIP_TELEMETRY_EXPORT_SLO_WINDOW_SECONDS",
+            "IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS",
+            "IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ELIGIBLE_ATTEMPTS",
+            "IIP_TELEMETRY_EXPORT_SLO_RETENTION_SECONDS",
         ):
             self.assertIn(variable, config_map)
         self.assertIn(
@@ -271,6 +279,10 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         )
         self.assertIn(
             "telemetry.healthRetentionSeconds must be at least twice",
+            validation,
+        )
+        self.assertIn(
+            "telemetry.exportSloRetentionSeconds must be at least",
             validation,
         )
 
@@ -333,6 +345,10 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn(
             'document["kind"] == "TelemetryDeploymentExportHealthReport"',
             script,
+        )
+        self.assertIn("/v1/operations/telemetry/export-slo", script)
+        self.assertIn(
+            'document["kind"] == "TelemetryExportSloReport"', script
         )
         self.assertIn("/v1/operations/events/delivery-health?limit=10", script)
         self.assertIn('document["kind"] == "EventDeliveryHealthReport"', script)

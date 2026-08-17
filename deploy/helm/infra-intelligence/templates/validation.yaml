@@ -28,6 +28,9 @@
 {{- if lt (int .Values.telemetry.healthRetentionSeconds) (mul (int .Values.telemetry.healthStaleAfterSeconds) 2) }}
 {{- fail "telemetry.healthRetentionSeconds must be at least twice telemetry.healthStaleAfterSeconds" }}
 {{- end }}
+{{- if lt (int .Values.telemetry.exportSloRetentionSeconds) (int .Values.telemetry.exportSloWindowSeconds) }}
+{{- fail "telemetry.exportSloRetentionSeconds must be at least telemetry.exportSloWindowSeconds" }}
+{{- end }}
 {{- if and (or .Values.telemetry.metricsEnabled .Values.telemetry.tracesEnabled) (not .Values.telemetry.otlpEndpoint) }}
 {{- fail "telemetry.otlpEndpoint is required when telemetry export is enabled" }}
 {{- end }}

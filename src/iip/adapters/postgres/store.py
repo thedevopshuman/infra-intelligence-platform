@@ -56,6 +56,7 @@ SCHEMA_MIGRATIONS = (
     "0014_durable_plugin_invocations.sql",
     "0015_plugin_invocation_lifecycle.sql",
     "0016_telemetry_export_health.sql",
+    "0017_telemetry_export_slo_samples.sql",
 )
 
 

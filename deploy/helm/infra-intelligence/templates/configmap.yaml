@@ -51,6 +51,10 @@ data:
   IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS: {{ .Values.telemetry.healthReportIntervalSeconds | quote }}
   IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS: {{ .Values.telemetry.healthStaleAfterSeconds | quote }}
   IIP_TELEMETRY_HEALTH_RETENTION_SECONDS: {{ .Values.telemetry.healthRetentionSeconds | quote }}
+  IIP_TELEMETRY_EXPORT_SLO_WINDOW_SECONDS: {{ .Values.telemetry.exportSloWindowSeconds | quote }}
+  IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS: {{ .Values.telemetry.exportSloMinimumAttainmentBasisPoints | quote }}
+  IIP_TELEMETRY_EXPORT_SLO_MINIMUM_ELIGIBLE_ATTEMPTS: {{ .Values.telemetry.exportSloMinimumEligibleAttempts | quote }}
+  IIP_TELEMETRY_EXPORT_SLO_RETENTION_SECONDS: {{ .Values.telemetry.exportSloRetentionSeconds | quote }}
   OTEL_SERVICE_NAME: {{ .Values.telemetry.serviceName | quote }}
   IIP_TELEMETRY_METRICS_BACKEND: {{ .Values.telemetryEvidence.backend | quote }}
   IIP_TELEMETRY_LOGS_BACKEND: {{ .Values.logEvidence.backend | quote }}

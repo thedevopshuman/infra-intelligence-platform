@@ -2,10 +2,10 @@
   "apiVersion": "iip.dev/v1alpha1",
   "kind": "ReleaseManifest",
   "metadata": {
-    "version": "0.45.0",
-    "chartVersion": "0.47.0",
-    "pythonSdkVersion": "0.38.0",
-    "typescriptSdkVersion": "0.38.0",
+    "version": "0.46.0",
+    "chartVersion": "0.48.0",
+    "pythonSdkVersion": "0.39.0",
+    "typescriptSdkVersion": "0.39.0",
     "revision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDate": "2026-08-17T04:45:00Z",
     "signatureStatus": "unsigned"
@@ -13,42 +13,42 @@
   "spec": {
     "artifacts": [
       {
-        "path": "infra-intelligence-control-plane-0.45.0.oci.tar",
+        "path": "infra-intelligence-control-plane-0.46.0.oci.tar",
         "role": "control-plane-image",
         "mediaType": "application/vnd.oci.image.layout.v1.tar",
         "sizeBytes": 104857600,
         "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       {
-        "path": "infra-intelligence-plugin-mediation-bridge-0.45.0.oci.tar",
+        "path": "infra-intelligence-plugin-mediation-bridge-0.46.0.oci.tar",
         "role": "plugin-mediation-bridge-image",
         "mediaType": "application/vnd.oci.image.layout.v1.tar",
         "sizeBytes": 52428800,
         "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
       },
       {
-        "path": "infra-intelligence-0.47.0.tgz",
+        "path": "infra-intelligence-0.48.0.tgz",
         "role": "helm-chart",
         "mediaType": "application/vnd.cncf.helm.chart.content.v1.tar+gzip",
         "sizeBytes": 32768,
         "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
       },
       {
-        "path": "infra-intelligence-contracts-0.45.0.tar.gz",
+        "path": "infra-intelligence-contracts-0.46.0.tar.gz",
         "role": "public-contracts",
         "mediaType": "application/gzip",
         "sizeBytes": 65536,
         "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
       },
       {
-        "path": "infra-intelligence-sdk-0.38.0.tar.gz",
+        "path": "infra-intelligence-sdk-0.39.0.tar.gz",
         "role": "python-sdk-source",
         "mediaType": "application/gzip",
         "sizeBytes": 16384,
         "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
       },
       {
-        "path": "iip-sdk-0.38.0.tgz",
+        "path": "iip-sdk-0.39.0.tgz",
         "role": "typescript-sdk",
         "mediaType": "application/vnd.npm.package+gzip",
         "sizeBytes": 16384,
@@ -56,7 +56,7 @@
       }
     ],
     "image": {
-      "path": "infra-intelligence-control-plane-0.45.0.oci.tar",
+      "path": "infra-intelligence-control-plane-0.46.0.oci.tar",
       "indexDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "platforms": [
         {
@@ -78,7 +78,7 @@
       ]
     },
     "pluginMediationBridgeImage": {
-      "path": "infra-intelligence-plugin-mediation-bridge-0.45.0.oci.tar",
+      "path": "infra-intelligence-plugin-mediation-bridge-0.46.0.oci.tar",
       "indexDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "platforms": [
         {

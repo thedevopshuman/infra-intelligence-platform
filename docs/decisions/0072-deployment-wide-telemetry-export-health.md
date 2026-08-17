@@ -19,3 +19,5 @@ Do not expose a public reporting route, raw workload identity, exporter configur
 - failures to persist a heartbeat never interrupt customer workflows;
 - shared-store unavailability makes the report unavailable instead of fabricating health;
 - counters remain per process, so measured exporter availability windows and Collector queue/loss objectives remain separate work.
+
+ADR 0073 subsequently adds a separate rolling sampled export-attempt objective. Collector queue/loss measurement, regional aggregation, and burn-rate alerting remain separate work.

@@ -247,6 +247,28 @@ class TelemetryExportInstanceState:
 
 
 @dataclass(frozen=True)
+class TelemetryExportSloSignalState:
+    """Aggregate sampled exporter outcomes for one signal and window."""
+
+    signal: str
+    enabled_observations: int
+    eligible_attempts: int
+    successful_attempts: int
+    failed_attempts: int
+
+
+@dataclass(frozen=True)
+class TelemetryExportSloState:
+    """Deployment-wide sampled exporter outcomes returned by storage."""
+
+    window_start: str
+    window_end: str
+    observed_instances: int
+    observed_samples: int
+    signals: tuple[TelemetryExportSloSignalState, ...]
+
+
+@dataclass(frozen=True)
 class ReconciliationSnapshot:
     """Last complete resource membership for one tenant-scoped source."""
 
@@ -721,8 +743,9 @@ class TelemetryExportHealthRepository(Protocol):
         state: TelemetryExportInstanceState,
         *,
         expire_before: str,
+        sample_expire_before: str,
     ) -> None:
-        """Upsert one internal instance heartbeat and expire older observations."""
+        """Upsert latest health, append a sample, and expire bounded history."""
 
     def list_telemetry_export_health(
         self,
@@ -734,6 +757,14 @@ class TelemetryExportHealthRepository(Protocol):
 
     def retire_telemetry_export_health(self, instance_id: str) -> None:
         """Remove one gracefully stopped runtime instance from the live view."""
+
+    def get_telemetry_export_slo_state(
+        self,
+        *,
+        window_start: str,
+        window_end: str,
+    ) -> TelemetryExportSloState:
+        """Return aggregate sampled attempt outcomes for one deployment window."""
 
 
 class ReconciliationRepository(Protocol):

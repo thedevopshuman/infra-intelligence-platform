@@ -105,6 +105,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "telemetry-deployment-export-health-report.schema.json": (
         "telemetry-deployment-export-health-report.json",
     ),
+    "telemetry-export-slo-report.schema.json": (
+        "telemetry-export-slo-report.json",
+    ),
     "integration-config.schema.json": ("integration-config.json",),
     "log-evidence-request.schema.json": ("log-evidence-request.json",),
     "log-evidence-result.schema.json": ("log-evidence-result.json",),

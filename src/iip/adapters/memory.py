@@ -811,6 +811,7 @@ class AllowTenantPolicy:
             "resource:ingest",
             "resource:read",
             "telemetry-export-health:read",
+            "telemetry-export-slo:read",
         ):
             return PolicyDecision(False, "action.unsupported")
         return PolicyDecision(True, "development.allow")

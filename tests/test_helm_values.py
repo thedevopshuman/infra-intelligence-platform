@@ -72,6 +72,7 @@ class HelmValuesContractTests(unittest.TestCase):
             "worker.heartbeatSeconds must be less than worker.leaseSeconds",
             "eventPublisher.retryBaseSeconds must not exceed",
             "eventDeliverySlo.maximumDeliveryLatencySeconds must be less than",
+            "investigationCompletionSlo.maximumCompletionSeconds must be less than",
             "telemetry.traceMaxExportBatchSize must not exceed",
             "telemetry.otlpEndpoint is required",
             "auth.existingSecret is required",

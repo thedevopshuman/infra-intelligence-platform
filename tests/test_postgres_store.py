@@ -1037,6 +1037,41 @@ class PostgresOperationalStoreTests(unittest.TestCase):
             ),
             terminal,
         )
+        slo = self.operations.get_investigation_completion_slo_state(
+            "local",
+            window_start="2026-08-17T11:59:00Z",
+            window_end="2026-08-17T12:10:00Z",
+            maturity_cutoff="2026-08-17T12:05:00Z",
+            completion_objective_seconds=300,
+        )
+        self.assertEqual(slo.accepted_jobs, 1)
+        self.assertEqual(slo.eligible_jobs, 1)
+        self.assertEqual(slo.within_objective_jobs, 1)
+        self.assertEqual(slo.late_completed_jobs, 0)
+        self.assertEqual(slo.failed_jobs, 0)
+        self.assertEqual(slo.cancelled_jobs, 0)
+        self.assertEqual(slo.unfinished_jobs, 0)
+        historical = self.operations.get_investigation_completion_slo_state(
+            "local",
+            window_start="2026-08-17T11:59:00Z",
+            window_end="2026-08-17T12:00:10Z",
+            maturity_cutoff="2026-08-17T12:00:05Z",
+            completion_objective_seconds=5,
+        )
+        self.assertEqual(historical.accepted_jobs, 1)
+        self.assertEqual(historical.eligible_jobs, 1)
+        self.assertEqual(historical.unfinished_jobs, 1)
+        self.assertEqual(historical.within_objective_jobs, 0)
+        self.assertEqual(
+            self.operations.get_investigation_completion_slo_state(
+                "another-tenant",
+                window_start="2026-08-17T11:59:00Z",
+                window_end="2026-08-17T12:10:00Z",
+                maturity_cutoff="2026-08-17T12:05:00Z",
+                completion_objective_seconds=300,
+            ).accepted_jobs,
+            0,
+        )
 
 
 if __name__ == "__main__":

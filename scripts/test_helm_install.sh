@@ -245,6 +245,16 @@ IIP_EVENT_DELIVERY_SLO_JSON=$(
 printf '%s' "$IIP_EVENT_DELIVERY_SLO_JSON" | "$IIP_TEST_PYTHON" -c \
     'import json,sys; document=json.load(sys.stdin); spec=document["spec"]; assert document["kind"] == "EventDeliverySloReport"; assert document["metadata"]["tenantId"] == "helm-test"; assert spec["status"] == "no-data"; assert spec["objective"] == {"maximumDeliveryLatencySeconds":60,"minimumAttainmentBasisPoints":9900,"minimumEligibleEvents":20}; assert spec["measurement"] == {"createdEvents":0,"immatureEvents":0,"eligibleEvents":0,"withinObjectiveEvents":0,"lateDeliveredEvents":0,"undeliveredEvents":0,"quarantinedEvents":0,"attainmentBasisPoints":None}'
 
+IIP_INVESTIGATION_COMPLETION_SLO_JSON=$(
+    printf '%s' "$IIP_AUTH_BEARER_TOKEN" | \
+        "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+            --namespace "$IIP_TEST_NAMESPACE" exec -i \
+            deployment/iip-infra-intelligence -- python -c \
+            'import json,sys,urllib.request; token=sys.stdin.read(); request=urllib.request.Request("http://127.0.0.1:8080/v1/operations/investigations/completion-slo", headers={"Authorization": "Bearer " + token}); print(json.dumps(json.load(urllib.request.urlopen(request, timeout=5)), separators=(",", ":")))'
+)
+printf '%s' "$IIP_INVESTIGATION_COMPLETION_SLO_JSON" | "$IIP_TEST_PYTHON" -c \
+    'import json,sys; document=json.load(sys.stdin); spec=document["spec"]; assert document["kind"] == "InvestigationCompletionSloReport"; assert document["metadata"]["tenantId"] == "helm-test"; assert spec["status"] == "no-data"; assert spec["objective"] == {"maximumCompletionSeconds":300,"minimumAttainmentBasisPoints":9900,"minimumEligibleJobs":20}; assert spec["measurement"] == {"acceptedJobs":0,"immatureJobs":0,"eligibleJobs":0,"withinObjectiveJobs":0,"lateCompletedJobs":0,"failedJobs":0,"cancelledJobs":0,"unfinishedJobs":0,"attainmentBasisPoints":None}'
+
 IIP_EXPECTED_MIGRATION_COUNT=$(
     rg --files src/iip/adapters/postgres/migrations -g '*.sql' | wc -l | tr -d ' '
 )

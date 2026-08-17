@@ -101,6 +101,10 @@ from iip.application.query_event_delivery_slo import (
     EventDeliverySloObjectives,
     EventDeliverySloService,
 )
+from iip.application.query_investigation_completion_slo import (
+    InvestigationCompletionSloObjectives,
+    InvestigationCompletionSloService,
+)
 from iip.application.query_resources import ResourceQueryService
 from iip.application.query_runtime_version import (
     RuntimeVersionIdentity,
@@ -138,6 +142,7 @@ class Runtime:
     ingestion_telemetry: IngestionFreshnessService
     event_delivery_health: EventDeliveryHealthService
     event_delivery_slo: EventDeliverySloService
+    investigation_completion_slo: InvestigationCompletionSloService
     telemetry_export_health: TelemetryExportHealthService
     runtime_version: RuntimeVersionService
     queries: ResourceQueryService
@@ -176,6 +181,7 @@ def build_local_runtime(
     *,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     event_delivery_slo_objectives: EventDeliverySloObjectives | None = None,
+    investigation_completion_slo_objectives: InvestigationCompletionSloObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
@@ -202,6 +208,7 @@ def build_local_runtime(
         authenticator or DenyAllAuthenticator(),
         ingestion_objectives,
         event_delivery_slo_objectives,
+        investigation_completion_slo_objectives,
         ingestion_telemetry_sink,
         investigation_telemetry_sink,
         telemetry_metrics_backend,
@@ -225,6 +232,7 @@ def _compose_runtime(
     authenticator: Authenticator,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     event_delivery_slo_objectives: EventDeliverySloObjectives | None = None,
+    investigation_completion_slo_objectives: InvestigationCompletionSloObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
@@ -335,6 +343,12 @@ def _compose_runtime(
             clock,
             event_delivery_slo_objectives,
         ),
+        investigation_completion_slo=InvestigationCompletionSloService(
+            operational,
+            policy,
+            clock,
+            investigation_completion_slo_objectives,
+        ),
         telemetry_export_health=TelemetryExportHealthService(
             (
                 telemetry_runtime
@@ -423,6 +437,7 @@ def build_postgres_runtime(
     migrate: bool = False,
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     event_delivery_slo_objectives: EventDeliverySloObjectives | None = None,
+    investigation_completion_slo_objectives: InvestigationCompletionSloObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
@@ -456,6 +471,7 @@ def build_postgres_runtime(
         authenticator or DenyAllAuthenticator(),
         ingestion_objectives,
         event_delivery_slo_objectives,
+        investigation_completion_slo_objectives,
         ingestion_telemetry_sink,
         investigation_telemetry_sink,
         telemetry_metrics_backend,
@@ -506,6 +522,9 @@ def _build_runtime_from_env(
     policy = _policy_from_env()
     objectives = _ingestion_objectives_from_env()
     event_delivery_slo_objectives = _event_delivery_slo_objectives_from_env()
+    investigation_completion_slo_objectives = (
+        _investigation_completion_slo_objectives_from_env()
+    )
     metrics_runtime = _otel_metrics_runtime_from_env()
     try:
         traces_runtime = _otel_traces_runtime_from_env()
@@ -554,6 +573,9 @@ def _build_runtime_from_env(
                 authenticator,
                 ingestion_objectives=objectives,
                 event_delivery_slo_objectives=event_delivery_slo_objectives,
+                investigation_completion_slo_objectives=(
+                    investigation_completion_slo_objectives
+                ),
                 ingestion_telemetry_sink=(
                     metrics_runtime.sink
                     if metrics_runtime is not None
@@ -583,6 +605,9 @@ def _build_runtime_from_env(
             migrate=auto_migrate,
             ingestion_objectives=objectives,
             event_delivery_slo_objectives=event_delivery_slo_objectives,
+            investigation_completion_slo_objectives=(
+                investigation_completion_slo_objectives
+            ),
             ingestion_telemetry_sink=(
                 metrics_runtime.sink if metrics_runtime is not None else None
             ),
@@ -626,6 +651,9 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
         migrate=auto_migrate,
         ingestion_objectives=_ingestion_objectives_from_env(),
         event_delivery_slo_objectives=_event_delivery_slo_objectives_from_env(),
+        investigation_completion_slo_objectives=(
+            _investigation_completion_slo_objectives_from_env()
+        ),
         otlp_metrics_receiver=metrics_receiver,
         otlp_logs_receiver=logs_receiver,
         policy=_policy_from_env(),
@@ -867,6 +895,39 @@ def _event_delivery_slo_objectives_from_env() -> EventDeliverySloObjectives:
         minimum_eligible_events=value(
             "IIP_EVENT_DELIVERY_SLO_MINIMUM_ELIGIBLE_EVENTS",
             defaults.minimum_eligible_events,
+        ),
+    )
+
+
+def _investigation_completion_slo_objectives_from_env() -> InvestigationCompletionSloObjectives:
+    def value(name: str, default: int) -> int:
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            raise ValueError(
+                "investigation.completion-slo.configuration.invalid"
+            ) from None
+
+    defaults = InvestigationCompletionSloObjectives()
+    return InvestigationCompletionSloObjectives(
+        window_seconds=value(
+            "IIP_INVESTIGATION_COMPLETION_SLO_WINDOW_SECONDS",
+            defaults.window_seconds,
+        ),
+        maximum_completion_seconds=value(
+            "IIP_INVESTIGATION_COMPLETION_SLO_MAXIMUM_SECONDS",
+            defaults.maximum_completion_seconds,
+        ),
+        minimum_attainment_basis_points=value(
+            "IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS",
+            defaults.minimum_attainment_basis_points,
+        ),
+        minimum_eligible_jobs=value(
+            "IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ELIGIBLE_JOBS",
+            defaults.minimum_eligible_jobs,
         ),
     )
 

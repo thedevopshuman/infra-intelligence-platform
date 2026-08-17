@@ -798,6 +798,7 @@ class AllowTenantPolicy:
             "event-delivery-health:read",
             "event-delivery-slo:read",
             "ingestion-telemetry:read",
+            "investigation-completion-slo:read",
             "plugin:open-session",
             "resource-projection:rebuild",
             "resource:ingest",

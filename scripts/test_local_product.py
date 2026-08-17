@@ -423,9 +423,39 @@ def main() -> int:
             + measurement.get("immatureEvents", 0)
         ):
             raise ProductWorkflowError("local event delivery SLO is invalid")
+        investigation_slo = _request(
+            "/v1/operations/investigations/completion-slo", operator
+        )
+        investigation_slo_spec = investigation_slo.get("spec")
+        investigation_measurement = (
+            investigation_slo_spec.get("measurement")
+            if isinstance(investigation_slo_spec, Mapping)
+            else None
+        )
+        investigation_objective = (
+            investigation_slo_spec.get("objective")
+            if isinstance(investigation_slo_spec, Mapping)
+            else None
+        )
+        if (
+            investigation_slo.get("kind")
+            != "InvestigationCompletionSloReport"
+            or investigation_slo.get("metadata", {}).get("tenantId") != "local"
+            or not isinstance(investigation_measurement, Mapping)
+            or not isinstance(investigation_objective, Mapping)
+            or investigation_objective.get("maximumCompletionSeconds") != 300
+            or investigation_objective.get("minimumAttainmentBasisPoints") != 9900
+            or investigation_measurement.get("acceptedJobs", 0) < 1
+            or investigation_measurement.get("acceptedJobs")
+            != investigation_measurement.get("eligibleJobs", 0)
+            + investigation_measurement.get("immatureJobs", 0)
+        ):
+            raise ProductWorkflowError(
+                "local investigation completion SLO is invalid"
+            )
         print(
             "local product workflow passed: runtime identity → collection → event delivery health/SLO → queued worker "
-            "investigation → proposal → independent approval → one-shot dry-run → queue"
+            "investigation and completion SLO → proposal → independent approval → one-shot dry-run → queue"
         )
         print(f"action: {proposal_id}")
         return 0

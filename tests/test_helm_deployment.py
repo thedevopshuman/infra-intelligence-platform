@@ -132,6 +132,22 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             with self.subTest(variable=variable):
                 self.assertIn(variable, config_map)
 
+    def test_investigation_completion_slo_is_explicit_and_api_visible(self) -> None:
+        config_map = (CHART / "templates" / "configmap.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("investigationCompletionSlo:", values)
+        for variable in (
+            "IIP_INVESTIGATION_COMPLETION_SLO_WINDOW_SECONDS",
+            "IIP_INVESTIGATION_COMPLETION_SLO_MAXIMUM_SECONDS",
+            "IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS",
+            "IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ELIGIBLE_JOBS",
+        ):
+            with self.subTest(variable=variable):
+                self.assertIn(variable, config_map)
+
     def test_migration_hook_has_database_only_authority(self) -> None:
         template = (CHART / "templates" / "migration-job.yaml").read_text(
             encoding="utf-8"
@@ -187,6 +203,14 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn('document["kind"] == "EventDeliveryHealthReport"', script)
         self.assertIn("/v1/operations/events/delivery-slo", script)
         self.assertIn('document["kind"] == "EventDeliverySloReport"', script)
+        self.assertIn(
+            "/v1/operations/investigations/completion-slo",
+            script,
+        )
+        self.assertIn(
+            'document["kind"] == "InvestigationCompletionSloReport"',
+            script,
+        )
         self.assertIn('printf \'%s\' "$IIP_AUTH_BEARER_TOKEN"', script)
         self.assertIn('"helmChartVersion":chart,"imageDigest":digest', script)
         self.assertEqual(script.count('"$IIP_HELM_BIN" upgrade --install iip'), 2)

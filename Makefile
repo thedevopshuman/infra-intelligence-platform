@@ -163,6 +163,11 @@ helm-lint:
 		echo "Helm validation accepted an event-delivery latency objective as long as its window" >&2; exit 1; \
 	fi
 	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set investigationCompletionSlo.windowSeconds=300 \
+		--set investigationCompletionSlo.maximumCompletionSeconds=300 >/dev/null 2>&1; then \
+		echo "Helm validation accepted an investigation completion objective as long as its window" >&2; exit 1; \
+	fi
+	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set ingress.enabled=true \
 		--set ingress.className=nginx \
 		--set ingress.host=iip.example.test \

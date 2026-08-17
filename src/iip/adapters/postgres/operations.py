@@ -15,6 +15,7 @@ from iip.application.ports import (
     ActionExecutionTransition,
     ActionWorkflowRecord,
     ActorContext,
+    InvestigationCompletionSloState,
     InvestigationJobClaim,
     PersistenceError,
 )
@@ -345,6 +346,97 @@ class PostgresOperationalStore:
             "SELECT status_document AS document FROM iip.investigation_jobs WHERE tenant_id = %s AND investigation_id = %s",
             (actor.tenant_id, investigation_id),
         )
+
+    def get_investigation_completion_slo_state(
+        self,
+        tenant_id: str,
+        *,
+        window_start: str,
+        window_end: str,
+        maturity_cutoff: str,
+        completion_objective_seconds: int,
+    ) -> InvestigationCompletionSloState:
+        if (
+            isinstance(completion_objective_seconds, bool)
+            or not isinstance(completion_objective_seconds, int)
+            or not 1 <= completion_objective_seconds <= 86_400
+        ):
+            raise ValueError("completion_objective_seconds is invalid")
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    WITH cohort AS (
+                        SELECT state, created_at, updated_at,
+                               created_at <= %s::timestamptz AS eligible,
+                               created_at + make_interval(secs => %s) AS deadline,
+                               updated_at <= %s::timestamptz AS observed_at_end
+                        FROM iip.investigation_jobs
+                        WHERE tenant_id = %s
+                          AND created_at >= %s::timestamptz
+                          AND created_at <= %s::timestamptz
+                    )
+                    SELECT
+                        count(*) AS accepted_jobs,
+                        count(*) FILTER (
+                            WHERE state IN ('completed', 'failed', 'cancelled')
+                              AND updated_at < created_at
+                        ) AS invalid_jobs,
+                        count(*) FILTER (WHERE NOT eligible) AS immature_jobs,
+                        count(*) FILTER (WHERE eligible) AS eligible_jobs,
+                        count(*) FILTER (
+                            WHERE eligible AND observed_at_end
+                              AND state = 'completed' AND updated_at <= deadline
+                        ) AS within_objective_jobs,
+                        count(*) FILTER (
+                            WHERE eligible AND observed_at_end
+                              AND state = 'completed' AND updated_at > deadline
+                        ) AS late_completed_jobs,
+                        count(*) FILTER (
+                            WHERE eligible AND observed_at_end AND state = 'failed'
+                        ) AS failed_jobs,
+                        count(*) FILTER (
+                            WHERE eligible AND observed_at_end AND state = 'cancelled'
+                        ) AS cancelled_jobs,
+                        count(*) FILTER (
+                            WHERE eligible AND (
+                                state IN ('queued', 'running', 'cancellation-requested')
+                                OR (
+                                    state IN ('completed', 'failed', 'cancelled')
+                                    AND NOT observed_at_end
+                                )
+                            )
+                        ) AS unfinished_jobs
+                    FROM cohort
+                    """,
+                    (
+                        maturity_cutoff,
+                        completion_objective_seconds,
+                        window_end,
+                        tenant_id,
+                        window_start,
+                        window_end,
+                    ),
+                ).fetchone()
+            assert row is not None
+            if row["invalid_jobs"]:
+                raise PersistenceError("storage.corrupt")
+            return InvestigationCompletionSloState(
+                tenant_id=tenant_id,
+                window_start=window_start,
+                window_end=window_end,
+                maturity_cutoff=maturity_cutoff,
+                accepted_jobs=row["accepted_jobs"],
+                immature_jobs=row["immature_jobs"],
+                eligible_jobs=row["eligible_jobs"],
+                within_objective_jobs=row["within_objective_jobs"],
+                late_completed_jobs=row["late_completed_jobs"],
+                failed_jobs=row["failed_jobs"],
+                cancelled_jobs=row["cancelled_jobs"],
+                unfinished_jobs=row["unfinished_jobs"],
+            )
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
 
     def claim_investigation_job(
         self,

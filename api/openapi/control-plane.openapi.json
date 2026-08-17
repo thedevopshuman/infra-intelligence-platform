@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.31.0",
+    "version": "0.32.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -192,6 +192,22 @@
           "503": {
             "description": "The delivery objective state is unavailable or inconsistent",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "event.delivery-slo.unavailable"}}}}
+          }
+        }
+      }
+    },
+    "/v1/operations/investigations/completion-slo": {
+      "get": {
+        "operationId": "getInvestigationCompletionSlo",
+        "description": "Return the deployment-configured rolling useful-completion objective for durable asynchronous investigations in the authenticated tenant. Each accepted job is counted once after its completion deadline; aggregate failures, cancellations, late completions, and unfinished jobs remain explicit misses.",
+        "responses": {
+          "200": {"description": "Tenant-scoped rolling investigation-completion objective", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-completion-slo-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "503": {
+            "description": "The investigation completion objective state is unavailable or inconsistent",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "investigation.completion-slo.unavailable"}}}}
           }
         }
       }
@@ -612,6 +628,7 @@
       "TelemetryExportHealthReport": {"$ref": "../../contracts/schemas/telemetry-export-health-report.schema.json"},
       "EventDeliveryHealthReport": {"$ref": "../../contracts/schemas/event-delivery-health-report.schema.json"},
       "EventDeliverySloReport": {"$ref": "../../contracts/schemas/event-delivery-slo-report.schema.json"},
+      "InvestigationCompletionSloReport": {"$ref": "../../contracts/schemas/investigation-completion-slo-report.schema.json"},
       "RuntimeVersionReport": {"$ref": "../../contracts/schemas/runtime-version-report.schema.json"},
       "SessionContext": {"$ref": "../../contracts/schemas/session-context.schema.json"},
       "PageInfo": {"$ref": "../../contracts/schemas/page-info.schema.json"},

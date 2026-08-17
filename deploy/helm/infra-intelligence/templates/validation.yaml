@@ -7,6 +7,9 @@
 {{- if ge (int .Values.eventDeliverySlo.maximumDeliveryLatencySeconds) (int .Values.eventDeliverySlo.windowSeconds) }}
 {{- fail "eventDeliverySlo.maximumDeliveryLatencySeconds must be less than eventDeliverySlo.windowSeconds" }}
 {{- end }}
+{{- if ge (int .Values.investigationCompletionSlo.maximumCompletionSeconds) (int .Values.investigationCompletionSlo.windowSeconds) }}
+{{- fail "investigationCompletionSlo.maximumCompletionSeconds must be less than investigationCompletionSlo.windowSeconds" }}
+{{- end }}
 {{- if gt (int .Values.telemetry.traceMaxExportBatchSize) (int .Values.telemetry.traceMaxQueueSize) }}
 {{- fail "telemetry.traceMaxExportBatchSize must not exceed telemetry.traceMaxQueueSize" }}
 {{- end }}

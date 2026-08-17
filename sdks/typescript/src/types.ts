@@ -371,6 +371,43 @@ export interface EventDeliverySloReport {
   };
 }
 
+export type InvestigationCompletionSloStatus =
+  | "no-data"
+  | "insufficient-data"
+  | "meeting"
+  | "breached";
+
+export interface InvestigationCompletionSloReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "InvestigationCompletionSloReport";
+  metadata: { tenantId: string; evaluatedAt: string };
+  spec: {
+    status: InvestigationCompletionSloStatus;
+    window: {
+      durationSeconds: number;
+      start: string;
+      end: string;
+      maturityCutoff: string;
+    };
+    objective: {
+      maximumCompletionSeconds: number;
+      minimumAttainmentBasisPoints: number;
+      minimumEligibleJobs: number;
+    };
+    measurement: {
+      acceptedJobs: number;
+      immatureJobs: number;
+      eligibleJobs: number;
+      withinObjectiveJobs: number;
+      lateCompletedJobs: number;
+      failedJobs: number;
+      cancelledJobs: number;
+      unfinishedJobs: number;
+      attainmentBasisPoints: number | null;
+    };
+  };
+}
+
 export interface PlatformEvent<TData extends Record<string, unknown> = Record<string, unknown>> {
   specversion: "1.0";
   id: string;

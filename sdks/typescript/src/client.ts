@@ -14,6 +14,7 @@ import type {
   EventDeliverySloReport,
   EventDeliveryReplayParameters,
   IngestionFreshnessReport,
+  InvestigationCompletionSloReport,
   InvestigationId,
   InvestigationCancellationRequest,
   InvestigationReport,
@@ -151,6 +152,12 @@ export class InfrastructureIntelligenceClient {
   async getEventDeliverySlo(): Promise<EventDeliverySloReport> {
     return this.get<EventDeliverySloReport>(
       "/v1/operations/events/delivery-slo",
+    );
+  }
+
+  async getInvestigationCompletionSlo(): Promise<InvestigationCompletionSloReport> {
+    return this.get<InvestigationCompletionSloReport>(
+      "/v1/operations/investigations/completion-slo",
     );
   }
 

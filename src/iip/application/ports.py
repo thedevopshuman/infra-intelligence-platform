@@ -860,6 +860,24 @@ class InvestigationJobClaim:
     attempts: int
 
 
+@dataclass(frozen=True)
+class InvestigationCompletionSloState:
+    """Aggregate durable job outcomes for one exact tenant window."""
+
+    tenant_id: str
+    window_start: str
+    window_end: str
+    maturity_cutoff: str
+    accepted_jobs: int
+    immature_jobs: int
+    eligible_jobs: int
+    within_objective_jobs: int
+    late_completed_jobs: int
+    failed_jobs: int
+    cancelled_jobs: int
+    unfinished_jobs: int
+
+
 class InvestigationJobRepository(Protocol):
     def enqueue_investigation_job(
         self,
@@ -874,6 +892,17 @@ class InvestigationJobRepository(Protocol):
         self, actor: ActorContext, investigation_id: str
     ) -> Optional[Mapping[str, object]]:
         """Return one job only from the actor's explicit tenant scope."""
+
+    def get_investigation_completion_slo_state(
+        self,
+        tenant_id: str,
+        *,
+        window_start: str,
+        window_end: str,
+        maturity_cutoff: str,
+        completion_objective_seconds: int,
+    ) -> InvestigationCompletionSloState:
+        """Return aggregate durable completion outcomes for one mature cohort."""
 
     def claim_investigation_job(
         self,

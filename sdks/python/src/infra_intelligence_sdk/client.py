@@ -22,6 +22,7 @@ from .models import (
     EventDeliveryHealthReport,
     EventDeliverySloReport,
     IngestionFreshnessReport,
+    InvestigationCompletionSloReport,
     InvestigationReport,
     InvestigationJobStatus,
     InvestigationRequest,
@@ -174,6 +175,15 @@ class Client:
 
         return EventDeliverySloReport.from_dict(
             self._get("/v1/operations/events/delivery-slo")
+        )
+
+    def get_investigation_completion_slo(
+        self,
+    ) -> InvestigationCompletionSloReport:
+        """Read the rolling useful-completion objective as an administrator."""
+
+        return InvestigationCompletionSloReport.from_dict(
+            self._get("/v1/operations/investigations/completion-slo")
         )
 
     def ingest_resource_collection(

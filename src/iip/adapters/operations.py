@@ -6,7 +6,7 @@ import copy
 import hashlib
 import json
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from threading import RLock
 from typing import Mapping, Optional
 
@@ -14,6 +14,7 @@ from iip.application.ports import (
     ActionExecutionTransition,
     ActionWorkflowRecord,
     ActorContext,
+    InvestigationCompletionSloState,
     InvestigationJobClaim,
     PersistenceError,
 )
@@ -175,6 +176,100 @@ class InMemoryOperationalStore:
                 (actor.tenant_id, investigation_id)
             )
             return copy.deepcopy(entry["status"]) if entry is not None else None
+
+    def get_investigation_completion_slo_state(
+        self,
+        tenant_id: str,
+        *,
+        window_start: str,
+        window_end: str,
+        maturity_cutoff: str,
+        completion_objective_seconds: int,
+    ) -> InvestigationCompletionSloState:
+        if (
+            isinstance(completion_objective_seconds, bool)
+            or not isinstance(completion_objective_seconds, int)
+            or not 1 <= completion_objective_seconds <= 86_400
+        ):
+            raise ValueError("completion_objective_seconds is invalid")
+        try:
+            start = datetime.fromisoformat(window_start.replace("Z", "+00:00"))
+            end = datetime.fromisoformat(window_end.replace("Z", "+00:00"))
+            cutoff = datetime.fromisoformat(maturity_cutoff.replace("Z", "+00:00"))
+        except (AttributeError, TypeError, ValueError):
+            raise ValueError("investigation completion SLO window is invalid") from None
+        if (
+            start.tzinfo is None
+            or end.tzinfo is None
+            or cutoff.tzinfo is None
+            or not start < cutoff < end
+            or int((end - cutoff).total_seconds()) != completion_objective_seconds
+        ):
+            raise ValueError("investigation completion SLO window is invalid")
+
+        with self._lock:
+            cohort: list[tuple[Mapping[str, object], datetime]] = []
+            for (candidate_tenant, _), entry in self._investigation_jobs.items():
+                if candidate_tenant != tenant_id:
+                    continue
+                status = entry.get("status")
+                spec = status.get("spec") if isinstance(status, Mapping) else None
+                if not isinstance(spec, Mapping):
+                    raise PersistenceError("storage.corrupt")
+                try:
+                    queued_at = datetime.fromisoformat(
+                        str(spec["queuedAt"]).replace("Z", "+00:00")
+                    )
+                except (KeyError, ValueError):
+                    raise PersistenceError("storage.corrupt") from None
+                if start <= queued_at <= end:
+                    cohort.append((spec, queued_at))
+            eligible = [item for item in cohort if item[1] <= cutoff]
+            within = late = failed = cancelled = unfinished = 0
+            for spec, queued_at in eligible:
+                state = spec.get("state")
+                if state in {"completed", "failed", "cancelled"}:
+                    try:
+                        completed_at = datetime.fromisoformat(
+                            str(spec["completedAt"]).replace("Z", "+00:00")
+                        )
+                    except (KeyError, ValueError):
+                        raise PersistenceError("storage.corrupt") from None
+                    if completed_at < queued_at:
+                        raise PersistenceError("storage.corrupt")
+                    if completed_at > end:
+                        unfinished += 1
+                        continue
+                if state == "completed":
+                    if completed_at <= queued_at + timedelta(
+                        seconds=completion_objective_seconds
+                    ):
+                        within += 1
+                    else:
+                        late += 1
+                elif state == "failed":
+                    failed += 1
+                elif state == "cancelled":
+                    cancelled += 1
+                elif state in {"queued", "running", "cancellation-requested"}:
+                    unfinished += 1
+                else:
+                    raise PersistenceError("storage.corrupt")
+
+        return InvestigationCompletionSloState(
+            tenant_id=tenant_id,
+            window_start=window_start,
+            window_end=window_end,
+            maturity_cutoff=maturity_cutoff,
+            accepted_jobs=len(cohort),
+            immature_jobs=len(cohort) - len(eligible),
+            eligible_jobs=len(eligible),
+            within_objective_jobs=within,
+            late_completed_jobs=late,
+            failed_jobs=failed,
+            cancelled_jobs=cancelled,
+            unfinished_jobs=unfinished,
+        )
 
     def claim_investigation_job(
         self,

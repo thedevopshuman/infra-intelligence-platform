@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.31.0"
+  tag: "0.32.0"
   digest: ""
 
 worker:
@@ -48,6 +48,12 @@ eventDeliverySlo:
   maximumDeliveryLatencySeconds: 60
   minimumAttainmentBasisPoints: 9900
   minimumEligibleEvents: 20
+
+investigationCompletionSlo:
+  windowSeconds: 3600
+  maximumCompletionSeconds: 300
+  minimumAttainmentBasisPoints: 9900
+  minimumEligibleJobs: 20
 
 imagePullSecrets: []
 nameOverride: ""

@@ -29,6 +29,8 @@ Resource observer integrations use the exported `ResourceCollectionRequest`, `Re
 
 `getEventDeliverySlo` returns the deployment-configured rolling publication objective with mature-cohort aggregate counts and integer-basis-point attainment. It measures publisher acknowledgement, not downstream receiver processing.
 
+`getInvestigationCompletionSlo` returns the deployment-configured rolling useful-completion objective for durable asynchronous jobs. It requires platform-administrator authority and contains aggregate outcomes only—never investigation identity, request, evidence, finding, worker, or provider data.
+
 `EventDeliveryReplayParameters` and `proposeEventDeliveryReplay` bind one exact quarantine generation into the normal investigation, independent approval, policy, audit, and one-shot execution workflow. Dry-run is the default; live replay preserves the CloudEvents ID so receivers must remain idempotent.
 
 Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. The server derives tenant, actor, and roles after credential verification; the SDK does not send caller-controlled identity headers.

@@ -20,6 +20,10 @@ data:
   IIP_EVENT_DELIVERY_SLO_MAXIMUM_LATENCY_SECONDS: {{ .Values.eventDeliverySlo.maximumDeliveryLatencySeconds | quote }}
   IIP_EVENT_DELIVERY_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS: {{ .Values.eventDeliverySlo.minimumAttainmentBasisPoints | quote }}
   IIP_EVENT_DELIVERY_SLO_MINIMUM_ELIGIBLE_EVENTS: {{ .Values.eventDeliverySlo.minimumEligibleEvents | quote }}
+  IIP_INVESTIGATION_COMPLETION_SLO_WINDOW_SECONDS: {{ .Values.investigationCompletionSlo.windowSeconds | quote }}
+  IIP_INVESTIGATION_COMPLETION_SLO_MAXIMUM_SECONDS: {{ .Values.investigationCompletionSlo.maximumCompletionSeconds | quote }}
+  IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS: {{ .Values.investigationCompletionSlo.minimumAttainmentBasisPoints | quote }}
+  IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ELIGIBLE_JOBS: {{ .Values.investigationCompletionSlo.minimumEligibleJobs | quote }}
   IIP_READINESS_DATABASE_TIMEOUT_SECONDS: {{ .Values.probes.readiness.databaseTimeoutSeconds | quote }}
   IIP_OTEL_METRICS_ENABLED: {{ .Values.telemetry.metricsEnabled | quote }}
   IIP_OTEL_TRACES_ENABLED: {{ .Values.telemetry.tracesEnabled | quote }}

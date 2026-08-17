@@ -6,6 +6,7 @@ const state = {
   runtimeVersion: null,
   eventDeliveryHealth: null,
   eventDeliverySlo: null,
+  investigationCompletionSlo: null,
   resources: [],
   investigations: [],
   evidence: [],
@@ -250,6 +251,54 @@ async function refreshEventDeliverySlo() {
   renderEventDeliverySlo();
 }
 
+function renderInvestigationCompletionSlo() {
+  const report = state.investigationCompletionSlo;
+  const spec = report?.spec;
+  const chip = $("#investigation-slo-state");
+  const fields = ["accepted", "eligible", "within", "misses", "attainment"];
+  if (!spec) {
+    fields.forEach((field) => { $(`#investigation-slo-${field}`).textContent = "—"; });
+    chip.textContent = state.session && !hasRole("platform-admin")
+      ? "SLO admin required"
+      : "SLO unavailable";
+    chip.className = "status-chip neutral";
+    $("#investigation-slo-details").disabled = true;
+    $("#investigation-slo-note").textContent = "The rolling useful-completion objective appears after connection.";
+    return;
+  }
+  const measurement = spec.measurement;
+  const objective = spec.objective;
+  $("#investigation-slo-accepted").textContent = String(measurement.acceptedJobs);
+  $("#investigation-slo-eligible").textContent = String(measurement.eligibleJobs);
+  $("#investigation-slo-within").textContent = String(measurement.withinObjectiveJobs);
+  $("#investigation-slo-misses").textContent = String(measurement.eligibleJobs - measurement.withinObjectiveJobs);
+  $("#investigation-slo-attainment").textContent = basisPoints(measurement.attainmentBasisPoints);
+  chip.textContent = spec.status;
+  chip.className = `status-chip ${spec.status === "meeting" ? "success" : spec.status === "breached" ? "danger" : spec.status === "insufficient-data" ? "warning" : "neutral"}`;
+  $("#investigation-slo-details").disabled = false;
+  if (spec.status === "no-data") {
+    $("#investigation-slo-note").textContent = "No accepted jobs have matured past the configured completion deadline in this window.";
+  } else if (spec.status === "insufficient-data") {
+    $("#investigation-slo-note").textContent = `${measurement.eligibleJobs}/${objective.minimumEligibleJobs} mature jobs; more samples are required before an SLO verdict.`;
+  } else {
+    $("#investigation-slo-note").textContent = `${basisPoints(measurement.attainmentBasisPoints)} attained vs ${basisPoints(objective.minimumAttainmentBasisPoints)} required. Late, failed, cancelled, and unfinished jobs remain misses.`;
+  }
+}
+
+async function refreshInvestigationCompletionSlo() {
+  if (!state.session || !hasRole("platform-admin")) {
+    state.investigationCompletionSlo = null;
+    renderInvestigationCompletionSlo();
+    return;
+  }
+  try {
+    state.investigationCompletionSlo = await api("/v1/operations/investigations/completion-slo");
+  } catch (_error) {
+    state.investigationCompletionSlo = null;
+  }
+  renderInvestigationCompletionSlo();
+}
+
 async function connect(token, remember) {
   state.token = token;
   try {
@@ -257,7 +306,7 @@ async function connect(token, remember) {
     if (remember) sessionStorage.setItem("iip.console.token", token);
     else sessionStorage.removeItem("iip.console.token");
     updateIdentity();
-    await Promise.all([refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshResources(), refreshActions()]);
+    await Promise.all([refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshResources(), refreshActions()]);
     $("#connection-dialog").close();
     $("#connection-error").hidden = true;
     showNotice(`Connected as ${state.session.metadata.actorId} in tenant ${state.session.metadata.tenantId}.`);
@@ -725,6 +774,7 @@ async function runInvestigation(event) {
     $("#investigation-state").className = "status-chip danger";
     showNotice(`Investigation failed (${error.message}).`, "error");
   } finally {
+    await refreshInvestigationCompletionSlo();
     state.activeInvestigationId = null;
     $("#cancel-investigation").hidden = true;
     $("#cancel-investigation").disabled = false;
@@ -996,7 +1046,7 @@ function bindEvents() {
   $("#identity-button").addEventListener("click", () => $("#connection-dialog").showModal());
   $("#connection-close").addEventListener("click", () => $("#connection-dialog").close());
   $("#refresh-button").addEventListener("click", async () => {
-    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshResources(), refreshActions()]);
+    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshResources(), refreshActions()]);
     showNotice("Live platform state refreshed.");
   });
   $("#connection-form").addEventListener("submit", async (event) => {
@@ -1056,6 +1106,14 @@ function bindEvents() {
     $("#detail-actions").hidden = true;
     $("#detail-dialog").showModal();
   });
+  $("#investigation-slo-details").addEventListener("click", () => {
+    if (!state.investigationCompletionSlo) return;
+    $("#detail-kicker").textContent = "Investigation reliability objective";
+    $("#detail-title").textContent = "Rolling useful-completion SLO";
+    $("#detail-content").textContent = JSON.stringify(state.investigationCompletionSlo, null, 2);
+    $("#detail-actions").hidden = true;
+    $("#detail-dialog").showModal();
+  });
   $("#delivery-recovery").addEventListener("click", () => {
     if (!state.inspectedReplay || !hasRole("platform-admin")) return;
     state.pendingReplay = { ...state.inspectedReplay };
@@ -1073,6 +1131,7 @@ async function start() {
   renderActionProposalMode();
   renderRuntimeVersion();
   renderEventDeliverySlo();
+  renderInvestigationCompletionSlo();
   await checkHealth();
   const remembered = sessionStorage.getItem("iip.console.token");
   if (remembered) {

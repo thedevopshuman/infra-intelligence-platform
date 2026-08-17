@@ -1,0 +1,33 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationCompletionSloReport",
+  "metadata": {
+    "tenantId": "tenant-acme",
+    "evaluatedAt": "2026-08-17T13:00:00Z"
+  },
+  "spec": {
+    "status": "meeting",
+    "window": {
+      "durationSeconds": 3600,
+      "start": "2026-08-17T12:00:00Z",
+      "end": "2026-08-17T13:00:00Z",
+      "maturityCutoff": "2026-08-17T12:55:00Z"
+    },
+    "objective": {
+      "maximumCompletionSeconds": 300,
+      "minimumAttainmentBasisPoints": 9900,
+      "minimumEligibleJobs": 20
+    },
+    "measurement": {
+      "acceptedJobs": 102,
+      "immatureJobs": 2,
+      "eligibleJobs": 100,
+      "withinObjectiveJobs": 99,
+      "lateCompletedJobs": 0,
+      "failedJobs": 0,
+      "cancelledJobs": 0,
+      "unfinishedJobs": 1,
+      "attainmentBasisPoints": 9900
+    }
+  }
+}

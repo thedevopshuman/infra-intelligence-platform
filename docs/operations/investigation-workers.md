@@ -2,6 +2,8 @@
 
 The API can execute the compatible synchronous endpoint or durably submit background work through `POST /v1/investigation-jobs`. The same worker process also closes expired governed-action execution leases without invoking an executor. The Docker Desktop stack starts one workflow worker for tenant `local`; the Helm worker is opt-in and requires explicit tenant enrollment.
 
+Platform administrators can query `GET /v1/operations/investigations/completion-slo` for an aggregate exact-tenant useful-completion objective. Configure it with `IIP_INVESTIGATION_COMPLETION_SLO_WINDOW_SECONDS`, `IIP_INVESTIGATION_COMPLETION_SLO_MAXIMUM_SECONDS`, `IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS`, and `IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ELIGIBLE_JOBS`. Only durable asynchronous jobs are measured. On-time `completed` jobs succeed; late completion, failure, cancellation, and unfinished mature jobs are misses. Retain job rows for at least the configured window.
+
 ## Required configuration
 
 - `IIP_DATABASE_URL`: the same migrated PostgreSQL database as the API.

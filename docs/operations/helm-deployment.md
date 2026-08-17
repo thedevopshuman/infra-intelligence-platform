@@ -65,7 +65,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.31.0
+  tag: 0.32.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -82,6 +82,12 @@ eventDeliverySlo:
   maximumDeliveryLatencySeconds: 60
   minimumAttainmentBasisPoints: 9900
   minimumEligibleEvents: 20
+
+investigationCompletionSlo:
+  windowSeconds: 3600
+  maximumCompletionSeconds: 300
+  minimumAttainmentBasisPoints: 9900
+  minimumEligibleJobs: 20
 
 networkPolicy:
   enabled: true

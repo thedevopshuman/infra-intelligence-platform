@@ -19,3 +19,8 @@ contract remains vendor-neutral; a policy product or adapter is responsible for
 producing the closed result shape. Missing, malformed, oversized, unavailable,
 or wrong-scope responses deny closed as `policy.unavailable` and do not grant a
 snapshot.
+
+The operational [policy-engine compatibility report](policy-engine-compatibility-contract.md)
+proves this boundary over real local TLS without adding a control-plane endpoint
+or SDK type. It qualifies the shipped adapter and fixed local profile only;
+customer policy-bundle correctness remains a deployment gate.

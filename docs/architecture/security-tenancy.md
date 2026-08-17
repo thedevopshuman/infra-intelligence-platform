@@ -36,7 +36,7 @@ The Kubernetes restart adapter additionally requires an observed provider UID an
 
 Agents and plugins declare a maximum authority; request policy may reduce but never increase it.
 
-Deployed profiles may delegate each exact decision through the [external policy boundary](authorization-policy.md). The external decision cannot change authenticated identity or request scope. A malformed, unavailable, or wrong-tenant result denies closed, and governed actions retain the returned immutable policy snapshot reference.
+Deployed profiles may delegate each exact decision through the [external policy boundary](authorization-policy.md). The external decision cannot change authenticated identity or request scope. A malformed, unavailable, or wrong-tenant result denies closed, and governed actions retain the returned immutable policy snapshot reference. A real-TLS local compatibility profile proves digest and tenant binding, credential rotation/revocation, bounded responses, outage recovery, and value-minimized evidence without treating its fixture as a customer policy engine.
 
 ## Credential model
 

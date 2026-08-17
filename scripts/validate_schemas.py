@@ -168,6 +168,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     ),
     "policy-decision-request.schema.json": ("policy-decision-request.json",),
     "policy-decision.schema.json": ("policy-decision.json",),
+    "policy-engine-compatibility-report.schema.json": (
+        "policy-engine-compatibility-report.json",
+    ),
     "page-info.schema.json": ("page-info.json",),
     "resource-collection-request.schema.json": ("resource-collection-request.json",),
     "resource-collection-result.schema.json": ("resource-collection-result.json",),

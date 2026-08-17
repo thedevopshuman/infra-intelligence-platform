@@ -91,9 +91,11 @@ REQUIRED_PATHS = (
     "docs/decisions/0076-deterministic-seasonal-telemetry-baseline.md",
     "docs/decisions/0077-executable-credential-broker-compatibility-evidence.md",
     "docs/decisions/0078-executable-oidc-issuer-compatibility-evidence.md",
+    "docs/decisions/0079-executable-policy-engine-compatibility-evidence.md",
     "docs/specifications/investigation-capacity-contract.md",
     "docs/specifications/credential-broker-compatibility-contract.md",
     "docs/specifications/oidc-issuer-compatibility-contract.md",
+    "docs/specifications/policy-engine-compatibility-contract.md",
     "docs/decisions/0059-backend-neutral-query-availability-telemetry.md",
     "docs/specifications/query-availability-telemetry-contract.md",
     "docs/decisions/0062-audited-evidence-artifact-retention.md",
@@ -123,6 +125,7 @@ REQUIRED_PATHS = (
     "docs/operations/kubernetes-actions.md",
     "docs/operations/credential-broker.md",
     "docs/operations/oidc-identity.md",
+    "docs/operations/policy-engine.md",
     "docs/operations/otlp-metrics-receiver.md",
     "docs/operations/log-evidence.md",
     "docs/operations/resource-change-evidence.md",
@@ -135,6 +138,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/credential-lease.schema.json",
     "contracts/schemas/credential-broker-compatibility-report.schema.json",
     "contracts/schemas/oidc-issuer-compatibility-report.schema.json",
+    "contracts/schemas/policy-engine-compatibility-report.schema.json",
     "contracts/schemas/integration-config.schema.json",
     "contracts/schemas/action-proposal.schema.json",
     "contracts/schemas/action-approval.schema.json",
@@ -199,6 +203,7 @@ REQUIRED_PATHS = (
     "contracts/examples/credential-lease.json",
     "contracts/examples/credential-broker-compatibility-report.json",
     "contracts/examples/oidc-issuer-compatibility-report.json",
+    "contracts/examples/policy-engine-compatibility-report.json",
     "contracts/examples/kubernetes-event-evidence-request.json",
     "contracts/examples/kubernetes-event-evidence-result.json",
     "contracts/examples/telemetry-evidence-request.json",
@@ -369,13 +374,17 @@ REQUIRED_PATHS = (
     "scripts/test_capacity.sh",
     "scripts/run_credential_broker_compatibility.py",
     "scripts/run_oidc_issuer_compatibility.py",
+    "scripts/run_policy_engine_compatibility.py",
     "scripts/compatibility_tls.py",
     "deploy/docker-compose.credential-broker.yml",
     "deploy/docker-compose.oidc-issuer.yml",
+    "deploy/docker-compose.policy-engine.yml",
     "tests/fixtures/credential_broker_fixture.py",
     "tests/fixtures/oidc_issuer_fixture.py",
+    "tests/fixtures/policy_engine_fixture.py",
     "tests/test_credential_broker_compatibility.py",
     "tests/test_oidc_issuer_compatibility.py",
+    "tests/test_policy_engine_compatibility.py",
     "sdks/typescript/package-lock.json",
     "tests/test_authentication.py",
     "tests/test_console_authentication.py",
@@ -926,6 +935,79 @@ def validate_oidc_issuer_compatibility_example(
         / "oidc-issuer-compatibility-report.json"
     )
     validate_oidc_issuer_compatibility_document(documents.get(path), errors)
+
+
+POLICY_ENGINE_COMPATIBILITY_CHECKS = (
+    "ca-verified-tls",
+    "untrusted-ca-denial",
+    "bearer-authentication",
+    "exact-input",
+    "allow-decision",
+    "deny-decision",
+    "input-digest-binding",
+    "tenant-binding",
+    "snapshot-binding",
+    "redirect-denial",
+    "content-type-denial",
+    "response-size-denial",
+    "token-rotation-without-restart",
+    "token-revocation",
+    "outage-fail-closed",
+    "service-recovery",
+    "audit-minimization",
+    "secret-redaction",
+)
+
+
+def validate_policy_engine_compatibility_document(
+    report: object, errors: List[str]
+) -> None:
+    """Check the closed external-policy profile and its derived summary."""
+
+    if not isinstance(report, dict):
+        fail(errors, "policy engine compatibility report must be an object")
+        return
+    spec = report.get("spec")
+    checks = spec.get("checks") if isinstance(spec, dict) else None
+    summary = spec.get("summary") if isinstance(spec, dict) else None
+    if not isinstance(checks, list) or not isinstance(summary, dict):
+        fail(errors, "policy engine compatibility report must contain checks and summary")
+        return
+    check_ids = tuple(
+        check.get("id") if isinstance(check, dict) else None for check in checks
+    )
+    if check_ids != POLICY_ENGINE_COMPATIBILITY_CHECKS:
+        fail(errors, "policy engine compatibility checks must match the closed profile")
+    passed = sum(
+        1
+        for check in checks
+        if isinstance(check, dict)
+        and check.get("status") == "passed"
+        and "errorCode" not in check
+    )
+    failed = len(checks) - passed
+    status = "compatible" if failed == 0 else "incompatible"
+    if spec.get("status") != status:
+        fail(errors, "policy engine compatibility status must match its checks")
+    if summary != {
+        "totalChecks": len(checks),
+        "passedChecks": passed,
+        "failedChecks": failed,
+        "overallStatus": status,
+    }:
+        fail(errors, "policy engine compatibility summary must match its checks")
+
+
+def validate_policy_engine_compatibility_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "policy-engine-compatibility-report.json"
+    )
+    validate_policy_engine_compatibility_document(documents.get(path), errors)
 
 
 def validate_plugin_action_mediation_examples(
@@ -3208,6 +3290,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "OidcIssuerCompatibilityReport",
         ),
         (
+            "policy-engine-compatibility-report.json",
+            "PolicyEngineCompatibilityReport",
+        ),
+        (
             "telemetry-export-health-report.json",
             "TelemetryExportHealthReport",
         ),
@@ -3254,6 +3340,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_plugin_compatibility_example(documents, errors)
     validate_credential_broker_compatibility_example(documents, errors)
     validate_oidc_issuer_compatibility_example(documents, errors)
+    validate_policy_engine_compatibility_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
 
     policy_request = documents.get(example_dir / "policy-decision-request.json")

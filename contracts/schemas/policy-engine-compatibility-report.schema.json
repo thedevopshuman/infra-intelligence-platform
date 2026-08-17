@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:policy-engine-compatibility-report:v1alpha1",
+  "title": "Policy Engine Compatibility Report",
+  "description": "Source-bound real-TLS evidence for the external policy decision adapter and its fail-closed interoperability profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "PolicyEngineCompatibilityReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^per_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "environment", "profile", "checks", "summary"],
+      "properties": {
+        "status": {"enum": ["compatible", "incompatible"]},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["platform", "containerRuntime", "containerRuntimeVersion", "pythonVersion", "applicationVersion"],
+          "properties": {
+            "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+            "containerRuntime": {"const": "docker"},
+            "containerRuntimeVersion": {"type": "string", "minLength": 1, "maxLength": 64},
+            "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+            "applicationVersion": {"$ref": "#/$defs/semver"}
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "transport", "requestWrapper", "credentialMode", "maximumResponseBytes"],
+          "properties": {
+            "name": {"const": "local-external-http-policy-v1"},
+            "transport": {"const": "https-json"},
+            "requestWrapper": {"const": "opa-input"},
+            "credentialMode": {"const": "rotating-bearer-file"},
+            "maximumResponseBytes": {"const": 65536}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 18,
+          "maxItems": 18,
+          "prefixItems": [
+            {"$ref": "#/$defs/caVerifiedTlsCheck"},
+            {"$ref": "#/$defs/untrustedCaDenialCheck"},
+            {"$ref": "#/$defs/bearerAuthenticationCheck"},
+            {"$ref": "#/$defs/exactInputCheck"},
+            {"$ref": "#/$defs/allowDecisionCheck"},
+            {"$ref": "#/$defs/denyDecisionCheck"},
+            {"$ref": "#/$defs/inputDigestBindingCheck"},
+            {"$ref": "#/$defs/tenantBindingCheck"},
+            {"$ref": "#/$defs/snapshotBindingCheck"},
+            {"$ref": "#/$defs/redirectDenialCheck"},
+            {"$ref": "#/$defs/contentTypeDenialCheck"},
+            {"$ref": "#/$defs/responseSizeDenialCheck"},
+            {"$ref": "#/$defs/tokenRotationWithoutRestartCheck"},
+            {"$ref": "#/$defs/tokenRevocationCheck"},
+            {"$ref": "#/$defs/outageFailClosedCheck"},
+            {"$ref": "#/$defs/serviceRecoveryCheck"},
+            {"$ref": "#/$defs/auditMinimizationCheck"},
+            {"$ref": "#/$defs/secretRedactionCheck"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 18},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 18},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 18},
+            "overallStatus": {"enum": ["compatible", "incompatible"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "caVerifiedTlsCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "ca-verified-tls"}}}]},
+    "untrustedCaDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "untrusted-ca-denial"}}}]},
+    "bearerAuthenticationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "bearer-authentication"}}}]},
+    "exactInputCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "exact-input"}}}]},
+    "allowDecisionCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "allow-decision"}}}]},
+    "denyDecisionCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "deny-decision"}}}]},
+    "inputDigestBindingCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "input-digest-binding"}}}]},
+    "tenantBindingCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "tenant-binding"}}}]},
+    "snapshotBindingCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "snapshot-binding"}}}]},
+    "redirectDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "redirect-denial"}}}]},
+    "contentTypeDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "content-type-denial"}}}]},
+    "responseSizeDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "response-size-denial"}}}]},
+    "tokenRotationWithoutRestartCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "token-rotation-without-restart"}}}]},
+    "tokenRevocationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "token-revocation"}}}]},
+    "outageFailClosedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "outage-fail-closed"}}}]},
+    "serviceRecoveryCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "service-recovery"}}}]},
+    "auditMinimizationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "audit-minimization"}}}]},
+    "secretRedactionCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "secret-redaction"}}}]}
+  }
+}

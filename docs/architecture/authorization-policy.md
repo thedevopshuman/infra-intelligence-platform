@@ -62,3 +62,9 @@ This completes the replaceable production policy integration boundary. Policy
 bundle content, change review, emergency access, availability objectives, and
 the chosen customer's policy service remain deployment and operating-model
 decisions.
+
+The Docker-backed gate in [ADR 0079](../decisions/0079-executable-policy-engine-compatibility-evidence.md)
+uses this production adapter against a real TLS fixture and emits source-bound
+evidence for exact input, digest and snapshot binding, bearer rotation and
+revocation, redirect and bounded-response denial, outage recovery, audit
+minimization, and redaction. It qualifies the adapter, not a customer bundle.

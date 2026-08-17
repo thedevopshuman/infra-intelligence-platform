@@ -49,6 +49,19 @@ make test-oidc
 
 The target keeps ephemeral private signing keys on the host, serves only rotating public JWKs from its isolated container, verifies exact token/claim/cache/redirect/outage behavior, and removes the fixture afterward. It does not exercise a real authorization/token endpoint. See the [OIDC qualification runbook](oidc-identity.md) for the customer browser and issuer gate.
 
+Exercise the production-facing external policy adapter over real local TLS with:
+
+```bash
+make test-policy-engine
+```
+
+The target requires a rotating bearer credential, validates the exact closed
+actor/action/resource wrapper, returns input-digest- and tenant-snapshot-bound
+allow and deny decisions, proves bounded fail-closed transport behavior and
+recovery, writes a source-bound secret-free report under `dist/`, and removes
+the fixture afterward. It is not a production policy engine or customer policy
+bundle. See the [policy-engine runbook](policy-engine.md) for qualification.
+
 Run the separate end-to-end recovery measurement with:
 
 ```bash

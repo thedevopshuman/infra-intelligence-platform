@@ -1,0 +1,53 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PolicyEngineCompatibilityReport",
+  "metadata": {
+    "id": "per_11111111111111111111111111111111",
+    "generatedAt": "2026-08-17T20:00:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "compatible",
+    "environment": {
+      "platform": "linux/arm64",
+      "containerRuntime": "docker",
+      "containerRuntimeVersion": "28.3.3",
+      "pythonVersion": "3.12.11",
+      "applicationVersion": "0.52.0"
+    },
+    "profile": {
+      "name": "local-external-http-policy-v1",
+      "transport": "https-json",
+      "requestWrapper": "opa-input",
+      "credentialMode": "rotating-bearer-file",
+      "maximumResponseBytes": 65536
+    },
+    "checks": [
+      {"id": "ca-verified-tls", "status": "passed"},
+      {"id": "untrusted-ca-denial", "status": "passed"},
+      {"id": "bearer-authentication", "status": "passed"},
+      {"id": "exact-input", "status": "passed"},
+      {"id": "allow-decision", "status": "passed"},
+      {"id": "deny-decision", "status": "passed"},
+      {"id": "input-digest-binding", "status": "passed"},
+      {"id": "tenant-binding", "status": "passed"},
+      {"id": "snapshot-binding", "status": "passed"},
+      {"id": "redirect-denial", "status": "passed"},
+      {"id": "content-type-denial", "status": "passed"},
+      {"id": "response-size-denial", "status": "passed"},
+      {"id": "token-rotation-without-restart", "status": "passed"},
+      {"id": "token-revocation", "status": "passed"},
+      {"id": "outage-fail-closed", "status": "passed"},
+      {"id": "service-recovery", "status": "passed"},
+      {"id": "audit-minimization", "status": "passed"},
+      {"id": "secret-redaction", "status": "passed"}
+    ],
+    "summary": {
+      "totalChecks": 18,
+      "passedChecks": 18,
+      "failedChecks": 0,
+      "overallStatus": "compatible"
+    }
+  }
+}

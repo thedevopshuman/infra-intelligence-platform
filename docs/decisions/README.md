@@ -82,3 +82,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0076](0076-deterministic-seasonal-telemetry-baseline.md) | Accepted | Compare matching prior metric periods from one committed artifact |
 | [0077](0077-executable-credential-broker-compatibility-evidence.md) | Accepted | Prove the external broker client over local TLS, signed workload identity, exact policy, rotation, audit, and recovery |
 | [0078](0078-executable-oidc-issuer-compatibility-evidence.md) | Accepted | Prove OIDC/JWKS verification, cache rotation, minimized PKCE discovery, outage, and recovery over local TLS |
+| [0079](0079-executable-policy-engine-compatibility-evidence.md) | Accepted | Prove exact external policy decisions, snapshot binding, credential rotation, outage, and recovery over local TLS |

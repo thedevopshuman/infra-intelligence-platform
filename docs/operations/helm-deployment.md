@@ -86,6 +86,34 @@ The browser calls the token endpoint directly. Its CORS policy must allow the ex
 
 Before rollout, run `make test-oidc` to certify the shipped verifier's local real-TLS profile, then qualify the selected issuer and browser flow using the [OIDC runbook](oidc-identity.md). Verify the public `GET /v1/authentication/console` response, redirect registration, MFA and consent behavior, token audience and lifetime, tenant/role claim mapping, CORS denial for other origins, logout expectations, key and certificate rotation, revocation expectations, outage, and recovery. The platform keeps no refresh token, ID token, identity-provider password, or server session.
 
+### External policy qualification
+
+Select the fail-closed external decision adapter with reviewed configuration
+and existing Secrets. Paths inside `configJson` must match the mounted files:
+
+```yaml
+policy:
+  mode: external-http
+  externalHttp:
+    configJson: >-
+      {"endpoint":"https://policy.example.internal/v1/data/iip/decision","caBundlePath":"/var/run/iip-policy-ca/ca.crt","bearerTokenPath":"/var/run/iip-policy-token/token","timeoutSeconds":5,"maxResponseBytes":65536}
+    bearerTokenExistingSecret: iip-policy-token
+    caBundleExistingSecret: iip-policy-ca
+
+networkPolicy:
+  policyEgress:
+    enabled: true
+    cidr: 203.0.113.20/32
+    port: 443
+```
+
+Before rollout, run `make test-policy-engine` to certify the shipped adapter's
+local real-TLS profile, then qualify the selected engine using the
+[policy-engine runbook](policy-engine.md). Review every closed application
+action, immutable snapshot semantics, credential and certificate rotation,
+revocation, response bounds, audit delivery, outage, failover, and recovery.
+Never use the permissive local policy mode in a production deployment.
+
 ## Fresh durable install
 
 Create the database and identity Secrets through the cluster's secret-management workflow, then use a protected values file similar to:
@@ -93,7 +121,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.51.0
+  tag: 0.52.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:

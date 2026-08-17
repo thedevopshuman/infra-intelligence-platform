@@ -53,7 +53,7 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | Agent manifest | [agent-contract.md](agent-contract.md) | `contracts/schemas/agent-manifest.schema.json` | `contracts/examples/agent-manifest.json` |
 | Plugin manifest | [plugin-contract.md](plugin-contract.md) | `contracts/schemas/plugin-manifest.schema.json` | `contracts/examples/plugin-manifest.json` |
 | Plugin invocation | [plugin-invocation-contract.md](plugin-invocation-contract.md) | `contracts/schemas/plugin-invocation.schema.json` | `contracts/examples/plugin-invocation.json` |
-| Plugin invocation result | [plugin-invocation-contract.md](plugin-invocation-contract.md) | `contracts/schemas/plugin-invocation-result.schema.json` | `contracts/examples/plugin-invocation-result.json` |
+| Plugin invocation result | [plugin-invocation-contract.md](plugin-invocation-contract.md) | `contracts/schemas/plugin-invocation-result.schema.json` | `contracts/examples/plugin-invocation-result.json`, `contracts/examples/plugin-invocation-result-failed.json` |
 | Integration configuration | [integration-config-contract.md](integration-config-contract.md) | `contracts/schemas/integration-config.schema.json` | `contracts/examples/integration-config.json` |
 | Credential lease request | [credential-lease-contract.md](credential-lease-contract.md) | `contracts/schemas/credential-lease-request.schema.json` | `contracts/examples/credential-lease-request.json` |
 | Credential lease | [credential-lease-contract.md](credential-lease-contract.md) | `contracts/schemas/credential-lease.schema.json` | `contracts/examples/credential-lease.json` |

@@ -1760,13 +1760,18 @@ export interface PluginInvocationResult {
     completedAt: string;
   };
   spec: {
-    outputDigest: Sha256Digest;
     usage: { wallTimeMillis: number; outputBytes: number };
   } & (
-    | { status: "succeeded"; output: Record<string, unknown>; error?: never }
+    | {
+        status: "succeeded";
+        outputDigest: Sha256Digest;
+        output: Record<string, unknown>;
+        error?: never;
+      }
     | {
         status: "failed" | "cancelled";
         error: { code: string };
+        outputDigest?: never;
         output?: never;
       }
   );

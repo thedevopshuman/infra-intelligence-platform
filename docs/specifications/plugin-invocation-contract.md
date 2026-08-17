@@ -16,12 +16,27 @@ a bounded JSON object and does not treat it as trusted provider data.
 
 `PluginInvocationResult` is created by the host, not trusted from the plugin. A
 successful result contains the method output, its canonical digest, wall time,
-and exact captured output bytes. A failed or cancelled result contains only a
-stable error code. Raw stderr, provider exceptions, credentials, and stack traces
-never cross this contract.
+and exact captured output bytes. A failed or cancelled result contains a stable
+error code and usage, but no output or output digest. Raw stderr, provider
+exceptions, credentials, and stack traces never cross this contract. Both the
+successful and failed examples are normative schema fixtures.
 
 Invocation and session timestamps must be ordered as `createdAt <= deadline <=
 session.expiresAt`. Tenant, session, request, plugin identity, and manifest digest
-must agree across all documents. The standalone runner rejects duplicate request
-IDs within its process. A production workflow must additionally claim and store
-requests durably before enabling any side-effecting plugin capability.
+must agree across all documents.
+
+Before starting a container, a durable runner atomically claims the exact-tenant
+request ID and binds it to the persisted session plus the canonical invocation
+digest. An exact retry returns a stored terminal result without execution even
+after its deadline; expiry prevents new impact, not read-only recovery. An
+unfinished claim returns `plugin.request.reconciliation-required`; it is never
+automatically replayed because the prior impact is unknown. Reusing an ID for
+different content or another session returns `plugin.request.conflict`.
+
+The session request limit is enforced in the same serialized transaction across
+runner replicas and restarts. A host runtime failure is stored as a terminal
+failed result. A failure to persist that terminal result leaves the claim
+ambiguous and therefore non-replayable. [ADR 0064](../decisions/0064-durable-plugin-invocation-ownership.md)
+defines these ownership semantics. Explicit cancellation and reconciliation are
+still required before connected or side-effecting plugin capabilities can be
+enabled.

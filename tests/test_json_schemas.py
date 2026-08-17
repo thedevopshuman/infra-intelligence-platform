@@ -590,6 +590,17 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(errors)
 
+    def test_failed_plugin_result_requires_only_a_stable_error(self) -> None:
+        result = document("contracts/examples/plugin-invocation-result-failed.json")
+
+        self.assertEqual(
+            self.validate("plugin-invocation-result.schema.json", result), []
+        )
+        result["spec"]["outputDigest"] = "sha256:" + "a" * 64
+        self.assertTrue(
+            self.validate("plugin-invocation-result.schema.json", result)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

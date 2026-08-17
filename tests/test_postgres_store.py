@@ -43,6 +43,7 @@ from iip.application.ingest_resource import (
     ResourceIngestionService,
     StaleObservationError,
 )
+from iip.application.investigate import canonical_digest
 from iip.application.ports import ActorContext, PersistenceError, SourceCheckpoint
 from iip.application.investigation_dispatch import InvestigationDispatchService
 from iip.application.rebuild_projections import (
@@ -728,7 +729,8 @@ class PostgresOperationalStoreTests(unittest.TestCase):
         with psycopg.connect(DATABASE_URL) as connection:
             connection.execute(
                 """
-                TRUNCATE iip.audit_records, iip.plugin_sessions,
+                TRUNCATE iip.audit_records, iip.plugin_invocations,
+                         iip.plugin_sessions,
                          iip.action_results, iip.action_executions,
                          iip.action_approvals,
                          iip.action_proposals, iip.investigation_jobs,
@@ -740,6 +742,114 @@ class PostgresOperationalStoreTests(unittest.TestCase):
                          iip.resource_projections
                 RESTART IDENTITY CASCADE
                 """
+            )
+
+    def test_plugin_claim_survives_reconnect_and_replays_only_terminal_result(self) -> None:
+        actor = ActorContext("plugin-host", "local")
+        session = json.loads(
+            (ROOT / "contracts/examples/plugin-session.json").read_text()
+        )
+        invocation = json.loads(
+            (ROOT / "contracts/examples/plugin-invocation.json").read_text()
+        )
+        result = json.loads(
+            (ROOT / "contracts/examples/plugin-invocation-result.json").read_text()
+        )
+        digest = canonical_digest(invocation)
+        self.operations.commit_plugin_session(actor, session)
+
+        claimed = self.operations.claim_plugin_invocation(
+            actor,
+            session,
+            invocation,
+            digest,
+            "2026-08-14T12:44:31Z",
+        )
+        reconnected = PostgresOperationalStore(DATABASE_URL)
+        ambiguous = reconnected.claim_plugin_invocation(
+            actor,
+            session,
+            invocation,
+            digest,
+            "2026-08-14T12:44:32Z",
+        )
+
+        self.assertEqual(claimed.state, "claimed")
+        self.assertEqual(ambiguous.state, "in-progress")
+        self.assertIsNone(ambiguous.result)
+
+        reconnected.commit_plugin_invocation_result(actor, digest, result)
+        replayed = self.operations.claim_plugin_invocation(
+            actor,
+            session,
+            invocation,
+            digest,
+            "2026-08-14T13:00:00Z",
+        )
+        self.assertEqual(replayed.state, "completed")
+        self.assertEqual(replayed.result, result)
+        reconnected.commit_plugin_invocation_result(actor, digest, result)
+
+    def test_plugin_claim_binds_content_tenant_session_and_atomic_request_limit(self) -> None:
+        actor = ActorContext("plugin-host", "local")
+        session = json.loads(
+            (ROOT / "contracts/examples/plugin-session.json").read_text()
+        )
+        invocation = json.loads(
+            (ROOT / "contracts/examples/plugin-invocation.json").read_text()
+        )
+        self.operations.commit_plugin_session(actor, session)
+        digest = canonical_digest(invocation)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            claims = tuple(
+                pool.map(
+                    lambda store: store.claim_plugin_invocation(
+                        actor,
+                        session,
+                        invocation,
+                        digest,
+                        "2026-08-14T12:44:31Z",
+                    ),
+                    (
+                        self.operations,
+                        PostgresOperationalStore(DATABASE_URL),
+                    ),
+                )
+            )
+        self.assertEqual(sorted(claim.state for claim in claims), ["claimed", "in-progress"])
+
+        conflicting = copy.deepcopy(invocation)
+        conflicting["spec"]["input"]["spec"]["startSequence"] = 43
+        with self.assertRaisesRegex(PersistenceError, "storage.conflict"):
+            self.operations.claim_plugin_invocation(
+                actor,
+                session,
+                conflicting,
+                canonical_digest(conflicting),
+                "2026-08-14T12:44:32Z",
+            )
+
+        next_invocation = copy.deepcopy(invocation)
+        next_invocation["metadata"]["id"] = "pin_88888888888888888888888888888888"
+        with self.assertRaisesRegex(PersistenceError, "plugin.request.limit-exceeded"):
+            self.operations.claim_plugin_invocation(
+                actor,
+                session,
+                next_invocation,
+                canonical_digest(next_invocation),
+                "2026-08-14T12:44:33Z",
+            )
+
+        cross_tenant = copy.deepcopy(invocation)
+        cross_tenant["metadata"]["tenantId"] = "another-tenant"
+        with self.assertRaisesRegex(PersistenceError, "storage.input-invalid"):
+            self.operations.claim_plugin_invocation(
+                actor,
+                session,
+                cross_tenant,
+                canonical_digest(cross_tenant),
+                "2026-08-14T12:44:34Z",
             )
 
     def test_evidence_metadata_and_artifact_are_durable_and_tenant_scoped(self) -> None:

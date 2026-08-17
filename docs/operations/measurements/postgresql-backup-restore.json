@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/operations/v1alpha1",
   "kind": "PostgreSQLBackupRestoreMeasurement",
   "metadata": {
-    "capturedAt": "2026-08-15T04:41:16.874492Z",
+    "capturedAt": "2026-08-17T11:14:12.470844Z",
     "environment": "docker-desktop-local",
     "hostArchitecture": "arm64"
   },
@@ -26,14 +26,14 @@
   },
   "status": {
     "backup": {
-      "bytes": 39443,
+      "bytes": 54127,
       "committedRecordLoss": 0,
-      "durationSeconds": 0.134848,
-      "recoveryPoint": "2026-08-15T04:41:16.304693Z",
-      "recoveryPointAgeSeconds": 0.137155
+      "durationSeconds": 0.150026,
+      "recoveryPoint": "2026-08-17T11:14:11.772230Z",
+      "recoveryPointAgeSeconds": 0.152442
     },
     "integrity": {
-      "databaseDigest": "sha256:4def673a5717c78e4149ff9110d8ad82717135c56b576166ba7b70aba1df56e6",
+      "databaseDigest": "sha256:4c7311ef4b788e544f68b48b1fb587e0c8a6a9464c9172a95554b3052d9f5cac",
       "matched": true,
       "projectionVerification": {
         "driftDetected": false,
@@ -42,52 +42,64 @@
         "relationshipCount": 1,
         "resourceCount": 1
       },
-      "rowCount": 22,
+      "rowCount": 33,
       "sequenceCount": 4,
-      "tableCount": 15,
+      "tableCount": 18,
       "tables": {
         "action_approvals": {
-          "digest": "sha256:69f7002e0276cdabb212297dca6bba1eda3c176f015b224c950485d4e79017f6",
+          "digest": "sha256:08d24c4bc47f9cee48a0618e471a862698f0c0673626c753c4fe5fd79bb8c6ae",
+          "rowCount": 1
+        },
+        "action_executions": {
+          "digest": "sha256:3693196b4049a1719ab987e13c2aa1861e312dab6e845f41afe171fc0c58698d",
           "rowCount": 1
         },
         "action_proposals": {
-          "digest": "sha256:0589bd83f88bc461d2e7c2dcd594b49f8f415f26d1e32d17ed4681e9bf6b2b26",
+          "digest": "sha256:74412ea5807284cc380536bf4463219d4340ae634d9de5c9aa4c3427d1db0f28",
           "rowCount": 1
         },
         "action_results": {
-          "digest": "sha256:08775e0fbb003fa83b68f4f8bc6a74525caebb3042eff918b15d887f8f155840",
+          "digest": "sha256:a5183ce352e06dff861446a31e9676859a8b2a7c04f528e2165cb7923cf69fd7",
           "rowCount": 1
         },
         "audit_records": {
-          "digest": "sha256:c004d2faf1f8becba6b458fbf4a6d160871e13548b892e020e9197e722f817d9",
-          "rowCount": 3
+          "digest": "sha256:750f8c7567d48da654e9b2ba0cb5de076a9f474f2fa382324b76c4b9b9cbc119",
+          "rowCount": 4
         },
         "event_log": {
-          "digest": "sha256:9ac587825406fe29c7ea34739d0950d1e3113f7cf571e7094a1da5521d940a29",
+          "digest": "sha256:e7b54f74c69a22b5cfe029eaaaf80c97855587bc41f04fcaf3edfc2128f3dcfc",
           "rowCount": 1
         },
         "event_outbox": {
-          "digest": "sha256:44e4b2c0507ab6bed7d1b7499fcdfc85ccdc33940b55989f0ad7b88da2d61b4a",
+          "digest": "sha256:4271bd6d03bcc1d0431feb71ce7d235c1e72d4453a016f3a4343d41181bd31e0",
           "rowCount": 1
         },
         "evidence_artifacts": {
-          "digest": "sha256:2d8451e3a2d33343976b022ae2b7433aeb7261b0e8596ea87cd4d62188236f61",
+          "digest": "sha256:5f3055b1622b13c532b08b50e3e208092adebd43f6494a36159848ab7888e056",
           "rowCount": 1
         },
+        "investigation_jobs": {
+          "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "rowCount": 0
+        },
         "investigations": {
-          "digest": "sha256:990c01886b1e52bc8049f3227cb801bf148efbc18eebc1fdd9ed37d9bc29d512",
+          "digest": "sha256:235c7f55e47f10da5a87ce8e43160d8bce691165e6dac531503f43c21aecb520",
+          "rowCount": 1
+        },
+        "plugin_invocations": {
+          "digest": "sha256:4ad6902d7a4147ea0d377e3d81c9b1fad7e92b855f226d90984e731110dd68ca",
           "rowCount": 1
         },
         "plugin_sessions": {
-          "digest": "sha256:a13b8e4ca8a95a8d4ce0ac59ad3029e49d862e1928a88fbf80b80576d9b7f544",
+          "digest": "sha256:7f96ef1d580a7aacfd89f8206716996c567a4c98f40374c6dff2c21146aa1f52",
           "rowCount": 1
         },
         "resource_observations": {
-          "digest": "sha256:18e4afcdb92a767d1f07e51fe1561c57eb7281c2e6ac6a7fa2ab4fda3831f96e",
+          "digest": "sha256:40d6ba211f6228183dcfc9924a3a5535214a372f806779fb91082135a74deb11",
           "rowCount": 1
         },
         "resource_projections": {
-          "digest": "sha256:205009b5693369870c61e08f0f6f9be74cee2f8753bca3ed564453d573468a93",
+          "digest": "sha256:6e4b6b4ead96bb8de487fac7c52e806d2d4eb531dc892d537eae235aeb60c9b8",
           "rowCount": 1
         },
         "resource_relationships": {
@@ -95,27 +107,28 @@
           "rowCount": 1
         },
         "schema_migrations": {
-          "digest": "sha256:529873cc712ab97dee0dab4d5952eb6e643dbbceb9128bd952d845dda3ea17f1",
-          "rowCount": 6
+          "digest": "sha256:635d7ef0d0e0942aa460df1cb59355d33fa0c088b168b5afa86e89aa7d2000a2",
+          "rowCount": 14
         },
         "source_checkpoints": {
-          "digest": "sha256:152cf3e85474b30e846014f99e06a4b33187835ce0ec1466f6abae11e5021b9f",
+          "digest": "sha256:973fff1684f1c952d9cb47d8e68d7e087cdbb446f4dfe5fd249ae8eafd40b6be",
           "rowCount": 1
         },
         "source_reconciliations": {
-          "digest": "sha256:037859d60bd34b1128b9f4132aac43dab6e051c860ec31e930f3f3e004489d20",
+          "digest": "sha256:954d3e975add19154516c9661cd36b181a11dd1efa88a405f3ef0f43fceb0359",
           "rowCount": 1
         }
       }
     },
     "objectivesMet": true,
     "restore": {
-      "commandDurationSeconds": 0.117969,
-      "recoveryReadySeconds": 0.341428
+      "commandDurationSeconds": 0.166477,
+      "recoveryReadySeconds": 0.448553
     },
     "seed": {
       "actionOutcome": "dry-run",
       "investigationOutcome": "conclusive",
+      "pluginInvocationState": "claimed",
       "pluginSessionStatus": "ready",
       "resourceCount": 1,
       "tenantId": "local"

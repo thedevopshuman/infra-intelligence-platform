@@ -113,6 +113,22 @@ class RecordingTransport:
         return json.dumps(self.output, separators=(",", ":")).encode()
 
 
+class FailingTransport(RecordingTransport):
+    def run(self, image_reference, payload, *, timeout_seconds, max_output_bytes):
+        super().run(
+            image_reference,
+            payload,
+            timeout_seconds=timeout_seconds,
+            max_output_bytes=max_output_bytes,
+        )
+        raise PluginRunnerError("plugin.runtime.deadline-exceeded")
+
+
+class LeakyTransport(RecordingTransport):
+    def run(self, image_reference, payload, *, timeout_seconds, max_output_bytes):
+        raise PluginRunnerError("provider secret and stack detail")
+
+
 class SignedDockerPluginRunnerTests(unittest.TestCase):
     actor = ActorContext("plugin-host", "local", ("developer",))
 
@@ -193,20 +209,92 @@ class SignedDockerPluginRunnerTests(unittest.TestCase):
                         self.actor, manifest, session, invocation, TOKEN
                     )
 
-    def test_request_accounting_is_atomic_and_output_must_be_json_object(self) -> None:
+    def test_completed_request_is_replayed_without_duplicate_execution(self) -> None:
         manifest, trust = signed_fixture()
         session, invocation = scoped_documents(manifest)
         ledger = InMemoryPluginExecutionLedger()
-        runner = self.runner(trust, RecordingTransport(), ledger)
-        runner.run(self.actor, manifest, session, invocation, TOKEN)
+        transport = RecordingTransport()
+        runner = self.runner(trust, transport, ledger)
+        first = runner.run(self.actor, manifest, session, invocation, TOKEN)
+        second = runner.run(self.actor, manifest, session, invocation, TOKEN)
 
-        with self.assertRaisesRegex(PluginRunnerError, "request.duplicate"):
-            runner.run(self.actor, manifest, session, invocation, TOKEN)
+        self.assertEqual(second, first)
+        self.assertEqual(len(transport.calls), 1)
+
+        after_expiry_transport = RecordingTransport()
+        after_expiry = SignedDockerPluginRunner(
+            trust,
+            transport=after_expiry_transport,
+            ledger=ledger,
+            now=lambda: datetime(2026, 8, 14, 12, 50, tzinfo=timezone.utc),
+        ).run(self.actor, manifest, session, invocation, TOKEN)
+        self.assertEqual(after_expiry, first)
+        self.assertEqual(after_expiry_transport.calls, [])
+
+        conflicting = copy.deepcopy(invocation)
+        conflicting["spec"]["input"]["spec"]["startSequence"] = 43
+        with self.assertRaisesRegex(PluginRunnerError, "request.conflict"):
+            runner.run(self.actor, manifest, session, conflicting, TOKEN)
+
+    def test_ambiguous_claim_is_not_replayed_and_session_limit_is_atomic(self) -> None:
+        manifest, trust = signed_fixture()
+        session, invocation = scoped_documents(manifest)
+        ledger = InMemoryPluginExecutionLedger()
+        ledger.claim_plugin_invocation(
+            self.actor,
+            session,
+            invocation,
+            canonical_digest(invocation),
+            "2026-08-14T12:44:40Z",
+        )
+        transport = RecordingTransport()
+
+        with self.assertRaisesRegex(PluginRunnerError, "reconciliation-required"):
+            self.runner(trust, transport, ledger).run(
+                self.actor, manifest, session, invocation, TOKEN
+            )
+        self.assertEqual(transport.calls, [])
+
+        next_invocation = copy.deepcopy(invocation)
+        next_invocation["metadata"]["id"] = "pin_88888888888888888888888888888888"
+        with self.assertRaisesRegex(PluginRunnerError, "limit-exceeded"):
+            self.runner(trust, transport, ledger).run(
+                self.actor, manifest, session, next_invocation, TOKEN
+            )
+
+    def test_runtime_and_output_failures_become_durable_terminal_results(self) -> None:
+        manifest, trust = signed_fixture()
+        session, invocation = scoped_documents(manifest)
+        ledger = InMemoryPluginExecutionLedger()
+        transport = FailingTransport()
+        runner = self.runner(trust, transport, ledger)
+
+        failed = runner.run(self.actor, manifest, session, invocation, TOKEN)
+        replayed = runner.run(self.actor, manifest, session, invocation, TOKEN)
+
+        self.assertEqual(failed, replayed)
+        self.assertEqual(failed["spec"]["status"], "failed")
+        self.assertEqual(
+            failed["spec"]["error"]["code"],
+            "plugin.runtime.deadline-exceeded",
+        )
+        self.assertNotIn("outputDigest", failed["spec"])
+        self.assertEqual(len(transport.calls), 1)
 
         session, invocation = scoped_documents(manifest)
         invalid = self.runner(trust, RecordingTransport(b"[]"))
-        with self.assertRaisesRegex(PluginRunnerError, "output.invalid"):
-            invalid.run(self.actor, manifest, session, invocation, TOKEN)
+        invalid_result = invalid.run(
+            self.actor, manifest, session, invocation, TOKEN
+        )
+        self.assertEqual(invalid_result["spec"]["status"], "failed")
+        self.assertEqual(invalid_result["spec"]["error"]["code"], "plugin.output.invalid")
+
+        session, invocation = scoped_documents(manifest)
+        leaky = self.runner(trust, LeakyTransport()).run(
+            self.actor, manifest, session, invocation, TOKEN
+        )
+        self.assertEqual(leaky["spec"]["error"]["code"], "plugin.runtime.failed")
+        self.assertNotIn("secret", json.dumps(leaky))
 
     def test_trust_configuration_is_closed_and_key_ids_are_unique(self) -> None:
         _, trust = signed_fixture()

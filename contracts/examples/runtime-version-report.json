@@ -6,15 +6,15 @@
     "evaluatedAt": "2026-08-17T15:00:00Z"
   },
   "spec": {
-    "application": {"version": "0.37.0"},
+    "application": {"version": "0.38.0"},
     "contracts": {"apiVersion": "iip.platform/v1alpha1"},
-    "storage": {"requiredMigration": "0013_evidence_artifact_retention.sql"},
+    "storage": {"requiredMigration": "0014_durable_plugin_invocations.sql"},
     "build": {
       "mode": "release",
       "revision": "0123456789abcdef0123456789abcdef01234567"
     },
     "deployment": {
-      "helmChartVersion": "0.39.0",
+      "helmChartVersion": "0.40.0",
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     }
   }

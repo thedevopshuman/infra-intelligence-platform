@@ -22,7 +22,12 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from iip.application.investigate import canonical_digest
-from iip.application.ports import ActorContext
+from iip.application.ports import (
+    ActorContext,
+    PersistenceError,
+    PluginInvocationClaim,
+    PluginInvocationLedger,
+)
 
 
 _DIGEST = re.compile(r"sha256:[a-f0-9]{64}")
@@ -35,6 +40,15 @@ _CAPABILITY = re.compile(r"[a-z][a-z0-9-]{2,63}")
 _METHOD = re.compile(r"[a-z][a-z0-9.-]{1,63}")
 _OCI_REFERENCE = re.compile(
     r"(?:[a-z0-9][a-z0-9._:/-]{0,957}@)?sha256:[a-f0-9]{64}"
+)
+_TERMINAL_RUNTIME_ERRORS = frozenset(
+    {
+        "plugin.output.invalid",
+        "plugin.runtime.deadline-exceeded",
+        "plugin.runtime.failed",
+        "plugin.runtime.output-limit-exceeded",
+        "plugin.runtime.unavailable",
+    }
 )
 
 
@@ -364,20 +378,96 @@ class DockerCliPluginTransport:
 
 
 class InMemoryPluginExecutionLedger:
-    """Atomic process-local request accounting for the standalone runner."""
+    """Process-local implementation of the durable claim contract for tests."""
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
-        self._claimed: dict[str, set[str]] = {}
+        self._records: dict[
+            tuple[str, str],
+            tuple[str, str, Mapping[str, object] | None],
+        ] = {}
 
-    def claim(self, session_id: str, request_id: str, maximum: int) -> None:
+    def claim_plugin_invocation(
+        self,
+        actor: ActorContext,
+        session: Mapping[str, object],
+        invocation: Mapping[str, object],
+        request_digest: str,
+        claimed_at: str,
+    ) -> PluginInvocationClaim:
+        session_metadata = session.get("metadata")
+        session_spec = session.get("spec")
+        invocation_metadata = invocation.get("metadata")
+        limits = session_spec.get("limits") if isinstance(session_spec, Mapping) else None
+        if (
+            not isinstance(session_metadata, Mapping)
+            or not isinstance(invocation_metadata, Mapping)
+            or not isinstance(limits, Mapping)
+            or session_metadata.get("tenantId") != actor.tenant_id
+            or invocation_metadata.get("tenantId") != actor.tenant_id
+            or invocation_metadata.get("sessionId") != session_metadata.get("id")
+            or canonical_digest(invocation) != request_digest
+        ):
+            raise PersistenceError("storage.input-invalid")
+        session_id = str(session_metadata["id"])
+        request_id = str(invocation_metadata["id"])
+        maximum = limits.get("maxRequests")
+        if isinstance(maximum, bool) or not isinstance(maximum, int):
+            raise PersistenceError("storage.input-invalid")
+        key = (actor.tenant_id, request_id)
         with self._lock:
-            requests = self._claimed.setdefault(session_id, set())
-            if request_id in requests:
-                raise PluginRunnerError("plugin.request.duplicate")
-            if len(requests) >= maximum:
+            existing = self._records.get(key)
+            if existing is not None:
+                existing_session, existing_digest, result = existing
+                if existing_session != session_id or existing_digest != request_digest:
+                    raise PersistenceError("storage.conflict")
+                return PluginInvocationClaim(
+                    "completed" if result is not None else "in-progress",
+                    dict(result) if result is not None else None,
+                )
+            count = sum(
+                1
+                for (tenant_id, _), (record_session, _, _) in self._records.items()
+                if tenant_id == actor.tenant_id and record_session == session_id
+            )
+            try:
+                created = _timestamp(invocation_metadata["createdAt"])
+                deadline = _timestamp(invocation_metadata["deadline"])
+                expires = _timestamp(session_spec["expiresAt"])
+                claim_time = _timestamp(claimed_at)
+            except (KeyError, TypeError, ValueError):
+                raise PersistenceError("storage.input-invalid") from None
+            if not created <= claim_time <= deadline <= expires:
+                raise PersistenceError("plugin.request.expired")
+            if count >= maximum:
                 raise PluginRunnerError("plugin.request.limit-exceeded")
-            requests.add(request_id)
+            self._records[key] = (session_id, request_digest, None)
+            return PluginInvocationClaim("claimed")
+
+    def commit_plugin_invocation_result(
+        self,
+        actor: ActorContext,
+        request_digest: str,
+        result: Mapping[str, object],
+    ) -> None:
+        metadata = result.get("metadata")
+        if not isinstance(metadata, Mapping) or metadata.get("tenantId") != actor.tenant_id:
+            raise PersistenceError("storage.input-invalid")
+        key = (actor.tenant_id, str(metadata.get("id")))
+        with self._lock:
+            existing = self._records.get(key)
+            if existing is None:
+                raise PersistenceError("storage.not-found")
+            session_id, existing_digest, current = existing
+            if (
+                existing_digest != request_digest
+                or metadata.get("sessionId") != session_id
+            ):
+                raise PersistenceError("storage.conflict")
+            value = dict(result)
+            if current is not None and dict(current) != value:
+                raise PersistenceError("storage.conflict")
+            self._records[key] = (session_id, existing_digest, value)
 
 
 class SignedDockerPluginRunner:
@@ -388,7 +478,7 @@ class SignedDockerPluginRunner:
         trust_store: PluginTrustStore,
         configuration: PluginRunnerConfiguration | None = None,
         transport: PluginContainerTransport | None = None,
-        ledger: InMemoryPluginExecutionLedger | None = None,
+        ledger: PluginInvocationLedger | None = None,
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -417,48 +507,125 @@ class SignedDockerPluginRunner:
             permissions.get(name) for name in ("network", "secrets", "actions")
         ):
             raise PluginRunnerError("plugin.permission.unsupported")
-        limits = session_spec["limits"]
-        self._ledger.claim(
-            session_metadata["id"], metadata["id"], limits["maxRequests"]
-        )
         payload = _canonical_bytes(invocation) + b"\n"
         if len(payload) > self._configuration.max_input_bytes:
             raise PluginRunnerError("plugin.input.too-large")
-        start = self._monotonic()
-        output_bytes = self._transport.run(
-            image_reference,
-            payload,
-            timeout_seconds=limits["maxWallTimeSeconds"],
-            max_output_bytes=limits["maxOutputBytes"],
-        )
-        elapsed = max(0, round((self._monotonic() - start) * 1000))
+        request_digest = canonical_digest(invocation)
         try:
-            output = json.loads(output_bytes)
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            raise PluginRunnerError("plugin.output.invalid") from None
-        if not isinstance(output, dict):
-            raise PluginRunnerError("plugin.output.invalid")
+            claim = self._ledger.claim_plugin_invocation(
+                actor,
+                session,
+                invocation,
+                request_digest,
+                self._now().isoformat().replace("+00:00", "Z"),
+            )
+        except PersistenceError as error:
+            raise PluginRunnerError(_persistence_code(error)) from None
+        if claim.state == "completed":
+            if not isinstance(claim.result, Mapping):
+                raise PluginRunnerError("plugin.execution.persistence-corrupt")
+            return dict(claim.result)
+        if claim.state == "in-progress":
+            raise PluginRunnerError("plugin.request.reconciliation-required")
+        if claim.state != "claimed" or claim.result is not None:
+            raise PluginRunnerError("plugin.execution.persistence-corrupt")
+
+        limits = session_spec["limits"]
+        start = self._monotonic()
+        try:
+            output_bytes = self._transport.run(
+                image_reference,
+                payload,
+                timeout_seconds=limits["maxWallTimeSeconds"],
+                max_output_bytes=limits["maxOutputBytes"],
+            )
+            try:
+                output = json.loads(output_bytes)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                raise PluginRunnerError("plugin.output.invalid") from None
+            if not isinstance(output, dict):
+                raise PluginRunnerError("plugin.output.invalid")
+            result = self._result(
+                actor,
+                manifest,
+                metadata,
+                session_metadata,
+                status="succeeded",
+                wall_time_millis=self._elapsed_millis(start),
+                output_bytes=len(output_bytes),
+                output=output,
+            )
+        except PluginRunnerError as error:
+            result = self._result(
+                actor,
+                manifest,
+                metadata,
+                session_metadata,
+                status="failed",
+                wall_time_millis=self._elapsed_millis(start),
+                output_bytes=0,
+                error_code=_runtime_error_code(error),
+            )
+        except Exception:
+            result = self._result(
+                actor,
+                manifest,
+                metadata,
+                session_metadata,
+                status="failed",
+                wall_time_millis=self._elapsed_millis(start),
+                output_bytes=0,
+                error_code="plugin.runtime.failed",
+            )
+        try:
+            self._ledger.commit_plugin_invocation_result(
+                actor, request_digest, result
+            )
+        except PersistenceError as error:
+            raise PluginRunnerError(_persistence_code(error)) from None
+        return result
+
+    def _elapsed_millis(self, start: float) -> int:
+        return min(max(0, round((self._monotonic() - start) * 1000)), 3_600_000)
+
+    def _result(
+        self,
+        actor: ActorContext,
+        manifest: Mapping[str, object],
+        invocation_metadata: Mapping[str, object],
+        session_metadata: Mapping[str, object],
+        *,
+        status: str,
+        wall_time_millis: int,
+        output_bytes: int,
+        output: Mapping[str, object] | None = None,
+        error_code: str | None = None,
+    ) -> dict[str, object]:
         plugin_metadata = manifest["metadata"]
+        assert isinstance(plugin_metadata, Mapping)
+        spec: dict[str, object] = {
+            "status": status,
+            "usage": {
+                "wallTimeMillis": wall_time_millis,
+                "outputBytes": output_bytes,
+            },
+        }
+        if status == "succeeded" and output is not None:
+            spec.update(outputDigest=canonical_digest(output), output=dict(output))
+        elif error_code is not None:
+            spec["error"] = {"code": error_code}
         return {
             "apiVersion": "iip.platform/v1alpha1",
             "kind": "PluginInvocationResult",
             "metadata": {
-                "id": metadata["id"],
+                "id": invocation_metadata["id"],
                 "sessionId": session_metadata["id"],
                 "tenantId": actor.tenant_id,
                 "pluginId": plugin_metadata["id"],
                 "pluginVersion": plugin_metadata["version"],
                 "completedAt": self._now().isoformat().replace("+00:00", "Z"),
             },
-            "spec": {
-                "status": "succeeded",
-                "outputDigest": canonical_digest(output),
-                "output": output,
-                "usage": {
-                    "wallTimeMillis": min(elapsed, 3_600_000),
-                    "outputBytes": len(output_bytes),
-                },
-            },
+            "spec": spec,
         }
 
     def _validate_scope(
@@ -533,8 +700,7 @@ class SignedDockerPluginRunner:
             created = _timestamp(metadata["createdAt"])
             deadline = _timestamp(metadata["deadline"])
             expires = _timestamp(session_spec["expiresAt"])
-            now = self._now()
-            if not created <= now <= deadline <= expires:
+            if not created <= deadline <= expires:
                 raise PluginRunnerError("plugin.request.expired")
             capability = spec["capability"]
             method = spec["method"]
@@ -601,3 +767,19 @@ def _docker_environment() -> dict[str, str]:
         for name in ("PATH", "HOME", "DOCKER_HOST", "DOCKER_CONTEXT")
         if name in os.environ
     }
+
+
+def _persistence_code(error: PersistenceError) -> str:
+    return {
+        "storage.not-found": "plugin.session.not-found",
+        "storage.conflict": "plugin.request.conflict",
+        "storage.input-invalid": "plugin.request.invalid",
+        "storage.corrupt": "plugin.execution.persistence-corrupt",
+        "plugin.request.limit-exceeded": "plugin.request.limit-exceeded",
+        "plugin.request.expired": "plugin.request.expired",
+    }.get(str(error), "plugin.execution.persistence-unavailable")
+
+
+def _runtime_error_code(error: PluginRunnerError) -> str:
+    code = str(error)
+    return code if code in _TERMINAL_RUNTIME_ERRORS else "plugin.runtime.failed"

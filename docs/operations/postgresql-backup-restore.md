@@ -17,7 +17,7 @@ make test-backup-restore
 The command performs these bounded steps:
 
 1. Start PostgreSQL 18.4 under the isolated `iip-backup-restore` Compose project.
-2. Migrate and seed a reconciliation, resource graph edge, event/outbox entry, evidence-backed investigation, governed dry-run action, plugin session, and audit records.
+2. Migrate and seed a reconciliation, resource graph edge, event/outbox entry, evidence-backed investigation, governed dry-run action, plugin session, completed plugin invocation claim/result, and audit records.
 3. Record a canonical source manifest and a database recovery-point marker.
 4. Create a consistent custom-format logical backup with `pg_dump` while the fixture workload is quiesced.
 5. Restore into the explicitly separate `iip_restore` database.
@@ -43,7 +43,7 @@ The output path must be protected like other operational evidence even though th
 - `projectionVerification.driftDetected` must be false, proving that restored serving projections agree with immutable accepted observations.
 - `objectivesMet` applies only to the 60-second recovery-point-age and 120-second recovery-readiness local guardrails recorded in ADR 0010.
 
-The baseline captured on 2026-08-15 is stored in [the measurement report](measurements/postgresql-backup-restore.json). It restored 22 rows across 15 tables and 4 sequences with an identical digest. Backup duration was 0.135 seconds, recovery-point age was 0.137 seconds, and verified recovery readiness was 0.341 seconds on the local arm64 Docker Desktop environment.
+The current baseline captured on 2026-08-17 is stored in [the measurement report](measurements/postgresql-backup-restore.json). It restored 33 rows across all 18 tables, including the durable plugin claim and terminal result, plus 4 sequences with an identical digest. Backup duration was 0.150 seconds, recovery-point age was 0.152 seconds, and verified recovery readiness was 0.449 seconds on the local arm64 Docker Desktop environment.
 
 ## Scheduled Helm backup baseline
 

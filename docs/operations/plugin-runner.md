@@ -26,3 +26,14 @@ Production deployment must place Docker/containerd access in a dedicated runner
 service, configure reviewed publisher public keys, pre-pull digest-pinned images,
 and export runner audit/SLO telemetry. Never mount a container runtime socket or
 customer cloud/Kubernetes credentials into the API pod.
+
+The conformance command intentionally uses the process-local implementation of
+the claim state machine. A production runner must inject the PostgreSQL
+operational store so claims and terminal results survive restarts. An exact
+completed retry is served from storage; `plugin.request.reconciliation-required`
+means a prior attempt may have produced impact and must not be automatically
+retried. Restarting or deleting runner processes is not a recovery action.
+
+The durable ledger does not by itself authorize connected or side-effecting
+plugins. Network, secrets, and actions remain denied until mediated grants,
+cancellation propagation, and an operator-owned reconciliation policy exist.

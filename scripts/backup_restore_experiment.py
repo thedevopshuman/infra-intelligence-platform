@@ -30,10 +30,11 @@ from iip.application.actions import (
     ProposeActionCommand,
 )
 from iip.application.ingest_collection import IngestCollectionCommand
-from iip.application.investigate import RunInvestigationCommand
+from iip.application.investigate import RunInvestigationCommand, canonical_digest
 from iip.application.plugin_sessions import OpenPluginSessionCommand
 from iip.application.ports import ActorContext
 from iip.application.rebuild_projections import RebuildProjectionsCommand
+from iip.adapters.postgres import PostgresOperationalStore
 from iip.bootstrap import build_postgres_runtime, build_projection_maintenance
 
 
@@ -244,9 +245,44 @@ def seed_reference_workflow(database_url_value: str) -> dict[str, object]:
             secrets.token_urlsafe(32),
         )
     )
+    invocation = load_example("plugin-invocation.json")
+    invocation["metadata"].update(
+        {
+            "sessionId": plugin_session["metadata"]["id"],
+            "tenantId": investigator.tenant_id,
+            "actorId": investigator.actor_id,
+            "createdAt": plugin_session["metadata"]["createdAt"],
+            "deadline": plugin_session["spec"]["expiresAt"],
+        }
+    )
+    invocation["spec"]["manifestDigest"] = plugin_session["spec"]["manifestDigest"]
+    invocation_digest = canonical_digest(invocation)
+    result = load_example("plugin-invocation-result.json")
+    result["metadata"].update(
+        {
+            "id": invocation["metadata"]["id"],
+            "sessionId": plugin_session["metadata"]["id"],
+            "tenantId": investigator.tenant_id,
+            "pluginId": plugin_session["metadata"]["pluginId"],
+            "pluginVersion": plugin_session["metadata"]["pluginVersion"],
+            "completedAt": plugin_session["spec"]["expiresAt"],
+        }
+    )
+    operations = PostgresOperationalStore(database_url_value)
+    claim = operations.claim_plugin_invocation(
+        investigator,
+        plugin_session,
+        invocation,
+        invocation_digest,
+        str(invocation["metadata"]["createdAt"]),
+    )
+    operations.commit_plugin_invocation_result(
+        investigator, invocation_digest, result
+    )
     return {
         "actionOutcome": action_result["spec"]["outcome"],
         "investigationOutcome": report["spec"]["outcome"],
+        "pluginInvocationState": claim.state,
         "pluginSessionStatus": plugin_session["status"],
         "resourceCount": len(resources),
         "tenantId": target.identity.tenant_id,

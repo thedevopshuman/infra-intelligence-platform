@@ -25,7 +25,7 @@
     "spec": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "outputDigest", "usage"],
+      "required": ["status", "usage"],
       "properties": {
         "status": {"type": "string", "enum": ["succeeded", "failed", "cancelled"]},
         "outputDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
@@ -47,8 +47,8 @@
         }
       },
       "allOf": [
-        {"if": {"properties": {"status": {"const": "succeeded"}}}, "then": {"required": ["output"], "not": {"required": ["error"]}}},
-        {"if": {"properties": {"status": {"enum": ["failed", "cancelled"]}}}, "then": {"required": ["error"], "not": {"required": ["output"]}}}
+        {"if": {"properties": {"status": {"const": "succeeded"}}}, "then": {"required": ["outputDigest", "output"], "not": {"anyOf": [{"required": ["error"]}]}}},
+        {"if": {"properties": {"status": {"enum": ["failed", "cancelled"]}}}, "then": {"required": ["error"], "not": {"anyOf": [{"required": ["outputDigest"]}, {"required": ["output"]}]}}}
       ]
     }
   }

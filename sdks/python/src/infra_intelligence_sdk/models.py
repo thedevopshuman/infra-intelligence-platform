@@ -2622,7 +2622,7 @@ class PluginInvocation:
 
 @dataclass(frozen=True)
 class PluginInvocationResult:
-    """Bounded host-wrapped plugin output with stable runtime status."""
+    """Durably replayable host result with output or a stable terminal error."""
 
     payload: Mapping[str, Any]
 

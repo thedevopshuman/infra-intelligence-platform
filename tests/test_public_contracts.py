@@ -193,6 +193,9 @@ class PublicContractSdkTests(unittest.TestCase):
         plugin_result = PluginInvocationResult.from_dict(
             example("plugin-invocation-result.json")
         )
+        failed_plugin_result = PluginInvocationResult.from_dict(
+            example("plugin-invocation-result-failed.json")
+        )
         policy_request = PolicyDecisionRequest.from_dict(
             example("policy-decision-request.json")
         )
@@ -398,6 +401,9 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(plugin_invocation.to_dict()["kind"], "PluginInvocation")
         self.assertEqual(
             plugin_result.to_dict()["kind"], "PluginInvocationResult"
+        )
+        self.assertEqual(
+            failed_plugin_result.to_dict()["spec"]["status"], "failed"
         )
         self.assertEqual(
             policy_request.to_dict()["kind"], "PolicyDecisionRequest"

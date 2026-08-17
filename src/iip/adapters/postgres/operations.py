@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 import secrets
+from datetime import datetime
 from typing import Iterable, Mapping, Optional
 
 import psycopg
@@ -20,6 +21,7 @@ from iip.application.ports import (
     InvestigationCompletionSloState,
     InvestigationJobClaim,
     PersistenceError,
+    PluginInvocationClaim,
 )
 
 
@@ -1362,6 +1364,203 @@ class PostgresOperationalStore:
             (actor.tenant_id, session_id),
         )
 
+    def claim_plugin_invocation(
+        self,
+        actor: ActorContext,
+        session: Mapping[str, object],
+        invocation: Mapping[str, object],
+        request_digest: str,
+        claimed_at: str,
+    ) -> PluginInvocationClaim:
+        self._assert_tenant(actor, session)
+        self._assert_tenant(actor, invocation)
+        session_metadata = session.get("metadata")
+        session_spec = session.get("spec")
+        invocation_metadata = invocation.get("metadata")
+        limits = session_spec.get("limits") if isinstance(session_spec, Mapping) else None
+        created_at = (
+            invocation_metadata.get("createdAt")
+            if isinstance(invocation_metadata, Mapping)
+            else None
+        )
+        deadline = (
+            invocation_metadata.get("deadline")
+            if isinstance(invocation_metadata, Mapping)
+            else None
+        )
+        expires_at = session_spec.get("expiresAt") if isinstance(session_spec, Mapping) else None
+        if (
+            not isinstance(session_metadata, Mapping)
+            or not isinstance(invocation_metadata, Mapping)
+            or not isinstance(limits, Mapping)
+            or re.fullmatch(r"psn_[a-f0-9]{32}", str(session_metadata.get("id")))
+            is None
+            or re.fullmatch(r"pin_[a-f0-9]{32}", str(invocation_metadata.get("id")))
+            is None
+            or invocation_metadata.get("sessionId") != session_metadata.get("id")
+            or canonical_digest(invocation) != request_digest
+            or re.fullmatch(r"sha256:[a-f0-9]{64}", request_digest) is None
+            or isinstance(limits.get("maxRequests"), bool)
+            or not isinstance(limits.get("maxRequests"), int)
+            or not 1 <= limits["maxRequests"] <= 10_000
+            or not self._valid_timestamp(claimed_at)
+            or not self._valid_timestamp(created_at)
+            or not self._valid_timestamp(deadline)
+            or not self._valid_timestamp(expires_at)
+        ):
+            raise PersistenceError("storage.input-invalid")
+        session_id = str(session_metadata["id"])
+        request_id = str(invocation_metadata["id"])
+        try:
+            with self._connect() as connection:
+                stored_session = connection.execute(
+                    """
+                    SELECT document
+                    FROM iip.plugin_sessions
+                    WHERE tenant_id = %s AND session_id = %s
+                    FOR UPDATE
+                    """,
+                    (actor.tenant_id, session_id),
+                ).fetchone()
+                if stored_session is None:
+                    raise PersistenceError("storage.not-found")
+                if dict(stored_session["document"]) != dict(session):
+                    raise PersistenceError("storage.conflict")
+                existing = connection.execute(
+                    """
+                    SELECT session_id, request_digest, state, result_document
+                    FROM iip.plugin_invocations
+                    WHERE tenant_id = %s AND request_id = %s
+                    """,
+                    (actor.tenant_id, request_id),
+                ).fetchone()
+                if existing is not None:
+                    if (
+                        existing["session_id"] != session_id
+                        or existing["request_digest"] != request_digest
+                    ):
+                        raise PersistenceError("storage.conflict")
+                    result = existing["result_document"]
+                    if existing["state"] == "completed" and isinstance(result, Mapping):
+                        return PluginInvocationClaim("completed", dict(result))
+                    if existing["state"] == "claimed" and result is None:
+                        return PluginInvocationClaim("in-progress")
+                    raise PersistenceError("storage.corrupt")
+                assert isinstance(created_at, str)
+                assert isinstance(deadline, str)
+                assert isinstance(expires_at, str)
+                if not (
+                    self._parse_timestamp(created_at)
+                    <= self._parse_timestamp(claimed_at)
+                    <= self._parse_timestamp(deadline)
+                    <= self._parse_timestamp(expires_at)
+                ):
+                    raise PersistenceError("plugin.request.expired")
+                count = connection.execute(
+                    """
+                    SELECT count(*) AS request_count
+                    FROM iip.plugin_invocations
+                    WHERE tenant_id = %s AND session_id = %s
+                    """,
+                    (actor.tenant_id, session_id),
+                ).fetchone()
+                if count is None:
+                    raise PersistenceError("storage.corrupt")
+                if int(count["request_count"]) >= limits["maxRequests"]:
+                    raise PersistenceError("plugin.request.limit-exceeded")
+                connection.execute(
+                    """
+                    INSERT INTO iip.plugin_invocations (
+                        tenant_id, request_id, session_id, request_digest,
+                        invocation_document, state, claimed_at
+                    ) VALUES (%s, %s, %s, %s, %s, 'claimed', %s)
+                    """,
+                    (
+                        actor.tenant_id,
+                        request_id,
+                        session_id,
+                        request_digest,
+                        Jsonb(dict(invocation)),
+                        claimed_at,
+                    ),
+                )
+                return PluginInvocationClaim("claimed")
+        except PersistenceError:
+            raise
+        except psycopg.errors.UniqueViolation:
+            raise PersistenceError("storage.conflict") from None
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def commit_plugin_invocation_result(
+        self,
+        actor: ActorContext,
+        request_digest: str,
+        result: Mapping[str, object],
+    ) -> None:
+        self._assert_tenant(actor, result)
+        metadata = result.get("metadata")
+        spec = result.get("spec")
+        if (
+            not isinstance(metadata, Mapping)
+            or not isinstance(spec, Mapping)
+            or re.fullmatch(r"pin_[a-f0-9]{32}", str(metadata.get("id"))) is None
+            or re.fullmatch(r"psn_[a-f0-9]{32}", str(metadata.get("sessionId")))
+            is None
+            or re.fullmatch(r"sha256:[a-f0-9]{64}", request_digest) is None
+            or spec.get("status") not in ("succeeded", "failed", "cancelled")
+            or not self._valid_timestamp(metadata.get("completedAt"))
+        ):
+            raise PersistenceError("storage.input-invalid")
+        request_id = str(metadata["id"])
+        session_id = str(metadata["sessionId"])
+        value = dict(result)
+        try:
+            with self._connect() as connection:
+                existing = connection.execute(
+                    """
+                    SELECT session_id, request_digest, state, result_document
+                    FROM iip.plugin_invocations
+                    WHERE tenant_id = %s AND request_id = %s
+                    FOR UPDATE
+                    """,
+                    (actor.tenant_id, request_id),
+                ).fetchone()
+                if existing is None:
+                    raise PersistenceError("storage.not-found")
+                if (
+                    existing["session_id"] != session_id
+                    or existing["request_digest"] != request_digest
+                ):
+                    raise PersistenceError("storage.conflict")
+                if existing["state"] == "completed":
+                    current = existing["result_document"]
+                    if isinstance(current, Mapping) and dict(current) == value:
+                        return
+                    raise PersistenceError("storage.conflict")
+                if existing["state"] != "claimed" or existing["result_document"] is not None:
+                    raise PersistenceError("storage.corrupt")
+                updated = connection.execute(
+                    """
+                    UPDATE iip.plugin_invocations
+                    SET state = 'completed', result_document = %s, completed_at = %s
+                    WHERE tenant_id = %s AND request_id = %s AND state = 'claimed'
+                    RETURNING request_id
+                    """,
+                    (
+                        Jsonb(value),
+                        metadata["completedAt"],
+                        actor.tenant_id,
+                        request_id,
+                    ),
+                ).fetchone()
+                if updated is None:
+                    raise PersistenceError("storage.conflict")
+        except PersistenceError:
+            raise
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
     def append_audit(
         self,
         actor: ActorContext,
@@ -1424,3 +1623,17 @@ class PostgresOperationalStore:
         metadata = document.get("metadata")
         if not isinstance(metadata, Mapping) or metadata.get("tenantId") != actor.tenant_id:
             raise PersistenceError("storage.input-invalid")
+
+    @staticmethod
+    def _valid_timestamp(value: object) -> bool:
+        if not isinstance(value, str) or not value.endswith("Z"):
+            return False
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        return parsed.tzinfo is not None
+
+    @staticmethod
+    def _parse_timestamp(value: str) -> datetime:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))

@@ -1147,6 +1147,34 @@ class PluginSessionRepository(Protocol):
         """Resolve one tenant-scoped plugin session."""
 
 
+@dataclass(frozen=True)
+class PluginInvocationClaim:
+    """Atomic ownership outcome for one canonical plugin invocation."""
+
+    state: str
+    result: Optional[Mapping[str, object]] = None
+
+
+class PluginInvocationLedger(Protocol):
+    def claim_plugin_invocation(
+        self,
+        actor: ActorContext,
+        session: Mapping[str, object],
+        invocation: Mapping[str, object],
+        request_digest: str,
+        claimed_at: str,
+    ) -> PluginInvocationClaim:
+        """Claim once, recover a terminal result, or report ambiguous ownership."""
+
+    def commit_plugin_invocation_result(
+        self,
+        actor: ActorContext,
+        request_digest: str,
+        result: Mapping[str, object],
+    ) -> None:
+        """Persist one terminal host-created result for its exact request digest."""
+
+
 class AuditSink(Protocol):
     def append_audit(
         self,

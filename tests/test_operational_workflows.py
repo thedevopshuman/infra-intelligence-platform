@@ -138,6 +138,7 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
             def __init__(self) -> None:
                 self.requests: list[TelemetryMetricsQuery] = []
                 self.values = (0.07, 0.09)
+                self.points: tuple[TelemetryMetricPoint, ...] | None = None
 
             def query_metrics(
                 self, request: TelemetryMetricsQuery
@@ -151,7 +152,8 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
                             metric=request.metric,
                             unit="1",
                             attributes=(("service.name", "api"),),
-                            points=(
+                            points=self.points
+                            or (
                                 TelemetryMetricPoint(request.start, self.values[0]),
                                 TelemetryMetricPoint(request.end, self.values[1]),
                             ),
@@ -402,6 +404,100 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
         )
         self.assertEqual(rolling["disposition"], "supporting")
         assert_schema(self, "investigation-report.schema.json", rolling_report)
+
+        seasonal_request = copy.deepcopy(baseline_request)
+        seasonal_request["metadata"]["id"] = (
+            "inv_18181818181818181818181818181818"
+        )
+        seasonal_request["spec"]["scope"]["timeRange"]["start"] = (
+            "2026-07-31T10:27:00Z"
+        )
+        seasonal_selection = seasonal_request["spec"]["telemetrySelections"][1]
+        seasonal_selection.pop("baselineComparison")
+        seasonal_selection["seasonalBaselineComparison"] = {
+            "statistic": "mean",
+            "unit": "1",
+            "periodSeconds": 604800,
+            "lookbackPeriods": 2,
+            "evaluationDurationSeconds": 62,
+            "baselineAggregation": "mean",
+            "calculation": "ratio",
+            "operator": "gte",
+            "threshold": 3,
+            "whenMatched": "supports",
+            "whenNotMatched": "contradicts",
+        }
+        backend.points = (
+            TelemetryMetricPoint("2026-07-31T10:27:30Z", 0.01),
+            TelemetryMetricPoint("2026-08-07T10:27:30Z", 0.03),
+            TelemetryMetricPoint("2026-08-14T10:27:30Z", 0.08),
+        )
+
+        seasonal_report = service.execute(
+            RunInvestigationCommand(self.actor, seasonal_request)
+        )
+
+        seasonal = seasonal_report["spec"]["telemetryAssessments"][0]
+        self.assertEqual(
+            seasonal["assessmentType"], "seasonal-baseline-comparison"
+        )
+        self.assertEqual(
+            seasonal["baselineTimeRanges"],
+            [
+                {
+                    "start": "2026-08-07T10:27:00Z",
+                    "end": "2026-08-07T10:28:02Z",
+                },
+                {
+                    "start": "2026-07-31T10:27:00Z",
+                    "end": "2026-07-31T10:28:02Z",
+                },
+            ],
+        )
+        self.assertEqual(seasonal["baselinePeriodValues"], [0.03, 0.01])
+        self.assertAlmostEqual(seasonal["baselineValue"], 0.02)
+        self.assertAlmostEqual(seasonal["comparisonValue"], 4)
+        self.assertEqual(seasonal["disposition"], "supporting")
+        assert_schema(self, "investigation-report.schema.json", seasonal_report)
+
+        incomplete_seasonal_request = copy.deepcopy(seasonal_request)
+        incomplete_seasonal_request["metadata"]["id"] = (
+            "inv_19191919191919191919191919191919"
+        )
+        backend.points = (
+            TelemetryMetricPoint("2026-07-31T10:27:30Z", 0.01),
+            TelemetryMetricPoint("2026-08-14T10:27:30Z", 0.08),
+        )
+
+        incomplete_seasonal_report = service.execute(
+            RunInvestigationCommand(self.actor, incomplete_seasonal_request)
+        )
+
+        incomplete_seasonal = incomplete_seasonal_report["spec"][
+            "telemetryAssessments"
+        ][0]
+        self.assertEqual(incomplete_seasonal["disposition"], "incomplete")
+        self.assertNotIn("baselinePeriodValues", incomplete_seasonal)
+        self.assertNotIn("comparisonValue", incomplete_seasonal)
+        assert_schema(
+            self,
+            "investigation-report.schema.json",
+            incomplete_seasonal_report,
+        )
+        invalid_seasonal = copy.deepcopy(seasonal_request)
+        invalid_seasonal["metadata"]["id"] = (
+            "inv_20202020202020202020202020202020"
+        )
+        invalid_seasonal_rule = invalid_seasonal["spec"]["telemetrySelections"][1][
+            "seasonalBaselineComparison"
+        ]
+        invalid_seasonal_rule["periodSeconds"] = 3600
+        invalid_seasonal_rule["evaluationDurationSeconds"] = 3600
+        with self.assertRaisesRegex(
+            InvalidInvestigationError, "investigation.contract.invalid"
+        ):
+            service.execute(RunInvestigationCommand(self.actor, invalid_seasonal))
+        backend.points = None
 
         oversized_rolling = copy.deepcopy(rolling_request)
         oversized_rolling["metadata"]["id"] = (

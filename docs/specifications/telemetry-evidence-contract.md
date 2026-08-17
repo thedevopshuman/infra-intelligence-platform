@@ -35,7 +35,7 @@ Backend adapters must either implement these semantics or fail with a stable pro
 
 `eq` requires the attribute to equal the supplied value. `neq` requires the attribute to exist and differ from the supplied value; a missing attribute is not a match. This rule avoids backend-specific missing-label behavior.
 
-`timeRange.start` is inclusive and `timeRange.end` is inclusive. Application validation requires `start < end <= requestedAt`, a maximum seven-day range, and a deadline no more than five minutes after `requestedAt`.
+`timeRange.start` is inclusive and `timeRange.end` is inclusive. Application validation requires `start < end <= requestedAt`, a maximum 90-day range, and a deadline no more than five minutes after `requestedAt`. The wider range supports bounded hourly, daily, and weekly seasonal investigation comparisons; it does not raise the 100-series, 10,000-point, 16 MiB, or five-minute ceilings.
 
 ## Bounds and output
 
@@ -79,3 +79,5 @@ Investigations may carry bounded `telemetrySelections` that reuse this contract'
 An investigation may also attach a predeclared threshold interpretation to a root-cause-scoped selection. Interpretation happens only after this service has validated, redacted, hashed, and committed the normalized result. The investigator reads those committed bytes through the tenant-scoped Evidence store, requires the declared metric and unit, and never reasons over the backend adapter's raw response. Partial and no-data results cannot support or contradict a hypothesis.
 
 A selection may instead declare a baseline comparison. One query still covers the full inherited investigation range and produces one committed artifact. The investigator applies the declared statistic to two ordered, non-overlapping subranges of those stored points, then evaluates either the evaluation-minus-baseline difference or the dimensionless evaluation-to-baseline ratio. It never issues a hidden second query, and missing window data or a zero ratio denominator is incomplete rather than guessed.
+
+A seasonal selection similarly derives two to twelve matching prior windows from a fixed elapsed period and the scope-end evaluation window. Every prior period must contain data. Their declared statistic values are aggregated by mean or median before the difference or ratio is evaluated. Derived ranges and period values are report data, never provider query syntax; changing the telemetry backend does not change the calculation.

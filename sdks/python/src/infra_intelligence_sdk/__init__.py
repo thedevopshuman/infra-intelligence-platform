@@ -44,6 +44,8 @@ from .models import (
     InvestigationTelemetryBaselineAssessment,
     InvestigationTelemetryBaselineComparison,
     InvestigationTelemetryRollingBaselineComparison,
+    InvestigationTelemetrySeasonalBaselineAssessment,
+    InvestigationTelemetrySeasonalBaselineComparison,
     InvestigationTelemetryInterpretation,
     InvestigationTelemetrySelection,
     IntegrationConfig,
@@ -129,6 +131,8 @@ __all__ = [
     "InvestigationTelemetryBaselineAssessment",
     "InvestigationTelemetryBaselineComparison",
     "InvestigationTelemetryRollingBaselineComparison",
+    "InvestigationTelemetrySeasonalBaselineAssessment",
+    "InvestigationTelemetrySeasonalBaselineComparison",
     "InvestigationTelemetryInterpretation",
     "InvestigationTelemetrySelection",
     "IntegrationConfig",
@@ -173,4 +177,4 @@ __all__ = [
     "TelemetryExportSloReport",
     "discover_console_authentication",
 ]
-__version__ = "0.40.0"
+__version__ = "0.41.0"

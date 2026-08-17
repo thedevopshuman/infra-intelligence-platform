@@ -12,8 +12,8 @@
       "platform": "linux/arm64",
       "containerRuntime": "docker",
       "containerRuntimeVersion": "29.7.2",
-      "applicationVersion": "0.48.0",
-      "sdk": {"language": "python", "version": "0.40.0"}
+      "applicationVersion": "0.49.0",
+      "sdk": {"language": "python", "version": "0.41.0"}
     },
     "plugin": {
       "id": "kubernetes-observer",

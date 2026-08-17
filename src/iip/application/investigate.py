@@ -665,8 +665,11 @@ class DeterministicInvestigationService:
                 evidence_documents.append(telemetry_evidence)
                 interpretation = selection.get("interpretation")
                 baseline_comparison = selection.get("baselineComparison")
-                if isinstance(interpretation, Mapping) or isinstance(
-                    baseline_comparison, Mapping
+                seasonal_comparison = selection.get("seasonalBaselineComparison")
+                if (
+                    isinstance(interpretation, Mapping)
+                    or isinstance(baseline_comparison, Mapping)
+                    or isinstance(seasonal_comparison, Mapping)
                 ):
                     assessment = self._assess_telemetry(
                         command.actor,
@@ -2766,10 +2769,13 @@ class DeterministicInvestigationService:
     ) -> dict[str, object] | None:
         interpretation = selection.get("interpretation")
         baseline_comparison = selection.get("baselineComparison")
+        seasonal_comparison = selection.get("seasonalBaselineComparison")
         rule = (
             interpretation
             if isinstance(interpretation, Mapping)
             else baseline_comparison
+            if isinstance(baseline_comparison, Mapping)
+            else seasonal_comparison
         )
         if (
             self._evidence_store is None
@@ -2822,7 +2828,42 @@ class DeterministicInvestigationService:
         status = artifact_spec.get("status")
         if status not in {"complete", "partial", "no-data"}:
             return None
-        if isinstance(baseline_comparison, Mapping):
+        if isinstance(seasonal_comparison, Mapping):
+            seasonal_ranges = self._seasonal_time_ranges(
+                seasonal_comparison,
+                request_spec.get("timeRange"),
+            )
+            if seasonal_ranges is None:
+                return None
+            baseline_ranges, evaluation_range = seasonal_ranges
+            assessment: dict[str, object] = {
+                "assessmentType": "seasonal-baseline-comparison",
+                "selectionId": selection["id"],
+                "evidenceId": evidence_id,
+                "rootCauseClass": root_cause,
+                "metric": query["metric"],
+                "statistic": seasonal_comparison["statistic"],
+                "unit": seasonal_comparison["unit"],
+                "periodSeconds": seasonal_comparison["periodSeconds"],
+                "lookbackPeriods": seasonal_comparison["lookbackPeriods"],
+                "evaluationDurationSeconds": seasonal_comparison[
+                    "evaluationDurationSeconds"
+                ],
+                "baselineAggregation": seasonal_comparison[
+                    "baselineAggregation"
+                ],
+                "baselineTimeRanges": baseline_ranges,
+                "evaluationTimeRange": evaluation_range,
+                "calculation": seasonal_comparison["calculation"],
+                "comparisonUnit": (
+                    "1"
+                    if seasonal_comparison["calculation"] == "ratio"
+                    else seasonal_comparison["unit"]
+                ),
+                "operator": seasonal_comparison["operator"],
+                "threshold": seasonal_comparison["threshold"],
+            }
+        elif isinstance(baseline_comparison, Mapping):
             assessment: dict[str, object] = {
                 "assessmentType": "baseline-comparison",
                 "selectionId": selection["id"],
@@ -2874,6 +2915,12 @@ class DeterministicInvestigationService:
         )
         if points is None:
             return None
+        if isinstance(seasonal_comparison, Mapping):
+            return self._seasonal_baseline_assessment(
+                assessment,
+                points,
+                seasonal_comparison,
+            )
         if isinstance(baseline_comparison, Mapping):
             return self._baseline_assessment(
                 assessment,
@@ -2898,6 +2945,48 @@ class DeterministicInvestigationService:
         assessment["observedValue"] = observed_value
         assessment["disposition"] = self._assessment_disposition(configured)
         return assessment
+
+    @staticmethod
+    def _seasonal_time_ranges(
+        comparison: Mapping[str, object],
+        time_range: object,
+    ) -> tuple[list[dict[str, str]], dict[str, str]] | None:
+        if not isinstance(time_range, Mapping):
+            return None
+        scope_end = DeterministicInvestigationService._parse_datetime(
+            time_range.get("end")
+        )
+        period = comparison.get("periodSeconds")
+        lookbacks = comparison.get("lookbackPeriods")
+        evaluation_duration = comparison.get("evaluationDurationSeconds")
+        if (
+            scope_end is None
+            or not isinstance(period, int)
+            or isinstance(period, bool)
+            or not isinstance(lookbacks, int)
+            or isinstance(lookbacks, bool)
+            or not isinstance(evaluation_duration, int)
+            or isinstance(evaluation_duration, bool)
+        ):
+            return None
+        evaluation_start = scope_end - timedelta(seconds=evaluation_duration)
+
+        def timestamp(value: datetime) -> str:
+            return value.isoformat().replace("+00:00", "Z")
+
+        baselines = []
+        for position in range(1, lookbacks + 1):
+            offset = timedelta(seconds=period * position)
+            baselines.append(
+                {
+                    "start": timestamp(evaluation_start - offset),
+                    "end": timestamp(scope_end - offset),
+                }
+            )
+        return baselines, {
+            "start": timestamp(evaluation_start),
+            "end": timestamp(scope_end),
+        }
 
     @staticmethod
     def _metric_points(
@@ -3045,6 +3134,122 @@ class DeterministicInvestigationService:
             }
         )
         return assessment
+
+    @staticmethod
+    def _seasonal_baseline_assessment(
+        assessment: dict[str, object],
+        points: list[tuple[datetime, float]],
+        comparison: Mapping[str, object],
+    ) -> dict[str, object]:
+        baseline_ranges = assessment.get("baselineTimeRanges")
+        evaluation_range = assessment.get("evaluationTimeRange")
+        if not isinstance(baseline_ranges, list) or not isinstance(
+            evaluation_range, Mapping
+        ):
+            assessment["disposition"] = "incomplete"
+            return assessment
+        statistic = comparison.get("statistic")
+        baseline_period_values: list[float] = []
+        for baseline_range in baseline_ranges:
+            if not isinstance(baseline_range, Mapping):
+                assessment["disposition"] = "incomplete"
+                return assessment
+            start = DeterministicInvestigationService._parse_datetime(
+                baseline_range.get("start")
+            )
+            end = DeterministicInvestigationService._parse_datetime(
+                baseline_range.get("end")
+            )
+            if start is None or end is None:
+                assessment["disposition"] = "incomplete"
+                return assessment
+            period_value = DeterministicInvestigationService._statistic(
+                [value for timestamp, value in points if start <= timestamp <= end],
+                statistic,
+            )
+            if period_value is None:
+                assessment["disposition"] = "incomplete"
+                return assessment
+            baseline_period_values.append(period_value)
+        evaluation_start = DeterministicInvestigationService._parse_datetime(
+            evaluation_range.get("start")
+        )
+        evaluation_end = DeterministicInvestigationService._parse_datetime(
+            evaluation_range.get("end")
+        )
+        if evaluation_start is None or evaluation_end is None:
+            assessment["disposition"] = "incomplete"
+            return assessment
+        evaluation_value = DeterministicInvestigationService._statistic(
+            [
+                value
+                for timestamp, value in points
+                if evaluation_start <= timestamp <= evaluation_end
+            ],
+            statistic,
+        )
+        baseline_value = DeterministicInvestigationService._aggregate_periods(
+            baseline_period_values,
+            comparison.get("baselineAggregation"),
+        )
+        if baseline_value is None or evaluation_value is None:
+            assessment["disposition"] = "incomplete"
+            return assessment
+        try:
+            if comparison.get("calculation") == "difference":
+                comparison_value = evaluation_value - baseline_value
+            elif baseline_value != 0:
+                comparison_value = evaluation_value / baseline_value
+            else:
+                assessment["disposition"] = "incomplete"
+                return assessment
+        except (OverflowError, ValueError):
+            assessment["disposition"] = "incomplete"
+            return assessment
+        if not math.isfinite(comparison_value):
+            assessment["disposition"] = "incomplete"
+            return assessment
+        matched = DeterministicInvestigationService._compare(
+            comparison_value,
+            float(comparison["threshold"]),
+            comparison.get("operator"),
+        )
+        configured = comparison[
+            "whenMatched" if matched else "whenNotMatched"
+        ]
+        assessment.update(
+            {
+                "baselinePeriodValues": baseline_period_values,
+                "baselineValue": baseline_value,
+                "evaluationValue": evaluation_value,
+                "comparisonValue": comparison_value,
+                "disposition": DeterministicInvestigationService._assessment_disposition(
+                    configured
+                ),
+            }
+        )
+        return assessment
+
+    @staticmethod
+    def _aggregate_periods(values: list[float], aggregation: object) -> float | None:
+        if not values:
+            return None
+        try:
+            if aggregation == "mean":
+                result = math.fsum(values) / len(values)
+            elif aggregation == "median":
+                ordered = sorted(values)
+                middle = len(ordered) // 2
+                result = (
+                    ordered[middle]
+                    if len(ordered) % 2
+                    else math.fsum(ordered[middle - 1 : middle + 1]) / 2
+                )
+            else:
+                return None
+        except (OverflowError, ValueError):
+            return None
+        return result if math.isfinite(result) else None
 
     @staticmethod
     def _statistic(values: list[float], statistic: object) -> float | None:
@@ -3205,6 +3410,7 @@ class DeterministicInvestigationService:
             and (
                 "baselineComparison" in candidate
                 or "rollingBaselineComparison" in candidate
+                or "seasonalBaselineComparison" in candidate
             )
             for candidate in telemetry
         ):
@@ -3756,6 +3962,7 @@ class DeterministicInvestigationService:
                     "interpretation",
                     "baselineComparison",
                     "rollingBaselineComparison",
+                    "seasonalBaselineComparison",
                 }
             ):
                 raise InvalidInvestigationError("investigation.contract.invalid")
@@ -3793,12 +4000,16 @@ class DeterministicInvestigationService:
             interpretation = value.get("interpretation")
             baseline_comparison = value.get("baselineComparison")
             rolling_baseline_comparison = value.get("rollingBaselineComparison")
+            seasonal_baseline_comparison = value.get(
+                "seasonalBaselineComparison"
+            )
             if sum(
                 candidate is not None
                 for candidate in (
                     interpretation,
                     baseline_comparison,
                     rolling_baseline_comparison,
+                    seasonal_baseline_comparison,
                 )
             ) > 1:
                 raise InvalidInvestigationError("investigation.contract.invalid")
@@ -3838,6 +4049,19 @@ class DeterministicInvestigationService:
                         scope_end=end,
                     )
                 )
+            normalized_seasonal_baseline_comparison = None
+            if seasonal_baseline_comparison is not None:
+                if classes is None:
+                    raise InvalidInvestigationError(
+                        "investigation.contract.invalid"
+                    )
+                normalized_seasonal_baseline_comparison = (
+                    DeterministicInvestigationService._validate_seasonal_baseline_comparison(
+                        seasonal_baseline_comparison,
+                        scope_start=start,
+                        scope_end=end,
+                    )
+                )
             normalized: dict[str, object] = {
                 "id": selection_id,
                 "integrationId": integration_id,
@@ -3850,6 +4074,10 @@ class DeterministicInvestigationService:
                 normalized["interpretation"] = normalized_interpretation
             if normalized_baseline_comparison is not None:
                 normalized["baselineComparison"] = normalized_baseline_comparison
+            if normalized_seasonal_baseline_comparison is not None:
+                normalized["seasonalBaselineComparison"] = (
+                    normalized_seasonal_baseline_comparison
+                )
             normalized_selections.append(normalized)
             selection_ids.add(selection_id)
         spec["telemetrySelections"] = normalized_selections
@@ -4225,6 +4453,84 @@ class DeterministicInvestigationService:
             scope_start=scope_start,
             scope_end=scope_end,
         )
+
+    @staticmethod
+    def _validate_seasonal_baseline_comparison(
+        value: object,
+        *,
+        scope_start: datetime,
+        scope_end: datetime,
+    ) -> dict[str, object]:
+        required = {
+            "statistic",
+            "unit",
+            "periodSeconds",
+            "lookbackPeriods",
+            "evaluationDurationSeconds",
+            "baselineAggregation",
+            "calculation",
+            "operator",
+            "threshold",
+            "whenMatched",
+            "whenNotMatched",
+        }
+        if not isinstance(value, Mapping) or set(value) != required:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        period = value.get("periodSeconds")
+        lookbacks = value.get("lookbackPeriods")
+        evaluation_duration = value.get("evaluationDurationSeconds")
+        if (
+            not isinstance(period, int)
+            or isinstance(period, bool)
+            or not 3_600 <= period <= 604_800
+            or not isinstance(lookbacks, int)
+            or isinstance(lookbacks, bool)
+            or not 2 <= lookbacks <= 12
+            or not isinstance(evaluation_duration, int)
+            or isinstance(evaluation_duration, bool)
+            or not 60 <= evaluation_duration <= 86_400
+            or evaluation_duration >= period
+            or value.get("baselineAggregation") not in {"mean", "median"}
+            or value.get("calculation") not in {"difference", "ratio"}
+        ):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        DeterministicInvestigationService._validate_interpretation(
+            {
+                key: value[key]
+                for key in (
+                    "statistic",
+                    "unit",
+                    "operator",
+                    "threshold",
+                    "whenMatched",
+                    "whenNotMatched",
+                )
+            }
+        )
+        ranges = DeterministicInvestigationService._seasonal_time_ranges(
+            value,
+            {
+                "start": scope_start.isoformat().replace("+00:00", "Z"),
+                "end": scope_end.isoformat().replace("+00:00", "Z"),
+            },
+        )
+        if ranges is None:
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        baseline_ranges, evaluation_range = ranges
+        earliest = DeterministicInvestigationService._parse_datetime(
+            baseline_ranges[-1]["start"]
+        )
+        evaluation_start = DeterministicInvestigationService._parse_datetime(
+            evaluation_range["start"]
+        )
+        if (
+            earliest is None
+            or evaluation_start is None
+            or earliest < scope_start
+            or evaluation_start < scope_start
+        ):
+            raise InvalidInvestigationError("investigation.contract.invalid")
+        return dict(value)
 
     @staticmethod
     def _validate_assessment_range(

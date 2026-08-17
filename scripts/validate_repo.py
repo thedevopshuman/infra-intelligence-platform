@@ -88,6 +88,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0058-investigation-completion-slo-semantics.md",
     "docs/specifications/investigation-completion-slo-contract.md",
     "docs/decisions/0074-executable-investigation-capacity-evidence.md",
+    "docs/decisions/0076-deterministic-seasonal-telemetry-baseline.md",
     "docs/specifications/investigation-capacity-contract.md",
     "docs/decisions/0059-backend-neutral-query-availability-telemetry.md",
     "docs/specifications/query-availability-telemetry-contract.md",
@@ -230,6 +231,7 @@ REQUIRED_PATHS = (
     "contracts/examples/investigation-request-context.json",
     "contracts/examples/investigation-request-telemetry.json",
     "contracts/examples/investigation-request-telemetry-baseline.json",
+    "contracts/examples/investigation-request-telemetry-seasonal.json",
     "contracts/examples/investigation-report.json",
     "contracts/examples/investigation-report-adaptive-replan.json",
     "contracts/examples/investigation-report-kubernetes-events.json",
@@ -239,6 +241,7 @@ REQUIRED_PATHS = (
     "contracts/examples/investigation-status.json",
     "contracts/examples/investigation-report-telemetry.json",
     "contracts/examples/investigation-report-telemetry-baseline.json",
+    "contracts/examples/investigation-report-telemetry-seasonal.json",
     "contracts/examples/ingestion-freshness-report.json",
     "contracts/examples/investigation-capacity-report.json",
     "contracts/examples/telemetry-export-health-report.json",
@@ -2224,6 +2227,10 @@ def validate_investigation_telemetry_examples(
             "investigation-request-telemetry-baseline.json",
             "investigation-report-telemetry-baseline.json",
         ),
+        (
+            "investigation-request-telemetry-seasonal.json",
+            "investigation-report-telemetry-seasonal.json",
+        ),
     )
     for request_name, report_name in pairs:
         request = documents.get(example_dir / request_name)
@@ -2281,6 +2288,54 @@ def expand_rolling_baseline(
         "start": timestamp(baseline_start),
         "end": timestamp(baseline_end),
     }
+    expanded["evaluationTimeRange"] = {
+        "start": timestamp(evaluation_start),
+        "end": timestamp(scope_end),
+    }
+    return expanded
+
+
+def expand_seasonal_baseline(
+    rule: Mapping[str, object],
+    request_spec: Mapping[str, object],
+) -> Optional[dict[str, object]]:
+    """Expand periodic lookbacks from the scope end in nearest-first order."""
+
+    scope = request_spec.get("scope")
+    scope_range = scope.get("timeRange") if isinstance(scope, dict) else None
+    scope_end = (
+        parse_timestamp(scope_range.get("end"))
+        if isinstance(scope_range, dict)
+        else None
+    )
+    period = rule.get("periodSeconds")
+    lookbacks = rule.get("lookbackPeriods")
+    evaluation_duration = rule.get("evaluationDurationSeconds")
+    if (
+        scope_end is None
+        or not isinstance(period, int)
+        or isinstance(period, bool)
+        or not isinstance(lookbacks, int)
+        or isinstance(lookbacks, bool)
+        or not isinstance(evaluation_duration, int)
+        or isinstance(evaluation_duration, bool)
+    ):
+        return None
+    evaluation_start = scope_end - timedelta(seconds=evaluation_duration)
+
+    def timestamp(value: datetime) -> str:
+        return value.isoformat().replace("+00:00", "Z")
+
+    expanded = dict(rule)
+    expanded["baselineTimeRanges"] = [
+        {
+            "start": timestamp(
+                evaluation_start - timedelta(seconds=period * position)
+            ),
+            "end": timestamp(scope_end - timedelta(seconds=period * position)),
+        }
+        for position in range(1, lookbacks + 1)
+    ]
     expanded["evaluationTimeRange"] = {
         "start": timestamp(evaluation_start),
         "end": timestamp(scope_end),
@@ -2477,15 +2532,23 @@ def validate_investigation_telemetry_pair(
         interpretation = selection.get("interpretation")
         baseline_comparison = selection.get("baselineComparison")
         rolling_baseline = selection.get("rollingBaselineComparison")
+        seasonal_baseline = selection.get("seasonalBaselineComparison")
         if not isinstance(baseline_comparison, dict) and isinstance(
             rolling_baseline, dict
         ):
             baseline_comparison = expand_rolling_baseline(
                 rolling_baseline, request_spec
             )
+        expanded_seasonal = (
+            expand_seasonal_baseline(seasonal_baseline, request_spec)
+            if isinstance(seasonal_baseline, dict)
+            else None
+        )
         rule = (
             interpretation
             if isinstance(interpretation, dict)
+            else seasonal_baseline
+            if isinstance(seasonal_baseline, dict)
             else baseline_comparison
         )
         query = selection.get("query")
@@ -2499,7 +2562,120 @@ def validate_investigation_telemetry_pair(
             "operator": rule.get("operator"),
             "threshold": rule.get("threshold"),
         }
-        if isinstance(baseline_comparison, dict):
+        if isinstance(seasonal_baseline, dict) and isinstance(
+            expanded_seasonal, dict
+        ):
+            expected_fields.update(
+                {
+                    "assessmentType": "seasonal-baseline-comparison",
+                    "periodSeconds": seasonal_baseline.get("periodSeconds"),
+                    "lookbackPeriods": seasonal_baseline.get("lookbackPeriods"),
+                    "evaluationDurationSeconds": seasonal_baseline.get(
+                        "evaluationDurationSeconds"
+                    ),
+                    "baselineAggregation": seasonal_baseline.get(
+                        "baselineAggregation"
+                    ),
+                    "baselineTimeRanges": expanded_seasonal.get(
+                        "baselineTimeRanges"
+                    ),
+                    "evaluationTimeRange": expanded_seasonal.get(
+                        "evaluationTimeRange"
+                    ),
+                    "calculation": seasonal_baseline.get("calculation"),
+                    "comparisonUnit": (
+                        "1"
+                        if seasonal_baseline.get("calculation") == "ratio"
+                        else seasonal_baseline.get("unit")
+                    ),
+                }
+            )
+            baseline_ranges = expanded_seasonal.get("baselineTimeRanges")
+            scope = request_spec.get("scope")
+            scope_range = scope.get("timeRange") if isinstance(scope, dict) else None
+            scope_start = (
+                parse_timestamp(scope_range.get("start"))
+                if isinstance(scope_range, dict)
+                else None
+            )
+            earliest_start = (
+                parse_timestamp(baseline_ranges[-1].get("start"))
+                if isinstance(baseline_ranges, list)
+                and baseline_ranges
+                and isinstance(baseline_ranges[-1], dict)
+                else None
+            )
+            if (
+                scope_start is None
+                or earliest_start is None
+                or earliest_start < scope_start
+            ):
+                fail(
+                    errors,
+                    "telemetry seasonal baseline windows must fit request scope",
+                )
+            period_values = assessment.get("baselinePeriodValues")
+            lookbacks = seasonal_baseline.get("lookbackPeriods")
+            if not isinstance(period_values, list) or len(period_values) != lookbacks:
+                fail(
+                    errors,
+                    "telemetry seasonal baseline values must match lookback periods",
+                )
+            elif all(
+                isinstance(value, (int, float)) and not isinstance(value, bool)
+                for value in period_values
+            ):
+                aggregation = seasonal_baseline.get("baselineAggregation")
+                ordered = sorted(float(value) for value in period_values)
+                if aggregation == "mean":
+                    expected_baseline = math.fsum(ordered) / len(ordered)
+                elif len(ordered) % 2:
+                    expected_baseline = ordered[len(ordered) // 2]
+                else:
+                    middle = len(ordered) // 2
+                    expected_baseline = math.fsum(
+                        (ordered[middle - 1], ordered[middle])
+                    ) / 2
+                baseline_value = assessment.get("baselineValue")
+                if (
+                    not isinstance(baseline_value, (int, float))
+                    or isinstance(baseline_value, bool)
+                    or not math.isclose(
+                        baseline_value,
+                        expected_baseline,
+                        rel_tol=1e-12,
+                        abs_tol=1e-15,
+                    )
+                ):
+                    fail(
+                        errors,
+                        "telemetry seasonal baselineValue must match its periods",
+                    )
+            baseline_value = assessment.get("baselineValue")
+            evaluation_value = assessment.get("evaluationValue")
+            comparison_value = assessment.get("comparisonValue")
+            if all(
+                isinstance(value, (int, float)) and not isinstance(value, bool)
+                for value in (baseline_value, evaluation_value, comparison_value)
+            ):
+                expected_comparison = (
+                    evaluation_value - baseline_value
+                    if seasonal_baseline.get("calculation") == "difference"
+                    else evaluation_value / baseline_value
+                    if baseline_value != 0
+                    else None
+                )
+                if expected_comparison is None or not math.isclose(
+                    comparison_value,
+                    expected_comparison,
+                    rel_tol=1e-12,
+                    abs_tol=1e-15,
+                ):
+                    fail(
+                        errors,
+                        "telemetry seasonal comparisonValue must match its values",
+                    )
+        elif isinstance(baseline_comparison, dict):
             expected_fields.update(
                 {
                     "assessmentType": "baseline-comparison",
@@ -2860,6 +3036,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("investigation-report-kubernetes-events.json", "InvestigationReport"),
         ("investigation-report-logs.json", "InvestigationReport"),
         ("investigation-report-telemetry-baseline.json", "InvestigationReport"),
+        ("investigation-report-telemetry-seasonal.json", "InvestigationReport"),
         ("ingestion-freshness-report.json", "IngestionFreshnessReport"),
         ("investigation-capacity-report.json", "InvestigationCapacityReport"),
         (

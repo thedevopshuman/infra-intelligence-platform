@@ -413,7 +413,7 @@ class LokiTelemetryLogsBackend:
         url = f"{integration.endpoint}/loki/api/v1/query_range?{query}"
         if len(url.encode("utf-8")) > _MAX_URL_BYTES:
             raise LokiBackendError("logs.backend.query.unsupported")
-        headers = {"Accept": "application/json", "User-Agent": "iip-loki-adapter/0.48.0"}
+        headers = {"Accept": "application/json", "User-Agent": "iip-loki-adapter/0.49.0"}
         if integration.organization_id is not None:
             headers["X-Scope-OrgID"] = integration.organization_id
         if integration.credential_ref is not None:

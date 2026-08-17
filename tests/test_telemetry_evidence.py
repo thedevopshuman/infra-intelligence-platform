@@ -210,6 +210,31 @@ class TelemetryEvidenceServiceTests(unittest.TestCase):
                     service.execute(CollectTelemetryEvidenceCommand(self.actor, request))
         self.assertEqual(self.backend.requests, [])
 
+    def test_metric_query_range_supports_bounded_seasonal_lookback(self) -> None:
+        request = copy.deepcopy(example("telemetry-evidence-request.json"))
+        end = datetime.fromisoformat(
+            request["spec"]["timeRange"]["end"].replace("Z", "+00:00")
+        )
+        request["spec"]["timeRange"]["start"] = iso(end - timedelta(days=90))
+
+        evidence = self.collect(request)
+
+        self.assertEqual(evidence["spec"]["type"], "telemetry.metrics")
+        self.assertEqual(len(self.backend.requests), 1)
+
+        oversized = copy.deepcopy(request)
+        oversized["spec"]["timeRange"]["start"] = iso(
+            end - timedelta(days=90, seconds=1)
+        )
+        with self.assertRaisesRegex(
+            InvalidTelemetryEvidenceRequestError,
+            "telemetry.request.invalid",
+        ):
+            self.service().execute(
+                CollectTelemetryEvidenceCommand(self.actor, oversized)
+            )
+        self.assertEqual(len(self.backend.requests), 1)
+
     def test_cross_tenant_or_missing_resource_never_reaches_backend(self) -> None:
         request = copy.deepcopy(example("telemetry-evidence-request.json"))
         request["spec"]["resourceRefs"] = [

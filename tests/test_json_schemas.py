@@ -298,6 +298,49 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(any("gapSeconds" in error for error in errors))
 
+    def test_seasonal_baseline_rejects_ambiguous_assessment_rules(self) -> None:
+        request = document(
+            "contracts/examples/investigation-request-telemetry-seasonal.json"
+        )
+        request["spec"]["telemetrySelections"][0][
+            "rollingBaselineComparison"
+        ] = {
+            "statistic": "mean",
+            "unit": "1",
+            "baselineDurationSeconds": 900,
+            "evaluationDurationSeconds": 900,
+            "gapSeconds": 60,
+            "calculation": "ratio",
+            "operator": "gte",
+            "threshold": 5,
+            "whenMatched": "supports",
+            "whenNotMatched": "contradicts",
+        }
+
+        errors = self.validate("investigation-request.schema.json", request)
+
+        self.assertTrue(errors)
+
+    def test_seasonal_data_assessment_requires_period_values(self) -> None:
+        report = document(
+            "contracts/examples/investigation-report-telemetry-seasonal.json"
+        )
+        del report["spec"]["telemetryAssessments"][0]["baselinePeriodValues"]
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(errors)
+
+    def test_seasonal_incomplete_assessment_rejects_derived_values(self) -> None:
+        report = document(
+            "contracts/examples/investigation-report-telemetry-seasonal.json"
+        )
+        report["spec"]["telemetryAssessments"][0]["disposition"] = "incomplete"
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(errors)
+
     def test_baseline_data_assessment_requires_all_derived_values(self) -> None:
         report = document(
             "contracts/examples/investigation-report-telemetry-baseline.json"

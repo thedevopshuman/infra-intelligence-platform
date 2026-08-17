@@ -1,6 +1,6 @@
 # OpenTelemetry portability boundary
 
-**Status:** Accepted direction; outbound exporter, historical metric/log queries, isolated inbound metrics/logs receivers, metric selection, and bounded threshold/explicit/rolling baseline assessment implemented
+**Status:** Accepted direction; outbound exporter, historical metric/log queries, isolated inbound metrics/logs receivers, metric selection, and bounded threshold/explicit/rolling/seasonal baseline assessment implemented
 **Date:** 2026-08-15
 **Decision:** [ADR 0012](../decisions/0012-opentelemetry-portability-boundary.md)
 
@@ -55,6 +55,8 @@ A selected candidate may also declare a unit-aware threshold rule before executi
 
 A candidate may instead declare ordered baseline and evaluation windows within the same inherited query range. Windows may be explicit or derived from bounded durations anchored at the investigation scope end. The runtime writes derived absolute ranges into the report and compares a difference or ratio from the one committed artifact without another backend call, preserving both OTLP/backend portability and investigation budgets. [ADR 0019](../decisions/0019-baseline-window-telemetry-assessment.md) records the window and failure semantics; [ADR 0032](../decisions/0032-scope-end-rolling-baseline.md) records rolling derivation.
 
+Fixed-period seasonal rules extend that same one-query boundary. Two to twelve matching prior windows are derived from the scope end in nearest-first order, every window must contain data, and their values are aggregated by mean or median before the declared difference or ratio is assessed. The wider query range remains bounded to 90 days and retains the existing result and deadline ceilings. [ADR 0076](../decisions/0076-deterministic-seasonal-telemetry-baseline.md) records these semantics.
+
 ## Security and tenancy
 
 - Endpoint credentials and custom OTLP headers are secret references or protected runtime configuration, never public resource/report fields.
@@ -72,6 +74,6 @@ A candidate may instead declare ordered baseline and evaluation windows within t
 - retention, sampling, cardinality budgets, and regional/data-residency controls;
 - queue durability and the division of retry, batching, and end-to-end delivery-SLO ownership between the official SDK and a sidecar/customer Collector;
 - the cadence and ownership of automatic freshness evaluation and production SLO windows;
-- seasonal baseline policy, minimum sample counts, and multi-signal reasoning.
+- calendar-aware or learned baselines, minimum sample counts, and multi-signal reasoning.
 
-External-broker, additional backend, federated receiver identity, seasonal/multi-signal reasoning, and expanded-signal decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, durable buffering, and SLO decisions belong to the Phase 3 operational-hardening gate. The current freshness API, outbound metric projection, terminal investigation traces, normalized historical metric/log query boundaries, Prometheus and Loki adapters, isolated tenant-bound OTLP metrics/logs receivers, deterministic metric/log investigation selection, and unit-aware threshold/explicit-or-rolling two-window/log-count assessment are deliberately useful before those production selections.
+External-broker, additional backend, federated receiver identity, learned/calendar-aware baseline and broader multi-signal reasoning, and expanded-signal decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, durable buffering, and SLO decisions belong to the Phase 3 operational-hardening gate. The current freshness API, outbound metric projection, terminal investigation traces, normalized historical metric/log query boundaries, Prometheus and Loki adapters, isolated tenant-bound OTLP metrics/logs receivers, deterministic metric/log investigation selection, and unit-aware threshold/explicit/rolling/seasonal baseline and log-count assessment are deliberately useful before those production selections.

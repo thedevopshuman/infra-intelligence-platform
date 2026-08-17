@@ -425,7 +425,8 @@
     "telemetryAssessment": {
       "oneOf": [
         {"$ref": "#/$defs/telemetryThresholdAssessment"},
-        {"$ref": "#/$defs/telemetryBaselineAssessment"}
+        {"$ref": "#/$defs/telemetryBaselineAssessment"},
+        {"$ref": "#/$defs/telemetrySeasonalBaselineAssessment"}
       ]
     },
     "telemetryThresholdAssessment": {
@@ -585,6 +586,146 @@
           "else": {
             "not": {
               "anyOf": [
+                {"required": ["baselineValue"]},
+                {"required": ["evaluationValue"]},
+                {"required": ["comparisonValue"]}
+              ]
+            }
+          }
+        },
+        {
+          "if": {"properties": {"calculation": {"const": "ratio"}}},
+          "then": {"properties": {"comparisonUnit": {"const": "1"}}}
+        }
+      ]
+    },
+    "telemetrySeasonalBaselineAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assessmentType",
+        "selectionId",
+        "evidenceId",
+        "rootCauseClass",
+        "metric",
+        "statistic",
+        "unit",
+        "periodSeconds",
+        "lookbackPeriods",
+        "evaluationDurationSeconds",
+        "baselineAggregation",
+        "baselineTimeRanges",
+        "evaluationTimeRange",
+        "calculation",
+        "comparisonUnit",
+        "operator",
+        "threshold",
+        "disposition"
+      ],
+      "properties": {
+        "assessmentType": {"const": "seasonal-baseline-comparison"},
+        "selectionId": {"type": "string", "pattern": "^tqs_[a-f0-9]{16}$"},
+        "evidenceId": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"},
+        "rootCauseClass": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._/-]{2,127}$"
+        },
+        "metric": {
+          "type": "string",
+          "pattern": "^[A-Za-z_:][A-Za-z0-9_.:/-]{0,255}$"
+        },
+        "statistic": {
+          "type": "string",
+          "enum": ["minimum", "maximum", "mean"]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        },
+        "periodSeconds": {
+          "type": "integer",
+          "minimum": 3600,
+          "maximum": 604800
+        },
+        "lookbackPeriods": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 12
+        },
+        "evaluationDurationSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
+        },
+        "baselineAggregation": {
+          "type": "string",
+          "enum": ["mean", "median"]
+        },
+        "baselineTimeRanges": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {"$ref": "#/$defs/assessmentTimeRange"}
+        },
+        "evaluationTimeRange": {"$ref": "#/$defs/assessmentTimeRange"},
+        "calculation": {
+          "type": "string",
+          "enum": ["difference", "ratio"]
+        },
+        "comparisonUnit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["lt", "lte", "gt", "gte"]
+        },
+        "threshold": {"type": "number"},
+        "baselinePeriodValues": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {"type": "number"}
+        },
+        "baselineValue": {"type": "number"},
+        "evaluationValue": {"type": "number"},
+        "comparisonValue": {"type": "number"},
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "supporting",
+            "contradicting",
+            "neutral",
+            "no-data",
+            "incomplete"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": ["supporting", "contradicting", "neutral"]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "baselinePeriodValues",
+              "baselineValue",
+              "evaluationValue",
+              "comparisonValue"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {"required": ["baselinePeriodValues"]},
                 {"required": ["baselineValue"]},
                 {"required": ["evaluationValue"]},
                 {"required": ["comparisonValue"]}

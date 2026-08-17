@@ -6,7 +6,7 @@
 
 `InvestigationSignalCatalog` lets an operator review reusable evidence candidates once instead of requiring every caller to hand-author provider-neutral Kubernetes Event, context, resource-change, metric, and log selections. One profile is bound to exactly one tenant. Profile IDs and semantic versions identify operator intent; content digests bind the exact profile and the subset frozen into an accepted investigation.
 
-The catalog contains logical integration IDs, closed query fragments, bounded limits, root-cause applicability, and deterministic interpretations. It cannot contain credentials, endpoints, vendor query languages, tenant wildcards, actor identity, resource scope, time scope, or execution authority. The first catalog profile intentionally excludes absolute and rolling metric baselines because their validity depends on each request's time range; callers may continue to declare those explicitly.
+The catalog contains logical integration IDs, closed query fragments, bounded limits, root-cause applicability, and deterministic interpretations. It cannot contain credentials, endpoints, vendor query languages, tenant wildcards, actor identity, resource scope, time scope, or execution authority. The first catalog profile intentionally excludes absolute, rolling, and seasonal metric baselines because their validity depends on each request's time range; callers may continue to declare those explicitly.
 
 ## Resolution and authority
 

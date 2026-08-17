@@ -79,3 +79,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0073](0073-sampled-telemetry-export-slo.md) | Accepted | Measure rolling deployment export reliability from bounded pseudonymous counter samples |
 | [0074](0074-executable-investigation-capacity-evidence.md) | Accepted | Bind large-tenant queue isolation and overload measurements to an executable PostgreSQL profile |
 | [0075](0075-bounded-adaptive-signal-replanning.md) | Accepted | Promote one accepted investigation signal into capacity released by a provider gap |
+| [0076](0076-deterministic-seasonal-telemetry-baseline.md) | Accepted | Compare matching prior metric periods from one committed artifact |

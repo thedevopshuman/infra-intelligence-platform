@@ -81,6 +81,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "investigation-report-logs.json",
         "investigation-report-telemetry.json",
         "investigation-report-telemetry-baseline.json",
+        "investigation-report-telemetry-seasonal.json",
     ),
     "investigation-cancellation-request.schema.json": (
         "investigation-cancellation-request.json",
@@ -97,6 +98,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "investigation-request-logs.json",
         "investigation-request-telemetry.json",
         "investigation-request-telemetry-baseline.json",
+        "investigation-request-telemetry-seasonal.json",
     ),
     "investigation-signal-catalog.schema.json": (
         "investigation-signal-catalog.json",

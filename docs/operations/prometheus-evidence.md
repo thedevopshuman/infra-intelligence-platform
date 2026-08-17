@@ -91,6 +91,8 @@ To let a normalized result support or contradict that class, declare `interpreta
 
 Use `baselineComparison` instead when the question is about change between periods. Declare non-overlapping baseline and evaluation subranges inside the investigation range, plus `difference` or `ratio`. The adapter still executes exactly one range query for the inherited investigation scope; the investigator splits the committed normalized points locally. A difference keeps the catalog unit, a ratio uses unit `1`, and missing points or a zero baseline ratio denominator produce `incomplete`. The Docker gate exercises this path against Prometheus's real self-scraped `up` series.
 
+Use `rollingBaselineComparison` for scope-end durations or `seasonalBaselineComparison` for matching prior hours, days, or weeks. A seasonal rule declares a fixed elapsed period, two to twelve lookbacks, a shorter scope-end evaluation duration, mean or median aggregation, and the same difference/ratio threshold. Include every derived window in the investigation scope and size `maxDataPoints` for the requested history. The metric range is bounded to 90 days while the existing 100-series, 10,000-point, 16 MiB, and five-minute limits remain unchanged. One missing period produces `incomplete`; neither the application nor the Prometheus adapter issues a follow-up query.
+
 ## Helm
 
 Set `telemetryEvidence.backend: prometheus`, put the non-secret registry in `telemetryEvidence.prometheus.integrationsJson`, and reference a Kubernetes Secret for credentials when required. If NetworkPolicy is enabled, configure `networkPolicy.prometheusEgress` for the exact Prometheus namespace, pod labels, and port. The chart contains no endpoint credentials by default.

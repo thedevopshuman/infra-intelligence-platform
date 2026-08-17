@@ -41,6 +41,8 @@ from infra_intelligence_sdk import (
     InvestigationTelemetryAssessment,
     InvestigationTelemetryBaselineAssessment,
     InvestigationTelemetryRollingBaselineComparison,
+    InvestigationTelemetrySeasonalBaselineAssessment,
+    InvestigationTelemetrySeasonalBaselineComparison,
     InvestigationTelemetryInterpretation,
     InvestigationTelemetrySelection,
     IngestionFreshnessReport,
@@ -104,6 +106,9 @@ class PublicContractSdkTests(unittest.TestCase):
         baseline_investigation = InvestigationRequest.from_dict(
             example("investigation-request-telemetry-baseline.json")
         )
+        seasonal_investigation = InvestigationRequest.from_dict(
+            example("investigation-request-telemetry-seasonal.json")
+        )
         event_investigation = InvestigationRequest.from_dict(
             example("investigation-request-kubernetes-events.json")
         )
@@ -128,6 +133,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         baseline_report = InvestigationReport.from_dict(
             example("investigation-report-telemetry-baseline.json")
+        )
+        seasonal_report = InvestigationReport.from_dict(
+            example("investigation-report-telemetry-seasonal.json")
         )
         adaptive_report = InvestigationReport.from_dict(
             example("investigation-report-adaptive-replan.json")
@@ -313,6 +321,26 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             baseline_assessment.to_dict()["assessmentType"],
             "baseline-comparison",
+        )
+        seasonal_selection = seasonal_investigation.telemetry_selections[0]
+        self.assertIsInstance(
+            seasonal_selection.seasonal_baseline_comparison,
+            InvestigationTelemetrySeasonalBaselineComparison,
+        )
+        self.assertIsNone(seasonal_selection.baseline_comparison)
+        self.assertEqual(
+            seasonal_selection.seasonal_baseline_comparison.lookback_periods,
+            2,
+        )
+        seasonal_assessment = seasonal_report.telemetry_assessments[0]
+        self.assertIsInstance(
+            seasonal_assessment,
+            InvestigationTelemetrySeasonalBaselineAssessment,
+        )
+        self.assertEqual(seasonal_assessment.baseline_period_values, (0.012, 0.008))
+        self.assertEqual(
+            seasonal_assessment.to_dict()["assessmentType"],
+            "seasonal-baseline-comparison",
         )
         event_selection = event_investigation.kubernetes_event_selections[0]
         self.assertIsInstance(event_selection, InvestigationKubernetesEventSelection)
@@ -690,6 +718,24 @@ class PublicContractRepositoryValidationTests(unittest.TestCase):
 
         self.assertIn(
             "telemetry assessment comparisonUnit must match its request",
+            self.errors,
+        )
+
+    def test_seasonal_assessment_must_match_its_period_aggregation(self) -> None:
+        path = (
+            ROOT
+            / "contracts"
+            / "examples"
+            / "investigation-report-telemetry-seasonal.json"
+        )
+        report = copy.deepcopy(self.documents[path])
+        report["spec"]["telemetryAssessments"][0]["baselineValue"] = 0.02
+        self.documents[path] = report
+
+        validate_repo.validate_examples(self.documents, self.errors)
+
+        self.assertIn(
+            "telemetry seasonal baselineValue must match its periods",
             self.errors,
         )
 

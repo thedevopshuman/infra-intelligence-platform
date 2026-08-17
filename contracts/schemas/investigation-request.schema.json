@@ -211,6 +211,9 @@
         },
         "rollingBaselineComparison": {
           "$ref": "#/$defs/telemetryRollingBaselineComparison"
+        },
+        "seasonalBaselineComparison": {
+          "$ref": "#/$defs/telemetrySeasonalBaselineComparison"
         }
       },
       "allOf": [
@@ -227,11 +230,18 @@
           "then": {"required": ["rootCauseClasses"]}
         },
         {
+          "if": {"required": ["seasonalBaselineComparison"]},
+          "then": {"required": ["rootCauseClasses"]}
+        },
+        {
           "not": {
             "anyOf": [
               {"required": ["interpretation", "baselineComparison"]},
               {"required": ["interpretation", "rollingBaselineComparison"]},
-              {"required": ["baselineComparison", "rollingBaselineComparison"]}
+              {"required": ["interpretation", "seasonalBaselineComparison"]},
+              {"required": ["baselineComparison", "rollingBaselineComparison"]},
+              {"required": ["baselineComparison", "seasonalBaselineComparison"]},
+              {"required": ["rollingBaselineComparison", "seasonalBaselineComparison"]}
             ]
           }
         }
@@ -360,6 +370,71 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 86400
+        },
+        "calculation": {
+          "type": "string",
+          "enum": ["difference", "ratio"]
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["lt", "lte", "gt", "gte"]
+        },
+        "threshold": {"type": "number"},
+        "whenMatched": {
+          "type": "string",
+          "enum": ["supports", "contradicts", "neutral"]
+        },
+        "whenNotMatched": {
+          "type": "string",
+          "enum": ["supports", "contradicts", "neutral"]
+        }
+      }
+    },
+    "telemetrySeasonalBaselineComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statistic",
+        "unit",
+        "periodSeconds",
+        "lookbackPeriods",
+        "evaluationDurationSeconds",
+        "baselineAggregation",
+        "calculation",
+        "operator",
+        "threshold",
+        "whenMatched",
+        "whenNotMatched"
+      ],
+      "properties": {
+        "statistic": {
+          "type": "string",
+          "enum": ["minimum", "maximum", "mean"]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+        },
+        "periodSeconds": {
+          "type": "integer",
+          "minimum": 3600,
+          "maximum": 604800
+        },
+        "lookbackPeriods": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 12
+        },
+        "evaluationDurationSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
+        },
+        "baselineAggregation": {
+          "type": "string",
+          "enum": ["mean", "median"]
         },
         "calculation": {
           "type": "string",

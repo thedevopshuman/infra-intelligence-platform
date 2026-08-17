@@ -1012,6 +1012,7 @@ export interface InvestigationTelemetrySelection {
   interpretation?: InvestigationTelemetryInterpretation;
   baselineComparison?: InvestigationTelemetryBaselineComparison;
   rollingBaselineComparison?: InvestigationTelemetryRollingBaselineComparison;
+  seasonalBaselineComparison?: InvestigationTelemetrySeasonalBaselineComparison;
 }
 
 export interface InvestigationKubernetesEventInterpretation {
@@ -1110,6 +1111,20 @@ export interface InvestigationTelemetryRollingBaselineComparison {
   baselineDurationSeconds: number;
   evaluationDurationSeconds: number;
   gapSeconds: number;
+  calculation: "difference" | "ratio";
+  operator: "lt" | "lte" | "gt" | "gte";
+  threshold: number;
+  whenMatched: "supports" | "contradicts" | "neutral";
+  whenNotMatched: "supports" | "contradicts" | "neutral";
+}
+
+export interface InvestigationTelemetrySeasonalBaselineComparison {
+  statistic: "minimum" | "maximum" | "mean";
+  unit: string;
+  periodSeconds: number;
+  lookbackPeriods: number;
+  evaluationDurationSeconds: number;
+  baselineAggregation: "mean" | "median";
   calculation: "difference" | "ratio";
   operator: "lt" | "lte" | "gt" | "gte";
   threshold: number;
@@ -1401,6 +1416,36 @@ export interface InvestigationTelemetryBaselineAssessment {
     | "incomplete";
 }
 
+export interface InvestigationTelemetrySeasonalBaselineAssessment {
+  assessmentType: "seasonal-baseline-comparison";
+  selectionId: `tqs_${string}`;
+  evidenceId: EvidenceId;
+  rootCauseClass: string;
+  metric: string;
+  statistic: "minimum" | "maximum" | "mean";
+  unit: string;
+  periodSeconds: number;
+  lookbackPeriods: number;
+  evaluationDurationSeconds: number;
+  baselineAggregation: "mean" | "median";
+  baselineTimeRanges: { start: string; end: string }[];
+  evaluationTimeRange: { start: string; end: string };
+  calculation: "difference" | "ratio";
+  comparisonUnit: string;
+  operator: "lt" | "lte" | "gt" | "gte";
+  threshold: number;
+  baselinePeriodValues?: number[];
+  baselineValue?: number;
+  evaluationValue?: number;
+  comparisonValue?: number;
+  disposition:
+    | "supporting"
+    | "contradicting"
+    | "neutral"
+    | "no-data"
+    | "incomplete";
+}
+
 export interface InvestigationReport {
   apiVersion: "iip.platform/v1alpha1";
   kind: "InvestigationReport";
@@ -1437,6 +1482,7 @@ export interface InvestigationReport {
     telemetryAssessments?: (
       | InvestigationTelemetryAssessment
       | InvestigationTelemetryBaselineAssessment
+      | InvestigationTelemetrySeasonalBaselineAssessment
     )[];
     kubernetesEventAssessments?: InvestigationKubernetesEventAssessment[];
     changeAssessments?: InvestigationChangeAssessment[];

@@ -28,7 +28,7 @@ from iip.application.ports import (
 )
 
 
-MAX_QUERY_RANGE = timedelta(days=7)
+MAX_QUERY_RANGE = timedelta(days=90)
 MAX_DEADLINE_OFFSET = timedelta(minutes=5)
 _REQUEST_ID = re.compile(r"teq_[a-f0-9]{32}")
 _TENANT_ID = re.compile(r"[a-zA-Z0-9._-]{1,128}")

@@ -1046,6 +1046,100 @@ class InvestigationTelemetryRollingBaselineComparison:
 
 
 @dataclass(frozen=True)
+class InvestigationTelemetrySeasonalBaselineComparison:
+    """Scope-end comparison against matching prior periodic windows."""
+
+    statistic: str
+    unit: str
+    period_seconds: int
+    lookback_periods: int
+    evaluation_duration_seconds: int
+    baseline_aggregation: str
+    calculation: str
+    operator: str
+    threshold: float
+    when_matched: str
+    when_not_matched: str
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationTelemetrySeasonalBaselineComparison":
+        expected = {
+            "statistic",
+            "unit",
+            "periodSeconds",
+            "lookbackPeriods",
+            "evaluationDurationSeconds",
+            "baselineAggregation",
+            "calculation",
+            "operator",
+            "threshold",
+            "whenMatched",
+            "whenNotMatched",
+        }
+        period = payload.get("periodSeconds")
+        lookbacks = payload.get("lookbackPeriods")
+        evaluation_duration = payload.get("evaluationDurationSeconds")
+        threshold = payload.get("threshold")
+        dispositions = ("supports", "contradicts", "neutral")
+        if (
+            set(payload) != expected
+            or payload.get("statistic") not in ("minimum", "maximum", "mean")
+            or not isinstance(payload.get("unit"), str)
+            or not payload["unit"]
+            or not isinstance(period, int)
+            or isinstance(period, bool)
+            or not 3_600 <= period <= 604_800
+            or not isinstance(lookbacks, int)
+            or isinstance(lookbacks, bool)
+            or not 2 <= lookbacks <= 12
+            or not isinstance(evaluation_duration, int)
+            or isinstance(evaluation_duration, bool)
+            or not 60 <= evaluation_duration <= 86_400
+            or evaluation_duration >= period
+            or payload.get("baselineAggregation") not in ("mean", "median")
+            or payload.get("calculation") not in ("difference", "ratio")
+            or payload.get("operator") not in ("lt", "lte", "gt", "gte")
+            or isinstance(threshold, bool)
+            or not isinstance(threshold, (int, float))
+            or not math.isfinite(float(threshold))
+            or payload.get("whenMatched") not in dispositions
+            or payload.get("whenNotMatched") not in dispositions
+            or payload.get("whenMatched") == payload.get("whenNotMatched")
+        ):
+            raise ValueError("investigation seasonal baseline comparison is invalid")
+        return cls(
+            statistic=payload["statistic"],
+            unit=payload["unit"],
+            period_seconds=period,
+            lookback_periods=lookbacks,
+            evaluation_duration_seconds=evaluation_duration,
+            baseline_aggregation=payload["baselineAggregation"],
+            calculation=payload["calculation"],
+            operator=payload["operator"],
+            threshold=float(threshold),
+            when_matched=payload["whenMatched"],
+            when_not_matched=payload["whenNotMatched"],
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "statistic": self.statistic,
+            "unit": self.unit,
+            "periodSeconds": self.period_seconds,
+            "lookbackPeriods": self.lookback_periods,
+            "evaluationDurationSeconds": self.evaluation_duration_seconds,
+            "baselineAggregation": self.baseline_aggregation,
+            "calculation": self.calculation,
+            "operator": self.operator,
+            "threshold": self.threshold,
+            "whenMatched": self.when_matched,
+            "whenNotMatched": self.when_not_matched,
+        }
+
+
+@dataclass(frozen=True)
 class InvestigationTelemetrySelection:
     """Provider-neutral metric candidate bounded by an investigation request."""
 
@@ -1058,6 +1152,9 @@ class InvestigationTelemetrySelection:
     baseline_comparison: Optional[InvestigationTelemetryBaselineComparison] = None
     rolling_baseline_comparison: Optional[
         InvestigationTelemetryRollingBaselineComparison
+    ] = None
+    seasonal_baseline_comparison: Optional[
+        InvestigationTelemetrySeasonalBaselineComparison
     ] = None
 
     @classmethod
@@ -1072,6 +1169,7 @@ class InvestigationTelemetrySelection:
         interpretation = payload.get("interpretation")
         baseline_comparison = payload.get("baselineComparison")
         rolling_baseline_comparison = payload.get("rollingBaselineComparison")
+        seasonal_baseline_comparison = payload.get("seasonalBaselineComparison")
         if not isinstance(selection_id, str) or not selection_id.startswith("tqs_"):
             raise ValueError("investigation telemetry selection id is invalid")
         if not isinstance(integration_id, str) or not integration_id:
@@ -1094,10 +1192,17 @@ class InvestigationTelemetrySelection:
             raise ValueError(
                 "investigation telemetry rollingBaselineComparison is invalid"
             )
+        if seasonal_baseline_comparison is not None and not isinstance(
+            seasonal_baseline_comparison, Mapping
+        ):
+            raise ValueError(
+                "investigation telemetry seasonalBaselineComparison is invalid"
+            )
         rules = (
             interpretation,
             baseline_comparison,
             rolling_baseline_comparison,
+            seasonal_baseline_comparison,
         )
         if sum(rule is not None for rule in rules) > 1:
             raise ValueError("investigation telemetry assessment rule is ambiguous")
@@ -1132,6 +1237,13 @@ class InvestigationTelemetrySelection:
                 if isinstance(rolling_baseline_comparison, Mapping)
                 else None
             ),
+            seasonal_baseline_comparison=(
+                InvestigationTelemetrySeasonalBaselineComparison.from_dict(
+                    seasonal_baseline_comparison
+                )
+                if isinstance(seasonal_baseline_comparison, Mapping)
+                else None
+            ),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1150,6 +1262,10 @@ class InvestigationTelemetrySelection:
         if self.rolling_baseline_comparison is not None:
             result["rollingBaselineComparison"] = (
                 self.rolling_baseline_comparison.to_dict()
+            )
+        if self.seasonal_baseline_comparison is not None:
+            result["seasonalBaselineComparison"] = (
+                self.seasonal_baseline_comparison.to_dict()
             )
         return result
 
@@ -1380,6 +1496,217 @@ class InvestigationTelemetryBaselineAssessment:
             "threshold": self.threshold,
             "disposition": self.disposition,
         }
+        if self.baseline_value is not None:
+            result["baselineValue"] = self.baseline_value
+        if self.evaluation_value is not None:
+            result["evaluationValue"] = self.evaluation_value
+        if self.comparison_value is not None:
+            result["comparisonValue"] = self.comparison_value
+        return result
+
+
+@dataclass(frozen=True)
+class InvestigationTelemetrySeasonalBaselineAssessment:
+    """Auditable comparison against matching prior periodic windows."""
+
+    selection_id: str
+    evidence_id: str
+    root_cause_class: str
+    metric: str
+    statistic: str
+    unit: str
+    period_seconds: int
+    lookback_periods: int
+    evaluation_duration_seconds: int
+    baseline_aggregation: str
+    baseline_time_ranges: tuple[Mapping[str, str], ...]
+    evaluation_time_range: Mapping[str, str]
+    calculation: str
+    comparison_unit: str
+    operator: str
+    threshold: float
+    disposition: str
+    baseline_period_values: Optional[tuple[float, ...]] = None
+    baseline_value: Optional[float] = None
+    evaluation_value: Optional[float] = None
+    comparison_value: Optional[float] = None
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationTelemetrySeasonalBaselineAssessment":
+        if payload.get("assessmentType") != "seasonal-baseline-comparison":
+            raise ValueError(
+                "investigation telemetry seasonal baseline assessment is invalid"
+            )
+        required_strings = (
+            "selectionId",
+            "evidenceId",
+            "rootCauseClass",
+            "metric",
+            "statistic",
+            "unit",
+            "baselineAggregation",
+            "calculation",
+            "comparisonUnit",
+            "operator",
+            "disposition",
+        )
+        if any(
+            not isinstance(payload.get(field), str) for field in required_strings
+        ):
+            raise ValueError(
+                "investigation telemetry seasonal baseline assessment is incomplete"
+            )
+        period = payload.get("periodSeconds")
+        lookbacks = payload.get("lookbackPeriods")
+        evaluation_duration = payload.get("evaluationDurationSeconds")
+        baseline_ranges = payload.get("baselineTimeRanges")
+        evaluation_range = payload.get("evaluationTimeRange")
+        threshold = payload.get("threshold")
+        if (
+            not isinstance(period, int)
+            or isinstance(period, bool)
+            or not 3_600 <= period <= 604_800
+            or not isinstance(lookbacks, int)
+            or isinstance(lookbacks, bool)
+            or not 2 <= lookbacks <= 12
+            or not isinstance(evaluation_duration, int)
+            or isinstance(evaluation_duration, bool)
+            or not 60 <= evaluation_duration <= 86_400
+            or evaluation_duration >= period
+            or not isinstance(baseline_ranges, list)
+            or len(baseline_ranges) != lookbacks
+            or not isinstance(evaluation_range, Mapping)
+            or isinstance(threshold, bool)
+            or not isinstance(threshold, (int, float))
+        ):
+            raise ValueError(
+                "investigation telemetry seasonal baseline assessment is invalid"
+            )
+        windows = (*baseline_ranges, evaluation_range)
+        if any(
+            not isinstance(window, Mapping)
+            or set(window) != {"start", "end"}
+            or any(
+                not isinstance(window.get(field), str)
+                for field in ("start", "end")
+            )
+            for window in windows
+        ):
+            raise ValueError(
+                "investigation telemetry seasonal baseline windows are invalid"
+            )
+        if (
+            payload["statistic"] not in ("minimum", "maximum", "mean")
+            or payload["baselineAggregation"] not in ("mean", "median")
+            or payload["calculation"] not in ("difference", "ratio")
+            or payload["operator"] not in ("lt", "lte", "gt", "gte")
+            or (
+                payload["calculation"] == "ratio"
+                and payload["comparisonUnit"] != "1"
+            )
+        ):
+            raise ValueError(
+                "investigation telemetry seasonal baseline assessment is invalid"
+            )
+        disposition = payload["disposition"]
+        period_values = payload.get("baselinePeriodValues")
+        values = (
+            payload.get("baselineValue"),
+            payload.get("evaluationValue"),
+            payload.get("comparisonValue"),
+        )
+        data_dispositions = ("supporting", "contradicting", "neutral")
+        empty_dispositions = ("no-data", "incomplete")
+        if (
+            disposition not in data_dispositions + empty_dispositions
+            or (
+                disposition in data_dispositions
+                and (
+                    not isinstance(period_values, list)
+                    or len(period_values) != lookbacks
+                    or any(value is None for value in values)
+                )
+            )
+            or (
+                disposition in empty_dispositions
+                and (period_values is not None or any(value is not None for value in values))
+            )
+        ):
+            raise ValueError(
+                "investigation telemetry seasonal baseline values are invalid"
+            )
+        numeric_values = (threshold,) + values + tuple(period_values or ())
+        try:
+            values_are_finite = all(
+                value is None
+                or (
+                    not isinstance(value, bool)
+                    and isinstance(value, (int, float))
+                    and math.isfinite(float(value))
+                )
+                for value in numeric_values
+            )
+        except (OverflowError, ValueError):
+            values_are_finite = False
+        if not values_are_finite:
+            raise ValueError(
+                "investigation telemetry seasonal baseline values are invalid"
+            )
+        return cls(
+            selection_id=payload["selectionId"],
+            evidence_id=payload["evidenceId"],
+            root_cause_class=payload["rootCauseClass"],
+            metric=payload["metric"],
+            statistic=payload["statistic"],
+            unit=payload["unit"],
+            period_seconds=period,
+            lookback_periods=lookbacks,
+            evaluation_duration_seconds=evaluation_duration,
+            baseline_aggregation=payload["baselineAggregation"],
+            baseline_time_ranges=tuple(dict(window) for window in baseline_ranges),
+            evaluation_time_range=dict(evaluation_range),
+            calculation=payload["calculation"],
+            comparison_unit=payload["comparisonUnit"],
+            operator=payload["operator"],
+            threshold=float(threshold),
+            disposition=disposition,
+            baseline_period_values=(
+                tuple(float(value) for value in period_values)
+                if isinstance(period_values, list)
+                else None
+            ),
+            baseline_value=float(values[0]) if values[0] is not None else None,
+            evaluation_value=float(values[1]) if values[1] is not None else None,
+            comparison_value=float(values[2]) if values[2] is not None else None,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "assessmentType": "seasonal-baseline-comparison",
+            "selectionId": self.selection_id,
+            "evidenceId": self.evidence_id,
+            "rootCauseClass": self.root_cause_class,
+            "metric": self.metric,
+            "statistic": self.statistic,
+            "unit": self.unit,
+            "periodSeconds": self.period_seconds,
+            "lookbackPeriods": self.lookback_periods,
+            "evaluationDurationSeconds": self.evaluation_duration_seconds,
+            "baselineAggregation": self.baseline_aggregation,
+            "baselineTimeRanges": [
+                dict(window) for window in self.baseline_time_ranges
+            ],
+            "evaluationTimeRange": dict(self.evaluation_time_range),
+            "calculation": self.calculation,
+            "comparisonUnit": self.comparison_unit,
+            "operator": self.operator,
+            "threshold": self.threshold,
+            "disposition": self.disposition,
+        }
+        if self.baseline_period_values is not None:
+            result["baselinePeriodValues"] = list(self.baseline_period_values)
         if self.baseline_value is not None:
             result["baselineValue"] = self.baseline_value
         if self.evaluation_value is not None:
@@ -2492,7 +2819,9 @@ class InvestigationReport:
     def telemetry_assessments(
         self,
     ) -> tuple[
-        InvestigationTelemetryAssessment | InvestigationTelemetryBaselineAssessment,
+        InvestigationTelemetryAssessment
+        | InvestigationTelemetryBaselineAssessment
+        | InvestigationTelemetrySeasonalBaselineAssessment,
         ...,
     ]:
         """Return structured interpretations without importing server classes."""
@@ -2504,9 +2833,13 @@ class InvestigationReport:
         ):
             raise ValueError("investigation telemetryAssessments must be an array")
         return tuple(
-            InvestigationTelemetryBaselineAssessment.from_dict(value)
-            if value.get("assessmentType") == "baseline-comparison"
-            else InvestigationTelemetryAssessment.from_dict(value)
+            (
+                InvestigationTelemetrySeasonalBaselineAssessment.from_dict(value)
+                if value.get("assessmentType") == "seasonal-baseline-comparison"
+                else InvestigationTelemetryBaselineAssessment.from_dict(value)
+                if value.get("assessmentType") == "baseline-comparison"
+                else InvestigationTelemetryAssessment.from_dict(value)
+            )
             for value in values
         )
 

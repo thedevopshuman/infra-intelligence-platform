@@ -9,6 +9,22 @@ CHART = ROOT / "deploy" / "helm" / "infra-intelligence"
 
 
 class HelmMigrationBoundaryTests(unittest.TestCase):
+    def test_every_application_workload_uses_one_digest_aware_image_helper(self) -> None:
+        for name in (
+            "deployment.yaml",
+            "worker-deployment.yaml",
+            "otlp-receiver-deployment.yaml",
+            "migration-job.yaml",
+        ):
+            with self.subTest(template=name):
+                template = (CHART / "templates" / name).read_text(encoding="utf-8")
+                self.assertIn('include "infra-intelligence.image"', template)
+                self.assertNotIn(".Values.image.repository }}:", template)
+
+        helpers = (CHART / "templates" / "_helpers.tpl").read_text(encoding="utf-8")
+        self.assertIn('printf "%s@%s" .Values.image.repository .Values.image.digest', helpers)
+        self.assertIn(".Values.image.tag | default .Chart.AppVersion", helpers)
+
     def test_scheduled_backup_has_database_and_pvc_authority_only(self) -> None:
         cronjob = (CHART / "templates" / "backup-cronjob.yaml").read_text(
             encoding="utf-8"
@@ -118,10 +134,14 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertNotIn("current-context", script)
         self.assertNotIn("echo \"$IIP_DB_PASSWORD\"", script)
         self.assertIn('IIP_AUTH_VERIFIER="sha256:$(openssl rand -hex 32)"', script)
+        self.assertIn("build --provenance=false", script)
+        self.assertIn("ctr -n k8s.io images tag --force", script)
         self.assertIn('basename "$IIP_EXPECTED_MIGRATION"', script)
         self.assertNotIn('basename "$IIP_EXPECTED_MIGRATION" .sql', script)
         self.assertEqual(script.count('"$IIP_HELM_BIN" upgrade --install iip'), 2)
         self.assertIn("--set replicaCount=2", script)
+        self.assertEqual(script.count('--set-string "image.digest=$IIP_TEST_IMAGE_DIGEST"'), 2)
+        self.assertIn("iip-local-platform@$IIP_TEST_IMAGE_DIGEST", script)
         self.assertIn("--set ingress.tls.existingSecret=iip-tls", script)
         self.assertIn("--set backup.destination.existingClaim=iip-backups", script)
         self.assertIn("--from=cronjob/iip-infra-intelligence-backup", script)

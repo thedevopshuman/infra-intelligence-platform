@@ -38,3 +38,10 @@ app.kubernetes.io/component: control-plane-api
 {{- end }}
 {{- end }}
 
+{{- define "infra-intelligence.image" -}}
+{{- if .Values.image.digest -}}
+{{- printf "%s@%s" .Values.image.repository .Values.image.digest -}}
+{{- else -}}
+{{- printf "%s:%s" .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) -}}
+{{- end -}}
+{{- end }}

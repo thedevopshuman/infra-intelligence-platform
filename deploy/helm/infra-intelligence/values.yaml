@@ -4,6 +4,7 @@ image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
   tag: "0.25.0"
+  digest: ""
 
 worker:
   enabled: false

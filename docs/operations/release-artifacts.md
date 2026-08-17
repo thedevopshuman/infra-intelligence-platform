@@ -45,4 +45,6 @@ The local bundle is explicitly unsigned. It proves artifact integrity and build 
 5. scan the attached SBOM under a documented vulnerability exception policy;
 6. distribute only the verified digest and matching manifest/checksums through a trusted release channel.
 
+Deploy that verified OCI index as `image.repository@image.digest` through the Helm values contract. The chart resolves the same immutable reference for its API, worker, OTLP receiver, and schema-migration Job; a mutable tag is only a local-development fallback.
+
 Docker documents the [SBOM attestation](https://docs.docker.com/build/metadata/attestations/sbom/) and [SLSA provenance](https://docs.docker.com/build/metadata/attestations/slsa-provenance/) formats used by the local BuildKit path. The repository does not claim a production signature until the external identity gate is real and independently verifiable.

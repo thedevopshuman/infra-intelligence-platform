@@ -13,7 +13,7 @@ Before installation, provide:
 - authentication configuration through an existing Secret or the documented OIDC mode;
 - reviewed tenant, policy, network, telemetry, backup, and retention settings.
 
-The default repository and tag are placeholders. Pin a released image digest in production rather than relying on a mutable tag.
+The default repository and tag are placeholders. Set `image.repository` to the published repository and `image.digest` to the verified release OCI index digest in production. A non-empty digest takes precedence over the tag for the API, worker, OTLP receiver, and migration Job.
 
 ## Validate configuration before access
 
@@ -64,6 +64,7 @@ Create the database and identity Secrets through the cluster's secret-management
 image:
   repository: registry.example.test/iip/control-plane
   tag: 0.25.0
+  digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
   existingSecret: iip-database
@@ -108,7 +109,7 @@ Before upgrading:
 
 1. Review migration and compatibility notes between the installed and target versions.
 2. Complete and verify the database backup procedure for the deployment's RPO/RTO policy.
-3. Pin the target image digest and render the exact values with `helm template`.
+3. Put the target OCI index digest in `image.digest` and render the exact values with `helm template`.
 4. Run `helm upgrade --install ... --wait`; do not bypass a failed hook.
 5. Verify the migration Job log, Deployment rollout, `/readyz`, and the customer workflow appropriate to the environment.
 
@@ -122,7 +123,7 @@ With Docker Desktop and the explicit `kind-iip-dev` context available, run:
 make test-helm-install
 ```
 
-The gate builds and loads the current image, creates a disposable exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, and proves API readiness from inside the pod. It then performs a second Helm revision with two API replicas, a TLS Ingress declaration, and scheduled backup configuration. The gate proves migration idempotency and exact ingress binding, runs the installed backup CronJob on demand, verifies its persisted checksum, restores it into a separate database, confirms every packaged migration, and checks rollout and Helm history. It removes the namespace and claim, refuses non-kind contexts, and never prints generated credentials, database contents, or private keys. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
+The gate builds and loads the current image, registers its exact host-platform digest on every disposable kind node, creates an exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, and proves API readiness from inside the pod. It then performs a second Helm revision with two API replicas, a TLS Ingress declaration, and scheduled backup configuration. The gate proves immutable image selection, migration idempotency, and exact ingress binding; runs the installed backup CronJob on demand; verifies its persisted checksum; restores it into a separate database; confirms every packaged migration; and checks rollout and Helm history. It removes the namespace and claim, refuses non-kind contexts, and never prints generated credentials, database contents, or private keys. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
 
 ## Production gaps
 

@@ -5,6 +5,8 @@ The foundation API service is available inside the cluster at:
 The API fails closed unless its configured authentication mode has valid protected configuration.
 Chart values are closed by values.schema.json; validate the exact protected values file
 with both helm lint and helm template before applying it.
+Set image.digest to the verified release OCI index digest for production. When present,
+it takes precedence over image.tag for every application and migration workload.
 Optional ingress requires an existing TLS Secret, explicit controller class, redirect
 annotation, NetworkPolicy, and exact controller namespace/pod selectors.
 Optional scheduled logical backups require an existing protected PVC, the database

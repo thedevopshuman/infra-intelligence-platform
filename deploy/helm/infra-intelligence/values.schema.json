@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Infrastructure Intelligence Platform Helm values",
-  "description": "Strict customer configuration contract for chart 0.24.x.",
+  "description": "Strict customer configuration contract for the Infrastructure Intelligence Platform chart.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -39,14 +39,27 @@
     "image": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repository", "pullPolicy", "tag"],
+      "required": ["repository", "pullPolicy", "tag", "digest"],
       "properties": {
-        "repository": { "$ref": "#/definitions/nonEmptyString" },
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+        },
         "pullPolicy": {
           "type": "string",
           "enum": ["Always", "IfNotPresent", "Never"]
         },
-        "tag": { "type": "string", "maxLength": 128 }
+        "tag": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^$|^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^$|^sha256:[a-f0-9]{64}$"
+        }
       }
     },
     "worker": {

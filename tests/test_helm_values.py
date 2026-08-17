@@ -45,6 +45,10 @@ class HelmValuesContractTests(unittest.TestCase):
             properties["service"]["properties"]["type"]["const"], "ClusterIP"
         )
         self.assertEqual(
+            properties["image"]["properties"]["digest"]["pattern"],
+            "^$|^sha256:[a-f0-9]{64}$",
+        )
+        self.assertEqual(
             properties["backup"]["properties"]["destination"]["properties"][
                 "mountPath"
             ]["const"],
@@ -57,6 +61,7 @@ class HelmValuesContractTests(unittest.TestCase):
             "sha256",
         )
         self.assertIn("existingSecret: iip-auth", self.values)
+        self.assertIn('digest: ""', self.values)
 
     def test_cross_field_guards_fail_before_a_workload_is_rendered(self) -> None:
         guards = (CHART / "templates" / "validation.yaml").read_text(

@@ -69,9 +69,23 @@ IIP_AUTH_IDENTITIES_JSON=$(printf '%s' \
     "{\"identities\":[{\"tokenSha256\":\"$IIP_AUTH_VERIFIER\",\"actorId\":\"helm-test-operator\",\"tenantId\":\"helm-test\",\"roles\":[\"developer\"]}]}"
 )
 
-"$IIP_DOCKER_BIN" build --tag "$IIP_TEST_IMAGE" . >/dev/null
+"$IIP_DOCKER_BIN" build --provenance=false --tag "$IIP_TEST_IMAGE" . >/dev/null
+IIP_TEST_IMAGE_REFERENCE=$(
+    "$IIP_DOCKER_BIN" image inspect "$IIP_TEST_IMAGE" \
+        --format '{{index .RepoDigests 0}}'
+)
+IIP_TEST_IMAGE_DIGEST=${IIP_TEST_IMAGE_REFERENCE#*@}
+if ! printf '%s\n' "$IIP_TEST_IMAGE_DIGEST" | rg -q '^sha256:[a-f0-9]{64}$'; then
+    echo "Local Helm test image did not produce an immutable digest" >&2
+    exit 1
+fi
 "$IIP_KIND_BIN" load docker-image "$IIP_TEST_IMAGE" \
     --name "$IIP_KIND_CLUSTER" >/dev/null
+for IIP_KIND_NODE in $("$IIP_KIND_BIN" get nodes --name "$IIP_KIND_CLUSTER"); do
+    "$IIP_DOCKER_BIN" exec "$IIP_KIND_NODE" ctr -n k8s.io images tag --force \
+        "docker.io/library/$IIP_TEST_IMAGE" \
+        "docker.io/library/iip-local-platform@$IIP_TEST_IMAGE_DIGEST" >/dev/null
+done
 
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" create namespace \
     "$IIP_TEST_NAMESPACE" >/dev/null
@@ -158,6 +172,7 @@ EOF
     --namespace "$IIP_TEST_NAMESPACE" \
     --set image.repository=iip-local-platform \
     --set "image.tag=$IIP_APP_VERSION" \
+    --set-string "image.digest=$IIP_TEST_IMAGE_DIGEST" \
     --set image.pullPolicy=Never \
     --set database.existingSecret=iip-database \
     --set database.migrations.enabled=true \
@@ -197,6 +212,7 @@ IIP_EXPECTED_MIGRATION_COUNT=$(
     --namespace "$IIP_TEST_NAMESPACE" \
     --set image.repository=iip-local-platform \
     --set "image.tag=$IIP_APP_VERSION" \
+    --set-string "image.digest=$IIP_TEST_IMAGE_DIGEST" \
     --set image.pullPolicy=Never \
     --set replicaCount=2 \
     --set database.existingSecret=iip-database \
@@ -236,6 +252,15 @@ IIP_INGRESS_BINDING=$(
 )
 if [ "$IIP_INGRESS_BINDING" != "iip-conformance|iip.helm.test|iip-tls|true" ]; then
     echo "Helm upgrade did not preserve the explicit TLS ingress binding" >&2
+    exit 1
+fi
+IIP_DEPLOYED_IMAGE=$(
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" get deployment/iip-infra-intelligence \
+        -o 'jsonpath={.spec.template.spec.containers[0].image}'
+)
+if [ "$IIP_DEPLOYED_IMAGE" != "iip-local-platform@$IIP_TEST_IMAGE_DIGEST" ]; then
+    echo "Helm rollout did not preserve the immutable application image digest" >&2
     exit 1
 fi
 
@@ -333,4 +358,4 @@ EOF
     "$IIP_TEST_PYTHON" -c \
         'import json,sys; rows=json.load(sys.stdin); assert len(rows) == 2 and str(rows[-1]["revision"]) == "2" and rows[-1]["status"] == "deployed"'
 
-echo "Helm install/upgrade test passed: migrations -> TLS ingress -> scheduled backup -> verified restore"
+echo "Helm install/upgrade test passed: immutable image -> migrations -> TLS ingress -> backup/restore"

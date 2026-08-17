@@ -42,7 +42,7 @@ spec:
       {{- end }}
       containers:
         - name: otlp-receiver
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: {{ include "infra-intelligence.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["python", "-m", "iip.surfaces.otlp_receiver"]
           securityContext:

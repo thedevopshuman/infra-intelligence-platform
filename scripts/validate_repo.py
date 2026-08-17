@@ -76,6 +76,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0047-attested-release-bundle.md",
     "docs/decisions/0048-explicit-tls-ingress-and-upgrade-conformance.md",
     "docs/decisions/0049-least-authority-scheduled-logical-backups.md",
+    "docs/decisions/0050-immutable-application-image-identity.md",
     "docs/operations/event-delivery.md",
     "docs/operations/helm-deployment.md",
     "docs/operations/release-artifacts.md",

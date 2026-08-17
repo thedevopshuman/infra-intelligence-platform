@@ -94,6 +94,8 @@ helm-lint:
 	$(HELM) lint deploy/helm/infra-intelligence
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set-string image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa >/dev/null
+	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
 		--set otlpReceiver.enabled=true \
 		--set otlpReceiver.channelsExistingSecret=iip-otlp-metrics \
@@ -142,6 +144,10 @@ helm-lint:
 	fi
 	@if $(HELM) lint deploy/helm/infra-intelligence --set unknownCustomerSetting=true >/dev/null 2>&1; then \
 		echo "Helm values schema accepted an unknown setting" >&2; exit 1; \
+	fi
+	@if $(HELM) lint deploy/helm/infra-intelligence \
+		--set-string image.digest=sha256:not-a-digest >/dev/null 2>&1; then \
+		echo "Helm values schema accepted a mutable or malformed image digest" >&2; exit 1; \
 	fi
 	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set worker.enabled=true \

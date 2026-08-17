@@ -172,7 +172,7 @@ class HttpsJwksTransport:
         opener = build_opener(HTTPSHandler(context=context), _NoRedirect())
         request = Request(
             url,
-            headers={"Accept": "application/json", "User-Agent": "iip-oidc/0.20.0"},
+            headers={"Accept": "application/json", "User-Agent": "iip-oidc/0.21.0"},
             method="GET",
         )
         try:

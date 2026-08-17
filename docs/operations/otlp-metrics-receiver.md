@@ -15,10 +15,17 @@ export IIP_OTLP_RECEIVER_CHANNELS_JSON="$(tr -d '\n' < deploy/otlp/receiver-chan
 
 The example resource reference is the deterministic UID of `contracts/examples/resource.json`. The resource must already exist in the configured tenant or the receiver rejects the export without persistence.
 
-Point an OTLP/HTTP exporter at the API:
+The production-shaped receiver requires the shared durable database and runs on its own listener:
 
 ```bash
-export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:8080/v1/metrics
+export IIP_DATABASE_URL=postgresql://...
+PYTHONPATH=src python3 -m iip.surfaces.otlp_receiver
+```
+
+Point an OTLP/HTTP exporter at the receiver:
+
+```bash
+export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:4318/v1/metrics
 export OTEL_EXPORTER_OTLP_METRICS_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_METRICS_HEADERS="Authorization=Bearer%20<channel-token>"
 ```
@@ -48,15 +55,17 @@ Successful non-empty exports produce an `OtlpMetricsEvidence` JSON artifact behi
 
 ## Docker Compose and Helm
 
-Compose passes `IIP_OTLP_RECEIVER_ENABLED` and `IIP_OTLP_RECEIVER_CHANNELS_JSON` to the API. Keep the latter in shell/secret-manager state; do not commit a populated document.
+The Docker integration starts PostgreSQL, the control API, and the receiver as separate containers. It passes `IIP_OTLP_RECEIVER_ENABLED` and `IIP_OTLP_RECEIVER_CHANNELS_JSON` only to the receiver. Keep the latter in shell/secret-manager state; do not commit a populated document.
 
-For Helm, set `otlpReceiver.enabled: true` and reference a Kubernetes Secret through `otlpReceiver.channelsExistingSecret`. The secret value must contain the complete JSON document under the configured key. The chart never puts channel configuration in a ConfigMap.
+For Helm, set `otlpReceiver.enabled: true`, `database.existingSecret`, and `otlpReceiver.channelsExistingSecret`. The secret value must contain the complete JSON document under the configured key. The chart never puts channel configuration in a ConfigMap or mounts it into the control-plane pod.
 
-The reference receiver shares the API's HTTP port. If NetworkPolicy is enabled, restrict inbound access to the namespace hosting the trusted Collector/gateway. A production managed deployment should normally give this route a dedicated gateway policy and rate limits; a dedicated listener/process is a future isolation option.
+The chart creates a dedicated receiver Deployment and Service on OTLP/HTTP port `4318`. It exposes no console or control-plane operation, has no interactive identity configuration or ambient service-account token, and applies per-channel process admission from `otlpIngest.maxRequestsPerSecond` and `otlpIngest.requestBurst`. If NetworkPolicy is enabled, both `networkPolicy.databaseEgress` and an exact `networkPolicy.otlpReceiverIngress` must be configured. Federated workload identity or mTLS, automated channel rotation, distributed gateway admission, and durable buffering remain production deployment decisions.
+
+For one-process development compatibility only, set `IIP_OTLP_RECEIVER_MODE=shared` on the control API. Helm deliberately never enables this mode.
 
 ## Verification
 
-`make verify` covers Protobuf normalization, channel/control-plane credential separation, gzip and post-decompression limits, tenant/resource binding, redaction, immutable persistence, schemas, OpenAPI, SDK types, and Helm rendering. The Docker gate sends a real OTLP export from the official Python exporter into the built API image:
+`make verify` covers Protobuf normalization, channel/control-plane credential separation, gzip and post-decompression limits, tenant/resource binding, redaction, immutable persistence, separate OpenAPI documents, SDK types, and Helm rendering. The Docker gate sends real exports from the official Python exporters into the isolated receiver and verifies route separation:
 
 ```bash
 make test-otlp-receiver

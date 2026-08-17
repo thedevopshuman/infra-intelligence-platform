@@ -61,7 +61,7 @@ Create a random channel token of at least 32 characters. Store only its SHA-256 
 ```bash
 export IIP_OTLP_LOGS_RECEIVER_ENABLED=true
 export IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON="$(tr -d '\n' < deploy/otlp/log-receiver-channels.example.json)"
-export OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://localhost:8080/v1/logs
+export OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://localhost:4318/v1/logs
 export OTEL_EXPORTER_OTLP_LOGS_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_LOGS_HEADERS="Authorization=Bearer%20<channel-token>"
 ```
@@ -74,15 +74,15 @@ Each protected channel fixes request/artifact bytes, record count, mapped attrib
 
 String bodies may contain secrets or hostile instructions. They are treated as confidential untrusted text and redacted before hashing/persistence. Do not route unrestricted production logs into this receiver. Use a Collector to filter service pipelines and inject the channel authorization header outside application workloads.
 
-The reference receiver shares the API listener. When Helm NetworkPolicy is enabled, `networkPolicy.otlpReceiverIngress` applies to metrics and logs; restrict it to the trusted Collector/gateway namespace and pods. Production isolation, workload identity or mTLS, rate limits, durable buffering, deletion/data-residency controls, and receiver-specific SLOs remain required.
+Metrics and logs share a dedicated OTLP intake process, not the control-plane listener. The receiver exposes no console or control operations, has independent channel secrets, and applies per-channel request admission before body reads. When Helm NetworkPolicy is enabled, `networkPolicy.otlpReceiverIngress` applies to both signals; restrict it to the trusted Collector/gateway namespace and pods, and configure `networkPolicy.databaseEgress`. Federated workload identity or mTLS, distributed rate enforcement, durable buffering, deletion/data-residency controls, and receiver-specific SLOs remain required.
 
 ## Helm and Docker verification
 
 For historical Loki queries, set `logEvidence.backend: loki`, put the non-secret registry in `logEvidence.loki.integrationsJson`, and reference a Kubernetes Secret through `logEvidence.loki.credentialsExistingSecret` when static credentials are required. With NetworkPolicy enabled, configure `networkPolicy.lokiEgress` for the exact Loki/gateway namespace, pod labels, and port. Prefer the external credential broker for production leases.
 
-For Helm, set `otlpLogsReceiver.enabled: true` and place the complete channel JSON in a Kubernetes Secret referenced by `otlpLogsReceiver.channelsExistingSecret`. The chart never writes channel configuration into a ConfigMap.
+For Helm, set `otlpLogsReceiver.enabled: true`, `database.existingSecret`, and place the complete channel JSON in a Kubernetes Secret referenced by `otlpLogsReceiver.channelsExistingSecret`. The chart never writes channel configuration into a ConfigMap or mounts it into the API pod.
 
-The Docker receiver gate builds the API image and sends both metrics and logs using official OpenTelemetry exporters:
+The Docker receiver gate builds one image, runs it as separate API and receiver processes against PostgreSQL, and sends both metrics and logs using official OpenTelemetry exporters:
 
 ```bash
 make test-otlp-receiver

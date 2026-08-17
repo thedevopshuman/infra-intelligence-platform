@@ -120,7 +120,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.20.0"
+    server_version = "IIPReference/0.21.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -737,6 +737,12 @@ class ApiHandler(BaseHTTPRequestHandler):
                 raise OtlpReceiverAuthenticationError(code) from None
             channel = service.authenticate_bearer(token)
             validate_channel_context(channel)
+            if not self._admit_otlp_channel(channel.channel_id):
+                self._otlp_failure(
+                    HTTPStatus.TOO_MANY_REQUESTS,
+                    "otlp.rate-limit.exceeded",
+                )
+                return
 
             content_type = self.headers.get("content-type", "")
             media_type = content_type.partition(";")[0].strip().lower()
@@ -801,6 +807,12 @@ class ApiHandler(BaseHTTPRequestHandler):
                 raise OtlpReceiverAuthenticationError(code) from None
             channel = service.authenticate_bearer(token)
             validate_logs_channel_context(channel)
+            if not self._admit_otlp_channel(channel.channel_id):
+                self._otlp_failure(
+                    HTTPStatus.TOO_MANY_REQUESTS,
+                    "otlp.rate-limit.exceeded",
+                )
+                return
             content_type = self.headers.get("content-type", "")
             media_type = content_type.partition(";")[0].strip().lower()
             if media_type != "application/x-protobuf":
@@ -852,6 +864,12 @@ class ApiHandler(BaseHTTPRequestHandler):
         if code not in ("authentication.required", "authentication.invalid"):
             code = "authentication.invalid"
         self._json(HTTPStatus.UNAUTHORIZED, {"error": {"code": code}})
+
+    def _admit_otlp_channel(self, channel_id: str) -> bool:
+        """Allow the shared compatibility receiver without process-level throttling."""
+
+        del channel_id
+        return True
 
     def _stored_document(
         self,

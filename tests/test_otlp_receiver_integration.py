@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import unittest
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -40,11 +41,12 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
         with urllib.request.urlopen(request, timeout=5) as response:
             self.assertEqual(response.status, 202)
 
-    def test_official_exporter_reaches_built_api_image(self) -> None:
-        base_url = os.environ["IIP_TEST_OTLP_RECEIVER_ENDPOINT"].rstrip("/")
+    def test_official_exporter_reaches_isolated_receiver(self) -> None:
+        control_url = os.environ["IIP_TEST_CONTROL_ENDPOINT"].rstrip("/")
+        receiver_url = os.environ["IIP_TEST_OTLP_RECEIVER_ENDPOINT"].rstrip("/")
         control_token = os.environ["IIP_TEST_OTLP_CONTROL_TOKEN"]
         channel_token = os.environ["IIP_TEST_OTLP_CHANNEL_TOKEN"]
-        self.seed_resource(base_url, control_token)
+        self.seed_resource(control_url, control_token)
 
         reader = InMemoryMetricReader()
         provider = MeterProvider(
@@ -66,7 +68,7 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
         self.assertIsNotNone(metrics_data)
 
         exporter = OTLPMetricExporter(
-            endpoint=f"{base_url}/v1/metrics",
+            endpoint=f"{receiver_url}/v1/metrics",
             headers={"Authorization": f"Bearer {channel_token}"},
             timeout=5,
         )
@@ -79,14 +81,15 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
             exporter.shutdown()
             provider.shutdown()
 
-    def test_official_log_exporter_reaches_built_api_image(self) -> None:
-        base_url = os.environ["IIP_TEST_OTLP_RECEIVER_ENDPOINT"].rstrip("/")
+    def test_official_log_exporter_reaches_isolated_receiver(self) -> None:
+        control_url = os.environ["IIP_TEST_CONTROL_ENDPOINT"].rstrip("/")
+        receiver_url = os.environ["IIP_TEST_OTLP_RECEIVER_ENDPOINT"].rstrip("/")
         control_token = os.environ["IIP_TEST_OTLP_CONTROL_TOKEN"]
         channel_token = os.environ["IIP_TEST_OTLP_CHANNEL_TOKEN"]
-        self.seed_resource(base_url, control_token)
+        self.seed_resource(control_url, control_token)
 
         exporter = OTLPLogExporter(
-            endpoint=f"{base_url}/v1/logs",
+            endpoint=f"{receiver_url}/v1/logs",
             headers={"Authorization": f"Bearer {channel_token}"},
             timeout=5,
         )
@@ -111,6 +114,30 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
             logger.removeHandler(handler)
             handler.close()
             provider.shutdown()
+
+    def test_control_and_receiver_routes_are_process_isolated(self) -> None:
+        control_url = os.environ["IIP_TEST_CONTROL_ENDPOINT"].rstrip("/")
+        receiver_url = os.environ["IIP_TEST_OTLP_RECEIVER_ENDPOINT"].rstrip("/")
+        channel_token = os.environ["IIP_TEST_OTLP_CHANNEL_TOKEN"]
+
+        control_request = urllib.request.Request(
+            f"{control_url}/v1/metrics",
+            data=b"",
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {channel_token}",
+                "Content-Type": "application/x-protobuf",
+            },
+        )
+        with self.assertRaises(urllib.error.HTTPError) as control_error:
+            urllib.request.urlopen(control_request, timeout=5)
+        self.assertEqual(control_error.exception.code, 404)
+        control_error.exception.close()
+
+        with self.assertRaises(urllib.error.HTTPError) as receiver_error:
+            urllib.request.urlopen(f"{receiver_url}/console", timeout=5)
+        self.assertEqual(receiver_error.exception.code, 404)
+        receiver_error.exception.close()
 
 
 if __name__ == "__main__":

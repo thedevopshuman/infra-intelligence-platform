@@ -385,6 +385,7 @@ class OtlpReceiverCompositionAndHttpTests(unittest.TestCase):
         if enabled:
             environment.update(
                 {
+                    "IIP_OTLP_RECEIVER_MODE": "shared",
                     "IIP_OTLP_RECEIVER_ENABLED": "true",
                     "IIP_OTLP_RECEIVER_CHANNELS_JSON": receiver_config(),
                 }
@@ -515,6 +516,7 @@ class OtlpReceiverCompositionAndHttpTests(unittest.TestCase):
             os.environ,
             {
                 "IIP_AUTH_IDENTITIES_JSON": control_identity_config(),
+                "IIP_OTLP_RECEIVER_MODE": "shared",
                 "IIP_OTLP_RECEIVER_ENABLED": "true",
             },
             clear=True,

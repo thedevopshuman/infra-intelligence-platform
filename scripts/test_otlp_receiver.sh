@@ -27,10 +27,11 @@ cleanup
 "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
     -f "$IIP_COMPOSE_FILE" up --build --detach --wait
 
-IIP_TEST_OTLP_RECEIVER_ENDPOINT=http://127.0.0.1:18080 \
+IIP_TEST_CONTROL_ENDPOINT=http://127.0.0.1:18080 \
+IIP_TEST_OTLP_RECEIVER_ENDPOINT=http://127.0.0.1:18081 \
 IIP_TEST_OTLP_CHANNEL_TOKEN="$IIP_TEST_OTLP_CHANNEL_TOKEN" \
 IIP_TEST_OTLP_CONTROL_TOKEN="$IIP_TEST_OTLP_CONTROL_TOKEN" \
 PYTHONPATH=src:sdks/python/src \
     "$IIP_TEST_PYTHON" -m unittest tests.test_otlp_receiver_integration -v
 
-echo "Official OTLP/HTTP exporters delivered metrics and logs to the built API image"
+echo "Official OTLP/HTTP exporters delivered metrics and logs to the isolated receiver"

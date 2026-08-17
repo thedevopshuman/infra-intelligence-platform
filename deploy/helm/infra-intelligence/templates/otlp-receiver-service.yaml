@@ -1,0 +1,19 @@
+{{- if or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "infra-intelligence.fullname" . }}-otlp-receiver
+  labels:
+    {{- include "infra-intelligence.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.otlpIngest.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "infra-intelligence.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: otlp-receiver
+  ports:
+    - name: otlp-http
+      port: {{ .Values.otlpIngest.service.port }}
+      targetPort: otlp-http
+      protocol: TCP
+{{- end }}

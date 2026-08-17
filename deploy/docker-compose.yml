@@ -15,7 +15,7 @@ services:
       - postgres-data:/var/lib/postgresql
 
   api:
-    image: iip-local-platform:0.20.0
+    image: iip-local-platform:0.21.0
     build:
       context: ..
       dockerfile: Dockerfile
@@ -23,12 +23,9 @@ services:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
       IIP_DATABASE_AUTO_MIGRATE: "true"
       IIP_AUTH_IDENTITIES_JSON: ${IIP_AUTH_IDENTITIES_JSON:?set IIP_AUTH_IDENTITIES_JSON}
+      IIP_OTLP_RECEIVER_MODE: disabled
       IIP_OTEL_METRICS_ENABLED: ${IIP_OTEL_METRICS_ENABLED:-false}
       IIP_OTEL_TRACES_ENABLED: ${IIP_OTEL_TRACES_ENABLED:-false}
-      IIP_OTLP_RECEIVER_ENABLED: ${IIP_OTLP_RECEIVER_ENABLED:-false}
-      IIP_OTLP_RECEIVER_CHANNELS_JSON: ${IIP_OTLP_RECEIVER_CHANNELS_JSON:-}
-      IIP_OTLP_LOGS_RECEIVER_ENABLED: ${IIP_OTLP_LOGS_RECEIVER_ENABLED:-false}
-      IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON: ${IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON:-}
       IIP_TELEMETRY_METRICS_BACKEND: ${IIP_TELEMETRY_METRICS_BACKEND:-no-data}
       IIP_TELEMETRY_LOGS_BACKEND: ${IIP_TELEMETRY_LOGS_BACKEND:-no-data}
       IIP_PROMETHEUS_INTEGRATIONS_JSON: ${IIP_PROMETHEUS_INTEGRATIONS_JSON:-}
@@ -73,7 +70,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-local-platform:0.20.0
+    image: iip-local-platform:0.21.0
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip

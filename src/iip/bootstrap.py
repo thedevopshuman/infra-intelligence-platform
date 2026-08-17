@@ -395,8 +395,19 @@ def build_runtime_from_env(*, include_action_executor: bool = True) -> Runtime:
     )
     database_url = os.environ.get("IIP_DATABASE_URL")
     try:
-        otlp_metrics_receiver = _otlp_metrics_receiver_from_env()
-        otlp_logs_receiver = _otlp_logs_receiver_from_env()
+        receiver_mode = os.environ.get("IIP_OTLP_RECEIVER_MODE", "disabled")
+        if receiver_mode not in ("disabled", "shared"):
+            raise OtlpReceiverConfigurationError("otlp.configuration.invalid")
+        otlp_metrics_receiver = (
+            _otlp_metrics_receiver_from_env()
+            if receiver_mode == "shared"
+            else None
+        )
+        otlp_logs_receiver = (
+            _otlp_logs_receiver_from_env()
+            if receiver_mode == "shared"
+            else None
+        )
         credential_broker = _credential_broker_from_env()
         action_executor = (
             _kubernetes_action_executor_from_env(credential_broker)
@@ -464,6 +475,30 @@ def build_runtime_from_env(*, include_action_executor: bool = True) -> Runtime:
         if telemetry_runtime is not None:
             telemetry_runtime.shutdown()
         raise
+
+
+def build_otlp_receiver_runtime_from_env() -> Runtime:
+    """Compose the isolated OTLP intake process from protected configuration."""
+
+    database_url = os.environ.get("IIP_DATABASE_URL")
+    if not database_url:
+        raise OtlpReceiverConfigurationError("otlp.database.configuration.required")
+    metrics_receiver = _otlp_metrics_receiver_from_env()
+    logs_receiver = _otlp_logs_receiver_from_env()
+    if metrics_receiver is None and logs_receiver is None:
+        raise OtlpReceiverConfigurationError("otlp.configuration.required")
+    auto_migrate = (
+        os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower() == "true"
+    )
+    return build_postgres_runtime(
+        database_url,
+        authenticator=DenyAllAuthenticator(),
+        migrate=auto_migrate,
+        ingestion_objectives=_ingestion_objectives_from_env(),
+        otlp_metrics_receiver=metrics_receiver,
+        otlp_logs_receiver=logs_receiver,
+        policy=_policy_from_env(),
+    )
 
 
 def build_investigation_worker_from_env(runtime: Runtime) -> InvestigationWorker:

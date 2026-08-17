@@ -65,6 +65,9 @@ REQUIRED_PATHS = (
     "docs/decisions/0036-request-scoped-kubernetes-restart.md",
     "docs/decisions/0037-oidc-and-external-policy-boundaries.md",
     "docs/decisions/0038-signed-no-network-plugin-runner.md",
+    "docs/decisions/0039-tenant-scoped-investigation-dispatch.md",
+    "docs/decisions/0040-action-timers-and-fail-closed-reconciliation.md",
+    "docs/decisions/0041-isolated-otlp-receiver-process.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/kubernetes-event-evidence.md",
@@ -267,6 +270,7 @@ REQUIRED_PATHS = (
     "scripts/run_reference_workflow.py",
     "scripts/backup_restore_experiment.py",
     "api/openapi/control-plane.openapi.json",
+    "api/openapi/otlp-receiver.openapi.json",
     "deploy/helm/infra-intelligence/Chart.yaml",
 )
 
@@ -348,6 +352,9 @@ def validate_authentication_boundary(
         operation = item.get("get") if isinstance(item, dict) else None
         if not isinstance(operation, dict) or operation.get("security") != []:
             fail(errors, f"{public_path} must explicitly remain unauthenticated")
+    for receiver_path in ("/v1/metrics", "/v1/logs"):
+        if receiver_path in paths:
+            fail(errors, f"control-plane OpenAPI must not expose {receiver_path}")
     for path, item in paths.items():
         if not path.startswith("/v1") or not isinstance(item, dict):
             continue
@@ -371,6 +378,18 @@ def validate_authentication_boundary(
         for header in ("x-iip-tenant-id", "x-iip-actor-id"):
             if header in content:
                 fail(errors, f"legacy identity header remains in {relative}: {header}")
+
+    receiver_path = ROOT / "api" / "openapi" / "otlp-receiver.openapi.json"
+    receiver = documents.get(receiver_path)
+    if not isinstance(receiver, dict):
+        fail(errors, "OTLP receiver OpenAPI document must be an object")
+        return
+    receiver_paths = receiver.get("paths")
+    allowed_receiver_paths = {"/healthz", "/readyz", "/v1/metrics", "/v1/logs"}
+    if not isinstance(receiver_paths, dict) or set(receiver_paths) != allowed_receiver_paths:
+        fail(errors, "OTLP receiver OpenAPI must expose only health and OTLP routes")
+    if receiver.get("security") != [{"otlpChannelBearerAuth": []}]:
+        fail(errors, "OTLP receiver OpenAPI must require channel Bearer authentication")
 
 
 def canonical_digest(document: object) -> str:

@@ -16,8 +16,7 @@ data:
   IIP_DATABASE_AUTO_MIGRATE: {{ .Values.database.autoMigrate | quote }}
   IIP_OTEL_METRICS_ENABLED: {{ .Values.telemetry.metricsEnabled | quote }}
   IIP_OTEL_TRACES_ENABLED: {{ .Values.telemetry.tracesEnabled | quote }}
-  IIP_OTLP_RECEIVER_ENABLED: {{ .Values.otlpReceiver.enabled | quote }}
-  IIP_OTLP_LOGS_RECEIVER_ENABLED: {{ .Values.otlpLogsReceiver.enabled | quote }}
+  IIP_OTLP_RECEIVER_MODE: "disabled"
   IIP_OTEL_INGESTION_ATTRIBUTE_MODE: {{ .Values.telemetry.attributeMode | quote }}
   IIP_OTEL_INVESTIGATION_ATTRIBUTE_MODE: {{ .Values.telemetry.investigationAttributeMode | quote }}
   OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.telemetry.otlpEndpoint | quote }}

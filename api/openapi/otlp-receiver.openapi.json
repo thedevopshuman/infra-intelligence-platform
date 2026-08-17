@@ -1,0 +1,116 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Infrastructure Intelligence OTLP Receiver API",
+    "version": "0.21.0",
+    "description": "Isolated OTLP/HTTP Protobuf intake for allowlisted metrics and logs. This listener exposes no Infrastructure Intelligence control-plane operations."
+  },
+  "servers": [{"url": "http://localhost:4318"}],
+  "security": [{"otlpChannelBearerAuth": []}],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "receiverHealth",
+        "security": [],
+        "responses": {"200": {"description": "Receiver process is healthy"}}
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "receiverReady",
+        "security": [],
+        "responses": {"200": {"description": "Receiver process is ready"}}
+      }
+    },
+    "/v1/metrics": {
+      "post": {
+        "operationId": "ingestOtlpMetrics",
+        "description": "Accept one bounded OTLP metrics export under a protected tenant-bound channel.",
+        "requestBody": {"$ref": "#/components/requestBodies/OtlpExport"},
+        "responses": {
+          "200": {"$ref": "#/components/responses/OtlpSuccess"},
+          "400": {"$ref": "#/components/responses/OtlpInvalidRequest"},
+          "401": {"$ref": "#/components/responses/OtlpUnauthorized"},
+          "403": {"$ref": "#/components/responses/OtlpPolicyDenied"},
+          "404": {"$ref": "#/components/responses/OtlpReceiverDisabled"},
+          "413": {"$ref": "#/components/responses/OtlpRequestTooLarge"},
+          "415": {"$ref": "#/components/responses/OtlpUnsupportedMedia"},
+          "429": {"$ref": "#/components/responses/OtlpRateLimited"},
+          "503": {"$ref": "#/components/responses/OtlpUnavailable"}
+        }
+      }
+    },
+    "/v1/logs": {
+      "post": {
+        "operationId": "ingestOtlpLogs",
+        "description": "Accept one bounded OTLP logs export under a protected tenant-bound channel.",
+        "requestBody": {"$ref": "#/components/requestBodies/OtlpExport"},
+        "responses": {
+          "200": {"$ref": "#/components/responses/OtlpSuccess"},
+          "400": {"$ref": "#/components/responses/OtlpInvalidRequest"},
+          "401": {"$ref": "#/components/responses/OtlpUnauthorized"},
+          "403": {"$ref": "#/components/responses/OtlpPolicyDenied"},
+          "404": {"$ref": "#/components/responses/OtlpReceiverDisabled"},
+          "413": {"$ref": "#/components/responses/OtlpRequestTooLarge"},
+          "415": {"$ref": "#/components/responses/OtlpUnsupportedMedia"},
+          "429": {"$ref": "#/components/responses/OtlpRateLimited"},
+          "503": {"$ref": "#/components/responses/OtlpUnavailable"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "otlpChannelBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Independent receiver credential. Protected configuration fixes tenant, integration, resource scope, catalogs, limits, sensitivity, and retention."
+      }
+    },
+    "requestBodies": {
+      "OtlpExport": {
+        "required": true,
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      }
+    },
+    "responses": {
+      "OtlpSuccess": {
+        "description": "Full OTLP success response",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpInvalidRequest": {
+        "description": "The OTLP protobuf or normalized signal semantics are invalid",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpUnauthorized": {
+        "description": "The receiver channel credential is missing or invalid",
+        "headers": {"WWW-Authenticate": {"schema": {"type": "string", "const": "Bearer"}}},
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpPolicyDenied": {
+        "description": "Evidence collection policy denied the configured channel scope",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpReceiverDisabled": {
+        "description": "This signal is disabled on the receiver",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpRequestTooLarge": {
+        "description": "The encoded, decompressed, or normalized payload exceeded a channel bound",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpUnsupportedMedia": {
+        "description": "Only OTLP binary Protobuf with identity or gzip content encoding is accepted",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpRateLimited": {
+        "description": "The authenticated channel exceeded its process-level request admission budget",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpUnavailable": {
+        "description": "The evidence processor, policy, or durable storage boundary is unavailable",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # OpenTelemetry portability boundary
 
-**Status:** Accepted direction; outbound exporter, historical metric/log queries, inbound metrics/logs receivers, metric selection, and bounded threshold/explicit/rolling baseline assessment implemented
+**Status:** Accepted direction; outbound exporter, historical metric/log queries, isolated inbound metrics/logs receivers, metric selection, and bounded threshold/explicit/rolling baseline assessment implemented
 **Date:** 2026-08-15
 **Decision:** [ADR 0012](../decisions/0012-opentelemetry-portability-boundary.md)
 
@@ -17,7 +17,7 @@ flowchart LR
     end
 
     subgraph IIP["Infrastructure Intelligence Platform"]
-      Receiver["Optional OTLP receiver adapter"]
+      Receiver["Isolated optional OTLP receiver process"]
       Normalized["Normalized bounded telemetry evidence"]
       Evidence["Application evidence ports"]
       Signals["IIP operational and freshness signals"]
@@ -45,6 +45,8 @@ OTLP is a push/export protocol, not a historical query protocol. The executable 
 
 Optional receivers accept customer-selected OTLP/HTTP Protobuf metrics and logs streams and convert non-empty batches into bounded `OtlpMetricsEvidence` or `OtlpLogsEvidence` through the immutable Evidence pipeline. ADRs [0016](../decisions/0016-tenant-bound-otlp-metrics-receiver.md) and [0023](../decisions/0023-backend-neutral-log-evidence-and-otlp-intake.md) keep them separate because channel authentication, tenant binding, admission control, and retention authority differ from request/response queries. Protected channel profiles fix tenant, integration, resources, catalogs, attribute mappings, limits, sensitivity, and retention; payload attributes provide no authority.
 
+[ADR 0041](../decisions/0041-isolated-otlp-receiver-process.md) gives both signals a dedicated listener and composition. The receiver has no console, interactive authenticator, control-plane operations, ambient service-account token, historical backend credentials, or action executor. Helm gives it an independent Deployment, Service, channel Secrets, request-rate budget, and Collector-selective NetworkPolicy; the control API has no OTLP routes in its OpenAPI or default runtime.
+
 The metrics receiver accepts gauges and numeric sums. The logs receiver accepts allowlisted services, string bodies, normalized severity, mapped scalar attributes, and optional complete trace/span correlation. Both support bounded identity/gzip requests, bound time/bytes/cardinality/processing, and atomically reject unknown or unsupported semantics. Collector output is untrusted and passes allowlisting, validation, redaction, hashing, and provenance controls before becoming evidence. Traces, histograms, arbitrary retention, forwarding, and receiver-side query storage remain out of scope.
 
 Investigations can now select provider-neutral historical metric candidates after deterministic resource classification. The candidate supplies no identity or transport authority: tenant/actor, resource/time scope, deadline, and budgets are inherited from the investigation, while endpoint and credentials remain inside the configured backend adapter. [ADR 0017](../decisions/0017-investigation-telemetry-selection.md) records this orchestration boundary.
@@ -66,10 +68,10 @@ A candidate may instead declare ordered baseline and evaluation windows within t
 
 - whether later pushed signals use immutable Evidence only, customer storage forwarding, or a hybrid policy;
 - a production credential issuer/interoperability gate plus additional historical log and metric adapters;
-- production receiver topology, workload identity/mTLS, token rotation, and process/gateway isolation for self-hosted, customer-hosted, and managed deployments;
+- federated receiver workload identity or mTLS, token rotation, distributed gateway admission, and durable buffering for self-hosted, customer-hosted, and managed deployments;
 - retention, sampling, cardinality budgets, and regional/data-residency controls;
 - queue durability and the division of retry, batching, and delivery-health ownership between the official SDK and a sidecar/customer Collector;
 - the cadence and ownership of automatic freshness evaluation and production SLO windows;
 - seasonal baseline policy, minimum sample counts, and multi-signal reasoning.
 
-External-broker, additional backend, receiver-isolation, seasonal/multi-signal reasoning, and expanded-signal decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, durable buffering, and SLO decisions belong to the Phase 3 operational-hardening gate. The current freshness API, outbound metric projection, terminal investigation traces, normalized historical metric/log query boundaries, Prometheus and Loki adapters, tenant-bound OTLP metrics/logs receivers, deterministic metric/log investigation selection, and unit-aware threshold/explicit-or-rolling two-window/log-count assessment are deliberately useful before those production selections.
+External-broker, additional backend, federated receiver identity, seasonal/multi-signal reasoning, and expanded-signal decisions belong to the Phase 2 telemetry-evidence slice; automatic sampling, delivery health, durable buffering, and SLO decisions belong to the Phase 3 operational-hardening gate. The current freshness API, outbound metric projection, terminal investigation traces, normalized historical metric/log query boundaries, Prometheus and Loki adapters, isolated tenant-bound OTLP metrics/logs receivers, deterministic metric/log investigation selection, and unit-aware threshold/explicit-or-rolling two-window/log-count assessment are deliberately useful before those production selections.

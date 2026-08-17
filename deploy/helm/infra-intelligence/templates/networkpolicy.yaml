@@ -18,18 +18,6 @@ spec:
       ports:
         - port: http
           protocol: TCP
-    {{- if .Values.networkPolicy.otlpReceiverIngress.enabled }}
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              {{- toYaml .Values.networkPolicy.otlpReceiverIngress.namespaceSelector | nindent 14 }}
-          podSelector:
-            matchLabels:
-              {{- toYaml .Values.networkPolicy.otlpReceiverIngress.podSelector | nindent 14 }}
-      ports:
-        - port: http
-          protocol: TCP
-    {{- end }}
   egress:
     - to:
         - namespaceSelector: {}
@@ -38,6 +26,23 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+    {{- if .Values.networkPolicy.databaseEgress.enabled }}
+    - to:
+        {{- if .Values.networkPolicy.databaseEgress.cidr }}
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.databaseEgress.cidr | quote }}
+        {{- else }}
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.databaseEgress.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.databaseEgress.podSelector | nindent 14 }}
+        {{- end }}
+      ports:
+        - port: {{ .Values.networkPolicy.databaseEgress.port }}
+          protocol: TCP
+    {{- end }}
     {{- if .Values.networkPolicy.otlpEgress.enabled }}
     - to:
         - namespaceSelector:
@@ -106,4 +111,66 @@ spec:
         - port: {{ .Values.networkPolicy.policyEgress.port }}
           protocol: TCP
     {{- end }}
+{{- if or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "infra-intelligence.fullname" . }}-otlp-receiver
+  labels:
+    {{- include "infra-intelligence.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "infra-intelligence.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: otlp-receiver
+  policyTypes: ["Ingress", "Egress"]
+  {{- if .Values.networkPolicy.otlpReceiverIngress.enabled }}
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.otlpReceiverIngress.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.otlpReceiverIngress.podSelector | nindent 14 }}
+      ports:
+        - port: otlp-http
+          protocol: TCP
+  {{- else }}
+  ingress: []
+  {{- end }}
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        {{- if .Values.networkPolicy.databaseEgress.cidr }}
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.databaseEgress.cidr | quote }}
+        {{- else }}
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.databaseEgress.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.databaseEgress.podSelector | nindent 14 }}
+        {{- end }}
+      ports:
+        - port: {{ .Values.networkPolicy.databaseEgress.port }}
+          protocol: TCP
+    {{- if .Values.networkPolicy.policyEgress.enabled }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.policyEgress.cidr | quote }}
+      ports:
+        - port: {{ .Values.networkPolicy.policyEgress.port }}
+          protocol: TCP
+    {{- end }}
+{{- end }}
 {{- end }}

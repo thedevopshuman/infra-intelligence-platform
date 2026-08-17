@@ -49,13 +49,13 @@ make test-otel
 
 The isolated target verifies receipt of a reference ingestion metric and terminal investigation trace, then removes its Collector. See the [OpenTelemetry export guide](opentelemetry-export.md) for the long-running Compose profile, Helm settings, security constraints, and production gaps.
 
-Exercise an official OTLP/HTTP exporter against the receiver in the built API image with:
+Exercise official OTLP/HTTP exporters against the isolated receiver process with:
 
 ```bash
 make test-otlp-receiver
 ```
 
-The gate seeds the configured tenant/resource through the control plane, exports an allowlisted cumulative sum and log record through independent channel authentication, requires OTLP success, and removes the isolated API container afterward. Pure normalization, redaction, scope, and persistence behavior remains covered by `make verify`. See the [metrics receiver guide](otlp-metrics-receiver.md) and [log evidence guide](log-evidence.md) for protected channel and Helm configuration.
+The gate runs PostgreSQL plus separate control-plane and receiver containers, seeds the configured tenant/resource through the control plane, exports an allowlisted cumulative sum and log record through independent channel authentication, verifies route isolation, requires OTLP success, and removes the isolated stack afterward. Pure normalization, redaction, scope, and persistence behavior remains covered by `make verify`. See the [metrics receiver guide](otlp-metrics-receiver.md) and [log evidence guide](log-evidence.md) for protected channel and Helm configuration.
 
 Exercise the historical metric-evidence adapter against a real Prometheus server with:
 

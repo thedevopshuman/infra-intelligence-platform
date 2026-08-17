@@ -93,6 +93,25 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn('IIP_DATABASE_AUTO_MIGRATE: "false"', config_map)
         self.assertNotIn("autoMigrate:", values)
 
+    def test_oidc_console_profile_flows_only_through_reviewed_configuration(self) -> None:
+        config_map = (CHART / "templates" / "configmap.yaml").read_text(
+            encoding="utf-8"
+        )
+        deployment = (CHART / "templates" / "deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+        guide = (ROOT / "docs" / "operations" / "helm-deployment.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("IIP_AUTH_OIDC_CONFIG_JSON", config_map)
+        self.assertIn("auth.oidc.configJson", config_map)
+        self.assertIn("auth.oidc.caBundleExistingSecret", deployment)
+        self.assertIn("Authorization Code", guide)
+        self.assertIn("S256", guide)
+        self.assertIn("CORS policy", guide)
+        self.assertNotIn("clientSecret", guide)
+
     def test_protected_signal_catalog_is_secret_backed_for_api_and_worker(self) -> None:
         deployment = (CHART / "templates" / "deployment.yaml").read_text(
             encoding="utf-8"
@@ -275,6 +294,8 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn("ctr -n k8s.io images tag --force", script)
         self.assertIn('basename "$IIP_EXPECTED_MIGRATION"', script)
         self.assertNotIn('basename "$IIP_EXPECTED_MIGRATION" .sql', script)
+        self.assertIn("/v1/authentication/console", script)
+        self.assertIn('"kind":"ConsoleAuthenticationConfiguration"', script)
         self.assertIn("/v1/system/version", script)
         self.assertIn("/v1/operations/events/delivery-health?limit=10", script)
         self.assertIn('document["kind"] == "EventDeliveryHealthReport"', script)

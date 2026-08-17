@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:console-authentication:v1alpha1",
+  "title": "Infrastructure Intelligence Console Authentication Configuration",
+  "description": "Non-secret browser authentication discovery for the customer console.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "ConsoleAuthenticationConfiguration"},
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["local-token", "access-token", "oidc-pkce"]
+        },
+        "oidc": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "issuer",
+            "clientId",
+            "authorizationEndpoint",
+            "tokenEndpoint",
+            "redirectUri",
+            "scopes",
+            "providerLabel",
+            "pkceMethod"
+          ],
+          "properties": {
+            "issuer": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://",
+              "maxLength": 2048
+            },
+            "clientId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[^\\s\\x00-\\x1f]+$"
+            },
+            "authorizationEndpoint": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://",
+              "maxLength": 2048
+            },
+            "tokenEndpoint": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://",
+              "maxLength": 2048
+            },
+            "redirectUri": {
+              "type": "string",
+              "format": "uri",
+              "maxLength": 2048,
+              "allOf": [
+                {
+                  "pattern": "^(https://|http://localhost(?=[:/])|http://127\\.0\\.0\\.1(?=[:/]))"
+                },
+                {"pattern": "/console/?$"}
+              ]
+            },
+            "scopes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "uniqueItems": true,
+              "contains": {"const": "openid"},
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9._:/-]+$"
+              }
+            },
+            "providerLabel": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "pkceMethod": {"const": "S256"}
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"mode": {"const": "oidc-pkce"}}},
+          "then": {"required": ["oidc"]},
+          "else": {"not": {"required": ["oidc"]}}
+        }
+      ]
+    }
+  }
+}

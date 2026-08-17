@@ -1,6 +1,6 @@
 """Public Python SDK for the Infrastructure Intelligence Platform."""
 
-from .client import Client
+from .client import Client, discover_console_authentication
 from .errors import ApiError
 from .models import (
     ActionApproval,
@@ -9,6 +9,7 @@ from .models import (
     ActionResult,
     ActionWorkflow,
     ActionWorkflowPage,
+    ConsoleAuthenticationConfiguration,
     ContextEvidenceRequest,
     ContextEvidenceResult,
     Evidence,
@@ -80,6 +81,7 @@ __all__ = [
     "ActionWorkflowPage",
     "ApiError",
     "Client",
+    "ConsoleAuthenticationConfiguration",
     "ContextEvidenceRequest",
     "ContextEvidenceResult",
     "Evidence",
@@ -140,5 +142,6 @@ __all__ = [
     "TelemetryEvidenceRequest",
     "TelemetryEvidenceResult",
     "TelemetryExportHealthReport",
+    "discover_console_authentication",
 ]
-__version__ = "0.30.0"
+__version__ = "0.31.0"

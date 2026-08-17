@@ -8,6 +8,7 @@ import type {
   ActionWorkflowPage,
   ApiErrorBody,
   ContextEvidenceRequest,
+  ConsoleAuthenticationConfiguration,
   Evidence,
   EvidenceRetentionReport,
   EvidenceId,
@@ -51,6 +52,137 @@ export class PlatformApiError extends Error {
   ) {
     super(`platform request failed (${status}, ${code})`);
   }
+}
+
+export interface ConsoleAuthenticationDiscoveryOptions {
+  baseUrl: string;
+  fetch?: typeof globalThis.fetch;
+}
+
+function validateConsoleAuthentication(
+  payload: unknown,
+): ConsoleAuthenticationConfiguration {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("console authentication configuration is invalid");
+  }
+  const document = payload as Partial<ConsoleAuthenticationConfiguration>;
+  const spec = document.spec;
+  if (
+    Object.keys(payload).sort().join(",") !== "apiVersion,kind,spec" ||
+    document.apiVersion !== "iip.platform/v1alpha1" ||
+    document.kind !== "ConsoleAuthenticationConfiguration" ||
+    !spec ||
+    !["local-token", "access-token", "oidc-pkce"].includes(spec.mode)
+  ) {
+    throw new Error("console authentication configuration is invalid");
+  }
+  if (spec.mode !== "oidc-pkce") {
+    if (Object.keys(spec).join(",") !== "mode") {
+      throw new Error("console OIDC configuration is inconsistent");
+    }
+    return document as ConsoleAuthenticationConfiguration;
+  }
+  const profile = spec.oidc;
+  if (
+    !profile ||
+    typeof profile !== "object" ||
+    Object.keys(spec).sort().join(",") !== "mode,oidc" ||
+    Object.keys(profile).sort().join(",") !==
+      "authorizationEndpoint,clientId,issuer,pkceMethod,providerLabel,redirectUri,scopes,tokenEndpoint"
+  ) {
+    throw new Error("console OIDC profile is invalid");
+  }
+  if (
+    [profile.issuer, profile.authorizationEndpoint, profile.tokenEndpoint, profile.redirectUri]
+      .some((value) => typeof value !== "string" || value.length < 1 || value.length > 2048 || /[\x00-\x20\x7f]/.test(value))
+  ) {
+    throw new Error("console OIDC profile is invalid");
+  }
+  let issuer: URL;
+  let authorizationEndpoint: URL;
+  let tokenEndpoint: URL;
+  let redirectUri: URL;
+  try {
+    issuer = new URL(profile.issuer);
+    authorizationEndpoint = new URL(profile.authorizationEndpoint);
+    tokenEndpoint = new URL(profile.tokenEndpoint);
+    redirectUri = new URL(profile.redirectUri);
+  } catch {
+    throw new Error("console OIDC profile is invalid");
+  }
+  const cleanHttps = (value: URL) =>
+    value.protocol === "https:" &&
+    !value.username &&
+    !value.password &&
+    !value.search &&
+    !value.hash;
+  const redirectIsSafe =
+    redirectUri.protocol === "https:" ||
+    (redirectUri.protocol === "http:" &&
+      ["localhost", "127.0.0.1"].includes(redirectUri.hostname));
+  if (
+    !cleanHttps(issuer) ||
+    !cleanHttps(authorizationEndpoint) ||
+    !cleanHttps(tokenEndpoint) ||
+    !redirectIsSafe ||
+    !!redirectUri.username ||
+    !!redirectUri.password ||
+    !!redirectUri.search ||
+    !!redirectUri.hash ||
+    !["/console", "/console/"].includes(redirectUri.pathname) ||
+    !/^[^\s\x00-\x1f]{1,256}$/.test(profile.clientId) ||
+    !Array.isArray(profile.scopes) ||
+    profile.scopes.length < 1 ||
+    profile.scopes.length > 32 ||
+    new Set(profile.scopes).size !== profile.scopes.length ||
+    !profile.scopes.includes("openid") ||
+    profile.scopes.some((scope) => !/^[A-Za-z0-9._:/-]{1,128}$/.test(scope)) ||
+    !/^[^\x00-\x1f\x7f]{1,64}$/.test(profile.providerLabel) ||
+    profile.pkceMethod !== "S256"
+  ) {
+    throw new Error("console OIDC profile is invalid");
+  }
+  return document as ConsoleAuthenticationConfiguration;
+}
+
+export async function discoverConsoleAuthentication(
+  options: ConsoleAuthenticationDiscoveryOptions,
+): Promise<ConsoleAuthenticationConfiguration> {
+  const baseUrl = options.baseUrl.replace(/\/$/, "");
+  if (!baseUrl) throw new Error("baseUrl is required");
+  const fetcher = options.fetch ?? globalThis.fetch;
+  const response = await fetcher(`${baseUrl}/v1/authentication/console`, {
+    headers: { accept: "application/json" },
+    cache: "no-store",
+    credentials: "omit",
+    redirect: "error",
+    referrerPolicy: "no-referrer",
+  });
+  const declaredLength = response.headers.get("content-length");
+  if (
+    declaredLength !== null &&
+    (!/^\d+$/.test(declaredLength) || Number(declaredLength) > 65_536)
+  ) {
+    throw new Error("console authentication response is invalid");
+  }
+  const text = await response.text();
+  if (new TextEncoder().encode(text).byteLength > 65_536) {
+    throw new Error("console authentication response is invalid");
+  }
+  let body: ConsoleAuthenticationConfiguration | ApiErrorBody;
+  try {
+    body = JSON.parse(text) as ConsoleAuthenticationConfiguration | ApiErrorBody;
+  } catch {
+    throw new Error("console authentication response is invalid");
+  }
+  if (!response.ok) {
+    const candidate = body as Partial<ApiErrorBody>;
+    throw new PlatformApiError(
+      response.status,
+      candidate.error?.code ?? "request.failed",
+    );
+  }
+  return validateConsoleAuthentication(body);
 }
 
 export class InfrastructureIntelligenceClient {

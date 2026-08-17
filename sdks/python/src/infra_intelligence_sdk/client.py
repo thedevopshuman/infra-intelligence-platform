@@ -16,6 +16,7 @@ from .models import (
     ActionResult,
     ActionWorkflow,
     ActionWorkflowPage,
+    ConsoleAuthenticationConfiguration,
     ContextEvidenceRequest,
     Evidence,
     EvidenceRetentionReport,
@@ -43,6 +44,45 @@ from .models import (
     TelemetryEvidenceRequest,
     TelemetryExportHealthReport,
 )
+
+
+def discover_console_authentication(
+    base_url: str,
+    timeout_seconds: float = 10.0,
+) -> ConsoleAuthenticationConfiguration:
+    """Read the public browser authentication profile without a credential."""
+
+    if not isinstance(base_url, str) or not base_url:
+        raise ValueError("base_url must be a non-empty string")
+    if (
+        isinstance(timeout_seconds, bool)
+        or not isinstance(timeout_seconds, (int, float))
+        or timeout_seconds <= 0
+    ):
+        raise ValueError("timeout_seconds must be positive")
+    request = Request(
+        f"{base_url.rstrip('/')}/v1/authentication/console",
+        headers={"accept": "application/json"},
+        method="GET",
+    )
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            body = response.read(65_537)
+            if len(body) > 65_536:
+                raise ApiError(200, "response.invalid")
+            payload = json.loads(body.decode("utf-8"))
+    except HTTPError as exc:
+        try:
+            body = json.loads(exc.read(65_537).decode("utf-8"))
+            code = str(body.get("error", {}).get("code", "request.failed"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            code = "request.failed"
+        raise ApiError(exc.code, code) from exc
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ApiError(200, "response.invalid") from exc
+    if not isinstance(payload, dict):
+        raise ApiError(200, "response.invalid")
+    return ConsoleAuthenticationConfiguration.from_dict(payload)
 
 
 class Client:

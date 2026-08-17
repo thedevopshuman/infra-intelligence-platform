@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Optional
+from urllib.parse import urlsplit
 
 
 API_VERSION = "iip.platform/v1alpha1"
@@ -389,6 +391,132 @@ class SessionContext:
                 label="session context",
             )
         )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class ConsoleAuthenticationConfiguration:
+    """Public, non-secret browser authentication discovery document."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "ConsoleAuthenticationConfiguration":
+        if (
+            not isinstance(payload, Mapping)
+            or set(payload) != {"apiVersion", "kind", "spec"}
+            or payload.get("apiVersion") != API_VERSION
+            or payload.get("kind") != "ConsoleAuthenticationConfiguration"
+            or not isinstance(payload.get("spec"), Mapping)
+        ):
+            raise ValueError("console authentication configuration is invalid")
+        document = dict(payload)
+        spec = document["spec"]
+        assert isinstance(spec, Mapping)
+        mode = spec.get("mode")
+        if mode not in ("local-token", "access-token", "oidc-pkce"):
+            raise ValueError("console authentication mode is invalid")
+        if mode != "oidc-pkce":
+            if set(spec) != {"mode"}:
+                raise ValueError("console OIDC configuration is inconsistent")
+            return cls(document)
+        profile = spec.get("oidc")
+        expected_profile_keys = {
+            "issuer",
+            "clientId",
+            "authorizationEndpoint",
+            "tokenEndpoint",
+            "redirectUri",
+            "scopes",
+            "providerLabel",
+            "pkceMethod",
+        }
+        if set(spec) != {"mode", "oidc"} or not isinstance(profile, Mapping):
+            raise ValueError("console OIDC configuration is inconsistent")
+        if set(profile) != expected_profile_keys:
+            raise ValueError("console OIDC profile is invalid")
+        try:
+            url_values = (
+                profile["issuer"],
+                profile["authorizationEndpoint"],
+                profile["tokenEndpoint"],
+                profile["redirectUri"],
+            )
+            if any(
+                not isinstance(value, str)
+                or not 1 <= len(value) <= 2048
+                or re.search(r"[\x00-\x20\x7f]", value) is not None
+                for value in url_values
+            ):
+                raise ValueError
+            issuer = urlsplit(profile["issuer"])
+            authorization_endpoint = urlsplit(profile["authorizationEndpoint"])
+            token_endpoint = urlsplit(profile["tokenEndpoint"])
+            redirect_uri = urlsplit(profile["redirectUri"])
+            for parsed in (
+                issuer,
+                authorization_endpoint,
+                token_endpoint,
+                redirect_uri,
+            ):
+                parsed.port
+        except (KeyError, TypeError, ValueError):
+            raise ValueError("console OIDC profile is invalid") from None
+        endpoints = (authorization_endpoint, token_endpoint)
+        scopes = profile["scopes"]
+        redirect_is_safe = (
+            redirect_uri.scheme == "https"
+            or (
+                redirect_uri.scheme == "http"
+                and redirect_uri.hostname in ("localhost", "127.0.0.1")
+            )
+        )
+        if (
+            issuer.scheme != "https"
+            or not issuer.hostname
+            or issuer.username is not None
+            or issuer.password is not None
+            or issuer.query
+            or issuer.fragment
+            or any(
+                endpoint.scheme != "https"
+                or not endpoint.hostname
+                or endpoint.username is not None
+                or endpoint.password is not None
+                or endpoint.query
+                or endpoint.fragment
+                for endpoint in endpoints
+            )
+            or not redirect_is_safe
+            or not redirect_uri.hostname
+            or redirect_uri.username is not None
+            or redirect_uri.password is not None
+            or redirect_uri.query
+            or redirect_uri.fragment
+            or redirect_uri.path not in ("/console", "/console/")
+            or not isinstance(profile["clientId"], str)
+            or re.fullmatch(r"[^\s\x00-\x1f]{1,256}", profile["clientId"])
+            is None
+            or not isinstance(scopes, list)
+            or not 1 <= len(scopes) <= 32
+            or any(
+                not isinstance(scope, str)
+                or re.fullmatch(r"[A-Za-z0-9._:/-]{1,128}", scope) is None
+                for scope in scopes
+            )
+            or len(set(scopes)) != len(scopes)
+            or "openid" not in scopes
+            or not isinstance(profile["providerLabel"], str)
+            or re.fullmatch(r"[^\x00-\x1f\x7f]{1,64}", profile["providerLabel"])
+            is None
+            or profile["pkceMethod"] != "S256"
+        ):
+            raise ValueError("console OIDC profile is invalid")
+        return cls(document)
 
     def to_dict(self) -> Dict[str, Any]:
         return dict(self.payload)

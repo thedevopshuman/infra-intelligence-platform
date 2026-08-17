@@ -91,6 +91,8 @@ REQUIRED_PATHS = (
     "docs/specifications/query-availability-telemetry-contract.md",
     "docs/decisions/0062-audited-evidence-artifact-retention.md",
     "docs/specifications/evidence-retention-contract.md",
+    "docs/decisions/0063-console-oidc-authorization-code-pkce.md",
+    "docs/specifications/console-authentication-contract.md",
     "docs/operations/evidence-retention.md",
     "docs/operations/event-delivery.md",
     "docs/operations/helm-deployment.md",
@@ -154,6 +156,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/telemetry-export-health-report.schema.json",
     "contracts/schemas/runtime-version-report.schema.json",
     "contracts/schemas/session-context.schema.json",
+    "contracts/schemas/console-authentication.schema.json",
     "contracts/schemas/evaluation-scenario.schema.json",
     "contracts/examples/evidence.json",
     "contracts/examples/evidence-retention-report.json",
@@ -200,6 +203,8 @@ REQUIRED_PATHS = (
     "contracts/examples/event-delivery-health-report.json",
     "contracts/examples/runtime-version-report.json",
     "contracts/examples/session-context.json",
+    "contracts/examples/console-authentication-local.json",
+    "contracts/examples/console-authentication-oidc.json",
     "contracts/examples/evaluation-scenario.json",
     "contracts/examples/resource-collection-request.json",
     "contracts/examples/resource-collection-result.json",
@@ -298,6 +303,7 @@ REQUIRED_PATHS = (
     "scripts/release_bundle.py",
     "sdks/typescript/package-lock.json",
     "tests/test_authentication.py",
+    "tests/test_console_authentication.py",
     "tests/test_readiness.py",
     "tests/test_operational_workflows.py",
     "tests/test_otel_metrics.py",
@@ -434,7 +440,12 @@ def validate_authentication_boundary(
     if not isinstance(paths, dict):
         fail(errors, "OpenAPI paths must be an object")
         return
-    for public_path in ("/healthz", "/readyz"):
+    public_paths = (
+        "/healthz",
+        "/readyz",
+        "/v1/authentication/console",
+    )
+    for public_path in public_paths:
         item = paths.get(public_path)
         operation = item.get("get") if isinstance(item, dict) else None
         if not isinstance(operation, dict) or operation.get("security") != []:
@@ -447,6 +458,8 @@ def validate_authentication_boundary(
             continue
         for method, operation in item.items():
             if method not in ("get", "post", "put", "patch", "delete"):
+                continue
+            if isinstance(operation, dict) and operation.get("security") == []:
                 continue
             responses = operation.get("responses") if isinstance(operation, dict) else None
             if not isinstance(responses, dict) or "401" not in responses:

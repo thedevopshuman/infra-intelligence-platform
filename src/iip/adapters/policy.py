@@ -235,7 +235,7 @@ class ExternalHttpPolicyDecisionPoint:
             headers = {
                 "Accept": "application/json",
                 "Content-Type": "application/json",
-                "User-Agent": "iip-policy-adapter/0.36.0",
+                "User-Agent": "iip-policy-adapter/0.37.0",
             }
             token = self._bearer_token()
             if token is not None:

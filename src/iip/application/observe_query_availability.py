@@ -13,6 +13,7 @@ from iip.application.ports import (
 
 QUERY_OPERATIONS = frozenset(
     {
+        "console-authentication",
         "session",
         "runtime-version",
         "resources-list",

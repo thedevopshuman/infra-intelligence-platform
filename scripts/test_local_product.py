@@ -54,13 +54,15 @@ def _credentials() -> dict[str, str]:
 
 def _request(
     path: str,
-    token: str,
+    token: str | None,
     *,
     method: str = "GET",
     body: Mapping[str, object] | None = None,
 ) -> Mapping[str, object]:
     encoded = None
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {}
+    if token is not None:
+        headers["Authorization"] = f"Bearer {token}"
     if body is not None:
         encoded = json.dumps(body, separators=(",", ":")).encode("utf-8")
         headers["Content-Type"] = "application/json"
@@ -123,6 +125,18 @@ def _wait_for_event_delivery(token: str, timeout_seconds: float = 15.0) -> None:
 
 def main() -> int:
     try:
+        console_authentication = _request(
+            "/v1/authentication/console",
+            None,
+        )
+        if console_authentication != {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "ConsoleAuthenticationConfiguration",
+            "spec": {"mode": "local-token"},
+        }:
+            raise ProductWorkflowError(
+                "local console authentication discovery is invalid"
+            )
         tokens = _credentials()
         operator = tokens["local-operator"]
         approver = tokens["local-approver"]

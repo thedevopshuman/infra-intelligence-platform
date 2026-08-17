@@ -201,6 +201,15 @@ EOF
     exec deployment/iip-infra-intelligence -- python -c \
     'import json,urllib.request; result=json.load(urllib.request.urlopen("http://127.0.0.1:8080/readyz", timeout=5)); assert result == {"status":"ok"}'
 
+IIP_CONSOLE_AUTHENTICATION_JSON=$(
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" exec \
+        deployment/iip-infra-intelligence -- python -c \
+        'import json,urllib.request; print(json.dumps(json.load(urllib.request.urlopen("http://127.0.0.1:8080/v1/authentication/console", timeout=5)), separators=(",", ":")))'
+)
+printf '%s' "$IIP_CONSOLE_AUTHENTICATION_JSON" | "$IIP_TEST_PYTHON" -c \
+    'import json,sys; document=json.load(sys.stdin); assert document == {"apiVersion":"iip.platform/v1alpha1","kind":"ConsoleAuthenticationConfiguration","spec":{"mode":"local-token"}}'
+
 IIP_EXPECTED_MIGRATION=$(rg --files src/iip/adapters/postgres/migrations -g '*.sql' | sort | tail -n 1)
 IIP_EXPECTED_MIGRATION=$(basename "$IIP_EXPECTED_MIGRATION")
 IIP_APPLIED_MIGRATION=$(

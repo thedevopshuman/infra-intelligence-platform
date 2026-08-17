@@ -1,0 +1,17 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ConsoleAuthenticationConfiguration",
+  "spec": {
+    "mode": "oidc-pkce",
+    "oidc": {
+      "issuer": "https://identity.example.test/",
+      "clientId": "iip-console",
+      "authorizationEndpoint": "https://identity.example.test/oauth2/authorize",
+      "tokenEndpoint": "https://identity.example.test/oauth2/token",
+      "redirectUri": "https://control-plane.example.test/console",
+      "scopes": ["openid", "profile"],
+      "providerLabel": "Organization SSO",
+      "pkceMethod": "S256"
+    }
+  }
+}

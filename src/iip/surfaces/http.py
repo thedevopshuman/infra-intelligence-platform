@@ -157,7 +157,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.36.0"
+    server_version = "IIPReference/0.37.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -192,6 +192,18 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if path == "/readyz":
             self._readiness()
+            return
+        if path == "/v1/authentication/console":
+            if parsed.query:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": {"code": "request.invalid"}},
+                )
+            else:
+                self._json(
+                    HTTPStatus.OK,
+                    dict(self.runtime.console_authentication),
+                )
             return
         segments = path.strip("/").split("/")
         is_resource_query = (
@@ -1337,6 +1349,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_response(status.value)
             self.send_header("content-type", "application/json")
             self._security_headers()
+            self.send_header("cache-control", "no-store")
             if status == HTTPStatus.UNAUTHORIZED:
                 self.send_header("WWW-Authenticate", "Bearer")
             self.send_header("content-length", str(len(body)))
@@ -1353,6 +1366,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     @staticmethod
     def _query_operation(path: str) -> Optional[str]:
         exact = {
+            "/v1/authentication/console": "console-authentication",
             "/v1/session": "session",
             "/v1/system/version": "runtime-version",
             "/v1/resources": "resources-list",
@@ -1436,13 +1450,18 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         self.send_response(HTTPStatus.OK.value)
         self.send_header("content-type", content_type)
-        self._security_headers()
+        runtime = getattr(self, "runtime", None)
+        self._security_headers(
+            console_connect_origin=getattr(runtime, "console_token_origin", None)
+        )
         self.send_header("cache-control", "no-store" if filename == "index.html" else "no-cache")
         self.send_header("content-length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
-    def _security_headers(self) -> None:
+    def _security_headers(
+        self, *, console_connect_origin: str | None = None
+    ) -> None:
         self.send_header("x-content-type-options", "nosniff")
         self.send_header("referrer-policy", "no-referrer")
         self.send_header("x-frame-options", "DENY")
@@ -1451,10 +1470,13 @@ class ApiHandler(BaseHTTPRequestHandler):
             "permissions-policy",
             "camera=(), microphone=(), geolocation=()",
         )
+        connect_sources = "'self'"
+        if console_connect_origin is not None:
+            connect_sources += f" {console_connect_origin}"
         self.send_header(
             "content-security-policy",
             "default-src 'none'; script-src 'self'; style-src 'self'; "
-            "img-src 'self' data:; connect-src 'self'; base-uri 'none'; "
+            f"img-src 'self' data:; connect-src {connect_sources}; base-uri 'none'; "
             "form-action 'self'; frame-ancestors 'none'",
         )
 

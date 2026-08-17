@@ -28,6 +28,26 @@ export interface SessionContext {
   };
 }
 
+export interface OidcPkceConsoleProfile {
+  issuer: string;
+  clientId: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  redirectUri: string;
+  scopes: string[];
+  providerLabel: string;
+  pkceMethod: "S256";
+}
+
+export type ConsoleAuthenticationConfiguration = {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ConsoleAuthenticationConfiguration";
+} & {
+  spec:
+    | { mode: "local-token" | "access-token"; oidc?: never }
+    | { mode: "oidc-pkce"; oidc: OidcPkceConsoleProfile };
+};
+
 export interface RuntimeVersionReport {
   apiVersion: "iip.platform/v1alpha1";
   kind: "RuntimeVersionReport";

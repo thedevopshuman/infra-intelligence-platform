@@ -30,6 +30,7 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | Query availability telemetry | [query-availability-telemetry-contract.md](query-availability-telemetry-contract.md) | OTLP Metrics protobuf semantic convention | n/a |
 | Runtime version report | [runtime-version-contract.md](runtime-version-contract.md) | `contracts/schemas/runtime-version-report.schema.json` | `contracts/examples/runtime-version-report.json` |
 | Session context | [session-context-contract.md](session-context-contract.md) | `contracts/schemas/session-context.schema.json` | `contracts/examples/session-context.json` |
+| Console authentication | [console-authentication-contract.md](console-authentication-contract.md) | `contracts/schemas/console-authentication.schema.json` | `contracts/examples/console-authentication-local.json`, `contracts/examples/console-authentication-oidc.json` |
 | Page information | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/page-info.schema.json` | `contracts/examples/page-info.json` |
 | Error | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/error.schema.json` | `contracts/examples/error.json` |
 | Event | [event-contract.md](event-contract.md) | `contracts/schemas/event.schema.json` | `contracts/examples/event.json` |

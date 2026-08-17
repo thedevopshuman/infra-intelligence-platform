@@ -35,10 +35,141 @@ _CLAIM_NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,255}")
 _OIDC_REQUIRED_KEYS = {"issuer", "audience", "jwksUrl", "tenantClaim", "rolesClaim"}
 _OIDC_OPTIONAL_KEYS = {
     "actorClaim",
+    "browser",
     "caBundlePath",
     "cacheSeconds",
     "clockSkewSeconds",
 }
+_OIDC_BROWSER_REQUIRED_KEYS = {
+    "clientId",
+    "authorizationEndpoint",
+    "tokenEndpoint",
+    "redirectUri",
+    "scopes",
+}
+_OIDC_BROWSER_OPTIONAL_KEYS = {"providerLabel"}
+_OIDC_SCOPE = re.compile(r"[A-Za-z0-9._:/-]{1,128}")
+
+
+def _safe_url_parts(value: object):
+    if (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 2048
+        or re.search(r"[\x00-\x20\x7f]", value) is not None
+    ):
+        return None
+    try:
+        parsed = urlsplit(value)
+        parsed.port
+        return parsed
+    except ValueError:
+        return None
+
+
+def _is_strict_https_endpoint(value: object) -> bool:
+    parsed = _safe_url_parts(value)
+    return bool(
+        parsed is not None
+        and parsed.scheme == "https"
+        and parsed.hostname
+        and parsed.username is None
+        and parsed.password is None
+        and not parsed.query
+        and not parsed.fragment
+    )
+
+
+def _is_safe_console_redirect(value: object) -> bool:
+    parsed = _safe_url_parts(value)
+    if parsed is None:
+        return False
+    secure = parsed.scheme == "https"
+    loopback = parsed.scheme == "http" and parsed.hostname in (
+        "localhost",
+        "127.0.0.1",
+    )
+    return bool(
+        (secure or loopback)
+        and parsed.hostname
+        and parsed.username is None
+        and parsed.password is None
+        and not parsed.query
+        and not parsed.fragment
+        and parsed.path in ("/console", "/console/")
+    )
+
+
+@dataclass(frozen=True)
+class OidcBrowserConfiguration:
+    """Closed public-client profile used only to bootstrap browser PKCE."""
+
+    client_id: str
+    authorization_endpoint: str
+    token_endpoint: str
+    redirect_uri: str
+    scopes: tuple[str, ...]
+    provider_label: str = "Organization SSO"
+
+    @classmethod
+    def from_mapping(cls, payload: object) -> "OidcBrowserConfiguration":
+        if (
+            not isinstance(payload, Mapping)
+            or not _OIDC_BROWSER_REQUIRED_KEYS.issubset(payload)
+            or set(payload).difference(
+                _OIDC_BROWSER_REQUIRED_KEYS | _OIDC_BROWSER_OPTIONAL_KEYS
+            )
+        ):
+            raise ValueError
+        scopes = payload["scopes"]
+        if not isinstance(scopes, list):
+            raise ValueError
+        configuration = cls(
+            client_id=payload["clientId"],
+            authorization_endpoint=payload["authorizationEndpoint"],
+            token_endpoint=payload["tokenEndpoint"],
+            redirect_uri=payload["redirectUri"],
+            scopes=tuple(scopes),
+            provider_label=payload.get("providerLabel", "Organization SSO"),
+        )
+        configuration.validate()
+        return configuration
+
+    def validate(self) -> None:
+        if (
+            not isinstance(self.client_id, str)
+            or re.fullmatch(r"[^\s\x00-\x1f]{1,256}", self.client_id) is None
+            or not _is_strict_https_endpoint(self.authorization_endpoint)
+            or not _is_strict_https_endpoint(self.token_endpoint)
+            or not _is_safe_console_redirect(self.redirect_uri)
+            or not 1 <= len(self.scopes) <= 32
+            or any(
+                not isinstance(scope, str) or _OIDC_SCOPE.fullmatch(scope) is None
+                for scope in self.scopes
+            )
+            or len(set(self.scopes)) != len(self.scopes)
+            or "openid" not in self.scopes
+            or not isinstance(self.provider_label, str)
+            or re.fullmatch(r"[^\x00-\x1f\x7f]{1,64}", self.provider_label)
+            is None
+        ):
+            raise ValueError
+
+    @property
+    def token_origin(self) -> str:
+        parsed = urlsplit(self.token_endpoint)
+        return f"{parsed.scheme}://{parsed.netloc}"
+
+    def public_document(self, issuer: str) -> Mapping[str, object]:
+        return {
+            "issuer": issuer,
+            "clientId": self.client_id,
+            "authorizationEndpoint": self.authorization_endpoint,
+            "tokenEndpoint": self.token_endpoint,
+            "redirectUri": self.redirect_uri,
+            "scopes": list(self.scopes),
+            "providerLabel": self.provider_label,
+            "pkceMethod": "S256",
+        }
 
 
 @dataclass(frozen=True)
@@ -67,6 +198,7 @@ class OidcConfiguration:
     tenant_claim: str
     roles_claim: str
     actor_claim: str = "sub"
+    browser: OidcBrowserConfiguration | None = None
     ca_bundle_path: str | None = None
     cache_seconds: int = 300
     clock_skew_seconds: int = 30
@@ -92,6 +224,11 @@ class OidcConfiguration:
                 tenant_claim=payload["tenantClaim"],
                 roles_claim=payload["rolesClaim"],
                 actor_claim=payload.get("actorClaim", "sub"),
+                browser=(
+                    OidcBrowserConfiguration.from_mapping(payload["browser"])
+                    if "browser" in payload
+                    else None
+                ),
                 ca_bundle_path=payload.get("caBundlePath"),
                 cache_seconds=payload.get("cacheSeconds", 300),
                 clock_skew_seconds=payload.get("clockSkewSeconds", 30),
@@ -104,10 +241,18 @@ class OidcConfiguration:
             ) from None
 
     def validate(self) -> None:
+        if self.browser is not None:
+            try:
+                self.browser.validate()
+            except (AttributeError, ValueError):
+                raise AuthenticationConfigurationError(
+                    "authentication.configuration.invalid"
+                ) from None
         issuer = urlsplit(self.issuer) if isinstance(self.issuer, str) else None
         jwks = urlsplit(self.jwks_url) if isinstance(self.jwks_url, str) else None
         invalid_url = (
             issuer is None
+            or re.search(r"[\x00-\x20\x7f]", self.issuer) is not None
             or issuer.scheme != "https"
             or not issuer.hostname
             or issuer.username is not None
@@ -115,6 +260,7 @@ class OidcConfiguration:
             or issuer.query
             or issuer.fragment
             or jwks is None
+            or re.search(r"[\x00-\x20\x7f]", self.jwks_url) is not None
             or jwks.scheme != "https"
             or not jwks.hostname
             or jwks.username is not None
@@ -133,6 +279,10 @@ class OidcConfiguration:
             )
             or len({self.actor_claim, self.tenant_claim, self.roles_claim}) != 3
             or (
+                self.browser is not None
+                and not isinstance(self.browser, OidcBrowserConfiguration)
+            )
+            or (
                 self.ca_bundle_path is not None
                 and (
                     not isinstance(self.ca_bundle_path, str)
@@ -150,6 +300,22 @@ class OidcConfiguration:
             raise AuthenticationConfigurationError(
                 "authentication.configuration.invalid"
             )
+
+    def console_authentication_document(self) -> Mapping[str, object]:
+        spec: dict[str, object] = {
+            "mode": "oidc-pkce" if self.browser is not None else "access-token"
+        }
+        if self.browser is not None:
+            spec["oidc"] = self.browser.public_document(self.issuer)
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "ConsoleAuthenticationConfiguration",
+            "spec": spec,
+        }
+
+    @property
+    def console_token_origin(self) -> str | None:
+        return self.browser.token_origin if self.browser is not None else None
 
 
 class JwksTransport(Protocol):
@@ -172,7 +338,7 @@ class HttpsJwksTransport:
         opener = build_opener(HTTPSHandler(context=context), _NoRedirect())
         request = Request(
             url,
-            headers={"Accept": "application/json", "User-Agent": "iip-oidc/0.36.0"},
+            headers={"Accept": "application/json", "User-Agent": "iip-oidc/0.37.0"},
             method="GET",
         )
         try:
@@ -227,6 +393,17 @@ class OidcJwtAuthenticator:
     @classmethod
     def from_json(cls, raw: str) -> "OidcJwtAuthenticator":
         return cls(OidcConfiguration.from_json(raw))
+
+    def console_authentication_document(self) -> Mapping[str, object]:
+        """Return only the reviewed non-secret browser bootstrap profile."""
+
+        return self._configuration.console_authentication_document()
+
+    @property
+    def console_token_origin(self) -> str | None:
+        """Return the single additional CSP connection origin, when configured."""
+
+        return self._configuration.console_token_origin
 
     def authenticate_bearer(self, token: str) -> ActorContext:
         if (

@@ -29,6 +29,26 @@ class JsonSchemaValidationTests(unittest.TestCase):
     def test_all_contract_examples_validate(self) -> None:
         self.assertEqual(validate_schemas.validate_repository(), [])
 
+    def test_console_oidc_mode_requires_exactly_one_public_client_profile(self) -> None:
+        local = document("contracts/examples/console-authentication-local.json")
+        local["spec"]["oidc"] = document(
+            "contracts/examples/console-authentication-oidc.json"
+        )["spec"]["oidc"]
+        missing = document("contracts/examples/console-authentication-oidc.json")
+        del missing["spec"]["oidc"]
+
+        local_errors = self.validate(
+            "console-authentication.schema.json",
+            local,
+        )
+        missing_errors = self.validate(
+            "console-authentication.schema.json",
+            missing,
+        )
+
+        self.assertTrue(local_errors)
+        self.assertTrue(missing_errors)
+
     def test_invalid_date_time_is_rejected(self) -> None:
         evidence = document("contracts/examples/evidence.json")
         evidence["metadata"]["recordedAt"] = "not-a-date-time"

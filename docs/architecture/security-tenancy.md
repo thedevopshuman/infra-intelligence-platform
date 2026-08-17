@@ -19,6 +19,8 @@ Asynchronous investigation admission is tenant-local and bounded twice: non-term
 
 The HTTP surface follows the [authentication boundary](authentication-boundary.md): a replaceable authenticator verifies a Bearer credential and derives actor, tenant, and roles before any protected use case runs. Caller-controlled identity headers are ignored. The hashed opaque-token adapter is restricted to local development and tests; deployed profiles can verify issuer- and audience-bound OIDC JWTs against an explicitly trusted HTTPS JWKS endpoint.
 
+The public console-authentication discovery endpoint is deliberately outside tenant scope and contains only a closed mode plus optional OIDC public-client metadata. It never reveals an audience, JWKS location, claim mapping, tenant, actor, role, token, authorization code, verifier, CA path, or client secret. Browser Authorization Code + `S256` PKCE changes only how a credential is obtained; `/v1/session` and every protected use case still derive and enforce exact identity from the server-verified access token.
+
 ## Authority levels
 
 | Level | May do | Default approval |

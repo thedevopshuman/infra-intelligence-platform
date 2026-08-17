@@ -1,0 +1,7 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ConsoleAuthenticationConfiguration",
+  "spec": {
+    "mode": "local-token"
+  }
+}

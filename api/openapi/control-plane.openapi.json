@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.36.0",
+    "version": "0.37.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence and retention observation, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -22,6 +22,17 @@
         "responses": {
           "200": {"description": "Process and required durable dependencies are ready"},
           "503": {"description": "A required dependency or schema migration is unavailable"}
+        }
+      }
+    },
+    "/v1/authentication/console": {
+      "get": {
+        "operationId": "getConsoleAuthentication",
+        "security": [],
+        "description": "Discover the deployment's non-secret console authentication mode and optional OIDC Authorization Code plus S256 PKCE public-client profile. This endpoint never returns credentials, verifier settings, claim mappings, or client secrets.",
+        "responses": {
+          "200": {"description": "Public console authentication discovery", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/console-authentication.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"}
         }
       }
     },
@@ -648,6 +659,7 @@
       "InvestigationCompletionSloReport": {"$ref": "../../contracts/schemas/investigation-completion-slo-report.schema.json"},
       "EvidenceRetentionReport": {"$ref": "../../contracts/schemas/evidence-retention-report.schema.json"},
       "RuntimeVersionReport": {"$ref": "../../contracts/schemas/runtime-version-report.schema.json"},
+      "ConsoleAuthenticationConfiguration": {"$ref": "../../contracts/schemas/console-authentication.schema.json"},
       "SessionContext": {"$ref": "../../contracts/schemas/session-context.schema.json"},
       "PageInfo": {"$ref": "../../contracts/schemas/page-info.schema.json"},
       "Event": {"$ref": "../../contracts/schemas/event.schema.json"},

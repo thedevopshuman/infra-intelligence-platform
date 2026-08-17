@@ -201,6 +201,7 @@ class QueryAvailabilityHttpBoundaryTests(unittest.TestCase):
 
     def test_only_closed_query_routes_resolve_to_stable_operations(self) -> None:
         cases = {
+            "/v1/authentication/console": "console-authentication",
             "/v1/session": "session",
             "/v1/system/version": "runtime-version",
             "/v1/resources": "resources-list",

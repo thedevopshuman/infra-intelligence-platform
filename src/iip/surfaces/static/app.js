@@ -3,6 +3,7 @@
 const state = {
   token: "",
   session: null,
+  consoleAuthentication: null,
   runtimeVersion: null,
   eventDeliveryHealth: null,
   eventDeliverySlo: null,
@@ -19,6 +20,10 @@ const state = {
   inspectedReplay: null,
 };
 
+const OIDC_TRANSACTION_KEY = "iip.console.oidc.transaction";
+const REMEMBERED_TOKEN_KEY = "iip.console.token";
+const OIDC_TRANSACTION_MAX_AGE_MILLIS = 10 * 60_000;
+
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
@@ -33,6 +38,242 @@ function identifier(prefix, length = 32) {
   const bytes = new Uint8Array(Math.ceil(length / 2));
   crypto.getRandomValues(bytes);
   return `${prefix}_${[...bytes].map((value) => value.toString(16).padStart(2, "0")).join("").slice(0, length)}`;
+}
+
+function base64Url(bytes) {
+  let raw = "";
+  bytes.forEach((value) => { raw += String.fromCharCode(value); });
+  return btoa(raw).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+}
+
+function randomBase64Url(byteLength) {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return base64Url(bytes);
+}
+
+async function pkceChallenge(verifier) {
+  if (!crypto.subtle) throw new Error("authentication.pkce-unavailable");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  return base64Url(new Uint8Array(digest));
+}
+
+function validateConsoleAuthentication(document) {
+  if (document?.apiVersion !== "iip.platform/v1alpha1"
+      || document?.kind !== "ConsoleAuthenticationConfiguration"
+      || Object.keys(document).sort().join(",") !== "apiVersion,kind,spec"
+      || !["local-token", "access-token", "oidc-pkce"].includes(document?.spec?.mode)) {
+    throw new Error("authentication.configuration.invalid");
+  }
+  if (document.spec.mode !== "oidc-pkce") {
+    if (Object.keys(document.spec).join(",") !== "mode") throw new Error("authentication.configuration.invalid");
+    return document;
+  }
+  const profile = document.spec.oidc;
+  if (!profile || Object.keys(document.spec).sort().join(",") !== "mode,oidc"
+      || Object.keys(profile).sort().join(",") !== "authorizationEndpoint,clientId,issuer,pkceMethod,providerLabel,redirectUri,scopes,tokenEndpoint") {
+    throw new Error("authentication.configuration.invalid");
+  }
+  if ([profile.issuer, profile.authorizationEndpoint, profile.tokenEndpoint, profile.redirectUri]
+    .some((value) => typeof value !== "string" || value.length < 1 || value.length > 2048 || /[\x00-\x20\x7f]/.test(value))) {
+    throw new Error("authentication.configuration.invalid");
+  }
+  const issuer = new URL(profile.issuer);
+  const authorizationEndpoint = new URL(profile.authorizationEndpoint);
+  const tokenEndpoint = new URL(profile.tokenEndpoint);
+  const redirectUri = new URL(profile.redirectUri);
+  const safeRedirect = redirectUri.protocol === "https:"
+    || (redirectUri.protocol === "http:" && ["localhost", "127.0.0.1"].includes(redirectUri.hostname));
+  if (profile?.pkceMethod !== "S256"
+      || issuer.protocol !== "https:" || issuer.username || issuer.password || issuer.search || issuer.hash
+      || authorizationEndpoint.protocol !== "https:"
+      || tokenEndpoint.protocol !== "https:"
+      || authorizationEndpoint.username || authorizationEndpoint.password
+      || tokenEndpoint.username || tokenEndpoint.password
+      || authorizationEndpoint.search || authorizationEndpoint.hash
+      || tokenEndpoint.search || tokenEndpoint.hash
+      || !safeRedirect || redirectUri.username || redirectUri.password
+      || redirectUri.origin !== window.location.origin
+      || !["/console", "/console/"].includes(redirectUri.pathname)
+      || redirectUri.search || redirectUri.hash
+      || typeof profile.clientId !== "string" || !/^[^\s\x00-\x1f]{1,256}$/.test(profile.clientId)
+      || !Array.isArray(profile.scopes) || profile.scopes.length < 1 || profile.scopes.length > 32
+      || new Set(profile.scopes).size !== profile.scopes.length || !profile.scopes.includes("openid")
+      || profile.scopes.some((scope) => typeof scope !== "string" || !/^[A-Za-z0-9._:/-]{1,128}$/.test(scope))
+      || typeof profile.providerLabel !== "string" || !/^[^\x00-\x1f\x7f]{1,64}$/.test(profile.providerLabel)) {
+    throw new Error("authentication.configuration.invalid");
+  }
+  return document;
+}
+
+async function loadConsoleAuthentication() {
+  try {
+    const response = await fetch("/v1/authentication/console", {
+      headers: { accept: "application/json" },
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    if (!response.ok) throw new Error("authentication.configuration.unavailable");
+    state.consoleAuthentication = validateConsoleAuthentication(await readBoundedJson(response));
+  } catch (_error) {
+    state.consoleAuthentication = {
+      apiVersion: "iip.platform/v1alpha1",
+      kind: "ConsoleAuthenticationConfiguration",
+      spec: { mode: "access-token" },
+    };
+    $("#connection-error").textContent = "Single sign-on discovery is unavailable. You can still use an issued access token.";
+    $("#connection-error").hidden = false;
+  }
+}
+
+function configureConnectionDialog() {
+  const mode = state.consoleAuthentication?.spec?.mode || "access-token";
+  const oidc = state.consoleAuthentication?.spec?.oidc;
+  const oidcAvailable = mode === "oidc-pkce" && oidc;
+  $("#oidc-connect").hidden = !oidcAvailable;
+  $("#token-caption").textContent = mode === "local-token"
+    ? "Local development Bearer token"
+    : "Issued access token";
+  $("#token-input").placeholder = mode === "local-token"
+    ? "Paste a generated local token"
+    : "Paste an OIDC access token";
+  if (oidcAvailable) {
+    $("#oidc-button").textContent = `Continue with ${oidc.providerLabel}`;
+    $("#connection-copy").textContent = "Use your organization's identity provider. Tenant, actor, and roles are derived only after the API verifies the returned access token.";
+    $("#connection-help").textContent = "No password, client secret, refresh token, or identity-provider session is stored by this console.";
+  } else if (mode === "local-token") {
+    $("#connection-copy").textContent = "Enter a local development Bearer token. It is sent only to this same-origin API and never written to platform logs or resources.";
+    $("#connection-help").innerHTML = "Run <code>make dev-up</code> to create a local stack and credentials.";
+  } else {
+    $("#connection-copy").textContent = "Enter an access token issued for this control plane. Browser single sign-on has not been enabled by the deployment.";
+    $("#connection-help").textContent = "Ask the deployment administrator to configure the OIDC public-client profile for one-click sign-in.";
+  }
+}
+
+async function beginOidcSignIn() {
+  const profile = state.consoleAuthentication?.spec?.oidc;
+  if (state.consoleAuthentication?.spec?.mode !== "oidc-pkce" || !profile) {
+    throw new Error("authentication.configuration.invalid");
+  }
+  const csrfState = randomBase64Url(32);
+  const verifier = randomBase64Url(64);
+  const challenge = await pkceChallenge(verifier);
+  const transaction = {
+    state: csrfState,
+    verifier,
+    redirectUri: profile.redirectUri,
+    remember: $("#remember-token").checked,
+    createdAt: Date.now(),
+  };
+  sessionStorage.setItem(OIDC_TRANSACTION_KEY, JSON.stringify(transaction));
+  sessionStorage.removeItem(REMEMBERED_TOKEN_KEY);
+  const destination = new URL(profile.authorizationEndpoint);
+  destination.searchParams.set("response_type", "code");
+  destination.searchParams.set("client_id", profile.clientId);
+  destination.searchParams.set("redirect_uri", profile.redirectUri);
+  destination.searchParams.set("scope", profile.scopes.join(" "));
+  destination.searchParams.set("state", csrfState);
+  destination.searchParams.set("code_challenge", challenge);
+  destination.searchParams.set("code_challenge_method", "S256");
+  window.location.assign(destination.href);
+}
+
+async function readBoundedJson(response, maximumBytes = 65_536) {
+  const declared = response.headers.get("content-length");
+  if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > maximumBytes)) {
+    throw new Error("authentication.response.invalid");
+  }
+  if (!response.body?.getReader) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > maximumBytes) throw new Error("authentication.response.invalid");
+    return JSON.parse(text);
+  }
+  const reader = response.body.getReader();
+  const chunks = [];
+  let received = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    if (received > maximumBytes) {
+      await reader.cancel();
+      throw new Error("authentication.response.invalid");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(received);
+  let offset = 0;
+  chunks.forEach((chunk) => { bytes.set(chunk, offset); offset += chunk.byteLength; });
+  return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+}
+
+function oidcCallbackPresent() {
+  const parameters = new URLSearchParams(window.location.search);
+  return parameters.has("code") || parameters.has("error") || parameters.has("state");
+}
+
+async function completeOidcCallback() {
+  const parameters = new URLSearchParams(window.location.search);
+  const codeValues = parameters.getAll("code");
+  const stateValues = parameters.getAll("state");
+  const errorValues = parameters.getAll("error");
+  const issuerValues = parameters.getAll("iss");
+  window.history.replaceState({}, "", `${window.location.pathname}${window.location.hash}`);
+  let transaction;
+  try {
+    transaction = JSON.parse(sessionStorage.getItem(OIDC_TRANSACTION_KEY) || "null");
+  } catch (_error) {
+    transaction = null;
+  }
+  sessionStorage.removeItem(OIDC_TRANSACTION_KEY);
+  const profile = state.consoleAuthentication?.spec?.oidc;
+  const transactionAge = Date.now() - transaction?.createdAt;
+  if (state.consoleAuthentication?.spec?.mode !== "oidc-pkce"
+      || !profile || !transaction
+      || codeValues.length > 1 || stateValues.length !== 1 || errorValues.length > 1 || issuerValues.length > 1
+      || transaction.state !== stateValues[0]
+      || transaction.redirectUri !== profile.redirectUri
+      || typeof transaction.verifier !== "string" || !/^[A-Za-z0-9_-]{43,128}$/.test(transaction.verifier)
+      || !Number.isFinite(transactionAge) || transactionAge < -60_000 || transactionAge > OIDC_TRANSACTION_MAX_AGE_MILLIS
+      || (issuerValues.length === 1 && issuerValues[0] !== profile.issuer)) {
+    throw new Error("authentication.callback.invalid");
+  }
+  if (errorValues.length === 1) throw new Error("authentication.authorization.denied");
+  const code = codeValues[0];
+  if (codeValues.length !== 1 || typeof code !== "string" || !/^[^\s\x00-\x1f]{1,8192}$/.test(code)) {
+    throw new Error("authentication.callback.invalid");
+  }
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: profile.clientId,
+    code,
+    redirect_uri: profile.redirectUri,
+    code_verifier: transaction.verifier,
+  });
+  const response = await fetch(profile.tokenEndpoint, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body,
+    cache: "no-store",
+    credentials: "omit",
+    redirect: "error",
+    referrerPolicy: "no-referrer",
+  });
+  const tokenResponse = await readBoundedJson(response);
+  const accessToken = tokenResponse?.access_token;
+  if (!response.ok
+      || typeof tokenResponse?.token_type !== "string"
+      || tokenResponse.token_type.toLowerCase() !== "bearer"
+      || typeof accessToken !== "string"
+      || !/^[A-Za-z0-9._~+/-]{32,8192}=*$/.test(accessToken)) {
+    throw new Error("authentication.exchange.invalid");
+  }
+  await connect(accessToken, transaction.remember === true);
 }
 
 function formatDate(value) {
@@ -350,8 +591,8 @@ async function connect(token, remember) {
   state.token = token;
   try {
     state.session = await api("/v1/session");
-    if (remember) sessionStorage.setItem("iip.console.token", token);
-    else sessionStorage.removeItem("iip.console.token");
+    if (remember) sessionStorage.setItem(REMEMBERED_TOKEN_KEY, token);
+    else sessionStorage.removeItem(REMEMBERED_TOKEN_KEY);
     updateIdentity();
     await Promise.all([refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
     $("#connection-dialog").close();
@@ -361,9 +602,12 @@ async function connect(token, remember) {
   } catch (error) {
     state.token = "";
     state.session = null;
-    sessionStorage.removeItem("iip.console.token");
+    sessionStorage.removeItem(REMEMBERED_TOKEN_KEY);
+    const localMode = state.consoleAuthentication?.spec?.mode === "local-token";
     const message = error.message === "authentication.invalid" || error.message === "authentication.required"
-      ? "The Bearer token was not accepted. Use a token generated by make dev-up."
+      ? localMode
+        ? "The Bearer token was not accepted. Use a token generated by make dev-up."
+        : "The identity provider's access token was not accepted by this control plane."
       : `Connection failed (${error.message}).`;
     $("#connection-error").textContent = message;
     $("#connection-error").hidden = false;
@@ -1102,13 +1346,34 @@ function bindEvents() {
     button.disabled = true;
     button.textContent = "Verifying…";
     try {
-      await connect($("#token-input").value, $("#remember-token").checked);
+      const token = $("#token-input").value.trim();
+      if (!token) {
+        $("#connection-error").textContent = "Enter an access token before connecting.";
+        $("#connection-error").hidden = false;
+        return;
+      }
+      await connect(token, $("#remember-token").checked);
       $("#token-input").value = "";
     } catch (_error) {
       // The connection panel already contains the stable error.
     } finally {
       button.disabled = false;
       button.textContent = "Connect securely";
+    }
+  });
+  $("#oidc-button").addEventListener("click", async () => {
+    const button = $("#oidc-button");
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = "Preparing secure sign-in…";
+    $("#connection-error").hidden = true;
+    try {
+      await beginOidcSignIn();
+    } catch (_error) {
+      $("#connection-error").textContent = "Single sign-on could not start. Verify the deployment's redirect and identity-provider configuration.";
+      $("#connection-error").hidden = false;
+      button.disabled = false;
+      button.textContent = original;
     }
   });
   $("#demo-resource-button").addEventListener("click", addDemoResource);
@@ -1188,8 +1453,23 @@ async function start() {
   renderEventDeliverySlo();
   renderInvestigationCompletionSlo();
   renderEvidenceRetention();
-  await checkHealth();
-  const remembered = sessionStorage.getItem("iip.console.token");
+  await Promise.all([checkHealth(), loadConsoleAuthentication()]);
+  configureConnectionDialog();
+  if (oidcCallbackPresent()) {
+    $("#connection-dialog").showModal();
+    $("#oidc-button").disabled = true;
+    $("#oidc-button").textContent = "Completing secure sign-in…";
+    try {
+      await completeOidcCallback();
+      return;
+    } catch (_error) {
+      $("#connection-error").textContent = "Single sign-on did not complete safely. Start a new sign-in attempt or use an issued access token.";
+      $("#connection-error").hidden = false;
+      $("#oidc-button").disabled = false;
+      configureConnectionDialog();
+    }
+  }
+  const remembered = sessionStorage.getItem(REMEMBERED_TOKEN_KEY);
   if (remembered) {
     $("#remember-token").checked = true;
     try {
@@ -1199,7 +1479,7 @@ async function start() {
       // Fall through to an explicit connection prompt.
     }
   }
-  $("#connection-dialog").showModal();
+  if (!$("#connection-dialog").open) $("#connection-dialog").showModal();
 }
 
 start();

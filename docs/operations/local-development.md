@@ -116,7 +116,7 @@ make run
 
 The local surface stores resources in memory. Its hashed opaque-token authenticator is a local reference boundary, not a production identity provider.
 
-Open `http://127.0.0.1:8080/console` for the browser console, or use the API directly. The console sends the Bearer token only to the same-origin control plane. By default the token exists only in page memory; the optional “keep for this browser tab” setting uses `sessionStorage`, never persistent `localStorage`. The console shell is public, while every tenant data request still authenticates independently.
+Open `http://127.0.0.1:8080/console` for the browser console, or use the API directly. The public `GET /v1/authentication/console` discovery response identifies this profile as `local-token`; it contains no tenant or credential. The console sends the Bearer token only to the same-origin control plane. By default the token exists only in page memory; the optional “keep for this browser tab” setting uses `sessionStorage`, never persistent `localStorage`. The console shell and discovery response are public, while every tenant data request still authenticates independently. An OIDC deployment can instead expose a public-client profile for one-click Authorization Code + `S256` PKCE sign-in; manual issued-token entry remains the explicit fallback.
 
 ```bash
 curl -X POST http://localhost:8080/v1/resources \
@@ -155,7 +155,7 @@ make dev-down
 ```
 
 `make test-local-product` reads the protected local credentials without printing
-them and exercises the durable customer path end to end: complete collection ingestion,
+them, verifies unauthenticated console discovery, and exercises the durable customer path end to end: complete collection ingestion,
 leased event delivery, durably queued worker investigation, immutable proposal, independent approval, one-shot
 dry-run execution, replay safety, and the paginated action queue.
 
@@ -210,7 +210,7 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_HTTP_PORT` | `8080` | Reference API port |
 | `IIP_AUTH_MODE` | `local-hashed` | Authenticator selection: local hashed verifier or `oidc` |
 | `IIP_AUTH_IDENTITIES_JSON` | required by API startup | Local Bearer-token verifier identities; supply through protected runtime configuration |
-| `IIP_AUTH_OIDC_CONFIG_JSON` | required in `oidc` mode | HTTPS issuer/JWKS, audience, claim mapping, CA path, cache, and clock-skew bounds |
+| `IIP_AUTH_OIDC_CONFIG_JSON` | required in `oidc` mode | HTTPS issuer/JWKS, audience, claim mapping, optional browser Authorization Code + PKCE public-client profile, CA path, cache, and clock-skew bounds |
 | `IIP_POLICY_MODE` | `local` | Policy adapter selection: local reference rules or `external-http` |
 | `IIP_POLICY_CONFIG_JSON` | required in `external-http` mode | TLS endpoint, protected CA/token paths, timeout, and response-size bounds |
 | `IIP_CREDENTIAL_BROKER_MODE` | `static` | Provider credential resolution: provider-specific local `static` brokers or shared `external-http` client |

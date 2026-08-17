@@ -5,7 +5,7 @@
 
 The HTTP surface authenticates credentials before constructing the application `ActorContext`. Tenant, actor, and roles come from the configured authenticator; payload fields and request headers are consistency assertions at most and never grant identity.
 
-An authenticated client may call `GET /v1/session` to retrieve its non-secret `SessionContext`. This enables browser and SDK workflows to populate required identity assertions from server-derived context. The response does not replace authorization at a use-case port and cannot be used to select or elevate an identity.
+Before authentication, a browser or SDK may call `GET /v1/authentication/console` to retrieve the deployment's non-secret console mode. An authenticated client may call `GET /v1/session` to retrieve its non-secret `SessionContext`. Together these endpoints let the browser discover how to obtain a credential and then populate identity assertions from server-derived context. Neither response can select or elevate an identity, and neither replaces authorization at a use-case port.
 
 ```mermaid
 sequenceDiagram
@@ -28,7 +28,8 @@ sequenceDiagram
 ## HTTP behavior
 
 - `/healthz` and `/readyz` are public and reveal only process liveness or a generic dependency-readiness result; no identity, tenant, endpoint, schema, or provider detail is returned.
-- Every `/v1` operation requires exactly one syntactically valid Bearer credential.
+- `GET /v1/authentication/console` is the only public `/v1` exception. It returns a closed non-secret discovery document, accepts no query parameters, and is never tenant-specific.
+- Every other `/v1` operation requires exactly one syntactically valid Bearer credential.
 - Missing credentials return HTTP 401 with `authentication.required`.
 - Malformed, unknown, or rejected credentials return HTTP 401 with `authentication.invalid`.
 - HTTP 401 responses carry `WWW-Authenticate: Bearer`.
@@ -74,6 +75,14 @@ clock skew.
   "actorClaim": "sub",
   "tenantClaim": "iip_tenant_id",
   "rolesClaim": "iip_roles",
+  "browser": {
+    "clientId": "iip-console",
+    "authorizationEndpoint": "https://identity.example.com/oauth2/authorize",
+    "tokenEndpoint": "https://identity.example.com/oauth2/token",
+    "redirectUri": "https://iip.example.com/console",
+    "scopes": ["openid", "profile"],
+    "providerLabel": "Organization SSO"
+  },
   "caBundlePath": "/var/run/iip-oidc-ca/ca.crt",
   "cacheSeconds": 300,
   "clockSkewSeconds": 30
@@ -87,6 +96,18 @@ verification, caches at most 64 keys, and refreshes once when a key ID rotates.
 JWKS reads are TLS-only, bounded, and redirect-free. Every rejection remains the
 same `authentication.invalid` response.
 
-The platform does not issue OIDC tokens. Customer issuer enrollment, claim
-mapping governance, MFA/session policy, revocation behavior, and workload
-identity configuration stay with the deployment's identity provider.
+The optional `browser` object enables the customer console's Authorization Code
+flow with a fresh `S256` PKCE challenge and state value. It is a public-client
+profile: client secrets are prohibited, the exact redirect is HTTPS except for
+loopback testing, and authorization/token endpoints are HTTPS, query-free, and
+redirect-free. The public discovery document omits the audience, JWKS URL,
+claim mappings, CA path, and all credential material. The console exchanges the
+code directly with the identity provider, stores no refresh or ID token, and
+then proves the access token through the same `/v1/session` verifier used by
+every API call. [ADR 0063](../decisions/0063-console-oidc-authorization-code-pkce.md)
+records the accepted browser boundary.
+
+The platform does not issue OIDC tokens or hold an OAuth client secret. Customer
+issuer enrollment, exact redirect registration, token-endpoint CORS, claim
+mapping governance, MFA/session/logout policy, revocation behavior, and
+workload identity configuration stay with the deployment's identity provider.

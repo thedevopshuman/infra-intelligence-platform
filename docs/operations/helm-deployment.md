@@ -58,6 +58,34 @@ networkPolicy:
 
 The chart sets the selected redirect annotation to `"true"` and does not permit `NodePort` or `LoadBalancer` Services. Before customer use, independently verify HTTPS-only routing, the full certificate chain and rotation, maximum request/header/time settings, controller availability, source-IP behavior, and the OIDC issuer/origin configuration. Bearer or OIDC authentication remains enforced by the application after TLS termination.
 
+## Customer console OIDC sign-in
+
+Production console sign-in uses the same OIDC verifier as API clients plus an optional public browser profile. Register `https://<ingress-host>/console` as an exact redirect URI at the identity provider, use Authorization Code with `S256` PKCE, and configure the issuer to return an RS256 JWT access token with the exact audience and actor, tenant, and roles claims expected by the API. The client is public: do not create, embed, or mount a client secret.
+
+`auth.oidc.configJson` is rendered into non-secret application configuration. Treat it as reviewed deployment policy even though the browser subset is public. A complete profile is structurally similar to:
+
+```yaml
+auth:
+  mode: oidc
+  existingSecret: ""
+  oidc:
+    configJson: >-
+      {"issuer":"https://identity.example.com/","audience":"iip-control-plane","jwksUrl":"https://identity.example.com/.well-known/jwks.json","actorClaim":"sub","tenantClaim":"iip_tenant_id","rolesClaim":"iip_roles","browser":{"clientId":"iip-console","authorizationEndpoint":"https://identity.example.com/oauth2/authorize","tokenEndpoint":"https://identity.example.com/oauth2/token","redirectUri":"https://iip.example.com/console","scopes":["openid","profile"],"providerLabel":"Organization SSO"},"cacheSeconds":300,"clockSkewSeconds":30}
+    caBundleExistingSecret: iip-oidc-ca
+    caBundleSecretKey: ca.crt
+    caBundleMountPath: /var/run/iip-oidc-ca
+
+networkPolicy:
+  oidcEgress:
+    enabled: true
+    cidr: 203.0.113.10/32
+    port: 443
+```
+
+The browser calls the token endpoint directly. Its CORS policy must allow the exact console origin, `POST`, and the `content-type` header without cookies. The authorization and token endpoint URLs must not contain query strings, fragments, or embedded credentials. The console's CSP adds only the configured token endpoint origin to `connect-src`; server-side NetworkPolicy independently controls JWKS access from the API pod.
+
+Before rollout, verify the public `GET /v1/authentication/console` response, redirect registration, MFA and consent behavior, token audience and lifetime, tenant/role claim mapping, CORS denial for other origins, logout expectations, key rotation, revocation expectations, and failure behavior. The platform keeps no refresh token, ID token, identity-provider password, or server session.
+
 ## Fresh durable install
 
 Create the database and identity Secrets through the cluster's secret-management workflow, then use a protected values file similar to:
@@ -65,7 +93,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.36.0
+  tag: 0.37.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -141,7 +169,7 @@ The migration NetworkPolicy hook is created first, then the migration Job. The J
 
 `evidenceRetention` is disabled by default. Enabling it requires the workflow worker and exact tenant enrollment. Review legal hold and backup lifecycle first, then use the [evidence retention runbook](evidence-retention.md); the administrator endpoint is observe-only and deletion remains bounded, policy-gated, tenant-serialized, and audited.
 
-The local-hashed authentication example is suitable for a controlled evaluation. The default Secret name is `iip-auth`, but the chart never creates its sensitive contents. Configure the documented OIDC boundary for production; do not place either local verifier JSON or OIDC client material directly in a values file. Serving pods always receive `IIP_DATABASE_AUTO_MIGRATE=false`; the hook is the chart's only schema authority.
+The local-hashed authentication example is suitable for a controlled evaluation. The default Secret name is `iip-auth`, but the chart never creates its sensitive contents. Configure the documented OIDC boundary for production; never place local verifier JSON, raw tokens, or an OAuth client secret in a values file. The reviewed OIDC verifier and public-client profile are non-secret configuration; protect changes to them as security policy. Serving pods always receive `IIP_DATABASE_AUTO_MIGRATE=false`; the hook is the chart's only schema authority.
 
 ## Scheduled logical backups
 
@@ -171,7 +199,7 @@ make test-helm-install
 
 The gate builds and loads the current image, registers its exact host-platform digest on every disposable kind node, creates an exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, and proves API readiness from inside the pod. It then authenticates without printing the generated credential and requires the runtime report, event-delivery health, and rolling publication objective to match the installed configuration. A second Helm revision adds two API replicas, a TLS Ingress declaration, and scheduled backup configuration. The gate proves immutable image selection, runtime identity, migration idempotency, and exact ingress binding; runs the installed backup CronJob on demand; verifies its persisted checksum; restores it into a separate database; confirms every packaged migration; and checks rollout and Helm history. It removes the namespace and claim, refuses non-kind contexts, and never prints generated credentials, database contents, or private keys. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
 
-The first revision additionally proves the investigation-completion objective and disabled-by-default Evidence retention report from inside the installed pod.
+The first revision additionally proves the public local console-authentication discovery document, the investigation-completion objective, and the disabled-by-default Evidence retention report from inside the installed pod.
 
 ## Production gaps
 

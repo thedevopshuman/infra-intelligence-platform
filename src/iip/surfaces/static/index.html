@@ -292,12 +292,17 @@
         <span class="mark large" aria-hidden="true"><i></i><i></i><i></i></span>
         <span class="kicker">Secure control-plane access</span>
         <h2>Connect your workspace</h2>
-        <p>Enter a local development Bearer token. The token is sent only to this same-origin API and is never written to platform logs or resources.</p>
-        <label>Bearer token<input id="token-input" type="password" autocomplete="off" required placeholder="Paste a generated local token"></label>
+        <p id="connection-copy">Loading the deployment's authentication profile…</p>
+        <div id="oidc-connect" class="oidc-connect" hidden>
+          <button class="button primary wide" id="oidc-button" type="button">Continue with organization SSO</button>
+          <small>Authorization Code + S256 PKCE. The identity provider retains MFA and session policy.</small>
+          <div class="auth-divider"><span>or use an access token</span></div>
+        </div>
+        <label id="token-label"><span id="token-caption">Bearer token</span><input id="token-input" type="password" autocomplete="off" placeholder="Paste a generated local token"></label>
         <label class="check-row compact"><input id="remember-token" type="checkbox"><span><strong>Keep for this browser tab</strong><small>Uses session storage; never local storage.</small></span></label>
         <p class="form-error" id="connection-error" role="alert" hidden></p>
         <button class="button primary wide" id="connect-button" type="submit">Connect securely</button>
-        <small class="connection-help">Run <code>make dev-up</code> to create a local stack and credentials.</small>
+        <small class="connection-help" id="connection-help">Authentication is configured by this deployment.</small>
       </form>
     </dialog>
 

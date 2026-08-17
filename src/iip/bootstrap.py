@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
 from . import __version__
 
@@ -145,6 +145,8 @@ class Runtime:
     """Concrete services and adapters owned by one process."""
 
     authenticator: Authenticator
+    console_authentication: Mapping[str, object]
+    console_token_origin: str | None
     resources: ResourceRepository
     event_log: EventLog
     outbox: EventOutbox
@@ -341,8 +343,13 @@ def _compose_runtime(
         signal_catalog=signal_catalog,
     )
     investigation_lifecycle = InvestigationLifecycleService(operational, clock)
+    console_authentication, console_token_origin = _console_authentication_for(
+        authenticator
+    )
     return Runtime(
         authenticator=authenticator,
+        console_authentication=console_authentication,
+        console_token_origin=console_token_origin,
         resources=store,
         event_log=store,
         outbox=store,
@@ -539,6 +546,31 @@ def build_projection_maintenance(database_url: str) -> ProjectionRebuildService:
     from iip.adapters.postgres import PostgresResourceStore
 
     return ProjectionRebuildService(PostgresResourceStore(database_url), AllowTenantPolicy())
+
+
+def _console_authentication_for(
+    authenticator: Authenticator,
+) -> tuple[Mapping[str, object], str | None]:
+    """Derive only the non-secret browser bootstrap view at composition time."""
+
+    if isinstance(authenticator, OidcJwtAuthenticator):
+        return (
+            authenticator.console_authentication_document(),
+            authenticator.console_token_origin,
+        )
+    mode = (
+        "local-token"
+        if isinstance(authenticator, HashedBearerAuthenticator)
+        else "access-token"
+    )
+    return (
+        {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "ConsoleAuthenticationConfiguration",
+            "spec": {"mode": mode},
+        },
+        None,
+    )
 
 
 def build_runtime_from_env(*, include_action_executor: bool = True) -> Runtime:

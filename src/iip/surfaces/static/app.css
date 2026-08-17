@@ -314,6 +314,11 @@ dialog::backdrop { background: rgb(3 6 10 / 78%); backdrop-filter: blur(9px); }
 .connection-card > p { margin: 0 0 23px; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .dialog-close { width: 31px; height: 31px; display: grid; place-items: center; color: var(--muted); background: #111925; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; font-size: 18px; }
 .connection-card > .dialog-close { position: absolute; top: 16px; right: 16px; }
+.oidc-connect { margin-bottom: 16px; }
+.oidc-connect[hidden] { display: none; }
+.oidc-connect > small { display: block; margin-top: 9px; color: var(--muted); text-align: center; font-size: 9px; line-height: 1.5; }
+.auth-divider { display: flex; align-items: center; gap: 10px; margin: 17px 0 0; color: var(--muted-2); font-size: 8px; text-transform: uppercase; letter-spacing: .08em; }
+.auth-divider::before, .auth-divider::after { content: ""; height: 1px; flex: 1; background: var(--line-soft); }
 .form-error { padding: 9px 11px; color: #ffd6dd !important; background: rgb(255 113 133 / 8%); border: 1px solid rgb(255 113 133 / 20%); border-radius: 8px; }
 .connection-help { display: block; margin-top: 14px; color: var(--muted-2); text-align: center; font-size: 9px; }
 code { color: var(--cyan); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

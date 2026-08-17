@@ -13,6 +13,7 @@ from infra_intelligence_sdk import (
     ActionResult,
     ActionWorkflow,
     ActionWorkflowPage,
+    ConsoleAuthenticationConfiguration,
     ContextEvidenceRequest,
     ContextEvidenceResult,
     Evidence,
@@ -149,6 +150,12 @@ class PublicContractSdkTests(unittest.TestCase):
             example("runtime-version-report.json")
         )
         session = SessionContext.from_dict(example("session-context.json"))
+        local_console_authentication = ConsoleAuthenticationConfiguration.from_dict(
+            example("console-authentication-local.json")
+        )
+        oidc_console_authentication = ConsoleAuthenticationConfiguration.from_dict(
+            example("console-authentication-oidc.json")
+        )
         collection_request = ResourceCollectionRequest.from_dict(
             example("resource-collection-request.json")
         )
@@ -334,6 +341,14 @@ class PublicContractSdkTests(unittest.TestCase):
             runtime_version.to_dict()["kind"], "RuntimeVersionReport"
         )
         self.assertEqual(session.to_dict()["kind"], "SessionContext")
+        self.assertEqual(
+            local_console_authentication.to_dict()["spec"]["mode"],
+            "local-token",
+        )
+        self.assertEqual(
+            oidc_console_authentication.to_dict()["spec"]["oidc"]["pkceMethod"],
+            "S256",
+        )
         self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")
         self.assertEqual(collection_result.to_dict()["kind"], "ResourceCollectionResult")
         self.assertIsNone(collection_request.resume)

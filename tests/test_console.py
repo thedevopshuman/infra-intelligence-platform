@@ -73,6 +73,26 @@ class ConsoleHttpTests(unittest.TestCase):
                 self.assertIn(("x-content-type-options", "nosniff"), headers)
                 self.assertIn(expected_text, handler.wfile.getvalue().decode("utf-8"))
 
+        handler = object.__new__(ApiHandler)
+        handler.path = "/console"
+        handler.headers = Message()
+        self._wire_response(handler)
+        handler.do_GET()
+        self.assertIn(
+            "What this control plane is serving",
+            handler.wfile.getvalue().decode("utf-8"),
+        )
+
+        handler = object.__new__(ApiHandler)
+        handler.path = "/console/app.js"
+        handler.headers = Message()
+        self._wire_response(handler)
+        handler.do_GET()
+        self.assertIn(
+            "/v1/system/version",
+            handler.wfile.getvalue().decode("utf-8"),
+        )
+
     def test_session_is_derived_from_the_credential(self) -> None:
         with patch.dict(
             os.environ,

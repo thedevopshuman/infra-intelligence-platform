@@ -5,6 +5,8 @@ metadata:
   labels:
     {{- include "infra-intelligence.labels" . | nindent 4 }}
 data:
+  IIP_DEPLOYMENT_HELM_CHART_VERSION: {{ .Chart.Version | quote }}
+  IIP_DEPLOYMENT_IMAGE_DIGEST: {{ .Values.image.digest | quote }}
   IIP_HTTP_HOST: {{ .Values.config.httpHost | quote }}
   IIP_HTTP_PORT: {{ .Values.config.httpPort | quote }}
   IIP_AUTH_MODE: {{ .Values.auth.mode | quote }}

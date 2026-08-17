@@ -267,6 +267,26 @@ class TelemetryExportHealthReport:
 
 
 @dataclass(frozen=True)
+class RuntimeVersionReport:
+    """Authenticated application, contract, storage, build, and deployment identity."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "RuntimeVersionReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="RuntimeVersionReport",
+                label="runtime version report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class SessionContext:
     """Non-secret identity context derived from the client's credential."""
 

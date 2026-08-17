@@ -28,6 +28,27 @@ export interface SessionContext {
   };
 }
 
+export interface RuntimeVersionReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "RuntimeVersionReport";
+  metadata: {
+    tenantId: string;
+    evaluatedAt: string;
+  };
+  spec: {
+    application: { version: string };
+    contracts: { apiVersion: "iip.platform/v1alpha1" };
+    storage: { requiredMigration: string };
+    build:
+      | { mode: "development"; revision?: never }
+      | { mode: "release"; revision: string };
+    deployment: {
+      helmChartVersion?: string;
+      imageDigest?: Sha256Digest;
+    };
+  };
+}
+
 export interface ResourceRelationship {
   type: string;
   target: string;

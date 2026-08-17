@@ -3,6 +3,7 @@
 const state = {
   token: "",
   session: null,
+  runtimeVersion: null,
   resources: [],
   investigations: [],
   evidence: [],
@@ -113,6 +114,46 @@ function updateIdentity() {
   $("#avatar").textContent = actorId.slice(0, 2).toUpperCase();
 }
 
+function compactIdentity(value, length = 12) {
+  if (!value) return "Not supplied";
+  if (value.startsWith("sha256:")) return `sha256:${value.slice(7, 7 + length)}…`;
+  return value.length > length ? `${value.slice(0, length)}…` : value;
+}
+
+function renderRuntimeVersion() {
+  const report = state.runtimeVersion;
+  const spec = report?.spec;
+  if (!spec) {
+    const waiting = state.session ? "Unavailable" : "Connect to verify";
+    $("#runtime-application").textContent = waiting;
+    ["contracts", "storage", "revision", "chart", "image"].forEach((field) => {
+      $(`#runtime-${field}`).textContent = "—";
+    });
+    $("#runtime-details").disabled = true;
+    return;
+  }
+  $("#runtime-application").textContent = `v${spec.application.version}`;
+  $("#runtime-contracts").textContent = spec.contracts.apiVersion.replace("iip.platform/", "");
+  $("#runtime-storage").textContent = spec.storage.requiredMigration.replace(".sql", "");
+  $("#runtime-revision").textContent = spec.build.mode === "development"
+    ? "Development"
+    : compactIdentity(spec.build.revision);
+  $("#runtime-chart").textContent = spec.deployment.helmChartVersion
+    ? `v${spec.deployment.helmChartVersion}`
+    : "Not supplied";
+  $("#runtime-image").textContent = compactIdentity(spec.deployment.imageDigest);
+  $("#runtime-details").disabled = false;
+}
+
+async function refreshRuntimeVersion() {
+  try {
+    state.runtimeVersion = await api("/v1/system/version");
+  } catch (_error) {
+    state.runtimeVersion = null;
+  }
+  renderRuntimeVersion();
+}
+
 async function connect(token, remember) {
   state.token = token;
   try {
@@ -120,7 +161,7 @@ async function connect(token, remember) {
     if (remember) sessionStorage.setItem("iip.console.token", token);
     else sessionStorage.removeItem("iip.console.token");
     updateIdentity();
-    await Promise.all([refreshResources(), refreshActions()]);
+    await Promise.all([refreshRuntimeVersion(), refreshResources(), refreshActions()]);
     $("#connection-dialog").close();
     $("#connection-error").hidden = true;
     showNotice(`Connected as ${state.session.metadata.actorId} in tenant ${state.session.metadata.tenantId}.`);
@@ -792,7 +833,7 @@ function bindEvents() {
   $("#identity-button").addEventListener("click", () => $("#connection-dialog").showModal());
   $("#connection-close").addEventListener("click", () => $("#connection-dialog").close());
   $("#refresh-button").addEventListener("click", async () => {
-    await Promise.all([checkHealth(), refreshResources(), refreshActions()]);
+    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshResources(), refreshActions()]);
     showNotice("Live platform state refreshed.");
   });
   $("#connection-form").addEventListener("submit", async (event) => {
@@ -826,11 +867,19 @@ function bindEvents() {
   $("#action-reject").addEventListener("click", () => decideSelectedAction("rejected"));
   $("#action-execute").addEventListener("click", executeSelectedAction);
   $("#detail-close").addEventListener("click", () => $("#detail-dialog").close());
+  $("#runtime-details").addEventListener("click", () => {
+    if (!state.runtimeVersion) return;
+    $("#detail-kicker").textContent = "Runtime identity";
+    $("#detail-title").textContent = "Verified version report";
+    $("#detail-content").textContent = JSON.stringify(state.runtimeVersion, null, 2);
+    $("#detail-dialog").showModal();
+  });
 }
 
 async function start() {
   bindEvents();
   renderResources();
+  renderRuntimeVersion();
   await checkHealth();
   const remembered = sessionStorage.getItem("iip.console.token");
   if (remembered) {

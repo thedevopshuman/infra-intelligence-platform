@@ -1,0 +1,21 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "RuntimeVersionReport",
+  "metadata": {
+    "tenantId": "tenant-acme",
+    "evaluatedAt": "2026-08-17T15:00:00Z"
+  },
+  "spec": {
+    "application": {"version": "0.27.0"},
+    "contracts": {"apiVersion": "iip.platform/v1alpha1"},
+    "storage": {"requiredMigration": "0009_investigation_jobs.sql"},
+    "build": {
+      "mode": "release",
+      "revision": "0123456789abcdef0123456789abcdef01234567"
+    },
+    "deployment": {
+      "helmChartVersion": "0.29.0",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:runtime-version-report:v1alpha1",
+  "title": "Infrastructure Intelligence Runtime Version Report",
+  "description": "Authenticated, non-secret application, contract, storage, build, and deployment identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "RuntimeVersionReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId", "evaluatedAt"],
+      "properties": {
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "evaluatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["application", "contracts", "storage", "build", "deployment"],
+      "properties": {
+        "application": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version"],
+          "properties": {"version": {"$ref": "#/$defs/semver"}}
+        },
+        "contracts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["apiVersion"],
+          "properties": {"apiVersion": {"const": "iip.platform/v1alpha1"}}
+        },
+        "storage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requiredMigration"],
+          "properties": {
+            "requiredMigration": {
+              "type": "string",
+              "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"
+            }
+          }
+        },
+        "build": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {"type": "string", "enum": ["development", "release"]},
+            "revision": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"}
+          },
+          "allOf": [
+            {
+              "if": {"properties": {"mode": {"const": "release"}}},
+              "then": {"required": ["revision"]},
+              "else": {"not": {"required": ["revision"]}}
+            }
+          ]
+        },
+        "deployment": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "helmChartVersion": {"$ref": "#/$defs/semver"},
+            "imageDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    }
+  }
+}

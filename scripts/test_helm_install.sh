@@ -61,15 +61,20 @@ IIP_APP_VERSION=$(
     "$IIP_TEST_PYTHON" -c \
         'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])'
 )
+IIP_CHART_VERSION=$(awk '$1 == "version:" {print $2; exit}' deploy/helm/infra-intelligence/Chart.yaml)
 IIP_TEST_IMAGE="iip-local-platform:$IIP_APP_VERSION"
 IIP_KIND_CLUSTER=${IIP_KUBE_CONTEXT#kind-}
 IIP_DB_PASSWORD=$(openssl rand -hex 24)
-IIP_AUTH_VERIFIER="sha256:$(openssl rand -hex 32)"
+IIP_AUTH_BEARER_TOKEN=$(openssl rand -hex 32)
+IIP_AUTH_VERIFIER="sha256:$(printf '%s' "$IIP_AUTH_BEARER_TOKEN" | openssl dgst -sha256 -hex | awk '{print $NF}')"
 IIP_AUTH_IDENTITIES_JSON=$(printf '%s' \
     "{\"identities\":[{\"tokenSha256\":\"$IIP_AUTH_VERIFIER\",\"actorId\":\"helm-test-operator\",\"tenantId\":\"helm-test\",\"roles\":[\"developer\"]}]}"
 )
 
-"$IIP_DOCKER_BIN" build --provenance=false --tag "$IIP_TEST_IMAGE" . >/dev/null
+"$IIP_DOCKER_BIN" build --provenance=false \
+    --build-arg "IIP_IMAGE_VERSION=$IIP_APP_VERSION" \
+    --build-arg IIP_IMAGE_REVISION=development \
+    --tag "$IIP_TEST_IMAGE" . >/dev/null
 IIP_TEST_IMAGE_REFERENCE=$(
     "$IIP_DOCKER_BIN" image inspect "$IIP_TEST_IMAGE" \
         --format '{{index .RepoDigests 0}}'
@@ -202,6 +207,18 @@ if [ "$IIP_APPLIED_MIGRATION" != "$IIP_EXPECTED_MIGRATION" ]; then
     echo "Helm migration hook did not apply the latest packaged schema" >&2
     exit 1
 fi
+
+IIP_RUNTIME_VERSION_JSON=$(
+    printf '%s' "$IIP_AUTH_BEARER_TOKEN" | \
+        "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+            --namespace "$IIP_TEST_NAMESPACE" exec -i \
+            deployment/iip-infra-intelligence -- python -c \
+            'import json,sys,urllib.request; token=sys.stdin.read(); request=urllib.request.Request("http://127.0.0.1:8080/v1/system/version", headers={"Authorization": "Bearer " + token}); print(json.dumps(json.load(urllib.request.urlopen(request, timeout=5)), separators=(",", ":")))'
+)
+printf '%s' "$IIP_RUNTIME_VERSION_JSON" | "$IIP_TEST_PYTHON" -c \
+    'import json,sys; document=json.load(sys.stdin); app,chart,digest,migration=sys.argv[1:]; spec=document["spec"]; assert document["kind"] == "RuntimeVersionReport"; assert document["metadata"]["tenantId"] == "helm-test"; assert spec["application"]["version"] == app; assert spec["contracts"]["apiVersion"] == "iip.platform/v1alpha1"; assert spec["storage"]["requiredMigration"] == migration; assert spec["build"] == {"mode":"development"}; assert spec["deployment"] == {"helmChartVersion":chart,"imageDigest":digest}' \
+    "$IIP_APP_VERSION" "$IIP_CHART_VERSION" "$IIP_TEST_IMAGE_DIGEST" \
+    "$IIP_EXPECTED_MIGRATION"
 
 IIP_EXPECTED_MIGRATION_COUNT=$(
     rg --files src/iip/adapters/postgres/migrations -g '*.sql' | wc -l | tr -d ' '
@@ -358,4 +375,4 @@ EOF
     "$IIP_TEST_PYTHON" -c \
         'import json,sys; rows=json.load(sys.stdin); assert len(rows) == 2 and str(rows[-1]["revision"]) == "2" and rows[-1]["status"] == "deployed"'
 
-echo "Helm install/upgrade test passed: immutable image -> migrations -> TLS ingress -> backup/restore"
+echo "Helm install/upgrade test passed: immutable image -> runtime identity -> migrations -> TLS ingress -> backup/restore"

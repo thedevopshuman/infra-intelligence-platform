@@ -25,6 +25,8 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 `Client.get_ingestion_freshness` returns an `IngestionFreshnessReport` for one source in the credential-derived tenant. The response exposes applied objectives and stable violations, not provider cursors or resource contents.
 
+`Client.get_runtime_version` returns the authenticated non-secret application, contract, required storage migration, build revision, Helm chart, and immutable image identity reported by the answering process. Optional deployment evidence is absent when it was not supplied rather than inferred from a mutable tag.
+
 Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. Supply a Bearer credential; the authenticated server derives tenant, actor, and roles from that credential. The SDK never sends identity assertion headers.
 
 Version 0.4 adds opaque provider cursor resume fields, ingestion-freshness telemetry, backend-neutral telemetry evidence, and the stored `OtlpMetricsEvidence` artifact model. OTLP transport is intentionally not reimplemented by this client; send metrics with a standard OpenTelemetry SDK/Collector and the separately provisioned channel credential.

@@ -13,7 +13,7 @@ Before installation, provide:
 - authentication configuration through an existing Secret or the documented OIDC mode;
 - reviewed tenant, policy, network, telemetry, backup, and retention settings.
 
-The default repository and tag are placeholders. Set `image.repository` to the published repository and `image.digest` to the verified release OCI index digest in production. A non-empty digest takes precedence over the tag for the API, worker, OTLP receiver, and migration Job.
+The default repository and tag are placeholders. Set `image.repository` to the published repository and `image.digest` to the verified release OCI index digest in production. A non-empty digest takes precedence over the tag for the API, worker, OTLP receiver, and migration Job. The chart injects its version and this exact digest into application workloads so authenticated users can verify them through `GET /v1/system/version` and the console.
 
 ## Validate configuration before access
 
@@ -63,7 +63,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.26.0
+  tag: 0.27.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -93,7 +93,7 @@ helm upgrade --install iip deploy/helm/infra-intelligence \
   --wait --timeout 10m
 ```
 
-The migration NetworkPolicy hook is created first, then the migration Job. The Job receives only the database Secret and runs every packaged migration under an advisory lock. The serving Deployment rolls out only after the hook succeeds. `/readyz` independently opens a bounded database connection and verifies the latest migration recorded by the new image.
+The migration NetworkPolicy hook is created first, then the migration Job. The Job receives only the database Secret and runs every packaged migration under an advisory lock. The serving Deployment rolls out only after the hook succeeds. `/readyz` independently opens a bounded database connection and verifies the latest migration recorded by the new image. After rollout, compare the authenticated runtime report's application, required migration, source revision, chart version, and image digest with the promoted release evidence.
 
 The local-hashed authentication example is suitable for a controlled evaluation. The default Secret name is `iip-auth`, but the chart never creates its sensitive contents. Configure the documented OIDC boundary for production; do not place either local verifier JSON or OIDC client material directly in a values file. Serving pods always receive `IIP_DATABASE_AUTO_MIGRATE=false`; the hook is the chart's only schema authority.
 
@@ -123,7 +123,7 @@ With Docker Desktop and the explicit `kind-iip-dev` context available, run:
 make test-helm-install
 ```
 
-The gate builds and loads the current image, registers its exact host-platform digest on every disposable kind node, creates an exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, and proves API readiness from inside the pod. It then performs a second Helm revision with two API replicas, a TLS Ingress declaration, and scheduled backup configuration. The gate proves immutable image selection, migration idempotency, and exact ingress binding; runs the installed backup CronJob on demand; verifies its persisted checksum; restores it into a separate database; confirms every packaged migration; and checks rollout and Helm history. It removes the namespace and claim, refuses non-kind contexts, and never prints generated credentials, database contents, or private keys. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
+The gate builds and loads the current image, registers its exact host-platform digest on every disposable kind node, creates an exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, and proves API readiness from inside the pod. It then authenticates without printing the generated credential and requires the runtime report to match the application version, contract version, migration, chart, and exact installed digest. A second Helm revision adds two API replicas, a TLS Ingress declaration, and scheduled backup configuration. The gate proves immutable image selection, runtime identity, migration idempotency, and exact ingress binding; runs the installed backup CronJob on demand; verifies its persisted checksum; restores it into a separate database; confirms every packaged migration; and checks rollout and Helm history. It removes the namespace and claim, refuses non-kind contexts, and never prints generated credentials, database contents, or private keys. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
 
 ## Production gaps
 

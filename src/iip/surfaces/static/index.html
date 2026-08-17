@@ -88,6 +88,21 @@
             <article class="metric-card"><span>Evidence items</span><strong id="metric-evidence">0</strong><small>Retrieved in this tab</small></article>
           </div>
 
+          <article class="panel runtime-panel" aria-labelledby="runtime-heading">
+            <div class="runtime-heading">
+              <div><span class="kicker">Running identity</span><h2 id="runtime-heading">What this control plane is serving</h2></div>
+              <button class="text-button" id="runtime-details" type="button" disabled>View report →</button>
+            </div>
+            <div class="runtime-grid" id="runtime-grid" aria-live="polite">
+              <div><span>Application</span><strong id="runtime-application">Connect to verify</strong></div>
+              <div><span>Contracts</span><strong id="runtime-contracts">—</strong></div>
+              <div><span>Storage schema</span><strong id="runtime-storage">—</strong></div>
+              <div><span>Build revision</span><strong id="runtime-revision">—</strong></div>
+              <div><span>Helm chart</span><strong id="runtime-chart">—</strong></div>
+              <div><span>Image digest</span><strong id="runtime-image">—</strong></div>
+            </div>
+          </article>
+
           <div class="two-column">
             <article class="panel">
               <div class="panel-heading">

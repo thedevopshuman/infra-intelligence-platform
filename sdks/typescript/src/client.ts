@@ -27,6 +27,7 @@ import type {
   ResourceObservation,
   ResourceTimeline,
   ResourceUid,
+  RuntimeVersionReport,
   SessionContext,
   TelemetryEvidenceRequest,
   TelemetryExportHealthReport,
@@ -82,6 +83,10 @@ export class InfrastructureIntelligenceClient {
 
   async getSession(): Promise<SessionContext> {
     return this.get<SessionContext>("/v1/session");
+  }
+
+  async getRuntimeVersion(): Promise<RuntimeVersionReport> {
+    return this.get<RuntimeVersionReport>("/v1/system/version");
   }
 
   async getResourceNeighborhood(

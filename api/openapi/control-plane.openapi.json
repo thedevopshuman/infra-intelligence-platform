@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.26.0",
-    "description": "Executable control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral evidence, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
+    "version": "0.27.0",
+    "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -31,6 +31,17 @@
         "description": "Return the non-secret tenant, actor, and role context derived from the authenticated control-plane credential.",
         "responses": {
           "200": {"description": "Authenticated session context", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/session-context.schema.json"}}}},
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/v1/system/version": {
+      "get": {
+        "operationId": "getRuntimeVersion",
+        "description": "Return tenant-contextual, non-secret application, contract, required storage migration, build, and deployment identity for the answering process. Optional revision, chart, and digest fields are omitted when not verifiably supplied.",
+        "responses": {
+          "200": {"description": "Authenticated runtime version identity", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/runtime-version-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
           "401": {"$ref": "#/components/responses/Unauthorized"}
         }
       }
@@ -559,6 +570,7 @@
       "ResourceTimeline": {"$ref": "../../contracts/schemas/resource-timeline.schema.json"},
       "IngestionFreshnessReport": {"$ref": "../../contracts/schemas/ingestion-freshness-report.schema.json"},
       "TelemetryExportHealthReport": {"$ref": "../../contracts/schemas/telemetry-export-health-report.schema.json"},
+      "RuntimeVersionReport": {"$ref": "../../contracts/schemas/runtime-version-report.schema.json"},
       "SessionContext": {"$ref": "../../contracts/schemas/session-context.schema.json"},
       "PageInfo": {"$ref": "../../contracts/schemas/page-info.schema.json"},
       "Event": {"$ref": "../../contracts/schemas/event.schema.json"},

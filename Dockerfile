@@ -1,7 +1,7 @@
 FROM python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
 
 ARG IIP_IMAGE_VERSION=development
-ARG IIP_IMAGE_REVISION=unknown
+ARG IIP_IMAGE_REVISION=development
 
 LABEL org.opencontainers.image.title="Infrastructure Intelligence Platform" \
     org.opencontainers.image.version="$IIP_IMAGE_VERSION" \
@@ -10,6 +10,7 @@ LABEL org.opencontainers.image.title="Infrastructure Intelligence Platform" \
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src \
+    IIP_BUILD_REVISION="$IIP_IMAGE_REVISION" \
     IIP_HTTP_HOST=0.0.0.0 \
     IIP_HTTP_PORT=8080
 

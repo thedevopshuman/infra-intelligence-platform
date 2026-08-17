@@ -33,6 +33,7 @@ from .models import (
     ResourceNeighborhood,
     ResourceObservation,
     ResourceTimeline,
+    RuntimeVersionReport,
     SessionContext,
     TelemetryEvidenceRequest,
     TelemetryExportHealthReport,
@@ -89,6 +90,11 @@ class Client:
         """Return the actor, tenant, and roles derived from this credential."""
 
         return SessionContext.from_dict(self._get("/v1/session"))
+
+    def get_runtime_version(self) -> RuntimeVersionReport:
+        """Return verified non-secret identity for the answering API process."""
+
+        return RuntimeVersionReport.from_dict(self._get("/v1/system/version"))
 
     def get_resource_neighborhood(
         self,

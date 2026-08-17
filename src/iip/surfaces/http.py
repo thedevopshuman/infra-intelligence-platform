@@ -110,6 +110,7 @@ from iip.application.query_resources import (
     ResourceNotFoundError,
     ResourceTimelineResult,
 )
+from iip.application.query_runtime_version import GetRuntimeVersionCommand
 from iip.application.query_telemetry_export_health import (
     GetTelemetryExportHealthCommand,
     TelemetryExportHealthAuthorizationError,
@@ -130,7 +131,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.26.0"
+    server_version = "IIPReference/0.27.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -177,6 +178,18 @@ class ApiHandler(BaseHTTPRequestHandler):
                     "spec": {"roles": sorted(actor.roles)},
                 },
             )
+            return
+        if path == "/v1/system/version":
+            if parsed.query:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": {"code": "request.invalid"}},
+                )
+                return
+            report = self.runtime.runtime_version.get(
+                GetRuntimeVersionCommand(actor)
+            )
+            self._json(HTTPStatus.OK, report.to_dict())
             return
         if path == "/v1/resources":
             try:

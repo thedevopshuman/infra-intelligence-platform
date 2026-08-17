@@ -56,3 +56,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0050](0050-immutable-application-image-identity.md) | Accepted | Resolve every application workload from one immutable OCI digest when configured |
 | [0051](0051-immutable-ci-execution-dependencies.md) | Accepted | Pin third-party CI actions and service images to reviewed immutable revisions |
 | [0052](0052-process-local-telemetry-export-health.md) | Accepted | Track backend-neutral exporter outcomes without coupling API readiness to telemetry delivery |
+| [0053](0053-authenticated-runtime-version-identity.md) | Accepted | Expose authenticated runtime identity from release and deployment evidence without guessing |

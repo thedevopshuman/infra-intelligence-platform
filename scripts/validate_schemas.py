@@ -107,6 +107,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     ),
     "resource.schema.json": ("resource.json", "resource-tombstone.json"),
     "release-manifest.schema.json": ("release-manifest.json",),
+    "runtime-version-report.schema.json": ("runtime-version-report.json",),
     "session-context.schema.json": ("session-context.json",),
     "resource-timeline.schema.json": ("resource-timeline.json",),
 }

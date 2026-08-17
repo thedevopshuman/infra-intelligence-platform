@@ -7,6 +7,8 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from . import __version__
+
 from iip.adapters.actions import KubernetesRestartDryRunExecutor
 from iip.adapters.auth import (
     DenyAllAuthenticator,
@@ -89,6 +91,10 @@ from iip.application.observe_ingestion import (
 from iip.application.plugin_sessions import PluginSessionService
 from iip.application.query_actions import ActionWorkflowQueryService
 from iip.application.query_resources import ResourceQueryService
+from iip.application.query_runtime_version import (
+    RuntimeVersionIdentity,
+    RuntimeVersionService,
+)
 from iip.application.query_telemetry_export_health import (
     TelemetryExportHealthService,
 )
@@ -120,6 +126,7 @@ class Runtime:
     collection_ingestion: ResourceCollectionIngestionService
     ingestion_telemetry: IngestionFreshnessService
     telemetry_export_health: TelemetryExportHealthService
+    runtime_version: RuntimeVersionService
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
     kubernetes_event_evidence: KubernetesEventEvidenceService
@@ -311,6 +318,10 @@ def _compose_runtime(
             policy,
             clock,
         ),
+        runtime_version=RuntimeVersionService(
+            _runtime_version_identity_from_env(),
+            clock,
+        ),
         queries=queries,
         evidence=evidence,
         kubernetes_event_evidence=kubernetes_event_evidence,
@@ -352,6 +363,25 @@ def _compose_runtime(
         evidence_store=evidence_store,
         readiness=readiness or AlwaysReadyProbe(),
         telemetry_runtime=telemetry_runtime,
+    )
+
+
+def _runtime_version_identity_from_env() -> RuntimeVersionIdentity:
+    """Build strict non-secret runtime identity without guessing deployment facts."""
+
+    from iip.adapters.postgres.store import SCHEMA_MIGRATIONS
+
+    revision_value = os.environ.get("IIP_BUILD_REVISION", "development")
+    revision = None if revision_value in ("", "development") else revision_value
+    chart_version = os.environ.get("IIP_DEPLOYMENT_HELM_CHART_VERSION") or None
+    image_digest = os.environ.get("IIP_DEPLOYMENT_IMAGE_DIGEST") or None
+    return RuntimeVersionIdentity(
+        application_version=__version__,
+        contract_api_version="iip.platform/v1alpha1",
+        required_storage_migration=SCHEMA_MIGRATIONS[-1],
+        build_revision=revision,
+        helm_chart_version=chart_version,
+        image_digest=image_digest,
     )
 
 

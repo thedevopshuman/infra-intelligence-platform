@@ -8,6 +8,7 @@ import json
 import secrets
 import sys
 import time
+import tomllib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Mapping
@@ -18,6 +19,12 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 CREDENTIALS_PATH = ROOT / ".iip" / "local-credentials.json"
 BASE_URL = "http://127.0.0.1:8080"
+APPLICATION_VERSION = tomllib.loads(
+    (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+)["project"]["version"]
+REQUIRED_MIGRATION = sorted(
+    (ROOT / "src/iip/adapters/postgres/migrations").glob("*.sql")
+)[-1].name
 
 
 class ProductWorkflowError(RuntimeError):
@@ -120,6 +127,22 @@ def main() -> int:
         operator = tokens["local-operator"]
         approver = tokens["local-approver"]
         executor = tokens["local-executor"]
+        runtime_version = _request("/v1/system/version", operator)
+        runtime_spec = runtime_version.get("spec")
+        if (
+            runtime_version.get("kind") != "RuntimeVersionReport"
+            or runtime_version.get("metadata", {}).get("tenantId") != "local"
+            or not isinstance(runtime_spec, Mapping)
+            or runtime_spec.get("application", {}).get("version")
+            != APPLICATION_VERSION
+            or runtime_spec.get("contracts", {}).get("apiVersion")
+            != "iip.platform/v1alpha1"
+            or runtime_spec.get("storage", {}).get("requiredMigration")
+            != REQUIRED_MIGRATION
+            or runtime_spec.get("build") != {"mode": "development"}
+            or runtime_spec.get("deployment") != {}
+        ):
+            raise ProductWorkflowError("local runtime identity is invalid")
         now = datetime.now(timezone.utc)
         suffix = secrets.token_hex(6)
         workload_name = f"product-gate-{suffix}"
@@ -346,7 +369,7 @@ def main() -> int:
             raise ProductWorkflowError("terminal workflow is missing from the action queue")
         _wait_for_event_delivery(operator)
         print(
-            "local product workflow passed: collection → event delivery → queued worker "
+            "local product workflow passed: runtime identity → collection → event delivery → queued worker "
             "investigation → proposal → independent approval → one-shot dry-run → queue"
         )
         print(f"action: {proposal_id}")

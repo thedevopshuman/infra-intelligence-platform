@@ -12,6 +12,8 @@ make release-bundle PYTHON=.venv/bin/python
 
 The default build produces `linux/amd64` and `linux/arm64` image manifests. BuildKit attaches an in-toto SPDX SBOM and SLSA v1 provenance statement to each platform inside the OCI layout. The base-image index and SBOM generator are digest pinned; dependency updates must intentionally update those pins and pass the normal verification gates.
 
+The build also writes the exact committed source revision into the OCI image label and the process environment. Once deployed, authenticated users can compare `GET /v1/system/version` with the manifest revision; Helm deployments additionally report the configured chart version and immutable OCI digest. A development build explicitly reports `development` and does not claim unverifiable release identity.
+
 The directory under `dist/iip-<version>-<revision>/` contains:
 
 - the multi-platform control-plane OCI image archive;
@@ -28,7 +30,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.26.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.27.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 

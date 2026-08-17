@@ -222,6 +222,7 @@ REQUIRED_PATHS = (
     "contracts/examples/policy-decision-request.json",
     "contracts/examples/policy-decision.json",
     "contracts/examples/investigation-request.json",
+    "contracts/examples/investigation-request-adaptive-replan.json",
     "contracts/examples/investigation-request-catalog-resolved.json",
     "contracts/examples/investigation-signal-catalog.json",
     "contracts/examples/investigation-request-kubernetes-events.json",
@@ -230,6 +231,7 @@ REQUIRED_PATHS = (
     "contracts/examples/investigation-request-telemetry.json",
     "contracts/examples/investigation-request-telemetry-baseline.json",
     "contracts/examples/investigation-report.json",
+    "contracts/examples/investigation-report-adaptive-replan.json",
     "contracts/examples/investigation-report-kubernetes-events.json",
     "contracts/examples/investigation-report-logs.json",
     "contracts/examples/investigation-report-context.json",
@@ -1729,16 +1731,13 @@ def validate_investigation_context_examples(
                 fail(errors, f"context {disposition} Evidence must cite its hypothesis")
 
 
-def validate_investigation_log_examples(
-    documents: Mapping[Path, object], errors: List[str]
+def validate_investigation_log_pair(
+    request: Mapping[str, object],
+    report: Mapping[str, object],
+    errors: List[str],
 ) -> None:
-    """Check log investigation request/report links beyond JSON Schema."""
+    """Check one log investigation request/report pair beyond JSON Schema."""
 
-    example_dir = ROOT / "contracts" / "examples"
-    request = documents.get(example_dir / "investigation-request-logs.json")
-    report = documents.get(example_dir / "investigation-report-logs.json")
-    if not isinstance(request, dict) or not isinstance(report, dict):
-        return
     request_metadata = request.get("metadata")
     request_spec = request.get("spec")
     report_metadata = report.get("metadata")
@@ -1756,6 +1755,7 @@ def validate_investigation_log_examples(
         fail(errors, "log investigation report digest must match its request")
     if report_spec.get("scope") != request_spec.get("scope"):
         fail(errors, "log investigation report scope must match its request")
+    validate_investigation_signal_plan(request_spec, report_spec, errors)
 
     selections = request_spec.get("logSelections", [])
     selections_by_id = {
@@ -1823,6 +1823,25 @@ def validate_investigation_log_examples(
             )
             if evidence_id not in hypothesis.get(field, []):
                 fail(errors, f"log {disposition} Evidence must cite its hypothesis")
+
+
+def validate_investigation_log_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check fixed and adaptively replanned log investigation examples."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    for request_name, report_name in (
+        ("investigation-request-logs.json", "investigation-report-logs.json"),
+        (
+            "investigation-request-adaptive-replan.json",
+            "investigation-report-adaptive-replan.json",
+        ),
+    ):
+        request = documents.get(example_dir / request_name)
+        report = documents.get(example_dir / report_name)
+        if isinstance(request, dict) and isinstance(report, dict):
+            validate_investigation_log_pair(request, report, errors)
 
 
 def validate_telemetry_evidence_examples(
@@ -2348,6 +2367,56 @@ def validate_investigation_signal_plan(
         or plan.get("deferredCount") != len(steps) - scheduled
     ):
         fail(errors, "investigation signal plan counts must match its steps")
+    strategy = plan.get("strategy")
+    replanning = plan.get("replanning")
+    usage = report_spec.get("usage")
+    iterations = usage.get("iterations") if isinstance(usage, dict) else None
+    if strategy == "risk-aware-v2":
+        promotions = (
+            replanning.get("promotions") if isinstance(replanning, dict) else None
+        )
+        if not isinstance(promotions, list) or len(promotions) != 1:
+            fail(errors, "adaptive investigation plan must record one promotion")
+        else:
+            promotion = promotions[0]
+            trigger = promotion.get("trigger") if isinstance(promotion, dict) else None
+            candidate = (
+                promotion.get("candidate") if isinstance(promotion, dict) else None
+            )
+            if not isinstance(trigger, dict) or not isinstance(candidate, dict):
+                fail(errors, "adaptive investigation promotion must identify both steps")
+            else:
+                trigger_key = (trigger.get("signal"), trigger.get("selectionId"))
+                candidate_key = (
+                    candidate.get("signal"),
+                    candidate.get("selectionId"),
+                )
+                step_by_key = {
+                    (step.get("signal"), step.get("selectionId")): step
+                    for step in steps
+                    if isinstance(step, dict)
+                }
+                trigger_step = step_by_key.get(trigger_key)
+                candidate_step = step_by_key.get(candidate_key)
+                if trigger_key == candidate_key or not isinstance(trigger_step, dict):
+                    fail(errors, "adaptive investigation trigger must resolve uniquely")
+                if (
+                    not isinstance(candidate_step, dict)
+                    or candidate_step.get("decision") != "scheduled"
+                    or candidate_step.get("reason") != "eligible"
+                ):
+                    fail(errors, "adaptive investigation candidate must be promoted")
+                if (
+                    isinstance(trigger_step, dict)
+                    and isinstance(candidate_step, dict)
+                    and candidate_step.get("position", 0)
+                    <= trigger_step.get("position", 0)
+                ):
+                    fail(errors, "adaptive investigation promotion must preserve risk order")
+        if iterations != 2:
+            fail(errors, "adaptive investigation report must record two iterations")
+    elif replanning is not None:
+        fail(errors, "fixed investigation plan must not record replanning")
     leading_classes = {
         hypothesis.get("rootCauseClass")
         for hypothesis in report_spec.get("hypotheses", [])
@@ -2773,6 +2842,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("otlp-metrics-evidence.json", "OtlpMetricsEvidence"),
         ("otlp-logs-evidence.json", "OtlpLogsEvidence"),
         ("investigation-request.json", "InvestigationRequest"),
+        ("investigation-request-adaptive-replan.json", "InvestigationRequest"),
         (
             "investigation-cancellation-request.json",
             "InvestigationCancellationRequest",
@@ -2783,6 +2853,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("investigation-request-kubernetes-events.json", "InvestigationRequest"),
         ("investigation-request-logs.json", "InvestigationRequest"),
         ("investigation-report.json", "InvestigationReport"),
+        ("investigation-report-adaptive-replan.json", "InvestigationReport"),
         ("investigation-report-changes.json", "InvestigationReport"),
         ("investigation-report-context.json", "InvestigationReport"),
         ("investigation-report-telemetry.json", "InvestigationReport"),

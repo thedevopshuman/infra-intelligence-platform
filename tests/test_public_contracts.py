@@ -25,6 +25,7 @@ from infra_intelligence_sdk import (
     InvestigationReport,
     InvestigationRequest,
     InvestigationSignalCatalog,
+    InvestigationSignalPromotion,
     InvestigationCancellationRequest,
     InvestigationStatus,
     InvestigationJobStatus,
@@ -127,6 +128,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         baseline_report = InvestigationReport.from_dict(
             example("investigation-report-telemetry-baseline.json")
+        )
+        adaptive_report = InvestigationReport.from_dict(
+            example("investigation-report-adaptive-replan.json")
         )
         event_report = InvestigationReport.from_dict(
             example("investigation-report-kubernetes-events.json")
@@ -293,6 +297,14 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         baseline_assessment = baseline_report.telemetry_assessments[0]
         self.assertEqual(baseline_report.signal_plan["scheduledCount"], 1)
+        promotion = adaptive_report.signal_promotions[0]
+        self.assertIsInstance(promotion, InvestigationSignalPromotion)
+        self.assertEqual(promotion.trigger_outcome, "provider-error")
+        self.assertEqual(promotion.candidate_signal, "telemetry.logs")
+        self.assertEqual(
+            promotion.to_dict(),
+            adaptive_report.signal_plan["replanning"]["promotions"][0],
+        )
         self.assertIsInstance(
             baseline_assessment,
             InvestigationTelemetryBaselineAssessment,

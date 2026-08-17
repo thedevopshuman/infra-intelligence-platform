@@ -1,0 +1,143 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationReport",
+  "metadata": {
+    "id": "inv_12121212121212121212121212121212",
+    "tenantId": "evaluation",
+    "createdAt": "2026-08-17T12:00:09Z"
+  },
+  "spec": {
+    "requestDigest": "sha256:f170dcc4a7eb82398efb41eaecdff1da524b34fc45cf66d0d28999914bbbc7e1",
+    "outcome": "conclusive",
+    "terminalReason": "sufficient-evidence",
+    "startedAt": "2026-08-17T12:00:01Z",
+    "completedAt": "2026-08-17T12:00:09Z",
+    "scope": {
+      "resourceUids": [
+        "res_887a03e62d6f027eee1b409efd5c536b",
+        "res_e880409862f02beba52e506e394f7fc8"
+      ],
+      "timeRange": {
+        "start": "2026-08-17T11:45:00Z",
+        "end": "2026-08-17T12:00:00Z"
+      }
+    },
+    "agent": {
+      "id": "incident-investigator",
+      "version": "0.1.0",
+      "manifestDigest": "sha256:7da250dedb1d113e64a75278f014c3b72bb319c66adbfd15f8a8104a7a10eb97",
+      "modelClass": "local"
+    },
+    "summary": "The metric provider failed, and one already-authorized log candidate was promoted into the released capacity and supported the image-pull hypothesis.",
+    "hypotheses": [
+      {
+        "id": "hyp_1212121212121212",
+        "rank": 1,
+        "statement": "The rollout is blocked because the selected image manifest is unavailable.",
+        "rootCauseClass": "kubernetes.image-pull.manifest-not-found",
+        "confidence": 0.86,
+        "disposition": "leading",
+        "supportingEvidenceIds": [
+          "evd_11111111111111111111111111111111",
+          "evd_77777777777777777777777777777777"
+        ],
+        "contradictingEvidenceIds": []
+      }
+    ],
+    "unknowns": [
+      {
+        "statement": "Selected metric evidence could not be collected for tqs_fedcba9876543210.",
+        "impact": "medium",
+        "requestedEvidenceTypes": ["telemetry.metrics"]
+      }
+    ],
+    "signalPlan": {
+      "strategy": "risk-aware-v2",
+      "rootCauseClass": "kubernetes.image-pull.manifest-not-found",
+      "capacity": {
+        "toolCalls": 2,
+        "evidenceItems": 1
+      },
+      "replanning": {
+        "maximumPromotions": 1,
+        "promotionCount": 1,
+        "promotions": [
+          {
+            "position": 1,
+            "trigger": {
+              "signal": "telemetry.metrics",
+              "selectionId": "tqs_fedcba9876543210",
+              "outcome": "provider-error"
+            },
+            "candidate": {
+              "signal": "telemetry.logs",
+              "selectionId": "lqs_0123456789abcdef",
+              "initialReason": "budget-exhausted"
+            },
+            "remainingCapacity": {
+              "toolCalls": 1,
+              "evidenceItems": 1
+            }
+          }
+        ]
+      },
+      "candidateCount": 2,
+      "scheduledCount": 2,
+      "deferredCount": 0,
+      "steps": [
+        {
+          "position": 1,
+          "signal": "telemetry.metrics",
+          "selectionId": "tqs_fedcba9876543210",
+          "origin": "request",
+          "decision": "scheduled",
+          "reason": "eligible"
+        },
+        {
+          "position": 2,
+          "signal": "telemetry.logs",
+          "selectionId": "lqs_0123456789abcdef",
+          "origin": "request",
+          "decision": "scheduled",
+          "reason": "eligible"
+        }
+      ]
+    },
+    "logAssessments": [
+      {
+        "selectionId": "lqs_0123456789abcdef",
+        "evidenceId": "evd_77777777777777777777777777777777",
+        "rootCauseClass": "kubernetes.image-pull.manifest-not-found",
+        "minRecords": 2,
+        "observedRecordCount": 2,
+        "disposition": "supporting"
+      }
+    ],
+    "evidenceIds": [
+      "evd_11111111111111111111111111111111",
+      "evd_77777777777777777777777777777777"
+    ],
+    "recommendations": [
+      {
+        "id": "rec_1212121212121212",
+        "type": "next-check",
+        "description": "Verify the image reference and registry manifest before proposing a rollout change.",
+        "priority": "high",
+        "evidenceIds": [
+          "evd_11111111111111111111111111111111",
+          "evd_77777777777777777777777777777777"
+        ]
+      }
+    ],
+    "toolCallLedgerRef": "ledger://evaluation/investigations/inv_12121212121212121212121212121212/tool-calls",
+    "policySnapshotRef": "policy://evaluation/snapshots/deterministic-investigation-v1",
+    "usage": {
+      "toolCalls": 3,
+      "iterations": 2,
+      "modelTokens": 0,
+      "wallTimeSeconds": 8,
+      "costUsd": 0,
+      "evidenceItems": 2
+    }
+  }
+}

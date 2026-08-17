@@ -121,6 +121,12 @@ class RecordingMetricsBackend:
         )
 
 
+class UnavailableMetricsBackend(RecordingMetricsBackend):
+    def query_metrics(self, request: TelemetryMetricsQuery) -> TelemetryMetricsResult:
+        self.requests.append(request)
+        raise RuntimeError("untrusted provider detail")
+
+
 class CorruptingEvidenceStore(InMemoryEvidenceStore):
     def read_artifact(self, actor: ActorContext, evidence_id: str) -> bytes | None:
         stored = super().read_artifact(actor, evidence_id)
@@ -375,6 +381,158 @@ class InvestigationLogTests(unittest.TestCase):
                 ("telemetry.logs", "deferred", "budget-exhausted"),
             ],
         )
+        assert_schema(self, "investigation-report.schema.json", report)
+
+    def test_provider_gap_promotes_one_deferred_candidate_within_budget(self) -> None:
+        logs_backend = RecordingLogsBackend()
+        metrics_backend = UnavailableMetricsBackend()
+        service, store = self.service(logs_backend, metrics_backend=metrics_backend)
+        request = self.request("inv_12121212121212121212121212121212")
+        request["spec"]["evidenceTypes"].append("telemetry.metrics")
+        request["spec"]["telemetrySelections"] = [
+            {
+                "id": "tqs_fedcba9876543210",
+                "integrationId": "observability-evaluation",
+                "rootCauseClasses": [
+                    "kubernetes.image-pull.manifest-not-found"
+                ],
+                "query": {
+                    "metric": "service.request.count",
+                    "filters": [],
+                    "aggregation": {"function": "sum", "stepSeconds": 60},
+                    "groupBy": [],
+                },
+                "limits": {
+                    "maxSeries": 2,
+                    "maxDataPoints": 100,
+                    "maxBytes": 131072,
+                },
+            }
+        ]
+        request["spec"]["budgets"]["maxToolCalls"] = 3
+        request["spec"]["budgets"]["maxEvidenceItems"] = 2
+
+        report = service.execute(RunInvestigationCommand(self.actor, request))
+
+        self.assertEqual(len(metrics_backend.requests), 1)
+        self.assertEqual(len(logs_backend.requests), 1)
+        self.assertEqual(
+            {item["spec"]["type"] for item in store.list(self.actor)},
+            {"kubernetes.pod-status", "telemetry.logs"},
+        )
+        plan = report["spec"]["signalPlan"]
+        self.assertEqual(plan["strategy"], "risk-aware-v2")
+        self.assertEqual(plan["scheduledCount"], 2)
+        self.assertEqual(plan["deferredCount"], 0)
+        self.assertEqual(
+            plan["replanning"],
+            {
+                "maximumPromotions": 1,
+                "promotionCount": 1,
+                "promotions": [
+                    {
+                        "position": 1,
+                        "trigger": {
+                            "signal": "telemetry.metrics",
+                            "selectionId": "tqs_fedcba9876543210",
+                            "outcome": "provider-error",
+                        },
+                        "candidate": {
+                            "signal": "telemetry.logs",
+                            "selectionId": "lqs_0123456789abcdef",
+                            "initialReason": "budget-exhausted",
+                        },
+                        "remainingCapacity": {
+                            "toolCalls": 1,
+                            "evidenceItems": 1,
+                        },
+                    }
+                ],
+            },
+        )
+        self.assertEqual(report["spec"]["usage"]["iterations"], 2)
+        self.assertEqual(report["spec"]["usage"]["toolCalls"], 3)
+        self.assertEqual(report["spec"]["usage"]["evidenceItems"], 2)
+        self.assertEqual(
+            report["spec"]["logAssessments"][0]["disposition"], "supporting"
+        )
+        self.assertNotIn("untrusted provider detail", json.dumps(report))
+        assert_schema(self, "investigation-report.schema.json", report)
+
+    def test_missing_provider_promotes_a_different_signal_without_a_call(self) -> None:
+        logs_backend = RecordingLogsBackend()
+        service, _ = self.service(logs_backend)
+        request = self.request("inv_34343434343434343434343434343434")
+        request["spec"]["evidenceTypes"].append("telemetry.metrics")
+        request["spec"]["telemetrySelections"] = [
+            {
+                "id": "tqs_fedcba9876543210",
+                "integrationId": "observability-evaluation",
+                "rootCauseClasses": [
+                    "kubernetes.image-pull.manifest-not-found"
+                ],
+                "query": {
+                    "metric": "service.request.count",
+                    "filters": [],
+                    "aggregation": {"function": "sum", "stepSeconds": 60},
+                    "groupBy": [],
+                },
+                "limits": {
+                    "maxSeries": 2,
+                    "maxDataPoints": 100,
+                    "maxBytes": 131072,
+                },
+            }
+        ]
+        request["spec"]["budgets"]["maxToolCalls"] = 3
+        request["spec"]["budgets"]["maxEvidenceItems"] = 2
+
+        report = service.execute(RunInvestigationCommand(self.actor, request))
+
+        self.assertEqual(len(logs_backend.requests), 1)
+        promotion = report["spec"]["signalPlan"]["replanning"]["promotions"][0]
+        self.assertEqual(promotion["trigger"]["outcome"], "provider-unavailable")
+        self.assertEqual(promotion["candidate"]["signal"], "telemetry.logs")
+        self.assertEqual(report["spec"]["usage"]["toolCalls"], 2)
+        assert_schema(self, "investigation-report.schema.json", report)
+
+    def test_replanning_respects_the_iteration_upper_bound(self) -> None:
+        logs_backend = RecordingLogsBackend()
+        metrics_backend = UnavailableMetricsBackend()
+        service, _ = self.service(logs_backend, metrics_backend=metrics_backend)
+        request = self.request("inv_56565656565656565656565656565656")
+        request["spec"]["evidenceTypes"].append("telemetry.metrics")
+        request["spec"]["telemetrySelections"] = [
+            {
+                "id": "tqs_fedcba9876543210",
+                "integrationId": "observability-evaluation",
+                "rootCauseClasses": [
+                    "kubernetes.image-pull.manifest-not-found"
+                ],
+                "query": {
+                    "metric": "service.request.count",
+                    "filters": [],
+                    "aggregation": {"function": "sum", "stepSeconds": 60},
+                    "groupBy": [],
+                },
+                "limits": {
+                    "maxSeries": 2,
+                    "maxDataPoints": 100,
+                    "maxBytes": 131072,
+                },
+            }
+        ]
+        request["spec"]["budgets"]["maxToolCalls"] = 3
+        request["spec"]["budgets"]["maxEvidenceItems"] = 2
+        request["spec"]["budgets"]["maxIterations"] = 1
+
+        report = service.execute(RunInvestigationCommand(self.actor, request))
+
+        self.assertEqual(len(metrics_backend.requests), 1)
+        self.assertEqual(logs_backend.requests, [])
+        self.assertEqual(report["spec"]["signalPlan"]["strategy"], "risk-aware-v1")
+        self.assertNotIn("replanning", report["spec"]["signalPlan"])
+        self.assertEqual(report["spec"]["usage"]["iterations"], 1)
         assert_schema(self, "investigation-report.schema.json", report)
 
 

@@ -11,7 +11,7 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 `Evidence`, `InvestigationRequest`, and `InvestigationReport` expose the corresponding `v1alpha1` public envelopes without importing server implementation classes. `run_investigation`, `get_investigation`, and `get_evidence` use the executable reference API.
 
-`InvestigationSignalCatalog` models protected tenant profile documents for configuration tooling. `InvestigationRequest.catalog_snapshot` reads server-owned profile and resolved-subset provenance from an accepted request; clients must not populate that field when submitting work. Report `signalPlan` entries identify request versus protected-catalog origin without exposing protected query configuration.
+`InvestigationSignalCatalog` models protected tenant profile documents for configuration tooling. `InvestigationRequest.catalog_snapshot` reads server-owned profile and resolved-subset provenance from an accepted request; clients must not populate that field when submitting work. Report `signalPlan` entries identify request versus protected-catalog origin without exposing protected query configuration. `InvestigationReport.signal_promotions` returns typed `InvestigationSignalPromotion` provenance when one accepted candidate was promoted after a provider gap; fixed plans return an empty tuple.
 
 `InvestigationRequest.telemetry_selections` returns typed `InvestigationTelemetrySelection` candidates. Each contains only a provider-neutral query, output limits, and an optional closed `InvestigationTelemetryInterpretation`; authenticated identity, resources, time range, and deadline are inherited by the server from the investigation. `InvestigationReport.telemetry_assessments` exposes the applied unit-aware rule and committed Evidence citation without importing server internals.
 
@@ -75,3 +75,5 @@ execute the returned proposal.
 Version 0.37 extends `PluginCompatibilityReport` with the separately signed
 action-provider profile and closed checks proving the host stored only a pending
 governed proposal. It remains exact-host evidence, not a customer support claim.
+
+Version 0.40 adds typed bounded adaptive investigation promotions. The SDK exposes only signal and selection IDs, stable provider-gap outcomes, and aggregate remaining capacity; it never exposes provider details or grants a new query.

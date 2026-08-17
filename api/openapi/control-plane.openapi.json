@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.47.0",
+    "version": "0.48.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence and retention observation, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions and invocation lifecycles. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],

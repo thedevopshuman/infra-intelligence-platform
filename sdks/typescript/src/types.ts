@@ -1433,32 +1433,7 @@ export interface InvestigationReport {
     summary: string;
     hypotheses: InvestigationHypothesis[];
     unknowns: InvestigationUnknown[];
-    signalPlan?: {
-      strategy: "risk-aware-v1";
-      rootCauseClass?: string;
-      catalog?: {
-        profileId: string;
-        profileVersion: string;
-        profileDigest: Sha256Digest;
-        snapshotDigest: Sha256Digest;
-      };
-      capacity: { toolCalls: number; evidenceItems: number };
-      candidateCount: number;
-      scheduledCount: number;
-      deferredCount: number;
-      steps: {
-        position: number;
-        signal: InvestigationSignal;
-        selectionId: string;
-        origin: "request" | "protected-catalog";
-        decision: "scheduled" | "deferred";
-        reason:
-          | "eligible"
-          | "root-cause-mismatch"
-          | "request-upper-bound"
-          | "budget-exhausted";
-      }[];
-    };
+    signalPlan?: InvestigationSignalPlan;
     telemetryAssessments?: (
       | InvestigationTelemetryAssessment
       | InvestigationTelemetryBaselineAssessment
@@ -1480,6 +1455,53 @@ export interface InvestigationReport {
       evidenceItems: number;
     };
   };
+}
+
+export interface InvestigationSignalPromotion {
+  position: 1;
+  trigger: {
+    signal: InvestigationSignal;
+    selectionId: string;
+    outcome: "provider-error" | "provider-unavailable";
+  };
+  candidate: {
+    signal: InvestigationSignal;
+    selectionId: string;
+    initialReason: "budget-exhausted";
+  };
+  remainingCapacity: { toolCalls: number; evidenceItems: number };
+}
+
+export interface InvestigationSignalPlan {
+  strategy: "risk-aware-v1" | "risk-aware-v2";
+  rootCauseClass?: string;
+  catalog?: {
+    profileId: string;
+    profileVersion: string;
+    profileDigest: Sha256Digest;
+    snapshotDigest: Sha256Digest;
+  };
+  capacity: { toolCalls: number; evidenceItems: number };
+  replanning?: {
+    maximumPromotions: 1;
+    promotionCount: 1;
+    promotions: InvestigationSignalPromotion[];
+  };
+  candidateCount: number;
+  scheduledCount: number;
+  deferredCount: number;
+  steps: {
+    position: number;
+    signal: InvestigationSignal;
+    selectionId: string;
+    origin: "request" | "protected-catalog";
+    decision: "scheduled" | "deferred";
+    reason:
+      | "eligible"
+      | "root-cause-mismatch"
+      | "request-upper-bound"
+      | "budget-exhausted";
+  }[];
 }
 
 export interface EvaluationScenarioExpectations {

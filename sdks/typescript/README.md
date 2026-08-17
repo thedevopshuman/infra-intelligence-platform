@@ -15,7 +15,7 @@ const client = new InfrastructureIntelligenceClient({
 
 The package exports `Evidence`, `InvestigationRequest`, and `InvestigationReport` as transport-independent `v1alpha1` contract types and provides executable investigation/evidence client methods.
 
-`InvestigationSignalCatalog` describes protected tenant profile documents for configuration tooling. `InvestigationRequest.catalogSnapshot` is readonly server-owned provenance on accepted work; clients must omit it when submitting an investigation. Report signal-plan steps distinguish `request` from `protected-catalog` origin without returning protected query configuration.
+`InvestigationSignalCatalog` describes protected tenant profile documents for configuration tooling. `InvestigationRequest.catalogSnapshot` is readonly server-owned provenance on accepted work; clients must omit it when submitting an investigation. `InvestigationSignalPlan` and `InvestigationSignalPromotion` type the fixed plan and its optional one-candidate adaptive transition without returning protected query configuration or provider details.
 
 `EvaluationScenario` describes offline graph, timeline, alert, evidence, request, and scoring fixtures. It is an evaluation artifact, not an API method or authority grant.
 
@@ -68,3 +68,5 @@ response types. Approval and execution remain separate control-plane contracts.
 
 Version 0.37 adds the action-provider compatibility profile and its closed
 proposal-queue, no-approval, and no-execution check identifiers.
+
+Version 0.40 adds `InvestigationSignalPlan` and `InvestigationSignalPromotion` for one bounded promotion of an accepted candidate after a provider gap. The transition carries no query body or authority.

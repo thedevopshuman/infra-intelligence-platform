@@ -165,7 +165,7 @@
         "steps"
       ],
       "properties": {
-        "strategy": {"const": "risk-aware-v1"},
+        "strategy": {"enum": ["risk-aware-v1", "risk-aware-v2"]},
         "rootCauseClass": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9._/-]{2,127}$"
@@ -195,6 +195,21 @@
             "snapshotDigest": {
               "type": "string",
               "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          }
+        },
+        "replanning": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maximumPromotions", "promotionCount", "promotions"],
+          "properties": {
+            "maximumPromotions": {"const": 1},
+            "promotionCount": {"const": 1},
+            "promotions": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {"$ref": "#/$defs/signalPromotion"}
             }
           }
         },
@@ -264,7 +279,65 @@
             ]
           }
         }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"strategy": {"const": "risk-aware-v2"}}},
+          "then": {"required": ["replanning"]},
+          "else": {"not": {"required": ["replanning"]}}
+        }
+      ]
+    },
+    "signalPromotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["position", "trigger", "candidate", "remainingCapacity"],
+      "properties": {
+        "position": {"const": 1},
+        "trigger": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["signal", "selectionId", "outcome"],
+          "properties": {
+            "signal": {"$ref": "#/$defs/signal"},
+            "selectionId": {"$ref": "#/$defs/selectionId"},
+            "outcome": {"enum": ["provider-error", "provider-unavailable"]}
+          }
+        },
+        "candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["signal", "selectionId", "initialReason"],
+          "properties": {
+            "signal": {"$ref": "#/$defs/signal"},
+            "selectionId": {"$ref": "#/$defs/selectionId"},
+            "initialReason": {"const": "budget-exhausted"}
+          }
+        },
+        "remainingCapacity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["toolCalls", "evidenceItems"],
+          "properties": {
+            "toolCalls": {"type": "integer", "minimum": 1, "maximum": 200},
+            "evidenceItems": {"type": "integer", "minimum": 1, "maximum": 1000}
+          }
+        }
       }
+    },
+    "signal": {
+      "type": "string",
+      "enum": [
+        "kubernetes.event",
+        "repository.context",
+        "resource.change",
+        "telemetry.metrics",
+        "telemetry.logs"
+      ]
+    },
+    "selectionId": {
+      "type": "string",
+      "pattern": "^(?:kes|xqs|cqs|tqs|lqs)_[a-f0-9]{16}$"
     },
     "scope": {
       "type": "object",

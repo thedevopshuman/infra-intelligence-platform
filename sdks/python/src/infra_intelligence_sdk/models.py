@@ -2327,6 +2327,112 @@ class InvestigationSignalCatalog:
 
 
 @dataclass(frozen=True)
+class InvestigationSignalPromotion:
+    """One bounded, provenance-preserving adaptive-plan promotion."""
+
+    trigger_signal: str
+    trigger_selection_id: str
+    trigger_outcome: str
+    candidate_signal: str
+    candidate_selection_id: str
+    remaining_tool_calls: int
+    remaining_evidence_items: int
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationSignalPromotion":
+        trigger = payload.get("trigger")
+        candidate = payload.get("candidate")
+        capacity = payload.get("remainingCapacity")
+        if payload.get("position") != 1:
+            raise ValueError("investigation signal promotion position must be one")
+        if not all(
+            isinstance(item, Mapping) for item in (trigger, candidate, capacity)
+        ):
+            raise ValueError("investigation signal promotion is incomplete")
+        prefixes = {
+            "kubernetes.event": "kes_",
+            "repository.context": "xqs_",
+            "resource.change": "cqs_",
+            "telemetry.metrics": "tqs_",
+            "telemetry.logs": "lqs_",
+        }
+        trigger_signal = trigger.get("signal")
+        candidate_signal = candidate.get("signal")
+        trigger_selection_id = trigger.get("selectionId")
+        candidate_selection_id = candidate.get("selectionId")
+        if (
+            not isinstance(trigger_signal, str)
+            or trigger_signal not in prefixes
+            or not isinstance(candidate_signal, str)
+            or candidate_signal not in prefixes
+        ):
+            raise ValueError("investigation signal promotion signal is invalid")
+        if (
+            not isinstance(trigger_selection_id, str)
+            or re.fullmatch(
+                re.escape(prefixes[trigger_signal]) + r"[a-f0-9]{16}",
+                trigger_selection_id,
+            )
+            is None
+            or not isinstance(candidate_selection_id, str)
+            or re.fullmatch(
+                re.escape(prefixes[candidate_signal]) + r"[a-f0-9]{16}",
+                candidate_selection_id,
+            )
+            is None
+        ):
+            raise ValueError("investigation signal promotion selectionId is invalid")
+        if trigger.get("outcome") not in {
+            "provider-error",
+            "provider-unavailable",
+        }:
+            raise ValueError("investigation signal promotion outcome is invalid")
+        if candidate.get("initialReason") != "budget-exhausted":
+            raise ValueError("investigation signal promotion reason is invalid")
+        tool_calls = capacity.get("toolCalls")
+        evidence_items = capacity.get("evidenceItems")
+        if (
+            isinstance(tool_calls, bool)
+            or not isinstance(tool_calls, int)
+            or not 1 <= tool_calls <= 200
+            or isinstance(evidence_items, bool)
+            or not isinstance(evidence_items, int)
+            or not 1 <= evidence_items <= 1000
+        ):
+            raise ValueError("investigation signal promotion capacity is invalid")
+        return cls(
+            trigger_signal=trigger_signal,
+            trigger_selection_id=trigger_selection_id,
+            trigger_outcome=trigger["outcome"],
+            candidate_signal=candidate_signal,
+            candidate_selection_id=candidate_selection_id,
+            remaining_tool_calls=tool_calls,
+            remaining_evidence_items=evidence_items,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "position": 1,
+            "trigger": {
+                "signal": self.trigger_signal,
+                "selectionId": self.trigger_selection_id,
+                "outcome": self.trigger_outcome,
+            },
+            "candidate": {
+                "signal": self.candidate_signal,
+                "selectionId": self.candidate_selection_id,
+                "initialReason": "budget-exhausted",
+            },
+            "remainingCapacity": {
+                "toolCalls": self.remaining_tool_calls,
+                "evidenceItems": self.remaining_evidence_items,
+            },
+        }
+
+
+@dataclass(frozen=True)
 class InvestigationReport:
     """Immutable terminal result of one bounded investigation."""
 
@@ -2360,6 +2466,27 @@ class InvestigationReport:
         if not isinstance(value, Mapping):
             raise ValueError("investigation signalPlan must be an object")
         return dict(value)
+
+    @property
+    def signal_promotions(self) -> tuple[InvestigationSignalPromotion, ...]:
+        """Return adaptive promotions; fixed plans return an empty tuple."""
+
+        plan = self.signal_plan
+        if plan is None:
+            return ()
+        replanning = plan.get("replanning")
+        if replanning is None:
+            return ()
+        if not isinstance(replanning, Mapping):
+            raise ValueError("investigation signalPlan replanning must be an object")
+        promotions = replanning.get("promotions")
+        if not isinstance(promotions, list) or any(
+            not isinstance(item, Mapping) for item in promotions
+        ):
+            raise ValueError("investigation signalPlan promotions must be an array")
+        return tuple(
+            InvestigationSignalPromotion.from_dict(item) for item in promotions
+        )
 
     @property
     def telemetry_assessments(

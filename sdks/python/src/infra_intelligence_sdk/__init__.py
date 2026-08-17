@@ -25,6 +25,7 @@ from .models import (
     InvestigationJobStatus,
     InvestigationRequest,
     InvestigationSignalCatalog,
+    InvestigationSignalPromotion,
     InvestigationCancellationRequest,
     InvestigationStatus,
     InvestigationChangeAssessment,
@@ -109,6 +110,7 @@ __all__ = [
     "InvestigationJobStatus",
     "InvestigationRequest",
     "InvestigationSignalCatalog",
+    "InvestigationSignalPromotion",
     "InvestigationCancellationRequest",
     "InvestigationStatus",
     "InvestigationChangeAssessment",
@@ -171,4 +173,4 @@ __all__ = [
     "TelemetryExportSloReport",
     "discover_console_authentication",
 ]
-__version__ = "0.39.0"
+__version__ = "0.40.0"

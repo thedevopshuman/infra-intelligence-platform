@@ -1,0 +1,102 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationRequest",
+  "metadata": {
+    "id": "inv_12121212121212121212121212121212",
+    "tenantId": "evaluation",
+    "actorId": "evaluation-runner",
+    "requestedAt": "2026-08-17T12:00:00Z",
+    "correlationId": "scenario-adaptive-signal-replan"
+  },
+  "spec": {
+    "question": "Can an already-authorized fallback signal fill capacity released by a provider failure?",
+    "trigger": {
+      "type": "alert",
+      "source": "urn:iip:evaluation:alertmanager",
+      "reference": "urn:iip:event:alert-eval-image-pull-002",
+      "summary": "The api Deployment has one unavailable replica after its latest rollout."
+    },
+    "scope": {
+      "resourceUids": [
+        "res_887a03e62d6f027eee1b409efd5c536b",
+        "res_e880409862f02beba52e506e394f7fc8"
+      ],
+      "timeRange": {
+        "start": "2026-08-17T11:45:00Z",
+        "end": "2026-08-17T12:00:00Z"
+      }
+    },
+    "agentSelector": {
+      "id": "incident-investigator",
+      "version": "0.1.0"
+    },
+    "evidenceTypes": [
+      "kubernetes.pod-status",
+      "telemetry.metrics",
+      "telemetry.logs"
+    ],
+    "allowedTools": ["evidence/fetch", "telemetry/query"],
+    "telemetrySelections": [
+      {
+        "id": "tqs_fedcba9876543210",
+        "integrationId": "observability-evaluation",
+        "rootCauseClasses": [
+          "kubernetes.image-pull.manifest-not-found"
+        ],
+        "query": {
+          "metric": "service.request.count",
+          "filters": [],
+          "aggregation": {
+            "function": "sum",
+            "stepSeconds": 60
+          },
+          "groupBy": []
+        },
+        "limits": {
+          "maxSeries": 2,
+          "maxDataPoints": 100,
+          "maxBytes": 131072
+        }
+      }
+    ],
+    "logSelections": [
+      {
+        "id": "lqs_0123456789abcdef",
+        "integrationId": "observability-evaluation",
+        "rootCauseClasses": [
+          "kubernetes.image-pull.manifest-not-found"
+        ],
+        "query": {
+          "serviceNames": ["api"],
+          "severities": ["error"],
+          "filters": [
+            {
+              "attribute": "error.type",
+              "operator": "eq",
+              "value": "ImagePullBackOff"
+            }
+          ]
+        },
+        "limits": {
+          "maxRecords": 20,
+          "maxBytes": 262144
+        },
+        "interpretation": {
+          "minRecords": 2,
+          "whenMatched": "supports",
+          "whenNotMatched": "contradicts"
+        }
+      }
+    ],
+    "budgets": {
+      "maxToolCalls": 3,
+      "maxWallTimeSeconds": 180,
+      "maxModelTokens": 50000,
+      "maxCostUsd": 1,
+      "maxEvidenceItems": 2,
+      "maxIterations": 8
+    },
+    "maxAuthority": "read",
+    "priority": "high"
+  }
+}

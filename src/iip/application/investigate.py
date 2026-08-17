@@ -323,6 +323,41 @@ class DeterministicInvestigationService:
                 0, budgets["maxEvidenceItems"] - len(evidence_documents)
             ),
         )
+        attempted_signal_selections: set[str] = set()
+
+        def promote_after_gap(
+            signal: str,
+            selection_id: str,
+            outcome: str,
+            *,
+            exclude_signal: str | None = None,
+        ) -> bool:
+            if budgets["maxIterations"] < 2:
+                return False
+            pending = sum(
+                candidate.get("id") not in attempted_signal_selections
+                for candidates in scheduled_signals.values()
+                for candidate in candidates
+            )
+            return self._promote_deferred_signal(
+                spec,
+                signal_plan,
+                scheduled_signals,
+                trigger_signal=signal,
+                trigger_selection_id=selection_id,
+                outcome=outcome,
+                remaining_tool_calls=max(
+                    0, budgets["maxToolCalls"] - tool_calls - pending
+                ),
+                remaining_evidence_items=max(
+                    0,
+                    budgets["maxEvidenceItems"]
+                    - len(evidence_documents)
+                    - pending,
+                ),
+                exclude_signal=exclude_signal,
+            )
+
         kubernetes_events_allowed = (
             (not requested_types or "kubernetes.event" in requested_types)
             and (not allowed_tools or "events/search" in allowed_tools)
@@ -333,8 +368,17 @@ class DeterministicInvestigationService:
             and kubernetes_events_allowed
             and self._kubernetes_events is None
         ):
+            attempted_signal_selections.update(
+                str(selection["id"]) for selection in matching_event_selections
+            )
             kubernetes_event_unknowns.append(
                 self._kubernetes_event_unknown("unavailable")
+            )
+            promote_after_gap(
+                "kubernetes.event",
+                str(matching_event_selections[0]["id"]),
+                "provider-unavailable",
+                exclude_signal="kubernetes.event",
             )
         elif kubernetes_events_allowed and self._kubernetes_events is not None:
             for selection in matching_event_selections:
@@ -344,6 +388,7 @@ class DeterministicInvestigationService:
                     or len(evidence_documents) >= budgets["maxEvidenceItems"]
                 ):
                     break
+                attempted_signal_selections.add(str(selection["id"]))
                 tool_calls += 1
                 try:
                     event_request = self._kubernetes_event_request(
@@ -370,6 +415,11 @@ class DeterministicInvestigationService:
                 ):
                     kubernetes_event_unknowns.append(
                         self._kubernetes_event_unknown(str(selection["id"]))
+                    )
+                    promote_after_gap(
+                        "kubernetes.event",
+                        str(selection["id"]),
+                        "provider-error",
                     )
                     continue
                 evidence_documents.append(event_evidence)
@@ -401,7 +451,16 @@ class DeterministicInvestigationService:
         )
         matching_context_selections = scheduled_signals["repository.context"]
         if matching_context_selections and context_allowed and self._context is None:
+            attempted_signal_selections.update(
+                str(selection["id"]) for selection in matching_context_selections
+            )
             context_unknowns.append(self._context_unknown("unavailable"))
+            promote_after_gap(
+                "repository.context",
+                str(matching_context_selections[0]["id"]),
+                "provider-unavailable",
+                exclude_signal="repository.context",
+            )
         elif context_allowed and self._context is not None:
             for selection in matching_context_selections:
                 if (
@@ -410,6 +469,7 @@ class DeterministicInvestigationService:
                     or len(evidence_documents) >= budgets["maxEvidenceItems"]
                 ):
                     break
+                attempted_signal_selections.add(str(selection["id"]))
                 tool_calls += 1
                 try:
                     context_request = self._context_request(
@@ -433,6 +493,11 @@ class DeterministicInvestigationService:
                 ):
                     context_unknowns.append(
                         self._context_unknown(str(selection["id"]))
+                    )
+                    promote_after_gap(
+                        "repository.context",
+                        str(selection["id"]),
+                        "provider-error",
                     )
                     continue
                 evidence_documents.append(context_evidence)
@@ -466,7 +531,16 @@ class DeterministicInvestigationService:
             and changes_allowed
             and self._resource_changes is None
         ):
+            attempted_signal_selections.update(
+                str(selection["id"]) for selection in matching_change_selections
+            )
             change_unknowns.append(self._change_unknown("unavailable"))
+            promote_after_gap(
+                "resource.change",
+                str(matching_change_selections[0]["id"]),
+                "provider-unavailable",
+                exclude_signal="resource.change",
+            )
         elif changes_allowed and self._resource_changes is not None:
             for selection in matching_change_selections:
                 if (
@@ -475,6 +549,7 @@ class DeterministicInvestigationService:
                     or len(evidence_documents) >= budgets["maxEvidenceItems"]
                 ):
                     break
+                attempted_signal_selections.add(str(selection["id"]))
                 tool_calls += 1
                 try:
                     change_request = self._change_request(
@@ -501,6 +576,11 @@ class DeterministicInvestigationService:
                 ):
                     change_unknowns.append(
                         self._change_unknown(str(selection["id"]))
+                    )
+                    promote_after_gap(
+                        "resource.change",
+                        str(selection["id"]),
+                        "provider-error",
                     )
                     continue
                 evidence_documents.append(change_evidence)
@@ -530,7 +610,16 @@ class DeterministicInvestigationService:
         )
         matching_selections = scheduled_signals["telemetry.metrics"]
         if matching_selections and telemetry_allowed and self._telemetry is None:
+            attempted_signal_selections.update(
+                str(selection["id"]) for selection in matching_selections
+            )
             telemetry_unknowns.append(self._telemetry_unknown("unavailable"))
+            promote_after_gap(
+                "telemetry.metrics",
+                str(matching_selections[0]["id"]),
+                "provider-unavailable",
+                exclude_signal="telemetry.metrics",
+            )
         elif telemetry_allowed and self._telemetry is not None:
             for selection in matching_selections:
                 if (
@@ -539,6 +628,7 @@ class DeterministicInvestigationService:
                     or len(evidence_documents) >= budgets["maxEvidenceItems"]
                 ):
                     break
+                attempted_signal_selections.add(str(selection["id"]))
                 tool_calls += 1
                 try:
                     telemetry_request = self._telemetry_request(
@@ -565,6 +655,11 @@ class DeterministicInvestigationService:
                 ):
                     telemetry_unknowns.append(
                         self._telemetry_unknown(str(selection["id"]))
+                    )
+                    promote_after_gap(
+                        "telemetry.metrics",
+                        str(selection["id"]),
+                        "provider-error",
                     )
                     continue
                 evidence_documents.append(telemetry_evidence)
@@ -600,7 +695,16 @@ class DeterministicInvestigationService:
         )
         matching_log_selections = scheduled_signals["telemetry.logs"]
         if matching_log_selections and logs_allowed and self._logs is None:
+            attempted_signal_selections.update(
+                str(selection["id"]) for selection in matching_log_selections
+            )
             log_unknowns.append(self._log_unknown("unavailable"))
+            promote_after_gap(
+                "telemetry.logs",
+                str(matching_log_selections[0]["id"]),
+                "provider-unavailable",
+                exclude_signal="telemetry.logs",
+            )
         elif logs_allowed and self._logs is not None:
             for selection in matching_log_selections:
                 if (
@@ -609,6 +713,7 @@ class DeterministicInvestigationService:
                     or len(evidence_documents) >= budgets["maxEvidenceItems"]
                 ):
                     break
+                attempted_signal_selections.add(str(selection["id"]))
                 tool_calls += 1
                 try:
                     log_request = self._log_request(
@@ -631,6 +736,11 @@ class DeterministicInvestigationService:
                     PersistenceError,
                 ):
                     log_unknowns.append(self._log_unknown(str(selection["id"])))
+                    promote_after_gap(
+                        "telemetry.logs",
+                        str(selection["id"]),
+                        "provider-error",
+                    )
                     continue
                 evidence_documents.append(log_evidence)
                 if isinstance(selection.get("interpretation"), Mapping):
@@ -797,7 +907,11 @@ class DeterministicInvestigationService:
                 ),
                 "usage": {
                     "toolCalls": tool_calls,
-                    "iterations": 1,
+                    "iterations": (
+                        2
+                        if signal_plan.get("strategy") == "risk-aware-v2"
+                        else 1
+                    ),
                     "modelTokens": 0,
                     "wallTimeSeconds": wall_time_seconds,
                     "costUsd": 0,
@@ -1725,7 +1839,7 @@ class DeterministicInvestigationService:
         available_evidence_items: int,
     ) -> tuple[
         dict[str, object],
-        dict[str, tuple[Mapping[str, object], ...]],
+        dict[str, list[Mapping[str, object]]],
     ]:
         """Select a reproducible cross-signal plan under inherited upper bounds."""
 
@@ -1822,10 +1936,88 @@ class DeterministicInvestigationService:
                 "profileDigest": catalog_snapshot["profileDigest"],
                 "snapshotDigest": catalog_snapshot["snapshotDigest"],
             }
-        return plan, {
-            signal: tuple(candidates)
-            for signal, candidates in scheduled.items()
-        }
+        return plan, scheduled
+
+    @staticmethod
+    def _promote_deferred_signal(
+        spec: Mapping[str, object],
+        plan: dict[str, object],
+        scheduled: dict[str, list[Mapping[str, object]]],
+        *,
+        trigger_signal: str,
+        trigger_selection_id: str,
+        outcome: str,
+        remaining_tool_calls: int,
+        remaining_evidence_items: int,
+        exclude_signal: str | None = None,
+    ) -> bool:
+        """Promote at most one accepted candidate after recoverable capacity opens."""
+
+        if (
+            plan.get("strategy") != "risk-aware-v1"
+            or remaining_tool_calls <= 0
+            or remaining_evidence_items <= 0
+            or outcome not in {"provider-error", "provider-unavailable"}
+        ):
+            return False
+        steps = plan.get("steps")
+        if not isinstance(steps, list):
+            return False
+        fields = {signal: field for signal, field, _ in _SIGNAL_DEFINITIONS}
+        for step in steps:
+            if (
+                not isinstance(step, dict)
+                or step.get("decision") != "deferred"
+                or step.get("reason") != "budget-exhausted"
+                or step.get("signal") == exclude_signal
+            ):
+                continue
+            signal = step.get("signal")
+            selection_id = step.get("selectionId")
+            field = fields.get(signal) if isinstance(signal, str) else None
+            candidates = spec.get(field, []) if field is not None else []
+            candidate = next(
+                (
+                    item
+                    for item in candidates
+                    if isinstance(item, Mapping)
+                    and item.get("id") == selection_id
+                ),
+                None,
+            )
+            if candidate is None or not isinstance(signal, str):
+                return False
+            step["decision"] = "scheduled"
+            step["reason"] = "eligible"
+            scheduled[signal].append(candidate)
+            plan["strategy"] = "risk-aware-v2"
+            plan["scheduledCount"] = int(plan["scheduledCount"]) + 1
+            plan["deferredCount"] = int(plan["deferredCount"]) - 1
+            plan["replanning"] = {
+                "maximumPromotions": 1,
+                "promotionCount": 1,
+                "promotions": [
+                    {
+                        "position": 1,
+                        "trigger": {
+                            "signal": trigger_signal,
+                            "selectionId": trigger_selection_id,
+                            "outcome": outcome,
+                        },
+                        "candidate": {
+                            "signal": signal,
+                            "selectionId": selection_id,
+                            "initialReason": "budget-exhausted",
+                        },
+                        "remainingCapacity": {
+                            "toolCalls": remaining_tool_calls,
+                            "evidenceItems": remaining_evidence_items,
+                        },
+                    }
+                ],
+            }
+            return True
+        return False
 
     @staticmethod
     def _matching_kubernetes_event_selections(

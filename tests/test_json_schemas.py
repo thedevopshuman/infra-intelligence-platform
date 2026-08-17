@@ -338,6 +338,26 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(errors)
 
+    def test_adaptive_signal_plan_requires_replanning_provenance(self) -> None:
+        report = document(
+            "contracts/examples/investigation-report-adaptive-replan.json"
+        )
+        del report["spec"]["signalPlan"]["replanning"]
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(errors)
+
+    def test_fixed_signal_plan_rejects_replanning_provenance(self) -> None:
+        report = document(
+            "contracts/examples/investigation-report-adaptive-replan.json"
+        )
+        report["spec"]["signalPlan"]["strategy"] = "risk-aware-v1"
+
+        errors = self.validate("investigation-report.schema.json", report)
+
+        self.assertTrue(errors)
+
     def test_no_data_telemetry_result_cannot_contain_series(self) -> None:
         result = document("contracts/examples/telemetry-evidence-result.json")
         result["spec"]["status"] = "no-data"

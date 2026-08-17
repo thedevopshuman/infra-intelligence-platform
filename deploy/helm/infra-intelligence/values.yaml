@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.23.0"
+  tag: "0.24.0"
 
 worker:
   enabled: false
@@ -23,6 +23,23 @@ worker:
     limits:
       cpu: 500m
       memory: 256Mi
+
+eventPublisher:
+  mode: disabled
+  batchSize: 100
+  leaseSeconds: 30
+  retryBaseSeconds: 5
+  retryMaxSeconds: 300
+  httpsWebhook:
+    endpoint: ""
+    timeoutSeconds: 5
+    maxResponseBytes: 4096
+    tokenExistingSecret: ""
+    tokenSecretKey: token
+    tokenMountPath: /var/run/iip-event-publisher-token
+    caBundleExistingSecret: ""
+    caBundleSecretKey: ca.crt
+    caBundleMountPath: /var/run/iip-event-publisher-ca
 
 imagePullSecrets: []
 nameOverride: ""
@@ -251,6 +268,10 @@ networkPolicy:
     cidr: 10.96.0.1/32
     port: 443
   policyEgress:
+    enabled: false
+    cidr: 10.96.0.1/32
+    port: 443
+  eventPublisherEgress:
     enabled: false
     cidr: 10.96.0.1/32
     port: 443

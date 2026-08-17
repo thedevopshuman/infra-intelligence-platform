@@ -11,6 +11,7 @@ from threading import Event
 
 from iip.bootstrap import (
     build_action_reconciler_from_env,
+    build_event_delivery_from_env,
     build_ingestion_freshness_sampler_from_env,
     build_investigation_worker_from_env,
     build_workflow_worker_runtime_from_env,
@@ -51,6 +52,7 @@ def main() -> None:
     runtime = build_workflow_worker_runtime_from_env()
     worker = build_investigation_worker_from_env(runtime)
     action_reconciler = build_action_reconciler_from_env(runtime)
+    event_delivery = build_event_delivery_from_env(runtime, tenants)
     ingestion_sampler = build_ingestion_freshness_sampler_from_env(runtime, tenants)
     sampling_interval = (
         monitor_interval_seconds() if ingestion_sampler is not None else 60
@@ -73,6 +75,23 @@ def main() -> None:
                 worked = worked or result is not None
                 reconciliation = action_reconciler.run_once(tenant_id)
                 worked = worked or reconciliation.transitioned > 0
+                if event_delivery is not None:
+                    delivery = event_delivery.run_once(tenant_id)
+                    if delivery.claimed > 0:
+                        print(
+                            json.dumps(
+                                {
+                                    "event": "outbox.delivery.completed",
+                                    "claimed": delivery.claimed,
+                                    "delivered": delivery.delivered,
+                                    "released": delivery.released,
+                                    "ambiguous": delivery.ambiguous,
+                                },
+                                separators=(",", ":"),
+                                sort_keys=True,
+                            )
+                        )
+                        worked = True
             if ingestion_sampler is not None and time.monotonic() >= next_sample_at:
                 summary = ingestion_sampler.run_once()
                 print(

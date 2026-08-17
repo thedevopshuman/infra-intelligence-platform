@@ -33,6 +33,14 @@ class PolicyConfigurationError(RuntimeError):
     """Fail-closed policy-adapter configuration error."""
 
 
+class EventPublisherConfigurationError(RuntimeError):
+    """Fail-closed event-publisher configuration error."""
+
+
+class EventPublicationError(RuntimeError):
+    """A provider-neutral event delivery failure with a stable code."""
+
+
 class ReadinessProbe(Protocol):
     def check(self) -> None:
         """Return only when required dependencies are ready for traffic."""

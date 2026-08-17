@@ -14,6 +14,11 @@ from iip.adapters.auth import (
     OidcJwtAuthenticator,
 )
 from iip.adapters.context import NoDataContextDocumentsBackend
+from iip.adapters.event_publisher import (
+    HttpsCloudEventsPublisher,
+    HttpsEventPublisherConfiguration,
+    StructuredLogEventPublisher,
+)
 from iip.adapters.evidence import (
     InMemoryEvidenceStore,
     NoDataKubernetesEventsBackend,
@@ -32,6 +37,7 @@ from iip.application.action_reconciliation import ActionReconciliationService
 from iip.application.actions import GovernedActionService
 from iip.application.collect_evidence import EvidenceCollectionService
 from iip.application.context_evidence import ContextEvidenceProvider, ContextEvidenceService
+from iip.application.deliver_events import EventDeliveryService
 from iip.application.ingest_collection import ResourceCollectionIngestionService
 from iip.application.ingest_otlp_metrics import (
     OtlpMetricsIngestionService,
@@ -591,6 +597,49 @@ def build_action_reconciler_from_env(runtime: Runtime) -> ActionReconciliationSe
         SystemClock(),
         worker_id=worker_id,
         batch_size=batch_size,
+    )
+
+
+def build_event_delivery_from_env(
+    runtime: Runtime,
+    allowed_tenants: tuple[str, ...],
+) -> EventDeliveryService | None:
+    """Compose an optional exact-tenant transactional-outbox publisher."""
+
+    mode = os.environ.get("IIP_EVENT_PUBLISHER_MODE", "disabled")
+    if mode == "disabled":
+        return None
+    if mode == "stdout-json":
+        publisher = StructuredLogEventPublisher(allowed_tenants)
+    elif mode == "https-webhook":
+        raw = os.environ.get("IIP_EVENT_PUBLISHER_CONFIG_JSON")
+        if raw is None:
+            raise ValueError("event.publisher.configuration.required")
+        configuration = HttpsEventPublisherConfiguration.from_json(raw)
+        if frozenset(configuration.tenant_ids) != frozenset(allowed_tenants):
+            raise ValueError("event.publisher.configuration.invalid")
+        publisher = HttpsCloudEventsPublisher(configuration)
+    else:
+        raise ValueError("event.publisher.mode.invalid")
+
+    worker_id = os.environ.get("IIP_WORKER_ID") or os.environ.get("HOSTNAME")
+    if worker_id is None:
+        raise ValueError("event.delivery.configuration.required")
+
+    def integer(name: str, default: int) -> int:
+        try:
+            return int(os.environ.get(name, str(default)))
+        except ValueError:
+            raise ValueError("event.delivery.configuration.invalid") from None
+
+    return EventDeliveryService(
+        runtime.outbox,
+        publisher,
+        worker_id=worker_id,
+        batch_size=integer("IIP_OUTBOX_BATCH_SIZE", 100),
+        lease_seconds=integer("IIP_OUTBOX_LEASE_SECONDS", 30),
+        retry_base_seconds=integer("IIP_OUTBOX_RETRY_BASE_SECONDS", 5),
+        retry_max_seconds=integer("IIP_OUTBOX_RETRY_MAX_SECONDS", 300),
     )
 
 

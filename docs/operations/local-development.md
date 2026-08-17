@@ -145,7 +145,7 @@ The supported local onboarding path generates 256-bit Bearer tokens for three se
 make dev-up
 ```
 
-This starts PostgreSQL, the API, and a tenant-explicit workflow worker, waits until the API proves both database connectivity and the latest packaged schema migration, and prints the console URL plus the `local-operator` token. `/healthz` remains process-only while `/readyz` is the serving gate. The worker dispatches investigations, performs non-executing action timer reconciliation, and samples the enrolled `local/kubernetes-local` ingestion source every 60 seconds. It has no interactive identity Secret and does not compose an action executor. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties. Run `make dev-credentials` when exercising the console approval workflow; that explicit command prints all three identities from the protected mode-`0600` file. Useful lifecycle commands are:
+This starts PostgreSQL, the API, and a tenant-explicit workflow worker, waits until the API proves both database connectivity and the latest packaged schema migration, and prints the console URL plus the `local-operator` token. `/healthz` remains process-only while `/readyz` is the serving gate. The worker dispatches investigations, performs non-executing action timer reconciliation, delivers local outbox events to an explicit development structured-log sink, and samples the enrolled `local/kubernetes-local` ingestion source every 60 seconds. It has no interactive identity Secret and does not compose an action executor. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties. Run `make dev-credentials` when exercising the console approval workflow; that explicit command prints all three identities from the protected mode-`0600` file. Useful lifecycle commands are:
 
 ```bash
 make dev-status
@@ -156,7 +156,7 @@ make dev-down
 
 `make test-local-product` reads the protected local credentials without printing
 them and exercises the durable customer path end to end: complete collection ingestion,
-durably queued worker investigation, immutable proposal, independent approval, one-shot
+leased event delivery, durably queued worker investigation, immutable proposal, independent approval, one-shot
 dry-run execution, replay safety, and the paginated action queue.
 
 `dev-down` preserves the named PostgreSQL volume. The setup never deletes local state automatically. If manual environment control is needed instead, the Compose profile requires a local-only password supplied at runtime and never committed:
@@ -217,6 +217,9 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_WORKER_TENANTS` | unset | Required comma-separated exact tenant enrollment for the workflow worker; wildcard is invalid |
 | `IIP_WORKER_ID` | pod/host name | Stable workflow-worker identity |
 | `IIP_ACTION_RECONCILIATION_BATCH_SIZE` | `100` | Maximum expired action leases scanned per enrolled tenant and timer pass |
+| `IIP_EVENT_PUBLISHER_MODE` | `disabled` | Transactional-outbox publisher; local `stdout-json` or production-oriented `https-webhook` are explicit opt-ins |
+| `IIP_EVENT_PUBLISHER_CONFIG_JSON` | unset | TLS endpoint, exact tenant IDs, mounted token/CA paths, and bounds for HTTPS publishing |
+| `IIP_OUTBOX_BATCH_SIZE` | `100` | Maximum outbox messages claimed for one tenant pass |
 | `IIP_INGESTION_MONITOR_TARGETS_JSON` | unset | Worker-only closed target list; each target tenant must be explicitly enrolled; omission disables sampling |
 | `IIP_INGESTION_MONITOR_INTERVAL_SECONDS` | `60` | Worker-only automatic freshness cadence from 5–3600 seconds |
 | `IIP_INGESTION_MAX_CHECKPOINT_AGE_SECONDS` | `300` | Local maximum age of the last complete committed collection |

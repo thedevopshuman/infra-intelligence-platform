@@ -41,6 +41,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Architecture decision records](decisions/README.md)
 - [Initial roadmap](roadmap/initial-roadmap.md)
 - [Local development](operations/local-development.md)
+- [Transactional outbox event delivery](operations/event-delivery.md)
 - [OpenTelemetry metrics export](operations/opentelemetry-export.md)
 - [Prometheus telemetry evidence](operations/prometheus-evidence.md)
 - [OTLP metrics receiver](operations/otlp-metrics-receiver.md)

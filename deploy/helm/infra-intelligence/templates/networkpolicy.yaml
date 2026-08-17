@@ -111,6 +111,114 @@ spec:
         - port: {{ .Values.networkPolicy.policyEgress.port }}
           protocol: TCP
     {{- end }}
+{{- if .Values.worker.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "infra-intelligence.fullname" . }}-worker
+  labels:
+    {{- include "infra-intelligence.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "infra-intelligence.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: workflow-worker
+  policyTypes: ["Ingress", "Egress"]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        {{- if .Values.networkPolicy.databaseEgress.cidr }}
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.databaseEgress.cidr | quote }}
+        {{- else }}
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.databaseEgress.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.databaseEgress.podSelector | nindent 14 }}
+        {{- end }}
+      ports:
+        - port: {{ .Values.networkPolicy.databaseEgress.port }}
+          protocol: TCP
+    {{- if .Values.networkPolicy.otlpEgress.enabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.otlpEgress.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.otlpEgress.podSelector | nindent 14 }}
+      ports:
+        - port: {{ .Values.networkPolicy.otlpEgress.port }}
+          protocol: TCP
+    {{- end }}
+    {{- if .Values.networkPolicy.prometheusEgress.enabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.prometheusEgress.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.prometheusEgress.podSelector | nindent 14 }}
+      ports:
+        - port: {{ .Values.networkPolicy.prometheusEgress.port }}
+          protocol: TCP
+    {{- end }}
+    {{- if .Values.networkPolicy.lokiEgress.enabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.lokiEgress.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.lokiEgress.podSelector | nindent 14 }}
+      ports:
+        - port: {{ .Values.networkPolicy.lokiEgress.port }}
+          protocol: TCP
+    {{- end }}
+    {{- if .Values.networkPolicy.kubernetesApiEgress.enabled }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.kubernetesApiEgress.cidr | quote }}
+      ports:
+        - port: {{ .Values.networkPolicy.kubernetesApiEgress.port }}
+          protocol: TCP
+    {{- end }}
+    {{- if .Values.networkPolicy.credentialBrokerEgress.enabled }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.credentialBrokerEgress.cidr | quote }}
+      ports:
+        - port: {{ .Values.networkPolicy.credentialBrokerEgress.port }}
+          protocol: TCP
+    {{- end }}
+    {{- if .Values.networkPolicy.policyEgress.enabled }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.policyEgress.cidr | quote }}
+      ports:
+        - port: {{ .Values.networkPolicy.policyEgress.port }}
+          protocol: TCP
+    {{- end }}
+    {{- if .Values.networkPolicy.eventPublisherEgress.enabled }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.eventPublisherEgress.cidr | quote }}
+      ports:
+        - port: {{ .Values.networkPolicy.eventPublisherEgress.port }}
+          protocol: TCP
+    {{- end }}
+{{- end }}
 {{- if or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled }}
 ---
 apiVersion: networking.k8s.io/v1

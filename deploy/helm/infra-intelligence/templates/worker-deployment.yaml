@@ -1,6 +1,13 @@
 {{- if .Values.worker.enabled }}
 {{- $databaseSecret := required "database.existingSecret is required when worker.enabled=true" .Values.database.existingSecret }}
 {{- if not .Values.worker.tenants }}{{ fail "worker.tenants must contain at least one explicit tenant when worker.enabled=true" }}{{- end }}
+{{- if and (ne .Values.eventPublisher.mode "disabled") (ne .Values.eventPublisher.mode "https-webhook") }}{{ fail "eventPublisher.mode must be disabled or https-webhook" }}{{- end }}
+{{- if eq .Values.eventPublisher.mode "https-webhook" }}
+{{- $eventEndpoint := required "eventPublisher.httpsWebhook.endpoint is required in https-webhook mode" .Values.eventPublisher.httpsWebhook.endpoint }}
+{{- $eventTokenSecret := required "eventPublisher.httpsWebhook.tokenExistingSecret is required in https-webhook mode" .Values.eventPublisher.httpsWebhook.tokenExistingSecret }}
+{{- if and .Values.networkPolicy.enabled (not .Values.networkPolicy.eventPublisherEgress.enabled) }}{{ fail "networkPolicy.eventPublisherEgress.enabled must be true for https-webhook publishing when NetworkPolicy is enabled" }}{{- end }}
+{{- end }}
+{{- if and .Values.networkPolicy.enabled (not .Values.networkPolicy.databaseEgress.enabled) }}{{ fail "networkPolicy.databaseEgress.enabled must be true for the worker when NetworkPolicy is enabled" }}{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -66,6 +73,24 @@ spec:
               value: {{ .Values.worker.maxAttempts | quote }}
             - name: IIP_ACTION_RECONCILIATION_BATCH_SIZE
               value: {{ .Values.worker.actionReconciliationBatchSize | quote }}
+            - name: IIP_EVENT_PUBLISHER_MODE
+              value: {{ .Values.eventPublisher.mode | quote }}
+            - name: IIP_OUTBOX_BATCH_SIZE
+              value: {{ .Values.eventPublisher.batchSize | quote }}
+            - name: IIP_OUTBOX_LEASE_SECONDS
+              value: {{ .Values.eventPublisher.leaseSeconds | quote }}
+            - name: IIP_OUTBOX_RETRY_BASE_SECONDS
+              value: {{ .Values.eventPublisher.retryBaseSeconds | quote }}
+            - name: IIP_OUTBOX_RETRY_MAX_SECONDS
+              value: {{ .Values.eventPublisher.retryMaxSeconds | quote }}
+            {{- if eq .Values.eventPublisher.mode "https-webhook" }}
+            - name: IIP_EVENT_PUBLISHER_CONFIG_JSON
+              {{- if .Values.eventPublisher.httpsWebhook.caBundleExistingSecret }}
+              value: {{ dict "endpoint" .Values.eventPublisher.httpsWebhook.endpoint "tenantIds" .Values.worker.tenants "bearerTokenPath" (printf "%s/token" .Values.eventPublisher.httpsWebhook.tokenMountPath) "caBundlePath" (printf "%s/ca.crt" .Values.eventPublisher.httpsWebhook.caBundleMountPath) "timeoutSeconds" .Values.eventPublisher.httpsWebhook.timeoutSeconds "maxResponseBytes" .Values.eventPublisher.httpsWebhook.maxResponseBytes | toJson | quote }}
+              {{- else }}
+              value: {{ dict "endpoint" .Values.eventPublisher.httpsWebhook.endpoint "tenantIds" .Values.worker.tenants "bearerTokenPath" (printf "%s/token" .Values.eventPublisher.httpsWebhook.tokenMountPath) "timeoutSeconds" .Values.eventPublisher.httpsWebhook.timeoutSeconds "maxResponseBytes" .Values.eventPublisher.httpsWebhook.maxResponseBytes | toJson | quote }}
+              {{- end }}
+            {{- end }}
             {{- if .Values.worker.ingestionMonitorTargets }}
             - name: IIP_INGESTION_MONITOR_TARGETS_JSON
               value: {{ dict "targets" .Values.worker.ingestionMonitorTargets | toJson | quote }}
@@ -146,6 +171,16 @@ spec:
               mountPath: {{ .Values.contextEvidence.documentsMountPath | quote }}
               readOnly: true
             {{- end }}
+            {{- if eq .Values.eventPublisher.mode "https-webhook" }}
+            - name: event-publisher-token
+              mountPath: {{ .Values.eventPublisher.httpsWebhook.tokenMountPath | quote }}
+              readOnly: true
+            {{- if .Values.eventPublisher.httpsWebhook.caBundleExistingSecret }}
+            - name: event-publisher-ca
+              mountPath: {{ .Values.eventPublisher.httpsWebhook.caBundleMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
@@ -194,6 +229,22 @@ spec:
         - name: context-documents
           configMap:
             name: {{ .Values.contextEvidence.documentsExistingConfigMap | quote }}
+        {{- end }}
+        {{- if eq .Values.eventPublisher.mode "https-webhook" }}
+        - name: event-publisher-token
+          secret:
+            secretName: {{ .Values.eventPublisher.httpsWebhook.tokenExistingSecret | quote }}
+            items:
+              - key: {{ .Values.eventPublisher.httpsWebhook.tokenSecretKey | quote }}
+                path: token
+        {{- if .Values.eventPublisher.httpsWebhook.caBundleExistingSecret }}
+        - name: event-publisher-ca
+          secret:
+            secretName: {{ .Values.eventPublisher.httpsWebhook.caBundleExistingSecret | quote }}
+            items:
+              - key: {{ .Values.eventPublisher.httpsWebhook.caBundleSecretKey | quote }}
+                path: ca.crt
+        {{- end }}
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

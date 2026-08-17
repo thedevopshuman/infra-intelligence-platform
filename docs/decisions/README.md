@@ -47,3 +47,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0041](0041-isolated-otlp-receiver-process.md) | Accepted | Isolate tenant-bound OTLP intake in a dedicated process, listener, credential, and network boundary |
 | [0042](0042-dependency-aware-readiness.md) | Accepted | Separate process liveness from bounded PostgreSQL connectivity and schema readiness |
 | [0043](0043-explicit-ingestion-freshness-sampling.md) | Accepted | Evaluate explicitly enrolled tenant/source freshness automatically from a non-interactive workflow worker |
+| [0044](0044-tenant-scoped-outbox-delivery.md) | Accepted | Deliver leased tenant-scoped CloudEvents at least once through a replaceable bounded publisher |

@@ -96,6 +96,16 @@ helm-lint:
 		--set 'worker.tenants[0]=tenant-a' \
 		--set 'worker.ingestionMonitorTargets[0].tenantId=tenant-a' \
 		--set 'worker.ingestionMonitorTargets[0].sourceId=kubernetes-a' >/dev/null
+	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set database.existingSecret=iip-database \
+		--set worker.enabled=true \
+		--set 'worker.tenants[0]=tenant-a' \
+		--set eventPublisher.mode=https-webhook \
+		--set eventPublisher.httpsWebhook.endpoint=https://events.example.test/v1/cloudevents \
+		--set eventPublisher.httpsWebhook.tokenExistingSecret=iip-event-token \
+		--set networkPolicy.enabled=true \
+		--set networkPolicy.databaseEgress.enabled=true \
+		--set networkPolicy.eventPublisherEgress.enabled=true >/dev/null
 
 verify: validate validate-schemas test helm-lint
 

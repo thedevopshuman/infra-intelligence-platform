@@ -12,7 +12,7 @@ services:
       retries: 20
 
   api:
-    image: iip-otlp-receiver-test:0.23.0
+    image: iip-otlp-receiver-test:0.24.0
     build:
       context: ..
       dockerfile: Dockerfile
@@ -41,7 +41,7 @@ services:
       - no-new-privileges:true
 
   receiver:
-    image: iip-otlp-receiver-test:0.23.0
+    image: iip-otlp-receiver-test:0.24.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.otlp_receiver"]
     environment:

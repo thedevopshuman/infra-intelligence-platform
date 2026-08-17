@@ -60,6 +60,8 @@ Workers claim messages within one explicit tenant scope. Claims increment the at
 
 Delivery is at least once. A crash after external publish but before acknowledgement can redeliver, so downstream transports and consumers use the CloudEvents identity `(tenantid, source, id)` for idempotency.
 
+[ADR 0044](../decisions/0044-tenant-scoped-outbox-delivery.md) makes this dispatcher executable in the tenant-explicit workflow worker. The local structured-log sink is development-only; the Helm profile offers a TLS-only, authenticated, redirect-refusing webhook whose tenant authority exactly matches worker enrollment. Publisher credentials remain mounted only in the worker, and its dedicated NetworkPolicy has no ingress. See the [event-delivery operations guide](../operations/event-delivery.md).
+
 ## Resource queries
 
 The application query service authorizes `resource:read` before calling tenant-scoped repository ports. Neighborhood queries page the current `resource_relationships` index by deterministic edge ID, while timeline queries page immutable `resource_observations` by exclusive offset. The index records which latest resource projection asserted each canonical edge; unresolved provider references remain edge values and never create synthetic resource rows.

@@ -99,6 +99,21 @@ def _wait_for_investigation(
     raise ProductWorkflowError("investigation job did not complete before timeout")
 
 
+def _wait_for_event_delivery(token: str, timeout_seconds: float = 15.0) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        report = _request(
+            "/v1/telemetry/ingestion?sourceId=kubernetes-local",
+            token,
+        )
+        spec = report.get("spec")
+        delivery = spec.get("delivery") if isinstance(spec, Mapping) else None
+        if isinstance(delivery, Mapping) and delivery.get("pendingEvents") == 0:
+            return
+        time.sleep(0.2)
+    raise ProductWorkflowError("transactional outbox did not drain before timeout")
+
+
 def main() -> int:
     try:
         tokens = _credentials()
@@ -329,9 +344,10 @@ def main() -> int:
             raise ProductWorkflowError("workflow did not reach the dry-run terminal state")
         if proposal_id not in item_ids:
             raise ProductWorkflowError("terminal workflow is missing from the action queue")
+        _wait_for_event_delivery(operator)
         print(
-            "local product workflow passed: collection → queued worker investigation → proposal → "
-            "independent approval → one-shot dry-run → queue"
+            "local product workflow passed: collection → event delivery → queued worker "
+            "investigation → proposal → independent approval → one-shot dry-run → queue"
         )
         print(f"action: {proposal_id}")
         return 0

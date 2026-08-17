@@ -170,7 +170,9 @@ class PluginTrustStore:
                 not isinstance(artifact, Mapping)
                 or set(artifact) != {"type", "reference", "digest", "signature"}
                 or not isinstance(signature, Mapping)
-                or set(signature) != {"algorithm", "keyId", "value"}
+                or set(signature)
+                != {"profile", "algorithm", "keyId", "manifestDigest", "value"}
+                or signature.get("profile") != "iip.plugin-signature/v2"
                 or artifact.get("type") != "oci-image"
                 or signature.get("algorithm") != "ed25519"
             ):
@@ -182,6 +184,7 @@ class PluginTrustStore:
             reference = artifact["reference"]
             digest = artifact["digest"]
             key_id = signature["keyId"]
+            manifest_digest = signature["manifestDigest"]
             value = signature["value"]
             if (
                 not isinstance(plugin_id, str)
@@ -196,6 +199,9 @@ class PluginTrustStore:
                 or _DIGEST.fullmatch(digest) is None
                 or not (reference == digest or reference.endswith("@" + digest))
                 or not isinstance(key_id, str)
+                or not isinstance(manifest_digest, str)
+                or _DIGEST.fullmatch(manifest_digest) is None
+                or manifest_digest != _unsigned_manifest_digest(manifest)
                 or not isinstance(value, str)
                 or protocol != "1.0"
             ):
@@ -204,10 +210,11 @@ class PluginTrustStore:
             if trusted is None or trusted.publisher != publisher:
                 raise PluginRunnerError("plugin.signature.untrusted")
             signed = {
-                "apiVersion": "iip.plugin-signature/v1",
+                "apiVersion": "iip.plugin-signature/v2",
                 "pluginId": plugin_id,
                 "pluginVersion": version,
                 "protocolVersion": protocol,
+                "manifestDigest": manifest_digest,
                 "artifact": {
                     "type": "oci-image",
                     "reference": reference,
@@ -1293,6 +1300,18 @@ def _timestamp(value: object) -> datetime:
 
 def _copy_document(document: Mapping[str, object]) -> dict[str, object]:
     return json.loads(json.dumps(document))
+
+
+def _unsigned_manifest_digest(manifest: Mapping[str, object]) -> str:
+    document = _copy_document(manifest)
+    try:
+        artifact = document["spec"]["artifact"]
+        if not isinstance(artifact, dict):
+            raise ValueError
+        artifact.pop("signature")
+    except (KeyError, TypeError, ValueError):
+        raise ValueError from None
+    return canonical_digest(document)
 
 
 def _docker_environment() -> dict[str, str]:

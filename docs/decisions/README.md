@@ -71,3 +71,5 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0065](0065-plugin-invocation-cancellation-and-reconciliation.md) | Accepted | Persist cooperative plugin cancellation and close post-deadline ambiguity without replay |
 | [0066](0066-host-mediated-plugin-read-connectivity.md) | Accepted | Keep plugins offline while mediating invocation-scoped, policy-checked provider reads |
 | [0067](0067-attested-plugin-mediation-bridge-image.md) | Accepted | Ship the trusted mediation relay as a separately attested release image |
+| [0068](0068-executable-plugin-compatibility-evidence.md) | Accepted | Generate exact-host plugin compatibility evidence from executable profiles |
+| [0069](0069-manifest-bound-plugin-signatures.md) | Accepted | Authenticate the complete plugin declaration before granting runtime trust |

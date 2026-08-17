@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import base64
 import copy
 import hashlib
@@ -12,6 +13,7 @@ import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Iterable, Mapping
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -20,7 +22,10 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "sdks" / "python" / "src"))
 
+from infra_intelligence_sdk import __version__ as sdk_version  # noqa: E402
+from iip import __version__ as application_version  # noqa: E402
 from iip.adapters.memory import AllowTenantPolicy  # noqa: E402
 from iip.adapters.operations import InMemoryOperationalStore  # noqa: E402
 from iip.adapters.plugin_mediation import (  # noqa: E402
@@ -81,7 +86,201 @@ def canonical(document: object) -> bytes:
     return json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
 
 
-def main() -> int:
+def sign_manifest(
+    manifest: dict[str, object], private: Ed25519PrivateKey, key_id: str
+) -> None:
+    spec = manifest.get("spec")
+    artifact = spec.get("artifact") if isinstance(spec, dict) else None
+    metadata = manifest.get("metadata")
+    if not isinstance(artifact, dict) or not isinstance(metadata, dict):
+        raise RuntimeError("plugin manifest cannot be signed")
+    artifact.pop("signature", None)
+    manifest_digest = "sha256:" + hashlib.sha256(canonical(manifest)).hexdigest()
+    signed = {
+        "apiVersion": "iip.plugin-signature/v2",
+        "pluginId": metadata["id"],
+        "pluginVersion": metadata["version"],
+        "protocolVersion": spec["protocolVersion"],
+        "manifestDigest": manifest_digest,
+        "artifact": {
+            "type": artifact["type"],
+            "reference": artifact["reference"],
+            "digest": artifact["digest"],
+        },
+    }
+    artifact["signature"] = {
+        "profile": "iip.plugin-signature/v2",
+        "algorithm": "ed25519",
+        "keyId": key_id,
+        "manifestDigest": manifest_digest,
+        "value": b64url(private.sign(canonical(signed))),
+    }
+
+
+def arguments(argv: Iterable[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--report",
+        type=Path,
+        default=ROOT / "dist" / "plugin-compatibility-report.json",
+        help="machine-readable compatibility report output",
+    )
+    return parser.parse_args(tuple(argv) if argv is not None else None)
+
+
+def validate_contract(schema_name: str, document: object, *, label: str) -> None:
+    schema = json.loads(
+        (ROOT / "contracts" / "schemas" / schema_name).read_text(encoding="utf-8")
+    )
+    errors = validate_schemas.instance_validation_errors(schema, document, label=label)
+    if errors:
+        raise RuntimeError("; ".join(errors))
+
+
+def validate_result(result: Mapping[str, object], expected: object, *, profile: str) -> None:
+    spec = result.get("spec")
+    if not isinstance(spec, Mapping) or spec.get("status") != "succeeded":
+        error = spec.get("error") if isinstance(spec, Mapping) else None
+        code = error.get("code") if isinstance(error, Mapping) else "unknown"
+        raise RuntimeError(f"{profile} plugin failed with stable code: {code}")
+    if spec.get("output") != expected:
+        raise RuntimeError(f"{profile} plugin output did not match its golden contract")
+    validate_contract(
+        "plugin-invocation-result.schema.json",
+        result,
+        label=f"{profile} isolated plugin result",
+    )
+
+
+def passed_checks(*identifiers: str) -> list[dict[str, str]]:
+    return [{"id": identifier, "status": "passed"} for identifier in identifiers]
+
+
+def compatibility_report(
+    *,
+    manifest: Mapping[str, object],
+    offline_session: Mapping[str, object],
+    mediated_session: Mapping[str, object],
+    image_id: str,
+    bridge_image_id: str,
+) -> dict[str, object]:
+    metadata = manifest["metadata"]
+    spec = manifest["spec"]
+    offline_session_spec = offline_session["spec"]
+    mediated_session_spec = mediated_session["spec"]
+    if not all(
+        isinstance(value, Mapping)
+        for value in (metadata, spec, offline_session_spec, mediated_session_spec)
+    ):
+        raise RuntimeError("plugin compatibility identity is invalid")
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=10,
+        check=True,
+    ).stdout.strip()
+    dirty = bool(
+        subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=normal"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            timeout=10,
+            check=True,
+        ).stdout.strip()
+    )
+    platform = docker("info", "--format", "{{.OSType}}/{{.Architecture}}", capture=True)
+    runtime_version = docker(
+        "version", "--format", "{{.Server.Version}}", capture=True
+    )
+    identity = canonical(
+        {
+            "revision": revision,
+            "platform": platform,
+            "plugin": image_id,
+            "bridge": bridge_image_id,
+            "offlineManifest": offline_session_spec["manifestDigest"],
+            "mediatedManifest": mediated_session_spec["manifestDigest"],
+        }
+    )
+    profiles = [
+        {
+            "name": "offline-fixture",
+            "manifestDigest": offline_session_spec["manifestDigest"],
+            "result": "compatible",
+            "checks": passed_checks(
+                "manifest-schema",
+                "publisher-signature",
+                "immutable-plugin-artifact",
+                "no-network-sandbox",
+                "bounded-sandbox",
+                "input-contract",
+                "output-contract",
+                "golden-result",
+            ),
+        },
+        {
+            "name": "host-mediated-read",
+            "manifestDigest": mediated_session_spec["manifestDigest"],
+            "result": "compatible",
+            "checks": passed_checks(
+                "manifest-schema",
+                "publisher-signature",
+                "immutable-plugin-artifact",
+                "immutable-mediation-bridge",
+                "no-network-sandbox",
+                "bounded-sandbox",
+                "input-contract",
+                "output-contract",
+                "golden-result",
+                "invocation-local-socket",
+                "host-mediated-read",
+                "credentials-host-only",
+            ),
+        },
+    ]
+    return {
+        "apiVersion": "iip.platform/v1alpha1",
+        "kind": "PluginCompatibilityReport",
+        "metadata": {
+            "id": "pcr_" + hashlib.sha256(identity).hexdigest()[:32],
+            "generatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "sourceRevision": revision,
+            "sourceDirty": dirty,
+        },
+        "spec": {
+            "host": {
+                "platform": platform,
+                "containerRuntime": "docker",
+                "containerRuntimeVersion": runtime_version,
+                "applicationVersion": application_version,
+                "sdk": {"language": "python", "version": sdk_version},
+            },
+            "plugin": {
+                "id": metadata["id"],
+                "version": metadata["version"],
+                "protocolVersion": spec["protocolVersion"],
+                "capability": "resource-observer",
+                "method": "collect",
+                "artifactDigest": image_id,
+                "mediationBridgeDigest": bridge_image_id,
+            },
+            "profiles": profiles,
+            "summary": {
+                "totalProfiles": len(profiles),
+                "compatibleProfiles": len(profiles),
+                "incompatibleProfiles": 0,
+                "overallStatus": "compatible",
+            },
+        },
+    }
+
+
+def main(argv: Iterable[str] | None = None) -> int:
+    options = arguments(argv)
+    options.report.unlink(missing_ok=True)
     plugin_built = False
     bridge_built = False
     try:
@@ -109,22 +308,21 @@ def main() -> int:
             serialization.PublicFormat.Raw,
         )
         key_id = "local-plugin-runner-smoke"
-        signed = {
-            "apiVersion": "iip.plugin-signature/v1",
-            "pluginId": manifest["metadata"]["id"],
-            "pluginVersion": manifest["metadata"]["version"],
-            "protocolVersion": manifest["spec"]["protocolVersion"],
-            "artifact": {
-                "type": artifact["type"],
-                "reference": image_id,
-                "digest": image_id,
-            },
-        }
-        artifact["signature"] = {
-            "algorithm": "ed25519",
-            "keyId": key_id,
-            "value": b64url(private.sign(canonical(signed))),
-        }
+        sign_manifest(manifest, private, key_id)
+        offline_manifest = copy.deepcopy(manifest)
+        offline_manifest["spec"]["permissions"]["network"] = []
+        offline_manifest["spec"]["permissions"]["secrets"] = []
+        sign_manifest(offline_manifest, private, key_id)
+        validate_contract(
+            "plugin-manifest.schema.json",
+            manifest,
+            label="signed mediated plugin manifest",
+        )
+        validate_contract(
+            "plugin-manifest.schema.json",
+            offline_manifest,
+            label="signed offline plugin manifest",
+        )
         trust = PluginTrustStore.from_json(
             json.dumps(
                 {
@@ -141,6 +339,7 @@ def main() -> int:
 
         actor = ActorContext("plugin-host", "local", ("developer",))
         token = "local-plugin-capability-token-0123456789abcdef"
+        offline_token = "local-plugin-offline-token-0123456789abcdef"
         store = InMemoryOperationalStore()
         service = PluginSessionService(AllowTenantPolicy(), store, SystemClock())
         session = service.open(
@@ -153,9 +352,24 @@ def main() -> int:
                 max_wall_time_seconds=60,
             )
         )
+        offline_session = service.open(
+            OpenPluginSessionCommand(
+                actor,
+                offline_manifest,
+                ("resource-observer",),
+                offline_token,
+                max_requests=1,
+                max_wall_time_seconds=60,
+            )
+        )
         now = datetime.now(timezone.utc)
         request = json.loads(
             (PLUGIN / "fixtures" / "collection-request.json").read_text()
+        )
+        validate_contract(
+            "resource-collection-request.schema.json",
+            request,
+            label="plugin collection request",
         )
         invocation_id = "pin_" + hashlib.sha256(os.urandom(32)).hexdigest()[:32]
         grant_id = "pmg_" + hashlib.sha256(os.urandom(32)).hexdigest()[:32]
@@ -234,29 +448,53 @@ def main() -> int:
             ),
             mediation=mediation,
         )
-        result = runner.run(actor, manifest, session, invocation, token)
+        offline_invocation = copy.deepcopy(invocation)
+        offline_invocation["metadata"]["id"] = (
+            "pin_" + hashlib.sha256(os.urandom(32)).hexdigest()[:32]
+        )
+        offline_invocation["metadata"]["sessionId"] = offline_session["metadata"][
+            "id"
+        ]
+        offline_invocation["spec"]["manifestDigest"] = offline_session["spec"][
+            "manifestDigest"
+        ]
+        offline_invocation["spec"].pop("mediationGrants")
+        offline_result = runner.run(
+            actor,
+            offline_manifest,
+            offline_session,
+            offline_invocation,
+            offline_token,
+        )
+        mediated_result = runner.run(actor, manifest, session, invocation, token)
 
         expected = json.loads((PLUGIN / "fixtures" / "expected-result.json").read_text())
-        if result.get("spec", {}).get("status") != "succeeded":
-            code = result.get("spec", {}).get("error", {}).get("code", "unknown")
-            raise RuntimeError(f"isolated plugin failed with stable code: {code}")
-        if result["spec"]["output"] != expected:
-            raise RuntimeError("isolated plugin output did not match its golden contract")
-        schema = json.loads(
-            (ROOT / "contracts" / "schemas" / "plugin-invocation-result.schema.json").read_text()
+        validate_result(offline_result, expected, profile="offline-fixture")
+        validate_result(mediated_result, expected, profile="host-mediated-read")
+        report = compatibility_report(
+            manifest=manifest,
+            offline_session=offline_session,
+            mediated_session=session,
+            image_id=image_id,
+            bridge_image_id=bridge_image_id,
         )
-        errors = validate_schemas.instance_validation_errors(
-            schema, result, label="isolated plugin result"
+        validate_contract(
+            "plugin-compatibility-report.schema.json",
+            report,
+            label="plugin compatibility report",
         )
-        if errors:
-            raise RuntimeError("; ".join(errors))
+        options.report.parent.mkdir(parents=True, exist_ok=True)
+        options.report.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         print(
-            "signed plugin runner passed: Ed25519 trust → immutable image digest → "
-            "no-network sandbox → host-mediated Unix socket read → canonical resource result"
+            "plugin compatibility matrix passed: signed immutable image → no-network "
+            "offline fixture + host-mediated Unix socket read → canonical resource result"
         )
         print(f"image: {image_id}")
         print(f"mediation bridge: {bridge_image_id}")
-        print(f"output bytes: {result['spec']['usage']['outputBytes']}")
+        print(f"profiles: offline-fixture=compatible, host-mediated-read=compatible")
+        print(f"report: {options.report}")
         return 0
     finally:
         if plugin_built:

@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:plugin-compatibility-report:v1alpha1",
+  "title": "Plugin Compatibility Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "PluginCompatibilityReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^pcr_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "plugin", "profiles", "summary"],
+      "properties": {
+        "host": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "platform",
+            "containerRuntime",
+            "containerRuntimeVersion",
+            "applicationVersion",
+            "sdk"
+          ],
+          "properties": {
+            "platform": {
+              "type": "string",
+              "pattern": "^linux/[a-z0-9_]+(?:/[a-z0-9.]+)?$"
+            },
+            "containerRuntime": {"const": "docker"},
+            "containerRuntimeVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9A-Za-z][0-9A-Za-z.+_-]*$"
+            },
+            "applicationVersion": {"$ref": "#/$defs/semver"},
+            "sdk": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["language", "version"],
+              "properties": {
+                "language": {"const": "python"},
+                "version": {"$ref": "#/$defs/semver"}
+              }
+            }
+          }
+        },
+        "plugin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version",
+            "protocolVersion",
+            "capability",
+            "method",
+            "artifactDigest",
+            "mediationBridgeDigest"
+          ],
+          "properties": {
+            "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+            "version": {"$ref": "#/$defs/semver"},
+            "protocolVersion": {"const": "1.0"},
+            "capability": {
+              "enum": [
+                "resource-observer",
+                "event-source",
+                "evidence-provider",
+                "action-provider",
+                "surface"
+              ]
+            },
+            "method": {"type": "string", "pattern": "^[a-z][a-z0-9.-]{1,63}$"},
+            "artifactDigest": {"$ref": "#/$defs/digest"},
+            "mediationBridgeDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "profiles": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {"$ref": "#/$defs/profile"}
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "totalProfiles",
+            "compatibleProfiles",
+            "incompatibleProfiles",
+            "overallStatus"
+          ],
+          "properties": {
+            "totalProfiles": {"type": "integer", "minimum": 1, "maximum": 16},
+            "compatibleProfiles": {"type": "integer", "minimum": 0, "maximum": 16},
+            "incompatibleProfiles": {"type": "integer", "minimum": 0, "maximum": 16},
+            "overallStatus": {"enum": ["compatible", "incompatible"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {
+          "enum": [
+            "manifest-schema",
+            "publisher-signature",
+            "immutable-plugin-artifact",
+            "immutable-mediation-bridge",
+            "no-network-sandbox",
+            "bounded-sandbox",
+            "input-contract",
+            "output-contract",
+            "golden-result",
+            "invocation-local-socket",
+            "host-mediated-read",
+            "credentials-host-only"
+          ]
+        },
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9.-]+$"
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {"status": {"const": "passed"}},
+          "not": {"required": ["errorCode"]}
+        },
+        {
+          "required": ["errorCode"],
+          "properties": {"status": {"const": "failed"}}
+        }
+      ]
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "manifestDigest", "result", "checks"],
+      "properties": {
+        "name": {"enum": ["offline-fixture", "host-mediated-read"]},
+        "manifestDigest": {"$ref": "#/$defs/digest"},
+        "result": {"enum": ["compatible", "incompatible"]},
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/check"}
+        }
+      }
+    }
+  }
+}

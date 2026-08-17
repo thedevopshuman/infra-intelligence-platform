@@ -59,3 +59,7 @@ Version 0.33 adds plugin invocation status, cancellation, and reconciliation mod
 
 Version 0.34 adds plugin mediation grant/request/response models and the bounded
 Unix-socket client used by isolated Python plugins.
+
+Version 0.35 adds `PluginCompatibilityReport`, the machine-readable exact-host
+evidence emitted by the executable Docker matrix. It is not a universal support
+claim for architectures or provider integrations that were not exercised.

@@ -1,0 +1,70 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PluginCompatibilityReport",
+  "metadata": {
+    "id": "pcr_11111111111111111111111111111111",
+    "generatedAt": "2026-08-17T13:15:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "host": {
+      "platform": "linux/arm64",
+      "containerRuntime": "docker",
+      "containerRuntimeVersion": "29.7.2",
+      "applicationVersion": "0.42.0",
+      "sdk": {"language": "python", "version": "0.35.0"}
+    },
+    "plugin": {
+      "id": "kubernetes-observer",
+      "version": "0.3.0",
+      "protocolVersion": "1.0",
+      "capability": "resource-observer",
+      "method": "collect",
+      "artifactDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "mediationBridgeDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "profiles": [
+      {
+        "name": "offline-fixture",
+        "manifestDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": "compatible",
+        "checks": [
+          {"id": "manifest-schema", "status": "passed"},
+          {"id": "publisher-signature", "status": "passed"},
+          {"id": "immutable-plugin-artifact", "status": "passed"},
+          {"id": "no-network-sandbox", "status": "passed"},
+          {"id": "bounded-sandbox", "status": "passed"},
+          {"id": "input-contract", "status": "passed"},
+          {"id": "output-contract", "status": "passed"},
+          {"id": "golden-result", "status": "passed"}
+        ]
+      },
+      {
+        "name": "host-mediated-read",
+        "manifestDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "result": "compatible",
+        "checks": [
+          {"id": "manifest-schema", "status": "passed"},
+          {"id": "publisher-signature", "status": "passed"},
+          {"id": "immutable-plugin-artifact", "status": "passed"},
+          {"id": "immutable-mediation-bridge", "status": "passed"},
+          {"id": "no-network-sandbox", "status": "passed"},
+          {"id": "bounded-sandbox", "status": "passed"},
+          {"id": "input-contract", "status": "passed"},
+          {"id": "output-contract", "status": "passed"},
+          {"id": "golden-result", "status": "passed"},
+          {"id": "invocation-local-socket", "status": "passed"},
+          {"id": "host-mediated-read", "status": "passed"},
+          {"id": "credentials-host-only", "status": "passed"}
+        ]
+      }
+    ],
+    "summary": {
+      "totalProfiles": 2,
+      "compatibleProfiles": 2,
+      "incompatibleProfiles": 0,
+      "overallStatus": "compatible"
+    }
+  }
+}

@@ -26,6 +26,9 @@ from iip.application.ports import ActorContext
 ROOT = Path(__file__).resolve().parents[1]
 NOW = datetime(2026, 8, 14, 12, 44, 40, tzinfo=timezone.utc)
 TOKEN = "plugin-capability-token-0123456789abcdef"
+PRIVATE_KEY = Ed25519PrivateKey.from_private_bytes(
+    hashlib.sha256(b"runner-test-key").digest()
+)
 
 
 def example(name: str) -> dict:
@@ -36,21 +39,16 @@ def encoded(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).rstrip(b"=").decode()
 
 
-def signed_fixture() -> tuple[dict, PluginTrustStore]:
-    manifest = example("plugin-manifest.json")
-    manifest["spec"]["permissions"]["network"] = []
-    manifest["spec"]["permissions"]["secrets"] = []
-    private = Ed25519PrivateKey.from_private_bytes(hashlib.sha256(b"runner-test-key").digest())
-    public = private.public_key().public_bytes(
-        serialization.Encoding.Raw,
-        serialization.PublicFormat.Raw,
-    )
+def sign_manifest(manifest: dict) -> None:
     artifact = manifest["spec"]["artifact"]
+    artifact.pop("signature", None)
+    manifest_digest = canonical_digest(manifest)
     signed = {
-        "apiVersion": "iip.plugin-signature/v1",
+        "apiVersion": "iip.plugin-signature/v2",
         "pluginId": manifest["metadata"]["id"],
         "pluginVersion": manifest["metadata"]["version"],
         "protocolVersion": manifest["spec"]["protocolVersion"],
+        "manifestDigest": manifest_digest,
         "artifact": {
             "type": artifact["type"],
             "reference": artifact["reference"],
@@ -59,10 +57,23 @@ def signed_fixture() -> tuple[dict, PluginTrustStore]:
     }
     payload = json.dumps(signed, sort_keys=True, separators=(",", ":")).encode()
     artifact["signature"] = {
+        "profile": "iip.plugin-signature/v2",
         "algorithm": "ed25519",
         "keyId": "runner-test-2026",
-        "value": encoded(private.sign(payload)),
+        "manifestDigest": manifest_digest,
+        "value": encoded(PRIVATE_KEY.sign(payload)),
     }
+
+
+def signed_fixture() -> tuple[dict, PluginTrustStore]:
+    manifest = example("plugin-manifest.json")
+    manifest["spec"]["permissions"]["network"] = []
+    manifest["spec"]["permissions"]["secrets"] = []
+    public = PRIVATE_KEY.public_key().public_bytes(
+        serialization.Encoding.Raw,
+        serialization.PublicFormat.Raw,
+    )
+    sign_manifest(manifest)
     trust = PluginTrustStore.from_json(
         json.dumps(
             {
@@ -202,8 +213,27 @@ class SignedDockerPluginRunnerTests(unittest.TestCase):
             )
 
         manifest, trust = signed_fixture()
+        signature = manifest["spec"]["artifact"]["signature"]
+        signature.pop("profile")
+        signature.pop("manifestDigest")
+        session, invocation = scoped_documents(manifest)
+        with self.assertRaisesRegex(PluginRunnerError, "signature.invalid"):
+            self.runner(trust, transport).run(
+                self.actor, manifest, session, invocation, TOKEN
+            )
+
+        manifest, trust = signed_fixture()
+        session, invocation = scoped_documents(manifest)
+        manifest["spec"]["permissions"]["network"] = ["attacker.example:443"]
+        with self.assertRaisesRegex(PluginRunnerError, "signature.invalid"):
+            self.runner(trust, transport).run(
+                self.actor, manifest, session, invocation, TOKEN
+            )
+
+        manifest, trust = signed_fixture()
         session, invocation = scoped_documents(manifest)
         manifest["metadata"]["publisher"] = "unknown-publisher"
+        sign_manifest(manifest)
         with self.assertRaisesRegex(PluginRunnerError, "signature.untrusted"):
             self.runner(trust, transport).run(
                 self.actor, manifest, session, invocation, TOKEN
@@ -219,6 +249,7 @@ class SignedDockerPluginRunnerTests(unittest.TestCase):
             with self.subTest(permission=permission):
                 manifest, trust = signed_fixture()
                 manifest["spec"]["permissions"][permission] = value
+                sign_manifest(manifest)
                 session, invocation = scoped_documents(manifest)
                 with self.assertRaisesRegex(PluginRunnerError, "permission.unsupported"):
                     self.runner(trust).run(
@@ -231,6 +262,7 @@ class SignedDockerPluginRunnerTests(unittest.TestCase):
             "kubernetes.default.svc:443"
         ]
         manifest["spec"]["permissions"]["secrets"] = ["kubernetes-token"]
+        sign_manifest(manifest)
         session, invocation = scoped_documents(manifest)
         invocation["spec"]["mediationGrants"] = [{"hostCreated": True}]
         transport = RecordingTransport()

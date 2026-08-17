@@ -96,8 +96,12 @@ REQUIRED_PATHS = (
     "docs/decisions/0064-durable-plugin-invocation-ownership.md",
     "docs/decisions/0065-plugin-invocation-cancellation-and-reconciliation.md",
     "docs/decisions/0066-host-mediated-plugin-read-connectivity.md",
+    "docs/decisions/0067-attested-plugin-mediation-bridge-image.md",
+    "docs/decisions/0068-executable-plugin-compatibility-evidence.md",
+    "docs/decisions/0069-manifest-bound-plugin-signatures.md",
     "docs/specifications/plugin-invocation-lifecycle-contract.md",
     "docs/specifications/plugin-mediation-contract.md",
+    "docs/specifications/plugin-compatibility-contract.md",
     "docs/operations/evidence-retention.md",
     "docs/operations/event-delivery.md",
     "docs/operations/helm-deployment.md",
@@ -148,6 +152,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/plugin-mediation-grant.schema.json",
     "contracts/schemas/plugin-mediation-request.schema.json",
     "contracts/schemas/plugin-mediation-response.schema.json",
+    "contracts/schemas/plugin-compatibility-report.schema.json",
     "contracts/schemas/evidence.schema.json",
     "contracts/schemas/evidence-retention-report.schema.json",
     "contracts/schemas/kubernetes-event-evidence-request.schema.json",
@@ -199,6 +204,7 @@ REQUIRED_PATHS = (
     "contracts/examples/plugin-mediation-grant.json",
     "contracts/examples/plugin-mediation-request.json",
     "contracts/examples/plugin-mediation-response.json",
+    "contracts/examples/plugin-compatibility-report.json",
     "contracts/examples/policy-decision-request.json",
     "contracts/examples/policy-decision.json",
     "contracts/examples/investigation-request.json",
@@ -318,12 +324,14 @@ REQUIRED_PATHS = (
     "tests/test_helm_values.py",
     "tests/test_release_bundle.py",
     "tests/test_plugin_invocation_lifecycle.py",
+    "tests/test_plugin_compatibility.py",
     "tests/test_ci_supply_chain.py",
     "tests/test_investigation_signal_catalog.py",
     ".github/dependabot.yml",
     "scripts/test_helm_install.sh",
     "scripts/build_release_bundle.sh",
     "scripts/release_bundle.py",
+    "scripts/run_plugin_runner_conformance.py",
     "sdks/typescript/package-lock.json",
     "tests/test_authentication.py",
     "tests/test_console_authentication.py",
@@ -393,6 +401,7 @@ REQUIRED_PATHS = (
 )
 
 LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+IGNORED_TREE_PARTS = {".git", ".iip", ".venv", "dist", "node_modules"}
 
 
 def fail(errors: List[str], message: str) -> None:
@@ -408,7 +417,8 @@ def validate_required_paths(errors: List[str]) -> None:
 def load_json_documents(errors: List[str]) -> Mapping[Path, object]:
     documents = {}
     for path in sorted(ROOT.rglob("*.json")):
-        if "node_modules" in path.parts:
+        relative = path.relative_to(ROOT)
+        if any(part in IGNORED_TREE_PARTS for part in relative.parts):
             continue
         try:
             documents[path] = json.loads(path.read_text(encoding="utf-8"))
@@ -659,6 +669,63 @@ def validate_plugin_mediation_examples(
             fail(errors, "plugin mediation response bodyBytes must match canonical JSON")
         if response_spec.get("bodyDigest") != "sha256:" + hashlib.sha256(encoded).hexdigest():
             fail(errors, "plugin mediation response bodyDigest must match canonical JSON")
+
+
+def validate_plugin_compatibility_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check matrix uniqueness and derived compatibility summary semantics."""
+
+    path = ROOT / "contracts" / "examples" / "plugin-compatibility-report.json"
+    report = documents.get(path)
+    if not isinstance(report, dict):
+        fail(errors, "plugin compatibility report example must be an object")
+        return
+    spec = report.get("spec")
+    profiles = spec.get("profiles") if isinstance(spec, dict) else None
+    summary = spec.get("summary") if isinstance(spec, dict) else None
+    if not isinstance(profiles, list) or not isinstance(summary, dict):
+        fail(errors, "plugin compatibility report must contain profiles and summary")
+        return
+    names = [profile.get("name") for profile in profiles if isinstance(profile, dict)]
+    if len(names) != len(profiles) or len(set(names)) != len(names):
+        fail(errors, "plugin compatibility profile names must be unique")
+        return
+    if set(names) != {"offline-fixture", "host-mediated-read"}:
+        fail(errors, "repository compatibility report must cover both runner profiles")
+    manifest_digests = [
+        profile.get("manifestDigest")
+        for profile in profiles
+        if isinstance(profile, dict)
+    ]
+    if len(set(manifest_digests)) != len(profiles):
+        fail(errors, "plugin compatibility profiles must bind distinct manifests")
+    compatible = 0
+    for profile in profiles:
+        assert isinstance(profile, dict)
+        checks = profile.get("checks")
+        if not isinstance(checks, list):
+            continue
+        check_ids = [check.get("id") for check in checks if isinstance(check, dict)]
+        if len(check_ids) != len(checks) or len(set(check_ids)) != len(check_ids):
+            fail(errors, f"plugin compatibility {profile.get('name')} checks must be unique")
+        all_passed = all(
+            isinstance(check, dict)
+            and check.get("status") == "passed"
+            and "errorCode" not in check
+            for check in checks
+        )
+        if (profile.get("result") == "compatible") != all_passed:
+            fail(errors, f"plugin compatibility {profile.get('name')} result is inconsistent")
+        compatible += int(all_passed)
+    incompatible = len(profiles) - compatible
+    if summary != {
+        "totalProfiles": len(profiles),
+        "compatibleProfiles": compatible,
+        "incompatibleProfiles": incompatible,
+        "overallStatus": "compatible" if incompatible == 0 else "incompatible",
+    }:
+        fail(errors, "plugin compatibility summary must match its profile results")
 
 
 def validate_collection_examples(
@@ -2556,6 +2623,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("agent-manifest.json", "Agent"),
         ("integration-config.json", "IntegrationConfig"),
         ("plugin-manifest.json", "Plugin"),
+        ("plugin-compatibility-report.json", "PluginCompatibilityReport"),
         ("plugin-invocation.json", "PluginInvocation"),
         ("plugin-invocation-result.json", "PluginInvocationResult"),
         ("plugin-invocation-result-failed.json", "PluginInvocationResult"),
@@ -2650,6 +2718,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_otlp_logs_evidence_example(documents, errors)
     validate_evaluation_scenario(documents, errors)
     validate_plugin_mediation_examples(documents, errors)
+    validate_plugin_compatibility_example(documents, errors)
 
     policy_request = documents.get(example_dir / "policy-decision-request.json")
     policy_decision = documents.get(example_dir / "policy-decision.json")
@@ -2697,7 +2766,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
                             {
                                 "keyId": "local-development-2026",
                                 "publisher": "local-development",
-                                "publicKey": "iDSVA6ip-KrgSi71B7GGYnqy5F9yU-ubRVR5z9ZgMNA",
+                                "publicKey": "_9OFdoh9WV4eq_d8eGC_29nchXFwM23YvWuGUZD8lkM",
                             }
                         ]
                     }
@@ -3205,6 +3274,9 @@ def validate_python_boundaries(errors: List[str]) -> None:
 
 def validate_markdown_links(errors: List[str]) -> None:
     for path in sorted(ROOT.rglob("*.md")):
+        relative = path.relative_to(ROOT)
+        if any(part in IGNORED_TREE_PARTS for part in relative.parts):
+            continue
         for target in LINK.findall(path.read_text(encoding="utf-8")):
             target = target.strip()
             if not target or target.startswith(("http://", "https://", "mailto:", "#")):

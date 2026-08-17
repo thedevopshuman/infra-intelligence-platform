@@ -60,6 +60,7 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | Plugin mediation grant | [plugin-mediation-contract.md](plugin-mediation-contract.md) | `contracts/schemas/plugin-mediation-grant.schema.json` | `contracts/examples/plugin-mediation-grant.json` |
 | Plugin mediation request | [plugin-mediation-contract.md](plugin-mediation-contract.md) | `contracts/schemas/plugin-mediation-request.schema.json` | `contracts/examples/plugin-mediation-request.json` |
 | Plugin mediation response | [plugin-mediation-contract.md](plugin-mediation-contract.md) | `contracts/schemas/plugin-mediation-response.schema.json` | `contracts/examples/plugin-mediation-response.json` |
+| Plugin compatibility report | [plugin-compatibility-contract.md](plugin-compatibility-contract.md) | `contracts/schemas/plugin-compatibility-report.schema.json` | `contracts/examples/plugin-compatibility-report.json` |
 | Integration configuration | [integration-config-contract.md](integration-config-contract.md) | `contracts/schemas/integration-config.schema.json` | `contracts/examples/integration-config.json` |
 | Credential lease request | [credential-lease-contract.md](credential-lease-contract.md) | `contracts/schemas/credential-lease-request.schema.json` | `contracts/examples/credential-lease-request.json` |
 | Credential lease | [credential-lease-contract.md](credential-lease-contract.md) | `contracts/schemas/credential-lease.schema.json` | `contracts/examples/credential-lease.json` |

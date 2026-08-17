@@ -33,15 +33,20 @@ Install policy and request policy may narrow these. Runtime discovery cannot exp
 
 `spec.artifact` is an additive descriptor for executable releases. Legacy
 handshake-only manifests may omit it, but the signed runner requires an immutable
-OCI reference, matching SHA-256 digest, Ed25519 key ID, and signature. The
-signature covers canonical JSON with this exact shape:
+OCI reference, matching SHA-256 digest, Ed25519 key ID, manifest-bound `v2`
+profile, and signature. First remove the entire `artifact.signature` property and
+hash the remaining canonical manifest as `manifestDigest`; this binds
+permissions, capabilities, interfaces, configuration schema, publisher, and
+entrypoint without a circular signature. The Ed25519 signature then covers
+canonical JSON with this exact shape:
 
 ```json
 {
-  "apiVersion": "iip.plugin-signature/v1",
+  "apiVersion": "iip.plugin-signature/v2",
   "pluginId": "kubernetes-observer",
   "pluginVersion": "0.3.0",
   "protocolVersion": "1.0",
+  "manifestDigest": "sha256:...",
   "artifact": {
     "type": "oci-image",
     "reference": "repository/image@sha256:...",
@@ -52,7 +57,11 @@ signature covers canonical JSON with this exact shape:
 
 Publisher keys are explicit installation trust roots. A manifest signature does
 not grant capabilities; it only proves that the trusted publisher bound this
-plugin identity and version to this exact artifact.
+plugin identity and version to this exact artifact and declaration. The schema
+continues to parse the legacy image-only signature descriptor for migration and
+inventory tooling, but application `0.42.0` and later runners reject it. Re-sign
+the unsigned canonical manifest with `iip.plugin-signature/v2`; do not translate
+or reuse a `v1` signature.
 
 ## Handshake
 
@@ -84,3 +93,9 @@ mediation remains unsupported.
 ## Compatibility
 
 Plugin versions are immutable. Patch releases fix behavior without contract change; minor releases add backward-compatible capabilities; major releases may break plugin-specific methods. Plugin protocol changes have their own compatibility range independent of plugin semantic version.
+
+Compatibility claims use the executable
+[`PluginCompatibilityReport`](plugin-compatibility-contract.md), not only a
+manifest range. A report binds exact image/manifest digests and host/SDK/runtime
+identity to separately named offline and host-mediated profiles. It describes
+only the architecture and integrations actually exercised.

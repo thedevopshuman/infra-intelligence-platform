@@ -10,7 +10,7 @@
     "deadline": "2026-08-14T12:45:00Z"
   },
   "spec": {
-    "manifestDigest": "sha256:50bf15e1ff06140258890a6811dc909be8d6bc179013a681327d523f99d8783b",
+    "manifestDigest": "sha256:52cc80025e254078b8929a01ad4f37b6d629bc5670910cebef71790664e1f4fa",
     "capability": "resource-observer",
     "method": "collect",
     "input": {

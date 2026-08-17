@@ -50,6 +50,7 @@ from infra_intelligence_sdk import (
     LogEvidenceResult,
     OtlpLogsEvidence,
     OtlpMetricsEvidence,
+    PluginCompatibilityReport,
     PluginInvocation,
     PluginInvocationResult,
     PluginManifest,
@@ -187,6 +188,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         plugin_session = PluginSession.from_dict(example("plugin-session.json"))
         plugin_manifest = PluginManifest.from_dict(example("plugin-manifest.json"))
+        plugin_compatibility = PluginCompatibilityReport.from_dict(
+            example("plugin-compatibility-report.json")
+        )
         plugin_invocation = PluginInvocation.from_dict(
             example("plugin-invocation.json")
         )
@@ -398,6 +402,10 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         self.assertEqual(plugin_session.to_dict()["kind"], "PluginSession")
         self.assertEqual(plugin_manifest.to_dict()["kind"], "Plugin")
+        self.assertEqual(
+            plugin_compatibility.to_dict()["spec"]["summary"]["overallStatus"],
+            "compatible",
+        )
         self.assertEqual(plugin_invocation.to_dict()["kind"], "PluginInvocation")
         self.assertEqual(
             plugin_result.to_dict()["kind"], "PluginInvocationResult"

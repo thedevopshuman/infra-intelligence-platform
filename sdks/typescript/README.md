@@ -54,3 +54,7 @@ Version 0.7 adds `KubernetesEventEvidenceRequest`, `KubernetesEventEvidenceResul
 Version 0.33 adds plugin invocation status, cancellation, and reconciliation types and client methods.
 
 Version 0.34 adds invocation-scoped plugin mediation grant, request, and response types.
+
+Version 0.35 adds `PluginCompatibilityReport` for the offline exact-host
+conformance artifact. The type does not widen plugin authority or imply support
+for untested architectures or provider integrations.

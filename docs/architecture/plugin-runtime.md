@@ -6,8 +6,8 @@ Plugins remain untrusted even when their publisher signature is valid. The
 platform verifies trust and authority in this order:
 
 1. resolve an explicitly installed publisher/key trust root;
-2. verify the Ed25519 signature over plugin identity, protocol, immutable image
-   reference, and digest;
+2. verify the `v2` Ed25519 signature over the complete unsigned manifest digest,
+   plugin identity, protocol, immutable image reference, and digest;
 3. bind the manifest digest, actor, tenant, capability token digest, declared
    method, deadline, and limits to an active `PluginSession`;
 4. atomically claim the tenant/request ID against the persisted session and

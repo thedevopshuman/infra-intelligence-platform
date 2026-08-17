@@ -35,6 +35,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Evaluation scenario contract](specifications/evaluation-scenario-contract.md)
 - [Agent contract](specifications/agent-contract.md)
 - [Plugin contract](specifications/plugin-contract.md)
+- [Plugin compatibility report contract](specifications/plugin-compatibility-contract.md)
 
 ## Decisions and delivery
 

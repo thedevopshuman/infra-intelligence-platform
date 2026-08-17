@@ -45,14 +45,32 @@
             "reference": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^(?:[a-z0-9][a-z0-9._:/-]{0,957}@)?sha256:[a-f0-9]{64}$"},
             "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
             "signature": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["algorithm", "keyId", "value"],
-              "properties": {
-                "algorithm": {"const": "ed25519"},
-                "keyId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/@-]{0,255}$"},
-                "value": {"type": "string", "pattern": "^[A-Za-z0-9_-]{86}$"}
-              }
+              "oneOf": [
+                {
+                  "title": "Legacy image-only signature descriptor",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["algorithm", "keyId", "value"],
+                  "properties": {
+                    "algorithm": {"const": "ed25519"},
+                    "keyId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/@-]{0,255}$"},
+                    "value": {"type": "string", "pattern": "^[A-Za-z0-9_-]{86}$"}
+                  }
+                },
+                {
+                  "title": "Manifest-bound execution signature descriptor",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["profile", "algorithm", "keyId", "manifestDigest", "value"],
+                  "properties": {
+                    "profile": {"const": "iip.plugin-signature/v2"},
+                    "algorithm": {"const": "ed25519"},
+                    "keyId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/@-]{0,255}$"},
+                    "manifestDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+                    "value": {"type": "string", "pattern": "^[A-Za-z0-9_-]{86}$"}
+                  }
+                }
+              ]
             }
           }
         },

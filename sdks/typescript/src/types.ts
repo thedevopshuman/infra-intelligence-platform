@@ -1711,11 +1711,21 @@ export interface PluginManifest {
       type: "oci-image";
       reference: string;
       digest: Sha256Digest;
-      signature: {
-        algorithm: "ed25519";
-        keyId: string;
-        value: string;
-      };
+      signature:
+        | {
+            algorithm: "ed25519";
+            keyId: string;
+            value: string;
+            profile?: never;
+            manifestDigest?: never;
+          }
+        | {
+            profile: "iip.plugin-signature/v2";
+            algorithm: "ed25519";
+            keyId: string;
+            manifestDigest: Sha256Digest;
+            value: string;
+          };
     };
     capabilities: PluginCapability[];
     interfaces?: Array<{
@@ -1731,6 +1741,72 @@ export interface PluginManifest {
       actions: string[];
     };
     configSchema?: Record<string, unknown>;
+  };
+}
+
+export type PluginCompatibilityCheckId =
+  | "manifest-schema"
+  | "publisher-signature"
+  | "immutable-plugin-artifact"
+  | "immutable-mediation-bridge"
+  | "no-network-sandbox"
+  | "bounded-sandbox"
+  | "input-contract"
+  | "output-contract"
+  | "golden-result"
+  | "invocation-local-socket"
+  | "host-mediated-read"
+  | "credentials-host-only";
+
+export interface PluginCompatibilityReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PluginCompatibilityReport";
+  metadata: {
+    id: `pcr_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: boolean;
+  };
+  spec: {
+    host: {
+      platform: `linux/${string}`;
+      containerRuntime: "docker";
+      containerRuntimeVersion: string;
+      applicationVersion: string;
+      sdk: { language: "python"; version: string };
+    };
+    plugin: {
+      id: string;
+      version: string;
+      protocolVersion: "1.0";
+      capability: PluginCapability;
+      method: string;
+      artifactDigest: Sha256Digest;
+      mediationBridgeDigest: Sha256Digest;
+    };
+    profiles: Array<{
+      name: "offline-fixture" | "host-mediated-read";
+      manifestDigest: Sha256Digest;
+      result: "compatible" | "incompatible";
+      checks: Array<
+        | {
+            id: PluginCompatibilityCheckId;
+            status: "passed";
+            errorCode?: never;
+          }
+        | {
+            id: PluginCompatibilityCheckId;
+            status: "failed";
+            errorCode: string;
+          }
+      >;
+    }>;
+    summary: {
+      totalProfiles: number;
+      compatibleProfiles: number;
+      incompatibleProfiles: number;
+      overallStatus: "compatible" | "incompatible";
+    };
   };
 }
 

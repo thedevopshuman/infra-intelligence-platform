@@ -19,9 +19,11 @@
       "reference": "ghcr.io/replace-me/iip-kubernetes-observer@sha256:631af837f552055a375fc7b3c1879de30974859f0915cd735125557c7d8edbea",
       "digest": "sha256:631af837f552055a375fc7b3c1879de30974859f0915cd735125557c7d8edbea",
       "signature": {
+        "profile": "iip.plugin-signature/v2",
         "algorithm": "ed25519",
         "keyId": "local-development-2026",
-        "value": "I-uJSEKQenHkb0YWqp726B4BQngsoPeCXTvhupSUm1J63NXw4m4qy7QvwwmPoLY9rKgWeaNQM06hPTIfkQ2MBg"
+        "manifestDigest": "sha256:997ba9c475b06de15cf52c9fd94bf1ac1143caa2adbec7cdb4c29bee20501fb0",
+        "value": "YPa9bBD45cY5EGqmHG7xpnGVk2vBAkKeEw5je_9uEsHjeEQw0tDRMPKnAv79U5baFSchjfZIWvtQicVimtwkCw"
       }
     },
     "capabilities": ["resource-observer"],

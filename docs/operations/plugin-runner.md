@@ -5,24 +5,43 @@
 Run the complete offline gate with Docker Desktop:
 
 ```bash
-make test-plugin-runner
+make test-plugin-compatibility
 ```
 
+`make test-plugin-runner` remains an alias. The gate writes the validated
+machine-readable matrix to `dist/plugin-compatibility-report.json`.
+
 The target builds the example observer image locally, resolves its immutable
-image ID, creates an ephemeral Ed25519 publisher key, signs the exact artifact
-descriptor, opens a bounded plugin session, and invokes the container through
+image ID, creates an ephemeral Ed25519 publisher key, signs the complete
+least-authority manifest and exact artifact descriptor, opens a bounded plugin
+session, and invokes the container through
 the hardened runner. The result must match the observer's canonical golden
 resource collection and validate against the public invocation-result schema.
 The temporary image tag is removed afterward; no credential is printed or
 mounted into the container.
 
-The conformance invocation declares the Kubernetes API as a manifest upper
-bound, embeds one exact read grant, and uses a protected host binding. The
-container reaches only `/run/iip-mediation/request.sock`; the host test gateway
-returns the provider fixture through that socket. This proves the Docker bind,
-framing, path/query grant, policy, pre-egress audit, count limit, and
-no-network execution together. It does not claim live customer credential or
-Kubernetes interoperability.
+The runner accepts only `iip.plugin-signature/v2`, which signs the digest of the
+complete canonical manifest with its signature property removed. A permission,
+capability, interface, publisher, entrypoint, or configuration change therefore
+fails publisher verification. Legacy image-only signatures remain parseable for
+migration inventory but must be re-signed before execution.
+
+The conformance session makes two independent invocations against the same
+signed image. `offline-fixture` proves public SDK/stdin framing and the golden
+result without a mediation socket. `host-mediated-read` declares the Kubernetes
+API as a manifest upper bound, embeds one exact read grant, and uses a protected
+host binding. The container reaches only `/run/iip-mediation/request.sock`; the
+host test gateway returns the provider fixture through that socket. This proves
+the Docker bind, framing, path/query grant, policy, pre-egress audit, count
+limit, and no-network execution together. It does not claim live customer
+credential or Kubernetes interoperability.
+
+The report binds those outcomes to the exact plugin and relay image IDs,
+canonical signed-manifest digest, application and Python SDK versions, Git
+revision and dirty state, Docker server version, and Linux architecture. Never
+copy a local `linux/aarch64` or dirty-worktree pass into a general customer
+support claim; rerun the matrix on each certified host and clean release
+revision.
 
 The relay image is built from
 `deploy/plugin-mediation-bridge/Dockerfile`, resolved to its immutable image ID,

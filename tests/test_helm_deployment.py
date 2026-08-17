@@ -159,6 +159,19 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             with self.subTest(variable=variable):
                 self.assertIn(variable, config_map)
 
+    def test_investigation_queue_admission_limit_is_explicit(self) -> None:
+        config_map = (CHART / "templates" / "configmap.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("investigationQueue:", values)
+        self.assertIn("maxOutstandingJobsPerTenant: 1000", values)
+        self.assertIn(
+            "IIP_INVESTIGATION_MAX_OUTSTANDING_JOBS_PER_TENANT",
+            config_map,
+        )
+
     def test_query_availability_objective_is_explicit_and_otel_visible(self) -> None:
         config_map = (CHART / "templates" / "configmap.yaml").read_text(
             encoding="utf-8"

@@ -21,8 +21,10 @@ from iip.application.investigate import DeterministicInvestigationService
 from iip.application.investigation_dispatch import (
     CancelInvestigationJobCommand,
     GetInvestigationJobCommand,
+    InvestigationDispatchLimits,
     InvestigationDispatchService,
     InvestigationJobNotFoundError,
+    InvestigationQueueCapacityError,
     SubmitInvestigationJobCommand,
 )
 from iip.application.investigation_lifecycle import InvestigationLifecycleService
@@ -112,6 +114,15 @@ class InvestigationJobTests(unittest.TestCase):
             retry_seconds=1,
         )
 
+    def test_outstanding_job_limit_is_strict_and_bounded(self) -> None:
+        for value in (True, 0, 100_001):
+            with self.subTest(value=value), self.assertRaisesRegex(
+                ValueError, "investigation.queue.configuration.invalid"
+            ):
+                InvestigationDispatchLimits(
+                    max_outstanding_jobs_per_tenant=value
+                )
+
     def test_submit_worker_and_terminal_report_are_durable(self) -> None:
         queued = self.dispatch.submit(
             SubmitInvestigationJobCommand(self.actor, self.request)
@@ -152,6 +163,38 @@ class InvestigationJobTests(unittest.TestCase):
         changed["spec"]["question"] = "A different immutable question"
         with self.assertRaisesRegex(Exception, "investigation.id.conflict"):
             self.dispatch.submit(SubmitInvestigationJobCommand(self.actor, changed))
+
+    def test_outstanding_job_cap_preserves_idempotency_and_releases_on_terminal(self) -> None:
+        limited = InvestigationDispatchService(
+            self.store,
+            self.investigations,
+            InvestigationLifecycleService(self.store, self.clock),
+            self.clock,
+            InvestigationDispatchLimits(max_outstanding_jobs_per_tenant=1),
+        )
+        first = limited.submit(
+            SubmitInvestigationJobCommand(self.actor, self.request)
+        )
+        self.assertEqual(
+            limited.submit(SubmitInvestigationJobCommand(self.actor, self.request)),
+            first,
+        )
+        second = copy.deepcopy(self.request)
+        second["metadata"]["id"] = f"inv_{'c' * 32}"
+        with self.assertRaisesRegex(
+            InvestigationQueueCapacityError,
+            "investigation.queue.capacity-exceeded",
+        ):
+            limited.submit(SubmitInvestigationJobCommand(self.actor, second))
+
+        cancellation = example("investigation-cancellation-request.json")
+        cancellation["metadata"]["actorId"] = self.actor.actor_id
+        cancellation["metadata"]["requestedAt"] = self.clock.now()
+        cancellation["spec"]["investigationId"] = self.request["metadata"]["id"]
+        limited.cancel(CancelInvestigationJobCommand(self.actor, cancellation))
+
+        accepted = limited.submit(SubmitInvestigationJobCommand(self.actor, second))
+        self.assertEqual(accepted["metadata"]["id"], second["metadata"]["id"])
 
     def test_queued_cancellation_prevents_execution(self) -> None:
         self.dispatch.submit(SubmitInvestigationJobCommand(self.actor, self.request))
@@ -375,6 +418,58 @@ class InvestigationJobHttpAndSdkTests(unittest.TestCase):
         self.assertEqual(calls[0][0], "/v1/investigation-jobs")
         self.assertTrue(calls[1][0].startswith("/v1/investigation-jobs/inv_"))
         self.assertTrue(calls[2][0].endswith("/cancel"))
+
+    def test_http_returns_stable_rate_limit_error_when_tenant_queue_is_full(self) -> None:
+        token = "investigation-capacity-token-0123456789abcdef"
+        authenticator = HashedBearerAuthenticator.from_json(
+            json.dumps(
+                {
+                    "identities": [
+                        {
+                            "tokenSha256": HashedBearerAuthenticator.token_sha256(
+                                token
+                            ),
+                            "actorId": "developer",
+                            "tenantId": "local",
+                            "roles": ["developer"],
+                        }
+                    ]
+                }
+            )
+        )
+        runtime = build_local_runtime(
+            authenticator,
+            investigation_dispatch_limits=InvestigationDispatchLimits(
+                max_outstanding_jobs_per_tenant=1
+            ),
+        )
+        self.addCleanup(runtime.close)
+        actor = ActorContext("developer", "local", ("developer",))
+        resource = runtime.ingestion.execute(
+            IngestResourceCommand(actor, example("resource.json"))
+        )
+        request = example("investigation-request.json")
+        request["spec"]["scope"]["resourceUids"] = [resource.identity.uid]
+
+        handler = object.__new__(ApiHandler)
+        handler.runtime = runtime
+        handler.headers = {"authorization": f"Bearer {token}"}
+        handler.path = "/v1/investigation-jobs"
+        handler._read_json = lambda: request
+        responses: list[tuple[HTTPStatus, dict]] = []
+        handler._json = lambda status, payload: responses.append((status, payload))
+        handler.do_POST()
+
+        second = copy.deepcopy(request)
+        second["metadata"]["id"] = f"inv_{'d' * 32}"
+        handler._read_json = lambda: second
+        handler.do_POST()
+
+        self.assertEqual(responses[-1][0], HTTPStatus.TOO_MANY_REQUESTS)
+        self.assertEqual(
+            responses[-1][1],
+            {"error": {"code": "investigation.queue.capacity-exceeded"}},
+        )
 
 
 if __name__ == "__main__":

@@ -905,8 +905,10 @@ class InvestigationJobRepository(Protocol):
         investigation_id: str,
         request: Mapping[str, object],
         status: Mapping[str, object],
+        *,
+        max_outstanding_jobs_per_tenant: int = 1000,
     ) -> Mapping[str, object]:
-        """Idempotently persist one validated request for background execution."""
+        """Idempotently enqueue within one exact tenant's outstanding-job cap."""
 
     def get_investigation_job(
         self, actor: ActorContext, investigation_id: str

@@ -288,6 +288,8 @@ class PostgresOperationalStore:
         investigation_id: str,
         request: Mapping[str, object],
         status: Mapping[str, object],
+        *,
+        max_outstanding_jobs_per_tenant: int = 1000,
     ) -> Mapping[str, object]:
         self._assert_tenant(actor, request)
         self._assert_tenant(actor, status)
@@ -295,9 +297,46 @@ class PostgresOperationalStore:
         spec = status.get("spec")
         if not isinstance(metadata, Mapping) or not isinstance(spec, Mapping):
             raise PersistenceError("storage.input-invalid")
+        if (
+            isinstance(max_outstanding_jobs_per_tenant, bool)
+            or not isinstance(max_outstanding_jobs_per_tenant, int)
+            or not 1 <= max_outstanding_jobs_per_tenant <= 100_000
+        ):
+            raise PersistenceError("storage.input-invalid")
         request_digest = canonical_digest(request)
         try:
             with self._connect() as connection:
+                connection.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (actor.tenant_id,),
+                )
+                existing = connection.execute(
+                    """
+                    SELECT request_digest, status_document AS document
+                    FROM iip.investigation_jobs
+                    WHERE tenant_id = %s AND investigation_id = %s
+                    """,
+                    (actor.tenant_id, investigation_id),
+                ).fetchone()
+                if existing is not None:
+                    if existing["request_digest"] != request_digest:
+                        raise PersistenceError("storage.conflict")
+                    return dict(existing["document"])
+                outstanding = connection.execute(
+                    """
+                    SELECT count(*) AS outstanding
+                    FROM iip.investigation_jobs
+                    WHERE tenant_id = %s
+                      AND state IN ('queued', 'running', 'cancellation-requested')
+                    """,
+                    (actor.tenant_id,),
+                ).fetchone()
+                if (
+                    outstanding is not None
+                    and int(outstanding["outstanding"])
+                    >= max_outstanding_jobs_per_tenant
+                ):
+                    raise PersistenceError("storage.capacity-exceeded")
                 row = connection.execute(
                     """
                     INSERT INTO iip.investigation_jobs (

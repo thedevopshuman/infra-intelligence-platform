@@ -16,7 +16,7 @@ The exact validated request envelope is stored unchanged. The execution lease is
 
 ## Background dispatch
 
-`POST /v1/investigation-jobs` validates resource scope and the complete investigation request before durably accepting it, then returns `202` with `InvestigationJobStatus`. Submission is idempotent for the same investigation ID and exact request digest; reusing an ID for different input returns `investigation.id.conflict`. The existing synchronous `POST /v1/investigations` remains compatible for bounded callers.
+`POST /v1/investigation-jobs` validates resource scope and the complete investigation request before durably accepting it, then returns `202` with `InvestigationJobStatus`. Submission is idempotent for the same investigation ID and exact request digest; reusing an ID for different input returns `investigation.id.conflict`. A deployment-configured exact-tenant cap counts `queued`, `running`, and `cancellation-requested` jobs. Exact idempotent replay remains available at the cap, but a new ID returns HTTP `429` with `investigation.queue.capacity-exceeded`. Terminal jobs release admission capacity without deleting their immutable history. The response never reveals the configured cap, current count, or another job. The existing synchronous `POST /v1/investigations` remains compatible for bounded callers.
 
 Job state is `queued`, `running`, `cancellation-requested`, `completed`, `failed`, or `cancelled`. Queue time and attempt count are always present. Queued jobs expose their next `availableAt`; claimed jobs expose bounded heartbeat and lease timestamps; terminal jobs expose completion time and, when execution started, the immutable report reference. Only a stable redacted error code may be public. Worker identity, claim token, request content, evidence, provider output, credentials, and exception text never enter this contract.
 
@@ -47,3 +47,4 @@ Cancellation is cooperative: an in-flight provider call must return or honor its
 - a dispatch heartbeat cannot overwrite a concurrent cancellation; and
 - retry exhaustion terminates with a stable code instead of retrying indefinitely.
 - one tenant cannot exceed its configured deployment-wide live-lease cap.
+- concurrent API replicas cannot overfill one tenant's outstanding-job cap.

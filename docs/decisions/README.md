@@ -64,3 +64,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0058](0058-investigation-completion-slo-semantics.md) | Accepted | Measure useful asynchronous investigation completion from durable job outcomes |
 | [0059](0059-backend-neutral-query-availability-telemetry.md) | Accepted | Export bounded query availability and latency semantics through OTLP metrics |
 | [0060](0060-tenant-fair-investigation-admission.md) | Accepted | Bound process and deployment-wide tenant investigation concurrency without widening authority |
+| [0061](0061-bounded-tenant-investigation-admission.md) | Accepted | Bound each tenant's outstanding investigation backlog while preserving idempotent submission |

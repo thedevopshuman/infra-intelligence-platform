@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.34.0",
+    "version": "0.35.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -409,13 +409,14 @@
     "/v1/investigation-jobs": {
       "post": {
         "operationId": "submitInvestigation",
-        "description": "Validate and durably queue one immutable investigation request. Protected tenant catalog candidates are resolved and content-digested before persistence, then a tenant-scoped worker verifies the frozen snapshot and claims it under a renewable dispatch lease. Investigation upper bounds, budgets, and the separate non-renewable execution deadline remain authoritative.",
+        "description": "Validate and durably queue one immutable investigation request within the authenticated tenant's deployment-configured outstanding-job limit. Exact idempotent resubmission remains available when the limit is full. Protected tenant catalog candidates are resolved and content-digested before persistence, then a tenant-scoped worker verifies the frozen snapshot and claims it under a renewable dispatch lease. Investigation upper bounds, budgets, and the separate non-renewable execution deadline remain authoritative.",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-request.schema.json"}}}},
         "responses": {
           "202": {"description": "Request durably queued or its existing idempotent job returned", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-job-status.schema.json"}}}},
           "400": {"$ref": "#/components/responses/InvalidRequest"},
           "401": {"$ref": "#/components/responses/Unauthorized"},
           "409": {"$ref": "#/components/responses/ObservationConflict"},
+          "429": {"$ref": "#/components/responses/InvestigationQueueFull"},
           "503": {"$ref": "#/components/responses/StorageUnavailable"}
         }
       }
@@ -725,6 +726,15 @@
           "application/json": {
             "schema": {"$ref": "#/components/schemas/Error"},
             "example": {"error": {"code": "storage.unavailable"}}
+          }
+        }
+      },
+      "InvestigationQueueFull": {
+        "description": "The authenticated tenant has reached its outstanding investigation-job limit",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/Error"},
+            "example": {"error": {"code": "investigation.queue.capacity-exceeded"}}
           }
         }
       },

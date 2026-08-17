@@ -24,6 +24,7 @@ data:
   IIP_INVESTIGATION_COMPLETION_SLO_MAXIMUM_SECONDS: {{ .Values.investigationCompletionSlo.maximumCompletionSeconds | quote }}
   IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS: {{ .Values.investigationCompletionSlo.minimumAttainmentBasisPoints | quote }}
   IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ELIGIBLE_JOBS: {{ .Values.investigationCompletionSlo.minimumEligibleJobs | quote }}
+  IIP_INVESTIGATION_MAX_OUTSTANDING_JOBS_PER_TENANT: {{ .Values.investigationQueue.maxOutstandingJobsPerTenant | quote }}
   IIP_QUERY_AVAILABILITY_SLO_WINDOW_SECONDS: {{ .Values.queryAvailabilitySlo.windowSeconds | quote }}
   IIP_QUERY_AVAILABILITY_SLO_MINIMUM_BASIS_POINTS: {{ .Values.queryAvailabilitySlo.minimumAvailabilityBasisPoints | quote }}
   IIP_QUERY_AVAILABILITY_SLO_MINIMUM_ELIGIBLE_REQUESTS: {{ .Values.queryAvailabilitySlo.minimumEligibleRequests | quote }}

@@ -11,6 +11,7 @@
     "eventPublisher",
     "eventDeliverySlo",
     "investigationCompletionSlo",
+    "investigationQueue",
     "queryAvailabilitySlo",
     "serviceAccount",
     "podSecurityContext",
@@ -215,6 +216,18 @@
         "maximumCompletionSeconds": {"type": "integer", "minimum": 1, "maximum": 86400},
         "minimumAttainmentBasisPoints": {"type": "integer", "minimum": 1, "maximum": 10000},
         "minimumEligibleJobs": {"type": "integer", "minimum": 1, "maximum": 1000000}
+      }
+    },
+    "investigationQueue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxOutstandingJobsPerTenant"],
+      "properties": {
+        "maxOutstandingJobsPerTenant": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        }
       }
     },
     "queryAvailabilitySlo": {

@@ -70,6 +70,7 @@ from iip.application.investigation_dispatch import (
     CancelInvestigationJobCommand,
     GetInvestigationJobCommand,
     InvestigationJobNotFoundError,
+    InvestigationQueueCapacityError,
     SubmitInvestigationJobCommand,
 )
 from iip.application.kubernetes_event_evidence import (
@@ -151,7 +152,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.34.0"
+    server_version = "IIPReference/0.35.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -799,6 +800,11 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
         except (InvestigationConflictError, InvestigationInProgressError) as exc:
             self._json(HTTPStatus.CONFLICT, {"error": {"code": str(exc)}})
+        except InvestigationQueueCapacityError as exc:
+            self._json(
+                HTTPStatus.TOO_MANY_REQUESTS,
+                {"error": {"code": str(exc)}},
+            )
         except ActionWorkflowError as exc:
             code = str(exc)
             status = (

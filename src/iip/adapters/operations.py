@@ -145,9 +145,17 @@ class InMemoryOperationalStore:
         investigation_id: str,
         request: Mapping[str, object],
         status: Mapping[str, object],
+        *,
+        max_outstanding_jobs_per_tenant: int = 1000,
     ) -> Mapping[str, object]:
         self._assert_tenant(actor, request)
         self._assert_tenant(actor, status)
+        if (
+            isinstance(max_outstanding_jobs_per_tenant, bool)
+            or not isinstance(max_outstanding_jobs_per_tenant, int)
+            or not 1 <= max_outstanding_jobs_per_tenant <= 100_000
+        ):
+            raise PersistenceError("storage.input-invalid")
         key = (actor.tenant_id, investigation_id)
         entry: dict[str, object] = {
             "actor": actor,
@@ -165,8 +173,28 @@ class InMemoryOperationalStore:
                 if current["request"] != entry["request"]:
                     raise PersistenceError("storage.conflict")
                 return copy.deepcopy(current["status"])
+            outstanding = sum(
+                1
+                for (candidate_tenant, _), candidate in (
+                    self._investigation_jobs.items()
+                )
+                if candidate_tenant == actor.tenant_id
+                and self._job_is_outstanding(candidate)
+            )
+            if outstanding >= max_outstanding_jobs_per_tenant:
+                raise PersistenceError("storage.capacity-exceeded")
             self._investigation_jobs[key] = entry
             return copy.deepcopy(entry["status"])
+
+    @staticmethod
+    def _job_is_outstanding(entry: Mapping[str, object]) -> bool:
+        status = entry.get("status")
+        spec = status.get("spec") if isinstance(status, Mapping) else None
+        return bool(
+            isinstance(spec, Mapping)
+            and spec.get("state")
+            in {"queued", "running", "cancellation-requested"}
+        )
 
     def get_investigation_job(
         self, actor: ActorContext, investigation_id: str

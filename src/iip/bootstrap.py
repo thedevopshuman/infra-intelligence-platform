@@ -82,7 +82,10 @@ from iip.application.log_evidence import (
     TelemetryLogsEvidenceProvider,
 )
 from iip.application.investigate import DeterministicInvestigationService
-from iip.application.investigation_dispatch import InvestigationDispatchService
+from iip.application.investigation_dispatch import (
+    InvestigationDispatchLimits,
+    InvestigationDispatchService,
+)
 from iip.application.investigation_lifecycle import InvestigationLifecycleService
 from iip.application.investigation_worker import InvestigationWorker
 from iip.application.kubernetes_event_evidence import (
@@ -203,6 +206,7 @@ def build_local_runtime(
     policy: PolicyDecisionPoint | None = None,
     signal_catalog: InvestigationSignalCatalog | None = None,
     readiness: ReadinessProbe | None = None,
+    investigation_dispatch_limits: InvestigationDispatchLimits | None = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -232,6 +236,7 @@ def build_local_runtime(
         policy,
         signal_catalog,
         readiness,
+        investigation_dispatch_limits,
     )
 
 
@@ -258,6 +263,7 @@ def _compose_runtime(
     configured_policy: PolicyDecisionPoint | None = None,
     signal_catalog: InvestigationSignalCatalog | None = None,
     readiness: ReadinessProbe | None = None,
+    investigation_dispatch_limits: InvestigationDispatchLimits | None = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -403,6 +409,7 @@ def _compose_runtime(
             investigations,
             investigation_lifecycle,
             clock,
+            investigation_dispatch_limits,
         ),
         actions=GovernedActionService(
             store,
@@ -469,6 +476,7 @@ def build_postgres_runtime(
     policy: PolicyDecisionPoint | None = None,
     signal_catalog: InvestigationSignalCatalog | None = None,
     readiness_timeout_seconds: int = 2,
+    investigation_dispatch_limits: InvestigationDispatchLimits | None = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -505,6 +513,7 @@ def build_postgres_runtime(
         policy,
         signal_catalog,
         PostgresReadinessProbe(database_url, readiness_timeout_seconds),
+        investigation_dispatch_limits,
     )
 
 
@@ -546,6 +555,7 @@ def _build_runtime_from_env(
         _investigation_completion_slo_objectives_from_env()
     )
     query_availability_objectives = _query_availability_objectives_from_env()
+    investigation_dispatch_limits = _investigation_dispatch_limits_from_env()
     metrics_runtime = _otel_metrics_runtime_from_env()
     try:
         traces_runtime = _otel_traces_runtime_from_env()
@@ -621,6 +631,7 @@ def _build_runtime_from_env(
                 action_executor=action_executor,
                 policy=policy,
                 signal_catalog=signal_catalog,
+                investigation_dispatch_limits=investigation_dispatch_limits,
             )
         auto_migrate = (
             os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
@@ -657,6 +668,7 @@ def _build_runtime_from_env(
             action_executor=action_executor,
             policy=policy,
             signal_catalog=signal_catalog,
+            investigation_dispatch_limits=investigation_dispatch_limits,
             readiness_timeout_seconds=_readiness_timeout_from_env(),
         )
     except Exception:
@@ -994,6 +1006,18 @@ def _query_availability_objectives_from_env() -> QueryAvailabilityObjectives:
             defaults.minimum_eligible_requests,
         ),
     )
+
+
+def _investigation_dispatch_limits_from_env() -> InvestigationDispatchLimits:
+    raw = os.environ.get(
+        "IIP_INVESTIGATION_MAX_OUTSTANDING_JOBS_PER_TENANT",
+        "1000",
+    )
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError("investigation.queue.configuration.invalid") from None
+    return InvestigationDispatchLimits(max_outstanding_jobs_per_tenant=value)
 
 
 def _otel_metrics_runtime_from_env() -> Any:

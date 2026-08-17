@@ -28,6 +28,24 @@ class InvestigationJobNotFoundError(LookupError):
     """The job does not exist in the authenticated tenant."""
 
 
+class InvestigationQueueCapacityError(RuntimeError):
+    """The authenticated tenant has reached its outstanding-job limit."""
+
+
+@dataclass(frozen=True)
+class InvestigationDispatchLimits:
+    max_outstanding_jobs_per_tenant: int = 1000
+
+    def __post_init__(self) -> None:
+        value = self.max_outstanding_jobs_per_tenant
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or not 1 <= value <= 100_000
+        ):
+            raise ValueError("investigation.queue.configuration.invalid")
+
+
 @dataclass(frozen=True)
 class SubmitInvestigationJobCommand:
     actor: ActorContext
@@ -55,11 +73,13 @@ class InvestigationDispatchService:
         investigations: DeterministicInvestigationService,
         lifecycle: InvestigationLifecycleService,
         clock: Clock,
+        limits: InvestigationDispatchLimits | None = None,
     ) -> None:
         self._repository = repository
         self._investigations = investigations
         self._lifecycle = lifecycle
         self._clock = clock
+        self._limits = limits or InvestigationDispatchLimits()
 
     def submit(
         self, command: SubmitInvestigationJobCommand
@@ -85,11 +105,18 @@ class InvestigationDispatchService:
                 investigation_id,
                 request,
                 status,
+                max_outstanding_jobs_per_tenant=(
+                    self._limits.max_outstanding_jobs_per_tenant
+                ),
             )
         except PersistenceError as exc:
             if str(exc) == "storage.conflict":
                 raise InvestigationConflictError(
                     "investigation.id.conflict"
+                ) from None
+            if str(exc) == "storage.capacity-exceeded":
+                raise InvestigationQueueCapacityError(
+                    "investigation.queue.capacity-exceeded"
                 ) from None
             raise
 

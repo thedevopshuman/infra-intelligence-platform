@@ -67,6 +67,12 @@ class HelmValuesContractTests(unittest.TestCase):
         self.assertEqual(
             worker["maxTenantInvestigationConcurrency"]["maximum"], 64
         )
+        self.assertEqual(
+            properties["investigationQueue"]["properties"][
+                "maxOutstandingJobsPerTenant"
+            ]["maximum"],
+            100000,
+        )
 
     def test_cross_field_guards_fail_before_a_workload_is_rendered(self) -> None:
         guards = (CHART / "templates" / "validation.yaml").read_text(

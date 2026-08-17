@@ -13,6 +13,8 @@ The authenticated gateway establishes tenant and actor context. Payload tenant f
 
 Cross-tenant operations are a separate privileged use case with explicit policy and audit; they are not implemented by omitting the tenant predicate.
 
+Asynchronous investigation admission is tenant-local and bounded twice: non-terminal backlog at enqueue and unexpired live leases at worker claim. Both PostgreSQL checks serialize only the exact tenant, preserve idempotent submission, and return value-minimized stable errors. Capacity configuration never grants scope or reveals another tenant's demand.
+
 The HTTP surface follows the [authentication boundary](authentication-boundary.md): a replaceable authenticator verifies a Bearer credential and derives actor, tenant, and roles before any protected use case runs. Caller-controlled identity headers are ignored. The hashed opaque-token adapter is restricted to local development and tests; deployed profiles can verify issuer- and audience-bound OIDC JWTs against an explicitly trusted HTTPS JWKS endpoint.
 
 ## Authority levels

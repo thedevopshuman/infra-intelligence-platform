@@ -1146,6 +1146,59 @@ class PostgresOperationalStoreTests(unittest.TestCase):
             )
         )
 
+    def test_concurrent_job_admission_cannot_overfill_one_tenant(self) -> None:
+        actor = ActorContext("developer", "local", ("developer",))
+        barrier = Barrier(3)
+
+        def enqueue(digit: str):
+            request = json.loads(
+                (ROOT / "contracts/examples/investigation-request.json").read_text()
+            )
+            investigation_id = f"inv_{digit * 32}"
+            request["metadata"]["id"] = investigation_id
+            queued = InvestigationDispatchService.queued_status(
+                actor,
+                investigation_id,
+                request,
+                "2026-08-17T12:00:00Z",
+                attempts=0,
+            )
+            barrier.wait()
+            try:
+                result = self.operations.enqueue_investigation_job(
+                    actor,
+                    investigation_id,
+                    request,
+                    queued,
+                    max_outstanding_jobs_per_tenant=1,
+                )
+                return "accepted", request, result
+            except PersistenceError as exc:
+                return str(exc), request, queued
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = tuple(pool.submit(enqueue, digit) for digit in ("d", "e"))
+            barrier.wait()
+            results = tuple(future.result() for future in futures)
+
+        self.assertCountEqual(
+            (result[0] for result in results),
+            ("accepted", "storage.capacity-exceeded"),
+        )
+        accepted = next(result for result in results if result[0] == "accepted")
+        accepted_request = accepted[1]
+        accepted_status = accepted[2]
+        self.assertEqual(
+            self.operations.enqueue_investigation_job(
+                actor,
+                accepted_status["metadata"]["id"],
+                accepted_request,
+                accepted_status,
+                max_outstanding_jobs_per_tenant=1,
+            ),
+            accepted_status,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

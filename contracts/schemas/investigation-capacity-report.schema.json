@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:investigation-capacity-report:v1alpha1",
+  "title": "Investigation Dispatch Capacity Report",
+  "description": "Source-bound PostgreSQL capacity and isolation evidence for durable investigation dispatch.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "InvestigationCapacityReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^icr_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "environment", "profile", "measurements", "checks"],
+      "properties": {
+        "status": {"enum": ["certified", "failed"]},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["platform", "pythonVersion", "applicationVersion", "database"],
+          "properties": {
+            "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+            "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+            "applicationVersion": {"$ref": "#/$defs/semver"},
+            "database": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["engine", "version", "migration"],
+              "properties": {
+                "engine": {"const": "postgresql"},
+                "version": {"type": "string", "minLength": 1, "maxLength": 64},
+                "migration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"}
+              }
+            }
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "tenantCount",
+            "jobsPerTenant",
+            "parallelClients",
+            "maxOutstandingJobsPerTenant",
+            "maxTenantConcurrency",
+            "maximumOperationP95Milliseconds",
+            "maximumSuiteDurationMilliseconds"
+          ],
+          "properties": {
+            "name": {"const": "postgresql-investigation-dispatch-v1"},
+            "tenantCount": {"type": "integer", "minimum": 2, "maximum": 10000},
+            "jobsPerTenant": {"type": "integer", "minimum": 2, "maximum": 1000},
+            "parallelClients": {"type": "integer", "minimum": 1, "maximum": 64},
+            "maxOutstandingJobsPerTenant": {"type": "integer", "minimum": 2, "maximum": 100000},
+            "maxTenantConcurrency": {"const": 1},
+            "maximumOperationP95Milliseconds": {"type": "integer", "minimum": 1, "maximum": 60000},
+            "maximumSuiteDurationMilliseconds": {"type": "integer", "minimum": 1000, "maximum": 3600000}
+          }
+        },
+        "measurements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["admission", "overload", "claims", "recovery", "suiteDurationMilliseconds"],
+          "properties": {
+            "admission": {"$ref": "#/$defs/admission"},
+            "overload": {"$ref": "#/$defs/overload"},
+            "claims": {"$ref": "#/$defs/claims"},
+            "recovery": {"$ref": "#/$defs/recovery"},
+            "suiteDurationMilliseconds": {"$ref": "#/$defs/milliseconds"}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "prefixItems": [
+            {"$ref": "#/$defs/largeTenantAdmissionCheck"},
+            {"$ref": "#/$defs/overloadCapCheck"},
+            {"$ref": "#/$defs/idempotencyCheck"},
+            {"$ref": "#/$defs/crossTenantIsolationCheck"},
+            {"$ref": "#/$defs/liveLeaseCapCheck"},
+            {"$ref": "#/$defs/firstPassCoverageCheck"},
+            {"$ref": "#/$defs/capacityReleaseCheck"},
+            {"$ref": "#/$defs/latencyCheck"},
+            {"$ref": "#/$defs/durationCheck"}
+          ],
+          "items": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "counter": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "milliseconds": {"type": "integer", "minimum": 0, "maximum": 3600000},
+    "latency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p50Milliseconds", "p95Milliseconds", "maximumMilliseconds"],
+      "properties": {
+        "p50Milliseconds": {"$ref": "#/$defs/milliseconds"},
+        "p95Milliseconds": {"$ref": "#/$defs/milliseconds"},
+        "maximumMilliseconds": {"$ref": "#/$defs/milliseconds"}
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attemptedJobs", "acceptedJobs", "rejectedJobs", "tenantsAccepted", "latency"],
+      "properties": {
+        "attemptedJobs": {"$ref": "#/$defs/counter"},
+        "acceptedJobs": {"$ref": "#/$defs/counter"},
+        "rejectedJobs": {"$ref": "#/$defs/counter"},
+        "tenantsAccepted": {"$ref": "#/$defs/counter"},
+        "latency": {"$ref": "#/$defs/latency"}
+      }
+    },
+    "overload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attemptedJobs", "acceptedJobs", "capacityRejectedJobs", "idempotentRetriesAccepted", "companionTenantJobsAccepted", "latency"],
+      "properties": {
+        "attemptedJobs": {"$ref": "#/$defs/counter"},
+        "acceptedJobs": {"$ref": "#/$defs/counter"},
+        "capacityRejectedJobs": {"$ref": "#/$defs/counter"},
+        "idempotentRetriesAccepted": {"$ref": "#/$defs/counter"},
+        "companionTenantJobsAccepted": {"$ref": "#/$defs/counter"},
+        "latency": {"$ref": "#/$defs/latency"}
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eligibleTenants", "tenantsClaimed", "sameTenantSecondClaimsBlocked", "maximumLiveClaimsPerTenant", "latency"],
+      "properties": {
+        "eligibleTenants": {"$ref": "#/$defs/counter"},
+        "tenantsClaimed": {"$ref": "#/$defs/counter"},
+        "sameTenantSecondClaimsBlocked": {"$ref": "#/$defs/counter"},
+        "maximumLiveClaimsPerTenant": {"$ref": "#/$defs/counter"},
+        "latency": {"$ref": "#/$defs/latency"}
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["terminalizedClaims", "replacementJobsAccepted", "latency"],
+      "properties": {
+        "terminalizedClaims": {"$ref": "#/$defs/counter"},
+        "replacementJobsAccepted": {"$ref": "#/$defs/counter"},
+        "latency": {"$ref": "#/$defs/latency"}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "largeTenantAdmissionCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "large-tenant-admission"}}}]},
+    "overloadCapCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "overload-cap"}}}]},
+    "idempotencyCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "idempotency-at-capacity"}}}]},
+    "crossTenantIsolationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "cross-tenant-isolation"}}}]},
+    "liveLeaseCapCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "tenant-live-lease-cap"}}}]},
+    "firstPassCoverageCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "first-pass-coverage"}}}]},
+    "capacityReleaseCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "terminal-capacity-release"}}}]},
+    "latencyCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "operation-p95-objective"}}}]},
+    "durationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "suite-duration-objective"}}}]}
+  }
+}

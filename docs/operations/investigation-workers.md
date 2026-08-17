@@ -23,6 +23,8 @@ Run continuously with `python -m iip.surfaces.worker`. `--once` claims at most o
 
 Monitor queued age, attempts, heartbeat age, terminal state, and `lastErrorCode` from job status. An expired dispatch claim is safe to reclaim. A live investigation execution returns to the queue until its lease resolves; an expired execution becomes a failed immutable report without replaying evidence calls. Repeated `investigation.runtime.unavailable` or `investigation.retry.exhausted` requires provider/storage diagnosis before resubmitting with a new investigation ID.
 
+Before promotion, run `make test-capacity` and retain its clean-revision aggregate report with release evidence. The default PostgreSQL profile measures large-tenant admission, overload rejection, cross-tenant isolation, live-lease caps, first-pass coverage, and terminal capacity release. Its local timing objectives are regression gates only; follow the [capacity certification runbook](investigation-capacity.md) for customer sizing boundaries.
+
 Never broaden a worker by omitting tenant filters. Enroll tenants through reviewed deployment configuration and use workload identity plus the external credential broker for production evidence access.
 
 Action reconciliation is deliberately non-executing. An expired `executing` lease becomes `manual-reconciliation-required` together with exactly one audit record. The worker does not compose a live action executor, receive Kubernetes action credentials, call an action adapter, retry impact, or change an immutable proposal/approval. The console derives `expired` for unexecuted proposals at read time; an operator must create a new proposal after re-investigating current provider state.

@@ -1,0 +1,74 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationCapacityReport",
+  "metadata": {
+    "id": "icr_11111111111111111111111111111111",
+    "generatedAt": "2026-08-17T15:30:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "certified",
+    "environment": {
+      "platform": "darwin/arm64",
+      "pythonVersion": "3.12.11",
+      "applicationVersion": "0.47.0",
+      "database": {
+        "engine": "postgresql",
+        "version": "18.4",
+        "migration": "0017_telemetry_export_slo_samples.sql"
+      }
+    },
+    "profile": {
+      "name": "postgresql-investigation-dispatch-v1",
+      "tenantCount": 128,
+      "jobsPerTenant": 4,
+      "parallelClients": 16,
+      "maxOutstandingJobsPerTenant": 4,
+      "maxTenantConcurrency": 1,
+      "maximumOperationP95Milliseconds": 5000,
+      "maximumSuiteDurationMilliseconds": 120000
+    },
+    "measurements": {
+      "admission": {
+        "attemptedJobs": 512,
+        "acceptedJobs": 512,
+        "rejectedJobs": 0,
+        "tenantsAccepted": 128,
+        "latency": {"p50Milliseconds": 8, "p95Milliseconds": 24, "maximumMilliseconds": 61}
+      },
+      "overload": {
+        "attemptedJobs": 16,
+        "acceptedJobs": 4,
+        "capacityRejectedJobs": 12,
+        "idempotentRetriesAccepted": 4,
+        "companionTenantJobsAccepted": 1,
+        "latency": {"p50Milliseconds": 11, "p95Milliseconds": 38, "maximumMilliseconds": 43}
+      },
+      "claims": {
+        "eligibleTenants": 128,
+        "tenantsClaimed": 128,
+        "sameTenantSecondClaimsBlocked": 128,
+        "maximumLiveClaimsPerTenant": 1,
+        "latency": {"p50Milliseconds": 7, "p95Milliseconds": 19, "maximumMilliseconds": 32}
+      },
+      "recovery": {
+        "terminalizedClaims": 128,
+        "replacementJobsAccepted": 128,
+        "latency": {"p50Milliseconds": 9, "p95Milliseconds": 26, "maximumMilliseconds": 44}
+      },
+      "suiteDurationMilliseconds": 8654
+    },
+    "checks": [
+      {"id": "large-tenant-admission", "status": "passed"},
+      {"id": "overload-cap", "status": "passed"},
+      {"id": "idempotency-at-capacity", "status": "passed"},
+      {"id": "cross-tenant-isolation", "status": "passed"},
+      {"id": "tenant-live-lease-cap", "status": "passed"},
+      {"id": "first-pass-coverage", "status": "passed"},
+      {"id": "terminal-capacity-release", "status": "passed"},
+      {"id": "operation-p95-objective", "status": "passed"},
+      {"id": "suite-duration-objective", "status": "passed"}
+    ]
+  }
+}

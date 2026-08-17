@@ -93,7 +93,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.46.0
+  tag: 0.47.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -167,6 +167,8 @@ The migration NetworkPolicy hook is created first, then the migration Job. The J
 
 `investigationQueue.maxOutstandingJobsPerTenant` bounds each tenant's durable non-terminal backlog across API replicas. Size it from measured arrival rate, completion capacity, and acceptable queue delay; do not raise it merely to hide sustained completion-SLO misses. A full tenant receives `429 investigation.queue.capacity-exceeded`; an exact idempotent resubmission still returns its existing job. Alert on sustained rejection at the ingress/API telemetry layer and investigate worker capacity or a faulty submitter.
 
+Run the [investigation capacity certification](investigation-capacity.md) before promotion. The local PostgreSQL profile proves the queue's large-tenant and overload invariants, but customer sizing must repeat and extend it on the intended database, network, worker topology, and provider-latency distribution.
+
 `evidenceRetention` is disabled by default. Enabling it requires the workflow worker and exact tenant enrollment. Review legal hold and backup lifecycle first, then use the [evidence retention runbook](evidence-retention.md); the administrator endpoint is observe-only and deletion remains bounded, policy-gated, tenant-serialized, and audited.
 
 The local-hashed authentication example is suitable for a controlled evaluation. The default Secret name is `iip-auth`, but the chart never creates its sensitive contents. Configure the documented OIDC boundary for production; never place local verifier JSON, raw tokens, or an OAuth client secret in a values file. The reviewed OIDC verifier and public-client profile are non-secret configuration; protect changes to them as security policy. Serving pods always receive `IIP_DATABASE_AUTO_MIGRATE=false`; the hook is the chart's only schema authority.
@@ -203,4 +205,4 @@ The first revision additionally proves the public local console-authentication d
 
 ## Production gaps
 
-This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance evidence; the chart declares guarded TLS ingress and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; and the kind gate restores one. Organizational image signing, external secret-controller integration, controller-specific TLS conformance, high availability, zero-downtime migration compatibility, sustained capacity and overload tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.
+This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance and 128-tenant PostgreSQL overload evidence; the chart declares guarded TLS ingress and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; and the kind gate restores one. Organizational image signing, external secret-controller integration, controller-specific TLS conformance, high availability, zero-downtime migration compatibility, customer-environment sustained workload and failover tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.

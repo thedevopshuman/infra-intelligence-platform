@@ -7,8 +7,12 @@
 The release builder refuses a dirty worktree. With Docker Desktop, Buildx, Helm, Node/npm, and Python available, run:
 
 ```bash
+make verify PYTHON=.venv/bin/python
+make test-capacity PYTHON=.venv/bin/python
 make release-bundle PYTHON=.venv/bin/python
 ```
+
+Retain the clean-revision `dist/investigation-capacity-report.json` beside the release candidate as environment-specific queue evidence. It is deliberately not embedded in the portable bundle because its PostgreSQL and host measurements describe the certification environment, not every installation target.
 
 The default build produces `linux/amd64` and `linux/arm64` manifests for both the control plane and the trusted plugin-mediation bridge. BuildKit attaches an in-toto SPDX SBOM and SLSA v1 provenance statement to every platform inside each OCI layout. The base-image index and SBOM generator are digest pinned; dependency updates must intentionally update those pins and pass the normal verification gates.
 
@@ -31,7 +35,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.46.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.47.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 

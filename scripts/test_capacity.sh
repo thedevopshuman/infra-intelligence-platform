@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+IIP_DOCKER_BIN=${IIP_DOCKER_BIN:-docker}
+IIP_TEST_PYTHON=${IIP_TEST_PYTHON:-python3}
+IIP_COMPOSE_FILE=deploy/docker-compose.test.yml
+
+cleanup() {
+    "$IIP_DOCKER_BIN" compose -f "$IIP_COMPOSE_FILE" down --volumes >/dev/null 2>&1 || true
+}
+
+trap cleanup EXIT INT TERM
+if ! command -v "$IIP_DOCKER_BIN" >/dev/null 2>&1; then
+    echo "Docker CLI not found; install and start Docker Desktop" >&2
+    exit 127
+fi
+"$IIP_DOCKER_BIN" compose -f "$IIP_COMPOSE_FILE" up --detach --wait
+IIP_CAPACITY_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/iip_test \
+    PYTHONPATH=src \
+    "$IIP_TEST_PYTHON" scripts/run_capacity_certification.py \
+        --report dist/investigation-capacity-report.json

@@ -77,3 +77,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0071](0071-executable-action-provider-compatibility-profile.md) | Accepted | Prove an isolated action provider stops at the governed proposal queue |
 | [0072](0072-deployment-wide-telemetry-export-health.md) | Accepted | Aggregate pseudonymous API and worker exporter heartbeats without coupling observability to readiness |
 | [0073](0073-sampled-telemetry-export-slo.md) | Accepted | Measure rolling deployment export reliability from bounded pseudonymous counter samples |
+| [0074](0074-executable-investigation-capacity-evidence.md) | Accepted | Bind large-tenant queue isolation and overload measurements to an executable PostgreSQL profile |

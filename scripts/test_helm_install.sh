@@ -78,6 +78,7 @@ IIP_AUTH_IDENTITIES_JSON=$(printf '%s' \
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
     create secret generic iip-database \
     --from-literal="database-url=postgresql://iip:$IIP_DB_PASSWORD@iip-postgres:5432/iip" \
+    --from-literal="password=$IIP_DB_PASSWORD" \
     >/dev/null
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
     create secret generic iip-auth \
@@ -137,6 +138,16 @@ spec:
     - name: postgres
       port: 5432
       targetPort: postgres
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: iip-backups
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 64Mi
 EOF
 
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
@@ -196,6 +207,8 @@ IIP_EXPECTED_MIGRATION_COUNT=$(
     --set ingress.host=iip.helm.test \
     --set ingress.tls.existingSecret=iip-tls \
     --set ingress.tlsRedirectAnnotation=example.test/force-tls \
+    --set backup.enabled=true \
+    --set backup.destination.existingClaim=iip-backups \
     --set networkPolicy.enabled=true \
     --set networkPolicy.databaseEgress.enabled=true \
     --set-string "networkPolicy.databaseEgress.namespaceSelector.kubernetes\\.io/metadata\\.name=$IIP_TEST_NAMESPACE" \
@@ -225,10 +238,99 @@ if [ "$IIP_INGRESS_BINDING" != "iip-conformance|iip.helm.test|iip-tls|true" ]; t
     echo "Helm upgrade did not preserve the explicit TLS ingress binding" >&2
     exit 1
 fi
+
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    create job --from=cronjob/iip-infra-intelligence-backup \
+    iip-backup-conformance >/dev/null
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    wait --for=condition=complete job/iip-backup-conformance \
+    --timeout=180s >/dev/null
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    logs job/iip-backup-conformance | rg -q '^backup complete:'
+
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    apply -f - >/dev/null <<EOF
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: iip-backup-restore-conformance
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 180
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: infra-intelligence
+        app.kubernetes.io/instance: iip
+        app.kubernetes.io/component: database-backup
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: restore-check
+          image: postgres@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              cd /var/lib/iip-backups
+              set -- *.dump.sha256
+              [ "\$#" -eq 1 ]
+              sha256sum -c "\$1"
+              dump="\${1%.sha256}"
+              pg_restore --list "\$dump" >/dev/null
+              trap 'dropdb --if-exists iip_backup_restore_check >/dev/null 2>&1 || true' EXIT
+              dropdb --if-exists iip_backup_restore_check >/dev/null 2>&1 || true
+              createdb iip_backup_restore_check
+              pg_restore --no-owner --no-acl --dbname=iip_backup_restore_check "\$dump"
+              migration_count=\$(psql --dbname=iip_backup_restore_check -Atc 'SELECT count(*) FROM iip.schema_migrations')
+              [ "\$migration_count" = "$IIP_EXPECTED_MIGRATION_COUNT" ]
+              echo "restore verified: migrations=\$migration_count"
+          env:
+            - name: PGHOST
+              value: iip-postgres
+            - name: PGUSER
+              value: iip
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: iip-database
+                  key: password
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: backup
+              mountPath: /var/lib/iip-backups
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: backup
+          persistentVolumeClaim:
+            claimName: iip-backups
+        - name: tmp
+          emptyDir: {}
+EOF
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    wait --for=condition=complete job/iip-backup-restore-conformance \
+    --timeout=180s >/dev/null
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    logs job/iip-backup-restore-conformance | rg -q \
+    "^restore verified: migrations=$IIP_EXPECTED_MIGRATION_COUNT$"
+
 "$IIP_HELM_BIN" history iip \
     --kube-context "$IIP_KUBE_CONTEXT" \
     --namespace "$IIP_TEST_NAMESPACE" --output json |
     "$IIP_TEST_PYTHON" -c \
         'import json,sys; rows=json.load(sys.stdin); assert len(rows) == 2 and str(rows[-1]["revision"]) == "2" and rows[-1]["status"] == "deployed"'
 
-echo "Helm install/upgrade test passed: migration hook -> readiness -> TLS ingress binding -> idempotent upgrade"
+echo "Helm install/upgrade test passed: migrations -> TLS ingress -> scheduled backup -> verified restore"

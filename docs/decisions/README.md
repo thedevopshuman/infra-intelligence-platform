@@ -52,3 +52,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0046](0046-strict-helm-values-contract.md) | Accepted | Reject unknown, unsafe, and internally inconsistent Helm configuration before rollout |
 | [0047](0047-attested-release-bundle.md) | Accepted | Bind install artifacts to one clean revision with checksums, SPDX SBOM, and SLSA provenance |
 | [0048](0048-explicit-tls-ingress-and-upgrade-conformance.md) | Accepted | Keep Services internal while declaring exact TLS ingress and proving migration-safe Helm upgrades |
+| [0049](0049-least-authority-scheduled-logical-backups.md) | Accepted | Schedule checksum-complete logical backups with database-and-PVC-only authority |

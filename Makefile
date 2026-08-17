@@ -124,6 +124,12 @@ helm-lint:
 		--set networkPolicy.enabled=true \
 		--set networkPolicy.databaseEgress.enabled=true >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set database.existingSecret=iip-database \
+		--set backup.enabled=true \
+		--set backup.destination.existingClaim=iip-backups \
+		--set networkPolicy.enabled=true \
+		--set networkPolicy.databaseEgress.enabled=true >/dev/null
+	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set ingress.enabled=true \
 		--set ingress.className=nginx \
 		--set ingress.host=iip.example.test \
@@ -152,6 +158,12 @@ helm-lint:
 		--set networkPolicy.enabled=true \
 		--set networkPolicy.ingressController.enabled=true >/dev/null 2>&1; then \
 		echo "Helm validation accepted ingress without TLS and redirect policy" >&2; exit 1; \
+	fi
+	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set database.existingSecret=iip-database \
+		--set backup.enabled=true \
+		--set backup.destination.existingClaim=iip-backups >/dev/null 2>&1; then \
+		echo "Helm validation accepted backup without database-only NetworkPolicy" >&2; exit 1; \
 	fi
 
 verify: validate validate-schemas test test-typescript helm-lint

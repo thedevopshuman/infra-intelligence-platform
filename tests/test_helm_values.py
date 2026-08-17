@@ -44,6 +44,18 @@ class HelmValuesContractTests(unittest.TestCase):
         self.assertEqual(
             properties["service"]["properties"]["type"]["const"], "ClusterIP"
         )
+        self.assertEqual(
+            properties["backup"]["properties"]["destination"]["properties"][
+                "mountPath"
+            ]["const"],
+            "/var/lib/iip-backups",
+        )
+        self.assertRegex(
+            properties["backup"]["properties"]["image"]["properties"]["digest"][
+                "pattern"
+            ],
+            "sha256",
+        )
         self.assertIn("existingSecret: iip-auth", self.values)
 
     def test_cross_field_guards_fail_before_a_workload_is_rendered(self) -> None:
@@ -61,6 +73,8 @@ class HelmValuesContractTests(unittest.TestCase):
             "credentialBroker.externalHttp.configJson is required",
             "otlpReceiver.channelsExistingSecret is required",
             "otlpLogsReceiver.channelsExistingSecret is required",
+            "backup.destination.existingClaim is required",
+            "networkPolicy.databaseEgress.enabled must be true when backup is enabled",
             "ingress.tls.existingSecret is required",
             "ingress.tlsRedirectAnnotation is required",
         ):

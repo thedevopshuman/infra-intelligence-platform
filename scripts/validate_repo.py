@@ -75,6 +75,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0046-strict-helm-values-contract.md",
     "docs/decisions/0047-attested-release-bundle.md",
     "docs/decisions/0048-explicit-tls-ingress-and-upgrade-conformance.md",
+    "docs/decisions/0049-least-authority-scheduled-logical-backups.md",
     "docs/operations/event-delivery.md",
     "docs/operations/helm-deployment.md",
     "docs/operations/release-artifacts.md",
@@ -304,6 +305,9 @@ REQUIRED_PATHS = (
     "deploy/helm/infra-intelligence/templates/migration-job.yaml",
     "deploy/helm/infra-intelligence/templates/migration-networkpolicy.yaml",
     "deploy/helm/infra-intelligence/templates/ingress.yaml",
+    "deploy/helm/infra-intelligence/templates/backup-configmap.yaml",
+    "deploy/helm/infra-intelligence/templates/backup-cronjob.yaml",
+    "deploy/helm/infra-intelligence/templates/backup-networkpolicy.yaml",
     "deploy/helm/infra-intelligence/templates/validation.yaml",
 )
 

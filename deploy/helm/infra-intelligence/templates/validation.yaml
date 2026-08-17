@@ -29,6 +29,20 @@
 {{- if and .Values.otlpLogsReceiver.enabled (not .Values.otlpLogsReceiver.channelsExistingSecret) }}
 {{- fail "otlpLogsReceiver.channelsExistingSecret is required when the logs receiver is enabled" }}
 {{- end }}
+{{- if .Values.backup.enabled }}
+{{- if not .Values.database.existingSecret }}
+{{- fail "database.existingSecret is required when backup.enabled=true" }}
+{{- end }}
+{{- if not .Values.backup.destination.existingClaim }}
+{{- fail "backup.destination.existingClaim is required when backup.enabled=true" }}
+{{- end }}
+{{- if not .Values.networkPolicy.enabled }}
+{{- fail "networkPolicy.enabled must be true when backup is enabled" }}
+{{- end }}
+{{- if not .Values.networkPolicy.databaseEgress.enabled }}
+{{- fail "networkPolicy.databaseEgress.enabled must be true when backup is enabled" }}
+{{- end }}
+{{- end }}
 {{- if .Values.ingress.enabled }}
 {{- if not .Values.ingress.className }}
 {{- fail "ingress.className is required when ingress is enabled" }}

@@ -1,0 +1,35 @@
+{{- if .Values.backup.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "infra-intelligence.fullname" . }}-backup
+  labels:
+    {{- include "infra-intelligence.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database-backup
+data:
+  backup.sh: |
+    #!/bin/sh
+    set -eu
+    umask 077
+    cd "$IIP_BACKUP_DIRECTORY"
+    database_url="$IIP_DATABASE_URL"
+    unset IIP_DATABASE_URL
+    timestamp=$(date -u +%Y%m%dT%H%M%SZ)
+    base="${IIP_BACKUP_PREFIX}-${timestamp}-${HOSTNAME}.dump"
+    partial=".${base}.partial"
+    checksum="${base}.sha256"
+    cleanup() {
+      rm -f "$partial" ".${checksum}.partial"
+    }
+    trap cleanup EXIT INT TERM
+    pg_dump --dbname="$database_url" --format=custom --compress=gzip:6 --no-owner --no-acl --file="$partial"
+    unset database_url
+    pg_restore --list "$partial" >/dev/null
+    digest=$(sha256sum "$partial" | awk '{print $1}')
+    bytes=$(wc -c <"$partial" | tr -d ' ')
+    printf '%s  %s\n' "$digest" "$base" >".${checksum}.partial"
+    mv "$partial" "$base"
+    mv ".${checksum}.partial" "$checksum"
+    trap - EXIT INT TERM
+    printf 'backup complete: %s sha256:%s bytes:%s\n' "$base" "$digest" "$bytes"
+{{- end }}

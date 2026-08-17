@@ -1,0 +1,80 @@
+{{- if .Values.backup.enabled }}
+{{- $databaseSecret := required "database.existingSecret is required when backup.enabled=true" .Values.database.existingSecret }}
+{{- $backupClaim := required "backup.destination.existingClaim is required when backup.enabled=true" .Values.backup.destination.existingClaim }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "infra-intelligence.fullname" . }}-backup
+  labels:
+    {{- include "infra-intelligence.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database-backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  timeZone: {{ .Values.backup.timeZone | quote }}
+  suspend: {{ .Values.backup.suspend }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ .Values.backup.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.backup.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.backup.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.backup.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.backup.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: {{ include "infra-intelligence.name" . }}
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/component: database-backup
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 70
+            runAsGroup: 70
+            fsGroup: 70
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backup
+              image: "{{ .Values.backup.image.repository }}@{{ .Values.backup.image.digest }}"
+              imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
+              command: ["/bin/sh", "/opt/iip-backup/backup.sh"]
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              env:
+                - name: IIP_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $databaseSecret | quote }}
+                      key: {{ .Values.database.secretKey | quote }}
+                - name: IIP_BACKUP_DIRECTORY
+                  value: {{ .Values.backup.destination.mountPath | quote }}
+                - name: IIP_BACKUP_PREFIX
+                  value: {{ .Values.backup.prefix | quote }}
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+              volumeMounts:
+                - name: script
+                  mountPath: /opt/iip-backup
+                  readOnly: true
+                - name: backup
+                  mountPath: {{ .Values.backup.destination.mountPath | quote }}
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: script
+              configMap:
+                name: {{ include "infra-intelligence.fullname" . }}-backup
+                defaultMode: 0555
+            - name: backup
+              persistentVolumeClaim:
+                claimName: {{ $backupClaim | quote }}
+            - name: tmp
+              emptyDir: {}
+{{- end }}

@@ -19,7 +19,7 @@ Delivered:
 - resource, event, agent, and plugin `v1alpha1` contracts and examples;
 - runnable resource-ingestion vertical slice with ports/adapters;
 - Python and TypeScript SDK boundaries;
-- Helm/Kubernetes deployment skeleton, strict customer values contract, controlled schema-migration hook, guarded existing-certificate TLS Ingress, install/upgrade quality gates, and an attested unsigned release bundle.
+- Helm/Kubernetes deployment skeleton, strict customer values contract, controlled schema-migration hook, guarded existing-certificate TLS Ingress, least-authority scheduled logical backups, install/upgrade/recovery quality gates, and an attested unsigned release bundle.
 
 Exit gate: `make verify` passes and a new contributor can trace resource ingress through authorization, storage, and event emission.
 
@@ -39,7 +39,7 @@ Deliverables:
 
 Exit gate: a seeded cluster can be rebuilt from observations/events; graph correctness and source lag are measurable.
 
-Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, complete-snapshot membership, deterministic tombstones, exact-result replay, atomic reconciliation/checkpoint/provider-cursor commit, per-API-path list/watch resume with `410 Gone` full-reconciliation recovery, tenant-scoped at-least-once outbox delivery through local structured-log and authenticated HTTPS publishers, a privileged tenant-scoped projection drift/rebuild command from accepted observation history, a measured full-schema PostgreSQL backup/restore experiment with canonical integrity verification, tenant-scoped point-in-time freshness/source-lag telemetry, optional outbound OTLP/HTTP freshness metrics, and automatic exact-source sampling from a non-interactive tenant-enrolled worker. The local Phase 1 exit gate is complete; production broker/dead-letter policy, workload objectives, exporter-delivery health, and windowed SLO work remain Phase 3 deliverables.
+Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, complete-snapshot membership, deterministic tombstones, exact-result replay, atomic reconciliation/checkpoint/provider-cursor commit, per-API-path list/watch resume with `410 Gone` full-reconciliation recovery, tenant-scoped at-least-once outbox delivery through local structured-log and authenticated HTTPS publishers, a privileged tenant-scoped projection drift/rebuild command from accepted observation history, a measured full-schema PostgreSQL backup/restore experiment with canonical integrity verification, an opt-in database-only Helm CronJob that writes checksum-complete logical backups to customer-managed storage, a live isolated restore gate, tenant-scoped point-in-time freshness/source-lag telemetry, optional outbound OTLP/HTTP freshness metrics, and automatic exact-source sampling from a non-interactive tenant-enrolled worker. The local Phase 1 exit gate is complete; production broker/dead-letter policy, storage durability/retention/PITR, workload objectives, exporter-delivery health, and windowed SLO work remain Phase 3 deliverables.
 
 ## Phase 2 — evidence and investigation vertical slice
 

@@ -45,6 +45,35 @@ The output path must be protected like other operational evidence even though th
 
 The baseline captured on 2026-08-15 is stored in [the measurement report](measurements/postgresql-backup-restore.json). It restored 22 rows across 15 tables and 4 sequences with an identical digest. Backup duration was 0.135 seconds, recovery-point age was 0.137 seconds, and verified recovery readiness was 0.341 seconds on the local arm64 Docker Desktop environment.
 
+## Scheduled Helm backup baseline
+
+The chart can schedule the same logical format into a pre-created protected PersistentVolumeClaim. It never creates storage because encryption, replication, immutability, retention, and access controls belong to the customer's storage operating model. A minimal values fragment is:
+
+```yaml
+database:
+  existingSecret: iip-database
+
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  timeZone: Etc/UTC
+  destination:
+    existingClaim: iip-protected-backups
+
+networkPolicy:
+  enabled: true
+  databaseEgress:
+    enabled: true
+    namespaceSelector:
+      kubernetes.io/metadata.name: database-system
+    podSelector:
+      app.kubernetes.io/name: postgresql
+```
+
+The job uses a digest-pinned PostgreSQL 18 client, cannot overlap, receives no Kubernetes token, and can reach only DNS and the selected database. It publishes `<name>.dump.sha256` only after `pg_dump` and `pg_restore --list` succeed. Treat that sidecar as the completion marker and alert on missed schedules, failed Jobs, missing checksums, storage capacity, replication lag, and retention failures.
+
+Before enabling it for customer data, prove that the claim is encrypted, replicated away from the database failure domain, immutable for the required window, capacity-monitored, and covered by an authorized deletion policy. Exercise a restore into an isolated database on a recurring schedule. `make test-helm-install` performs this backup/checksum/restore flow against a disposable kind database; it does not certify the customer's storage.
+
 ## Production gap
 
-This experiment does not provide scheduled backups, off-host durability, encryption/key policy, retention, restore approvals, regional recovery, or point-in-time recovery. Those controls must be selected with the production PostgreSQL hosting model and tested under sustained writes and representative data volume. Never treat the disposable local dump as a retained backup.
+The chart now provides scheduling and a least-authority logical-dump job, but it does not provide off-host durability, encryption/key policy, immutability, retention, restore approvals, regional recovery, or point-in-time recovery. Those controls must be selected with the production PostgreSQL hosting model and tested under sustained writes and representative data volume. Never treat the disposable local dump as a retained backup.

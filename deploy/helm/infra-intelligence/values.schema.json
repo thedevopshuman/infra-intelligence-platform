@@ -16,6 +16,7 @@
     "ingress",
     "config",
     "database",
+    "backup",
     "auth",
     "policy",
     "credentialBroker",
@@ -299,6 +300,77 @@
             "resources": { "$ref": "#/definitions/resources" }
           }
         }
+      }
+    },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "schedule",
+        "timeZone",
+        "suspend",
+        "startingDeadlineSeconds",
+        "activeDeadlineSeconds",
+        "backoffLimit",
+        "successfulJobsHistoryLimit",
+        "failedJobsHistoryLimit",
+        "prefix",
+        "destination",
+        "image",
+        "resources"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "schedule": {
+          "type": "string",
+          "minLength": 9,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9*/?, -]+$"
+        },
+        "timeZone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_+.-]+(?:/[A-Za-z0-9_+.-]+)*$"
+        },
+        "suspend": { "type": "boolean" },
+        "startingDeadlineSeconds": { "type": "integer", "minimum": 10, "maximum": 86400 },
+        "activeDeadlineSeconds": { "type": "integer", "minimum": 60, "maximum": 86400 },
+        "backoffLimit": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "successfulJobsHistoryLimit": { "type": "integer", "minimum": 0, "maximum": 20 },
+        "failedJobsHistoryLimit": { "type": "integer", "minimum": 0, "maximum": 20 },
+        "prefix": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48,
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "destination": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["existingClaim", "mountPath"],
+          "properties": {
+            "existingClaim": { "$ref": "#/definitions/optionalName" },
+            "mountPath": { "const": "/var/lib/iip-backups" }
+          }
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "digest", "pullPolicy"],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+            },
+            "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            "pullPolicy": { "type": "string", "enum": ["IfNotPresent", "Always", "Never"] }
+          }
+        },
+        "resources": { "$ref": "#/definitions/resources" }
       }
     },
     "auth": {

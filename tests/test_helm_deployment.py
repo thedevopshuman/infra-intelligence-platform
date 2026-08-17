@@ -9,6 +9,40 @@ CHART = ROOT / "deploy" / "helm" / "infra-intelligence"
 
 
 class HelmMigrationBoundaryTests(unittest.TestCase):
+    def test_scheduled_backup_has_database_and_pvc_authority_only(self) -> None:
+        cronjob = (CHART / "templates" / "backup-cronjob.yaml").read_text(
+            encoding="utf-8"
+        )
+        script = (CHART / "templates" / "backup-configmap.yaml").read_text(
+            encoding="utf-8"
+        )
+        network_policy = (
+            CHART / "templates" / "backup-networkpolicy.yaml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("kind: CronJob", cronjob)
+        self.assertIn("concurrencyPolicy: Forbid", cronjob)
+        self.assertIn("automountServiceAccountToken: false", cronjob)
+        self.assertIn("runAsUser: 70", cronjob)
+        self.assertIn("runAsGroup: 70", cronjob)
+        self.assertIn("@{{ .Values.backup.image.digest }}", cronjob)
+        self.assertIn("database.existingSecret", cronjob)
+        self.assertIn("backup.destination.existingClaim", cronjob)
+        self.assertIn("readOnly: true", cronjob)
+        for forbidden in ("IIP_AUTH_", "IIP_POLICY_", "serviceAccountName:"):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, cronjob)
+        self.assertIn("umask 077", script)
+        self.assertIn("unset IIP_DATABASE_URL", script)
+        self.assertIn('pg_dump --dbname="$database_url" --format=custom', script)
+        self.assertIn("pg_restore --list", script)
+        self.assertLess(
+            script.index('mv "$partial" "$base"'),
+            script.index('mv ".${checksum}.partial" "$checksum"'),
+        )
+        self.assertIn("ingress: []", network_policy)
+        self.assertIn("networkPolicy.databaseEgress", network_policy)
+
     def test_ingress_requires_tls_redirect_and_exact_controller_ingress(self) -> None:
         ingress = (CHART / "templates" / "ingress.yaml").read_text(encoding="utf-8")
         validation = (CHART / "templates" / "validation.yaml").read_text(
@@ -89,6 +123,9 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertEqual(script.count('"$IIP_HELM_BIN" upgrade --install iip'), 2)
         self.assertIn("--set replicaCount=2", script)
         self.assertIn("--set ingress.tls.existingSecret=iip-tls", script)
+        self.assertIn("--set backup.destination.existingClaim=iip-backups", script)
+        self.assertIn("--from=cronjob/iip-infra-intelligence-backup", script)
+        self.assertIn("pg_restore --no-owner --no-acl", script)
         self.assertIn("SELECT count(*) FROM iip.schema_migrations", script)
         self.assertIn('"$IIP_HELM_BIN" history iip', script)
         self.assertTrue((ROOT / "scripts" / "test_helm_install.sh").stat().st_mode & 0o111)

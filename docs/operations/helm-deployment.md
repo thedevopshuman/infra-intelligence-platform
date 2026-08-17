@@ -2,7 +2,7 @@
 
 **Status:** Executable self-hosted reference path
 
-The chart can install the control-plane API against an existing PostgreSQL database, apply packaged schema migrations through a separately authorized hook, and optionally declare a TLS-only Ingress binding. It does not create a production database, identity provider, ingress controller, certificate/private key, or image registry.
+The chart can install the control-plane API against an existing PostgreSQL database, apply packaged schema migrations through a separately authorized hook, optionally declare a TLS-only Ingress binding, and schedule checksum-complete logical backups into existing protected storage. It does not create a production database, backup storage, identity provider, ingress controller, certificate/private key, or image registry.
 
 ## Required inputs
 
@@ -17,7 +17,7 @@ The default repository and tag are placeholders. Pin a released image digest in 
 
 ## Validate configuration before access
 
-The chart's `values.schema.json` is a closed customer configuration contract. Unknown keys, unsupported modes, unsafe Service exposure, relaxed container security, and out-of-range settings fail schema validation. Render-time guards also reject invalid relationships such as a heartbeat that cannot renew its lease or telemetry export without an OTLP endpoint.
+The chart's `values.schema.json` is a closed customer configuration contract. Unknown keys, unsupported modes, unsafe Service exposure, relaxed container security, and out-of-range settings fail schema validation. Render-time guards also reject invalid relationships such as a heartbeat that cannot renew its lease, telemetry export without an OTLP endpoint, or backup scheduling without existing storage and database-only NetworkPolicy.
 
 Run both checks against the exact protected values file before installation:
 
@@ -96,6 +96,12 @@ The migration NetworkPolicy hook is created first, then the migration Job. The J
 
 The local-hashed authentication example is suitable for a controlled evaluation. The default Secret name is `iip-auth`, but the chart never creates its sensitive contents. Configure the documented OIDC boundary for production; do not place either local verifier JSON or OIDC client material directly in a values file. Serving pods always receive `IIP_DATABASE_AUTO_MIGRATE=false`; the hook is the chart's only schema authority.
 
+## Scheduled logical backups
+
+Backups are disabled by default. To enable them, pre-create a protected PersistentVolumeClaim and configure `backup.enabled`, its schedule/time zone, `backup.destination.existingClaim`, and exact database egress. The digest-pinned PostgreSQL client receives the database Secret and backup volume but no identity Secret, service-account token, or general network access. It writes a custom-format dump and publishes its checksum sidecar only after the dump catalog validates.
+
+The chart does not create or prune storage. Before customer use, verify encryption, off-cluster replication, failure-domain separation, immutability, retention, capacity alerts, access review, and restore authorization. The complete configuration and operator checks are in [PostgreSQL backup and restore](postgresql-backup-restore.md).
+
 ## Upgrade procedure
 
 Before upgrading:
@@ -116,8 +122,8 @@ With Docker Desktop and the explicit `kind-iip-dev` context available, run:
 make test-helm-install
 ```
 
-The gate builds and loads the current image, creates a disposable exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, and proves API readiness from inside the pod. It then performs a second Helm revision with two API replicas and a TLS Ingress declaration, proving the hook remains idempotent and the exact class, host, existing TLS Secret, redirect policy, NetworkPolicy peer, rollout, and Helm history are preserved. It removes the namespace, refuses non-kind contexts, and never prints generated credentials or private keys. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
+The gate builds and loads the current image, creates a disposable exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, and proves API readiness from inside the pod. It then performs a second Helm revision with two API replicas, a TLS Ingress declaration, and scheduled backup configuration. The gate proves migration idempotency and exact ingress binding, runs the installed backup CronJob on demand, verifies its persisted checksum, restores it into a separate database, confirms every packaged migration, and checks rollout and Helm history. It removes the namespace and claim, refuses non-kind contexts, and never prints generated credentials, database contents, or private keys. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
 
 ## Production gaps
 
-This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance evidence and the chart declares a guarded TLS Ingress, but organizational image signing, external secret-controller integration, controller-specific TLS conformance, high availability, zero-downtime migration compatibility, capacity tests, database failover, scheduled backups, disaster recovery, and environment-specific policy remain release and customer gates.
+This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance evidence; the chart declares guarded TLS ingress and schedules logical backups; and the kind gate restores one. Organizational image signing, external secret-controller integration, controller-specific TLS conformance, high availability, zero-downtime migration compatibility, capacity tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.

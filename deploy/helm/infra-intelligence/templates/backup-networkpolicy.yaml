@@ -1,0 +1,40 @@
+{{- if and .Values.backup.enabled .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "infra-intelligence.fullname" . }}-backup
+  labels:
+    {{- include "infra-intelligence.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database-backup
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "infra-intelligence.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: database-backup
+  policyTypes: ["Ingress", "Egress"]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        {{- if .Values.networkPolicy.databaseEgress.cidr }}
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.databaseEgress.cidr | quote }}
+        {{- else }}
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.databaseEgress.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.databaseEgress.podSelector | nindent 14 }}
+        {{- end }}
+      ports:
+        - port: {{ .Values.networkPolicy.databaseEgress.port }}
+          protocol: TCP
+{{- end }}

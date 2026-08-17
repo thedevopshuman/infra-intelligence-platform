@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
@@ -96,6 +97,9 @@ from iip.application.ports import (
     PersistenceError,
     ReadinessError,
 )
+from iip.application.observe_query_availability import (
+    RecordQueryAvailabilityCommand,
+)
 from iip.application.query_actions import (
     ActionQueryAuthorizationError,
     ActionQueryError,
@@ -147,7 +151,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.32.0"
+    server_version = "IIPReference/0.33.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -158,6 +162,20 @@ class ApiHandler(BaseHTTPRequestHandler):
     }
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
+        operation = self._query_operation(urlparse(self.path).path)
+        self._query_availability_context = (
+            (operation, time.monotonic()) if operation is not None else None
+        )
+        try:
+            self._do_GET()
+        except Exception:
+            self._finish_query_availability(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                uncaught_failure=True,
+            )
+            raise
+
+    def _do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
         if path in self._console_assets:
@@ -1275,14 +1293,95 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def _json(self, status: HTTPStatus, payload: Dict[str, Any]) -> None:
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-        self.send_response(status.value)
-        self.send_header("content-type", "application/json")
-        self._security_headers()
-        if status == HTTPStatus.UNAUTHORIZED:
-            self.send_header("WWW-Authenticate", "Bearer")
-        self.send_header("content-length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(status.value)
+            self.send_header("content-type", "application/json")
+            self._security_headers()
+            if status == HTTPStatus.UNAUTHORIZED:
+                self.send_header("WWW-Authenticate", "Bearer")
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except Exception:
+            self._finish_query_availability(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                uncaught_failure=True,
+            )
+            raise
+        self._finish_query_availability(status)
+
+    @staticmethod
+    def _query_operation(path: str) -> Optional[str]:
+        exact = {
+            "/v1/session": "session",
+            "/v1/system/version": "runtime-version",
+            "/v1/resources": "resources-list",
+            "/v1/telemetry/ingestion": "ingestion-freshness",
+            "/v1/operations/telemetry/export-health": "telemetry-export-health",
+            "/v1/operations/events/delivery-health": "event-delivery-health",
+            "/v1/operations/events/delivery-slo": "event-delivery-slo",
+            "/v1/operations/investigations/completion-slo": (
+                "investigation-completion-slo"
+            ),
+            "/v1/actions": "actions-list",
+        }
+        operation = exact.get(path)
+        if operation is not None:
+            return operation
+        segments = path.strip("/").split("/")
+        if (
+            len(segments) == 4
+            and segments[:2] == ["v1", "resources"]
+            and segments[3] in ("neighborhood", "timeline")
+        ):
+            return f"resource-{segments[3]}"
+        if len(segments) == 3 and segments[:2] == ["v1", "evidence"]:
+            return "evidence-get"
+        if len(segments) == 3 and segments[:2] == ["v1", "investigations"]:
+            return "investigation-get"
+        if (
+            len(segments) == 4
+            and segments[:2] == ["v1", "investigations"]
+            and segments[3] == "status"
+        ):
+            return "investigation-status"
+        if len(segments) == 3 and segments[:2] == ["v1", "investigation-jobs"]:
+            return "investigation-job-get"
+        if len(segments) == 3 and segments[:2] == ["v1", "actions"]:
+            return "action-get"
+        if (
+            len(segments) == 4
+            and segments[:2] == ["v1", "actions"]
+            and segments[3] == "workflow"
+        ):
+            return "action-workflow-get"
+        if len(segments) == 3 and segments[:2] == ["v1", "plugin-sessions"]:
+            return "plugin-session-get"
+        return None
+
+    def _finish_query_availability(
+        self,
+        status: HTTPStatus,
+        *,
+        uncaught_failure: bool = False,
+    ) -> None:
+        context = getattr(self, "_query_availability_context", None)
+        if context is None:
+            return
+        self._query_availability_context = None
+        operation, started_at = context
+        try:
+            self.runtime.query_availability.record(
+                RecordQueryAvailabilityCommand(
+                    operation=operation,
+                    status_code=int(status),
+                    duration_seconds=max(0.0, time.monotonic() - started_at),
+                    uncaught_failure=uncaught_failure,
+                )
+            )
+        except Exception:
+            # Optional telemetry never changes an HTTP query result.
+            return
 
     def _console_asset(self, path: str) -> None:
         filename, content_type = self._console_assets[path]

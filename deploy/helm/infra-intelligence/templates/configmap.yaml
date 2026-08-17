@@ -24,6 +24,9 @@ data:
   IIP_INVESTIGATION_COMPLETION_SLO_MAXIMUM_SECONDS: {{ .Values.investigationCompletionSlo.maximumCompletionSeconds | quote }}
   IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ATTAINMENT_BASIS_POINTS: {{ .Values.investigationCompletionSlo.minimumAttainmentBasisPoints | quote }}
   IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ELIGIBLE_JOBS: {{ .Values.investigationCompletionSlo.minimumEligibleJobs | quote }}
+  IIP_QUERY_AVAILABILITY_SLO_WINDOW_SECONDS: {{ .Values.queryAvailabilitySlo.windowSeconds | quote }}
+  IIP_QUERY_AVAILABILITY_SLO_MINIMUM_BASIS_POINTS: {{ .Values.queryAvailabilitySlo.minimumAvailabilityBasisPoints | quote }}
+  IIP_QUERY_AVAILABILITY_SLO_MINIMUM_ELIGIBLE_REQUESTS: {{ .Values.queryAvailabilitySlo.minimumEligibleRequests | quote }}
   IIP_READINESS_DATABASE_TIMEOUT_SECONDS: {{ .Values.probes.readiness.databaseTimeoutSeconds | quote }}
   IIP_OTEL_METRICS_ENABLED: {{ .Values.telemetry.metricsEnabled | quote }}
   IIP_OTEL_TRACES_ENABLED: {{ .Values.telemetry.tracesEnabled | quote }}

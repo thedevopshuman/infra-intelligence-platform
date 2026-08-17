@@ -2,7 +2,7 @@
 
 **Status:** Reference implementation
 
-The API and workflow worker can export bounded ingestion-freshness metrics and terminal investigation spans over OTLP/HTTP protobuf to an OpenTelemetry Collector or compatible endpoint. Each signal is optional and disabled by default. Public reports and their underlying PostgreSQL/in-memory facts remain authoritative.
+The API and workflow worker can export bounded ingestion-freshness metrics, recognized query availability/latency metrics, and terminal investigation spans over OTLP/HTTP protobuf to an OpenTelemetry Collector or compatible endpoint. Each signal is optional and disabled by default. Public reports and their underlying PostgreSQL/in-memory facts remain authoritative.
 
 This path exports IIP's own operational telemetry. It does not receive customer workload telemetry or query historical metrics. Historical queries use the separate [telemetry evidence contract](../specifications/telemetry-evidence-contract.md) and replaceable backend port, while optional tenant-bound OTLP receivers handle selected pushed customer metrics and logs. The [portability boundary](../architecture/opentelemetry-portability.md) keeps these flows distinct.
 
@@ -24,9 +24,13 @@ Each newly committed terminal report can emit one `iip.investigation.execute` sp
 | `iip.ingestion.pending_event.age` | seconds | Age of the oldest unpublished source event, when present |
 | `iip.ingestion.within_objective` | dimensionless | `1` when the point-in-time evaluation has no violation |
 | `iip.ingestion.objective.violation` | dimensionless | One bounded series per known violation, with `1` for active |
+| `iip.query.requests` | dimensionless | One increment per recognized control-plane read, classified as available, unavailable, or excluded |
+| `iip.query.duration` | seconds | Monotonic serving time for the same recognized read |
 | `iip.telemetry.record.failures` | dimensionless | Local instrument-recording failures; not network delivery failures |
 
 Every measurement has `iip.ingestion.status`. `IIP_OTEL_INGESTION_ATTRIBUTE_MODE` selects `none`, `source`, or `tenant-source` for identity attributes. The default `source` mode adds `iip.source.id`; choose `none` when source names are sensitive or the source count exceeds the deployment's cardinality budget. `tenant-source` must be an explicit privacy and cost decision.
+
+Query metrics use only closed operation, outcome, availability, and objective attributes. They never include raw paths, query values, tenant/actor identity, credentials, object identifiers, bodies, or error text. Invalid, unauthenticated, and denied requests are exported as `excluded`; valid successful/not-found/conflict responses are `available`; server and dependency failures are `unavailable`. The configured availability basis-point target, window, and minimum eligible count accompany each observation so the customer backend can aggregate the same semantics. See the [query availability telemetry contract](../specifications/query-availability-telemetry-contract.md) and [ADR 0059](../decisions/0059-backend-neutral-query-availability-telemetry.md).
 
 ## Docker Desktop verification
 
@@ -36,7 +40,7 @@ Run the isolated real-Collector gate:
 make test-otel
 ```
 
-The target starts OpenTelemetry Collector `0.158.0`, sends a reference metric and investigation trace through the official Python SDK, verifies that the Collector debug exporter received `iip.ingestion.checkpoint.age` and `iip.investigation.execute`, and removes the container afterward.
+The target starts OpenTelemetry Collector `0.158.0`, sends reference freshness and query metrics plus an investigation trace through the official Python SDK, verifies that the Collector debug exporter received `iip.ingestion.checkpoint.age`, `iip.query.requests`, and `iip.investigation.execute`, and removes the container afterward.
 
 To add a Collector to the long-running development stack, first configure the database password and hashed Bearer identity described in [local development](local-development.md), then run:
 
@@ -63,6 +67,9 @@ The API and worker use the Collector through the Compose service network and app
 | `OTEL_EXPORTER_OTLP_HEADERS` | unset | SDK header configuration supplied through protected runtime configuration |
 | `IIP_OTEL_INGESTION_ATTRIBUTE_MODE` | `source` | `none`, `source`, or `tenant-source` |
 | `IIP_OTEL_INVESTIGATION_ATTRIBUTE_MODE` | `none` | `none`, `investigation`, or `tenant-investigation` |
+| `IIP_QUERY_AVAILABILITY_SLO_WINDOW_SECONDS` | `3600` | Aggregation window carried on query metrics |
+| `IIP_QUERY_AVAILABILITY_SLO_MINIMUM_BASIS_POINTS` | `9990` | Availability target carried on query metrics |
+| `IIP_QUERY_AVAILABILITY_SLO_MINIMUM_ELIGIBLE_REQUESTS` | `100` | Sample floor carried on query metrics |
 | `IIP_INGESTION_MONITOR_TARGETS_JSON` | unset | Worker-only closed list of 1–1000 unique, explicitly tenant-enrolled freshness targets; omission disables sampling |
 | `IIP_INGESTION_MONITOR_INTERVAL_SECONDS` | `60` | Worker-only sampling cadence from 5–3600 seconds |
 | `OTEL_SERVICE_NAME` | `infra-intelligence-api` | OpenTelemetry service identity |
@@ -79,7 +86,7 @@ The endpoint must be explicit HTTP(S), no longer than 2048 characters, and canno
 
 Set `telemetry.metricsEnabled` and/or `telemetry.tracesEnabled`, `telemetry.otlpEndpoint`, and the matching NetworkPolicy egress selector. If the endpoint requires headers, put their standard SDK value in an existing Secret and configure `telemetry.existingSecret`; the chart references the Secret and does not render the value. `worker.ingestionMonitorTargets` enables automatic sampling for exact tenant/source pairs, `worker.ingestionMonitorIntervalSeconds` controls its cadence, and `telemetry.workerServiceName` gives worker exports a distinct service identity. Each target tenant must also appear in `worker.tenants` or startup fails closed.
 
-The Helm chart does not deploy a Collector because topology and backend selection belong to the customer deployment. Point it at a customer-controlled Collector so changing exporters or destinations does not require an IIP build.
+The Helm chart does not deploy a Collector because topology and backend selection belong to the customer deployment. Point it at a customer-controlled Collector so changing exporters or destinations does not require an IIP build. Configure `queryAvailabilitySlo` alongside `telemetry.metricsEnabled`; the backend computes `floor(available * 10000 / (available + unavailable))` over the declared window after the minimum eligible count. Add ingress or synthetic availability separately because an application process cannot emit when every replica is unreachable.
 
 ## Delivery health
 
@@ -95,4 +102,4 @@ The report distinguishes disabled, awaiting-first-attempt, healthy, and degraded
 
 ## Production gaps
 
-The reference adapters and automatic sampler are failure-isolated but not a complete production telemetry pipeline. Production enablement still requires Collector-side queue/delivery monitoring, a defined loss objective, reviewed cardinality budgets, TLS/authentication policy, regional routing, and representative load tests. The trace queue is bounded but not durable. The process-local report describes latest exporter outcomes; it is not durable, cluster-wide, or a measured availability window.
+The reference adapters and automatic sampler are failure-isolated but not a complete production telemetry pipeline. Production enablement still requires Collector-side queue/delivery monitoring, a defined loss objective, reviewed cardinality budgets, TLS/authentication policy, regional routing, representative load tests, ingress/synthetic availability, burn-rate rules, and notification routing. The trace queue is bounded but not durable. The process-local report describes latest exporter outcomes; it is not durable or cluster-wide. Query SLO aggregation belongs to the customer telemetry backend and must account for Collector/export loss before making a production claim.

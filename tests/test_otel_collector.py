@@ -9,6 +9,7 @@ from iip.adapters.otel import (
     build_otlp_metrics_runtime,
     build_otlp_traces_runtime,
 )
+from iip.application.ports import QueryAvailabilityMeasurement
 
 from tests.test_otel_metrics import measurement
 from tests.test_otel_traces import measurement as investigation_measurement
@@ -32,8 +33,21 @@ class OtlpCollectorIntegrationTests(unittest.TestCase):
         )
         try:
             runtime.sink.record_ingestion_freshness(measurement())
+            self.assertIsNotNone(runtime.query_sink)
+            runtime.query_sink.record_query_availability(
+                QueryAvailabilityMeasurement(
+                    operation="runtime-version",
+                    outcome="success",
+                    availability="available",
+                    duration_seconds=0.025,
+                    objective_window_seconds=3600,
+                    objective_minimum_availability_basis_points=9990,
+                    objective_minimum_eligible_requests=100,
+                )
+            )
             self.assertTrue(runtime.force_flush(5_000))
             self.assertEqual(runtime.sink.record_failures, 0)
+            self.assertEqual(runtime.query_sink.record_failures, 0)
             metrics = runtime.read_export_health()[0]
             self.assertEqual(metrics.status, "healthy")
             self.assertGreaterEqual(metrics.successes, 1)

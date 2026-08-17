@@ -70,6 +70,7 @@ from iip.application.ports import (
     KubernetesEventsBackend,
     PolicyConfigurationError,
     PolicyDecisionPoint,
+    QueryAvailabilitySink,
     ReadinessProbe,
     ResourceRepository,
     SourceCheckpointRepository,
@@ -93,6 +94,10 @@ from iip.application.observe_ingestion import (
     IngestionFreshnessObjectives,
     IngestionFreshnessService,
     IngestionTelemetryInputError,
+)
+from iip.application.observe_query_availability import (
+    QueryAvailabilityObjectives,
+    QueryAvailabilityService,
 )
 from iip.application.plugin_sessions import PluginSessionService
 from iip.application.query_actions import ActionWorkflowQueryService
@@ -143,6 +148,7 @@ class Runtime:
     event_delivery_health: EventDeliveryHealthService
     event_delivery_slo: EventDeliverySloService
     investigation_completion_slo: InvestigationCompletionSloService
+    query_availability: QueryAvailabilityService
     telemetry_export_health: TelemetryExportHealthService
     runtime_version: RuntimeVersionService
     queries: ResourceQueryService
@@ -182,7 +188,9 @@ def build_local_runtime(
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     event_delivery_slo_objectives: EventDeliverySloObjectives | None = None,
     investigation_completion_slo_objectives: InvestigationCompletionSloObjectives | None = None,
+    query_availability_objectives: QueryAvailabilityObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
+    query_availability_sink: QueryAvailabilitySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
     telemetry_logs_backend: TelemetryLogsBackend | None = None,
@@ -209,7 +217,9 @@ def build_local_runtime(
         ingestion_objectives,
         event_delivery_slo_objectives,
         investigation_completion_slo_objectives,
+        query_availability_objectives,
         ingestion_telemetry_sink,
+        query_availability_sink,
         investigation_telemetry_sink,
         telemetry_metrics_backend,
         telemetry_logs_backend,
@@ -233,7 +243,9 @@ def _compose_runtime(
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     event_delivery_slo_objectives: EventDeliverySloObjectives | None = None,
     investigation_completion_slo_objectives: InvestigationCompletionSloObjectives | None = None,
+    query_availability_objectives: QueryAvailabilityObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
+    query_availability_sink: QueryAvailabilitySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
     telemetry_logs_backend: TelemetryLogsBackend | None = None,
@@ -349,6 +361,10 @@ def _compose_runtime(
             clock,
             investigation_completion_slo_objectives,
         ),
+        query_availability=QueryAvailabilityService(
+            query_availability_sink,
+            query_availability_objectives,
+        ),
         telemetry_export_health=TelemetryExportHealthService(
             (
                 telemetry_runtime
@@ -438,7 +454,9 @@ def build_postgres_runtime(
     ingestion_objectives: IngestionFreshnessObjectives | None = None,
     event_delivery_slo_objectives: EventDeliverySloObjectives | None = None,
     investigation_completion_slo_objectives: InvestigationCompletionSloObjectives | None = None,
+    query_availability_objectives: QueryAvailabilityObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
+    query_availability_sink: QueryAvailabilitySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
     telemetry_metrics_backend: TelemetryMetricsBackend | None = None,
     telemetry_logs_backend: TelemetryLogsBackend | None = None,
@@ -472,7 +490,9 @@ def build_postgres_runtime(
         ingestion_objectives,
         event_delivery_slo_objectives,
         investigation_completion_slo_objectives,
+        query_availability_objectives,
         ingestion_telemetry_sink,
+        query_availability_sink,
         investigation_telemetry_sink,
         telemetry_metrics_backend,
         telemetry_logs_backend,
@@ -525,6 +545,7 @@ def _build_runtime_from_env(
     investigation_completion_slo_objectives = (
         _investigation_completion_slo_objectives_from_env()
     )
+    query_availability_objectives = _query_availability_objectives_from_env()
     metrics_runtime = _otel_metrics_runtime_from_env()
     try:
         traces_runtime = _otel_traces_runtime_from_env()
@@ -576,8 +597,14 @@ def _build_runtime_from_env(
                 investigation_completion_slo_objectives=(
                     investigation_completion_slo_objectives
                 ),
+                query_availability_objectives=query_availability_objectives,
                 ingestion_telemetry_sink=(
                     metrics_runtime.sink
+                    if metrics_runtime is not None
+                    else None
+                ),
+                query_availability_sink=(
+                    metrics_runtime.query_sink
                     if metrics_runtime is not None
                     else None
                 ),
@@ -608,8 +635,14 @@ def _build_runtime_from_env(
             investigation_completion_slo_objectives=(
                 investigation_completion_slo_objectives
             ),
+            query_availability_objectives=query_availability_objectives,
             ingestion_telemetry_sink=(
                 metrics_runtime.sink if metrics_runtime is not None else None
+            ),
+            query_availability_sink=(
+                metrics_runtime.query_sink
+                if metrics_runtime is not None
+                else None
             ),
             investigation_telemetry_sink=(
                 traces_runtime.sink if traces_runtime is not None else None
@@ -654,6 +687,7 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
         investigation_completion_slo_objectives=(
             _investigation_completion_slo_objectives_from_env()
         ),
+        query_availability_objectives=_query_availability_objectives_from_env(),
         otlp_metrics_receiver=metrics_receiver,
         otlp_logs_receiver=logs_receiver,
         policy=_policy_from_env(),
@@ -928,6 +962,33 @@ def _investigation_completion_slo_objectives_from_env() -> InvestigationCompleti
         minimum_eligible_jobs=value(
             "IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ELIGIBLE_JOBS",
             defaults.minimum_eligible_jobs,
+        ),
+    )
+
+
+def _query_availability_objectives_from_env() -> QueryAvailabilityObjectives:
+    def value(name: str, default: int) -> int:
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            raise ValueError("query.availability.configuration.invalid") from None
+
+    defaults = QueryAvailabilityObjectives()
+    return QueryAvailabilityObjectives(
+        window_seconds=value(
+            "IIP_QUERY_AVAILABILITY_SLO_WINDOW_SECONDS",
+            defaults.window_seconds,
+        ),
+        minimum_availability_basis_points=value(
+            "IIP_QUERY_AVAILABILITY_SLO_MINIMUM_BASIS_POINTS",
+            defaults.minimum_availability_basis_points,
+        ),
+        minimum_eligible_requests=value(
+            "IIP_QUERY_AVAILABILITY_SLO_MINIMUM_ELIGIBLE_REQUESTS",
+            defaults.minimum_eligible_requests,
         ),
     )
 

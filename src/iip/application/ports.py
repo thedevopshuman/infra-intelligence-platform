@@ -191,6 +191,19 @@ class IngestionFreshnessMeasurement:
 
 
 @dataclass(frozen=True)
+class QueryAvailabilityMeasurement:
+    """Bounded HTTP query outcome offered to an observational telemetry sink."""
+
+    operation: str
+    outcome: str
+    availability: str
+    duration_seconds: float
+    objective_window_seconds: int
+    objective_minimum_availability_basis_points: int
+    objective_minimum_eligible_requests: int
+
+
+@dataclass(frozen=True)
 class InvestigationExecutionMeasurement:
     """Bounded terminal facts offered to an observational telemetry sink."""
 
@@ -662,6 +675,13 @@ class IngestionTelemetrySink(Protocol):
         self, measurement: IngestionFreshnessMeasurement
     ) -> None:
         """Record without network I/O or changing the owning use-case result."""
+
+
+class QueryAvailabilitySink(Protocol):
+    def record_query_availability(
+        self, measurement: QueryAvailabilityMeasurement
+    ) -> None:
+        """Record one bounded query outcome without becoming serving authority."""
 
 
 class InvestigationTelemetrySink(Protocol):

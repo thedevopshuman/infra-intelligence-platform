@@ -9,10 +9,17 @@ from iip.adapters.auth import HashedBearerAuthenticator
 from iip.adapters.otel import (
     OpenTelemetryConfigurationError,
     OpenTelemetryIngestionSink,
+    OpenTelemetryQueryAvailabilitySink,
     OtlpMetricsConfiguration,
     OtlpMetricsRuntime,
 )
-from iip.application.ports import IngestionFreshnessMeasurement
+from iip.application.ports import (
+    IngestionFreshnessMeasurement,
+    QueryAvailabilityMeasurement,
+)
+from iip.application.observe_query_availability import (
+    RecordQueryAvailabilityCommand,
+)
 from iip.bootstrap import build_local_runtime, build_runtime_from_env
 
 
@@ -45,6 +52,9 @@ class RecordingMeter:
         return instrument
 
     def create_counter(self, name: str, **kwargs: object) -> RecordingInstrument:
+        return self.create_gauge(name, **kwargs)
+
+    def create_histogram(self, name: str, **kwargs: object) -> RecordingInstrument:
         return self.create_gauge(name, **kwargs)
 
 
@@ -205,6 +215,57 @@ class OpenTelemetryIngestionSinkTests(unittest.TestCase):
         )
 
 
+class OpenTelemetryQueryAvailabilitySinkTests(unittest.TestCase):
+    @staticmethod
+    def measurement() -> QueryAvailabilityMeasurement:
+        return QueryAvailabilityMeasurement(
+            operation="runtime-version",
+            outcome="success",
+            availability="available",
+            duration_seconds=0.125,
+            objective_window_seconds=3600,
+            objective_minimum_availability_basis_points=9990,
+            objective_minimum_eligible_requests=100,
+        )
+
+    def test_sink_emits_bounded_counter_and_histogram_attributes(self) -> None:
+        meter = RecordingMeter()
+        sink = OpenTelemetryQueryAvailabilitySink(meter)
+
+        sink.record_query_availability(self.measurement())
+
+        request = meter.instruments["iip.query.requests"].records[0]
+        duration = meter.instruments["iip.query.duration"].records[0]
+        self.assertEqual(request[0], 1)
+        self.assertEqual(duration[0], 0.125)
+        self.assertEqual(request[1], duration[1])
+        self.assertEqual(request[1]["iip.query.operation"], "runtime-version")
+        self.assertEqual(request[1]["iip.query.availability"], "available")
+        serialized = json.dumps(request[1])
+        for forbidden in ("tenant", "actor", "path", "credential", "status_code"):
+            self.assertNotIn(forbidden, serialized)
+
+    def test_instrument_failure_is_local_and_counted(self) -> None:
+        meter = RecordingMeter(failing_name="iip.query.requests")
+        sink = OpenTelemetryQueryAvailabilitySink(meter)
+
+        sink.record_query_availability(self.measurement())
+
+        self.assertEqual(sink.record_failures, 1)
+        self.assertEqual(
+            meter.instruments["iip.telemetry.record.failures"].records,
+            [
+                (
+                    1,
+                    {
+                        "iip.telemetry.signal": "metrics",
+                        "iip.telemetry.instrument": "query-availability",
+                    },
+                )
+            ],
+        )
+
+
 class RuntimeTelemetryLifecycleTests(unittest.TestCase):
     def test_runtime_flush_and_close_delegate_only_when_configured(self) -> None:
         class Provider:
@@ -292,9 +353,11 @@ class RuntimeTelemetryLifecycleTests(unittest.TestCase):
                 self.timeout_millis = timeout_millis
 
         provider = Provider()
+        query_meter = RecordingMeter()
         otel = OtlpMetricsRuntime(
             OpenTelemetryIngestionSink(RecordingMeter()),
             provider,
+            query_sink=OpenTelemetryQueryAvailabilitySink(query_meter),
         )
         with patch.dict(
             os.environ,
@@ -316,6 +379,17 @@ class RuntimeTelemetryLifecycleTests(unittest.TestCase):
             "https://collector.example/base/v1/metrics",
         )
         self.assertIs(runtime.telemetry_runtime, otel)
+        runtime.query_availability.record(
+            RecordQueryAvailabilityCommand(
+                operation="runtime-version",
+                status_code=200,
+                duration_seconds=0.01,
+            )
+        )
+        self.assertEqual(
+            query_meter.instruments["iip.query.requests"].records[0][0],
+            1,
+        )
         runtime.close()
         self.assertEqual(provider.shutdowns, 1)
 

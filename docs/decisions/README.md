@@ -62,3 +62,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0056](0056-governed-event-delivery-replay.md) | Accepted | Recover one exact quarantine generation through the existing one-shot governed-action chain |
 | [0057](0057-event-delivery-slo-semantics.md) | Accepted | Measure rolling transport-neutral publication objectives from durable outbox outcomes |
 | [0058](0058-investigation-completion-slo-semantics.md) | Accepted | Measure useful asynchronous investigation completion from durable job outcomes |
+| [0059](0059-backend-neutral-query-availability-telemetry.md) | Accepted | Export bounded query availability and latency semantics through OTLP metrics |

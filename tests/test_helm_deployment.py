@@ -148,6 +148,21 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             with self.subTest(variable=variable):
                 self.assertIn(variable, config_map)
 
+    def test_query_availability_objective_is_explicit_and_otel_visible(self) -> None:
+        config_map = (CHART / "templates" / "configmap.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("queryAvailabilitySlo:", values)
+        for variable in (
+            "IIP_QUERY_AVAILABILITY_SLO_WINDOW_SECONDS",
+            "IIP_QUERY_AVAILABILITY_SLO_MINIMUM_BASIS_POINTS",
+            "IIP_QUERY_AVAILABILITY_SLO_MINIMUM_ELIGIBLE_REQUESTS",
+        ):
+            with self.subTest(variable=variable):
+                self.assertIn(variable, config_map)
+
     def test_migration_hook_has_database_only_authority(self) -> None:
         template = (CHART / "templates" / "migration-job.yaml").read_text(
             encoding="utf-8"

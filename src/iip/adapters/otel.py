@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 from iip.application.ports import (
     IngestionFreshnessMeasurement,
     InvestigationExecutionMeasurement,
+    QueryAvailabilityMeasurement,
     TelemetryExportSignalState,
 )
 
@@ -550,6 +551,68 @@ class OpenTelemetryIngestionSink:
         return attributes
 
 
+class OpenTelemetryQueryAvailabilitySink:
+    """Map closed query outcomes to backend-neutral OTLP metrics."""
+
+    def __init__(self, meter: Any) -> None:
+        self._requests = meter.create_counter(
+            "iip.query.requests",
+            unit="1",
+            description="Recognized control-plane query attempts by availability class.",
+        )
+        self._duration = meter.create_histogram(
+            "iip.query.duration",
+            unit="s",
+            description="Monotonic serving time for recognized control-plane queries.",
+        )
+        self._record_failure = meter.create_counter(
+            "iip.telemetry.record.failures",
+            unit="1",
+            description="Measurements rejected before reaching an exporter.",
+        )
+        self._failures = 0
+        self._failure_lock = Lock()
+
+    @property
+    def record_failures(self) -> int:
+        with self._failure_lock:
+            return self._failures
+
+    def record_query_availability(
+        self, measurement: QueryAvailabilityMeasurement
+    ) -> None:
+        attributes: dict[str, str | int] = {
+            "iip.query.operation": measurement.operation,
+            "iip.query.outcome": measurement.outcome,
+            "iip.query.availability": measurement.availability,
+            "iip.query.objective.window_seconds": (
+                measurement.objective_window_seconds
+            ),
+            "iip.query.objective.minimum_availability_basis_points": (
+                measurement.objective_minimum_availability_basis_points
+            ),
+            "iip.query.objective.minimum_eligible_requests": (
+                measurement.objective_minimum_eligible_requests
+            ),
+        }
+        try:
+            self._requests.add(1, attributes)
+            self._duration.record(measurement.duration_seconds, attributes)
+        except Exception:
+            with self._failure_lock:
+                self._failures += 1
+            try:
+                self._record_failure.add(
+                    1,
+                    {
+                        "iip.telemetry.signal": "metrics",
+                        "iip.telemetry.instrument": "query-availability",
+                    },
+                )
+            except Exception:
+                pass
+
+
 class OpenTelemetryInvestigationSink:
     """Emit one bounded span from each durable terminal investigation report."""
 
@@ -619,6 +682,7 @@ class OtlpMetricsRuntime:
     sink: OpenTelemetryIngestionSink
     provider: Any
     health: TelemetryExportHealthState | None = None
+    query_sink: OpenTelemetryQueryAvailabilitySink | None = None
 
     def force_flush(self, timeout_millis: int = 10_000) -> bool:
         return bool(self.provider.force_flush(timeout_millis=timeout_millis))
@@ -712,20 +776,22 @@ def build_otlp_metrics_runtime(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.32.0",
+                    "service.version": "0.33.0",
                 }
             ),
             metric_readers=(reader,),
         )
-        meter = provider.get_meter("iip.ingestion", "0.32.0")
+        ingestion_meter = provider.get_meter("iip.ingestion", "0.33.0")
+        query_meter = provider.get_meter("iip.query", "0.33.0")
         sink = OpenTelemetryIngestionSink(
-            meter,
+            ingestion_meter,
             attribute_mode=configuration.attribute_mode,
         )
         return OtlpMetricsRuntime(
             sink=sink,
             provider=provider,
             health=export_health,
+            query_sink=OpenTelemetryQueryAvailabilitySink(query_meter),
         )
     except OpenTelemetryConfigurationError:
         raise
@@ -759,7 +825,7 @@ def build_otlp_traces_runtime(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.32.0",
+                    "service.version": "0.33.0",
                 }
             )
         )
@@ -772,7 +838,7 @@ def build_otlp_traces_runtime(
                 max_export_batch_size=configuration.max_export_batch_size,
             )
         )
-        tracer = provider.get_tracer("iip.investigation", "0.32.0")
+        tracer = provider.get_tracer("iip.investigation", "0.33.0")
         sink = OpenTelemetryInvestigationSink(
             tracer,
             attribute_mode=configuration.attribute_mode,

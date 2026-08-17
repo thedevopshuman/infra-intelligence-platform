@@ -1,0 +1,126 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationSignalCatalog",
+  "profiles": [
+    {
+      "tenantId": "tenant-acme",
+      "profileId": "kubernetes-standard",
+      "version": "1.0.0",
+      "selections": {
+        "kubernetesEventSelections": [
+          {
+            "id": "kes_28f7d4ea459b4ce9",
+            "integrationId": "kubernetes-production",
+            "rootCauseClasses": ["kubernetes.rollout.unavailable-replicas"],
+            "query": {
+              "severities": ["warning"],
+              "reasons": ["ProgressDeadlineExceeded"]
+            },
+            "limits": {"maxEvents": 100, "maxBytes": 524288},
+            "interpretation": {
+              "conditions": ["workload.progress-deadline-exceeded"],
+              "minMatches": 1,
+              "whenMatched": "supports",
+              "whenNotMatched": "neutral"
+            }
+          }
+        ],
+        "contextSelections": [
+          {
+            "id": "xqs_93b4d7e10ca648f2",
+            "integrationId": "service-catalog-production",
+            "rootCauseClasses": ["kubernetes.rollout.unavailable-replicas"],
+            "query": {
+              "kinds": ["runbook"],
+              "referenceIds": ["runbooks/api-rollout"]
+            },
+            "limits": {
+              "maxDocuments": 4,
+              "maxExcerptChars": 4096,
+              "maxBytes": 262144
+            },
+            "interpretation": {
+              "minDocuments": 1,
+              "whenMatched": "supports",
+              "whenNotMatched": "neutral"
+            }
+          }
+        ],
+        "changeSelections": [
+          {
+            "id": "cqs_6a28c9f31db44ea2",
+            "integrationId": "platform-resource-history",
+            "rootCauseClasses": ["kubernetes.rollout.unavailable-replicas"],
+            "query": {"changeKinds": ["image", "scale"]},
+            "limits": {
+              "maxChanges": 100,
+              "maxObservationsPerResource": 500,
+              "maxBytes": 524288
+            },
+            "interpretation": {
+              "minChanges": 1,
+              "whenMatched": "supports",
+              "whenNotMatched": "neutral"
+            }
+          }
+        ],
+        "telemetrySelections": [
+          {
+            "id": "tqs_0123456789abcdef",
+            "integrationId": "observability-production",
+            "rootCauseClasses": ["kubernetes.rollout.unavailable-replicas"],
+            "query": {
+              "metric": "service.request.error_ratio",
+              "filters": [
+                {
+                  "attribute": "service.name",
+                  "operator": "eq",
+                  "value": "api"
+                }
+              ],
+              "aggregation": {"function": "avg", "stepSeconds": 60},
+              "groupBy": ["service.name"]
+            },
+            "limits": {
+              "maxSeries": 8,
+              "maxDataPoints": 480,
+              "maxBytes": 524288
+            },
+            "interpretation": {
+              "statistic": "maximum",
+              "unit": "1",
+              "operator": "gte",
+              "threshold": 0.05,
+              "whenMatched": "supports",
+              "whenNotMatched": "contradicts"
+            }
+          }
+        ],
+        "logSelections": [
+          {
+            "id": "lqs_10f7d4ea459b4ce9",
+            "integrationId": "observability-production",
+            "rootCauseClasses": ["kubernetes.rollout.unavailable-replicas"],
+            "query": {
+              "serviceNames": ["api"],
+              "severities": ["error"],
+              "filters": [
+                {
+                  "attribute": "error.type",
+                  "operator": "eq",
+                  "value": "ProgressDeadlineExceeded"
+                }
+              ]
+            },
+            "limits": {"maxRecords": 100, "maxBytes": 524288},
+            "interpretation": {
+              "minRecords": 2,
+              "whenMatched": "supports",
+              "whenNotMatched": "neutral"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

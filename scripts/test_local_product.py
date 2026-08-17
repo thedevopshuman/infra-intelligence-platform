@@ -285,7 +285,10 @@ def main() -> int:
                         "id": "incident-investigator",
                         "version": "0.1.0",
                     },
-                    "evidenceTypes": ["kubernetes.resource-status"],
+                    "evidenceTypes": [
+                        "kubernetes.resource-status",
+                        "resource.change",
+                    ],
                     "allowedTools": ["resources/query", "evidence/fetch"],
                     "budgets": {
                         "maxToolCalls": 8,
@@ -305,6 +308,22 @@ def main() -> int:
         report = _wait_for_investigation(investigation_id, operator)
         if report.get("kind") != "InvestigationReport":
             raise ProductWorkflowError("investigation did not return a terminal report")
+        report_spec = report.get("spec")
+        signal_plan = (
+            report_spec.get("signalPlan")
+            if isinstance(report_spec, Mapping)
+            else None
+        )
+        steps = signal_plan.get("steps") if isinstance(signal_plan, Mapping) else None
+        if not isinstance(steps, list) or not any(
+            isinstance(step, Mapping)
+            and step.get("origin") == "protected-catalog"
+            and step.get("signal") == "resource.change"
+            for step in steps
+        ):
+            raise ProductWorkflowError(
+                "investigation did not use the reviewed tenant signal catalog"
+            )
 
         proposal = _request(
             "/v1/actions/proposals",

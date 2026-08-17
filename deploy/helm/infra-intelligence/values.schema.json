@@ -26,6 +26,7 @@
     "kubernetesEventEvidence",
     "kubernetesActions",
     "contextEvidence",
+    "investigationSignalCatalog",
     "otlpReceiver",
     "otlpLogsReceiver",
     "otlpIngest",
@@ -564,6 +565,15 @@
         "integrationsSecretKey": { "$ref": "#/definitions/nonEmptyString" },
         "documentsExistingConfigMap": { "$ref": "#/definitions/optionalName" },
         "documentsMountPath": { "$ref": "#/definitions/absolutePath" }
+      }
+    },
+    "investigationSignalCatalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existingSecret", "secretKey"],
+      "properties": {
+        "existingSecret": { "$ref": "#/definitions/optionalName" },
+        "secretKey": { "$ref": "#/definitions/nonEmptyString" }
       }
     },
     "otlpReceiver": { "$ref": "#/definitions/receiver" },

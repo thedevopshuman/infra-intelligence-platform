@@ -102,6 +102,10 @@ done
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
     create secret generic iip-auth \
     --from-literal="identities-json=$IIP_AUTH_IDENTITIES_JSON" >/dev/null
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    create secret generic iip-investigation-signal-catalog \
+    --from-file="investigation-signal-catalog-json=contracts/examples/investigation-signal-catalog.json" \
+    >/dev/null
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
     -subj "/CN=iip.helm.test" \
     -addext "subjectAltName=DNS:iip.helm.test" \
@@ -182,6 +186,7 @@ EOF
     --set database.existingSecret=iip-database \
     --set database.migrations.enabled=true \
     --set auth.existingSecret=iip-auth \
+    --set investigationSignalCatalog.existingSecret=iip-investigation-signal-catalog \
     --wait --timeout 180s >/dev/null
 
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
@@ -235,6 +240,7 @@ IIP_EXPECTED_MIGRATION_COUNT=$(
     --set database.existingSecret=iip-database \
     --set database.migrations.enabled=true \
     --set auth.existingSecret=iip-auth \
+    --set investigationSignalCatalog.existingSecret=iip-investigation-signal-catalog \
     --set ingress.enabled=true \
     --set ingress.className=iip-conformance \
     --set ingress.host=iip.helm.test \

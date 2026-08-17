@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import re
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Mapping
@@ -30,6 +31,7 @@ from iip.application.ports import (
     EvidenceStore,
     InvestigationExecutionMeasurement,
     InvestigationRepository,
+    InvestigationSignalCatalog,
     InvestigationTelemetrySink,
     PersistenceError,
     ResourceRepository,
@@ -72,6 +74,17 @@ _INTERPRETATION_OPERATORS = frozenset({"lt", "lte", "gt", "gte"})
 _INTERPRETATION_DISPOSITIONS = frozenset(
     {"supports", "contradicts", "neutral"}
 )
+_SIGNAL_DEFINITIONS = (
+    ("kubernetes.event", "kubernetesEventSelections", "events/search"),
+    ("repository.context", "contextSelections", "evidence/fetch"),
+    ("resource.change", "changeSelections", "evidence/fetch"),
+    ("telemetry.metrics", "telemetrySelections", "telemetry/query"),
+    ("telemetry.logs", "logSelections", "telemetry/query"),
+)
+_CATALOG_PROFILE_ID = re.compile(r"^[a-z][a-z0-9-]{2,63}$")
+_CATALOG_TENANT_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
+_SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$")
+_SHA256_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 
 
 class InvalidInvestigationError(ValueError):
@@ -84,6 +97,10 @@ class InvestigationConflictError(RuntimeError):
 
 class InvestigationInProgressError(RuntimeError):
     """The immutable investigation ID already has a live execution lease."""
+
+
+class InvestigationCatalogConfigurationError(RuntimeError):
+    """A protected signal profile is malformed or ambiguously tenant-bound."""
 
 
 @dataclass(frozen=True)
@@ -115,6 +132,7 @@ class DeterministicInvestigationService:
         context: ContextEvidenceService | None = None,
         evidence_store: EvidenceStore | None = None,
         telemetry_sink: InvestigationTelemetrySink | None = None,
+        signal_catalog: InvestigationSignalCatalog | None = None,
     ) -> None:
         self._resources = resources
         self._evidence = evidence
@@ -127,13 +145,18 @@ class DeterministicInvestigationService:
         self._context = context
         self._evidence_store = evidence_store
         self._telemetry_sink = telemetry_sink
+        self._signal_catalog = signal_catalog
+        self._validate_signal_catalog()
 
     def validate_for_dispatch(
         self, command: RunInvestigationCommand
     ) -> Mapping[str, object]:
         """Validate and normalize an asynchronous request before it is durable."""
 
-        request, _, _, scope, _ = self._validate(command)
+        request = self._prepare(command)
+        _, _, _, scope, _ = self._validate(
+            RunInvestigationCommand(command.actor, request)
+        )
         resources = tuple(
             self._resources.get_many(
                 command.actor.tenant_id, scope["resourceUids"]
@@ -144,7 +167,20 @@ class DeterministicInvestigationService:
         return request
 
     def execute(self, command: RunInvestigationCommand) -> Mapping[str, object]:
+        """Prepare an untrusted caller request and execute its frozen form."""
+
+        request = self._prepare(command)
+        return self.execute_prepared(
+            RunInvestigationCommand(command.actor, request)
+        )
+
+    def execute_prepared(
+        self, command: RunInvestigationCommand
+    ) -> Mapping[str, object]:
+        """Execute a request already frozen by the trusted dispatch boundary."""
+
         request, metadata, spec, scope, budgets = self._validate(command)
+        self._verify_catalog_snapshot(spec)
         investigation_id = metadata["id"]
         existing = self._investigations.get_investigation(command.actor, investigation_id)
         stored_request = self._investigations.get_investigation_request(
@@ -1697,17 +1733,17 @@ class DeterministicInvestigationService:
             set(requested_types) if isinstance(requested_types, list) else set()
         )
         tools = set(allowed_tools) if isinstance(allowed_tools, list) else set()
-        definitions = (
-            (
-                "kubernetes.event",
-                "kubernetesEventSelections",
-                "events/search",
-            ),
-            ("repository.context", "contextSelections", "evidence/fetch"),
-            ("resource.change", "changeSelections", "evidence/fetch"),
-            ("telemetry.metrics", "telemetrySelections", "telemetry/query"),
-            ("telemetry.logs", "logSelections", "telemetry/query"),
-        )
+        definitions = _SIGNAL_DEFINITIONS
+        catalog_snapshot = spec.get("catalogSnapshot")
+        generated = set()
+        if isinstance(catalog_snapshot, Mapping):
+            references = catalog_snapshot.get("generatedSelections")
+            if isinstance(references, list):
+                generated = {
+                    (reference.get("signal"), reference.get("selectionId"))
+                    for reference in references
+                    if isinstance(reference, Mapping)
+                }
         scheduled: dict[str, list[Mapping[str, object]]] = {
             signal: [] for signal, _, _ in definitions
         }
@@ -1753,6 +1789,11 @@ class DeterministicInvestigationService:
                         "position": position,
                         "signal": signal,
                         "selectionId": candidate["id"],
+                        "origin": (
+                            "protected-catalog"
+                            if (signal, candidate["id"]) in generated
+                            else "request"
+                        ),
                         "decision": decision,
                         "reason": reason,
                     }
@@ -1774,6 +1815,13 @@ class DeterministicInvestigationService:
         }
         if root_cause is not None:
             plan["rootCauseClass"] = root_cause
+        if isinstance(catalog_snapshot, Mapping):
+            plan["catalog"] = {
+                "profileId": catalog_snapshot["profileId"],
+                "profileVersion": catalog_snapshot["profileVersion"],
+                "profileDigest": catalog_snapshot["profileDigest"],
+                "snapshotDigest": catalog_snapshot["snapshotDigest"],
+            }
         return plan, {
             signal: tuple(candidates)
             for signal, candidates in scheduled.items()
@@ -2905,6 +2953,272 @@ class DeterministicInvestigationService:
     def _deadline(started_at: str, seconds: int) -> str:
         parsed = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
         return (parsed + timedelta(seconds=seconds)).isoformat().replace("+00:00", "Z")
+
+    def _validate_signal_catalog(self) -> None:
+        if self._signal_catalog is None:
+            return
+        tenants: set[str] = set()
+        try:
+            profiles = tuple(self._signal_catalog.profiles())
+        except Exception:
+            raise InvestigationCatalogConfigurationError(
+                "investigation.catalog.configuration.invalid"
+            ) from None
+        if len(profiles) > 256:
+            raise InvestigationCatalogConfigurationError(
+                "investigation.catalog.configuration.invalid"
+            )
+        for profile in profiles:
+            validated = self._validate_catalog_profile(profile)
+            tenant_id = str(validated["tenantId"])
+            if tenant_id in tenants:
+                raise InvestigationCatalogConfigurationError(
+                    "investigation.catalog.configuration.invalid"
+                )
+            tenants.add(tenant_id)
+
+    @staticmethod
+    def _validate_catalog_profile(
+        profile: Mapping[str, object],
+    ) -> dict[str, object]:
+        if (
+            not isinstance(profile, Mapping)
+            or set(profile) != {"tenantId", "profileId", "version", "selections"}
+        ):
+            raise InvestigationCatalogConfigurationError(
+                "investigation.catalog.configuration.invalid"
+            )
+        tenant_id = profile.get("tenantId")
+        profile_id = profile.get("profileId")
+        version = profile.get("version")
+        selections = profile.get("selections")
+        fields = {field for _, field, _ in _SIGNAL_DEFINITIONS}
+        if (
+            not isinstance(tenant_id, str)
+            or _CATALOG_TENANT_ID.fullmatch(tenant_id) is None
+            or not isinstance(profile_id, str)
+            or _CATALOG_PROFILE_ID.fullmatch(profile_id) is None
+            or not isinstance(version, str)
+            or _SEMVER.fullmatch(version) is None
+            or not isinstance(selections, Mapping)
+            or not selections
+            or set(selections).difference(fields)
+        ):
+            raise InvestigationCatalogConfigurationError(
+                "investigation.catalog.configuration.invalid"
+            )
+        telemetry = selections.get("telemetrySelections", [])
+        if isinstance(telemetry, list) and any(
+            isinstance(candidate, Mapping)
+            and (
+                "baselineComparison" in candidate
+                or "rollingBaselineComparison" in candidate
+            )
+            for candidate in telemetry
+        ):
+            raise InvestigationCatalogConfigurationError(
+                "investigation.catalog.configuration.invalid"
+            )
+        synthetic_spec: dict[str, object] = {
+            "question": "Validate protected investigation signal profile.",
+            "trigger": {
+                "type": "scheduled",
+                "source": "urn:iip:catalog-validation",
+                "summary": "Validate protected signal candidates.",
+            },
+            "scope": {
+                "resourceUids": ["res_" + ("0" * 32)],
+                "timeRange": {
+                    "start": "2025-01-01T00:00:00Z",
+                    "end": "2026-01-01T00:00:00Z",
+                },
+            },
+            "evidenceTypes": [signal for signal, _, _ in _SIGNAL_DEFINITIONS],
+            "allowedTools": sorted(
+                {required_tool for _, _, required_tool in _SIGNAL_DEFINITIONS}
+            ),
+            "budgets": {
+                "maxToolCalls": 200,
+                "maxWallTimeSeconds": 3600,
+                "maxModelTokens": 0,
+                "maxCostUsd": 0,
+                "maxEvidenceItems": 1000,
+                "maxIterations": 100,
+            },
+            "maxAuthority": "read",
+        }
+        synthetic_spec.update(deepcopy(dict(selections)))
+        request = {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "InvestigationRequest",
+            "metadata": {
+                "id": "inv_" + ("0" * 32),
+                "tenantId": tenant_id,
+                "actorId": "catalog-validator",
+                "requestedAt": "2026-01-01T00:00:00Z",
+            },
+            "spec": synthetic_spec,
+        }
+        try:
+            DeterministicInvestigationService._validate(
+                RunInvestigationCommand(
+                    ActorContext("catalog-validator", tenant_id), request
+                )
+            )
+        except InvalidInvestigationError:
+            raise InvestigationCatalogConfigurationError(
+                "investigation.catalog.configuration.invalid"
+            ) from None
+        return deepcopy(dict(profile))
+
+    def _prepare(self, command: RunInvestigationCommand) -> dict[str, object]:
+        """Freeze protected catalog candidates before durable persistence."""
+
+        request = deepcopy(dict(command.request))
+        raw_spec = request.get("spec")
+        if isinstance(raw_spec, Mapping) and "catalogSnapshot" in raw_spec:
+            raise InvalidInvestigationError(
+                "investigation.catalog.snapshot-forbidden"
+            )
+        self._validate(RunInvestigationCommand(command.actor, request))
+        if self._signal_catalog is None:
+            return request
+        try:
+            raw_profile = self._signal_catalog.get_profile(command.actor.tenant_id)
+        except Exception:
+            raise InvestigationCatalogConfigurationError(
+                "investigation.catalog.configuration.invalid"
+            ) from None
+        if raw_profile is None:
+            return request
+        profile = self._validate_catalog_profile(raw_profile)
+        if profile["tenantId"] != command.actor.tenant_id:
+            raise InvestigationCatalogConfigurationError(
+                "investigation.catalog.configuration.invalid"
+            )
+        spec = deepcopy(dict(request["spec"]))
+        selections = profile["selections"]
+        assert isinstance(selections, Mapping)
+        generated_references: list[dict[str, str]] = []
+        resolved_selections: list[dict[str, object]] = []
+        for signal, field, _ in _SIGNAL_DEFINITIONS:
+            candidates = selections.get(field)
+            if spec.get(field) or not isinstance(candidates, list):
+                continue
+            spec[field] = deepcopy(candidates)
+            for candidate in candidates:
+                assert isinstance(candidate, Mapping)
+                selection_id = str(candidate["id"])
+                generated_references.append(
+                    {"signal": signal, "selectionId": selection_id}
+                )
+                resolved_selections.append(
+                    {"signal": signal, "selection": deepcopy(dict(candidate))}
+                )
+        if not generated_references:
+            return request
+        profile_digest = canonical_digest(profile)
+        material = {
+            "profileId": profile["profileId"],
+            "profileVersion": profile["version"],
+            "profileDigest": profile_digest,
+            "selections": resolved_selections,
+        }
+        spec["catalogSnapshot"] = {
+            "strategy": "protected-catalog-v1",
+            "profileId": profile["profileId"],
+            "profileVersion": profile["version"],
+            "profileDigest": profile_digest,
+            "generatedSelections": generated_references,
+            "snapshotDigest": canonical_digest(material),
+        }
+        request["spec"] = spec
+        prepared_command = RunInvestigationCommand(command.actor, request)
+        _, _, prepared_spec, _, _ = self._validate(prepared_command)
+        self._verify_catalog_snapshot(prepared_spec)
+        return request
+
+    @staticmethod
+    def _verify_catalog_snapshot(spec: Mapping[str, object]) -> None:
+        snapshot = spec.get("catalogSnapshot")
+        if snapshot is None:
+            return
+        if (
+            not isinstance(snapshot, Mapping)
+            or set(snapshot)
+            != {
+                "strategy",
+                "profileId",
+                "profileVersion",
+                "profileDigest",
+                "generatedSelections",
+                "snapshotDigest",
+            }
+            or snapshot.get("strategy") != "protected-catalog-v1"
+            or not isinstance(snapshot.get("profileId"), str)
+            or _CATALOG_PROFILE_ID.fullmatch(str(snapshot.get("profileId"))) is None
+            or not isinstance(snapshot.get("profileVersion"), str)
+            or _SEMVER.fullmatch(str(snapshot.get("profileVersion"))) is None
+            or not isinstance(snapshot.get("profileDigest"), str)
+            or _SHA256_DIGEST.fullmatch(str(snapshot.get("profileDigest"))) is None
+            or not isinstance(snapshot.get("snapshotDigest"), str)
+            or _SHA256_DIGEST.fullmatch(str(snapshot.get("snapshotDigest"))) is None
+        ):
+            raise InvalidInvestigationError(
+                "investigation.catalog.snapshot-invalid"
+            )
+        references = snapshot.get("generatedSelections")
+        if not isinstance(references, list) or not 1 <= len(references) <= 40:
+            raise InvalidInvestigationError(
+                "investigation.catalog.snapshot-invalid"
+            )
+        fields = {signal: field for signal, field, _ in _SIGNAL_DEFINITIONS}
+        seen: set[tuple[str, str]] = set()
+        resolved: list[dict[str, object]] = []
+        for reference in references:
+            if not isinstance(reference, Mapping) or set(reference) != {
+                "signal",
+                "selectionId",
+            }:
+                raise InvalidInvestigationError(
+                    "investigation.catalog.snapshot-invalid"
+                )
+            signal = reference.get("signal")
+            selection_id = reference.get("selectionId")
+            if (
+                not isinstance(signal, str)
+                or signal not in fields
+                or not isinstance(selection_id, str)
+                or (signal, selection_id) in seen
+            ):
+                raise InvalidInvestigationError(
+                    "investigation.catalog.snapshot-invalid"
+                )
+            candidates = spec.get(fields[signal])
+            matches = [
+                candidate
+                for candidate in candidates
+                if isinstance(candidate, Mapping)
+                and candidate.get("id") == selection_id
+            ] if isinstance(candidates, list) else []
+            if len(matches) != 1:
+                raise InvalidInvestigationError(
+                    "investigation.catalog.snapshot-invalid"
+                )
+            seen.add((signal, selection_id))
+            resolved.append(
+                {"signal": signal, "selection": deepcopy(dict(matches[0]))}
+            )
+        material = {
+            "profileId": snapshot["profileId"],
+            "profileVersion": snapshot["profileVersion"],
+            "profileDigest": snapshot["profileDigest"],
+            "selections": resolved,
+        }
+        if canonical_digest(material) != snapshot["snapshotDigest"]:
+            raise InvalidInvestigationError(
+                "investigation.catalog.snapshot-invalid"
+            )
 
     @staticmethod
     def _validate(

@@ -32,6 +32,7 @@ from iip.adapters.evidence import (
     UuidEvidenceIdGenerator,
 )
 from iip.adapters.health import AlwaysReadyProbe
+from iip.adapters.investigation_catalog import build_investigation_signal_catalog
 from iip.adapters.memory import AllowTenantPolicy, InMemoryResourceStore
 from iip.adapters.otel import DisabledTelemetryExportHealthReader
 from iip.adapters.operations import InMemoryOperationalStore
@@ -60,6 +61,7 @@ from iip.application.ports import (
     CredentialBroker,
     ContextDocumentsBackend,
     IngestionTelemetrySink,
+    InvestigationSignalCatalog,
     InvestigationTelemetrySink,
     KubernetesEventsBackend,
     PolicyConfigurationError,
@@ -173,6 +175,7 @@ def build_local_runtime(
     telemetry_runtime: Any = None,
     action_executor: ActionExecutor | None = None,
     policy: PolicyDecisionPoint | None = None,
+    signal_catalog: InvestigationSignalCatalog | None = None,
     readiness: ReadinessProbe | None = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
@@ -197,6 +200,7 @@ def build_local_runtime(
         telemetry_runtime,
         action_executor,
         policy,
+        signal_catalog,
         readiness,
     )
 
@@ -218,6 +222,7 @@ def _compose_runtime(
     telemetry_runtime: Any = None,
     action_executor: ActionExecutor | None = None,
     configured_policy: PolicyDecisionPoint | None = None,
+    signal_catalog: InvestigationSignalCatalog | None = None,
     readiness: ReadinessProbe | None = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
@@ -285,6 +290,7 @@ def _compose_runtime(
         logs=log_evidence,
         evidence_store=evidence_store,
         telemetry_sink=investigation_telemetry_sink,
+        signal_catalog=signal_catalog,
     )
     investigation_lifecycle = InvestigationLifecycleService(operational, clock)
     return Runtime(
@@ -402,6 +408,7 @@ def build_postgres_runtime(
     telemetry_runtime: Any = None,
     action_executor: ActionExecutor | None = None,
     policy: PolicyDecisionPoint | None = None,
+    signal_catalog: InvestigationSignalCatalog | None = None,
     readiness_timeout_seconds: int = 2,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
@@ -433,6 +440,7 @@ def build_postgres_runtime(
         telemetry_runtime,
         action_executor,
         policy,
+        signal_catalog,
         PostgresReadinessProbe(database_url, readiness_timeout_seconds),
     )
 
@@ -512,6 +520,7 @@ def _build_runtime_from_env(
             credential_broker
         )
         context_documents_backend = _context_documents_backend_from_env()
+        signal_catalog = build_investigation_signal_catalog(os.environ)
         if not database_url:
             return build_local_runtime(
                 authenticator,
@@ -533,6 +542,7 @@ def _build_runtime_from_env(
                 telemetry_runtime=telemetry_runtime,
                 action_executor=action_executor,
                 policy=policy,
+                signal_catalog=signal_catalog,
             )
         auto_migrate = (
             os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
@@ -558,6 +568,7 @@ def _build_runtime_from_env(
             telemetry_runtime=telemetry_runtime,
             action_executor=action_executor,
             policy=policy,
+            signal_catalog=signal_catalog,
             readiness_timeout_seconds=_readiness_timeout_from_env(),
         )
     except Exception:

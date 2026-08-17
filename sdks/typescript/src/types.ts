@@ -909,6 +909,44 @@ export interface InvestigationCancellationRequest {
   };
 }
 
+export type InvestigationSignal =
+  | "kubernetes.event"
+  | "repository.context"
+  | "resource.change"
+  | "telemetry.metrics"
+  | "telemetry.logs";
+
+export interface InvestigationCatalogSnapshot {
+  strategy: "protected-catalog-v1";
+  profileId: string;
+  profileVersion: string;
+  profileDigest: Sha256Digest;
+  generatedSelections: {
+    signal: InvestigationSignal;
+    selectionId: string;
+  }[];
+  snapshotDigest: Sha256Digest;
+}
+
+export interface InvestigationSignalCatalogProfile {
+  tenantId: string;
+  profileId: string;
+  version: string;
+  selections: {
+    kubernetesEventSelections?: InvestigationKubernetesEventSelection[];
+    contextSelections?: InvestigationContextSelection[];
+    changeSelections?: InvestigationChangeSelection[];
+    telemetrySelections?: InvestigationTelemetrySelection[];
+    logSelections?: InvestigationLogSelection[];
+  };
+}
+
+export interface InvestigationSignalCatalog {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "InvestigationSignalCatalog";
+  profiles: InvestigationSignalCatalogProfile[];
+}
+
 export interface InvestigationStatus {
   apiVersion: "iip.platform/v1alpha1";
   kind: "InvestigationStatus";
@@ -1001,6 +1039,7 @@ export interface InvestigationRequest {
     contextSelections?: InvestigationContextSelection[];
     logSelections?: InvestigationLogSelection[];
     telemetrySelections?: InvestigationTelemetrySelection[];
+    readonly catalogSnapshot?: InvestigationCatalogSnapshot;
     budgets: InvestigationBudgets;
     maxAuthority: "read" | "propose";
     priority?: "low" | "normal" | "high" | "critical";
@@ -1174,19 +1213,21 @@ export interface InvestigationReport {
     signalPlan?: {
       strategy: "risk-aware-v1";
       rootCauseClass?: string;
+      catalog?: {
+        profileId: string;
+        profileVersion: string;
+        profileDigest: Sha256Digest;
+        snapshotDigest: Sha256Digest;
+      };
       capacity: { toolCalls: number; evidenceItems: number };
       candidateCount: number;
       scheduledCount: number;
       deferredCount: number;
       steps: {
         position: number;
-        signal:
-          | "kubernetes.event"
-          | "repository.context"
-          | "resource.change"
-          | "telemetry.metrics"
-          | "telemetry.logs";
+        signal: InvestigationSignal;
         selectionId: string;
+        origin: "request" | "protected-catalog";
         decision: "scheduled" | "deferred";
         reason:
           | "eligible"

@@ -27,3 +27,5 @@ Investigation requests can declare candidates for several evidence types, but ex
 ## Revisit triggers
 
 Revisit when protected signal catalogs generate candidates automatically, when observed evidence changes a plan mid-run, or when measured design-partner outcomes justify a different risk/cost ordering.
+
+**Revisited:** [ADR 0054](0054-protected-investigation-signal-catalog.md) adds protected catalog candidates by freezing them into the accepted request before this planner runs. The risk order and budget decisions here remain unchanged; plan steps now record candidate origin and catalog digest provenance.

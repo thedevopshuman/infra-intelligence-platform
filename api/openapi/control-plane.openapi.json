@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.27.0",
+    "version": "0.28.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -339,7 +339,7 @@
     "/v1/investigations": {
       "post": {
         "operationId": "runInvestigation",
-        "description": "Run a bounded investigation. Optional Kubernetes Event, repository/runbook context, resource-change, metric, and historical log selections inherit authenticated identity, resource/time scope, and investigation tool/evidence budgets before using configured backend-neutral adapters. Root-cause-scoped selections assess only committed normalized artifacts and record supporting, contradicting, neutral, no-data, or incomplete results. Context and log prose is untrusted data, is never interpreted as instructions, and is not copied into reports.",
+        "description": "Run a bounded investigation. Optional Kubernetes Event, repository/runbook context, resource-change, metric, and historical log selections inherit authenticated identity, resource/time scope, and investigation tool/evidence budgets before using configured backend-neutral adapters. Empty signal lists may be filled from a protected tenant profile and frozen with server-owned digest provenance; clients must not supply catalogSnapshot. Root-cause-scoped selections assess only committed normalized artifacts and record supporting, contradicting, neutral, no-data, or incomplete results. Context and log prose is untrusted data, is never interpreted as instructions, and is not copied into reports.",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-request.schema.json"}}}},
         "responses": {
           "201": {"description": "Immutable terminal investigation report", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-report.schema.json"}}}},
@@ -353,7 +353,7 @@
     "/v1/investigation-jobs": {
       "post": {
         "operationId": "submitInvestigation",
-        "description": "Validate and durably queue one immutable investigation request. A tenant-scoped worker claims it under a renewable dispatch lease; investigation budgets and the separate non-renewable execution deadline remain authoritative.",
+        "description": "Validate and durably queue one immutable investigation request. Protected tenant catalog candidates are resolved and content-digested before persistence, then a tenant-scoped worker verifies the frozen snapshot and claims it under a renewable dispatch lease. Investigation upper bounds, budgets, and the separate non-renewable execution deadline remain authoritative.",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-request.schema.json"}}}},
         "responses": {
           "202": {"description": "Request durably queued or its existing idempotent job returned", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-job-status.schema.json"}}}},
@@ -585,6 +585,7 @@
       "TelemetryEvidenceResult": {"$ref": "../../contracts/schemas/telemetry-evidence-result.schema.json"},
       "OtlpMetricsEvidence": {"$ref": "../../contracts/schemas/otlp-metrics-evidence.schema.json"},
       "InvestigationRequest": {"$ref": "../../contracts/schemas/investigation-request.schema.json"},
+      "InvestigationSignalCatalog": {"$ref": "../../contracts/schemas/investigation-signal-catalog.schema.json"},
       "InvestigationReport": {"$ref": "../../contracts/schemas/investigation-report.schema.json"},
       "InvestigationCancellationRequest": {"$ref": "../../contracts/schemas/investigation-cancellation-request.schema.json"},
       "InvestigationStatus": {"$ref": "../../contracts/schemas/investigation-status.schema.json"},

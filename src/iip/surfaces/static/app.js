@@ -480,6 +480,17 @@ function renderInvestigation(report) {
     meta.append(item);
   });
   container.append(meta);
+  if (spec.signalPlan?.steps?.length) {
+    container.append(node("h3", "", "Evidence plan"));
+    const plan = node("div", "signal-plan");
+    spec.signalPlan.steps.forEach((step) => {
+      const item = node("div", "signal-step");
+      item.append(node("strong", "", `${step.signal} · ${step.decision}`));
+      item.append(node("span", "", `${step.origin === "protected-catalog" ? "Reviewed catalog" : "Request"} · ${step.reason}`));
+      plan.append(item);
+    });
+    container.append(plan);
+  }
   if (spec.hypotheses?.length) {
     container.append(node("h3", "", "Ranked hypotheses"));
     spec.hypotheses.forEach((hypothesis) => {
@@ -556,8 +567,8 @@ async function runInvestigation(event) {
       trigger: { type: "user", source: "urn:iip:console:user", summary: question },
       scope: { resourceUids: [resourceUid], timeRange: { start: start.toISOString(), end: end.toISOString() } },
       agentSelector: { id: "incident-investigator", version: "0.1.0" },
-      evidenceTypes: ["kubernetes.resource-status"],
-      allowedTools: ["resources/query", "evidence/fetch"],
+      evidenceTypes: ["kubernetes.resource-status", "kubernetes.event", "repository.context", "resource.change", "telemetry.metrics", "telemetry.logs"],
+      allowedTools: ["resources/query", "events/search", "evidence/fetch", "telemetry/query"],
       budgets: { maxToolCalls: 8, maxWallTimeSeconds: 120, maxModelTokens: 0, maxCostUsd: 0, maxEvidenceItems: 16, maxIterations: 8 },
       maxAuthority: $("#allow-proposal").checked ? "propose" : "read",
       priority: "normal",

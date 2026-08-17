@@ -1,0 +1,74 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationRequest",
+  "metadata": {
+    "id": "inv_6a28c9f31db44ea2987fc50b1635e4ad",
+    "tenantId": "local",
+    "actorId": "developer",
+    "requestedAt": "2026-08-16T10:30:00Z",
+    "correlationId": "incident-2026-08-16-api-rollout-catalog"
+  },
+  "spec": {
+    "question": "Did a reviewed signal identify why the rollout is unavailable?",
+    "trigger": {
+      "type": "alert",
+      "source": "urn:iip:event:alertmanager",
+      "reference": "alert://local/api/unavailable-replicas",
+      "summary": "The api Deployment has fewer available replicas than requested."
+    },
+    "scope": {
+      "resourceUids": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+      "timeRange": {
+        "start": "2026-08-16T10:15:00Z",
+        "end": "2026-08-16T10:29:59Z"
+      }
+    },
+    "agentSelector": {
+      "id": "incident-investigator",
+      "version": "0.1.0"
+    },
+    "evidenceTypes": ["kubernetes.resource-status", "resource.change"],
+    "allowedTools": ["evidence/fetch"],
+    "changeSelections": [
+      {
+        "id": "cqs_6a28c9f31db44ea2",
+        "integrationId": "platform-resource-history",
+        "rootCauseClasses": ["kubernetes.rollout.unavailable-replicas"],
+        "query": {"changeKinds": ["image", "scale"]},
+        "limits": {
+          "maxChanges": 100,
+          "maxObservationsPerResource": 500,
+          "maxBytes": 524288
+        },
+        "interpretation": {
+          "minChanges": 1,
+          "whenMatched": "supports",
+          "whenNotMatched": "neutral"
+        }
+      }
+    ],
+    "catalogSnapshot": {
+      "strategy": "protected-catalog-v1",
+      "profileId": "local-kubernetes",
+      "profileVersion": "1.0.0",
+      "profileDigest": "sha256:5c3cece008b292caf6d472ca5dc143411bf0c5d7b899d5ec83d6e9ac780b64a5",
+      "generatedSelections": [
+        {
+          "signal": "resource.change",
+          "selectionId": "cqs_6a28c9f31db44ea2"
+        }
+      ],
+      "snapshotDigest": "sha256:fea35e273830ff46d4ba8e89dd9eba207fc13461fbe9f864dbc7de23ae00d51d"
+    },
+    "budgets": {
+      "maxToolCalls": 8,
+      "maxWallTimeSeconds": 180,
+      "maxModelTokens": 50000,
+      "maxCostUsd": 1,
+      "maxEvidenceItems": 16,
+      "maxIterations": 8
+    },
+    "maxAuthority": "read",
+    "priority": "high"
+  }
+}

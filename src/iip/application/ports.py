@@ -580,6 +580,14 @@ class InvestigationTelemetrySink(Protocol):
         """Record terminal execution facts without becoming workflow authority."""
 
 
+class InvestigationSignalCatalog(Protocol):
+    def profiles(self) -> Iterable[Mapping[str, object]]:
+        """Return bounded protected profiles for composition-time validation."""
+
+    def get_profile(self, tenant_id: str) -> Optional[Mapping[str, object]]:
+        """Return the one profile bound to exactly this tenant, when configured."""
+
+
 class TelemetryExportHealthReader(Protocol):
     def read_export_health(self) -> Iterable[TelemetryExportSignalState]:
         """Return bounded process-local delivery state without provider details."""

@@ -24,6 +24,45 @@ PROJECT = "iip-local"
 _LOCAL_OPERATOR_ROLES = ("developer", "platform-admin")
 
 
+def _local_signal_catalog_json() -> str:
+    """Return a non-secret reviewed profile for the disposable local tenant."""
+
+    document = {
+        "apiVersion": "iip.platform/v1alpha1",
+        "kind": "InvestigationSignalCatalog",
+        "profiles": [
+            {
+                "tenantId": "local",
+                "profileId": "local-kubernetes",
+                "version": "1.0.0",
+                "selections": {
+                    "changeSelections": [
+                        {
+                            "id": "cqs_6a28c9f31db44ea2",
+                            "integrationId": "platform-resource-history",
+                            "rootCauseClasses": [
+                                "kubernetes.rollout.unavailable-replicas"
+                            ],
+                            "query": {"changeKinds": ["image", "scale"]},
+                            "limits": {
+                                "maxChanges": 100,
+                                "maxObservationsPerResource": 500,
+                                "maxBytes": 524288,
+                            },
+                            "interpretation": {
+                                "minChanges": 1,
+                                "whenMatched": "supports",
+                                "whenNotMatched": "neutral",
+                            },
+                        }
+                    ]
+                },
+            }
+        ],
+    }
+    return json.dumps(document, separators=(",", ":"))
+
+
 def _token_identity(actor_id: str, roles: Sequence[str]) -> tuple[dict[str, object], dict[str, object]]:
     token = secrets.token_hex(32)
     digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
@@ -47,6 +86,7 @@ def create_local_configuration() -> tuple[Path, Path, bool]:
 
     if ENV_PATH.exists() and CREDENTIALS_PATH.exists():
         _ensure_local_operator_roles()
+        _ensure_local_signal_catalog()
         return ENV_PATH, CREDENTIALS_PATH, False
     if ENV_PATH.exists() or CREDENTIALS_PATH.exists():
         raise RuntimeError("local configuration is incomplete; restore or remove both .iip files")
@@ -70,6 +110,7 @@ def create_local_configuration() -> tuple[Path, Path, bool]:
             f"COMPOSE_PROJECT_NAME={PROJECT}",
             f"IIP_POSTGRES_PASSWORD={secrets.token_hex(24)}",
             f"IIP_AUTH_IDENTITIES_JSON={identity_document}",
+            f"IIP_INVESTIGATION_SIGNAL_CATALOG_JSON={_local_signal_catalog_json()}",
             "",
         )
     )
@@ -140,6 +181,25 @@ def _ensure_local_operator_roles() -> None:
     )
     os.chmod(ENV_PATH, stat.S_IRUSR | stat.S_IWUSR)
     os.chmod(CREDENTIALS_PATH, stat.S_IRUSR | stat.S_IWUSR)
+
+
+def _ensure_local_signal_catalog() -> None:
+    """Add the reviewed local profile to configurations from older releases."""
+
+    try:
+        lines = ENV_PATH.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise RuntimeError("local configuration is unreadable") from exc
+    if any(
+        line.startswith("IIP_INVESTIGATION_SIGNAL_CATALOG_JSON=")
+        for line in lines
+    ):
+        return
+    lines.append(
+        "IIP_INVESTIGATION_SIGNAL_CATALOG_JSON=" + _local_signal_catalog_json()
+    )
+    ENV_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    os.chmod(ENV_PATH, stat.S_IRUSR | stat.S_IWUSR)
 
 
 def load_credentials() -> Mapping[str, object]:

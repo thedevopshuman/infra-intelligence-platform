@@ -13,6 +13,8 @@ const client = new InfrastructureIntelligenceClient({
 
 The package exports `Evidence`, `InvestigationRequest`, and `InvestigationReport` as transport-independent `v1alpha1` contract types and provides executable investigation/evidence client methods.
 
+`InvestigationSignalCatalog` describes protected tenant profile documents for configuration tooling. `InvestigationRequest.catalogSnapshot` is readonly server-owned provenance on accepted work; clients must omit it when submitting an investigation. Report signal-plan steps distinguish `request` from `protected-catalog` origin without returning protected query configuration.
+
 `EvaluationScenario` describes offline graph, timeline, alert, evidence, request, and scoring fixtures. It is an evaluation artifact, not an API method or authority grant.
 
 Resource observer integrations use the exported `ResourceCollectionRequest`, `ResourceCollectionResume`, and `ResourceCollectionResult` types. Resume state combines the last committed aggregate checkpoint with an opaque provider cursor map. A complete reconciliation response may append host-generated deleted `ResourceObservation` items after the plugin observations. The types describe capability payloads only and expose no server implementation classes.

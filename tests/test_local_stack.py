@@ -55,6 +55,15 @@ class LocalStackConfigurationTests(unittest.TestCase):
         self.assertNotIn(tokens[0], environment)
         self.assertIn("tokenSha256", environment)
         self.assertNotIn("bearerToken", environment)
+        catalog_line = next(
+            line
+            for line in environment.splitlines()
+            if line.startswith("IIP_INVESTIGATION_SIGNAL_CATALOG_JSON=")
+        )
+        catalog = json.loads(catalog_line.partition("=")[2])
+        self.assertEqual(catalog["profiles"][0]["tenantId"], "local")
+        self.assertNotIn("credential", catalog_line.lower())
+        self.assertNotIn("endpoint", catalog_line.lower())
 
     def test_existing_pair_is_preserved_and_partial_state_fails_closed(self) -> None:
         _, credentials_path, _ = local_stack.create_local_configuration()

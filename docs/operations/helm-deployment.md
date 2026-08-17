@@ -4,6 +4,8 @@
 
 The chart can install the control-plane API against an existing PostgreSQL database, apply packaged schema migrations through a separately authorized hook, optionally declare a TLS-only Ingress binding, and schedule checksum-complete logical backups into existing protected storage. It does not create a production database, backup storage, identity provider, ingress controller, certificate/private key, or image registry.
 
+Reviewed automatic investigation candidates are optional. Set `investigationSignalCatalog.existingSecret` and `secretKey` to project the same tenant-bound [signal catalog](investigation-signal-catalog.md) into the API and worker. The chart never renders the catalog body into a ConfigMap or values-derived manifest.
+
 ## Required inputs
 
 Before installation, provide:
@@ -63,7 +65,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.27.0
+  tag: 0.28.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:

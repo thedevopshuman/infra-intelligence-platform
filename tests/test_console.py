@@ -92,6 +92,10 @@ class ConsoleHttpTests(unittest.TestCase):
             "/v1/system/version",
             handler.wfile.getvalue().decode("utf-8"),
         )
+        script = handler.wfile.getvalue().decode("utf-8")
+        self.assertIn("Reviewed catalog", script)
+        self.assertIn("protected-catalog", script)
+        self.assertIn("resource.change", script)
 
     def test_session_is_derived_from_the_credential(self) -> None:
         with patch.dict(

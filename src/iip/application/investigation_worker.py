@@ -82,7 +82,7 @@ class InvestigationWorker:
         if heartbeat is not None:
             heartbeat.start()
         try:
-            report = self._investigations.execute(
+            report = self._investigations.execute_prepared(
                 RunInvestigationCommand(claim.actor, claim.request)
             )
             report_spec = report.get("spec")

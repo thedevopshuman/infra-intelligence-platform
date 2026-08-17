@@ -57,3 +57,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0051](0051-immutable-ci-execution-dependencies.md) | Accepted | Pin third-party CI actions and service images to reviewed immutable revisions |
 | [0052](0052-process-local-telemetry-export-health.md) | Accepted | Track backend-neutral exporter outcomes without coupling API readiness to telemetry delivery |
 | [0053](0053-authenticated-runtime-version-identity.md) | Accepted | Expose authenticated runtime identity from release and deployment evidence without guessing |
+| [0054](0054-protected-investigation-signal-catalog.md) | Accepted | Freeze tenant-bound reviewed signal candidates without granting query, credential, or scope authority |

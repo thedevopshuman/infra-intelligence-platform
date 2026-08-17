@@ -54,6 +54,7 @@
           "position": 1,
           "signal": "telemetry.metrics",
           "selectionId": "tqs_ba5e11e0c0ffee01",
+          "origin": "request",
           "decision": "scheduled",
           "reason": "eligible"
         }

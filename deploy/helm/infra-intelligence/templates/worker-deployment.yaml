@@ -134,6 +134,13 @@ spec:
                   name: {{ .Values.contextEvidence.integrationsExistingSecret | quote }}
                   key: {{ .Values.contextEvidence.integrationsSecretKey | quote }}
             {{- end }}
+            {{- if .Values.investigationSignalCatalog.existingSecret }}
+            - name: IIP_INVESTIGATION_SIGNAL_CATALOG_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.investigationSignalCatalog.existingSecret | quote }}
+                  key: {{ .Values.investigationSignalCatalog.secretKey | quote }}
+            {{- end }}
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
           volumeMounts:

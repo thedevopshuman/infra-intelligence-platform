@@ -11,6 +11,8 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 `Evidence`, `InvestigationRequest`, and `InvestigationReport` expose the corresponding `v1alpha1` public envelopes without importing server implementation classes. `run_investigation`, `get_investigation`, and `get_evidence` use the executable reference API.
 
+`InvestigationSignalCatalog` models protected tenant profile documents for configuration tooling. `InvestigationRequest.catalog_snapshot` reads server-owned profile and resolved-subset provenance from an accepted request; clients must not populate that field when submitting work. Report `signalPlan` entries identify request versus protected-catalog origin without exposing protected query configuration.
+
 `InvestigationRequest.telemetry_selections` returns typed `InvestigationTelemetrySelection` candidates. Each contains only a provider-neutral query, output limits, and an optional closed `InvestigationTelemetryInterpretation`; authenticated identity, resources, time range, and deadline are inherited by the server from the investigation. `InvestigationReport.telemetry_assessments` exposes the applied unit-aware rule and committed Evidence citation without importing server internals.
 
 `KubernetesEventEvidenceRequest` and `KubernetesEventEvidenceResult` expose the normalized customer-cluster event boundary, which is distinct from internal platform CloudEvents. `InvestigationRequest.kubernetes_event_selections` and `InvestigationReport.kubernetes_event_assessments` expose condition-count correlation and committed Evidence citations. The SDK never carries kubeconfig, cluster credentials, or Kubernetes client types.

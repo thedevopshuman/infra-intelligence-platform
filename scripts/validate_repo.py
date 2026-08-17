@@ -80,8 +80,10 @@ REQUIRED_PATHS = (
     "docs/decisions/0051-immutable-ci-execution-dependencies.md",
     "docs/decisions/0052-process-local-telemetry-export-health.md",
     "docs/decisions/0053-authenticated-runtime-version-identity.md",
+    "docs/decisions/0054-protected-investigation-signal-catalog.md",
     "docs/operations/event-delivery.md",
     "docs/operations/helm-deployment.md",
+    "docs/operations/investigation-signal-catalog.md",
     "docs/operations/release-artifacts.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
@@ -131,6 +133,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/log-evidence-result.schema.json",
     "contracts/schemas/otlp-logs-evidence.schema.json",
     "contracts/schemas/investigation-request.schema.json",
+    "contracts/schemas/investigation-signal-catalog.schema.json",
     "contracts/schemas/investigation-report.schema.json",
     "contracts/schemas/investigation-cancellation-request.schema.json",
     "contracts/schemas/investigation-status.schema.json",
@@ -163,6 +166,8 @@ REQUIRED_PATHS = (
     "contracts/examples/policy-decision-request.json",
     "contracts/examples/policy-decision.json",
     "contracts/examples/investigation-request.json",
+    "contracts/examples/investigation-request-catalog-resolved.json",
+    "contracts/examples/investigation-signal-catalog.json",
     "contracts/examples/investigation-request-kubernetes-events.json",
     "contracts/examples/investigation-request-logs.json",
     "contracts/examples/investigation-request-context.json",
@@ -202,6 +207,7 @@ REQUIRED_PATHS = (
     "docs/specifications/action-contract.md",
     "docs/specifications/plugin-session-contract.md",
     "docs/specifications/investigation-contract.md",
+    "docs/specifications/investigation-signal-catalog-contract.md",
     "docs/specifications/investigation-lifecycle-contract.md",
     "docs/specifications/ingestion-freshness-contract.md",
     "docs/specifications/telemetry-export-health-contract.md",
@@ -225,6 +231,7 @@ REQUIRED_PATHS = (
     "src/iip/application/observe_ingestion.py",
     "src/iip/application/query_telemetry_export_health.py",
     "src/iip/application/query_runtime_version.py",
+    "src/iip/adapters/investigation_catalog.py",
     "src/iip/application/sample_ingestion.py",
     "src/iip/application/deliver_events.py",
     "src/iip/adapters/event_publisher.py",
@@ -258,6 +265,7 @@ REQUIRED_PATHS = (
     "tests/test_helm_values.py",
     "tests/test_release_bundle.py",
     "tests/test_ci_supply_chain.py",
+    "tests/test_investigation_signal_catalog.py",
     ".github/dependabot.yml",
     "scripts/test_helm_install.sh",
     "scripts/build_release_bundle.sh",
@@ -1929,12 +1937,30 @@ def validate_investigation_signal_plan(
         ("telemetry.metrics", "telemetrySelections"),
         ("telemetry.logs", "logSelections"),
     )
+    snapshot = request_spec.get("catalogSnapshot")
+    generated = set()
+    if isinstance(snapshot, dict):
+        references = snapshot.get("generatedSelections")
+        if isinstance(references, list):
+            generated = {
+                (reference.get("signal"), reference.get("selectionId"))
+                for reference in references
+                if isinstance(reference, dict)
+            }
     expected = []
     for signal, field in definitions:
         selections = request_spec.get(field, [])
         if isinstance(selections, list):
             expected.extend(
-                (signal, selection.get("id"))
+                (
+                    signal,
+                    selection.get("id"),
+                    (
+                        "protected-catalog"
+                        if (signal, selection.get("id")) in generated
+                        else "request"
+                    ),
+                )
                 for selection in selections
                 if isinstance(selection, dict)
             )
@@ -1942,12 +1968,21 @@ def validate_investigation_signal_plan(
     if not isinstance(steps, list):
         return
     observed = [
-        (step.get("signal"), step.get("selectionId"))
+        (step.get("signal"), step.get("selectionId"), step.get("origin"))
         for step in steps
         if isinstance(step, dict)
     ]
     if observed != expected:
         fail(errors, "investigation signal plan must account for ordered request candidates")
+    if isinstance(snapshot, dict):
+        expected_catalog = {
+            "profileId": snapshot.get("profileId"),
+            "profileVersion": snapshot.get("profileVersion"),
+            "profileDigest": snapshot.get("profileDigest"),
+            "snapshotDigest": snapshot.get("snapshotDigest"),
+        }
+        if plan.get("catalog") != expected_catalog:
+            fail(errors, "investigation signal plan catalog must match its request snapshot")
     if [step.get("position") for step in steps if isinstance(step, dict)] != list(
         range(1, len(steps) + 1)
     ):

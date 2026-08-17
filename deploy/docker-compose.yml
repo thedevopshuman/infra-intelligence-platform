@@ -15,12 +15,12 @@ services:
       - postgres-data:/var/lib/postgresql
 
   api:
-    image: iip-local-platform:0.27.0
+    image: iip-local-platform:0.28.0
     build:
       context: ..
       dockerfile: Dockerfile
       args:
-        IIP_IMAGE_VERSION: "0.27.0"
+        IIP_IMAGE_VERSION: "0.28.0"
         IIP_IMAGE_REVISION: development
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
@@ -38,6 +38,7 @@ services:
       IIP_LOKI_CREDENTIALS_JSON: ${IIP_LOKI_CREDENTIALS_JSON:-}
       IIP_CONTEXT_BACKEND: ${IIP_CONTEXT_BACKEND:-no-data}
       IIP_CONTEXT_INTEGRATIONS_JSON: ${IIP_CONTEXT_INTEGRATIONS_JSON:-}
+      IIP_INVESTIGATION_SIGNAL_CATALOG_JSON: ${IIP_INVESTIGATION_SIGNAL_CATALOG_JSON:-}
       IIP_OTEL_INGESTION_ATTRIBUTE_MODE: ${IIP_OTEL_INGESTION_ATTRIBUTE_MODE:-source}
       IIP_OTEL_INVESTIGATION_ATTRIBUTE_MODE: ${IIP_OTEL_INVESTIGATION_ATTRIBUTE_MODE:-none}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
@@ -74,7 +75,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-local-platform:0.27.0
+    image: iip-local-platform:0.28.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:
@@ -110,6 +111,7 @@ services:
       IIP_LOKI_CREDENTIALS_JSON: ${IIP_LOKI_CREDENTIALS_JSON:-}
       IIP_CONTEXT_BACKEND: ${IIP_CONTEXT_BACKEND:-no-data}
       IIP_CONTEXT_INTEGRATIONS_JSON: ${IIP_CONTEXT_INTEGRATIONS_JSON:-}
+      IIP_INVESTIGATION_SIGNAL_CATALOG_JSON: ${IIP_INVESTIGATION_SIGNAL_CATALOG_JSON:-}
       PGPASSWORD: ${IIP_POSTGRES_PASSWORD:?set IIP_POSTGRES_PASSWORD}
     depends_on:
       api:

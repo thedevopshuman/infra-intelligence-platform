@@ -258,6 +258,18 @@ td small { display: block; max-width: 310px; margin-top: 4px; overflow: hidden; 
 .finding + .finding { margin-top: 8px; }
 .finding strong { display: block; font-size: 11px; }
 .finding p { margin: 7px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.signal-plan { display: grid; gap: 7px; margin-bottom: 18px; }
+.signal-step {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #0d141e;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+}
+.signal-step strong { font-size: 10px; }
+.signal-step span { color: var(--muted-2); font-size: 9px; text-align: right; }
 .citation-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .citation { padding: 5px 7px; color: var(--blue); background: rgb(119 156 255 / 7%); border: 1px solid rgb(119 156 255 / 18%); border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 8px; cursor: pointer; }
 

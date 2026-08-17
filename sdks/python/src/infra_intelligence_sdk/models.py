@@ -1955,6 +1955,18 @@ class InvestigationRequest:
         return dict(self.payload)
 
     @property
+    def catalog_snapshot(self) -> Optional[Mapping[str, Any]]:
+        """Return server-owned protected-catalog provenance when resolved."""
+
+        spec = self.payload.get("spec")
+        value = spec.get("catalogSnapshot") if isinstance(spec, Mapping) else None
+        if value is None:
+            return None
+        if not isinstance(value, Mapping):
+            raise ValueError("investigation catalogSnapshot must be an object")
+        return dict(value)
+
+    @property
     def telemetry_selections(self) -> tuple[InvestigationTelemetrySelection, ...]:
         """Return bounded metric candidates without importing server classes."""
 
@@ -2025,6 +2037,33 @@ class InvestigationRequest:
         ):
             raise ValueError("investigation contextSelections must be an array")
         return tuple(InvestigationContextSelection.from_dict(value) for value in values)
+
+
+@dataclass(frozen=True)
+class InvestigationSignalCatalog:
+    """Protected tenant-bound profiles used to generate reviewed candidates."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "InvestigationSignalCatalog":
+        if payload.get("apiVersion") != API_VERSION:
+            raise ValueError("unsupported investigation signal catalog apiVersion")
+        if payload.get("kind") != "InvestigationSignalCatalog":
+            raise ValueError(
+                "investigation signal catalog kind must be InvestigationSignalCatalog"
+            )
+        profiles = payload.get("profiles")
+        if not isinstance(profiles, list) or any(
+            not isinstance(profile, Mapping) for profile in profiles
+        ):
+            raise ValueError("investigation signal catalog profiles must be an array")
+        return cls(dict(payload))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
 
 
 @dataclass(frozen=True)

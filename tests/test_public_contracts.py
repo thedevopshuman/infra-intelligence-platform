@@ -19,6 +19,7 @@ from infra_intelligence_sdk import (
     EvaluationScenario,
     InvestigationReport,
     InvestigationRequest,
+    InvestigationSignalCatalog,
     InvestigationCancellationRequest,
     InvestigationStatus,
     InvestigationJobStatus,
@@ -79,6 +80,12 @@ class PublicContractSdkTests(unittest.TestCase):
     def test_sdk_models_accept_public_contract_examples(self) -> None:
         evidence = Evidence.from_dict(example("evidence.json"))
         request = InvestigationRequest.from_dict(example("investigation-request.json"))
+        signal_catalog = InvestigationSignalCatalog.from_dict(
+            example("investigation-signal-catalog.json")
+        )
+        resolved_catalog_request = InvestigationRequest.from_dict(
+            example("investigation-request-catalog-resolved.json")
+        )
         telemetry_investigation = InvestigationRequest.from_dict(
             example("investigation-request-telemetry.json")
         )
@@ -201,6 +208,13 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(context_request.to_dict()["kind"], "ContextEvidenceRequest")
         self.assertEqual(context_result.to_dict()["kind"], "ContextEvidenceResult")
         self.assertEqual(request.to_dict()["kind"], "InvestigationRequest")
+        self.assertEqual(
+            signal_catalog.to_dict()["kind"], "InvestigationSignalCatalog"
+        )
+        self.assertEqual(
+            resolved_catalog_request.catalog_snapshot["profileId"],
+            "local-kubernetes",
+        )
         selection = telemetry_investigation.telemetry_selections[0]
         self.assertIsInstance(selection, InvestigationTelemetrySelection)
         self.assertIsInstance(

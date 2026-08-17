@@ -93,6 +93,21 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn('IIP_DATABASE_AUTO_MIGRATE: "false"', config_map)
         self.assertNotIn("autoMigrate:", values)
 
+    def test_protected_signal_catalog_is_secret_backed_for_api_and_worker(self) -> None:
+        deployment = (CHART / "templates" / "deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+        worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("investigationSignalCatalog:", values)
+        for template in (deployment, worker):
+            self.assertIn("IIP_INVESTIGATION_SIGNAL_CATALOG_JSON", template)
+            self.assertIn("investigationSignalCatalog.existingSecret", template)
+            self.assertIn("investigationSignalCatalog.secretKey", template)
+
     def test_migration_hook_has_database_only_authority(self) -> None:
         template = (CHART / "templates" / "migration-job.yaml").read_text(
             encoding="utf-8"
@@ -148,6 +163,17 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertEqual(script.count('"$IIP_HELM_BIN" upgrade --install iip'), 2)
         self.assertIn("--set replicaCount=2", script)
         self.assertEqual(script.count('--set-string "image.digest=$IIP_TEST_IMAGE_DIGEST"'), 2)
+        self.assertIn(
+            '--from-file="investigation-signal-catalog-json=contracts/examples/investigation-signal-catalog.json"',
+            script,
+        )
+        self.assertEqual(
+            script.count(
+                "--set investigationSignalCatalog.existingSecret="
+                "iip-investigation-signal-catalog"
+            ),
+            2,
+        )
         self.assertIn("iip-local-platform@$IIP_TEST_IMAGE_DIGEST", script)
         self.assertIn("--set ingress.tls.existingSecret=iip-tls", script)
         self.assertIn("--set backup.destination.existingClaim=iip-backups", script)

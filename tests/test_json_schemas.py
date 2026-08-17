@@ -461,6 +461,14 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(errors)
 
+    def test_investigation_job_state_rejects_mixed_queue_and_lease_fields(self) -> None:
+        status = document("contracts/examples/investigation-job-status.json")
+        status["spec"]["availableAt"] = "2026-08-14T10:30:14Z"
+
+        errors = self.validate("investigation-job-status.schema.json", status)
+
+        self.assertTrue(errors)
+
     def test_running_action_status_rejects_terminal_fields(self) -> None:
         status = document("contracts/examples/action-execution-status.json")
         status["spec"]["state"] = "executing"

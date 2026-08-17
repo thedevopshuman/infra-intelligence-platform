@@ -15,6 +15,7 @@ services:
       - postgres-data:/var/lib/postgresql
 
   api:
+    image: iip-local-platform:0.19.0
     build:
       context: ..
       dockerfile: Dockerfile
@@ -60,6 +61,42 @@ services:
       timeout: 3s
       retries: 20
       start_period: 10s
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    volumes:
+      - ./context:/var/run/iip-context:ro
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+
+  investigation-worker:
+    image: iip-local-platform:0.19.0
+    command: ["python", "-m", "iip.surfaces.worker"]
+    environment:
+      IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_AUTO_MIGRATE: "false"
+      IIP_AUTH_IDENTITIES_JSON: ${IIP_AUTH_IDENTITIES_JSON:?set IIP_AUTH_IDENTITIES_JSON}
+      IIP_WORKER_ID: local-investigation-worker
+      IIP_WORKER_TENANTS: local
+      IIP_WORKER_LEASE_SECONDS: ${IIP_WORKER_LEASE_SECONDS:-30}
+      IIP_WORKER_HEARTBEAT_SECONDS: ${IIP_WORKER_HEARTBEAT_SECONDS:-10}
+      IIP_WORKER_RETRY_SECONDS: ${IIP_WORKER_RETRY_SECONDS:-5}
+      IIP_WORKER_MAX_ATTEMPTS: ${IIP_WORKER_MAX_ATTEMPTS:-8}
+      IIP_TELEMETRY_METRICS_BACKEND: ${IIP_TELEMETRY_METRICS_BACKEND:-no-data}
+      IIP_TELEMETRY_LOGS_BACKEND: ${IIP_TELEMETRY_LOGS_BACKEND:-no-data}
+      IIP_PROMETHEUS_INTEGRATIONS_JSON: ${IIP_PROMETHEUS_INTEGRATIONS_JSON:-}
+      IIP_PROMETHEUS_CREDENTIALS_JSON: ${IIP_PROMETHEUS_CREDENTIALS_JSON:-}
+      IIP_LOKI_INTEGRATIONS_JSON: ${IIP_LOKI_INTEGRATIONS_JSON:-}
+      IIP_LOKI_CREDENTIALS_JSON: ${IIP_LOKI_CREDENTIALS_JSON:-}
+      IIP_CONTEXT_BACKEND: ${IIP_CONTEXT_BACKEND:-no-data}
+      IIP_CONTEXT_INTEGRATIONS_JSON: ${IIP_CONTEXT_INTEGRATIONS_JSON:-}
+      PGPASSWORD: ${IIP_POSTGRES_PASSWORD:?set IIP_POSTGRES_PASSWORD}
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped
     init: true
     read_only: true

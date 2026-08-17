@@ -42,3 +42,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0036](0036-request-scoped-kubernetes-restart.md) | Accepted | Execute one opt-in UID-bound Kubernetes restart with dry-run, verification, and rollback |
 | [0037](0037-oidc-and-external-policy-boundaries.md) | Accepted | Verify OIDC/JWKS identity and delegate exact decisions to a fail-closed external policy service |
 | [0038](0038-signed-no-network-plugin-runner.md) | Accepted | Execute signed digest-pinned plugins in a bounded no-network Docker sandbox |
+| [0039](0039-tenant-scoped-investigation-dispatch.md) | Accepted | Dispatch investigations through renewable tenant-scoped PostgreSQL worker leases without extending execution budgets |

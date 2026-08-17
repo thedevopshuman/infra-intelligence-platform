@@ -21,6 +21,7 @@ from infra_intelligence_sdk import (
     InvestigationRequest,
     InvestigationCancellationRequest,
     InvestigationStatus,
+    InvestigationJobStatus,
     InvestigationContextAssessment,
     InvestigationContextInterpretation,
     InvestigationContextSelection,
@@ -97,6 +98,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         investigation_status = InvestigationStatus.from_dict(
             example("investigation-status.json")
+        )
+        investigation_job_status = InvestigationJobStatus.from_dict(
+            example("investigation-job-status.json")
         )
         telemetry_report = InvestigationReport.from_dict(
             example("investigation-report-telemetry.json")
@@ -267,6 +271,8 @@ class PublicContractSdkTests(unittest.TestCase):
             cancellation.to_dict()["kind"], "InvestigationCancellationRequest"
         )
         self.assertEqual(investigation_status.state, "cancellation-requested")
+        self.assertEqual(investigation_job_status.state, "running")
+        self.assertEqual(investigation_job_status.attempts, 1)
         self.assertEqual(freshness.to_dict()["kind"], "IngestionFreshnessReport")
         self.assertEqual(session.to_dict()["kind"], "SessionContext")
         self.assertEqual(collection_request.to_dict()["kind"], "ResourceCollectionRequest")

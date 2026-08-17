@@ -1,0 +1,23 @@
+# Investigation workers
+
+The API can execute the compatible synchronous endpoint or durably submit background work through `POST /v1/investigation-jobs`. The Docker Desktop stack starts one worker for tenant `local`; the Helm worker is opt-in and requires explicit tenant enrollment.
+
+## Required configuration
+
+- `IIP_DATABASE_URL`: the same migrated PostgreSQL database as the API.
+- `IIP_WORKER_TENANTS`: comma-separated exact tenant IDs. There is no wildcard or implicit all-tenant mode.
+- `IIP_WORKER_ID`: stable process identity, normally the pod name.
+- `IIP_WORKER_LEASE_SECONDS`: 10–300, default 30.
+- `IIP_WORKER_HEARTBEAT_SECONDS`: 0 for tests or less than the lease, default 10.
+- `IIP_WORKER_RETRY_SECONDS`: 1–300, default 5.
+- `IIP_WORKER_MAX_ATTEMPTS`: 1–20, default 8.
+
+The worker uses the same protected policy, evidence-backend, credential-broker, trust, and telemetry configuration as the API. It does not accept actor identity from worker configuration: the immutable accepted request retains the authenticated submitter.
+
+## Operation
+
+Run continuously with `python -m iip.surfaces.worker`. `--once` claims at most one job for each configured tenant and is intended for smoke tests. SIGTERM stops polling and lets the current bounded operation return; provider calls retain their own deadlines.
+
+Monitor queued age, attempts, heartbeat age, terminal state, and `lastErrorCode` from job status. An expired dispatch claim is safe to reclaim. A live investigation execution returns to the queue until its lease resolves; an expired execution becomes a failed immutable report without replaying evidence calls. Repeated `investigation.runtime.unavailable` or `investigation.retry.exhausted` requires provider/storage diagnosis before resubmitting with a new investigation ID.
+
+Never broaden a worker by omitting tenant filters. Enroll tenants through reviewed deployment configuration and use workload identity plus the external credential broker for production evidence access.

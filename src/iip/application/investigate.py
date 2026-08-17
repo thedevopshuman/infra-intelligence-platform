@@ -128,6 +128,21 @@ class DeterministicInvestigationService:
         self._evidence_store = evidence_store
         self._telemetry_sink = telemetry_sink
 
+    def validate_for_dispatch(
+        self, command: RunInvestigationCommand
+    ) -> Mapping[str, object]:
+        """Validate and normalize an asynchronous request before it is durable."""
+
+        request, _, _, scope, _ = self._validate(command)
+        resources = tuple(
+            self._resources.get_many(
+                command.actor.tenant_id, scope["resourceUids"]
+            )
+        )
+        if {item.identity.uid for item in resources} != set(scope["resourceUids"]):
+            raise InvalidInvestigationError("investigation.resource.unavailable")
+        return request
+
     def execute(self, command: RunInvestigationCommand) -> Mapping[str, object]:
         request, metadata, spec, scope, budgets = self._validate(command)
         investigation_id = metadata["id"]

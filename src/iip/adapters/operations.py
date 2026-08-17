@@ -5,11 +5,17 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import secrets
 from datetime import datetime
 from threading import RLock
 from typing import Mapping, Optional
 
-from iip.application.ports import ActionWorkflowRecord, ActorContext, PersistenceError
+from iip.application.ports import (
+    ActionWorkflowRecord,
+    ActorContext,
+    InvestigationJobClaim,
+    PersistenceError,
+)
 
 
 class InMemoryOperationalStore:
@@ -20,6 +26,7 @@ class InMemoryOperationalStore:
             tuple[str, str],
             tuple[dict[str, object], Optional[dict[str, object]], dict[str, object]],
         ] = {}
+        self._investigation_jobs: dict[tuple[str, str], dict[str, object]] = {}
         self._proposals: dict[tuple[str, str], dict[str, object]] = {}
         self._proposal_keys: dict[tuple[str, str], str] = {}
         self._approvals: dict[tuple[str, str], dict[str, object]] = {}
@@ -129,6 +136,244 @@ class InMemoryOperationalStore:
             updated = copy.deepcopy(dict(status))
             self._investigations[key] = (current[0], current[1], updated)
             return copy.deepcopy(updated)
+
+    def enqueue_investigation_job(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        request: Mapping[str, object],
+        status: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self._assert_tenant(actor, request)
+        self._assert_tenant(actor, status)
+        key = (actor.tenant_id, investigation_id)
+        entry: dict[str, object] = {
+            "actor": actor,
+            "request": copy.deepcopy(dict(request)),
+            "status": copy.deepcopy(dict(status)),
+            "attempts": 0,
+            "availableAt": status["spec"]["availableAt"],
+            "workerId": None,
+            "claimToken": None,
+            "leaseExpiresAt": None,
+        }
+        with self._lock:
+            current = self._investigation_jobs.get(key)
+            if current is not None:
+                if current["request"] != entry["request"]:
+                    raise PersistenceError("storage.conflict")
+                return copy.deepcopy(current["status"])
+            self._investigation_jobs[key] = entry
+            return copy.deepcopy(entry["status"])
+
+    def get_investigation_job(
+        self, actor: ActorContext, investigation_id: str
+    ) -> Optional[Mapping[str, object]]:
+        with self._lock:
+            entry = self._investigation_jobs.get(
+                (actor.tenant_id, investigation_id)
+            )
+            return copy.deepcopy(entry["status"]) if entry is not None else None
+
+    def claim_investigation_job(
+        self,
+        tenant_id: str,
+        worker_id: str,
+        now: str,
+        lease_expires_at: str,
+    ) -> Optional[InvestigationJobClaim]:
+        with self._lock:
+            candidates = []
+            for (candidate_tenant, investigation_id), entry in self._investigation_jobs.items():
+                if candidate_tenant != tenant_id:
+                    continue
+                status = entry["status"]
+                spec = status.get("spec") if isinstance(status, Mapping) else None
+                state = spec.get("state") if isinstance(spec, Mapping) else None
+                ready = state == "queued" and str(entry["availableAt"]) <= now
+                abandoned = state in {"running", "cancellation-requested"} and (
+                    entry["leaseExpiresAt"] is not None
+                    and str(entry["leaseExpiresAt"]) <= now
+                )
+                if ready or abandoned:
+                    candidates.append((str(spec.get("queuedAt")), investigation_id, entry))
+            if not candidates:
+                return None
+            _, investigation_id, entry = sorted(candidates, key=lambda item: item[:2])[0]
+            attempts = int(entry["attempts"]) + 1
+            claim_token = secrets.token_hex(32)
+            status = copy.deepcopy(entry["status"])
+            metadata = status["metadata"]
+            spec = status["spec"]
+            metadata["updatedAt"] = now
+            if spec.get("state") == "queued":
+                spec["state"] = "running"
+                spec["startedAt"] = now
+                spec.pop("availableAt", None)
+            spec["attempts"] = attempts
+            spec["heartbeatAt"] = now
+            spec["leaseExpiresAt"] = lease_expires_at
+            entry.update(
+                {
+                    "status": status,
+                    "attempts": attempts,
+                    "workerId": worker_id,
+                    "claimToken": claim_token,
+                    "leaseExpiresAt": lease_expires_at,
+                }
+            )
+            actor = entry["actor"]
+            assert isinstance(actor, ActorContext)
+            return InvestigationJobClaim(
+                actor=actor,
+                investigation_id=investigation_id,
+                request=copy.deepcopy(entry["request"]),
+                claim_token=claim_token,
+                attempts=attempts,
+            )
+
+    def heartbeat_investigation_job(
+        self,
+        tenant_id: str,
+        investigation_id: str,
+        worker_id: str,
+        claim_token: str,
+        status: Mapping[str, object],
+    ) -> bool:
+        with self._lock:
+            entry = self._claimed_job(
+                tenant_id, investigation_id, worker_id, claim_token
+            )
+            if entry is None:
+                return False
+            current_spec = entry["status"].get("spec")
+            new_spec = status.get("spec")
+            if not isinstance(current_spec, Mapping) or current_spec.get("state") not in {
+                "running",
+                "cancellation-requested",
+            } or not isinstance(new_spec, Mapping) or new_spec.get("state") != current_spec.get("state"):
+                return False
+            entry["status"] = copy.deepcopy(dict(status))
+            entry["leaseExpiresAt"] = (
+                new_spec.get("leaseExpiresAt")
+                if isinstance(new_spec, Mapping)
+                else None
+            )
+            return True
+
+    def release_investigation_job(
+        self,
+        tenant_id: str,
+        investigation_id: str,
+        worker_id: str,
+        claim_token: str,
+        status: Mapping[str, object],
+        available_at: str,
+        error_code: str,
+    ) -> bool:
+        del error_code
+        with self._lock:
+            entry = self._claimed_job(
+                tenant_id, investigation_id, worker_id, claim_token
+            )
+            if entry is None:
+                return False
+            current_spec = entry["status"].get("spec")
+            terminal_spec = status.get("spec")
+            if (
+                isinstance(current_spec, Mapping)
+                and current_spec.get("state") == "cancellation-requested"
+                and (
+                    not isinstance(terminal_spec, Mapping)
+                    or terminal_spec.get("state") != "cancelled"
+                )
+            ):
+                return False
+            entry.update(
+                {
+                    "status": copy.deepcopy(dict(status)),
+                    "availableAt": available_at,
+                    "workerId": None,
+                    "claimToken": None,
+                    "leaseExpiresAt": None,
+                }
+            )
+            return True
+
+    def finish_investigation_job(
+        self,
+        tenant_id: str,
+        investigation_id: str,
+        worker_id: str,
+        claim_token: str,
+        status: Mapping[str, object],
+    ) -> bool:
+        with self._lock:
+            entry = self._claimed_job(
+                tenant_id, investigation_id, worker_id, claim_token
+            )
+            if entry is None:
+                return False
+            current_spec = entry["status"].get("spec")
+            terminal_spec = status.get("spec")
+            if (
+                isinstance(current_spec, Mapping)
+                and current_spec.get("state") == "cancellation-requested"
+                and (
+                    not isinstance(terminal_spec, Mapping)
+                    or terminal_spec.get("state") != "cancelled"
+                )
+            ):
+                return False
+            entry.update(
+                {
+                    "status": copy.deepcopy(dict(status)),
+                    "workerId": None,
+                    "claimToken": None,
+                    "leaseExpiresAt": None,
+                }
+            )
+            return True
+
+    def request_investigation_job_cancellation(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        status: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self._assert_tenant(actor, status)
+        with self._lock:
+            entry = self._investigation_jobs.get(
+                (actor.tenant_id, investigation_id)
+            )
+            if entry is None:
+                raise PersistenceError("storage.not-found")
+            current_spec = entry["status"].get("spec")
+            state = current_spec.get("state") if isinstance(current_spec, Mapping) else None
+            if state in {"completed", "failed", "cancelled"}:
+                return copy.deepcopy(entry["status"])
+            entry["status"] = copy.deepcopy(dict(status))
+            if status["spec"]["state"] == "cancelled":
+                entry.update(
+                    {"workerId": None, "claimToken": None, "leaseExpiresAt": None}
+                )
+            return copy.deepcopy(entry["status"])
+
+    def _claimed_job(
+        self,
+        tenant_id: str,
+        investigation_id: str,
+        worker_id: str,
+        claim_token: str,
+    ) -> dict[str, object] | None:
+        entry = self._investigation_jobs.get((tenant_id, investigation_id))
+        if (
+            entry is None
+            or entry["workerId"] != worker_id
+            or entry["claimToken"] != claim_token
+        ):
+            return None
+        return entry
 
     def get_proposal_by_key(
         self, actor: ActorContext, idempotency_key: str

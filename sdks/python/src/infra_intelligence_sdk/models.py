@@ -1854,6 +1854,42 @@ class InvestigationStatus:
 
 
 @dataclass(frozen=True)
+class InvestigationJobStatus:
+    """Durable queue, lease, retry, and terminal state for background work."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "InvestigationJobStatus":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="InvestigationJobStatus",
+                label="investigation job status",
+            )
+        )
+
+    @property
+    def state(self) -> str:
+        spec = self.payload.get("spec")
+        state = spec.get("state") if isinstance(spec, Mapping) else None
+        if not isinstance(state, str):
+            raise ValueError("investigation job status state is invalid")
+        return state
+
+    @property
+    def attempts(self) -> int:
+        spec = self.payload.get("spec")
+        attempts = spec.get("attempts") if isinstance(spec, Mapping) else None
+        if not isinstance(attempts, int) or isinstance(attempts, bool):
+            raise ValueError("investigation job status attempts is invalid")
+        return attempts
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class InvestigationRequest:
     """Bounded, tenant- and actor-scoped investigation input."""
 

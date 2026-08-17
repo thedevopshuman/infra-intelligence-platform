@@ -2,5 +2,8 @@ The foundation API service is available inside the cluster at:
 
   http://{{ include "infra-intelligence.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}
 
-This chart is a development skeleton and is not production-ready.
-The API fails closed unless auth.existingSecret supplies a valid identities-json verifier configuration.
+The API fails closed unless its configured authentication mode has valid protected configuration.
+For durable background investigations, set worker.enabled=true, database.existingSecret,
+and at least one exact worker.tenants entry. The worker has no wildcard tenant mode.
+Production rollout still requires customer-specific identity, policy, credential-broker,
+network-policy, telemetry, storage recovery, and SLO validation.

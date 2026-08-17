@@ -16,6 +16,7 @@ import type {
   InvestigationReport,
   InvestigationRequest,
   InvestigationStatus,
+  InvestigationJobStatus,
   KubernetesEventEvidenceRequest,
   LogEvidenceRequest,
   PluginSession,
@@ -141,6 +142,25 @@ export class InfrastructureIntelligenceClient {
 
   async runInvestigation(request: InvestigationRequest): Promise<InvestigationReport> {
     return this.post<InvestigationReport>("/v1/investigations", request);
+  }
+
+  async submitInvestigation(request: InvestigationRequest): Promise<InvestigationJobStatus> {
+    return this.post<InvestigationJobStatus>("/v1/investigation-jobs", request);
+  }
+
+  async getInvestigationJob(id: InvestigationId): Promise<InvestigationJobStatus> {
+    return this.get<InvestigationJobStatus>(
+      `/v1/investigation-jobs/${encodeURIComponent(id)}`,
+    );
+  }
+
+  async cancelInvestigationJob(
+    request: InvestigationCancellationRequest,
+  ): Promise<InvestigationJobStatus> {
+    return this.post<InvestigationJobStatus>(
+      `/v1/investigation-jobs/${encodeURIComponent(request.spec.investigationId)}/cancel`,
+      request,
+    );
   }
 
   async getInvestigation(id: InvestigationId): Promise<InvestigationReport> {

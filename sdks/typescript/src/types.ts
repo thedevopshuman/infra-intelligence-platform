@@ -883,6 +883,40 @@ export interface InvestigationStatus {
   };
 }
 
+export interface InvestigationJobStatus {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "InvestigationJobStatus";
+  metadata: {
+    id: InvestigationId;
+    tenantId: string;
+    updatedAt: string;
+  };
+  spec: {
+    requestDigest: Sha256Digest;
+    state:
+      | "queued"
+      | "running"
+      | "cancellation-requested"
+      | "completed"
+      | "failed"
+      | "cancelled";
+    queuedAt: string;
+    availableAt?: string;
+    attempts: number;
+    startedAt?: string;
+    heartbeatAt?: string;
+    leaseExpiresAt?: string;
+    completedAt?: string;
+    reportRef?: string;
+    lastErrorCode?: string;
+    cancellation?: {
+      requestedBy: string;
+      requestedAt: string;
+      reasonCode: "operator-requested" | "incident-resolved" | "superseded";
+    };
+  };
+}
+
 export interface InvestigationRequest {
   apiVersion: "iip.platform/v1alpha1";
   kind: "InvestigationRequest";

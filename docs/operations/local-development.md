@@ -145,7 +145,7 @@ The supported local onboarding path generates 256-bit Bearer tokens for three se
 make dev-up
 ```
 
-This starts the API and PostgreSQL, waits for both health checks, and prints the console URL plus the `local-operator` token. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties. Run `make dev-credentials` when exercising the console approval workflow; that explicit command prints all three identities from the protected mode-`0600` file. Useful lifecycle commands are:
+This starts PostgreSQL, the API, and a tenant-explicit investigation worker, waits for the serving health checks, and prints the console URL plus the `local-operator` token. The `local-approver` and `local-executor` credentials stay distinct to preserve separation of duties. Run `make dev-credentials` when exercising the console approval workflow; that explicit command prints all three identities from the protected mode-`0600` file. Useful lifecycle commands are:
 
 ```bash
 make dev-status
@@ -156,7 +156,7 @@ make dev-down
 
 `make test-local-product` reads the protected local credentials without printing
 them and exercises the durable customer path end to end: resource ingestion,
-bounded investigation, immutable proposal, independent approval, one-shot
+durably queued worker investigation, immutable proposal, independent approval, one-shot
 dry-run execution, replay safety, and the paginated action queue.
 
 `dev-down` preserves the named PostgreSQL volume. The setup never deletes local state automatically. If manual environment control is needed instead, the Compose profile requires a local-only password supplied at runtime and never committed:
@@ -167,7 +167,7 @@ docker compose -f deploy/docker-compose.yml up --build --detach
 docker compose -f deploy/docker-compose.yml ps
 ```
 
-This is the long-running development stack visible in Docker Desktop: the API plus PostgreSQL and a named database volume. It differs from `make test-postgres`, whose test container and volume are always removed on exit. The API is published only on `127.0.0.1`, runs as a non-root user with a read-only container filesystem, drops Linux capabilities, and enables `no-new-privileges`. Stop the manual stack with `docker compose -f deploy/docker-compose.yml down`; add `--volumes` only when you intentionally want to delete its local database.
+This is the long-running development stack visible in Docker Desktop: PostgreSQL, the API, the background investigation worker, and a named database volume. It differs from `make test-postgres`, whose test container and volume are always removed on exit. The API is published only on `127.0.0.1`; both application containers run as a non-root user with read-only filesystems, dropped Linux capabilities, and `no-new-privileges`. Stop the manual stack with `docker compose -f deploy/docker-compose.yml down`; add `--volumes` only when you intentionally want to delete its local database.
 
 The API migrates the local Compose database on startup. Automatic migration is disabled by default in Helm and should be a separately controlled deployment step outside local development.
 

@@ -62,7 +62,9 @@ from iip.application.log_evidence import (
     TelemetryLogsEvidenceProvider,
 )
 from iip.application.investigate import DeterministicInvestigationService
+from iip.application.investigation_dispatch import InvestigationDispatchService
 from iip.application.investigation_lifecycle import InvestigationLifecycleService
+from iip.application.investigation_worker import InvestigationWorker
 from iip.application.kubernetes_event_evidence import (
     KubernetesEventEvidenceService,
     KubernetesEventsEvidenceProvider,
@@ -110,10 +112,12 @@ class Runtime:
     otlp_logs_ingestion: OtlpLogsIngestionService | None
     investigations: DeterministicInvestigationService
     investigation_lifecycle: InvestigationLifecycleService
+    investigation_dispatch: InvestigationDispatchService
     actions: GovernedActionService
     action_queries: ActionWorkflowQueryService
     plugin_sessions: PluginSessionService
     operational_store: Any
+    investigation_jobs: Any
     evidence_store: Any
     telemetry_runtime: Any = None
 
@@ -239,6 +243,20 @@ def _compose_runtime(
     kubernetes_event_evidence = KubernetesEventEvidenceService(evidence, clock)
     resource_change_evidence = ResourceChangeEvidenceService(evidence, clock)
     context_evidence = ContextEvidenceService(evidence, clock)
+    investigations = DeterministicInvestigationService(
+        store,
+        evidence,
+        operational,
+        clock,
+        kubernetes_events=kubernetes_event_evidence,
+        resource_changes=resource_change_evidence,
+        context=context_evidence,
+        telemetry=telemetry_evidence,
+        logs=log_evidence,
+        evidence_store=evidence_store,
+        telemetry_sink=investigation_telemetry_sink,
+    )
+    investigation_lifecycle = InvestigationLifecycleService(operational, clock)
     return Runtime(
         authenticator=authenticator,
         resources=store,
@@ -277,20 +295,14 @@ def _compose_runtime(
             if otlp_logs_receiver is not None
             else None
         ),
-        investigations=DeterministicInvestigationService(
-            store,
-            evidence,
+        investigations=investigations,
+        investigation_lifecycle=investigation_lifecycle,
+        investigation_dispatch=InvestigationDispatchService(
             operational,
+            investigations,
+            investigation_lifecycle,
             clock,
-            kubernetes_events=kubernetes_event_evidence,
-            resource_changes=resource_change_evidence,
-            context=context_evidence,
-            telemetry=telemetry_evidence,
-            logs=log_evidence,
-            evidence_store=evidence_store,
-            telemetry_sink=investigation_telemetry_sink,
         ),
-        investigation_lifecycle=InvestigationLifecycleService(operational, clock),
         actions=GovernedActionService(
             store,
             policy,
@@ -303,6 +315,7 @@ def _compose_runtime(
         action_queries=ActionWorkflowQueryService(operational, policy),
         plugin_sessions=PluginSessionService(policy, operational, clock),
         operational_store=operational,
+        investigation_jobs=operational,
         evidence_store=evidence_store,
         telemetry_runtime=telemetry_runtime,
     )
@@ -375,6 +388,7 @@ def build_runtime_from_env() -> Runtime:
         if metrics_runtime is not None:
             metrics_runtime.shutdown()
         raise
+
     telemetry_runtime = _combine_telemetry_runtimes(
         metrics_runtime, traces_runtime
     )
@@ -445,6 +459,31 @@ def build_runtime_from_env() -> Runtime:
         if telemetry_runtime is not None:
             telemetry_runtime.shutdown()
         raise
+
+
+def build_investigation_worker_from_env(runtime: Runtime) -> InvestigationWorker:
+    """Compose one background worker from bounded process configuration."""
+
+    def integer(name: str, default: int) -> int:
+        raw = os.environ.get(name, str(default))
+        try:
+            return int(raw)
+        except ValueError:
+            raise ValueError("investigation.worker.configuration.invalid") from None
+
+    worker_id = os.environ.get("IIP_WORKER_ID") or os.environ.get("HOSTNAME")
+    if worker_id is None:
+        raise ValueError("investigation.worker.configuration.required")
+    return InvestigationWorker(
+        runtime.investigation_jobs,
+        runtime.investigations,
+        SystemClock(),
+        worker_id=worker_id,
+        lease_seconds=integer("IIP_WORKER_LEASE_SECONDS", 30),
+        heartbeat_seconds=integer("IIP_WORKER_HEARTBEAT_SECONDS", 10),
+        retry_seconds=integer("IIP_WORKER_RETRY_SECONDS", 5),
+        max_attempts=integer("IIP_WORKER_MAX_ATTEMPTS", 8),
+    )
 
 
 def _authenticator_from_env() -> Authenticator:

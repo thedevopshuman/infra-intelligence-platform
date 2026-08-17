@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.18.0",
-    "description": "Executable local control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral metric, log, Kubernetes Event, resource-change, and repository/runbook context evidence, tenant-bound OTLP metrics and logs intake, resource queries, investigation-driven evidence assessment, governed actions, and bounded plugin sessions."
+    "version": "0.19.0",
+    "description": "Executable control-plane API for authenticated session context, collection ingestion, freshness telemetry, backend-neutral evidence, tenant-bound OTLP intake, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -376,6 +376,48 @@
         }
       }
     },
+    "/v1/investigation-jobs": {
+      "post": {
+        "operationId": "submitInvestigation",
+        "description": "Validate and durably queue one immutable investigation request. A tenant-scoped worker claims it under a renewable dispatch lease; investigation budgets and the separate non-renewable execution deadline remain authoritative.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-request.schema.json"}}}},
+        "responses": {
+          "202": {"description": "Request durably queued or its existing idempotent job returned", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-job-status.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "409": {"$ref": "#/components/responses/ObservationConflict"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/investigation-jobs/{investigationId}": {
+      "get": {
+        "operationId": "getInvestigationJob",
+        "description": "Return bounded dispatch state from the authenticated tenant. Worker identity, claim tokens, request content, evidence, and provider details are never exposed.",
+        "parameters": [{"name": "investigationId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"}}],
+        "responses": {
+          "200": {"description": "Tenant-scoped background investigation status", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-job-status.schema.json"}}}},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/investigation-jobs/{investigationId}/cancel": {
+      "post": {
+        "operationId": "cancelInvestigationJob",
+        "description": "Cancel queued work without execution, or durably propagate cooperative cancellation to a claimed investigation. The first cancellation intent remains immutable.",
+        "parameters": [{"name": "investigationId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^inv_[a-f0-9]{32}$"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-cancellation-request.schema.json"}}}},
+        "responses": {
+          "202": {"description": "Cancellation intent or existing terminal state", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/investigation-job-status.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
     "/v1/investigations/{investigationId}": {
       "get": {
         "operationId": "getInvestigation",
@@ -575,6 +617,7 @@
       "InvestigationReport": {"$ref": "../../contracts/schemas/investigation-report.schema.json"},
       "InvestigationCancellationRequest": {"$ref": "../../contracts/schemas/investigation-cancellation-request.schema.json"},
       "InvestigationStatus": {"$ref": "../../contracts/schemas/investigation-status.schema.json"},
+      "InvestigationJobStatus": {"$ref": "../../contracts/schemas/investigation-job-status.schema.json"},
       "IntegrationConfig": {"$ref": "../../contracts/schemas/integration-config.schema.json"},
       "ActionProposal": {"$ref": "../../contracts/schemas/action-proposal.schema.json"},
       "ActionApproval": {"$ref": "../../contracts/schemas/action-approval.schema.json"},

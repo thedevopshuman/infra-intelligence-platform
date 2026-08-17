@@ -370,7 +370,7 @@ async function cancelInvestigation() {
     spec: { investigationId, reasonCode: "operator-requested" },
   };
   try {
-    const status = await api(`/v1/investigations/${encodeURIComponent(investigationId)}/cancel`, {
+    const status = await api(`/v1/investigation-jobs/${encodeURIComponent(investigationId)}/cancel`, {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -382,6 +382,36 @@ async function cancelInvestigation() {
     button.disabled = false;
     button.textContent = "Cancel safely";
   }
+}
+
+function pause(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+async function waitForInvestigationJob(investigationId, timeoutMilliseconds = 150000) {
+  const deadline = Date.now() + timeoutMilliseconds;
+  while (Date.now() < deadline) {
+    const job = await api(`/v1/investigation-jobs/${encodeURIComponent(investigationId)}`);
+    const stateLabel = {
+      queued: "Queued",
+      running: `Running · attempt ${job.spec.attempts}`,
+      "cancellation-requested": "Stopping safely",
+      completed: "Completed",
+      failed: "Failed",
+      cancelled: "Cancelled",
+    }[job.spec.state] || job.spec.state;
+    $("#investigation-state").textContent = stateLabel;
+    $("#investigation-state").className = `status-chip ${job.spec.state === "completed" ? "success" : job.spec.state === "failed" ? "danger" : "warning"}`;
+    if (["completed", "failed", "cancelled"].includes(job.spec.state)) {
+      if (job.spec.reportRef) {
+        return api(`/v1/investigations/${encodeURIComponent(investigationId)}`);
+      }
+      if (job.spec.state === "cancelled") return null;
+      throw new Error(job.spec.lastErrorCode || "investigation.job.failed");
+    }
+    await pause(500);
+  }
+  throw new Error("investigation.job.timeout");
 }
 
 function prepareInvestigation(resourceUid) {
@@ -495,7 +525,15 @@ async function runInvestigation(event) {
   state.activeInvestigationId = payload.metadata.id;
   $("#cancel-investigation").hidden = false;
   try {
-    const report = await api("/v1/investigations", { method: "POST", body: JSON.stringify(payload) });
+    await api("/v1/investigation-jobs", { method: "POST", body: JSON.stringify(payload) });
+    $("#investigation-state").textContent = "Queued";
+    $("#investigation-state").className = "status-chip warning";
+    showNotice("Investigation queued. A durable worker will continue even if this page closes.");
+    const report = await waitForInvestigationJob(payload.metadata.id);
+    if (!report) {
+      showNotice("Investigation cancelled before a terminal report was needed.");
+      return;
+    }
     state.investigations.unshift(report);
     if (payload.spec.maxAuthority === "propose") {
       $("#action-investigation-id").value = report.metadata.id;

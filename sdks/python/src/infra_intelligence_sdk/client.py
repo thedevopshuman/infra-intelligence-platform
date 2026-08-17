@@ -20,6 +20,7 @@ from .models import (
     Evidence,
     IngestionFreshnessReport,
     InvestigationReport,
+    InvestigationJobStatus,
     InvestigationRequest,
     InvestigationCancellationRequest,
     InvestigationStatus,
@@ -166,6 +167,37 @@ class Client:
 
         return InvestigationReport.from_dict(
             self._post("/v1/investigations", request.to_dict())
+        )
+
+    def submit_investigation(
+        self, request: InvestigationRequest
+    ) -> InvestigationJobStatus:
+        """Durably queue an investigation and return immediately."""
+
+        return InvestigationJobStatus.from_dict(
+            self._post("/v1/investigation-jobs", request.to_dict())
+        )
+
+    def get_investigation_job(
+        self, investigation_id: str
+    ) -> InvestigationJobStatus:
+        return InvestigationJobStatus.from_dict(
+            self._get(
+                f"/v1/investigation-jobs/{quote(investigation_id, safe='')}"
+            )
+        )
+
+    def cancel_investigation_job(
+        self, request: InvestigationCancellationRequest
+    ) -> InvestigationJobStatus:
+        investigation_id = request.to_dict().get("spec", {}).get("investigationId")
+        if not isinstance(investigation_id, str):
+            raise ValueError("investigation cancellation request is invalid")
+        return InvestigationJobStatus.from_dict(
+            self._post(
+                f"/v1/investigation-jobs/{quote(investigation_id, safe='')}/cancel",
+                request.to_dict(),
+            )
         )
 
     def get_investigation(self, investigation_id: str) -> InvestigationReport:

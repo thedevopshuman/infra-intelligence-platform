@@ -61,7 +61,7 @@ class InvestigationLifecycleService:
         return status
 
     def cancel(self, command: CancelInvestigationCommand) -> Mapping[str, object]:
-        request = self._validate(command)
+        request = self.validate_cancellation(command)
         metadata = request["metadata"]
         spec = request["spec"]
         assert isinstance(metadata, Mapping) and isinstance(spec, Mapping)
@@ -113,9 +113,11 @@ class InvestigationLifecycleService:
             command.actor, investigation_id, updated
         )
 
-    def _validate(
+    def validate_cancellation(
         self, command: CancelInvestigationCommand
     ) -> Mapping[str, object]:
+        """Validate cancellation identity and time without requiring live state."""
+
         request = command.request
         if (
             not isinstance(request, Mapping)

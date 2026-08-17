@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import secrets
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Mapping
@@ -77,6 +78,26 @@ def _identifier(prefix: str) -> str:
     return f"{prefix}_{secrets.token_hex(16)}"
 
 
+def _wait_for_investigation(
+    investigation_id: str, token: str, timeout_seconds: float = 30.0
+) -> Mapping[str, object]:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        status = _request(f"/v1/investigation-jobs/{investigation_id}", token)
+        spec = status.get("spec")
+        if not isinstance(spec, Mapping):
+            raise ProductWorkflowError("investigation job returned invalid state")
+        state = spec.get("state")
+        if state in {"completed", "failed", "cancelled"}:
+            if not spec.get("reportRef"):
+                raise ProductWorkflowError(
+                    f"investigation job ended without a report: {state}"
+                )
+            return _request(f"/v1/investigations/{investigation_id}", token)
+        time.sleep(0.2)
+    raise ProductWorkflowError("investigation job did not complete before timeout")
+
+
 def main() -> int:
     try:
         tokens = _credentials()
@@ -127,8 +148,8 @@ def main() -> int:
 
         investigation_id = _identifier("inv")
         question = f"Why is {workload_name} degraded?"
-        report = _request(
-            "/v1/investigations",
+        job = _request(
+            "/v1/investigation-jobs",
             operator,
             method="POST",
             body={
@@ -176,6 +197,9 @@ def main() -> int:
                 },
             },
         )
+        if job.get("kind") != "InvestigationJobStatus":
+            raise ProductWorkflowError("investigation was not durably queued")
+        report = _wait_for_investigation(investigation_id, operator)
         if report.get("kind") != "InvestigationReport":
             raise ProductWorkflowError("investigation did not return a terminal report")
 
@@ -241,7 +265,7 @@ def main() -> int:
         if proposal_id not in item_ids:
             raise ProductWorkflowError("terminal workflow is missing from the action queue")
         print(
-            "local product workflow passed: resource → investigation → proposal → "
+            "local product workflow passed: resource → queued worker investigation → proposal → "
             "independent approval → one-shot dry-run → queue"
         )
         print(f"action: {proposal_id}")

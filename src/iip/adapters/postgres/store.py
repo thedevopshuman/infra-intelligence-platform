@@ -45,6 +45,7 @@ _MIGRATIONS = (
     "0006_source_checkpoint_provider_cursors.sql",
     "0007_investigation_lifecycle.sql",
     "0008_action_execution_lifecycle.sql",
+    "0009_investigation_jobs.sql",
 )
 
 

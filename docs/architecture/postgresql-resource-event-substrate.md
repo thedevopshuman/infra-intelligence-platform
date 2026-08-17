@@ -52,6 +52,8 @@ The HTTP surface never sets the safe-checkpoint signal. A collector workflow may
 
 ## Outbox delivery
 
+Investigation jobs use the same explicit-tenant and `SKIP LOCKED` discipline in a separate table. Public job status never contains private claim ownership. Renewable dispatch leases coordinate delivery only; the immutable request's execution lease and wall-time budget remain separate. See [ADR 0039](../decisions/0039-tenant-scoped-investigation-dispatch.md).
+
 Workers claim messages within one explicit tenant scope. Claims increment the attempt count and create a bounded lease. Parallel workers skip active leases. Successful delivery acknowledges the row using tenant, worker identity, and message ID. A failure releases it with a stable error code and bounded retry delay; provider exception text is never persisted.
 
 Delivery is at least once. A crash after external publish but before acknowledgement can redeliver, so downstream transports and consumers use the CloudEvents identity `(tenantid, source, id)` for idempotency.

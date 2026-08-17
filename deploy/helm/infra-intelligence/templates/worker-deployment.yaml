@@ -1,0 +1,218 @@
+{{- if .Values.worker.enabled }}
+{{- $databaseSecret := required "database.existingSecret is required when worker.enabled=true" .Values.database.existingSecret }}
+{{- if not .Values.worker.tenants }}{{ fail "worker.tenants must contain at least one explicit tenant when worker.enabled=true" }}{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "infra-intelligence.fullname" . }}-worker
+  labels:
+    {{- include "infra-intelligence.labels" . | nindent 4 }}
+    app.kubernetes.io/component: investigation-worker
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "infra-intelligence.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: investigation-worker
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "infra-intelligence.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: investigation-worker
+    spec:
+      serviceAccountName: {{ include "infra-intelligence.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: investigation-worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "-m", "iip.surfaces.worker"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "infra-intelligence.fullname" . }}
+          env:
+            - name: IIP_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $databaseSecret | quote }}
+                  key: {{ .Values.database.secretKey | quote }}
+            - name: IIP_DATABASE_AUTO_MIGRATE
+              value: "false"
+            - name: IIP_WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: IIP_WORKER_TENANTS
+              value: {{ join "," .Values.worker.tenants | quote }}
+            - name: IIP_WORKER_LEASE_SECONDS
+              value: {{ .Values.worker.leaseSeconds | quote }}
+            - name: IIP_WORKER_HEARTBEAT_SECONDS
+              value: {{ .Values.worker.heartbeatSeconds | quote }}
+            - name: IIP_WORKER_RETRY_SECONDS
+              value: {{ .Values.worker.retrySeconds | quote }}
+            - name: IIP_WORKER_MAX_ATTEMPTS
+              value: {{ .Values.worker.maxAttempts | quote }}
+            {{- if .Values.auth.existingSecret }}
+            - name: IIP_AUTH_IDENTITIES_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.existingSecret | quote }}
+                  key: {{ .Values.auth.secretKey | quote }}
+            {{- end }}
+            {{- if .Values.telemetry.existingSecret }}
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetry.existingSecret | quote }}
+                  key: {{ .Values.telemetry.headersSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.telemetryEvidence.prometheus.credentialsExistingSecret }}
+            - name: IIP_PROMETHEUS_CREDENTIALS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetryEvidence.prometheus.credentialsExistingSecret | quote }}
+                  key: {{ .Values.telemetryEvidence.prometheus.credentialsSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.logEvidence.loki.credentialsExistingSecret }}
+            - name: IIP_LOKI_CREDENTIALS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.logEvidence.loki.credentialsExistingSecret | quote }}
+                  key: {{ .Values.logEvidence.loki.credentialsSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.kubernetesEventEvidence.credentialsExistingSecret }}
+            - name: IIP_KUBERNETES_EVENTS_CREDENTIALS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.kubernetesEventEvidence.credentialsExistingSecret | quote }}
+                  key: {{ .Values.kubernetesEventEvidence.credentialsSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.contextEvidence.integrationsExistingSecret }}
+            - name: IIP_CONTEXT_INTEGRATIONS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.contextEvidence.integrationsExistingSecret | quote }}
+                  key: {{ .Values.contextEvidence.integrationsSecretKey | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if eq .Values.credentialBroker.mode "external-http" }}
+            - name: credential-broker-identity
+              mountPath: {{ .Values.credentialBroker.externalHttp.identityMountPath | quote }}
+              readOnly: true
+            {{- if .Values.credentialBroker.externalHttp.caBundleExistingSecret }}
+            - name: credential-broker-ca
+              mountPath: {{ .Values.credentialBroker.externalHttp.caBundleMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- if and (eq .Values.auth.mode "oidc") .Values.auth.oidc.caBundleExistingSecret }}
+            - name: oidc-ca
+              mountPath: {{ .Values.auth.oidc.caBundleMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- if eq .Values.policy.mode "external-http" }}
+            {{- if .Values.policy.externalHttp.bearerTokenExistingSecret }}
+            - name: policy-token
+              mountPath: {{ .Values.policy.externalHttp.bearerTokenMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.policy.externalHttp.caBundleExistingSecret }}
+            - name: policy-ca
+              mountPath: {{ .Values.policy.externalHttp.caBundleMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- if .Values.kubernetesEventEvidence.caBundleExistingSecret }}
+            - name: kubernetes-events-ca
+              mountPath: {{ .Values.kubernetesEventEvidence.caBundleMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.contextEvidence.documentsExistingConfigMap }}
+            - name: context-documents
+              mountPath: {{ .Values.contextEvidence.documentsMountPath | quote }}
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if eq .Values.credentialBroker.mode "external-http" }}
+        - name: credential-broker-identity
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: {{ .Values.credentialBroker.externalHttp.audience | quote }}
+                  expirationSeconds: {{ .Values.credentialBroker.externalHttp.tokenExpirationSeconds }}
+                  path: token
+        {{- if .Values.credentialBroker.externalHttp.caBundleExistingSecret }}
+        - name: credential-broker-ca
+          secret:
+            secretName: {{ .Values.credentialBroker.externalHttp.caBundleExistingSecret | quote }}
+            items:
+              - key: {{ .Values.credentialBroker.externalHttp.caBundleSecretKey | quote }}
+                path: ca.crt
+        {{- end }}
+        {{- end }}
+        {{- if and (eq .Values.auth.mode "oidc") .Values.auth.oidc.caBundleExistingSecret }}
+        - name: oidc-ca
+          secret:
+            secretName: {{ .Values.auth.oidc.caBundleExistingSecret | quote }}
+            items:
+              - key: {{ .Values.auth.oidc.caBundleSecretKey | quote }}
+                path: ca.crt
+        {{- end }}
+        {{- if and (eq .Values.policy.mode "external-http") .Values.policy.externalHttp.bearerTokenExistingSecret }}
+        - name: policy-token
+          secret:
+            secretName: {{ .Values.policy.externalHttp.bearerTokenExistingSecret | quote }}
+            items:
+              - key: {{ .Values.policy.externalHttp.bearerTokenSecretKey | quote }}
+                path: token
+        {{- end }}
+        {{- if and (eq .Values.policy.mode "external-http") .Values.policy.externalHttp.caBundleExistingSecret }}
+        - name: policy-ca
+          secret:
+            secretName: {{ .Values.policy.externalHttp.caBundleExistingSecret | quote }}
+            items:
+              - key: {{ .Values.policy.externalHttp.caBundleSecretKey | quote }}
+                path: ca.crt
+        {{- end }}
+        {{- if .Values.kubernetesEventEvidence.caBundleExistingSecret }}
+        - name: kubernetes-events-ca
+          secret:
+            secretName: {{ .Values.kubernetesEventEvidence.caBundleExistingSecret | quote }}
+            items:
+              - key: {{ .Values.kubernetesEventEvidence.caBundleSecretKey | quote }}
+                path: ca.crt
+        {{- end }}
+        {{- if .Values.contextEvidence.documentsExistingConfigMap }}
+        - name: context-documents
+          configMap:
+            name: {{ .Values.contextEvidence.documentsExistingConfigMap | quote }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -36,6 +36,7 @@ from iip.application.ingest_resource import (
     StaleObservationError,
 )
 from iip.application.ports import ActorContext, PersistenceError, SourceCheckpoint
+from iip.application.investigation_dispatch import InvestigationDispatchService
 from iip.application.rebuild_projections import (
     ProjectionRebuildService,
     RebuildProjectionsCommand,
@@ -609,7 +610,8 @@ class PostgresOperationalStoreTests(unittest.TestCase):
                 TRUNCATE iip.audit_records, iip.plugin_sessions,
                          iip.action_results, iip.action_executions,
                          iip.action_approvals,
-                         iip.action_proposals, iip.investigations,
+                         iip.action_proposals, iip.investigation_jobs,
+                         iip.investigations,
                          iip.evidence_artifacts, iip.resource_relationships,
                          iip.source_reconciliations, iip.source_checkpoints,
                          iip.event_outbox,
@@ -786,6 +788,80 @@ class PostgresOperationalStoreTests(unittest.TestCase):
             reconnected.get_investigation(
                 ActorContext("other", "another-tenant"), investigation_id
             )
+        )
+
+    def test_investigation_job_claim_heartbeat_and_completion_are_atomic(self) -> None:
+        actor = ActorContext("developer", "local", ("developer",))
+        request = json.loads(
+            (ROOT / "contracts/examples/investigation-request.json").read_text()
+        )
+        investigation_id = request["metadata"]["id"]
+        queued = InvestigationDispatchService.queued_status(
+            actor,
+            investigation_id,
+            request,
+            "2026-08-17T12:00:00Z",
+            attempts=0,
+        )
+        self.assertEqual(
+            self.operations.enqueue_investigation_job(
+                actor, investigation_id, request, queued
+            ),
+            queued,
+        )
+        self.assertIsNone(
+            self.operations.claim_investigation_job(
+                "another-tenant",
+                "worker-a",
+                "2026-08-17T12:00:01Z",
+                "2026-08-17T12:00:31Z",
+            )
+        )
+        claim = self.operations.claim_investigation_job(
+            "local",
+            "worker-a",
+            "2026-08-17T12:00:01Z",
+            "2026-08-17T12:00:31Z",
+        )
+        self.assertIsNotNone(claim)
+        assert claim is not None
+        running = self.operations.get_investigation_job(actor, investigation_id)
+        self.assertEqual(running["spec"]["state"], "running")
+        heartbeat = copy.deepcopy(running)
+        heartbeat["metadata"]["updatedAt"] = "2026-08-17T12:00:11Z"
+        heartbeat["spec"]["heartbeatAt"] = "2026-08-17T12:00:11Z"
+        heartbeat["spec"]["leaseExpiresAt"] = "2026-08-17T12:00:41Z"
+        self.assertFalse(
+            self.operations.heartbeat_investigation_job(
+                "local", investigation_id, "worker-b", claim.claim_token, heartbeat
+            )
+        )
+        self.assertTrue(
+            self.operations.heartbeat_investigation_job(
+                "local", investigation_id, "worker-a", claim.claim_token, heartbeat
+            )
+        )
+        terminal = InvestigationDispatchService.terminal_status(
+            heartbeat,
+            state="completed",
+            completed_at="2026-08-17T12:00:12Z",
+            report_ref=f"investigation://local/{investigation_id}/report",
+        )
+        self.assertTrue(
+            self.operations.finish_investigation_job(
+                "local", investigation_id, "worker-a", claim.claim_token, terminal
+            )
+        )
+        self.assertFalse(
+            self.operations.finish_investigation_job(
+                "local", investigation_id, "worker-a", claim.claim_token, terminal
+            )
+        )
+        self.assertEqual(
+            PostgresOperationalStore(DATABASE_URL).get_investigation_job(
+                actor, investigation_id
+            ),
+            terminal,
         )
 
 

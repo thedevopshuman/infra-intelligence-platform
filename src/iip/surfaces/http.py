@@ -65,6 +65,12 @@ from iip.application.investigation_lifecycle import (
     InvalidInvestigationCancellationError,
     InvestigationLifecycleNotFoundError,
 )
+from iip.application.investigation_dispatch import (
+    CancelInvestigationJobCommand,
+    GetInvestigationJobCommand,
+    InvestigationJobNotFoundError,
+    SubmitInvestigationJobCommand,
+)
 from iip.application.kubernetes_event_evidence import (
     CollectKubernetesEventEvidenceCommand,
     InvalidKubernetesEventEvidenceRequestError,
@@ -114,7 +120,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.18.0"
+    server_version = "IIPReference/0.19.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -200,6 +206,23 @@ class ApiHandler(BaseHTTPRequestHandler):
                 ),
                 "investigation.not_found",
             )
+            return
+        if len(segments) == 3 and segments[:2] == ["v1", "investigation-jobs"]:
+            try:
+                document = self.runtime.investigation_dispatch.get(
+                    GetInvestigationJobCommand(actor, segments[2])
+                )
+                self._json(HTTPStatus.OK, dict(document))
+            except InvestigationJobNotFoundError:
+                self._json(
+                    HTTPStatus.NOT_FOUND,
+                    {"error": {"code": "investigation.job.not_found"}},
+                )
+            except PersistenceError:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"error": {"code": "storage.unavailable"}},
+                )
             return
         if (
             len(segments) == 4
@@ -342,6 +365,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "/v1/evidence/logs/queries",
                 "/v1/evidence/telemetry/queries",
                 "/v1/investigations",
+                "/v1/investigation-jobs",
                 "/v1/actions/proposals",
                 "/v1/plugin-sessions",
             )
@@ -349,6 +373,11 @@ class ApiHandler(BaseHTTPRequestHandler):
             or (
                 len(segments) == 4
                 and segments[:2] == ["v1", "investigations"]
+                and segments[3] == "cancel"
+            )
+            or (
+                len(segments) == 4
+                and segments[:2] == ["v1", "investigation-jobs"]
                 and segments[3] == "cancel"
             )
         )
@@ -412,6 +441,28 @@ class ApiHandler(BaseHTTPRequestHandler):
                     RunInvestigationCommand(actor, payload)
                 )
                 status = HTTPStatus.CREATED
+            elif path == "/v1/investigation-jobs":
+                document = self.runtime.investigation_dispatch.submit(
+                    SubmitInvestigationJobCommand(actor, payload)
+                )
+                status = HTTPStatus.ACCEPTED
+            elif (
+                len(segments) == 4
+                and segments[:2] == ["v1", "investigation-jobs"]
+                and segments[3] == "cancel"
+            ):
+                cancellation_spec = payload.get("spec")
+                if (
+                    not isinstance(cancellation_spec, Mapping)
+                    or cancellation_spec.get("investigationId") != segments[2]
+                ):
+                    raise InvalidInvestigationCancellationError(
+                        "investigation.cancellation.invalid"
+                    )
+                document = self.runtime.investigation_dispatch.cancel(
+                    CancelInvestigationJobCommand(actor, payload)
+                )
+                status = HTTPStatus.ACCEPTED
             elif len(segments) == 4 and segments[3] == "cancel":
                 cancellation_spec = payload.get("spec")
                 if (
@@ -493,6 +544,11 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json(
                 HTTPStatus.NOT_FOUND,
                 {"error": {"code": "investigation.not_found"}},
+            )
+        except InvestigationJobNotFoundError:
+            self._json(
+                HTTPStatus.NOT_FOUND,
+                {"error": {"code": "investigation.job.not_found"}},
             )
         except InvalidKubernetesEventEvidenceRequestError:
             self._json(

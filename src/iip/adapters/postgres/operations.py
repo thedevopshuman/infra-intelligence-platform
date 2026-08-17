@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import secrets
 from typing import Iterable, Mapping, Optional
 
 import psycopg
@@ -10,7 +11,12 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from iip.application.investigate import canonical_digest
-from iip.application.ports import ActionWorkflowRecord, ActorContext, PersistenceError
+from iip.application.ports import (
+    ActionWorkflowRecord,
+    ActorContext,
+    InvestigationJobClaim,
+    PersistenceError,
+)
 
 
 class PostgresOperationalStore:
@@ -262,6 +268,336 @@ class PostgresOperationalStore:
                         """
                         SELECT status_document AS document
                         FROM iip.investigations
+                        WHERE tenant_id = %s AND investigation_id = %s
+                        """,
+                        (actor.tenant_id, investigation_id),
+                    ).fetchone()
+            if row is None:
+                raise PersistenceError("storage.not-found")
+            return dict(row["document"])
+        except PersistenceError:
+            raise
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def enqueue_investigation_job(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        request: Mapping[str, object],
+        status: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self._assert_tenant(actor, request)
+        self._assert_tenant(actor, status)
+        metadata = status.get("metadata")
+        spec = status.get("spec")
+        if not isinstance(metadata, Mapping) or not isinstance(spec, Mapping):
+            raise PersistenceError("storage.input-invalid")
+        request_digest = canonical_digest(request)
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    INSERT INTO iip.investigation_jobs (
+                        tenant_id, investigation_id, actor_id, actor_roles,
+                        request_digest, request_document, status_document,
+                        state, attempts, available_at, created_at, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'queued', 0, %s, %s, %s)
+                    ON CONFLICT (tenant_id, investigation_id) DO NOTHING
+                    RETURNING status_document AS document
+                    """,
+                    (
+                        actor.tenant_id,
+                        investigation_id,
+                        actor.actor_id,
+                        Jsonb(list(actor.roles)),
+                        request_digest,
+                        Jsonb(dict(request)),
+                        Jsonb(dict(status)),
+                        spec["availableAt"],
+                        spec["queuedAt"],
+                        metadata["updatedAt"],
+                    ),
+                ).fetchone()
+                if row is None:
+                    existing = connection.execute(
+                        """
+                        SELECT request_digest, status_document AS document
+                        FROM iip.investigation_jobs
+                        WHERE tenant_id = %s AND investigation_id = %s
+                        """,
+                        (actor.tenant_id, investigation_id),
+                    ).fetchone()
+                    if existing is None or existing["request_digest"] != request_digest:
+                        raise PersistenceError("storage.conflict")
+                    row = existing
+            return dict(row["document"])
+        except PersistenceError:
+            raise
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def get_investigation_job(
+        self, actor: ActorContext, investigation_id: str
+    ) -> Optional[Mapping[str, object]]:
+        return self._one_document(
+            "SELECT status_document AS document FROM iip.investigation_jobs WHERE tenant_id = %s AND investigation_id = %s",
+            (actor.tenant_id, investigation_id),
+        )
+
+    def claim_investigation_job(
+        self,
+        tenant_id: str,
+        worker_id: str,
+        now: str,
+        lease_expires_at: str,
+    ) -> Optional[InvestigationJobClaim]:
+        claim_token = secrets.token_hex(32)
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    SELECT investigation_id, actor_id, actor_roles,
+                           request_document, status_document, attempts
+                    FROM iip.investigation_jobs
+                    WHERE tenant_id = %s
+                      AND (
+                        (state = 'queued' AND available_at <= %s)
+                        OR
+                        (state IN ('running', 'cancellation-requested') AND lease_expires_at <= %s)
+                      )
+                    ORDER BY created_at, investigation_id
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT 1
+                    """,
+                    (tenant_id, now, now),
+                ).fetchone()
+                if row is None:
+                    return None
+                status = dict(row["status_document"])
+                metadata = dict(status["metadata"])
+                spec = dict(status["spec"])
+                attempts = int(row["attempts"]) + 1
+                metadata["updatedAt"] = now
+                if spec.get("state") == "queued":
+                    spec["state"] = "running"
+                    spec["startedAt"] = now
+                    spec.pop("availableAt", None)
+                spec["attempts"] = attempts
+                spec["heartbeatAt"] = now
+                spec["leaseExpiresAt"] = lease_expires_at
+                status["metadata"] = metadata
+                status["spec"] = spec
+                updated = connection.execute(
+                    """
+                    UPDATE iip.investigation_jobs
+                    SET status_document = %s,
+                        state = %s,
+                        attempts = %s,
+                        available_at = NULL,
+                        lease_owner = %s,
+                        claim_token = %s,
+                        lease_expires_at = %s,
+                        updated_at = %s
+                    WHERE tenant_id = %s AND investigation_id = %s
+                    RETURNING investigation_id
+                    """,
+                    (
+                        Jsonb(status),
+                        spec["state"],
+                        attempts,
+                        worker_id,
+                        claim_token,
+                        lease_expires_at,
+                        now,
+                        tenant_id,
+                        row["investigation_id"],
+                    ),
+                ).fetchone()
+                if updated is None:
+                    return None
+            roles = row["actor_roles"]
+            return InvestigationJobClaim(
+                actor=ActorContext(
+                    str(row["actor_id"]),
+                    tenant_id,
+                    tuple(str(role) for role in roles),
+                ),
+                investigation_id=str(row["investigation_id"]),
+                request=dict(row["request_document"]),
+                claim_token=claim_token,
+                attempts=attempts,
+            )
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def heartbeat_investigation_job(
+        self,
+        tenant_id: str,
+        investigation_id: str,
+        worker_id: str,
+        claim_token: str,
+        status: Mapping[str, object],
+    ) -> bool:
+        spec = status.get("spec")
+        metadata = status.get("metadata")
+        if not isinstance(spec, Mapping) or not isinstance(metadata, Mapping):
+            raise PersistenceError("storage.input-invalid")
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    UPDATE iip.investigation_jobs
+                    SET status_document = %s, lease_expires_at = %s, updated_at = %s
+                    WHERE tenant_id = %s AND investigation_id = %s
+                      AND lease_owner = %s AND claim_token = %s
+                      AND state = %s
+                    RETURNING investigation_id
+                    """,
+                    (
+                        Jsonb(dict(status)),
+                        spec["leaseExpiresAt"],
+                        metadata["updatedAt"],
+                        tenant_id,
+                        investigation_id,
+                        worker_id,
+                        claim_token,
+                        spec["state"],
+                    ),
+                ).fetchone()
+            return row is not None
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def release_investigation_job(
+        self,
+        tenant_id: str,
+        investigation_id: str,
+        worker_id: str,
+        claim_token: str,
+        status: Mapping[str, object],
+        available_at: str,
+        error_code: str,
+    ) -> bool:
+        metadata = status.get("metadata")
+        if not isinstance(metadata, Mapping):
+            raise PersistenceError("storage.input-invalid")
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    UPDATE iip.investigation_jobs
+                    SET status_document = %s, state = 'queued',
+                        available_at = %s, lease_owner = NULL,
+                        claim_token = NULL, lease_expires_at = NULL,
+                        last_error_code = %s, updated_at = %s
+                    WHERE tenant_id = %s AND investigation_id = %s
+                      AND lease_owner = %s AND claim_token = %s
+                      AND state <> 'cancellation-requested'
+                    RETURNING investigation_id
+                    """,
+                    (
+                        Jsonb(dict(status)),
+                        available_at,
+                        error_code,
+                        metadata["updatedAt"],
+                        tenant_id,
+                        investigation_id,
+                        worker_id,
+                        claim_token,
+                    ),
+                ).fetchone()
+            return row is not None
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def finish_investigation_job(
+        self,
+        tenant_id: str,
+        investigation_id: str,
+        worker_id: str,
+        claim_token: str,
+        status: Mapping[str, object],
+    ) -> bool:
+        metadata = status.get("metadata")
+        spec = status.get("spec")
+        if not isinstance(metadata, Mapping) or not isinstance(spec, Mapping):
+            raise PersistenceError("storage.input-invalid")
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    UPDATE iip.investigation_jobs
+                    SET status_document = %s, state = %s,
+                        available_at = NULL, lease_owner = NULL,
+                        claim_token = NULL, lease_expires_at = NULL,
+                        last_error_code = %s, updated_at = %s
+                    WHERE tenant_id = %s AND investigation_id = %s
+                      AND lease_owner = %s AND claim_token = %s
+                      AND (state <> 'cancellation-requested' OR %s = 'cancelled')
+                    RETURNING investigation_id
+                    """,
+                    (
+                        Jsonb(dict(status)),
+                        spec["state"],
+                        spec.get("lastErrorCode"),
+                        metadata["updatedAt"],
+                        tenant_id,
+                        investigation_id,
+                        worker_id,
+                        claim_token,
+                        spec["state"],
+                    ),
+                ).fetchone()
+            return row is not None
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def request_investigation_job_cancellation(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        status: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self._assert_tenant(actor, status)
+        metadata = status.get("metadata")
+        spec = status.get("spec")
+        if not isinstance(metadata, Mapping) or not isinstance(spec, Mapping):
+            raise PersistenceError("storage.input-invalid")
+        terminal = spec.get("state") == "cancelled"
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    UPDATE iip.investigation_jobs
+                    SET status_document = %s,
+                        state = %s,
+                        available_at = CASE WHEN %s THEN NULL ELSE available_at END,
+                        lease_owner = CASE WHEN %s THEN NULL ELSE lease_owner END,
+                        claim_token = CASE WHEN %s THEN NULL ELSE claim_token END,
+                        lease_expires_at = CASE WHEN %s THEN NULL ELSE lease_expires_at END,
+                        updated_at = %s
+                    WHERE tenant_id = %s AND investigation_id = %s
+                      AND state NOT IN ('completed', 'failed', 'cancelled')
+                    RETURNING status_document AS document
+                    """,
+                    (
+                        Jsonb(dict(status)),
+                        spec["state"],
+                        terminal,
+                        terminal,
+                        terminal,
+                        terminal,
+                        metadata["updatedAt"],
+                        actor.tenant_id,
+                        investigation_id,
+                    ),
+                ).fetchone()
+                if row is None:
+                    row = connection.execute(
+                        """
+                        SELECT status_document AS document
+                        FROM iip.investigation_jobs
                         WHERE tenant_id = %s AND investigation_id = %s
                         """,
                         (actor.tenant_id, investigation_id),

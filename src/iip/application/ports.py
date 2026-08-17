@@ -712,6 +712,82 @@ class InvestigationRepository(Protocol):
 
 
 @dataclass(frozen=True)
+class InvestigationJobClaim:
+    """One explicitly tenant-scoped background investigation lease."""
+
+    actor: ActorContext
+    investigation_id: str
+    request: Mapping[str, object]
+    claim_token: str
+    attempts: int
+
+
+class InvestigationJobRepository(Protocol):
+    def enqueue_investigation_job(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        request: Mapping[str, object],
+        status: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        """Idempotently persist one validated request for background execution."""
+
+    def get_investigation_job(
+        self, actor: ActorContext, investigation_id: str
+    ) -> Optional[Mapping[str, object]]:
+        """Return one job only from the actor's explicit tenant scope."""
+
+    def claim_investigation_job(
+        self,
+        tenant_id: str,
+        worker_id: str,
+        now: str,
+        lease_expires_at: str,
+    ) -> Optional[InvestigationJobClaim]:
+        """Claim one ready or abandoned job from one explicitly named tenant."""
+
+    def heartbeat_investigation_job(
+        self,
+        tenant_id: str,
+        investigation_id: str,
+        worker_id: str,
+        claim_token: str,
+        status: Mapping[str, object],
+    ) -> bool:
+        """Renew exactly one live claim without widening tenant scope."""
+
+    def release_investigation_job(
+        self,
+        tenant_id: str,
+        investigation_id: str,
+        worker_id: str,
+        claim_token: str,
+        status: Mapping[str, object],
+        available_at: str,
+        error_code: str,
+    ) -> bool:
+        """Release a retryable claim with a stable redacted error code."""
+
+    def finish_investigation_job(
+        self,
+        tenant_id: str,
+        investigation_id: str,
+        worker_id: str,
+        claim_token: str,
+        status: Mapping[str, object],
+    ) -> bool:
+        """Atomically terminalize a claim owned by the named worker."""
+
+    def request_investigation_job_cancellation(
+        self,
+        actor: ActorContext,
+        investigation_id: str,
+        status: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        """Cancel queued work or persist cancellation intent for a live claim."""
+
+
+@dataclass(frozen=True)
 class ActionWorkflowRecord:
     """Consistent tenant-scoped action records returned by one repository read."""
 

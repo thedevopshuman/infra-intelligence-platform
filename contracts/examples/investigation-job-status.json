@@ -1,0 +1,18 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "InvestigationJobStatus",
+  "metadata": {
+    "id": "inv_71c9e4a2b8d04f65a3c7e9b102d4f608",
+    "tenantId": "local",
+    "updatedAt": "2026-08-14T10:30:13Z"
+  },
+  "spec": {
+    "requestDigest": "sha256:b180154d11d8bc0e95da47226e321649c99f81131efa0cab7a826b99fd134ee3",
+    "state": "running",
+    "queuedAt": "2026-08-14T10:30:00Z",
+    "attempts": 1,
+    "startedAt": "2026-08-14T10:30:03Z",
+    "heartbeatAt": "2026-08-14T10:30:13Z",
+    "leaseExpiresAt": "2026-08-14T10:30:43Z"
+  }
+}

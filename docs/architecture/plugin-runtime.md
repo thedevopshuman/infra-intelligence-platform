@@ -29,13 +29,17 @@ codes without stderr or provider text.
 The PostgreSQL ledger serializes claims against the persisted session, enforces
 request counts across replicas, stores terminal results, replays those results
 without re-execution, and leaves crash-ambiguous claims closed for explicit
-reconciliation. The process-local adapter implements the same state machine only
-for no-impact conformance and is not restart durable. Network, secret, and action
-declarations remain denied. Before any side-effecting or externally connected
-plugin is enabled, the platform must add a mediated network/credential proxy
-whose grants are narrower than the manifest and session, plus explicit
-cancellation and ambiguous-claim reconciliation. Direct Docker socket access
-belongs only to a dedicated runner deployment, never the API pod.
+reconciliation. Cancellation is a durable host-side flag: the runner polls it,
+terminates the isolated process, and stores a cancelled result. The plugin never
+receives the polling endpoint or control-plane credentials. A platform
+administrator can close a post-deadline ambiguous claim as outcome unknown, but
+cannot clear or replay it. The process-local adapter implements the same state
+machine only for no-impact conformance and is not restart durable. Network,
+secret, and action declarations remain denied. Before any side-effecting or
+externally connected plugin is enabled, the platform must add a mediated
+network/credential proxy whose grants are narrower than the manifest and
+session. Direct Docker socket access belongs only to a dedicated runner
+deployment, never the API pod.
 
 The Kubernetes observer container is an offline conformance artifact: it accepts
 one invocation over stdin and normalizes a bundled provider fixture. Its separate

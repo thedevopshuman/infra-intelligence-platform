@@ -32,6 +32,7 @@ from iip.application.actions import (
 from iip.application.ingest_collection import IngestCollectionCommand
 from iip.application.investigate import RunInvestigationCommand, canonical_digest
 from iip.application.plugin_sessions import OpenPluginSessionCommand
+from iip.application.plugin_invocations import CancelPluginInvocationCommand
 from iip.application.ports import ActorContext
 from iip.application.rebuild_projections import RebuildProjectionsCommand
 from iip.adapters.postgres import PostgresOperationalStore
@@ -257,7 +258,7 @@ def seed_reference_workflow(database_url_value: str) -> dict[str, object]:
     )
     invocation["spec"]["manifestDigest"] = plugin_session["spec"]["manifestDigest"]
     invocation_digest = canonical_digest(invocation)
-    result = load_example("plugin-invocation-result.json")
+    result = load_example("plugin-invocation-result-failed.json")
     result["metadata"].update(
         {
             "id": invocation["metadata"]["id"],
@@ -276,13 +277,31 @@ def seed_reference_workflow(database_url_value: str) -> dict[str, object]:
         invocation_digest,
         str(invocation["metadata"]["createdAt"]),
     )
+    cancellation = load_example("plugin-invocation-cancellation-request.json")
+    cancellation["metadata"].update(
+        {
+            "tenantId": investigator.tenant_id,
+            "actorId": investigator.actor_id,
+            "requestedAt": invocation["metadata"]["createdAt"],
+        }
+    )
+    cancellation["spec"]["invocationId"] = invocation["metadata"]["id"]
+    runtime.plugin_invocations.cancel(
+        CancelPluginInvocationCommand(investigator, cancellation)
+    )
+    result["spec"]["status"] = "cancelled"
+    result["spec"]["error"]["code"] = "plugin.runtime.cancelled"
     operations.commit_plugin_invocation_result(
         investigator, invocation_digest, result
+    )
+    plugin_status = operations.get_plugin_invocation_status(
+        investigator, str(invocation["metadata"]["id"])
     )
     return {
         "actionOutcome": action_result["spec"]["outcome"],
         "investigationOutcome": report["spec"]["outcome"],
         "pluginInvocationState": claim.state,
+        "pluginInvocationTerminalState": plugin_status["spec"]["state"],
         "pluginSessionStatus": plugin_session["status"],
         "resourceCount": len(resources),
         "tenantId": target.identity.tenant_id,

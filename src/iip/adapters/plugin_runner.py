@@ -44,6 +44,7 @@ _OCI_REFERENCE = re.compile(
 _TERMINAL_RUNTIME_ERRORS = frozenset(
     {
         "plugin.output.invalid",
+        "plugin.runtime.cancelled",
         "plugin.runtime.deadline-exceeded",
         "plugin.runtime.failed",
         "plugin.runtime.output-limit-exceeded",
@@ -224,6 +225,7 @@ class PluginContainerTransport(Protocol):
         *,
         timeout_seconds: int,
         max_output_bytes: int,
+        cancellation_requested: Callable[[], bool] | None = None,
     ) -> bytes:
         """Execute one invocation in a bounded container and return stdout."""
 
@@ -244,6 +246,7 @@ class DockerCliPluginTransport:
         *,
         timeout_seconds: int,
         max_output_bytes: int,
+        cancellation_requested: Callable[[], bool] | None = None,
     ) -> bytes:
         with tempfile.TemporaryDirectory(prefix="iip-plugin-") as directory:
             cidfile = Path(directory) / "container.id"
@@ -293,6 +296,7 @@ class DockerCliPluginTransport:
                     process,
                     timeout_seconds=timeout_seconds,
                     max_output_bytes=max_output_bytes,
+                    cancellation_requested=cancellation_requested,
                 )
                 if process.returncode != 0:
                     raise PluginRunnerError("plugin.runtime.failed")
@@ -310,6 +314,7 @@ class DockerCliPluginTransport:
         *,
         timeout_seconds: int,
         max_output_bytes: int,
+        cancellation_requested: Callable[[], bool] | None,
     ) -> tuple[bytes, bytes]:
         assert process.stdout is not None and process.stderr is not None
         selector = selectors.DefaultSelector()
@@ -324,6 +329,8 @@ class DockerCliPluginTransport:
         deadline = time.monotonic() + timeout_seconds
         try:
             while selector.get_map():
+                if cancellation_requested is not None and cancellation_requested():
+                    raise PluginRunnerError("plugin.runtime.cancelled")
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise PluginRunnerError("plugin.runtime.deadline-exceeded")
@@ -386,6 +393,9 @@ class InMemoryPluginExecutionLedger:
             tuple[str, str],
             tuple[str, str, Mapping[str, object] | None],
         ] = {}
+        self._statuses: dict[tuple[str, str], Mapping[str, object]] = {}
+        self._cancellations: set[tuple[str, str]] = set()
+        self._audits: list[Mapping[str, object]] = []
 
     def claim_plugin_invocation(
         self,
@@ -421,6 +431,8 @@ class InMemoryPluginExecutionLedger:
                 existing_session, existing_digest, result = existing
                 if existing_session != session_id or existing_digest != request_digest:
                     raise PersistenceError("storage.conflict")
+                if result is None and key in self._cancellations:
+                    return PluginInvocationClaim("cancellation-requested")
                 return PluginInvocationClaim(
                     "completed" if result is not None else "in-progress",
                     dict(result) if result is not None else None,
@@ -440,8 +452,15 @@ class InMemoryPluginExecutionLedger:
             if not created <= claim_time <= deadline <= expires:
                 raise PersistenceError("plugin.request.expired")
             if count >= maximum:
-                raise PluginRunnerError("plugin.request.limit-exceeded")
+                raise PersistenceError("plugin.request.limit-exceeded")
             self._records[key] = (session_id, request_digest, None)
+            self._statuses[key] = self._claim_status(
+                actor,
+                session_metadata,
+                invocation_metadata,
+                request_digest,
+                claimed_at,
+            )
             return PluginInvocationClaim("claimed")
 
     def commit_plugin_invocation_result(
@@ -451,7 +470,12 @@ class InMemoryPluginExecutionLedger:
         result: Mapping[str, object],
     ) -> None:
         metadata = result.get("metadata")
-        if not isinstance(metadata, Mapping) or metadata.get("tenantId") != actor.tenant_id:
+        spec = result.get("spec")
+        if (
+            not isinstance(metadata, Mapping)
+            or metadata.get("tenantId") != actor.tenant_id
+            or not isinstance(spec, Mapping)
+        ):
             raise PersistenceError("storage.input-invalid")
         key = (actor.tenant_id, str(metadata.get("id")))
         with self._lock:
@@ -467,7 +491,171 @@ class InMemoryPluginExecutionLedger:
             value = dict(result)
             if current is not None and dict(current) != value:
                 raise PersistenceError("storage.conflict")
+            if current is not None:
+                return
+            if key in self._cancellations and spec.get("status") != "cancelled":
+                raise PersistenceError("plugin.request.cancellation-pending")
             self._records[key] = (session_id, existing_digest, value)
+            self._statuses[key] = self._terminal_status(self._statuses.get(key), value)
+
+    def get_plugin_invocation_status(
+        self, actor: ActorContext, request_id: str
+    ) -> Mapping[str, object] | None:
+        with self._lock:
+            status = self._statuses.get((actor.tenant_id, request_id))
+            return _copy_document(status) if status is not None else None
+
+    def request_plugin_invocation_cancellation(
+        self,
+        actor: ActorContext,
+        request_id: str,
+        status: Mapping[str, object],
+        audit_document: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        status_metadata = status.get("metadata")
+        audit_metadata = audit_document.get("metadata")
+        if (
+            not isinstance(status_metadata, Mapping)
+            or status_metadata.get("tenantId") != actor.tenant_id
+            or not isinstance(audit_metadata, Mapping)
+            or audit_metadata.get("tenantId") != actor.tenant_id
+        ):
+            raise PersistenceError("storage.input-invalid")
+        key = (actor.tenant_id, request_id)
+        with self._lock:
+            current = self._statuses.get(key)
+            if current is None:
+                raise PersistenceError("storage.not-found")
+            current_spec = current.get("spec")
+            if not isinstance(current_spec, Mapping):
+                raise PersistenceError("storage.corrupt")
+            if current_spec.get("state") != "claimed":
+                return _copy_document(current)
+            self._statuses[key] = _copy_document(status)
+            self._cancellations.add(key)
+            self._audits.append(_copy_document(audit_document))
+            return _copy_document(status)
+
+    def plugin_invocation_cancellation_requested(
+        self, actor: ActorContext, request_id: str, request_digest: str
+    ) -> bool:
+        key = (actor.tenant_id, request_id)
+        with self._lock:
+            record = self._records.get(key)
+            if record is None or record[1] != request_digest:
+                raise PersistenceError("storage.not-found")
+            return key in self._cancellations and record[2] is None
+
+    def reconcile_plugin_invocation(
+        self,
+        actor: ActorContext,
+        request_id: str,
+        observed_at: str,
+        result: Mapping[str, object],
+        status: Mapping[str, object],
+        audit_document: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        for document in (result, status, audit_document):
+            metadata = document.get("metadata")
+            if (
+                not isinstance(metadata, Mapping)
+                or metadata.get("tenantId") != actor.tenant_id
+            ):
+                raise PersistenceError("storage.input-invalid")
+        key = (actor.tenant_id, request_id)
+        with self._lock:
+            current = self._statuses.get(key)
+            if current is None:
+                raise PersistenceError("storage.not-found")
+            current_spec = current.get("spec")
+            if not isinstance(current_spec, Mapping):
+                raise PersistenceError("storage.corrupt")
+            if current_spec.get("state") in {"succeeded", "failed", "cancelled"}:
+                return _copy_document(current)
+            result_spec = result.get("spec")
+            status_spec = status.get("spec")
+            expected_state = (
+                "cancelled"
+                if current_spec.get("state") == "cancellation-requested"
+                else "failed"
+            )
+            if (
+                not isinstance(result_spec, Mapping)
+                or not isinstance(status_spec, Mapping)
+                or result_spec.get("status") != expected_state
+                or status_spec.get("state") != expected_state
+            ):
+                raise PersistenceError("plugin.request.cancellation-pending")
+            if _timestamp(observed_at) < _timestamp(current_spec.get("deadline")):
+                raise PersistenceError("plugin.reconciliation.deadline-live")
+            record = self._records.get(key)
+            if record is None or record[2] is not None:
+                raise PersistenceError("storage.conflict")
+            self._records[key] = (record[0], record[1], _copy_document(result))
+            self._statuses[key] = _copy_document(status)
+            self._audits.append(_copy_document(audit_document))
+            return _copy_document(status)
+
+    @staticmethod
+    def _claim_status(
+        actor: ActorContext,
+        session_metadata: Mapping[str, object],
+        invocation_metadata: Mapping[str, object],
+        request_digest: str,
+        claimed_at: str,
+    ) -> dict[str, object]:
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "PluginInvocationStatus",
+            "metadata": {
+                "id": invocation_metadata["id"],
+                "sessionId": session_metadata["id"],
+                "tenantId": actor.tenant_id,
+                "pluginId": session_metadata["pluginId"],
+                "pluginVersion": session_metadata["pluginVersion"],
+                "updatedAt": claimed_at,
+            },
+            "spec": {
+                "requestDigest": request_digest,
+                "state": "claimed",
+                "claimedAt": claimed_at,
+                "deadline": invocation_metadata["deadline"],
+            },
+        }
+
+    @staticmethod
+    def _terminal_status(
+        current: Mapping[str, object] | None,
+        result: Mapping[str, object],
+    ) -> dict[str, object]:
+        if current is None:
+            raise PersistenceError("storage.corrupt")
+        metadata = current.get("metadata")
+        spec = current.get("spec")
+        result_metadata = result.get("metadata")
+        result_spec = result.get("spec")
+        if not all(
+            isinstance(value, Mapping)
+            for value in (metadata, spec, result_metadata, result_spec)
+        ):
+            raise PersistenceError("storage.corrupt")
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "PluginInvocationStatus",
+            "metadata": {
+                **dict(metadata),
+                "updatedAt": result_metadata["completedAt"],
+            },
+            "spec": {
+                **dict(spec),
+                "state": result_spec["status"],
+                "completedAt": result_metadata["completedAt"],
+                "resultRef": (
+                    f"plugin-result://{metadata['tenantId']}/sessions/"
+                    f"{metadata['sessionId']}/invocations/{metadata['id']}"
+                ),
+            },
+        }
 
 
 class SignedDockerPluginRunner:
@@ -527,63 +715,147 @@ class SignedDockerPluginRunner:
             return dict(claim.result)
         if claim.state == "in-progress":
             raise PluginRunnerError("plugin.request.reconciliation-required")
-        if claim.state != "claimed" or claim.result is not None:
+        if claim.state not in {"claimed", "cancellation-requested"} or claim.result is not None:
             raise PluginRunnerError("plugin.execution.persistence-corrupt")
 
         limits = session_spec["limits"]
         start = self._monotonic()
-        try:
-            output_bytes = self._transport.run(
-                image_reference,
-                payload,
-                timeout_seconds=limits["maxWallTimeSeconds"],
-                max_output_bytes=limits["maxOutputBytes"],
+        if claim.state == "cancellation-requested":
+            result = self._result(
+                actor,
+                manifest,
+                metadata,
+                session_metadata,
+                status="cancelled",
+                wall_time_millis=0,
+                output_bytes=0,
+                error_code="plugin.runtime.cancelled",
             )
+        else:
             try:
-                output = json.loads(output_bytes)
-            except (UnicodeDecodeError, json.JSONDecodeError):
-                raise PluginRunnerError("plugin.output.invalid") from None
-            if not isinstance(output, dict):
-                raise PluginRunnerError("plugin.output.invalid")
-            result = self._result(
-                actor,
-                manifest,
-                metadata,
-                session_metadata,
-                status="succeeded",
-                wall_time_millis=self._elapsed_millis(start),
-                output_bytes=len(output_bytes),
-                output=output,
-            )
-        except PluginRunnerError as error:
-            result = self._result(
-                actor,
-                manifest,
-                metadata,
-                session_metadata,
-                status="failed",
-                wall_time_millis=self._elapsed_millis(start),
-                output_bytes=0,
-                error_code=_runtime_error_code(error),
-            )
-        except Exception:
-            result = self._result(
-                actor,
-                manifest,
-                metadata,
-                session_metadata,
-                status="failed",
-                wall_time_millis=self._elapsed_millis(start),
-                output_bytes=0,
-                error_code="plugin.runtime.failed",
-            )
+                output_bytes = self._transport.run(
+                    image_reference,
+                    payload,
+                    timeout_seconds=limits["maxWallTimeSeconds"],
+                    max_output_bytes=limits["maxOutputBytes"],
+                    cancellation_requested=lambda: self._cancellation_requested(
+                        actor, str(metadata["id"]), request_digest
+                    ),
+                )
+                try:
+                    output = json.loads(output_bytes)
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    raise PluginRunnerError("plugin.output.invalid") from None
+                if not isinstance(output, dict):
+                    raise PluginRunnerError("plugin.output.invalid")
+                result = self._result(
+                    actor,
+                    manifest,
+                    metadata,
+                    session_metadata,
+                    status="succeeded",
+                    wall_time_millis=self._elapsed_millis(start),
+                    output_bytes=len(output_bytes),
+                    output=output,
+                )
+            except PluginRunnerError as error:
+                code = _runtime_error_code(error)
+                result = self._result(
+                    actor,
+                    manifest,
+                    metadata,
+                    session_metadata,
+                    status="cancelled" if code == "plugin.runtime.cancelled" else "failed",
+                    wall_time_millis=self._elapsed_millis(start),
+                    output_bytes=0,
+                    error_code=code,
+                )
+            except Exception:
+                result = self._result(
+                    actor,
+                    manifest,
+                    metadata,
+                    session_metadata,
+                    status="failed",
+                    wall_time_millis=self._elapsed_millis(start),
+                    output_bytes=0,
+                    error_code="plugin.runtime.failed",
+                )
         try:
             self._ledger.commit_plugin_invocation_result(
                 actor, request_digest, result
             )
         except PersistenceError as error:
+            if str(error) == "plugin.request.cancellation-pending":
+                result = self._result(
+                    actor,
+                    manifest,
+                    metadata,
+                    session_metadata,
+                    status="cancelled",
+                    wall_time_millis=self._elapsed_millis(start),
+                    output_bytes=0,
+                    error_code="plugin.runtime.cancelled",
+                )
+                try:
+                    self._ledger.commit_plugin_invocation_result(
+                        actor, request_digest, result
+                    )
+                except PersistenceError as cancellation_error:
+                    recovered = self._recover_completed(
+                        actor,
+                        session,
+                        invocation,
+                        request_digest,
+                        cancellation_error,
+                    )
+                    if recovered is not None:
+                        return recovered
+                    raise PluginRunnerError(
+                        _persistence_code(cancellation_error)
+                    ) from None
+                return result
+            recovered = self._recover_completed(
+                actor, session, invocation, request_digest, error
+            )
+            if recovered is not None:
+                return recovered
             raise PluginRunnerError(_persistence_code(error)) from None
         return result
+
+    def _cancellation_requested(
+        self, actor: ActorContext, request_id: str, request_digest: str
+    ) -> bool:
+        try:
+            return self._ledger.plugin_invocation_cancellation_requested(
+                actor, request_id, request_digest
+            )
+        except PersistenceError as error:
+            raise PluginRunnerError(_persistence_code(error)) from None
+
+    def _recover_completed(
+        self,
+        actor: ActorContext,
+        session: Mapping[str, object],
+        invocation: Mapping[str, object],
+        request_digest: str,
+        error: PersistenceError,
+    ) -> Mapping[str, object] | None:
+        if str(error) != "storage.conflict":
+            return None
+        try:
+            claim = self._ledger.claim_plugin_invocation(
+                actor,
+                session,
+                invocation,
+                request_digest,
+                self._now().isoformat().replace("+00:00", "Z"),
+            )
+        except PersistenceError:
+            return None
+        if claim.state == "completed" and isinstance(claim.result, Mapping):
+            return dict(claim.result)
+        return None
 
     def _elapsed_millis(self, start: float) -> int:
         return min(max(0, round((self._monotonic() - start) * 1000)), 3_600_000)
@@ -761,6 +1033,10 @@ def _timestamp(value: object) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
+def _copy_document(document: Mapping[str, object]) -> dict[str, object]:
+    return json.loads(json.dumps(document))
+
+
 def _docker_environment() -> dict[str, str]:
     return {
         name: os.environ[name]
@@ -777,6 +1053,7 @@ def _persistence_code(error: PersistenceError) -> str:
         "storage.corrupt": "plugin.execution.persistence-corrupt",
         "plugin.request.limit-exceeded": "plugin.request.limit-exceeded",
         "plugin.request.expired": "plugin.request.expired",
+        "plugin.request.cancellation-pending": "plugin.request.cancellation-pending",
     }.get(str(error), "plugin.execution.persistence-unavailable")
 
 

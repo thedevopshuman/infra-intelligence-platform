@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:plugin-invocation-status:v1alpha1",
+  "title": "Infrastructure Intelligence Plugin Invocation Status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "PluginInvocationStatus"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sessionId", "tenantId", "pluginId", "pluginVersion", "updatedAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^pin_[a-f0-9]{32}$"},
+        "sessionId": {"type": "string", "pattern": "^psn_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"},
+        "pluginId": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "pluginVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"},
+        "updatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestDigest", "state", "claimedAt", "deadline"],
+      "properties": {
+        "requestDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "state": {"type": "string", "enum": ["claimed", "cancellation-requested", "succeeded", "failed", "cancelled"]},
+        "claimedAt": {"type": "string", "format": "date-time"},
+        "deadline": {"type": "string", "format": "date-time"},
+        "cancellation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requestedBy", "requestedAt", "reasonCode"],
+          "properties": {
+            "requestedBy": {"type": "string", "minLength": 1, "maxLength": 256},
+            "requestedAt": {"type": "string", "format": "date-time"},
+            "reasonCode": {"type": "string", "enum": ["operator-requested", "session-superseded", "shutdown"]}
+          }
+        },
+        "completedAt": {"type": "string", "format": "date-time"},
+        "resultRef": {"type": "string", "format": "uri-reference", "pattern": "^plugin-result://", "maxLength": 2048}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"spec": {"properties": {"state": {"enum": ["claimed", "cancellation-requested"]}}}}},
+      "then": {"properties": {"spec": {"not": {"anyOf": [{"required": ["completedAt"]}, {"required": ["resultRef"]}]}}}},
+      "else": {"properties": {"spec": {"required": ["completedAt", "resultRef"]}}}
+    },
+    {
+      "if": {"properties": {"spec": {"properties": {"state": {"enum": ["cancellation-requested", "cancelled"]}}}}},
+      "then": {"properties": {"spec": {"required": ["cancellation"]}}},
+      "else": {"properties": {"spec": {"not": {"required": ["cancellation"]}}}}
+    }
+  ]
+}

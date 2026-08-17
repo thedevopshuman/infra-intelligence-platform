@@ -26,6 +26,10 @@ import type {
   KubernetesEventEvidenceRequest,
   LogEvidenceRequest,
   PluginSession,
+  PluginInvocationCancellationRequest,
+  PluginInvocationId,
+  PluginInvocationReconciliationRequest,
+  PluginInvocationStatus,
   ResourceCollectionRequest,
   ResourceCollectionResult,
   ResourceChangeEvidenceRequest,
@@ -472,6 +476,32 @@ export class InfrastructureIntelligenceClient {
     };
   }): Promise<PluginSession> {
     return this.post<PluginSession>("/v1/plugin-sessions", command);
+  }
+
+  async getPluginInvocationStatus(
+    invocationId: PluginInvocationId,
+  ): Promise<PluginInvocationStatus> {
+    return this.get<PluginInvocationStatus>(
+      `/v1/plugin-invocations/${encodeURIComponent(invocationId)}/status`,
+    );
+  }
+
+  async cancelPluginInvocation(
+    request: PluginInvocationCancellationRequest,
+  ): Promise<PluginInvocationStatus> {
+    return this.post<PluginInvocationStatus>(
+      `/v1/plugin-invocations/${encodeURIComponent(request.spec.invocationId)}/cancel`,
+      request,
+    );
+  }
+
+  async reconcilePluginInvocation(
+    request: PluginInvocationReconciliationRequest,
+  ): Promise<PluginInvocationStatus> {
+    return this.post<PluginInvocationStatus>(
+      `/v1/plugin-invocations/${encodeURIComponent(request.spec.invocationId)}/reconcile`,
+      request,
+    );
   }
 
   private async get<T>(path: string): Promise<T> {

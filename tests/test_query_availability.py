@@ -223,6 +223,7 @@ class QueryAvailabilityHttpBoundaryTests(unittest.TestCase):
             "/v1/actions/act_secret": "action-get",
             "/v1/actions/act_secret/workflow": "action-workflow-get",
             "/v1/plugin-sessions/plg_secret": "plugin-session-get",
+            "/v1/plugin-invocations/pin_secret/status": "plugin-invocation-status",
             "/healthz": None,
             "/readyz": None,
             "/console": None,

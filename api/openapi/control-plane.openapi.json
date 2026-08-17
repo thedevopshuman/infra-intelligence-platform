@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.38.0",
-    "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence and retention observation, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions. OTLP intake has a separate process and OpenAPI document."
+    "version": "0.39.0",
+    "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence and retention observation, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions and invocation lifecycles. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
   "security": [{"bearerAuth": []}],
@@ -630,6 +630,54 @@
           "503": {"$ref": "#/components/responses/StorageUnavailable"}
         }
       }
+    },
+    "/v1/plugin-invocations/{invocationId}/status": {
+      "get": {
+        "operationId": "getPluginInvocationStatus",
+        "description": "Read one durable invocation claim, cancellation intent, or terminal result reference in the authenticated tenant scope.",
+        "parameters": [{"$ref": "#/components/parameters/PluginInvocationId"}],
+        "responses": {
+          "200": {"description": "Tenant-scoped plugin invocation lifecycle", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/plugin-invocation-status.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/plugin-invocations/{invocationId}/cancel": {
+      "post": {
+        "operationId": "cancelPluginInvocation",
+        "description": "Record an auditable cancellation intent. The isolated runner polls the durable intent and returns a terminal cancelled result without granting the plugin control-plane authority.",
+        "parameters": [{"$ref": "#/components/parameters/PluginInvocationId"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/plugin-invocation-cancellation-request.schema.json"}}}},
+        "responses": {
+          "202": {"description": "Cancellation intent recorded or existing terminal status returned", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/plugin-invocation-status.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/plugin-invocations/{invocationId}/reconcile": {
+      "post": {
+        "operationId": "reconcilePluginInvocation",
+        "description": "Allow a policy-approved platform administrator to close an ambiguous post-deadline claim as outcome unknown without replaying plugin work.",
+        "parameters": [{"$ref": "#/components/parameters/PluginInvocationId"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/plugin-invocation-reconciliation-request.schema.json"}}}},
+        "responses": {
+          "200": {"description": "Terminal reconciled status or an existing terminal status", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/plugin-invocation-status.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "404": {"$ref": "#/components/responses/ResourceNotFound"},
+          "409": {"$ref": "#/components/responses/PluginInvocationLifecycleConflict"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
     }
   },
   "components": {
@@ -643,6 +691,7 @@
     "parameters": {
       "CorrelationId": {"name": "x-correlation-id", "in": "header", "required": false, "schema": {"type": "string", "minLength": 1}},
       "ResourceUid": {"name": "resourceUid", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}},
+      "PluginInvocationId": {"name": "invocationId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^pin_[a-f0-9]{32}$"}},
       "PageLimit": {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}},
       "PageCursor": {"name": "cursor", "in": "query", "required": false, "schema": {"type": "string", "pattern": "^p1\\.[A-Za-z0-9_-]+$", "maxLength": 2048}}
     },
@@ -718,6 +767,9 @@
       "PluginManifest": {"$ref": "../../contracts/schemas/plugin-manifest.schema.json"},
       "PluginInvocation": {"$ref": "../../contracts/schemas/plugin-invocation.schema.json"},
       "PluginInvocationResult": {"$ref": "../../contracts/schemas/plugin-invocation-result.schema.json"},
+      "PluginInvocationStatus": {"$ref": "../../contracts/schemas/plugin-invocation-status.schema.json"},
+      "PluginInvocationCancellationRequest": {"$ref": "../../contracts/schemas/plugin-invocation-cancellation-request.schema.json"},
+      "PluginInvocationReconciliationRequest": {"$ref": "../../contracts/schemas/plugin-invocation-reconciliation-request.schema.json"},
       "PolicyDecisionRequest": {"$ref": "../../contracts/schemas/policy-decision-request.schema.json"},
       "PolicyDecision": {"$ref": "../../contracts/schemas/policy-decision.schema.json"},
       "Error": {"$ref": "../../contracts/schemas/error.schema.json"}
@@ -764,6 +816,18 @@
           "application/json": {
             "schema": {"$ref": "#/components/schemas/Error"},
             "example": {"error": {"code": "investigation.queue.capacity-exceeded"}}
+          }
+        }
+      },
+      "PluginInvocationLifecycleConflict": {
+        "description": "The invocation deadline is still live or stored lifecycle state cannot be reconciled safely",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/Error"},
+            "examples": {
+              "deadlineLive": {"value": {"error": {"code": "plugin.reconciliation.deadline-live"}}},
+              "stateInvalid": {"value": {"error": {"code": "plugin.invocation.state-invalid"}}}
+            }
           }
         }
       },

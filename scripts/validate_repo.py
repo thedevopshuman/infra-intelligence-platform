@@ -94,6 +94,8 @@ REQUIRED_PATHS = (
     "docs/decisions/0063-console-oidc-authorization-code-pkce.md",
     "docs/specifications/console-authentication-contract.md",
     "docs/decisions/0064-durable-plugin-invocation-ownership.md",
+    "docs/decisions/0065-plugin-invocation-cancellation-and-reconciliation.md",
+    "docs/specifications/plugin-invocation-lifecycle-contract.md",
     "docs/operations/evidence-retention.md",
     "docs/operations/event-delivery.md",
     "docs/operations/helm-deployment.md",
@@ -138,6 +140,9 @@ REQUIRED_PATHS = (
     "contracts/schemas/plugin-manifest.schema.json",
     "contracts/schemas/plugin-invocation.schema.json",
     "contracts/schemas/plugin-invocation-result.schema.json",
+    "contracts/schemas/plugin-invocation-status.schema.json",
+    "contracts/schemas/plugin-invocation-cancellation-request.schema.json",
+    "contracts/schemas/plugin-invocation-reconciliation-request.schema.json",
     "contracts/schemas/evidence.schema.json",
     "contracts/schemas/evidence-retention-report.schema.json",
     "contracts/schemas/kubernetes-event-evidence-request.schema.json",
@@ -182,6 +187,9 @@ REQUIRED_PATHS = (
     "contracts/examples/plugin-invocation.json",
     "contracts/examples/plugin-invocation-result.json",
     "contracts/examples/plugin-invocation-result-failed.json",
+    "contracts/examples/plugin-invocation-status.json",
+    "contracts/examples/plugin-invocation-cancellation-request.json",
+    "contracts/examples/plugin-invocation-reconciliation-request.json",
     "contracts/examples/policy-decision-request.json",
     "contracts/examples/policy-decision.json",
     "contracts/examples/investigation-request.json",
@@ -254,6 +262,7 @@ REQUIRED_PATHS = (
     "src/iip/application/observe_ingestion.py",
     "src/iip/application/query_telemetry_export_health.py",
     "src/iip/application/query_runtime_version.py",
+    "src/iip/application/plugin_invocations.py",
     "src/iip/adapters/investigation_catalog.py",
     "src/iip/application/sample_ingestion.py",
     "src/iip/application/deliver_events.py",
@@ -284,6 +293,7 @@ REQUIRED_PATHS = (
     "src/iip/adapters/postgres/migrations/0012_investigation_job_slo_window.sql",
     "src/iip/adapters/postgres/migrations/0013_evidence_artifact_retention.sql",
     "src/iip/adapters/postgres/migrations/0014_durable_plugin_invocations.sql",
+    "src/iip/adapters/postgres/migrations/0015_plugin_invocation_lifecycle.sql",
     "src/iip/adapters/postgres/health.py",
     "tests/test_evidence_collection.py",
     "tests/test_telemetry_export_health.py",
@@ -298,6 +308,7 @@ REQUIRED_PATHS = (
     "tests/test_helm_deployment.py",
     "tests/test_helm_values.py",
     "tests/test_release_bundle.py",
+    "tests/test_plugin_invocation_lifecycle.py",
     "tests/test_ci_supply_chain.py",
     "tests/test_investigation_signal_catalog.py",
     ".github/dependabot.yml",
@@ -2432,6 +2443,15 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("plugin-invocation.json", "PluginInvocation"),
         ("plugin-invocation-result.json", "PluginInvocationResult"),
         ("plugin-invocation-result-failed.json", "PluginInvocationResult"),
+        ("plugin-invocation-status.json", "PluginInvocationStatus"),
+        (
+            "plugin-invocation-cancellation-request.json",
+            "PluginInvocationCancellationRequest",
+        ),
+        (
+            "plugin-invocation-reconciliation-request.json",
+            "PluginInvocationReconciliationRequest",
+        ),
         ("plugin-session.json", "PluginSession"),
         ("policy-decision-request.json", "PolicyDecisionRequest"),
         ("policy-decision.json", "PolicyDecision"),
@@ -2580,6 +2600,15 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     plugin_invocation = documents.get(example_dir / "plugin-invocation.json")
     plugin_invocation_result = documents.get(
         example_dir / "plugin-invocation-result.json"
+    )
+    plugin_invocation_status = documents.get(
+        example_dir / "plugin-invocation-status.json"
+    )
+    plugin_invocation_cancellation = documents.get(
+        example_dir / "plugin-invocation-cancellation-request.json"
+    )
+    plugin_invocation_reconciliation = documents.get(
+        example_dir / "plugin-invocation-reconciliation-request.json"
     )
     if all(
         isinstance(item, dict)
@@ -2754,6 +2783,43 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             usage = result_spec.get("usage", {})
             if usage.get("outputBytes") != output_bytes:
                 fail(errors, "plugin result outputBytes must match its canonical example output")
+
+    if all(
+        isinstance(item, dict)
+        for item in (
+            plugin_invocation,
+            plugin_invocation_status,
+            plugin_invocation_cancellation,
+            plugin_invocation_reconciliation,
+        )
+    ):
+        invocation_metadata = plugin_invocation["metadata"]
+        status_metadata = plugin_invocation_status["metadata"]
+        status_spec = plugin_invocation_status["spec"]
+        cancellation_metadata = plugin_invocation_cancellation["metadata"]
+        cancellation_spec = plugin_invocation_cancellation["spec"]
+        reconciliation_spec = plugin_invocation_reconciliation["spec"]
+        invocation_id = invocation_metadata.get("id")
+        if status_metadata.get("id") != invocation_id:
+            fail(errors, "plugin invocation status must identify its invocation")
+        if status_metadata.get("sessionId") != invocation_metadata.get("sessionId"):
+            fail(errors, "plugin invocation status must identify its session")
+        if status_metadata.get("tenantId") != invocation_metadata.get("tenantId"):
+            fail(errors, "plugin invocation lifecycle examples must share a tenant")
+        if status_spec.get("requestDigest") != canonical_digest(plugin_invocation):
+            fail(errors, "plugin invocation status digest must match its invocation")
+        if cancellation_spec.get("invocationId") != invocation_id:
+            fail(errors, "plugin cancellation must identify its invocation")
+        if reconciliation_spec.get("invocationId") != invocation_id:
+            fail(errors, "plugin reconciliation must identify its invocation")
+        cancellation = status_spec.get("cancellation", {})
+        if (
+            cancellation.get("requestedBy") != cancellation_metadata.get("actorId")
+            or cancellation.get("requestedAt")
+            != cancellation_metadata.get("requestedAt")
+            or cancellation.get("reasonCode") != cancellation_spec.get("reasonCode")
+        ):
+            fail(errors, "plugin status cancellation must match its request")
 
     evidence = documents.get(example_dir / "evidence.json")
     request = documents.get(example_dir / "investigation-request.json")

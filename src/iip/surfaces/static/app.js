@@ -12,6 +12,7 @@ const state = {
   resources: [],
   investigations: [],
   evidence: [],
+  pluginInvocationStatus: null,
   actionWorkflows: [],
   actionCursor: null,
   selectedActionId: null,
@@ -1107,6 +1108,134 @@ async function lookupEvidence(id) {
   }
 }
 
+function pluginInvocationStatusClass(value) {
+  if (value === "succeeded") return "success";
+  if (["failed", "cancelled"].includes(value)) return "danger";
+  return "warning";
+}
+
+function renderPluginInvocationStatus() {
+  const status = state.pluginInvocationStatus;
+  const chip = $("#plugin-invocation-state");
+  const controls = $("#plugin-lifecycle-controls");
+  if (!status?.spec || !status?.metadata) {
+    chip.textContent = "No selection";
+    chip.className = "status-chip neutral";
+    controls.hidden = true;
+    return;
+  }
+
+  const terminal = ["succeeded", "failed", "cancelled"].includes(status.spec.state);
+  const cancellation = status.spec.cancellation;
+  chip.textContent = status.spec.state;
+  chip.className = `status-chip ${pluginInvocationStatusClass(status.spec.state)}`;
+  renderLookup($("#plugin-invocation-result"), [
+    ["Invocation ID", status.metadata.id],
+    ["State", status.spec.state],
+    ["Plugin", `${status.metadata.pluginId} · ${status.metadata.pluginVersion}`],
+    ["Session", status.metadata.sessionId],
+    ["Claimed", formatDate(status.spec.claimedAt)],
+    ["Deadline", formatDate(status.spec.deadline)],
+    ["Request digest", status.spec.requestDigest],
+    ["Cancellation", cancellation ? `${cancellation.reasonCode} by ${cancellation.requestedBy}` : "Not requested"],
+    ["Completed", status.spec.completedAt ? formatDate(status.spec.completedAt) : "Not terminal"],
+    ["Result reference", status.spec.resultRef || "Not terminal"],
+  ]);
+
+  controls.hidden = terminal;
+  $("#plugin-cancellation-operation").hidden = status.spec.state !== "claimed";
+  const reconciliation = $("#plugin-reconciliation-operation");
+  reconciliation.hidden = terminal || !hasRole("platform-admin");
+  const deadlineReached = Date.now() >= Date.parse(status.spec.deadline);
+  $("#plugin-reconcile").disabled = !deadlineReached;
+  $("#plugin-reconciliation-help").textContent = deadlineReached
+    ? "This records an unknown terminal outcome and never replays the invocation."
+    : `Available after ${formatDate(status.spec.deadline)}. Reconciliation never replays the invocation.`;
+}
+
+async function lookupPluginInvocation(invocationId) {
+  try {
+    const status = await api(`/v1/plugin-invocations/${encodeURIComponent(invocationId)}/status`);
+    state.pluginInvocationStatus = status;
+    $("#plugin-invocation-id").value = status.metadata.id;
+    renderPluginInvocationStatus();
+  } catch (error) {
+    state.pluginInvocationStatus = null;
+    renderPluginInvocationStatus();
+    showNotice(`Plugin invocation lookup failed (${error.message}).`, "error");
+  }
+}
+
+async function cancelPluginInvocation() {
+  const invocationId = state.pluginInvocationStatus?.metadata?.id;
+  if (!invocationId || !state.session) return;
+  const button = $("#plugin-cancel");
+  button.disabled = true;
+  button.textContent = "Recording intent…";
+  const payload = {
+    apiVersion: "iip.platform/v1alpha1",
+    kind: "PluginInvocationCancellationRequest",
+    metadata: {
+      id: identifier("pcn"),
+      tenantId: state.session.metadata.tenantId,
+      actorId: state.session.metadata.actorId,
+      requestedAt: new Date().toISOString(),
+    },
+    spec: {
+      invocationId,
+      reasonCode: $("#plugin-cancellation-reason").value,
+    },
+  };
+  try {
+    state.pluginInvocationStatus = await api(`/v1/plugin-invocations/${encodeURIComponent(invocationId)}/cancel`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    renderPluginInvocationStatus();
+    showNotice("Cancellation intent is durable. The isolated runner will stop cooperatively and commit its terminal result.");
+  } catch (error) {
+    showNotice(`Plugin cancellation failed (${error.message}).`, "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Request cancellation";
+  }
+}
+
+async function reconcilePluginInvocation() {
+  const invocationId = state.pluginInvocationStatus?.metadata?.id;
+  if (!invocationId || !state.session || !hasRole("platform-admin")) return;
+  const button = $("#plugin-reconcile");
+  button.disabled = true;
+  button.textContent = "Closing safely…";
+  const payload = {
+    apiVersion: "iip.platform/v1alpha1",
+    kind: "PluginInvocationReconciliationRequest",
+    metadata: {
+      id: identifier("prc"),
+      tenantId: state.session.metadata.tenantId,
+      actorId: state.session.metadata.actorId,
+      requestedAt: new Date().toISOString(),
+    },
+    spec: {
+      invocationId,
+      reasonCode: $("#plugin-reconciliation-reason").value,
+    },
+  };
+  try {
+    state.pluginInvocationStatus = await api(`/v1/plugin-invocations/${encodeURIComponent(invocationId)}/reconcile`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    renderPluginInvocationStatus();
+    showNotice("The invocation is terminal with outcome unknown. No work was replayed.");
+  } catch (error) {
+    showNotice(`Plugin reconciliation failed (${error.message}).`, "error");
+  } finally {
+    button.textContent = "Close unknown outcome";
+    renderPluginInvocationStatus();
+  }
+}
+
 function hasRole(role) {
   return Boolean(state.session?.spec?.roles?.includes(role));
 }
@@ -1385,6 +1514,12 @@ function bindEvents() {
     event.preventDefault();
     lookupEvidence($("#evidence-id").value.trim());
   });
+  $("#plugin-invocation-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    lookupPluginInvocation($("#plugin-invocation-id").value.trim());
+  });
+  $("#plugin-cancel").addEventListener("click", cancelPluginInvocation);
+  $("#plugin-reconcile").addEventListener("click", reconcilePluginInvocation);
   $("#action-proposal-form").addEventListener("submit", proposeAction);
   $("#action-type").addEventListener("change", renderActionProposalMode);
   $("#action-refresh").addEventListener("click", () => refreshActions());
@@ -1453,6 +1588,7 @@ async function start() {
   renderEventDeliverySlo();
   renderInvestigationCompletionSlo();
   renderEvidenceRetention();
+  renderPluginInvocationStatus();
   await Promise.all([checkHealth(), loadConsoleAuthentication()]);
   configureConnectionDialog();
   if (oidcCallbackPresent()) {

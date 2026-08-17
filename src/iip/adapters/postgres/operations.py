@@ -1411,6 +1411,13 @@ class PostgresOperationalStore:
             raise PersistenceError("storage.input-invalid")
         session_id = str(session_metadata["id"])
         request_id = str(invocation_metadata["id"])
+        claim_status = self._plugin_claim_status(
+            actor,
+            session_metadata,
+            invocation_metadata,
+            request_digest,
+            claimed_at,
+        )
         try:
             with self._connect() as connection:
                 stored_session = connection.execute(
@@ -1428,7 +1435,8 @@ class PostgresOperationalStore:
                     raise PersistenceError("storage.conflict")
                 existing = connection.execute(
                     """
-                    SELECT session_id, request_digest, state, result_document
+                    SELECT session_id, request_digest, state, result_document,
+                           status_document, cancellation_document
                     FROM iip.plugin_invocations
                     WHERE tenant_id = %s AND request_id = %s
                     """,
@@ -1444,6 +1452,14 @@ class PostgresOperationalStore:
                     if existing["state"] == "completed" and isinstance(result, Mapping):
                         return PluginInvocationClaim("completed", dict(result))
                     if existing["state"] == "claimed" and result is None:
+                        status = existing["status_document"]
+                        status_spec = status.get("spec") if isinstance(status, Mapping) else None
+                        if (
+                            isinstance(status_spec, Mapping)
+                            and status_spec.get("state") == "cancellation-requested"
+                            and existing["cancellation_document"] is not None
+                        ):
+                            return PluginInvocationClaim("cancellation-requested")
                         return PluginInvocationClaim("in-progress")
                     raise PersistenceError("storage.corrupt")
                 assert isinstance(created_at, str)
@@ -1472,8 +1488,8 @@ class PostgresOperationalStore:
                     """
                     INSERT INTO iip.plugin_invocations (
                         tenant_id, request_id, session_id, request_digest,
-                        invocation_document, state, claimed_at
-                    ) VALUES (%s, %s, %s, %s, %s, 'claimed', %s)
+                        invocation_document, state, claimed_at, status_document
+                    ) VALUES (%s, %s, %s, %s, %s, 'claimed', %s, %s)
                     """,
                     (
                         actor.tenant_id,
@@ -1482,6 +1498,7 @@ class PostgresOperationalStore:
                         request_digest,
                         Jsonb(dict(invocation)),
                         claimed_at,
+                        Jsonb(claim_status),
                     ),
                 )
                 return PluginInvocationClaim("claimed")
@@ -1519,7 +1536,8 @@ class PostgresOperationalStore:
             with self._connect() as connection:
                 existing = connection.execute(
                     """
-                    SELECT session_id, request_digest, state, result_document
+                    SELECT session_id, request_digest, state, result_document,
+                           status_document, cancellation_document
                     FROM iip.plugin_invocations
                     WHERE tenant_id = %s AND request_id = %s
                     FOR UPDATE
@@ -1540,15 +1558,25 @@ class PostgresOperationalStore:
                     raise PersistenceError("storage.conflict")
                 if existing["state"] != "claimed" or existing["result_document"] is not None:
                     raise PersistenceError("storage.corrupt")
+                if (
+                    existing["cancellation_document"] is not None
+                    and spec.get("status") != "cancelled"
+                ):
+                    raise PersistenceError("plugin.request.cancellation-pending")
+                terminal_status = self._terminal_plugin_status(
+                    existing["status_document"], value
+                )
                 updated = connection.execute(
                     """
                     UPDATE iip.plugin_invocations
-                    SET state = 'completed', result_document = %s, completed_at = %s
+                    SET state = 'completed', result_document = %s,
+                        status_document = %s, completed_at = %s
                     WHERE tenant_id = %s AND request_id = %s AND state = 'claimed'
                     RETURNING request_id
                     """,
                     (
                         Jsonb(value),
+                        Jsonb(terminal_status),
                         metadata["completedAt"],
                         actor.tenant_id,
                         request_id,
@@ -1556,6 +1584,228 @@ class PostgresOperationalStore:
                 ).fetchone()
                 if updated is None:
                     raise PersistenceError("storage.conflict")
+        except PersistenceError:
+            raise
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def get_plugin_invocation_status(
+        self, actor: ActorContext, request_id: str
+    ) -> Optional[Mapping[str, object]]:
+        return self._one_document(
+            "SELECT status_document AS document FROM iip.plugin_invocations WHERE tenant_id = %s AND request_id = %s",
+            (actor.tenant_id, request_id),
+        )
+
+    def request_plugin_invocation_cancellation(
+        self,
+        actor: ActorContext,
+        request_id: str,
+        status: Mapping[str, object],
+        audit_document: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self._assert_tenant(actor, status)
+        self._assert_tenant(actor, audit_document)
+        status_metadata = status.get("metadata")
+        status_spec = status.get("spec")
+        cancellation = (
+            status_spec.get("cancellation") if isinstance(status_spec, Mapping) else None
+        )
+        if (
+            not isinstance(status_metadata, Mapping)
+            or status_metadata.get("id") != request_id
+            or not isinstance(status_spec, Mapping)
+            or status_spec.get("state") != "cancellation-requested"
+            or not isinstance(cancellation, Mapping)
+        ):
+            raise PersistenceError("storage.input-invalid")
+        try:
+            with self._connect() as connection:
+                existing = connection.execute(
+                    """
+                    SELECT request_digest, state, result_document, status_document
+                    FROM iip.plugin_invocations
+                    WHERE tenant_id = %s AND request_id = %s
+                    FOR UPDATE
+                    """,
+                    (actor.tenant_id, request_id),
+                ).fetchone()
+                if existing is None:
+                    raise PersistenceError("storage.not-found")
+                current = existing["status_document"]
+                current_spec = current.get("spec") if isinstance(current, Mapping) else None
+                if not isinstance(current_spec, Mapping):
+                    raise PersistenceError("storage.corrupt")
+                if current_spec.get("state") != "claimed":
+                    return dict(current)
+                if (
+                    existing["state"] != "claimed"
+                    or existing["result_document"] is not None
+                    or status_spec.get("requestDigest") != existing["request_digest"]
+                ):
+                    raise PersistenceError("storage.conflict")
+                updated = connection.execute(
+                    """
+                    UPDATE iip.plugin_invocations
+                    SET status_document = %s, cancellation_document = %s
+                    WHERE tenant_id = %s AND request_id = %s
+                      AND state = 'claimed' AND result_document IS NULL
+                    RETURNING status_document
+                    """,
+                    (
+                        Jsonb(dict(status)),
+                        Jsonb(dict(cancellation)),
+                        actor.tenant_id,
+                        request_id,
+                    ),
+                ).fetchone()
+                if updated is None:
+                    raise PersistenceError("storage.conflict")
+                connection.execute(
+                    "INSERT INTO iip.audit_records (tenant_id, category, document) VALUES (%s, %s, %s)",
+                    (
+                        actor.tenant_id,
+                        "plugin-invocation-cancellation",
+                        Jsonb(dict(audit_document)),
+                    ),
+                )
+                return dict(updated["status_document"])
+        except PersistenceError:
+            raise
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def plugin_invocation_cancellation_requested(
+        self, actor: ActorContext, request_id: str, request_digest: str
+    ) -> bool:
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    SELECT request_digest, status_document
+                    FROM iip.plugin_invocations
+                    WHERE tenant_id = %s AND request_id = %s
+                    """,
+                    (actor.tenant_id, request_id),
+                ).fetchone()
+            if row is None or row["request_digest"] != request_digest:
+                raise PersistenceError("storage.not-found")
+            status = row["status_document"]
+            spec = status.get("spec") if isinstance(status, Mapping) else None
+            if not isinstance(spec, Mapping):
+                raise PersistenceError("storage.corrupt")
+            return spec.get("state") == "cancellation-requested"
+        except PersistenceError:
+            raise
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def reconcile_plugin_invocation(
+        self,
+        actor: ActorContext,
+        request_id: str,
+        observed_at: str,
+        result: Mapping[str, object],
+        status: Mapping[str, object],
+        audit_document: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self._assert_tenant(actor, result)
+        self._assert_tenant(actor, status)
+        self._assert_tenant(actor, audit_document)
+        result_metadata = result.get("metadata")
+        result_spec = result.get("spec")
+        status_metadata = status.get("metadata")
+        status_spec = status.get("spec")
+        if (
+            not isinstance(result_metadata, Mapping)
+            or result_metadata.get("id") != request_id
+            or not isinstance(result_spec, Mapping)
+            or not isinstance(status_metadata, Mapping)
+            or status_metadata.get("id") != request_id
+            or not isinstance(status_spec, Mapping)
+            or status_spec.get("state") not in ("failed", "cancelled")
+            or not self._valid_timestamp(observed_at)
+        ):
+            raise PersistenceError("storage.input-invalid")
+        try:
+            with self._connect() as connection:
+                existing = connection.execute(
+                    """
+                    SELECT request_digest, state, result_document,
+                           invocation_document, status_document
+                    FROM iip.plugin_invocations
+                    WHERE tenant_id = %s AND request_id = %s
+                    FOR UPDATE
+                    """,
+                    (actor.tenant_id, request_id),
+                ).fetchone()
+                if existing is None:
+                    raise PersistenceError("storage.not-found")
+                current = existing["status_document"]
+                current_spec = current.get("spec") if isinstance(current, Mapping) else None
+                if not isinstance(current_spec, Mapping):
+                    raise PersistenceError("storage.corrupt")
+                if current_spec.get("state") in ("succeeded", "failed", "cancelled"):
+                    return dict(current)
+                expected_state = (
+                    "cancelled"
+                    if current_spec.get("state") == "cancellation-requested"
+                    else "failed"
+                )
+                if (
+                    status_spec.get("state") != expected_state
+                    or result_spec.get("status") != expected_state
+                ):
+                    raise PersistenceError("plugin.request.cancellation-pending")
+                invocation = existing["invocation_document"]
+                invocation_metadata = (
+                    invocation.get("metadata") if isinstance(invocation, Mapping) else None
+                )
+                deadline = (
+                    invocation_metadata.get("deadline")
+                    if isinstance(invocation_metadata, Mapping)
+                    else None
+                )
+                if (
+                    not isinstance(deadline, str)
+                    or self._parse_timestamp(observed_at)
+                    < self._parse_timestamp(deadline)
+                ):
+                    raise PersistenceError("plugin.reconciliation.deadline-live")
+                if (
+                    existing["state"] != "claimed"
+                    or existing["result_document"] is not None
+                    or status_spec.get("requestDigest") != existing["request_digest"]
+                ):
+                    raise PersistenceError("storage.conflict")
+                updated = connection.execute(
+                    """
+                    UPDATE iip.plugin_invocations
+                    SET state = 'completed', result_document = %s,
+                        status_document = %s, completed_at = %s
+                    WHERE tenant_id = %s AND request_id = %s
+                      AND state = 'claimed' AND result_document IS NULL
+                    RETURNING status_document
+                    """,
+                    (
+                        Jsonb(dict(result)),
+                        Jsonb(dict(status)),
+                        observed_at,
+                        actor.tenant_id,
+                        request_id,
+                    ),
+                ).fetchone()
+                if updated is None:
+                    raise PersistenceError("storage.conflict")
+                connection.execute(
+                    "INSERT INTO iip.audit_records (tenant_id, category, document) VALUES (%s, %s, %s)",
+                    (
+                        actor.tenant_id,
+                        "plugin-invocation-reconciliation",
+                        Jsonb(dict(audit_document)),
+                    ),
+                )
+                return dict(updated["status_document"])
         except PersistenceError:
             raise
         except psycopg.Error:
@@ -1637,3 +1887,64 @@ class PostgresOperationalStore:
     @staticmethod
     def _parse_timestamp(value: str) -> datetime:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+    @staticmethod
+    def _plugin_claim_status(
+        actor: ActorContext,
+        session_metadata: Mapping[str, object],
+        invocation_metadata: Mapping[str, object],
+        request_digest: str,
+        claimed_at: str,
+    ) -> dict[str, object]:
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "PluginInvocationStatus",
+            "metadata": {
+                "id": invocation_metadata["id"],
+                "sessionId": session_metadata["id"],
+                "tenantId": actor.tenant_id,
+                "pluginId": session_metadata["pluginId"],
+                "pluginVersion": session_metadata["pluginVersion"],
+                "updatedAt": claimed_at,
+            },
+            "spec": {
+                "requestDigest": request_digest,
+                "state": "claimed",
+                "claimedAt": claimed_at,
+                "deadline": invocation_metadata["deadline"],
+            },
+        }
+
+    @staticmethod
+    def _terminal_plugin_status(
+        current: object, result: Mapping[str, object]
+    ) -> dict[str, object]:
+        if not isinstance(current, Mapping):
+            raise PersistenceError("storage.corrupt")
+        current_metadata = current.get("metadata")
+        current_spec = current.get("spec")
+        result_metadata = result.get("metadata")
+        result_spec = result.get("spec")
+        if not all(
+            isinstance(value, Mapping)
+            for value in (current_metadata, current_spec, result_metadata, result_spec)
+        ):
+            raise PersistenceError("storage.corrupt")
+        terminal_spec = {
+            **dict(current_spec),
+            "state": result_spec["status"],
+            "completedAt": result_metadata["completedAt"],
+            "resultRef": (
+                f"plugin-result://{current_metadata['tenantId']}/sessions/"
+                f"{current_metadata['sessionId']}/invocations/{current_metadata['id']}"
+            ),
+        }
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "PluginInvocationStatus",
+            "metadata": {
+                **dict(current_metadata),
+                "updatedAt": result_metadata["completedAt"],
+            },
+            "spec": terminal_spec,
+        }

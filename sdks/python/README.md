@@ -37,6 +37,8 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 `EventDeliveryReplayCommand` and `Client.propose_event_delivery_replay` bind one exact quarantine generation into the normal investigation, independent approval, policy, audit, and one-shot execution workflow. Dry-run is the default; live replay preserves the CloudEvents ID so receivers must remain idempotent.
 
+`PluginInvocationStatus`, `PluginInvocationCancellationRequest`, and `PluginInvocationReconciliationRequest` expose durable plugin execution state without importing runner or storage internals. The client can read status, request cooperative cancellation, and submit administrator-only post-deadline reconciliation. Reconciliation records an unknown outcome and never replays plugin work.
+
 Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. Supply a Bearer credential; the authenticated server derives tenant, actor, and roles from that credential. The SDK never sends identity assertion headers.
 
 Version 0.4 adds opaque provider cursor resume fields, ingestion-freshness telemetry, backend-neutral telemetry evidence, and the stored `OtlpMetricsEvidence` artifact model. OTLP transport is intentionally not reimplemented by this client; send metrics with a standard OpenTelemetry SDK/Collector and the separately provisioned channel credential.
@@ -46,3 +48,5 @@ Version 0.5 adds investigation telemetry interpretation and assessment types. Th
 Version 0.6 adds baseline-window comparison request and report types. Ordered baseline and evaluation subranges are evaluated from one committed normalized artifact as a difference or ratio, without adding a backend query.
 
 Version 0.7 adds Kubernetes Event evidence request/result, investigation selection/assessment models, and `collect_kubernetes_event_evidence`. The default server backend returns honest no-data until a live adapter is configured.
+
+Version 0.33 adds plugin invocation status, cancellation, and reconciliation models and client methods.

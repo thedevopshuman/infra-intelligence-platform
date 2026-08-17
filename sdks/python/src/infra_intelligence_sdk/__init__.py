@@ -52,7 +52,10 @@ from .models import (
     OtlpLogsEvidence,
     OtlpMetricsEvidence,
     PluginInvocation,
+    PluginInvocationCancellationRequest,
+    PluginInvocationReconciliationRequest,
     PluginInvocationResult,
+    PluginInvocationStatus,
     PluginManifest,
     PluginSession,
     PolicyDecision,
@@ -124,7 +127,10 @@ __all__ = [
     "OtlpLogsEvidence",
     "OtlpMetricsEvidence",
     "PluginInvocation",
+    "PluginInvocationCancellationRequest",
+    "PluginInvocationReconciliationRequest",
     "PluginInvocationResult",
+    "PluginInvocationStatus",
     "PluginManifest",
     "PluginSession",
     "PolicyDecision",
@@ -144,4 +150,4 @@ __all__ = [
     "TelemetryExportHealthReport",
     "discover_console_authentication",
 ]
-__version__ = "0.32.0"
+__version__ = "0.33.0"

@@ -7,6 +7,9 @@ export type ActionId = `act_${string}`;
 export type ApprovalId = `apr_${string}`;
 export type IntegrationId = `int_${string}`;
 export type PluginSessionId = `psn_${string}`;
+export type PluginInvocationId = `pin_${string}`;
+export type PluginInvocationCancellationId = `pcn_${string}`;
+export type PluginInvocationReconciliationId = `prc_${string}`;
 export type Sha256Digest = `sha256:${string}`;
 export type ResourceLifecycle =
   | "active"
@@ -1733,7 +1736,7 @@ export interface PluginInvocation {
   apiVersion: "iip.platform/v1alpha1";
   kind: "PluginInvocation";
   metadata: {
-    id: `pin_${string}`;
+    id: PluginInvocationId;
     sessionId: PluginSessionId;
     tenantId: string;
     actorId: string;
@@ -1752,7 +1755,7 @@ export interface PluginInvocationResult {
   apiVersion: "iip.platform/v1alpha1";
   kind: "PluginInvocationResult";
   metadata: {
-    id: `pin_${string}`;
+    id: PluginInvocationId;
     sessionId: PluginSessionId;
     tenantId: string;
     pluginId: string;
@@ -1775,6 +1778,85 @@ export interface PluginInvocationResult {
         output?: never;
       }
   );
+}
+
+export interface PluginInvocationCancellation {
+  requestedBy: string;
+  requestedAt: string;
+  reasonCode: "operator-requested" | "session-superseded" | "shutdown";
+}
+
+export interface PluginInvocationStatus {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PluginInvocationStatus";
+  metadata: {
+    id: PluginInvocationId;
+    sessionId: PluginSessionId;
+    tenantId: string;
+    pluginId: string;
+    pluginVersion: string;
+    updatedAt: string;
+  };
+  spec: {
+    requestDigest: Sha256Digest;
+    claimedAt: string;
+    deadline: string;
+  } & (
+    | {
+        state: "claimed";
+        cancellation?: never;
+        completedAt?: never;
+        resultRef?: never;
+      }
+    | {
+        state: "cancellation-requested";
+        cancellation: PluginInvocationCancellation;
+        completedAt?: never;
+        resultRef?: never;
+      }
+    | {
+        state: "succeeded" | "failed";
+        cancellation?: never;
+        completedAt: string;
+        resultRef: `plugin-result://${string}`;
+      }
+    | {
+        state: "cancelled";
+        cancellation: PluginInvocationCancellation;
+        completedAt: string;
+        resultRef: `plugin-result://${string}`;
+      }
+  );
+}
+
+export interface PluginInvocationCancellationRequest {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PluginInvocationCancellationRequest";
+  metadata: {
+    id: PluginInvocationCancellationId;
+    tenantId: string;
+    actorId: string;
+    requestedAt: string;
+  };
+  spec: {
+    invocationId: PluginInvocationId;
+    reasonCode: PluginInvocationCancellation["reasonCode"];
+  };
+}
+
+export interface PluginInvocationReconciliationRequest {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PluginInvocationReconciliationRequest";
+  metadata: {
+    id: PluginInvocationReconciliationId;
+    tenantId: string;
+    actorId: string;
+    requestedAt: string;
+  };
+  spec: {
+    invocationId: PluginInvocationId;
+    reasonCode: "runner-lost" | "deadline-elapsed";
+  };
 }
 
 export interface PolicyDecisionRequest {

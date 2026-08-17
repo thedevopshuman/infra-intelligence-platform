@@ -37,6 +37,8 @@ The session request limit is enforced in the same serialized transaction across
 runner replicas and restarts. A host runtime failure is stored as a terminal
 failed result. A failure to persist that terminal result leaves the claim
 ambiguous and therefore non-replayable. [ADR 0064](../decisions/0064-durable-plugin-invocation-ownership.md)
-defines these ownership semantics. Explicit cancellation and reconciliation are
-still required before connected or side-effecting plugin capabilities can be
-enabled.
+defines these ownership semantics. The [plugin invocation lifecycle
+contract](plugin-invocation-lifecycle-contract.md) adds durable status,
+cooperative cancellation, and administrator-only post-deadline reconciliation.
+Connected or side-effecting plugin capabilities still require mediated network,
+credential, and action grants before they can be enabled.

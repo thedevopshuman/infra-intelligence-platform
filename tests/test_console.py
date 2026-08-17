@@ -88,6 +88,9 @@ class ConsoleHttpTests(unittest.TestCase):
         self.assertIn("SLO attainment", console)
         self.assertIn("Investigation reliability", console)
         self.assertIn("Evidence retention", console)
+        self.assertIn("Invocation operations", console)
+        self.assertIn("Close unknown outcome", console)
+        self.assertIn("This never replays", console)
 
         handler = object.__new__(ApiHandler)
         handler.path = "/console/app.js"
@@ -112,6 +115,10 @@ class ConsoleHttpTests(unittest.TestCase):
         self.assertIn("Event delivery", script)
         self.assertIn('actionType === "event-delivery.requeue"', script)
         self.assertIn("exact quarantine generation", script)
+        self.assertIn("/v1/plugin-invocations/${encodeURIComponent(invocationId)}/status", script)
+        self.assertIn("PluginInvocationCancellationRequest", script)
+        self.assertIn("PluginInvocationReconciliationRequest", script)
+        self.assertIn("No work was replayed", script)
 
         handler = object.__new__(ApiHandler)
         handler.path = "/console/app.css"
@@ -120,6 +127,10 @@ class ConsoleHttpTests(unittest.TestCase):
         handler.do_GET()
         self.assertIn(
             ".detail-actions[hidden] { display: none; }",
+            handler.wfile.getvalue().decode("utf-8"),
+        )
+        self.assertIn(
+            ".plugin-lifecycle-controls[hidden] { display: none; }",
             handler.wfile.getvalue().decode("utf-8"),
         )
 

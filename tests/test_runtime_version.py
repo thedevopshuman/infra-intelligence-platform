@@ -41,11 +41,11 @@ class Authenticator:
 
 def identity(**overrides: object) -> RuntimeVersionIdentity:
     values: dict[str, object] = {
-        "application_version": "0.38.0",
+        "application_version": "0.39.0",
         "contract_api_version": "iip.platform/v1alpha1",
-        "required_storage_migration": "0014_durable_plugin_invocations.sql",
+        "required_storage_migration": "0015_plugin_invocation_lifecycle.sql",
         "build_revision": REVISION,
-        "helm_chart_version": "0.40.0",
+        "helm_chart_version": "0.41.0",
         "image_digest": DIGEST,
     }
     values.update(overrides)
@@ -108,7 +108,7 @@ class RuntimeVersionHttpAndSdkTests(unittest.TestCase):
             os.environ,
             {
                 "IIP_BUILD_REVISION": REVISION,
-                "IIP_DEPLOYMENT_HELM_CHART_VERSION": "0.40.0",
+                "IIP_DEPLOYMENT_HELM_CHART_VERSION": "0.41.0",
                 "IIP_DEPLOYMENT_IMAGE_DIGEST": DIGEST,
             },
             clear=True,

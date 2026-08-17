@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from threading import RLock
 from typing import Mapping, Optional
 
+from iip.application.investigate import canonical_digest
 from iip.application.ports import (
     ActionExecutionTransition,
     ActionWorkflowRecord,
@@ -17,6 +18,7 @@ from iip.application.ports import (
     InvestigationCompletionSloState,
     InvestigationJobClaim,
     PersistenceError,
+    PluginInvocationClaim,
 )
 
 
@@ -35,6 +37,7 @@ class InMemoryOperationalStore:
         self._results: dict[tuple[str, str], dict[str, object]] = {}
         self._action_executions: dict[tuple[str, str], dict[str, object]] = {}
         self._sessions: dict[tuple[str, str], dict[str, object]] = {}
+        self._plugin_invocations: dict[tuple[str, str], dict[str, object]] = {}
         self._audit: list[tuple[str, str, dict[str, object]]] = []
         self._lock = RLock()
 
@@ -821,6 +824,276 @@ class InMemoryOperationalStore:
         with self._lock:
             value = self._sessions.get((actor.tenant_id, session_id))
             return copy.deepcopy(value) if value is not None else None
+
+    def claim_plugin_invocation(
+        self,
+        actor: ActorContext,
+        session: Mapping[str, object],
+        invocation: Mapping[str, object],
+        request_digest: str,
+        claimed_at: str,
+    ) -> PluginInvocationClaim:
+        self._assert_tenant(actor, session)
+        self._assert_tenant(actor, invocation)
+        session_metadata = session.get("metadata")
+        session_spec = session.get("spec")
+        invocation_metadata = invocation.get("metadata")
+        limits = session_spec.get("limits") if isinstance(session_spec, Mapping) else None
+        if (
+            not isinstance(session_metadata, Mapping)
+            or not isinstance(invocation_metadata, Mapping)
+            or not isinstance(limits, Mapping)
+            or invocation_metadata.get("sessionId") != session_metadata.get("id")
+            or canonical_digest(invocation) != request_digest
+            or isinstance(limits.get("maxRequests"), bool)
+            or not isinstance(limits.get("maxRequests"), int)
+        ):
+            raise PersistenceError("storage.input-invalid")
+        session_id = str(session_metadata["id"])
+        request_id = str(invocation_metadata["id"])
+        key = (actor.tenant_id, request_id)
+        with self._lock:
+            stored_session = self._sessions.get((actor.tenant_id, session_id))
+            if stored_session is None:
+                raise PersistenceError("storage.not-found")
+            if stored_session != dict(session):
+                raise PersistenceError("storage.conflict")
+            existing = self._plugin_invocations.get(key)
+            if existing is not None:
+                if (
+                    existing["sessionId"] != session_id
+                    or existing["requestDigest"] != request_digest
+                ):
+                    raise PersistenceError("storage.conflict")
+                result = existing.get("result")
+                if isinstance(result, Mapping):
+                    return PluginInvocationClaim("completed", copy.deepcopy(result))
+                status = existing.get("status")
+                status_spec = status.get("spec") if isinstance(status, Mapping) else None
+                if (
+                    isinstance(status_spec, Mapping)
+                    and status_spec.get("state") == "cancellation-requested"
+                ):
+                    return PluginInvocationClaim("cancellation-requested")
+                return PluginInvocationClaim("in-progress")
+            created = self._parse_time(str(invocation_metadata.get("createdAt")))
+            deadline = self._parse_time(str(invocation_metadata.get("deadline")))
+            expires = self._parse_time(str(session_spec.get("expiresAt")))
+            claim_time = self._parse_time(claimed_at)
+            if not created <= claim_time <= deadline <= expires:
+                raise PersistenceError("plugin.request.expired")
+            count = sum(
+                1
+                for (tenant_id, _), record in self._plugin_invocations.items()
+                if tenant_id == actor.tenant_id and record["sessionId"] == session_id
+            )
+            if count >= limits["maxRequests"]:
+                raise PersistenceError("plugin.request.limit-exceeded")
+            status = self._plugin_claim_status(
+                actor, session_metadata, invocation_metadata, request_digest, claimed_at
+            )
+            self._plugin_invocations[key] = {
+                "sessionId": session_id,
+                "requestDigest": request_digest,
+                "invocation": copy.deepcopy(dict(invocation)),
+                "status": status,
+                "result": None,
+            }
+            return PluginInvocationClaim("claimed")
+
+    def commit_plugin_invocation_result(
+        self,
+        actor: ActorContext,
+        request_digest: str,
+        result: Mapping[str, object],
+    ) -> None:
+        self._assert_tenant(actor, result)
+        metadata = result.get("metadata")
+        spec = result.get("spec")
+        if not isinstance(metadata, Mapping) or not isinstance(spec, Mapping):
+            raise PersistenceError("storage.input-invalid")
+        key = (actor.tenant_id, str(metadata.get("id")))
+        with self._lock:
+            record = self._plugin_invocations.get(key)
+            if record is None:
+                raise PersistenceError("storage.not-found")
+            if (
+                record["requestDigest"] != request_digest
+                or record["sessionId"] != metadata.get("sessionId")
+            ):
+                raise PersistenceError("storage.conflict")
+            current = record.get("result")
+            value = copy.deepcopy(dict(result))
+            if isinstance(current, Mapping):
+                if dict(current) != value:
+                    raise PersistenceError("storage.conflict")
+                return
+            status = record.get("status")
+            status_spec = status.get("spec") if isinstance(status, Mapping) else None
+            if (
+                isinstance(status_spec, Mapping)
+                and status_spec.get("state") == "cancellation-requested"
+                and spec.get("status") != "cancelled"
+            ):
+                raise PersistenceError("plugin.request.cancellation-pending")
+            record["result"] = value
+            record["status"] = self._terminal_plugin_status(status, value)
+
+    def get_plugin_invocation_status(
+        self, actor: ActorContext, request_id: str
+    ) -> Optional[Mapping[str, object]]:
+        with self._lock:
+            record = self._plugin_invocations.get((actor.tenant_id, request_id))
+            status = record.get("status") if record is not None else None
+            return copy.deepcopy(status) if isinstance(status, Mapping) else None
+
+    def request_plugin_invocation_cancellation(
+        self,
+        actor: ActorContext,
+        request_id: str,
+        status: Mapping[str, object],
+        audit_document: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self._assert_tenant(actor, status)
+        self._assert_tenant(actor, audit_document)
+        key = (actor.tenant_id, request_id)
+        with self._lock:
+            record = self._plugin_invocations.get(key)
+            if record is None:
+                raise PersistenceError("storage.not-found")
+            current = record.get("status")
+            current_spec = current.get("spec") if isinstance(current, Mapping) else None
+            if not isinstance(current_spec, Mapping):
+                raise PersistenceError("storage.corrupt")
+            if current_spec.get("state") != "claimed":
+                return copy.deepcopy(current)
+            value = copy.deepcopy(dict(status))
+            record["status"] = value
+            self._audit.append(
+                (actor.tenant_id, "plugin-invocation-cancellation", copy.deepcopy(dict(audit_document)))
+            )
+            return copy.deepcopy(value)
+
+    def plugin_invocation_cancellation_requested(
+        self, actor: ActorContext, request_id: str, request_digest: str
+    ) -> bool:
+        with self._lock:
+            record = self._plugin_invocations.get((actor.tenant_id, request_id))
+            if record is None or record.get("requestDigest") != request_digest:
+                raise PersistenceError("storage.not-found")
+            status = record.get("status")
+            spec = status.get("spec") if isinstance(status, Mapping) else None
+            if not isinstance(spec, Mapping):
+                raise PersistenceError("storage.corrupt")
+            return spec.get("state") == "cancellation-requested"
+
+    def reconcile_plugin_invocation(
+        self,
+        actor: ActorContext,
+        request_id: str,
+        observed_at: str,
+        result: Mapping[str, object],
+        status: Mapping[str, object],
+        audit_document: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self._assert_tenant(actor, result)
+        self._assert_tenant(actor, status)
+        self._assert_tenant(actor, audit_document)
+        key = (actor.tenant_id, request_id)
+        with self._lock:
+            record = self._plugin_invocations.get(key)
+            if record is None:
+                raise PersistenceError("storage.not-found")
+            current = record.get("status")
+            current_spec = current.get("spec") if isinstance(current, Mapping) else None
+            if not isinstance(current_spec, Mapping):
+                raise PersistenceError("storage.corrupt")
+            if current_spec.get("state") in {"succeeded", "failed", "cancelled"}:
+                return copy.deepcopy(current)
+            result_spec = result.get("spec")
+            status_spec = status.get("spec")
+            expected_state = (
+                "cancelled"
+                if current_spec.get("state") == "cancellation-requested"
+                else "failed"
+            )
+            if (
+                not isinstance(result_spec, Mapping)
+                or not isinstance(status_spec, Mapping)
+                or result_spec.get("status") != expected_state
+                or status_spec.get("state") != expected_state
+            ):
+                raise PersistenceError("plugin.request.cancellation-pending")
+            if self._parse_time(observed_at) < self._parse_time(str(current_spec["deadline"])):
+                raise PersistenceError("plugin.reconciliation.deadline-live")
+            record["result"] = copy.deepcopy(dict(result))
+            record["status"] = copy.deepcopy(dict(status))
+            self._audit.append(
+                (actor.tenant_id, "plugin-invocation-reconciliation", copy.deepcopy(dict(audit_document)))
+            )
+            return copy.deepcopy(record["status"])
+
+    @staticmethod
+    def _plugin_claim_status(
+        actor: ActorContext,
+        session_metadata: Mapping[str, object],
+        invocation_metadata: Mapping[str, object],
+        request_digest: str,
+        claimed_at: str,
+    ) -> dict[str, object]:
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "PluginInvocationStatus",
+            "metadata": {
+                "id": invocation_metadata["id"],
+                "sessionId": session_metadata["id"],
+                "tenantId": actor.tenant_id,
+                "pluginId": session_metadata["pluginId"],
+                "pluginVersion": session_metadata["pluginVersion"],
+                "updatedAt": claimed_at,
+            },
+            "spec": {
+                "requestDigest": request_digest,
+                "state": "claimed",
+                "claimedAt": claimed_at,
+                "deadline": invocation_metadata["deadline"],
+            },
+        }
+
+    @staticmethod
+    def _terminal_plugin_status(
+        current: object, result: Mapping[str, object]
+    ) -> dict[str, object]:
+        if not isinstance(current, Mapping):
+            raise PersistenceError("storage.corrupt")
+        current_metadata = current.get("metadata")
+        current_spec = current.get("spec")
+        result_metadata = result.get("metadata")
+        result_spec = result.get("spec")
+        if not all(
+            isinstance(value, Mapping)
+            for value in (current_metadata, current_spec, result_metadata, result_spec)
+        ):
+            raise PersistenceError("storage.corrupt")
+        status = str(result_spec["status"])
+        terminal_spec = {
+            **dict(current_spec),
+            "state": status,
+            "completedAt": result_metadata["completedAt"],
+            "resultRef": (
+                f"plugin-result://{current_metadata['tenantId']}/sessions/"
+                f"{current_metadata['sessionId']}/invocations/{current_metadata['id']}"
+            ),
+        }
+        return {
+            "apiVersion": "iip.platform/v1alpha1",
+            "kind": "PluginInvocationStatus",
+            "metadata": {
+                **dict(current_metadata),
+                "updatedAt": result_metadata["completedAt"],
+            },
+            "spec": terminal_spec,
+        }
 
     def append_audit(
         self,

@@ -54,6 +54,7 @@ SCHEMA_MIGRATIONS = (
     "0012_investigation_job_slo_window.sql",
     "0013_evidence_artifact_retention.sql",
     "0014_durable_plugin_invocations.sql",
+    "0015_plugin_invocation_lifecycle.sql",
 )
 
 

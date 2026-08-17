@@ -100,7 +100,9 @@ serializes the session request limit across replicas, retains host-created
 terminal results, serves exact completed retries without execution, and leaves
 crash-ambiguous claims closed for explicit reconciliation. The API pod still has
 no container-runtime socket, and connected or side-effecting plugin capabilities
-remain denied until mediated credentials/networking and cancellation exist.
+remain denied until mediated credentials/networking exist. Durable host-side
+plugin cancellation and administrator-only post-deadline reconciliation are
+defined by [ADR 0065](../decisions/0065-plugin-invocation-cancellation-and-reconciliation.md).
 [ADR 0064](../decisions/0064-durable-plugin-invocation-ownership.md) records the
 ownership and recovery boundary.
 

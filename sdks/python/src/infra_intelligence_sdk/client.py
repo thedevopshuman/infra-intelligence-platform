@@ -33,6 +33,9 @@ from .models import (
     KubernetesEventEvidenceRequest,
     LogEvidenceRequest,
     PluginSession,
+    PluginInvocationCancellationRequest,
+    PluginInvocationReconciliationRequest,
+    PluginInvocationStatus,
     ResourceCollectionRequest,
     ResourceCollectionResult,
     ResourceChangeEvidenceRequest,
@@ -430,6 +433,49 @@ class Client:
 
     def open_plugin_session(self, command: Mapping[str, Any]) -> PluginSession:
         return PluginSession.from_dict(self._post("/v1/plugin-sessions", command))
+
+    def get_plugin_invocation_status(
+        self, invocation_id: str
+    ) -> PluginInvocationStatus:
+        return PluginInvocationStatus.from_dict(
+            self._get(
+                f"/v1/plugin-invocations/{quote(invocation_id, safe='')}/status"
+            )
+        )
+
+    def cancel_plugin_invocation(
+        self, request: PluginInvocationCancellationRequest
+    ) -> PluginInvocationStatus:
+        payload = request.to_dict()
+        spec = payload.get("spec")
+        if not isinstance(spec, Mapping) or not isinstance(
+            spec.get("invocationId"), str
+        ):
+            raise ValueError("plugin invocation cancellation request is invalid")
+        invocation_id = str(spec["invocationId"])
+        return PluginInvocationStatus.from_dict(
+            self._post(
+                f"/v1/plugin-invocations/{quote(invocation_id, safe='')}/cancel",
+                payload,
+            )
+        )
+
+    def reconcile_plugin_invocation(
+        self, request: PluginInvocationReconciliationRequest
+    ) -> PluginInvocationStatus:
+        payload = request.to_dict()
+        spec = payload.get("spec")
+        if not isinstance(spec, Mapping) or not isinstance(
+            spec.get("invocationId"), str
+        ):
+            raise ValueError("plugin invocation reconciliation request is invalid")
+        invocation_id = str(spec["invocationId"])
+        return PluginInvocationStatus.from_dict(
+            self._post(
+                f"/v1/plugin-invocations/{quote(invocation_id, safe='')}/reconcile",
+                payload,
+            )
+        )
 
     def _get(self, path: str) -> Dict[str, Any]:
         return self._send(

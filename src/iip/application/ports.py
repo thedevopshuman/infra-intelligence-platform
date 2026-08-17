@@ -1174,6 +1174,36 @@ class PluginInvocationLedger(Protocol):
     ) -> None:
         """Persist one terminal host-created result for its exact request digest."""
 
+    def get_plugin_invocation_status(
+        self, actor: ActorContext, request_id: str
+    ) -> Optional[Mapping[str, object]]:
+        """Resolve one exact-tenant public invocation lifecycle document."""
+
+    def request_plugin_invocation_cancellation(
+        self,
+        actor: ActorContext,
+        request_id: str,
+        status: Mapping[str, object],
+        audit_document: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        """Atomically record first cancellation intent and its audit record."""
+
+    def plugin_invocation_cancellation_requested(
+        self, actor: ActorContext, request_id: str, request_digest: str
+    ) -> bool:
+        """Poll exact claim cancellation without exposing request content."""
+
+    def reconcile_plugin_invocation(
+        self,
+        actor: ActorContext,
+        request_id: str,
+        observed_at: str,
+        result: Mapping[str, object],
+        status: Mapping[str, object],
+        audit_document: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        """Close one post-deadline ambiguous claim without replaying it."""
+
 
 class AuditSink(Protocol):
     def append_audit(

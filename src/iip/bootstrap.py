@@ -107,6 +107,7 @@ from iip.application.observe_query_availability import (
     QueryAvailabilityService,
 )
 from iip.application.plugin_sessions import PluginSessionService
+from iip.application.plugin_invocations import PluginInvocationLifecycleService
 from iip.application.query_actions import ActionWorkflowQueryService
 from iip.application.query_event_delivery_health import EventDeliveryHealthService
 from iip.application.query_event_delivery_slo import (
@@ -176,6 +177,7 @@ class Runtime:
     actions: GovernedActionService
     action_queries: ActionWorkflowQueryService
     plugin_sessions: PluginSessionService
+    plugin_invocations: PluginInvocationLifecycleService
     operational_store: Any
     investigation_jobs: Any
     evidence_store: Any
@@ -447,6 +449,9 @@ def _compose_runtime(
         ),
         action_queries=ActionWorkflowQueryService(operational, policy, clock),
         plugin_sessions=PluginSessionService(policy, operational, clock),
+        plugin_invocations=PluginInvocationLifecycleService(
+            operational, policy, clock
+        ),
         operational_store=operational,
         investigation_jobs=operational,
         evidence_store=evidence_store,

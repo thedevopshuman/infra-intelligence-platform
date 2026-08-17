@@ -33,6 +33,7 @@ QUERY_OPERATIONS = frozenset(
         "action-get",
         "action-workflow-get",
         "plugin-session-get",
+        "plugin-invocation-status",
     }
 )
 _MAX_DURATION_SECONDS = 86_400.0

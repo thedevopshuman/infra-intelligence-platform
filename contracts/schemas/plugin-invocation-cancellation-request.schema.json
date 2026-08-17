@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:plugin-invocation-cancellation-request:v1alpha1",
+  "title": "Infrastructure Intelligence Plugin Invocation Cancellation Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "PluginInvocationCancellationRequest"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "actorId", "requestedAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^pcn_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"},
+        "actorId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "requestedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["invocationId", "reasonCode"],
+      "properties": {
+        "invocationId": {"type": "string", "pattern": "^pin_[a-f0-9]{32}$"},
+        "reasonCode": {"type": "string", "enum": ["operator-requested", "session-superseded", "shutdown"]}
+      }
+    }
+  }
+}

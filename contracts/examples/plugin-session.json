@@ -15,7 +15,7 @@
     "capabilityTokenRef": "capability://local/sessions/psn_77777777777777777777777777777777",
     "capabilityTokenDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "expiresAt": "2026-08-14T12:49:00Z",
-    "cancellation": {"supported": true, "endpoint": "stdio://control/cancel"},
+    "cancellation": {"supported": true, "endpoint": "/v1/plugin-invocations/{invocationId}/cancel"},
     "limits": {"maxRequests": 1, "maxWallTimeSeconds": 60, "maxOutputBytes": 16777216}
   },
   "status": "ready"

@@ -99,13 +99,22 @@ class RecordingTransport:
         }
         self.calls: list[dict[str, object]] = []
 
-    def run(self, image_reference, payload, *, timeout_seconds, max_output_bytes):
+    def run(
+        self,
+        image_reference,
+        payload,
+        *,
+        timeout_seconds,
+        max_output_bytes,
+        cancellation_requested=None,
+    ):
         self.calls.append(
             {
                 "image": image_reference,
                 "invocation": json.loads(payload),
                 "timeout": timeout_seconds,
                 "maximum": max_output_bytes,
+                "cancellationConfigured": cancellation_requested is not None,
             }
         )
         if isinstance(self.output, bytes):
@@ -114,18 +123,35 @@ class RecordingTransport:
 
 
 class FailingTransport(RecordingTransport):
-    def run(self, image_reference, payload, *, timeout_seconds, max_output_bytes):
+    def run(
+        self,
+        image_reference,
+        payload,
+        *,
+        timeout_seconds,
+        max_output_bytes,
+        cancellation_requested=None,
+    ):
         super().run(
             image_reference,
             payload,
             timeout_seconds=timeout_seconds,
             max_output_bytes=max_output_bytes,
+            cancellation_requested=cancellation_requested,
         )
         raise PluginRunnerError("plugin.runtime.deadline-exceeded")
 
 
 class LeakyTransport(RecordingTransport):
-    def run(self, image_reference, payload, *, timeout_seconds, max_output_bytes):
+    def run(
+        self,
+        image_reference,
+        payload,
+        *,
+        timeout_seconds,
+        max_output_bytes,
+        cancellation_requested=None,
+    ):
         raise PluginRunnerError("provider secret and stack detail")
 
 
@@ -157,6 +183,7 @@ class SignedDockerPluginRunnerTests(unittest.TestCase):
             transport.calls[0]["image"].endswith(manifest["spec"]["artifact"]["digest"])
         )
         self.assertNotIn(TOKEN, json.dumps(transport.calls))
+        self.assertTrue(transport.calls[0]["cancellationConfigured"])
 
     def test_signature_tampering_and_untrusted_publisher_fail_before_execution(self) -> None:
         manifest, trust = signed_fixture()
@@ -295,6 +322,69 @@ class SignedDockerPluginRunnerTests(unittest.TestCase):
         )
         self.assertEqual(leaky["spec"]["error"]["code"], "plugin.runtime.failed")
         self.assertNotIn("secret", json.dumps(leaky))
+
+    def test_durable_cancellation_stops_execution_and_replays_cancelled_result(self) -> None:
+        manifest, trust = signed_fixture()
+        session, invocation = scoped_documents(manifest)
+        ledger = InMemoryPluginExecutionLedger()
+        actor = self.actor
+
+        class CancellingTransport(RecordingTransport):
+            def run(
+                inner_self,
+                image_reference,
+                payload,
+                *,
+                timeout_seconds,
+                max_output_bytes,
+                cancellation_requested=None,
+            ):
+                current = ledger.get_plugin_invocation_status(
+                    actor, invocation["metadata"]["id"]
+                )
+                assert current is not None
+                updated = copy.deepcopy(current)
+                updated["metadata"]["updatedAt"] = "2026-08-14T12:44:41Z"
+                updated["spec"]["state"] = "cancellation-requested"
+                updated["spec"]["cancellation"] = {
+                    "requestedBy": actor.actor_id,
+                    "requestedAt": "2026-08-14T12:44:41Z",
+                    "reasonCode": "operator-requested",
+                }
+                ledger.request_plugin_invocation_cancellation(
+                    actor,
+                    invocation["metadata"]["id"],
+                    updated,
+                    {
+                        "metadata": {"tenantId": actor.tenant_id},
+                    },
+                )
+                if cancellation_requested is not None and cancellation_requested():
+                    raise PluginRunnerError("plugin.runtime.cancelled")
+                return super().run(
+                    image_reference,
+                    payload,
+                    timeout_seconds=timeout_seconds,
+                    max_output_bytes=max_output_bytes,
+                    cancellation_requested=cancellation_requested,
+                )
+
+        transport = CancellingTransport()
+        runner = self.runner(trust, transport, ledger)
+        cancelled = runner.run(actor, manifest, session, invocation, TOKEN)
+        replayed = runner.run(actor, manifest, session, invocation, TOKEN)
+
+        self.assertEqual(cancelled, replayed)
+        self.assertEqual(cancelled["spec"]["status"], "cancelled")
+        self.assertEqual(
+            cancelled["spec"]["error"]["code"], "plugin.runtime.cancelled"
+        )
+        self.assertEqual(
+            ledger.get_plugin_invocation_status(
+                actor, invocation["metadata"]["id"]
+            )["spec"]["state"],
+            "cancelled",
+        )
 
     def test_trust_configuration_is_closed_and_key_ids_are_unique(self) -> None:
         _, trust = signed_fixture()

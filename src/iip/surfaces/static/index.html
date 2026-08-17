@@ -35,6 +35,9 @@
           <button class="nav-item" type="button" data-view="evidence">
             <span aria-hidden="true">▣</span> Evidence
           </button>
+          <button class="nav-item" type="button" data-view="plugins">
+            <span aria-hidden="true">⬡</span> Plugins
+          </button>
           <button class="nav-item" type="button" data-view="actions">
             <span aria-hidden="true">↯</span> Actions
           </button>
@@ -235,6 +238,35 @@
             <form id="evidence-form" class="inline-form"><label><span class="sr-only">Evidence ID</span><input id="evidence-id" required pattern="evd_[a-f0-9]{32}" placeholder="evd_…"></label><button class="button primary" type="submit">Retrieve</button></form>
             <div id="evidence-result" class="empty-state"><div class="empty-icon">▣</div><p>Enter an evidence ID cited by an investigation.</p></div>
           </article>
+        </section>
+
+        <section class="view" id="view-plugins" data-title="Plugins" data-eyebrow="Isolated invocation lifecycle" hidden>
+          <div class="section-intro"><div><h2>Invocation operations</h2><p>Inspect one durable invocation in your tenant, request cooperative cancellation, or close an unknown outcome after its deadline.</p></div></div>
+          <div class="workbench">
+            <form class="panel form-panel" id="plugin-invocation-form">
+              <span class="kicker">Exact-tenant lookup</span>
+              <h2>Find an invocation</h2>
+              <p>The control plane returns host-authored lifecycle facts. Plugins never receive your credential or direct control-plane access.</p>
+              <label>Invocation ID<input id="plugin-invocation-id" required pattern="pin_[a-f0-9]{32}" placeholder="pin_…" autocomplete="off"></label>
+              <button class="button primary wide" type="submit">Retrieve durable status</button>
+            </form>
+            <article class="panel result-panel">
+              <div class="panel-heading"><div><span class="kicker">Host ledger</span><h2>Invocation status</h2></div><span class="status-chip neutral" id="plugin-invocation-state">No selection</span></div>
+              <div id="plugin-invocation-result" class="empty-state tall"><div class="empty-icon">⬡</div><h3>Choose an invocation</h3><p>Use the invocation ID returned by a plugin session request.</p></div>
+              <div class="plugin-lifecycle-controls" id="plugin-lifecycle-controls" hidden>
+                <div class="plugin-operation" id="plugin-cancellation-operation">
+                  <label>Cancellation reason<select id="plugin-cancellation-reason"><option value="operator-requested">Operator requested</option><option value="session-superseded">Session superseded</option><option value="shutdown">Host shutdown</option></select></label>
+                  <button class="button subtle danger-outline" id="plugin-cancel" type="button">Request cancellation</button>
+                  <small>Cancellation records intent. The isolated runner must stop and commit a terminal cancelled result.</small>
+                </div>
+                <div class="plugin-operation" id="plugin-reconciliation-operation" hidden>
+                  <label>Reconciliation reason<select id="plugin-reconciliation-reason"><option value="runner-lost">Runner lost</option><option value="deadline-elapsed">Deadline elapsed</option></select></label>
+                  <button class="button primary" id="plugin-reconcile" type="button">Close unknown outcome</button>
+                  <small id="plugin-reconciliation-help">Platform administrators can reconcile after the original deadline. This never replays the invocation.</small>
+                </div>
+              </div>
+            </article>
+          </div>
         </section>
 
         <section class="view" id="view-actions" data-title="Actions" data-eyebrow="Governed operations" hidden>

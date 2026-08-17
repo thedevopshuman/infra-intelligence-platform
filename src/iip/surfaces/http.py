@@ -97,6 +97,15 @@ from iip.application.plugin_sessions import (
     OpenPluginSessionCommand,
     PluginHandshakeError,
 )
+from iip.application.plugin_invocations import (
+    CancelPluginInvocationCommand,
+    GetPluginInvocationStatusCommand,
+    PluginInvocationAuthorizationError,
+    PluginInvocationConflictError,
+    PluginInvocationInputError,
+    PluginInvocationNotFoundError,
+    ReconcilePluginInvocationCommand,
+)
 from iip.application.ports import (
     ActorContext,
     AuthenticationError,
@@ -157,7 +166,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.38.0"
+    server_version = "IIPReference/0.39.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -371,6 +380,32 @@ class ApiHandler(BaseHTTPRequestHandler):
                 ),
                 "plugin.session.not_found",
             )
+            return
+        if (
+            len(segments) == 4
+            and segments[:2] == ["v1", "plugin-invocations"]
+            and segments[3] == "status"
+        ):
+            try:
+                if parsed.query:
+                    raise PluginInvocationInputError(
+                        "plugin.lifecycle.request.invalid"
+                    )
+                document = self.runtime.plugin_invocations.get(
+                    GetPluginInvocationStatusCommand(actor, segments[2])
+                )
+                self._json(HTTPStatus.OK, dict(document))
+            except PluginInvocationNotFoundError as exc:
+                self._json(HTTPStatus.NOT_FOUND, {"error": {"code": str(exc)}})
+            except PluginInvocationAuthorizationError as exc:
+                self._json(HTTPStatus.FORBIDDEN, {"error": {"code": str(exc)}})
+            except PluginInvocationInputError as exc:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": str(exc)}})
+            except PersistenceError:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"error": {"code": "storage.unavailable"}},
+                )
             return
         self._json(HTTPStatus.NOT_FOUND, {"error": {"code": "route.not_found"}})
 
@@ -622,6 +657,11 @@ class ApiHandler(BaseHTTPRequestHandler):
                 and segments[:2] == ["v1", "investigation-jobs"]
                 and segments[3] == "cancel"
             )
+            or (
+                len(segments) == 4
+                and segments[:2] == ["v1", "plugin-invocations"]
+                and segments[3] in ("cancel", "reconcile")
+            )
         )
         if not known:
             self._json(HTTPStatus.NOT_FOUND, {"error": {"code": "route.not_found"}})
@@ -705,7 +745,11 @@ class ApiHandler(BaseHTTPRequestHandler):
                     CancelInvestigationJobCommand(actor, payload)
                 )
                 status = HTTPStatus.ACCEPTED
-            elif len(segments) == 4 and segments[3] == "cancel":
+            elif (
+                len(segments) == 4
+                and segments[:2] == ["v1", "investigations"]
+                and segments[3] == "cancel"
+            ):
                 cancellation_spec = payload.get("spec")
                 if (
                     not isinstance(cancellation_spec, Mapping)
@@ -747,6 +791,29 @@ class ApiHandler(BaseHTTPRequestHandler):
                     ExecuteActionCommand(actor=actor, proposal_id=segments[2])
                 )
                 status = HTTPStatus.OK
+            elif (
+                len(segments) == 4
+                and segments[:2] == ["v1", "plugin-invocations"]
+                and segments[3] in ("cancel", "reconcile")
+            ):
+                lifecycle_spec = payload.get("spec")
+                if (
+                    not isinstance(lifecycle_spec, Mapping)
+                    or lifecycle_spec.get("invocationId") != segments[2]
+                ):
+                    raise PluginInvocationInputError(
+                        "plugin.lifecycle.request.invalid"
+                    )
+                if segments[3] == "cancel":
+                    document = self.runtime.plugin_invocations.cancel(
+                        CancelPluginInvocationCommand(actor, payload)
+                    )
+                    status = HTTPStatus.ACCEPTED
+                else:
+                    document = self.runtime.plugin_invocations.reconcile(
+                        ReconcilePluginInvocationCommand(actor, payload)
+                    )
+                    status = HTTPStatus.OK
             else:
                 limits = payload.get("limits", {})
                 document = self.runtime.plugin_sessions.open(
@@ -876,6 +943,14 @@ class ApiHandler(BaseHTTPRequestHandler):
             code = str(exc)
             status = HTTPStatus.FORBIDDEN if code.endswith("policy-denied") else HTTPStatus.BAD_REQUEST
             self._json(status, {"error": {"code": code}})
+        except PluginInvocationInputError as exc:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": str(exc)}})
+        except PluginInvocationAuthorizationError as exc:
+            self._json(HTTPStatus.FORBIDDEN, {"error": {"code": str(exc)}})
+        except PluginInvocationNotFoundError as exc:
+            self._json(HTTPStatus.NOT_FOUND, {"error": {"code": str(exc)}})
+        except PluginInvocationConflictError as exc:
+            self._json(HTTPStatus.CONFLICT, {"error": {"code": str(exc)}})
         except PersistenceError:
             self._json(
                 HTTPStatus.SERVICE_UNAVAILABLE,
@@ -1412,6 +1487,12 @@ class ApiHandler(BaseHTTPRequestHandler):
             return "action-workflow-get"
         if len(segments) == 3 and segments[:2] == ["v1", "plugin-sessions"]:
             return "plugin-session-get"
+        if (
+            len(segments) == 4
+            and segments[:2] == ["v1", "plugin-invocations"]
+            and segments[3] == "status"
+        ):
+            return "plugin-invocation-status"
         return None
 
     def _finish_query_availability(

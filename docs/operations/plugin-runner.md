@@ -35,5 +35,17 @@ means a prior attempt may have produced impact and must not be automatically
 retried. Restarting or deleting runner processes is not a recovery action.
 
 The durable ledger does not by itself authorize connected or side-effecting
-plugins. Network, secrets, and actions remain denied until mediated grants,
-cancellation propagation, and an operator-owned reconciliation policy exist.
+plugins. Network, secrets, and actions remain denied until mediated grants exist.
+
+Operators can inspect `GET /v1/plugin-invocations/{id}/status` and request
+cooperative stop with `POST /v1/plugin-invocations/{id}/cancel`. The accepted
+response means intent was recorded; wait for terminal `cancelled` state before
+treating the container as stopped. A runner polls the durable intent at most four
+times per second and kills the container without disclosing a control-plane
+credential to it.
+
+If a runner disappears and the claim remains non-terminal after its immutable
+deadline, a policy-approved `platform-admin` can call
+`POST /v1/plugin-invocations/{id}/reconcile`. This stores
+`plugin.execution.outcome-unknown` and an audit record without replay. Do not use
+database updates, pod deletion, or runner restart to bypass this workflow.

@@ -44,6 +44,11 @@ from iip.application.ingest_resource import (
     StaleObservationError,
 )
 from iip.application.investigate import canonical_digest
+from iip.application.plugin_invocations import (
+    CancelPluginInvocationCommand,
+    PluginInvocationLifecycleService,
+    ReconcilePluginInvocationCommand,
+)
 from iip.application.ports import ActorContext, PersistenceError, SourceCheckpoint
 from iip.application.investigation_dispatch import InvestigationDispatchService
 from iip.application.rebuild_projections import (
@@ -851,6 +856,120 @@ class PostgresOperationalStoreTests(unittest.TestCase):
                 canonical_digest(cross_tenant),
                 "2026-08-14T12:44:34Z",
             )
+
+    def test_plugin_cancellation_is_durable_audited_and_wins_normal_output(self) -> None:
+        actor = ActorContext("plugin-host", "local", ("developer",))
+        session = json.loads(
+            (ROOT / "contracts/examples/plugin-session.json").read_text()
+        )
+        invocation = json.loads(
+            (ROOT / "contracts/examples/plugin-invocation.json").read_text()
+        )
+        digest = canonical_digest(invocation)
+        self.operations.commit_plugin_session(actor, session)
+        self.operations.claim_plugin_invocation(
+            actor, session, invocation, digest, "2026-08-14T12:44:31Z"
+        )
+
+        class Clock:
+            def now(self) -> str:
+                return "2026-08-14T12:44:45Z"
+
+        service = PluginInvocationLifecycleService(
+            PostgresOperationalStore(DATABASE_URL), AllowTenantPolicy(), Clock()
+        )
+        cancellation = json.loads(
+            (
+                ROOT
+                / "contracts/examples/plugin-invocation-cancellation-request.json"
+            ).read_text()
+        )
+        pending = service.cancel(
+            CancelPluginInvocationCommand(actor, cancellation)
+        )
+        reconnected = PostgresOperationalStore(DATABASE_URL)
+        self.assertEqual(pending["spec"]["state"], "cancellation-requested")
+        self.assertTrue(
+            reconnected.plugin_invocation_cancellation_requested(
+                actor, invocation["metadata"]["id"], digest
+            )
+        )
+
+        succeeded = json.loads(
+            (ROOT / "contracts/examples/plugin-invocation-result.json").read_text()
+        )
+        with self.assertRaisesRegex(
+            PersistenceError, "plugin.request.cancellation-pending"
+        ):
+            reconnected.commit_plugin_invocation_result(actor, digest, succeeded)
+
+        cancelled = json.loads(
+            (
+                ROOT / "contracts/examples/plugin-invocation-result-failed.json"
+            ).read_text()
+        )
+        cancelled["metadata"] = copy.deepcopy(succeeded["metadata"])
+        cancelled["spec"]["status"] = "cancelled"
+        cancelled["spec"]["error"]["code"] = "plugin.runtime.cancelled"
+        reconnected.commit_plugin_invocation_result(actor, digest, cancelled)
+        terminal = self.operations.get_plugin_invocation_status(
+            actor, invocation["metadata"]["id"]
+        )
+        self.assertEqual(terminal["spec"]["state"], "cancelled")
+        with psycopg.connect(DATABASE_URL) as connection:
+            count = connection.execute(
+                "SELECT count(*) AS count FROM iip.audit_records WHERE tenant_id = %s AND category = %s",
+                (actor.tenant_id, "plugin-invocation-cancellation"),
+            ).fetchone()[0]
+        self.assertEqual(count, 1)
+
+    def test_plugin_reconciliation_closes_post_deadline_claim_without_replay(self) -> None:
+        runner = ActorContext("plugin-host", "local", ("developer",))
+        admin = ActorContext("platform-operator", "local", ("platform-admin",))
+        session = json.loads(
+            (ROOT / "contracts/examples/plugin-session.json").read_text()
+        )
+        invocation = json.loads(
+            (ROOT / "contracts/examples/plugin-invocation.json").read_text()
+        )
+        digest = canonical_digest(invocation)
+        self.operations.commit_plugin_session(runner, session)
+        self.operations.claim_plugin_invocation(
+            runner, session, invocation, digest, "2026-08-14T12:44:31Z"
+        )
+
+        class Clock:
+            def now(self) -> str:
+                return "2026-08-14T12:46:00Z"
+
+        service = PluginInvocationLifecycleService(
+            PostgresOperationalStore(DATABASE_URL), AllowTenantPolicy(), Clock()
+        )
+        request = json.loads(
+            (
+                ROOT
+                / "contracts/examples/plugin-invocation-reconciliation-request.json"
+            ).read_text()
+        )
+        status = service.reconcile(
+            ReconcilePluginInvocationCommand(admin, request)
+        )
+        replayed = self.operations.claim_plugin_invocation(
+            runner, session, invocation, digest, "2026-08-14T13:00:00Z"
+        )
+
+        self.assertEqual(status["spec"]["state"], "failed")
+        self.assertEqual(replayed.state, "completed")
+        self.assertEqual(
+            replayed.result["spec"]["error"]["code"],
+            "plugin.execution.outcome-unknown",
+        )
+        with psycopg.connect(DATABASE_URL) as connection:
+            count = connection.execute(
+                "SELECT count(*) AS count FROM iip.audit_records WHERE tenant_id = %s AND category = %s",
+                (runner.tenant_id, "plugin-invocation-reconciliation"),
+            ).fetchone()[0]
+        self.assertEqual(count, 1)
 
     def test_evidence_metadata_and_artifact_are_durable_and_tenant_scoped(self) -> None:
         actor = ActorContext("collector", "local")

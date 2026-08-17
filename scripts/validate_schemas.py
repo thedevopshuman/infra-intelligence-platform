@@ -121,6 +121,13 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "plugin-invocation-result.json",
         "plugin-invocation-result-failed.json",
     ),
+    "plugin-invocation-status.schema.json": ("plugin-invocation-status.json",),
+    "plugin-invocation-cancellation-request.schema.json": (
+        "plugin-invocation-cancellation-request.json",
+    ),
+    "plugin-invocation-reconciliation-request.schema.json": (
+        "plugin-invocation-reconciliation-request.json",
+    ),
     "plugin-session.schema.json": ("plugin-session.json",),
     "policy-decision-request.schema.json": ("policy-decision-request.json",),
     "policy-decision.schema.json": ("policy-decision.json",),

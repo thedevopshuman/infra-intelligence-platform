@@ -289,6 +289,12 @@ td small { display: block; max-width: 310px; margin-top: 4px; overflow: hidden; 
 .json-card dl { display: grid; grid-template-columns: 150px 1fr; gap: 10px; margin: 0; }
 .json-card dt { color: var(--muted-2); font-size: 9px; }
 .json-card dd { margin: 0; overflow-wrap: anywhere; color: #d8e0ea; font-size: 10px; }
+.plugin-lifecycle-controls { display: grid; gap: 12px; padding: 0 22px 22px; }
+.plugin-lifecycle-controls[hidden] { display: none; }
+.plugin-operation { display: grid; grid-template-columns: minmax(180px, 1fr) auto; gap: 9px 12px; align-items: end; padding: 14px; background: #0b111a; border: 1px solid var(--line-soft); border-radius: 10px; }
+.plugin-operation[hidden] { display: none; }
+.plugin-operation label { display: grid; gap: 7px; color: #bac4d2; font-size: 10px; font-weight: 650; }
+.plugin-operation small { grid-column: 1 / -1; color: var(--muted); font-size: 9px; line-height: 1.5; }
 .replay-binding { display: grid; gap: 5px; margin: 0 0 16px; padding: 13px; background: #0b111a; border: 1px solid var(--line-soft); border-radius: 10px; }
 .replay-binding span, .replay-binding small { color: var(--muted-2); font-size: 9px; }
 .replay-binding strong { overflow-wrap: anywhere; color: #d8e0ea; font-size: 10px; }
@@ -381,6 +387,8 @@ code { color: var(--cyan); font-family: ui-monospace, SFMono-Regular, Menlo, mon
   .form-grid { grid-template-columns: 1fr; gap: 0; }
   .report-meta { grid-template-columns: 1fr; }
   .inline-form { grid-template-columns: 1fr; }
+  .plugin-operation { grid-template-columns: 1fr; }
+  .plugin-operation small { grid-column: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

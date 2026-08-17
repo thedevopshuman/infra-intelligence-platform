@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/operations/v1alpha1",
   "kind": "PostgreSQLBackupRestoreMeasurement",
   "metadata": {
-    "capturedAt": "2026-08-17T11:14:12.470844Z",
+    "capturedAt": "2026-08-17T11:54:27.253736Z",
     "environment": "docker-desktop-local",
     "hostArchitecture": "arm64"
   },
@@ -26,14 +26,14 @@
   },
   "status": {
     "backup": {
-      "bytes": 54127,
+      "bytes": 54847,
       "committedRecordLoss": 0,
-      "durationSeconds": 0.150026,
-      "recoveryPoint": "2026-08-17T11:14:11.772230Z",
-      "recoveryPointAgeSeconds": 0.152442
+      "durationSeconds": 0.143949,
+      "recoveryPoint": "2026-08-17T11:54:26.586292Z",
+      "recoveryPointAgeSeconds": 0.146888
     },
     "integrity": {
-      "databaseDigest": "sha256:4c7311ef4b788e544f68b48b1fb587e0c8a6a9464c9172a95554b3052d9f5cac",
+      "databaseDigest": "sha256:ac3642b4cb03e35a1d112d46feee1dca60793588293eff17e3792d1f775ba9fa",
       "matched": true,
       "projectionVerification": {
         "driftDetected": false,
@@ -42,40 +42,40 @@
         "relationshipCount": 1,
         "resourceCount": 1
       },
-      "rowCount": 33,
+      "rowCount": 35,
       "sequenceCount": 4,
       "tableCount": 18,
       "tables": {
         "action_approvals": {
-          "digest": "sha256:08d24c4bc47f9cee48a0618e471a862698f0c0673626c753c4fe5fd79bb8c6ae",
+          "digest": "sha256:079fe7afa696da370aaa5ed6687d6363af14e6aeaee9df1b10a648ecdc5cf018",
           "rowCount": 1
         },
         "action_executions": {
-          "digest": "sha256:3693196b4049a1719ab987e13c2aa1861e312dab6e845f41afe171fc0c58698d",
+          "digest": "sha256:0e1175c68d69eff487be476a37de16e0579f1f45c5adf4127778bed981e2451c",
           "rowCount": 1
         },
         "action_proposals": {
-          "digest": "sha256:74412ea5807284cc380536bf4463219d4340ae634d9de5c9aa4c3427d1db0f28",
+          "digest": "sha256:ffccfbb40e75de1d60254e2723d9bd2f3c81c11ce56af532c2648bcd9a68cf15",
           "rowCount": 1
         },
         "action_results": {
-          "digest": "sha256:a5183ce352e06dff861446a31e9676859a8b2a7c04f528e2165cb7923cf69fd7",
+          "digest": "sha256:81ad6a09c2c816f0421a601d9df65fb03a182be4727d8d347e185418aa8d575c",
           "rowCount": 1
         },
         "audit_records": {
-          "digest": "sha256:750f8c7567d48da654e9b2ba0cb5de076a9f474f2fa382324b76c4b9b9cbc119",
-          "rowCount": 4
+          "digest": "sha256:5b124ed65f3fa2acc964bba3f0eef4a3b1839c2b079aef3f4f2f64f66fe79796",
+          "rowCount": 5
         },
         "event_log": {
-          "digest": "sha256:e7b54f74c69a22b5cfe029eaaaf80c97855587bc41f04fcaf3edfc2128f3dcfc",
+          "digest": "sha256:7b1e4bcb1c9e5876c8f1f26b4528510f77b98451cc458f0823628f38460642ef",
           "rowCount": 1
         },
         "event_outbox": {
-          "digest": "sha256:4271bd6d03bcc1d0431feb71ce7d235c1e72d4453a016f3a4343d41181bd31e0",
+          "digest": "sha256:21a766f74b94be80d484c5484490aff9a989d104560d5677fbf2d10a50004a72",
           "rowCount": 1
         },
         "evidence_artifacts": {
-          "digest": "sha256:5f3055b1622b13c532b08b50e3e208092adebd43f6494a36159848ab7888e056",
+          "digest": "sha256:70da1890dcc50e8213e9e601f4391ade7f50a84f2b53b856110762c06c241858",
           "rowCount": 1
         },
         "investigation_jobs": {
@@ -83,23 +83,23 @@
           "rowCount": 0
         },
         "investigations": {
-          "digest": "sha256:235c7f55e47f10da5a87ce8e43160d8bce691165e6dac531503f43c21aecb520",
+          "digest": "sha256:5bfcb0eda9b19f37a68f1a6416ec90bb705acada244f4431d6976d04ba17b00b",
           "rowCount": 1
         },
         "plugin_invocations": {
-          "digest": "sha256:4ad6902d7a4147ea0d377e3d81c9b1fad7e92b855f226d90984e731110dd68ca",
+          "digest": "sha256:e0b399530622a08753be3d8a40569b23ce6cf3fc3207576faaafbac7075f1302",
           "rowCount": 1
         },
         "plugin_sessions": {
-          "digest": "sha256:7f96ef1d580a7aacfd89f8206716996c567a4c98f40374c6dff2c21146aa1f52",
+          "digest": "sha256:2fcaa3880bf86d4969a08b5440c594bc599395750b2f659946290501854b24db",
           "rowCount": 1
         },
         "resource_observations": {
-          "digest": "sha256:40d6ba211f6228183dcfc9924a3a5535214a372f806779fb91082135a74deb11",
+          "digest": "sha256:e4253e32e7c22efa98fb3eadd5b5f138318fae4fd339a857bb1276c5ffd098dc",
           "rowCount": 1
         },
         "resource_projections": {
-          "digest": "sha256:6e4b6b4ead96bb8de487fac7c52e806d2d4eb531dc892d537eae235aeb60c9b8",
+          "digest": "sha256:a89935d2991ed06edde774f1f86c9d5b74ac1f0e8b4a1006d7523623fbd1da7f",
           "rowCount": 1
         },
         "resource_relationships": {
@@ -107,28 +107,29 @@
           "rowCount": 1
         },
         "schema_migrations": {
-          "digest": "sha256:635d7ef0d0e0942aa460df1cb59355d33fa0c088b168b5afa86e89aa7d2000a2",
-          "rowCount": 14
+          "digest": "sha256:54923cc09dba2ada321aa2892e4462e6b5910b52ee630783f6705c7d71eb1933",
+          "rowCount": 15
         },
         "source_checkpoints": {
-          "digest": "sha256:973fff1684f1c952d9cb47d8e68d7e087cdbb446f4dfe5fd249ae8eafd40b6be",
+          "digest": "sha256:814290dd8428b4be786d6ff18716391f136ba6d48ef8ad547d3ee1f4059b8278",
           "rowCount": 1
         },
         "source_reconciliations": {
-          "digest": "sha256:954d3e975add19154516c9661cd36b181a11dd1efa88a405f3ef0f43fceb0359",
+          "digest": "sha256:2e2fa0ca8ac130743e0a47c414c6a3c47171becc9726c9232109c2de103694d2",
           "rowCount": 1
         }
       }
     },
     "objectivesMet": true,
     "restore": {
-      "commandDurationSeconds": 0.166477,
-      "recoveryReadySeconds": 0.448553
+      "commandDurationSeconds": 0.139735,
+      "recoveryReadySeconds": 0.41702
     },
     "seed": {
       "actionOutcome": "dry-run",
       "investigationOutcome": "conclusive",
       "pluginInvocationState": "claimed",
+      "pluginInvocationTerminalState": "cancelled",
       "pluginSessionStatus": "ready",
       "resourceCount": 1,
       "tenantId": "local"

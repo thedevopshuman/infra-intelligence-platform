@@ -1,0 +1,14 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PluginInvocationCancellationRequest",
+  "metadata": {
+    "id": "pcn_4da8d7ab485b4d7f90f7b5b932c70827",
+    "tenantId": "local",
+    "actorId": "plugin-host",
+    "requestedAt": "2026-08-14T12:44:45Z"
+  },
+  "spec": {
+    "invocationId": "pin_4da8d7ab485b4d7f90f7b5b932c70827",
+    "reasonCode": "operator-requested"
+  }
+}

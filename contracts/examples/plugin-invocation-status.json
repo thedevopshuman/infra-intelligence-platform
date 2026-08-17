@@ -1,0 +1,23 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PluginInvocationStatus",
+  "metadata": {
+    "id": "pin_4da8d7ab485b4d7f90f7b5b932c70827",
+    "sessionId": "psn_77777777777777777777777777777777",
+    "tenantId": "local",
+    "pluginId": "kubernetes-observer",
+    "pluginVersion": "0.3.0",
+    "updatedAt": "2026-08-14T12:44:45Z"
+  },
+  "spec": {
+    "requestDigest": "sha256:6a0444f265ab6593c365303266c8c63a7d8925a7a9c86af2cf5ed5cb14b7d9fa",
+    "state": "cancellation-requested",
+    "claimedAt": "2026-08-14T12:44:40Z",
+    "deadline": "2026-08-14T12:45:00Z",
+    "cancellation": {
+      "requestedBy": "plugin-host",
+      "requestedAt": "2026-08-14T12:44:45Z",
+      "reasonCode": "operator-requested"
+    }
+  }
+}

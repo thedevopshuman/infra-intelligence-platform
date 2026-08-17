@@ -1,0 +1,14 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PluginInvocationReconciliationRequest",
+  "metadata": {
+    "id": "prc_4da8d7ab485b4d7f90f7b5b932c70827",
+    "tenantId": "local",
+    "actorId": "platform-operator",
+    "requestedAt": "2026-08-14T12:46:00Z"
+  },
+  "spec": {
+    "invocationId": "pin_4da8d7ab485b4d7f90f7b5b932c70827",
+    "reasonCode": "runner-lost"
+  }
+}

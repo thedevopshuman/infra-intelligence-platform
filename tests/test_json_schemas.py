@@ -481,6 +481,28 @@ class JsonSchemaValidationTests(unittest.TestCase):
 
         self.assertTrue(errors)
 
+    def test_plugin_cancellation_status_requires_intent_details(self) -> None:
+        status = document("contracts/examples/plugin-invocation-status.json")
+        del status["spec"]["cancellation"]
+
+        errors = self.validate("plugin-invocation-status.schema.json", status)
+
+        self.assertTrue(errors)
+
+    def test_claimed_plugin_status_rejects_terminal_result_fields(self) -> None:
+        status = document("contracts/examples/plugin-invocation-status.json")
+        status["spec"] = {
+            **status["spec"],
+            "state": "claimed",
+            "completedAt": "2026-08-14T12:44:50Z",
+            "resultRef": "plugin-result://local/sessions/example",
+        }
+        del status["spec"]["cancellation"]
+
+        errors = self.validate("plugin-invocation-status.schema.json", status)
+
+        self.assertTrue(errors)
+
     def test_investigation_job_state_rejects_mixed_queue_and_lease_fields(self) -> None:
         status = document("contracts/examples/investigation-job-status.json")
         status["spec"]["availableAt"] = "2026-08-14T10:30:14Z"

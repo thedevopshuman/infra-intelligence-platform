@@ -100,7 +100,7 @@ class PluginSessionService:
                 "expiresAt": expires_at,
                 "cancellation": {
                     "supported": True,
-                    "endpoint": "stdio://control/cancel",
+                    "endpoint": "/v1/plugin-invocations/{invocationId}/cancel",
                 },
                 "limits": {
                     "maxRequests": command.max_requests,

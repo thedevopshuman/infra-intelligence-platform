@@ -2641,6 +2641,70 @@ class PluginInvocationResult:
 
 
 @dataclass(frozen=True)
+class PluginInvocationStatus:
+    """Tenant-scoped durable claim, cancellation, and terminal-result state."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "PluginInvocationStatus":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="PluginInvocationStatus",
+                label="plugin invocation status",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class PluginInvocationCancellationRequest:
+    """Auditable request to stop a claimed plugin invocation cooperatively."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "PluginInvocationCancellationRequest":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="PluginInvocationCancellationRequest",
+                label="plugin invocation cancellation request",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class PluginInvocationReconciliationRequest:
+    """Privileged request to close a post-deadline ambiguous invocation."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "PluginInvocationReconciliationRequest":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="PluginInvocationReconciliationRequest",
+                label="plugin invocation reconciliation request",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class PolicyDecisionRequest:
     """Authenticated, tenant-scoped input sent to a replaceable policy service."""
 

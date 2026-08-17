@@ -68,3 +68,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0062](0062-audited-evidence-artifact-retention.md) | Accepted | Preserve immutable Evidence metadata while expiring artifact bytes under explicit audited policy |
 | [0063](0063-console-oidc-authorization-code-pkce.md) | Accepted | Let the browser console use a public OIDC client with Authorization Code and S256 PKCE |
 | [0064](0064-durable-plugin-invocation-ownership.md) | Accepted | Claim plugin requests durably before execution and replay only stored terminal results |
+| [0065](0065-plugin-invocation-cancellation-and-reconciliation.md) | Accepted | Persist cooperative plugin cancellation and close post-deadline ambiguity without replay |

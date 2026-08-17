@@ -48,6 +48,9 @@ data:
   OTEL_BSP_EXPORT_TIMEOUT: {{ .Values.telemetry.traceExportTimeoutMillis | quote }}
   OTEL_BSP_MAX_QUEUE_SIZE: {{ .Values.telemetry.traceMaxQueueSize | quote }}
   OTEL_BSP_MAX_EXPORT_BATCH_SIZE: {{ .Values.telemetry.traceMaxExportBatchSize | quote }}
+  IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS: {{ .Values.telemetry.healthReportIntervalSeconds | quote }}
+  IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS: {{ .Values.telemetry.healthStaleAfterSeconds | quote }}
+  IIP_TELEMETRY_HEALTH_RETENTION_SECONDS: {{ .Values.telemetry.healthRetentionSeconds | quote }}
   OTEL_SERVICE_NAME: {{ .Values.telemetry.serviceName | quote }}
   IIP_TELEMETRY_METRICS_BACKEND: {{ .Values.telemetryEvidence.backend | quote }}
   IIP_TELEMETRY_LOGS_BACKEND: {{ .Values.logEvidence.backend | quote }}

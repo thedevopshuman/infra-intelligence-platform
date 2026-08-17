@@ -40,6 +40,7 @@ import type {
   RuntimeVersionReport,
   SessionContext,
   TelemetryEvidenceRequest,
+  TelemetryDeploymentExportHealthReport,
   TelemetryExportHealthReport,
 } from "./types.js";
 
@@ -276,6 +277,12 @@ export class InfrastructureIntelligenceClient {
   async getTelemetryExportHealth(): Promise<TelemetryExportHealthReport> {
     return this.get<TelemetryExportHealthReport>(
       "/v1/operations/telemetry/export-health",
+    );
+  }
+
+  async getTelemetryDeploymentExportHealth(): Promise<TelemetryDeploymentExportHealthReport> {
+    return this.get<TelemetryDeploymentExportHealthReport>(
+      "/v1/operations/telemetry/deployment-export-health",
     );
   }
 

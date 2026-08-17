@@ -1,0 +1,82 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "TelemetryDeploymentExportHealthReport",
+  "metadata": {
+    "evaluatedAt": "2026-08-17T12:02:10Z"
+  },
+  "spec": {
+    "status": "degraded",
+    "freshness": {
+      "staleAfterSeconds": 120,
+      "retentionSeconds": 600
+    },
+    "summary": {
+      "includedInstances": 2,
+      "currentInstances": 1,
+      "staleInstances": 1,
+      "truncated": false
+    },
+    "instances": [
+      {
+        "instanceId": "sha256:172c4a63fc41ae24ba7410b250e9856703b816251e1233c9c7f105f2aaab380f",
+        "component": "api",
+        "startedAt": "2026-08-17T11:45:00Z",
+        "lastReportedAt": "2026-08-17T12:02:05Z",
+        "freshness": "current",
+        "status": "healthy",
+        "signals": [
+          {
+            "signal": "metrics",
+            "enabled": true,
+            "status": "healthy",
+            "attempts": 17,
+            "successes": 17,
+            "failures": 0,
+            "consecutiveFailures": 0,
+            "lastAttemptAt": "2026-08-17T12:02:00Z",
+            "lastSuccessAt": "2026-08-17T12:02:00Z"
+          },
+          {
+            "signal": "traces",
+            "enabled": false,
+            "status": "disabled",
+            "attempts": 0,
+            "successes": 0,
+            "failures": 0,
+            "consecutiveFailures": 0
+          }
+        ]
+      },
+      {
+        "instanceId": "sha256:6751888032b18a5f3e4aa879c6d8f88762d42245d90ddfc10c7e281f0a138e0c",
+        "component": "workflow-worker",
+        "startedAt": "2026-08-17T11:45:02Z",
+        "lastReportedAt": "2026-08-17T11:59:30Z",
+        "freshness": "stale",
+        "status": "healthy",
+        "signals": [
+          {
+            "signal": "metrics",
+            "enabled": true,
+            "status": "healthy",
+            "attempts": 14,
+            "successes": 14,
+            "failures": 0,
+            "consecutiveFailures": 0,
+            "lastAttemptAt": "2026-08-17T11:59:00Z",
+            "lastSuccessAt": "2026-08-17T11:59:00Z"
+          },
+          {
+            "signal": "traces",
+            "enabled": true,
+            "status": "awaiting-first-attempt",
+            "attempts": 0,
+            "successes": 0,
+            "failures": 0,
+            "consecutiveFailures": 0
+          }
+        ]
+      }
+    ]
+  }
+}

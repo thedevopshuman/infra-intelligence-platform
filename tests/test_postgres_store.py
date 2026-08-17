@@ -49,7 +49,13 @@ from iip.application.plugin_invocations import (
     PluginInvocationLifecycleService,
     ReconcilePluginInvocationCommand,
 )
-from iip.application.ports import ActorContext, PersistenceError, SourceCheckpoint
+from iip.application.ports import (
+    ActorContext,
+    PersistenceError,
+    SourceCheckpoint,
+    TelemetryExportInstanceState,
+    TelemetryExportSignalState,
+)
 from iip.application.investigation_dispatch import InvestigationDispatchService
 from iip.application.rebuild_projections import (
     ProjectionRebuildService,
@@ -734,7 +740,7 @@ class PostgresOperationalStoreTests(unittest.TestCase):
         with psycopg.connect(DATABASE_URL) as connection:
             connection.execute(
                 """
-                TRUNCATE iip.audit_records, iip.plugin_invocations,
+                TRUNCATE iip.telemetry_export_health, iip.audit_records, iip.plugin_invocations,
                          iip.plugin_sessions,
                          iip.action_results, iip.action_executions,
                          iip.action_approvals,
@@ -748,6 +754,50 @@ class PostgresOperationalStoreTests(unittest.TestCase):
                 RESTART IDENTITY CASCADE
                 """
             )
+
+    def test_telemetry_export_heartbeat_survives_reconnect_and_retires(self) -> None:
+        instance_id = "sha256:" + "f" * 64
+        state = TelemetryExportInstanceState(
+            instance_id=instance_id,
+            component="workflow-worker",
+            started_at="2026-08-17T12:00:00Z",
+            last_reported_at="2026-08-17T12:00:30Z",
+            signals=(
+                TelemetryExportSignalState(
+                    "metrics",
+                    True,
+                    "healthy",
+                    1,
+                    1,
+                    0,
+                    0,
+                    last_attempt_at="2026-08-17T12:00:20Z",
+                    last_success_at="2026-08-17T12:00:20Z",
+                ),
+                TelemetryExportSignalState(
+                    "traces", False, "disabled", 0, 0, 0, 0
+                ),
+            ),
+        )
+        self.operations.record_telemetry_export_health(
+            state,
+            expire_before="2026-08-17T11:50:00Z",
+        )
+
+        reconnected = PostgresOperationalStore(DATABASE_URL)
+        self.assertEqual(
+            reconnected.list_telemetry_export_health(
+                reported_since="2026-08-17T12:00:00Z", limit=1001
+            ),
+            (state,),
+        )
+        reconnected.retire_telemetry_export_health(instance_id)
+        self.assertEqual(
+            reconnected.list_telemetry_export_health(
+                reported_since="2026-08-17T12:00:00Z", limit=1001
+            ),
+            (),
+        )
 
     def test_plugin_claim_survives_reconnect_and_replays_only_terminal_result(self) -> None:
         actor = ActorContext("plugin-host", "local")

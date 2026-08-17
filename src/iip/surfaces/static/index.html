@@ -106,6 +106,24 @@
             </div>
           </article>
 
+          <article class="panel delivery-panel" aria-labelledby="telemetry-health-heading">
+            <div class="panel-heading">
+              <div><span class="kicker">Portable observability path</span><h2 id="telemetry-health-heading">Telemetry delivery</h2></div>
+              <div class="delivery-heading-actions">
+                <span class="status-chip neutral" id="telemetry-health-state">Connect to inspect</span>
+                <button class="text-button" id="telemetry-health-details" type="button" disabled>View instances →</button>
+              </div>
+            </div>
+            <div class="delivery-grid" aria-live="polite">
+              <div><span>Observed instances</span><strong id="telemetry-health-instances">—</strong></div>
+              <div><span>Current</span><strong id="telemetry-health-current">—</strong></div>
+              <div><span>Stale</span><strong id="telemetry-health-stale">—</strong></div>
+              <div><span>Metric exporters</span><strong id="telemetry-health-metrics">—</strong></div>
+              <div><span>Trace exporters</span><strong id="telemetry-health-traces">—</strong></div>
+            </div>
+            <p class="delivery-note" id="telemetry-health-note">Platform administrators can verify API and worker export outcomes without exposing endpoints or credentials.</p>
+          </article>
+
           <article class="panel delivery-panel" aria-labelledby="delivery-heading">
             <div class="panel-heading">
               <div><span class="kicker">Durable event path</span><h2 id="delivery-heading">Event delivery</h2></div>

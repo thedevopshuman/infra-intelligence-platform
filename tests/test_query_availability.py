@@ -209,6 +209,9 @@ class QueryAvailabilityHttpBoundaryTests(unittest.TestCase):
             "/v1/resources/res_secret/timeline": "resource-timeline",
             "/v1/telemetry/ingestion": "ingestion-freshness",
             "/v1/operations/telemetry/export-health": "telemetry-export-health",
+            "/v1/operations/telemetry/deployment-export-health": (
+                "telemetry-deployment-export-health"
+            ),
             "/v1/operations/events/delivery-health": "event-delivery-health",
             "/v1/operations/events/delivery-slo": "event-delivery-slo",
             "/v1/operations/investigations/completion-slo": (

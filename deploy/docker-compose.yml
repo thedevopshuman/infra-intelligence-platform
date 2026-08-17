@@ -15,12 +15,12 @@ services:
       - postgres-data:/var/lib/postgresql
 
   api:
-    image: iip-local-platform:0.44.0
+    image: iip-local-platform:0.45.0
     build:
       context: ..
       dockerfile: Dockerfile
       args:
-        IIP_IMAGE_VERSION: "0.44.0"
+        IIP_IMAGE_VERSION: "0.45.0"
         IIP_IMAGE_REVISION: development
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
@@ -67,6 +67,9 @@ services:
       OTEL_BSP_EXPORT_TIMEOUT: ${OTEL_BSP_EXPORT_TIMEOUT:-10000}
       OTEL_BSP_MAX_QUEUE_SIZE: ${OTEL_BSP_MAX_QUEUE_SIZE:-2048}
       OTEL_BSP_MAX_EXPORT_BATCH_SIZE: ${OTEL_BSP_MAX_EXPORT_BATCH_SIZE:-512}
+      IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS: ${IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS:-30}
+      IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS: ${IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS:-120}
+      IIP_TELEMETRY_HEALTH_RETENTION_SECONDS: ${IIP_TELEMETRY_HEALTH_RETENTION_SECONDS:-600}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-infra-intelligence-api}
       PGPASSWORD: ${IIP_POSTGRES_PASSWORD:?set IIP_POSTGRES_PASSWORD}
     depends_on:
@@ -92,7 +95,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-local-platform:0.44.0
+    image: iip-local-platform:0.45.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:
@@ -128,6 +131,9 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
       OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+      IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS: ${IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS:-30}
+      IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS: ${IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS:-120}
+      IIP_TELEMETRY_HEALTH_RETENTION_SECONDS: ${IIP_TELEMETRY_HEALTH_RETENTION_SECONDS:-600}
       OTEL_SERVICE_NAME: infra-intelligence-worker
       IIP_TELEMETRY_METRICS_BACKEND: ${IIP_TELEMETRY_METRICS_BACKEND:-no-data}
       IIP_TELEMETRY_LOGS_BACKEND: ${IIP_TELEMETRY_LOGS_BACKEND:-no-data}

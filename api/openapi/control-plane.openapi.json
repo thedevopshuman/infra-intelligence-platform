@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.44.0",
+    "version": "0.45.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence and retention observation, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions and invocation lifecycles. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -162,6 +162,22 @@
           "403": {"$ref": "#/components/responses/PolicyDenied"},
           "503": {
             "description": "The process-local exporter health reader returned inconsistent state",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "telemetry.export-health.unavailable"}}}}
+          }
+        }
+      }
+    },
+    "/v1/operations/telemetry/deployment-export-health": {
+      "get": {
+        "summary": "Read recent deployment-wide telemetry exporter delivery health",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {"description": "Bounded API and workflow-worker telemetry delivery state", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/telemetry-deployment-export-health-report.schema.json"}}}},
+          "400": {"description": "Query parameters are not accepted", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "401": {"description": "Authentication required", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "403": {"description": "Platform administrator role or policy approval required", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "503": {
+            "description": "Shared telemetry health state is unavailable or inconsistent",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "telemetry.export-health.unavailable"}}}}
           }
         }
@@ -703,6 +719,7 @@
       "ResourceTimeline": {"$ref": "../../contracts/schemas/resource-timeline.schema.json"},
       "IngestionFreshnessReport": {"$ref": "../../contracts/schemas/ingestion-freshness-report.schema.json"},
       "TelemetryExportHealthReport": {"$ref": "../../contracts/schemas/telemetry-export-health-report.schema.json"},
+      "TelemetryDeploymentExportHealthReport": {"$ref": "../../contracts/schemas/telemetry-deployment-export-health-report.schema.json"},
       "EventDeliveryHealthReport": {"$ref": "../../contracts/schemas/event-delivery-health-report.schema.json"},
       "EventDeliverySloReport": {"$ref": "../../contracts/schemas/event-delivery-slo-report.schema.json"},
       "InvestigationCompletionSloReport": {"$ref": "../../contracts/schemas/investigation-completion-slo-report.schema.json"},

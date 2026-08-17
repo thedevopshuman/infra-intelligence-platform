@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:telemetry-deployment-export-health-report:v1alpha1",
+  "title": "Infrastructure Intelligence Deployment Telemetry Export Health Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "TelemetryDeploymentExportHealthReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evaluatedAt"],
+      "properties": {
+        "evaluatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "freshness", "summary", "instances"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["disabled", "awaiting-first-attempt", "healthy", "degraded"]
+        },
+        "freshness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["staleAfterSeconds", "retentionSeconds"],
+          "properties": {
+            "staleAfterSeconds": {"type": "integer", "minimum": 10, "maximum": 3600},
+            "retentionSeconds": {"type": "integer", "minimum": 20, "maximum": 86400}
+          }
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["includedInstances", "currentInstances", "staleInstances", "truncated"],
+          "properties": {
+            "includedInstances": {"type": "integer", "minimum": 0, "maximum": 1000},
+            "currentInstances": {"type": "integer", "minimum": 0, "maximum": 1000},
+            "staleInstances": {"type": "integer", "minimum": 0, "maximum": 1000},
+            "truncated": {"type": "boolean"}
+          }
+        },
+        "instances": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {"$ref": "#/$defs/instance"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "instance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "component",
+        "startedAt",
+        "lastReportedAt",
+        "freshness",
+        "status",
+        "signals"
+      ],
+      "properties": {
+        "instanceId": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "component": {"type": "string", "enum": ["api", "workflow-worker"]},
+        "startedAt": {"type": "string", "format": "date-time"},
+        "lastReportedAt": {"type": "string", "format": "date-time"},
+        "freshness": {"type": "string", "enum": ["current", "stale"]},
+        "status": {
+          "type": "string",
+          "enum": ["disabled", "awaiting-first-attempt", "healthy", "degraded"]
+        },
+        "signals": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {"$ref": "urn:iip:contracts:telemetry-export-health-report:v1alpha1#/$defs/metricsSignal"},
+            {"$ref": "urn:iip:contracts:telemetry-export-health-report:v1alpha1#/$defs/tracesSignal"}
+          ],
+          "items": false
+        }
+      }
+    }
+  }
+}

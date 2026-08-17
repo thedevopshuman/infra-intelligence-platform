@@ -234,6 +234,16 @@ printf '%s' "$IIP_RUNTIME_VERSION_JSON" | "$IIP_TEST_PYTHON" -c \
     "$IIP_APP_VERSION" "$IIP_CHART_VERSION" "$IIP_TEST_IMAGE_DIGEST" \
     "$IIP_EXPECTED_MIGRATION"
 
+IIP_TELEMETRY_DEPLOYMENT_HEALTH_JSON=$(
+    printf '%s' "$IIP_AUTH_BEARER_TOKEN" | \
+        "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+            --namespace "$IIP_TEST_NAMESPACE" exec -i \
+            deployment/iip-infra-intelligence -- python -c \
+            'import json,sys,urllib.request; token=sys.stdin.read(); request=urllib.request.Request("http://127.0.0.1:8080/v1/operations/telemetry/deployment-export-health", headers={"Authorization": "Bearer " + token}); print(json.dumps(json.load(urllib.request.urlopen(request, timeout=5)), separators=(",", ":")))'
+)
+printf '%s' "$IIP_TELEMETRY_DEPLOYMENT_HEALTH_JSON" | "$IIP_TEST_PYTHON" -c \
+    'import json,sys; document=json.load(sys.stdin); spec=document["spec"]; assert document["kind"] == "TelemetryDeploymentExportHealthReport"; assert spec["status"] == "disabled"; assert spec["summary"] == {"includedInstances":0,"currentInstances":0,"staleInstances":0,"truncated":False}; assert spec["instances"] == []'
+
 IIP_EVENT_DELIVERY_HEALTH_JSON=$(
     printf '%s' "$IIP_AUTH_BEARER_TOKEN" | \
         "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \

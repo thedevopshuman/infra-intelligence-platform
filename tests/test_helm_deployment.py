@@ -244,6 +244,36 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             with self.subTest(variable=variable):
                 self.assertIn(variable, config_map)
 
+    def test_deployment_export_health_heartbeat_is_explicit_and_bounded(self) -> None:
+        config_map = (CHART / "templates" / "configmap.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+        validation = (CHART / "templates" / "validation.yaml").read_text(
+            encoding="utf-8"
+        )
+
+        for setting in (
+            "healthReportIntervalSeconds: 30",
+            "healthStaleAfterSeconds: 120",
+            "healthRetentionSeconds: 600",
+        ):
+            self.assertIn(setting, values)
+        for variable in (
+            "IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS",
+            "IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS",
+            "IIP_TELEMETRY_HEALTH_RETENTION_SECONDS",
+        ):
+            self.assertIn(variable, config_map)
+        self.assertIn(
+            "telemetry.healthStaleAfterSeconds must be at least twice",
+            validation,
+        )
+        self.assertIn(
+            "telemetry.healthRetentionSeconds must be at least twice",
+            validation,
+        )
+
     def test_migration_hook_has_database_only_authority(self) -> None:
         template = (CHART / "templates" / "migration-job.yaml").read_text(
             encoding="utf-8"
@@ -297,6 +327,13 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn("/v1/authentication/console", script)
         self.assertIn('"kind":"ConsoleAuthenticationConfiguration"', script)
         self.assertIn("/v1/system/version", script)
+        self.assertIn(
+            "/v1/operations/telemetry/deployment-export-health", script
+        )
+        self.assertIn(
+            'document["kind"] == "TelemetryDeploymentExportHealthReport"',
+            script,
+        )
         self.assertIn("/v1/operations/events/delivery-health?limit=10", script)
         self.assertIn('document["kind"] == "EventDeliveryHealthReport"', script)
         self.assertIn("/v1/operations/events/delivery-slo", script)

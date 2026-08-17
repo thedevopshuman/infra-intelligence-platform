@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import secrets
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -38,9 +40,10 @@ from iip.adapters.evidence import (
 from iip.adapters.health import AlwaysReadyProbe
 from iip.adapters.investigation_catalog import build_investigation_signal_catalog
 from iip.adapters.memory import AllowTenantPolicy, InMemoryResourceStore
-from iip.adapters.otel import DisabledTelemetryExportHealthReader
 from iip.adapters.operations import InMemoryOperationalStore
+from iip.adapters.otel import DisabledTelemetryExportHealthReader
 from iip.adapters.policy import ExternalHttpPolicyDecisionPoint
+from iip.adapters.telemetry_health import PeriodicTelemetryExportHealthReporter
 from iip.application.action_reconciliation import ActionReconciliationService
 from iip.application.actions import GovernedActionService
 from iip.application.collect_evidence import EvidenceCollectionService
@@ -119,12 +122,19 @@ from iip.application.query_investigation_completion_slo import (
     InvestigationCompletionSloService,
 )
 from iip.application.query_resources import ResourceQueryService
+from iip.application.query_telemetry_deployment_health import (
+    TelemetryDeploymentHealthService,
+)
 from iip.application.query_runtime_version import (
     RuntimeVersionIdentity,
     RuntimeVersionService,
 )
 from iip.application.query_telemetry_export_health import (
     TelemetryExportHealthService,
+)
+from iip.application.report_telemetry_export_health import (
+    TelemetryExportHealthReporter,
+    TelemetryExportHealthReportingConfiguration,
 )
 from iip.application.resource_change_evidence import (
     ResourceChangeEvidenceService,
@@ -160,6 +170,7 @@ class Runtime:
     investigation_completion_slo: InvestigationCompletionSloService
     query_availability: QueryAvailabilityService
     telemetry_export_health: TelemetryExportHealthService
+    telemetry_deployment_health: TelemetryDeploymentHealthService
     runtime_version: RuntimeVersionService
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
@@ -183,6 +194,7 @@ class Runtime:
     evidence_store: Any
     readiness: ReadinessProbe
     telemetry_runtime: Any = None
+    telemetry_health_reporter: Any = None
 
     def force_flush_telemetry(self, timeout_millis: int = 10_000) -> bool:
         if self.telemetry_runtime is None:
@@ -190,6 +202,8 @@ class Runtime:
         return bool(self.telemetry_runtime.force_flush(timeout_millis))
 
     def close(self) -> None:
+        if self.telemetry_health_reporter is not None:
+            self.telemetry_health_reporter.close()
         if self.telemetry_runtime is not None:
             self.telemetry_runtime.shutdown()
 
@@ -217,6 +231,9 @@ def build_local_runtime(
     readiness: ReadinessProbe | None = None,
     investigation_dispatch_limits: InvestigationDispatchLimits | None = None,
     evidence_retention_policy: EvidenceRetentionPolicy | None = None,
+    telemetry_health_reporting: (
+        TelemetryExportHealthReportingConfiguration | None
+    ) = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -248,6 +265,7 @@ def build_local_runtime(
         readiness,
         investigation_dispatch_limits,
         evidence_retention_policy,
+        telemetry_health_reporting,
     )
 
 
@@ -276,6 +294,9 @@ def _compose_runtime(
     readiness: ReadinessProbe | None = None,
     investigation_dispatch_limits: InvestigationDispatchLimits | None = None,
     evidence_retention_policy: EvidenceRetentionPolicy | None = None,
+    telemetry_health_reporting: (
+        TelemetryExportHealthReportingConfiguration | None
+    ) = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -348,7 +369,25 @@ def _compose_runtime(
     console_authentication, console_token_origin = _console_authentication_for(
         authenticator
     )
-    return Runtime(
+    health_reader = (
+        telemetry_runtime
+        if telemetry_runtime is not None
+        and callable(getattr(telemetry_runtime, "read_export_health", None))
+        else DisabledTelemetryExportHealthReader()
+    )
+    health_reporter = (
+        PeriodicTelemetryExportHealthReporter(
+            TelemetryExportHealthReporter(
+                health_reader,
+                operational,
+                clock,
+                telemetry_health_reporting,
+            )
+        )
+        if telemetry_runtime is not None and telemetry_health_reporting is not None
+        else None
+    )
+    runtime = Runtime(
         authenticator=authenticator,
         console_authentication=console_authentication,
         console_token_origin=console_token_origin,
@@ -389,14 +428,24 @@ def _compose_runtime(
             query_availability_objectives,
         ),
         telemetry_export_health=TelemetryExportHealthService(
-            (
-                telemetry_runtime
-                if telemetry_runtime is not None
-                and callable(getattr(telemetry_runtime, "read_export_health", None))
-                else DisabledTelemetryExportHealthReader()
-            ),
+            health_reader,
             policy,
             clock,
+        ),
+        telemetry_deployment_health=TelemetryDeploymentHealthService(
+            operational,
+            policy,
+            clock,
+            stale_after_seconds=(
+                telemetry_health_reporting.stale_after_seconds
+                if telemetry_health_reporting is not None
+                else 120
+            ),
+            retention_seconds=(
+                telemetry_health_reporting.retention_seconds
+                if telemetry_health_reporting is not None
+                else 600
+            ),
         ),
         runtime_version=RuntimeVersionService(
             _runtime_version_identity_from_env(),
@@ -457,7 +506,11 @@ def _compose_runtime(
         evidence_store=evidence_store,
         readiness=readiness or AlwaysReadyProbe(),
         telemetry_runtime=telemetry_runtime,
+        telemetry_health_reporter=health_reporter,
     )
+    if health_reporter is not None:
+        health_reporter.start()
+    return runtime
 
 
 def _runtime_version_identity_from_env() -> RuntimeVersionIdentity:
@@ -504,6 +557,9 @@ def build_postgres_runtime(
     readiness_timeout_seconds: int = 2,
     investigation_dispatch_limits: InvestigationDispatchLimits | None = None,
     evidence_retention_policy: EvidenceRetentionPolicy | None = None,
+    telemetry_health_reporting: (
+        TelemetryExportHealthReportingConfiguration | None
+    ) = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -542,6 +598,7 @@ def build_postgres_runtime(
         PostgresReadinessProbe(database_url, readiness_timeout_seconds),
         investigation_dispatch_limits,
         evidence_retention_policy,
+        telemetry_health_reporting,
     )
 
 
@@ -621,6 +678,13 @@ def _build_runtime_from_env(
     telemetry_runtime = _combine_telemetry_runtimes(
         metrics_runtime, traces_runtime
     )
+    telemetry_health_reporting = (
+        _telemetry_health_reporting_from_env(
+            "api" if include_action_executor else "workflow-worker"
+        )
+        if telemetry_runtime is not None
+        else None
+    )
     database_url = os.environ.get("IIP_DATABASE_URL")
     try:
         receiver_mode = os.environ.get("IIP_OTLP_RECEIVER_MODE", "disabled")
@@ -687,6 +751,7 @@ def _build_runtime_from_env(
                 signal_catalog=signal_catalog,
                 investigation_dispatch_limits=investigation_dispatch_limits,
                 evidence_retention_policy=evidence_retention_policy,
+                telemetry_health_reporting=telemetry_health_reporting,
             )
         auto_migrate = (
             os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
@@ -725,6 +790,7 @@ def _build_runtime_from_env(
             signal_catalog=signal_catalog,
             investigation_dispatch_limits=investigation_dispatch_limits,
             evidence_retention_policy=evidence_retention_policy,
+            telemetry_health_reporting=telemetry_health_reporting,
             readiness_timeout_seconds=_readiness_timeout_from_env(),
         )
     except Exception:
@@ -772,6 +838,42 @@ def _readiness_timeout_from_env() -> int:
     if value < 1 or value > 10:
         raise ValueError("readiness.database.configuration.invalid")
     return value
+
+
+def _telemetry_health_reporting_from_env(
+    component: str,
+) -> TelemetryExportHealthReportingConfiguration:
+    def integer(name: str, default: int) -> int:
+        try:
+            return int(os.environ.get(name, str(default)))
+        except ValueError:
+            raise ValueError(
+                "telemetry.export-health.reporting.configuration.invalid"
+            ) from None
+
+    instance_basis = (
+        os.environ.get("IIP_RUNTIME_INSTANCE_ID")
+        or os.environ.get("HOSTNAME")
+        or "local-runtime"
+    )[:256]
+    instance_id = "sha256:" + hashlib.sha256(
+        f"{component}\x1f{instance_basis}\x1f{os.getpid()}\x1f{secrets.token_hex(16)}".encode(
+            "utf-8"
+        )
+    ).hexdigest()
+    configuration = TelemetryExportHealthReportingConfiguration(
+        instance_id=instance_id,
+        component=component,
+        interval_seconds=integer("IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS", 30),
+        stale_after_seconds=integer(
+            "IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS", 120
+        ),
+        retention_seconds=integer(
+            "IIP_TELEMETRY_HEALTH_RETENTION_SECONDS", 600
+        ),
+    )
+    configuration.validate()
+    return configuration
 
 
 def build_investigation_worker_from_env(runtime: Runtime) -> InvestigationWorker:

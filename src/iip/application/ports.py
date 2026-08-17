@@ -236,6 +236,17 @@ class TelemetryExportSignalState:
 
 
 @dataclass(frozen=True)
+class TelemetryExportInstanceState:
+    """Pseudonymous latest exporter state reported by one runtime instance."""
+
+    instance_id: str
+    component: str
+    started_at: str
+    last_reported_at: str
+    signals: tuple[TelemetryExportSignalState, ...]
+
+
+@dataclass(frozen=True)
 class ReconciliationSnapshot:
     """Last complete resource membership for one tenant-scoped source."""
 
@@ -702,6 +713,27 @@ class InvestigationSignalCatalog(Protocol):
 class TelemetryExportHealthReader(Protocol):
     def read_export_health(self) -> Iterable[TelemetryExportSignalState]:
         """Return bounded process-local delivery state without provider details."""
+
+
+class TelemetryExportHealthRepository(Protocol):
+    def record_telemetry_export_health(
+        self,
+        state: TelemetryExportInstanceState,
+        *,
+        expire_before: str,
+    ) -> None:
+        """Upsert one internal instance heartbeat and expire older observations."""
+
+    def list_telemetry_export_health(
+        self,
+        *,
+        reported_since: str,
+        limit: int,
+    ) -> Iterable[TelemetryExportInstanceState]:
+        """Return recent instance observations without tenant or provider details."""
+
+    def retire_telemetry_export_health(self, instance_id: str) -> None:
+        """Remove one gracefully stopped runtime instance from the live view."""
 
 
 class ReconciliationRepository(Protocol):

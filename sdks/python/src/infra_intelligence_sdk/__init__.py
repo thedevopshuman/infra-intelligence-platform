@@ -80,6 +80,7 @@ from .models import (
     SessionContext,
     TelemetryEvidenceRequest,
     TelemetryEvidenceResult,
+    TelemetryDeploymentExportHealthReport,
     TelemetryExportHealthReport,
 )
 
@@ -164,7 +165,8 @@ __all__ = [
     "SessionContext",
     "TelemetryEvidenceRequest",
     "TelemetryEvidenceResult",
+    "TelemetryDeploymentExportHealthReport",
     "TelemetryExportHealthReport",
     "discover_console_authentication",
 ]
-__version__ = "0.37.0"
+__version__ = "0.38.0"

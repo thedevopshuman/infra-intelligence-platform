@@ -22,6 +22,12 @@
 {{- if gt (int .Values.telemetry.traceMaxExportBatchSize) (int .Values.telemetry.traceMaxQueueSize) }}
 {{- fail "telemetry.traceMaxExportBatchSize must not exceed telemetry.traceMaxQueueSize" }}
 {{- end }}
+{{- if lt (int .Values.telemetry.healthStaleAfterSeconds) (mul (int .Values.telemetry.healthReportIntervalSeconds) 2) }}
+{{- fail "telemetry.healthStaleAfterSeconds must be at least twice telemetry.healthReportIntervalSeconds" }}
+{{- end }}
+{{- if lt (int .Values.telemetry.healthRetentionSeconds) (mul (int .Values.telemetry.healthStaleAfterSeconds) 2) }}
+{{- fail "telemetry.healthRetentionSeconds must be at least twice telemetry.healthStaleAfterSeconds" }}
+{{- end }}
 {{- if and (or .Values.telemetry.metricsEnabled .Values.telemetry.tracesEnabled) (not .Values.telemetry.otlpEndpoint) }}
 {{- fail "telemetry.otlpEndpoint is required when telemetry export is enabled" }}
 {{- end }}

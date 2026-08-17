@@ -19,6 +19,7 @@ from iip.application.ports import (
     InvestigationJobClaim,
     PersistenceError,
     PluginInvocationClaim,
+    TelemetryExportInstanceState,
 )
 
 
@@ -38,8 +39,48 @@ class InMemoryOperationalStore:
         self._action_executions: dict[tuple[str, str], dict[str, object]] = {}
         self._sessions: dict[tuple[str, str], dict[str, object]] = {}
         self._plugin_invocations: dict[tuple[str, str], dict[str, object]] = {}
+        self._telemetry_export_health: dict[str, TelemetryExportInstanceState] = {}
         self._audit: list[tuple[str, str, dict[str, object]]] = []
         self._lock = RLock()
+
+    def record_telemetry_export_health(
+        self,
+        state: TelemetryExportInstanceState,
+        *,
+        expire_before: str,
+    ) -> None:
+        with self._lock:
+            self._telemetry_export_health = {
+                instance_id: item
+                for instance_id, item in self._telemetry_export_health.items()
+                if item.last_reported_at >= expire_before
+            }
+            self._telemetry_export_health[state.instance_id] = copy.deepcopy(state)
+
+    def list_telemetry_export_health(
+        self,
+        *,
+        reported_since: str,
+        limit: int,
+    ) -> tuple[TelemetryExportInstanceState, ...]:
+        if not 1 <= limit <= 1_001:
+            raise PersistenceError("storage.input-invalid")
+        with self._lock:
+            items = tuple(
+                sorted(
+                    (
+                        copy.deepcopy(item)
+                        for item in self._telemetry_export_health.values()
+                        if item.last_reported_at >= reported_since
+                    ),
+                    key=lambda item: (item.component, item.instance_id),
+                )[:limit]
+            )
+        return items
+
+    def retire_telemetry_export_health(self, instance_id: str) -> None:
+        with self._lock:
+            self._telemetry_export_health.pop(instance_id, None)
 
     def start_investigation(
         self,

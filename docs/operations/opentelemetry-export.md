@@ -79,6 +79,9 @@ The API and worker use the Collector through the Compose service network and app
 | `OTEL_BSP_EXPORT_TIMEOUT` | `10000` | Trace batch export timeout in milliseconds |
 | `OTEL_BSP_MAX_QUEUE_SIZE` | `2048` | Bounded in-memory trace queue |
 | `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | `512` | Maximum trace export batch, no larger than the queue |
+| `IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS` | `30` | Internal API/worker exporter-health heartbeat interval |
+| `IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS` | `120` | Age at which a missed internal heartbeat degrades deployment health |
+| `IIP_TELEMETRY_HEALTH_RETENTION_SECONDS` | `600` | Bounded crashed-instance visibility and cleanup window |
 
 The endpoint must be explicit HTTP(S), no longer than 2048 characters, and cannot contain user information, a query, or a fragment. Use `OTEL_EXPORTER_OTLP_HEADERS` or deployment-native authentication instead of embedding credentials in a URL.
 
@@ -98,8 +101,16 @@ curl --fail-with-body \
   http://127.0.0.1:8080/v1/operations/telemetry/export-health
 ```
 
-The report distinguishes disabled, awaiting-first-attempt, healthy, and degraded metric/trace delivery. It intentionally omits the configured endpoint and provider failures. It describes only the API process that answered. In a multi-replica deployment, query each API pod directly through an operator-only path because counters are process-local and reset on restart. The current worker has no HTTP operations listener; use Collector/SDK operational telemetry and logs for worker exports until deployment-wide aggregation is implemented. `/readyz` remains independent, so telemetry backend failure does not interrupt customer workflows.
+The process-local report distinguishes disabled, awaiting-first-attempt, healthy, and degraded metric/trace delivery and intentionally omits the configured endpoint and provider failures. The deployment-wide operation includes recent pseudonymous API and workflow-worker heartbeats from the shared store:
+
+```bash
+curl --fail-with-body \
+  -H "Authorization: Bearer $IIP_OPERATOR_TOKEN" \
+  http://127.0.0.1:8080/v1/operations/telemetry/deployment-export-health
+```
+
+Missed heartbeats become stale and degrade the deployment report; graceful stops retire immediately. Counters remain per process and reset on restart. `/readyz` remains independent, so telemetry backend failure or health-report write failure does not interrupt customer workflows.
 
 ## Production gaps
 
-The reference adapters and automatic sampler are failure-isolated but not a complete production telemetry pipeline. Production enablement still requires Collector-side queue/delivery monitoring, a defined loss objective, reviewed cardinality budgets, TLS/authentication policy, regional routing, representative load tests, ingress/synthetic availability, burn-rate rules, and notification routing. The trace queue is bounded but not durable. The process-local report describes latest exporter outcomes; it is not durable or cluster-wide. Query SLO aggregation belongs to the customer telemetry backend and must account for Collector/export loss before making a production claim.
+The reference adapters and automatic sampler are failure-isolated but not a complete production telemetry pipeline. Production enablement still requires Collector-side queue/delivery monitoring, a defined loss objective, reviewed cardinality budgets, TLS/authentication policy, regional routing, representative load tests, ingress/synthetic availability, burn-rate rules, and notification routing. The trace queue is bounded but not durable. The deployment report covers recent control-plane and worker SDK outcomes, not Collector queue durability, desired replica membership, long-term exporter SLO windows, or regional aggregation. Query SLO aggregation belongs to the customer telemetry backend and must account for Collector/export loss before making a production claim.

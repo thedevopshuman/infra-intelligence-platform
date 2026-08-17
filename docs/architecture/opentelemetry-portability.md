@@ -37,7 +37,7 @@ The `IngestionFreshnessReport` remains the authoritative point-in-time product r
 
 The adapters use the [standard exporter endpoint configuration](https://opentelemetry.io/docs/specs/otel/protocol/exporter/), including `OTEL_EXPORTER_OTLP_ENDPOINT` and signal-specific variables. The recommended target is a customer-controlled [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/), which can route to a different open-source or commercial backend without an IIP code change. [ADR 0013](../decisions/0013-otlp-http-ingestion-metrics-export.md) records the metrics selection, [ADR 0031](../decisions/0031-otlp-investigation-trace-export.md) records the trace privacy/cardinality boundary, and the [operations guide](../operations/opentelemetry-export.md) lists the signals and configuration.
 
-Export is disabled by default, asynchronous, and observational. Endpoint unavailability does not roll back ingestion, block an investigation, or change report results. The reference adapter has bounded timeouts, SDK retry behavior, local recording-failure counting, and controlled dimensions. It does not yet provide automatic sampling, a durable queue, an export-loss SLI, or complete exporter health; those are required before production enablement.
+Export is disabled by default, asynchronous, and observational. Endpoint unavailability does not roll back ingestion, block an investigation, or change report results. The reference adapter has bounded timeouts, SDK retry behavior, local recording-failure counting, controlled dimensions, and recent deployment-wide API/worker delivery health through a failure-isolated shared-store heartbeat. It does not yet provide a durable queue or measured export-loss SLI; those are required before production enablement.
 
 ## Customer telemetry evidence
 
@@ -70,7 +70,7 @@ A candidate may instead declare ordered baseline and evaluation windows within t
 - a production credential issuer/interoperability gate plus additional historical log and metric adapters;
 - federated receiver workload identity or mTLS, token rotation, distributed gateway admission, and durable buffering for self-hosted, customer-hosted, and managed deployments;
 - retention, sampling, cardinality budgets, and regional/data-residency controls;
-- queue durability and the division of retry, batching, and delivery-health ownership between the official SDK and a sidecar/customer Collector;
+- queue durability and the division of retry, batching, and measured delivery-SLO ownership between the official SDK and a sidecar/customer Collector;
 - the cadence and ownership of automatic freshness evaluation and production SLO windows;
 - seasonal baseline policy, minimum sample counts, and multi-signal reasoning.
 

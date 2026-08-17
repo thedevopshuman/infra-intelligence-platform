@@ -5,6 +5,7 @@ const state = {
   session: null,
   consoleAuthentication: null,
   runtimeVersion: null,
+  telemetryDeploymentHealth: null,
   eventDeliveryHealth: null,
   eventDeliverySlo: null,
   investigationCompletionSlo: null,
@@ -402,6 +403,58 @@ async function refreshRuntimeVersion() {
   renderRuntimeVersion();
 }
 
+function renderTelemetryDeploymentHealth() {
+  const spec = state.telemetryDeploymentHealth?.spec;
+  const chip = $("#telemetry-health-state");
+  if (!spec) {
+    ["instances", "current", "stale", "metrics", "traces"].forEach((field) => {
+      $(`#telemetry-health-${field}`).textContent = "—";
+    });
+    chip.textContent = state.session && !hasRole("platform-admin")
+      ? "Platform admin required"
+      : state.session ? "Unavailable" : "Connect to inspect";
+    chip.className = "status-chip neutral";
+    $("#telemetry-health-details").disabled = true;
+    $("#telemetry-health-note").textContent = "Platform administrators can verify API and worker export outcomes without exposing endpoints or credentials.";
+    return;
+  }
+  const summary = spec.summary;
+  const enabled = (signal) => spec.instances
+    .map((instance) => instance.signals.find((item) => item.signal === signal))
+    .filter((item) => item?.enabled);
+  const signalSummary = (signal) => {
+    const items = enabled(signal);
+    return items.length ? `${items.filter((item) => item.status === "healthy").length}/${items.length} healthy` : "Disabled";
+  };
+  $("#telemetry-health-instances").textContent = String(summary.includedInstances);
+  $("#telemetry-health-current").textContent = String(summary.currentInstances);
+  $("#telemetry-health-stale").textContent = String(summary.staleInstances);
+  $("#telemetry-health-metrics").textContent = signalSummary("metrics");
+  $("#telemetry-health-traces").textContent = signalSummary("traces");
+  chip.textContent = spec.status;
+  chip.className = `status-chip ${spec.status === "healthy" ? "success" : spec.status === "degraded" ? "danger" : spec.status === "awaiting-first-attempt" ? "warning" : "neutral"}`;
+  $("#telemetry-health-details").disabled = false;
+  $("#telemetry-health-note").textContent = summary.staleInstances
+    ? `${summary.staleInstances} instance heartbeat(s) are stale; product readiness remains independent.`
+    : summary.truncated
+      ? "The bounded instance view is truncated and requires capacity review."
+      : "Recent API and workflow-worker exporter outcomes are current.";
+}
+
+async function refreshTelemetryDeploymentHealth() {
+  if (!state.session || !hasRole("platform-admin")) {
+    state.telemetryDeploymentHealth = null;
+    renderTelemetryDeploymentHealth();
+    return;
+  }
+  try {
+    state.telemetryDeploymentHealth = await api("/v1/operations/telemetry/deployment-export-health");
+  } catch (_error) {
+    state.telemetryDeploymentHealth = null;
+  }
+  renderTelemetryDeploymentHealth();
+}
+
 function renderEventDeliveryHealth() {
   const report = state.eventDeliveryHealth;
   const spec = report?.spec;
@@ -595,7 +648,7 @@ async function connect(token, remember) {
     if (remember) sessionStorage.setItem(REMEMBERED_TOKEN_KEY, token);
     else sessionStorage.removeItem(REMEMBERED_TOKEN_KEY);
     updateIdentity();
-    await Promise.all([refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
+    await Promise.all([refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
     $("#connection-dialog").close();
     $("#connection-error").hidden = true;
     showNotice(`Connected as ${state.session.metadata.actorId} in tenant ${state.session.metadata.tenantId}.`);
@@ -1466,7 +1519,7 @@ function bindEvents() {
   $("#identity-button").addEventListener("click", () => $("#connection-dialog").showModal());
   $("#connection-close").addEventListener("click", () => $("#connection-dialog").close());
   $("#refresh-button").addEventListener("click", async () => {
-    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
+    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
     showNotice("Live platform state refreshed.");
   });
   $("#connection-form").addEventListener("submit", async (event) => {
@@ -1536,6 +1589,14 @@ function bindEvents() {
     $("#detail-actions").hidden = true;
     $("#detail-dialog").showModal();
   });
+  $("#telemetry-health-details").addEventListener("click", () => {
+    if (!state.telemetryDeploymentHealth) return;
+    $("#detail-kicker").textContent = "Portable observability path";
+    $("#detail-title").textContent = "Deployment telemetry delivery";
+    $("#detail-content").textContent = JSON.stringify(state.telemetryDeploymentHealth, null, 2);
+    $("#detail-actions").hidden = true;
+    $("#detail-dialog").showModal();
+  });
   $("#delivery-details").addEventListener("click", () => {
     if (!state.eventDeliveryHealth) return;
     $("#detail-kicker").textContent = "Event delivery";
@@ -1585,6 +1646,7 @@ async function start() {
   renderResources();
   renderActionProposalMode();
   renderRuntimeVersion();
+  renderTelemetryDeploymentHealth();
   renderEventDeliverySlo();
   renderInvestigationCompletionSlo();
   renderEvidenceRetention();

@@ -31,6 +31,8 @@ accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 
 `Client.get_event_delivery_health` gives a platform administrator the credential-tenant's bounded outbox backlog and quarantine summary. It exposes CloudEvents identity metadata and stable failure codes, never event payloads, provider responses, or destination configuration.
 
+`Client.get_telemetry_export_health` reads the answering API process. `Client.get_telemetry_deployment_export_health` reads bounded recent pseudonymous API and workflow-worker heartbeats from the shared store. Neither model exposes OTLP endpoints, headers, credentials, payloads, provider responses, or raw workload identity.
+
 `Client.get_event_delivery_slo` returns the deployment-configured rolling publication objective. It contains mature-cohort aggregate counts and integer-basis-point attainment only; it does not claim downstream receiver processing.
 
 `Client.get_investigation_completion_slo` returns the deployment-configured rolling useful-completion objective for durable asynchronous jobs. It requires platform-administrator authority and contains aggregate outcomes only—never investigation identity, request, evidence, finding, worker, or provider data.

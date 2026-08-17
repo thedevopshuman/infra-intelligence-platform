@@ -22,6 +22,8 @@ from iip.application.ports import (
     InvestigationJobClaim,
     PersistenceError,
     PluginInvocationClaim,
+    TelemetryExportInstanceState,
+    TelemetryExportSignalState,
 )
 
 
@@ -35,6 +37,147 @@ class PostgresOperationalStore:
 
     def _connect(self):
         return psycopg.connect(self._database_url, row_factory=dict_row)
+
+    def record_telemetry_export_health(
+        self,
+        state: TelemetryExportInstanceState,
+        *,
+        expire_before: str,
+    ) -> None:
+        signals = [
+            {
+                "signal": signal.signal,
+                "enabled": signal.enabled,
+                "status": signal.status,
+                "attempts": signal.attempts,
+                "successes": signal.successes,
+                "failures": signal.failures,
+                "consecutiveFailures": signal.consecutive_failures,
+                **(
+                    {"lastAttemptAt": signal.last_attempt_at}
+                    if signal.last_attempt_at is not None
+                    else {}
+                ),
+                **(
+                    {"lastSuccessAt": signal.last_success_at}
+                    if signal.last_success_at is not None
+                    else {}
+                ),
+                **(
+                    {"lastFailureAt": signal.last_failure_at}
+                    if signal.last_failure_at is not None
+                    else {}
+                ),
+                **(
+                    {"lastFailureCode": signal.last_failure_code}
+                    if signal.last_failure_code is not None
+                    else {}
+                ),
+            }
+            for signal in state.signals
+        ]
+        try:
+            with self._connect() as connection:
+                connection.execute(
+                    "DELETE FROM iip.telemetry_export_health WHERE last_reported_at < %s",
+                    (expire_before,),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO iip.telemetry_export_health (
+                        instance_id, component, started_at, last_reported_at, signals
+                    ) VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (instance_id) DO UPDATE SET
+                        component = EXCLUDED.component,
+                        started_at = EXCLUDED.started_at,
+                        last_reported_at = EXCLUDED.last_reported_at,
+                        signals = EXCLUDED.signals
+                    WHERE iip.telemetry_export_health.started_at = EXCLUDED.started_at
+                      AND iip.telemetry_export_health.last_reported_at <= EXCLUDED.last_reported_at
+                    """,
+                    (
+                        state.instance_id,
+                        state.component,
+                        state.started_at,
+                        state.last_reported_at,
+                        Jsonb(signals),
+                    ),
+                )
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    def list_telemetry_export_health(
+        self,
+        *,
+        reported_since: str,
+        limit: int,
+    ) -> tuple[TelemetryExportInstanceState, ...]:
+        if not 1 <= limit <= 1_001:
+            raise PersistenceError("storage.input-invalid")
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT instance_id, component, started_at, last_reported_at, signals
+                    FROM iip.telemetry_export_health
+                    WHERE last_reported_at >= %s
+                    ORDER BY component, instance_id
+                    LIMIT %s
+                    """,
+                    (reported_since, limit),
+                ).fetchall()
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+        return tuple(self._telemetry_export_state(row) for row in rows)
+
+    def retire_telemetry_export_health(self, instance_id: str) -> None:
+        try:
+            with self._connect() as connection:
+                connection.execute(
+                    "DELETE FROM iip.telemetry_export_health WHERE instance_id = %s",
+                    (instance_id,),
+                )
+        except psycopg.Error:
+            raise PersistenceError("storage.unavailable") from None
+
+    @staticmethod
+    def _telemetry_export_state(
+        row: Mapping[str, object],
+    ) -> TelemetryExportInstanceState:
+        signals = row["signals"]
+        if not isinstance(signals, list):
+            raise PersistenceError("storage.corrupt")
+        try:
+            decoded = tuple(
+                TelemetryExportSignalState(
+                    signal=item["signal"],
+                    enabled=item["enabled"],
+                    status=item["status"],
+                    attempts=item["attempts"],
+                    successes=item["successes"],
+                    failures=item["failures"],
+                    consecutive_failures=item["consecutiveFailures"],
+                    last_attempt_at=item.get("lastAttemptAt"),
+                    last_success_at=item.get("lastSuccessAt"),
+                    last_failure_at=item.get("lastFailureAt"),
+                    last_failure_code=item.get("lastFailureCode"),
+                )
+                for item in signals
+                if isinstance(item, Mapping)
+            )
+            if len(decoded) != len(signals):
+                raise ValueError
+            return TelemetryExportInstanceState(
+                instance_id=str(row["instance_id"]),
+                component=str(row["component"]),
+                started_at=row["started_at"].isoformat().replace("+00:00", "Z"),
+                last_reported_at=row["last_reported_at"].isoformat().replace(
+                    "+00:00", "Z"
+                ),
+                signals=decoded,
+            )
+        except (KeyError, TypeError, ValueError):
+            raise PersistenceError("storage.corrupt") from None
 
     def commit(
         self,

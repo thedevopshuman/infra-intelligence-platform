@@ -146,6 +146,9 @@ from iip.application.query_resources import (
     ResourceTimelineResult,
 )
 from iip.application.query_runtime_version import GetRuntimeVersionCommand
+from iip.application.query_telemetry_deployment_health import (
+    GetTelemetryDeploymentHealthCommand,
+)
 from iip.application.query_telemetry_export_health import (
     GetTelemetryExportHealthCommand,
     TelemetryExportHealthAuthorizationError,
@@ -166,7 +169,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.44.0"
+    server_version = "IIPReference/0.45.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -276,6 +279,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if path == "/v1/operations/telemetry/export-health":
             self._query_telemetry_export_health(actor, parsed.query)
+            return
+        if path == "/v1/operations/telemetry/deployment-export-health":
+            self._query_telemetry_deployment_health(actor, parsed.query)
             return
         if path == "/v1/operations/events/delivery-health":
             self._query_event_delivery_health(actor, parsed.query)
@@ -465,6 +471,32 @@ class ApiHandler(BaseHTTPRequestHandler):
                 {"error": {"code": "policy.denied"}},
             )
         except TelemetryExportHealthStateError:
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "telemetry.export-health.unavailable"}},
+            )
+
+    def _query_telemetry_deployment_health(
+        self, actor: ActorContext, query: str
+    ) -> None:
+        try:
+            if query:
+                raise ValueError
+            report = self.runtime.telemetry_deployment_health.get(
+                GetTelemetryDeploymentHealthCommand(actor)
+            )
+            self._json(HTTPStatus.OK, report.to_dict())
+        except ValueError:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": "request.invalid"}},
+            )
+        except TelemetryExportHealthAuthorizationError:
+            self._json(
+                HTTPStatus.FORBIDDEN,
+                {"error": {"code": "policy.denied"}},
+            )
+        except (TelemetryExportHealthStateError, PersistenceError):
             self._json(
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 {"error": {"code": "telemetry.export-health.unavailable"}},
@@ -1447,6 +1479,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             "/v1/resources": "resources-list",
             "/v1/telemetry/ingestion": "ingestion-freshness",
             "/v1/operations/telemetry/export-health": "telemetry-export-health",
+            "/v1/operations/telemetry/deployment-export-health": (
+                "telemetry-deployment-export-health"
+            ),
             "/v1/operations/events/delivery-health": "event-delivery-health",
             "/v1/operations/events/delivery-slo": "event-delivery-slo",
             "/v1/operations/investigations/completion-slo": (

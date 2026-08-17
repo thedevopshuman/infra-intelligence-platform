@@ -260,6 +260,9 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `OTEL_METRIC_EXPORT_INTERVAL` | `60000` | Periodic SDK export interval in milliseconds |
 | `OTEL_METRIC_EXPORT_TIMEOUT` | `10000` | Periodic SDK export timeout in milliseconds |
 | `OTEL_SERVICE_NAME` | `infra-intelligence-api` | OpenTelemetry service resource name |
+| `IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS` | `30` | Shared-store exporter-health heartbeat interval when OTLP export is enabled |
+| `IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS` | `120` | Missed-heartbeat threshold for deployment export health |
+| `IIP_TELEMETRY_HEALTH_RETENTION_SECONDS` | `600` | Bounded crashed-instance visibility window |
 | `IIP_TEST_DATABASE_URL` | unset | Enable PostgreSQL integration tests against an explicit test database |
 | `IIP_TEST_PROMETHEUS_ENDPOINT` | unset | Enable the real Prometheus adapter integration test against an explicit endpoint |
 | `IIP_TEST_LOKI_ENDPOINT` | unset | Enable the real Loki adapter integration test against an explicit endpoint |

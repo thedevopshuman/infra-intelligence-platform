@@ -583,6 +583,9 @@
         "traceExportTimeoutMillis",
         "traceMaxQueueSize",
         "traceMaxExportBatchSize",
+        "healthReportIntervalSeconds",
+        "healthStaleAfterSeconds",
+        "healthRetentionSeconds",
         "existingSecret",
         "headersSecretKey"
       ],
@@ -604,6 +607,9 @@
         "traceExportTimeoutMillis": { "$ref": "#/definitions/boundedMillis" },
         "traceMaxQueueSize": { "type": "integer", "minimum": 1, "maximum": 65536 },
         "traceMaxExportBatchSize": { "type": "integer", "minimum": 1, "maximum": 65536 },
+        "healthReportIntervalSeconds": { "type": "integer", "minimum": 5, "maximum": 300 },
+        "healthStaleAfterSeconds": { "type": "integer", "minimum": 10, "maximum": 3600 },
+        "healthRetentionSeconds": { "type": "integer", "minimum": 20, "maximum": 86400 },
         "existingSecret": { "$ref": "#/definitions/optionalName" },
         "headersSecretKey": { "$ref": "#/definitions/nonEmptyString" }
       }

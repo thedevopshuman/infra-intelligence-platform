@@ -71,6 +71,7 @@ from infra_intelligence_sdk import (
     SessionContext,
     TelemetryEvidenceRequest,
     TelemetryEvidenceResult,
+    TelemetryDeploymentExportHealthReport,
     TelemetryExportHealthReport,
 )
 
@@ -140,6 +141,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         export_health = TelemetryExportHealthReport.from_dict(
             example("telemetry-export-health-report.json")
+        )
+        deployment_export_health = TelemetryDeploymentExportHealthReport.from_dict(
+            example("telemetry-deployment-export-health-report.json")
         )
         event_delivery_health = EventDeliveryHealthReport.from_dict(
             example("event-delivery-health-report.json")
@@ -343,6 +347,10 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(freshness.to_dict()["kind"], "IngestionFreshnessReport")
         self.assertEqual(
             export_health.to_dict()["kind"], "TelemetryExportHealthReport"
+        )
+        self.assertEqual(
+            deployment_export_health.to_dict()["kind"],
+            "TelemetryDeploymentExportHealthReport",
         )
         self.assertEqual(
             event_delivery_health.to_dict()["kind"],

@@ -73,7 +73,7 @@ class TelemetryExportHealthService:
             raise TelemetryExportHealthStateError(
                 "telemetry.export-health.state-invalid"
             )
-        self._validate(states)
+        self.validate_states(states)
         enabled = tuple(state for state in states if state.enabled)
         if not enabled:
             status = "disabled"
@@ -100,7 +100,7 @@ class TelemetryExportHealthService:
         )
 
     @staticmethod
-    def _validate(states: tuple[TelemetryExportSignalState, ...]) -> None:
+    def validate_states(states: tuple[TelemetryExportSignalState, ...]) -> None:
         for state in states:
             counts = (
                 state.attempts,

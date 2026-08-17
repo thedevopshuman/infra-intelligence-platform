@@ -328,6 +328,36 @@ export interface TelemetryExportHealthReport {
   };
 }
 
+export interface TelemetryDeploymentExportHealthInstance {
+  instanceId: Sha256Digest;
+  component: "api" | "workflow-worker";
+  startedAt: string;
+  lastReportedAt: string;
+  freshness: "current" | "stale";
+  status: TelemetryExportSignalStatus;
+  signals: [TelemetryExportSignalHealth, TelemetryExportSignalHealth];
+}
+
+export interface TelemetryDeploymentExportHealthReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "TelemetryDeploymentExportHealthReport";
+  metadata: { evaluatedAt: string };
+  spec: {
+    status: TelemetryExportSignalStatus;
+    freshness: {
+      staleAfterSeconds: number;
+      retentionSeconds: number;
+    };
+    summary: {
+      includedInstances: number;
+      currentInstances: number;
+      staleInstances: number;
+      truncated: boolean;
+    };
+    instances: TelemetryDeploymentExportHealthInstance[];
+  };
+}
+
 export type EventDeliveryHealthStatus = "healthy" | "backlogged" | "degraded";
 
 export interface QuarantinedEventDelivery {

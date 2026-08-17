@@ -55,6 +55,7 @@ SCHEMA_MIGRATIONS = (
     "0013_evidence_artifact_retention.sql",
     "0014_durable_plugin_invocations.sql",
     "0015_plugin_invocation_lifecycle.sql",
+    "0016_telemetry_export_health.sql",
 )
 
 

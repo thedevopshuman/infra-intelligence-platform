@@ -88,6 +88,7 @@ class ConsoleHttpTests(unittest.TestCase):
         self.assertIn("SLO attainment", console)
         self.assertIn("Investigation reliability", console)
         self.assertIn("Evidence retention", console)
+        self.assertIn("Telemetry delivery", console)
         self.assertIn("Invocation operations", console)
         self.assertIn("Close unknown outcome", console)
         self.assertIn("This never replays", console)
@@ -112,6 +113,9 @@ class ConsoleHttpTests(unittest.TestCase):
             script,
         )
         self.assertIn("/v1/operations/evidence/retention", script)
+        self.assertIn(
+            "/v1/operations/telemetry/deployment-export-health", script
+        )
         self.assertIn("Event delivery", script)
         self.assertIn('actionType === "event-delivery.requeue"', script)
         self.assertIn("exact quarantine generation", script)

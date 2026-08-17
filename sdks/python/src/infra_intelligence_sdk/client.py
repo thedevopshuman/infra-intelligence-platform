@@ -45,6 +45,7 @@ from .models import (
     RuntimeVersionReport,
     SessionContext,
     TelemetryEvidenceRequest,
+    TelemetryDeploymentExportHealthReport,
     TelemetryExportHealthReport,
 )
 
@@ -202,6 +203,15 @@ class Client:
 
         return TelemetryExportHealthReport.from_dict(
             self._get("/v1/operations/telemetry/export-health")
+        )
+
+    def get_telemetry_deployment_export_health(
+        self,
+    ) -> TelemetryDeploymentExportHealthReport:
+        """Read recent API and worker delivery state as an administrator."""
+
+        return TelemetryDeploymentExportHealthReport.from_dict(
+            self._get("/v1/operations/telemetry/deployment-export-health")
         )
 
     def get_event_delivery_health(

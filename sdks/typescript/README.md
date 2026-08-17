@@ -2,6 +2,8 @@
 
 The SDK exposes public contract types and a small fetch-based client. It has no dependency on server code or a framework runtime.
 
+`getTelemetryExportHealth()` reads the answering API process; `getTelemetryDeploymentExportHealth()` returns bounded recent pseudonymous API and workflow-worker heartbeats. Both stay backend-neutral and exclude endpoint, credential, payload, provider-response, and raw workload identity data.
+
 ```ts
 import { InfrastructureIntelligenceClient } from "@iip/sdk";
 

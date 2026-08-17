@@ -157,6 +157,29 @@ def main() -> int:
             or runtime_spec.get("deployment") != {}
         ):
             raise ProductWorkflowError("local runtime identity is invalid")
+
+        telemetry_health = _request(
+            "/v1/operations/telemetry/deployment-export-health", operator
+        )
+        telemetry_spec = telemetry_health.get("spec")
+        telemetry_summary = (
+            telemetry_spec.get("summary")
+            if isinstance(telemetry_spec, Mapping)
+            else None
+        )
+        if (
+            telemetry_health.get("kind")
+            != "TelemetryDeploymentExportHealthReport"
+            or "tenantId" in telemetry_health.get("metadata", {})
+            or not isinstance(telemetry_spec, Mapping)
+            or telemetry_spec.get("status")
+            not in ("disabled", "awaiting-first-attempt", "healthy", "degraded")
+            or not isinstance(telemetry_summary, Mapping)
+            or not isinstance(telemetry_spec.get("instances"), list)
+        ):
+            raise ProductWorkflowError(
+                "local deployment telemetry health is invalid"
+            )
         retention = _request("/v1/operations/evidence/retention", operator)
         retention_spec = retention.get("spec")
         retention_artifacts = (
@@ -486,8 +509,9 @@ def main() -> int:
                 "local investigation completion SLO is invalid"
             )
         print(
-            "local product workflow passed: runtime identity → collection → event delivery health/SLO → queued worker "
-            "investigation and completion SLO → proposal → independent approval → one-shot dry-run → queue"
+            "local product workflow passed: runtime identity/telemetry delivery → "
+            "collection → event delivery health/SLO → queued worker investigation and "
+            "completion SLO → proposal → independent approval → one-shot dry-run → queue"
         )
         print(f"action: {proposal_id}")
         return 0

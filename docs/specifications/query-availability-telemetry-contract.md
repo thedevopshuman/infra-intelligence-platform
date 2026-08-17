@@ -23,7 +23,7 @@ Every query counter and duration observation has exactly these bounded attribute
 | `iip.query.objective.minimum_availability_basis_points` | integer | deployment-configured target |
 | `iip.query.objective.minimum_eligible_requests` | integer | deployment-configured sample floor |
 
-The closed operations are `console-authentication`, `session`, `runtime-version`, `resources-list`, `resource-neighborhood`, `resource-timeline`, `ingestion-freshness`, `telemetry-export-health`, `event-delivery-health`, `event-delivery-slo`, `investigation-completion-slo`, `evidence-retention`, `evidence-get`, `investigation-get`, `investigation-status`, `investigation-job-get`, `actions-list`, `action-get`, `action-workflow-get`, `plugin-session-get`, and `plugin-invocation-status`.
+The closed operations are `console-authentication`, `session`, `runtime-version`, `resources-list`, `resource-neighborhood`, `resource-timeline`, `ingestion-freshness`, `telemetry-export-health`, `telemetry-deployment-export-health`, `event-delivery-health`, `event-delivery-slo`, `investigation-completion-slo`, `evidence-retention`, `evidence-get`, `investigation-get`, `investigation-status`, `investigation-job-get`, `actions-list`, `action-get`, `action-workflow-get`, `plugin-session-get`, and `plugin-invocation-status`.
 
 ## Eligibility and arithmetic
 

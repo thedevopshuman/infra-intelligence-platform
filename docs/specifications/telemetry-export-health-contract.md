@@ -25,7 +25,7 @@ Overall status is `disabled` when neither signal is enabled, `degraded` when any
 
 `GET /v1/operations/telemetry/export-health` requires Bearer authentication, the `platform-admin` role, and policy approval for `telemetry-export-health:read`. The result is process-wide rather than tenant data; the tenant on the operator identity is used only as explicit policy scope and is not returned.
 
-This endpoint is intentionally separate from `/healthz` and `/readyz`. A customer-selected Collector or backend outage must not stop resource ingestion, investigation, or action-governance traffic. The report covers only the control-plane process answering the request. Operators alert on it out of band and query every API replica directly when a deployment has more than one; deployment-wide aggregation and exporter state for non-HTTP workers are not claimed by this contract.
+This endpoint is intentionally separate from `/healthz` and `/readyz`. A customer-selected Collector or backend outage must not stop resource ingestion, investigation, or action-governance traffic. The report covers only the control-plane process answering the request. The separate [deployment telemetry export health contract](telemetry-deployment-export-health-contract.md) aggregates recent pseudonymous API and workflow-worker heartbeats without changing these process-local semantics.
 
 | HTTP status | Code | Meaning |
 | --- | --- | --- |

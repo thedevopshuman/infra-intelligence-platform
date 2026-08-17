@@ -21,6 +21,7 @@ QUERY_OPERATIONS = frozenset(
         "resource-timeline",
         "ingestion-freshness",
         "telemetry-export-health",
+        "telemetry-deployment-export-health",
         "event-delivery-health",
         "event-delivery-slo",
         "investigation-completion-slo",

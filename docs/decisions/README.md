@@ -88,3 +88,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0082](0082-multi-window-telemetry-export-burn-rate.md) | Accepted | Calculate a two-window error-budget burn rate from the existing sampled exporter counters |
 | [0083](0083-calendar-aware-seasonal-baseline.md) | Accepted | Shift seasonal baseline lookbacks by whole calendar days in a declared timezone instead of raw elapsed seconds |
 | [0084](0084-opensearch-historical-log-evidence-adapter.md) | Accepted | Add an allowlisted OpenSearch adapter as a second historical log backend |
+| [0085](0085-otlp-receiver-expired-certificate-rejection-evidence.md) | Accepted | Prove the OTLP receiver rejects an otherwise-trusted but expired client certificate |

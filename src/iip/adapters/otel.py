@@ -838,14 +838,14 @@ def build_otlp_metrics_runtime(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.57.0",
+                    "service.version": "0.58.0",
                 }
             ),
             metric_readers=(reader,),
         )
-        ingestion_meter = provider.get_meter("iip.ingestion", "0.57.0")
-        query_meter = provider.get_meter("iip.query", "0.57.0")
-        receiver_meter = provider.get_meter("iip.otlp.receiver", "0.57.0")
+        ingestion_meter = provider.get_meter("iip.ingestion", "0.58.0")
+        query_meter = provider.get_meter("iip.query", "0.58.0")
+        receiver_meter = provider.get_meter("iip.otlp.receiver", "0.58.0")
         sink = OpenTelemetryIngestionSink(
             ingestion_meter,
             attribute_mode=configuration.attribute_mode,
@@ -889,7 +889,7 @@ def build_otlp_traces_runtime(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.57.0",
+                    "service.version": "0.58.0",
                 }
             )
         )
@@ -902,7 +902,7 @@ def build_otlp_traces_runtime(
                 max_export_batch_size=configuration.max_export_batch_size,
             )
         )
-        tracer = provider.get_tracer("iip.investigation", "0.57.0")
+        tracer = provider.get_tracer("iip.investigation", "0.58.0")
         sink = OpenTelemetryInvestigationSink(
             tracer,
             attribute_mode=configuration.attribute_mode,

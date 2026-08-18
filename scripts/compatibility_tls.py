@@ -22,8 +22,15 @@ def write_tls_material(
     dns_name: str,
     ip_address: str = "127.0.0.1",
     client_identities: Mapping[str, str] | None = None,
+    expired_client_identities: Mapping[str, str] | None = None,
 ) -> None:
-    """Write a one-hour CA/server chain and optional URI-SAN client identities."""
+    """Write a one-hour CA/server chain and optional URI-SAN client identities.
+
+    ``expired_client_identities`` are signed by the same CA as
+    ``client_identities`` but carry a validity window that already closed,
+    proving the receiver rejects an otherwise-trusted identity once its
+    certificate has expired rather than only rejecting an untrusted issuer.
+    """
 
     now = datetime.now(timezone.utc)
     ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -129,7 +136,13 @@ def write_tls_material(
     for name in ("ca.crt", "server.crt", "server.key"):
         os.chmod(directory / name, 0o644)
 
-    for prefix, uri_san in (client_identities or {}).items():
+    def write_client_identity(
+        prefix: str,
+        uri_san: str,
+        *,
+        not_valid_before: datetime,
+        not_valid_after: datetime,
+    ) -> None:
         if (
             re.fullmatch(r"[a-z][a-z0-9-]{0,63}", prefix) is None
             or not uri_san.startswith("spiffe://")
@@ -146,8 +159,8 @@ def write_tls_material(
             .issuer_name(ca_name)
             .public_key(client_key.public_key())
             .serial_number(x509.random_serial_number())
-            .not_valid_before(now - timedelta(minutes=1))
-            .not_valid_after(now + timedelta(hours=1))
+            .not_valid_before(not_valid_before)
+            .not_valid_after(not_valid_after)
             .add_extension(
                 x509.SubjectAlternativeName(
                     [x509.UniformResourceIdentifier(uri_san)]
@@ -199,3 +212,18 @@ def write_tls_material(
         )
         os.chmod(directory / f"{prefix}.crt", 0o644)
         os.chmod(directory / f"{prefix}.key", 0o600)
+
+    for prefix, uri_san in (client_identities or {}).items():
+        write_client_identity(
+            prefix,
+            uri_san,
+            not_valid_before=now - timedelta(minutes=1),
+            not_valid_after=now + timedelta(hours=1),
+        )
+    for prefix, uri_san in (expired_client_identities or {}).items():
+        write_client_identity(
+            prefix,
+            uri_san,
+            not_valid_before=now - timedelta(days=2),
+            not_valid_after=now - timedelta(days=1),
+        )

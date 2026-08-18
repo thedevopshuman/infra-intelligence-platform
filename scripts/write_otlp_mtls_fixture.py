@@ -31,6 +31,7 @@ def write_fixture(directory: Path) -> None:
             "collector-b": AUTHORIZED_SPIFFE_ID,
             "other-workload": UNAUTHORIZED_SPIFFE_ID,
         },
+        expired_client_identities={"collector-expired": AUTHORIZED_SPIFFE_ID},
     )
     untrusted = directory / "untrusted"
     untrusted.mkdir()

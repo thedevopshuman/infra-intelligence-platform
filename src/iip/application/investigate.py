@@ -8,8 +8,9 @@ import math
 import re
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as datetime_timezone
 from typing import Any, Mapping
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 
 from iip.application.collect_evidence import (
     CollectEvidenceCommand,
@@ -2852,6 +2853,10 @@ class DeterministicInvestigationService:
                 "baselineAggregation": seasonal_comparison[
                     "baselineAggregation"
                 ],
+                "calendarAligned": seasonal_comparison.get(
+                    "calendarAligned", False
+                ),
+                "timezone": seasonal_comparison.get("timezone"),
                 "baselineTimeRanges": baseline_ranges,
                 "evaluationTimeRange": evaluation_range,
                 "calculation": seasonal_comparison["calculation"],
@@ -2946,6 +2951,40 @@ class DeterministicInvestigationService:
         assessment["disposition"] = self._assessment_disposition(configured)
         return assessment
 
+    _MAX_TIMEZONE_NAME_LENGTH = 64
+
+    @staticmethod
+    def _resolve_timezone(value: object) -> ZoneInfo | None:
+        """Resolve a closed IANA timezone name, never a caller-shaped path."""
+
+        if (
+            not isinstance(value, str)
+            or not value
+            or len(value)
+            > DeterministicInvestigationService._MAX_TIMEZONE_NAME_LENGTH
+            or value not in available_timezones()
+        ):
+            return None
+        try:
+            return ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError):
+            return None
+
+    @staticmethod
+    def _shift_calendar_days(value: datetime, days: int, zone: ZoneInfo) -> datetime:
+        """Shift by whole calendar days of local wall-clock time, not elapsed seconds.
+
+        A local time that becomes ambiguous across a fall-back transition
+        resolves to its earlier UTC instant (``fold=0``); a local time that
+        falls in a spring-forward gap resolves per PEP 495's pre-transition
+        offset. Both are deterministic and reproducible from the same inputs.
+        """
+
+        local_naive = value.astimezone(zone).replace(tzinfo=None)
+        shifted_naive = local_naive - timedelta(days=days)
+        shifted_local = shifted_naive.replace(tzinfo=zone)
+        return shifted_local.astimezone(datetime_timezone.utc)
+
     @staticmethod
     def _seasonal_time_ranges(
         comparison: Mapping[str, object],
@@ -2959,6 +2998,7 @@ class DeterministicInvestigationService:
         period = comparison.get("periodSeconds")
         lookbacks = comparison.get("lookbackPeriods")
         evaluation_duration = comparison.get("evaluationDurationSeconds")
+        calendar_aligned = comparison.get("calendarAligned", False)
         if (
             scope_end is None
             or not isinstance(period, int)
@@ -2967,20 +3007,36 @@ class DeterministicInvestigationService:
             or isinstance(lookbacks, bool)
             or not isinstance(evaluation_duration, int)
             or isinstance(evaluation_duration, bool)
+            or calendar_aligned not in (True, False)
+            or (calendar_aligned and period % 86_400 != 0)
         ):
             return None
+        zone = None
+        if calendar_aligned:
+            zone = DeterministicInvestigationService._resolve_timezone(
+                comparison.get("timezone")
+            )
+            if zone is None:
+                return None
         evaluation_start = scope_end - timedelta(seconds=evaluation_duration)
 
         def timestamp(value: datetime) -> str:
             return value.isoformat().replace("+00:00", "Z")
 
+        def shifted(value: datetime, offset_seconds: int) -> datetime:
+            if zone is None:
+                return value - timedelta(seconds=offset_seconds)
+            return DeterministicInvestigationService._shift_calendar_days(
+                value, offset_seconds // 86_400, zone
+            )
+
         baselines = []
         for position in range(1, lookbacks + 1):
-            offset = timedelta(seconds=period * position)
+            offset_seconds = period * position
             baselines.append(
                 {
-                    "start": timestamp(evaluation_start - offset),
-                    "end": timestamp(scope_end - offset),
+                    "start": timestamp(shifted(evaluation_start, offset_seconds)),
+                    "end": timestamp(shifted(scope_end, offset_seconds)),
                 }
             )
         return baselines, {
@@ -4474,11 +4530,17 @@ class DeterministicInvestigationService:
             "whenMatched",
             "whenNotMatched",
         }
-        if not isinstance(value, Mapping) or set(value) != required:
+        calendar_fields = {"calendarAligned", "timezone"}
+        if (
+            not isinstance(value, Mapping)
+            or set(value) not in (required, required | calendar_fields)
+        ):
             raise InvalidInvestigationError("investigation.contract.invalid")
         period = value.get("periodSeconds")
         lookbacks = value.get("lookbackPeriods")
         evaluation_duration = value.get("evaluationDurationSeconds")
+        calendar_aligned = value.get("calendarAligned", False)
+        timezone_name = value.get("timezone")
         if (
             not isinstance(period, int)
             or isinstance(period, bool)
@@ -4492,6 +4554,15 @@ class DeterministicInvestigationService:
             or evaluation_duration >= period
             or value.get("baselineAggregation") not in {"mean", "median"}
             or value.get("calculation") not in {"difference", "ratio"}
+            or ("calendarAligned" in value and calendar_aligned is not True)
+            or (calendar_aligned and period % 86_400 != 0)
+            or (
+                calendar_aligned
+                and DeterministicInvestigationService._resolve_timezone(
+                    timezone_name
+                )
+                is None
+            )
         ):
             raise InvalidInvestigationError("investigation.contract.invalid")
         DeterministicInvestigationService._validate_interpretation(

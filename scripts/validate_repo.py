@@ -96,6 +96,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0081-backend-neutral-otlp-receiver-availability.md",
     "docs/decisions/0082-multi-window-telemetry-export-burn-rate.md",
     "docs/specifications/telemetry-export-burn-rate-contract.md",
+    "docs/decisions/0083-calendar-aware-seasonal-baseline.md",
     "docs/specifications/investigation-capacity-contract.md",
     "docs/specifications/credential-broker-compatibility-contract.md",
     "docs/specifications/oidc-issuer-compatibility-contract.md",

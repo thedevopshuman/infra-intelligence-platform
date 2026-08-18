@@ -10,3 +10,5 @@ googleapis-common-protos==1.75.1
 opentelemetry-proto==1.44.0
 opentelemetry-sdk==1.44.0
 opentelemetry-exporter-otlp-proto-http==1.44.0
+# Portable IANA timezone database for deterministic calendar-aware baselines.
+tzdata==2026.3

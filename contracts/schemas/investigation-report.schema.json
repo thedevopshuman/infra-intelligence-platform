@@ -614,6 +614,8 @@
         "lookbackPeriods",
         "evaluationDurationSeconds",
         "baselineAggregation",
+        "calendarAligned",
+        "timezone",
         "baselineTimeRanges",
         "evaluationTimeRange",
         "calculation",
@@ -662,6 +664,18 @@
         "baselineAggregation": {
           "type": "string",
           "enum": ["mean", "median"]
+        },
+        "calendarAligned": {"type": "boolean"},
+        "timezone": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+            },
+            {"type": "null"}
+          ]
         },
         "baselineTimeRanges": {
           "type": "array",
@@ -736,6 +750,16 @@
         {
           "if": {"properties": {"calculation": {"const": "ratio"}}},
           "then": {"properties": {"comparisonUnit": {"const": "1"}}}
+        },
+        {
+          "if": {"properties": {"calendarAligned": {"const": true}}},
+          "then": {
+            "properties": {
+              "timezone": {"type": "string"},
+              "periodSeconds": {"type": "integer", "multipleOf": 86400}
+            }
+          },
+          "else": {"properties": {"timezone": {"const": null}}}
         }
       ]
     },

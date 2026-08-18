@@ -452,8 +452,27 @@
         "whenNotMatched": {
           "type": "string",
           "enum": ["supports", "contradicts", "neutral"]
+        },
+        "calendarAligned": {"const": true},
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1F\\x7F]+$"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {"required": ["calendarAligned"]},
+          "then": {
+            "required": ["timezone"],
+            "properties": {
+              "periodSeconds": {"type": "integer", "multipleOf": 86400}
+            }
+          },
+          "else": {"not": {"required": ["timezone"]}}
+        }
+      ]
     },
     "assessmentTimeRange": {
       "type": "object",

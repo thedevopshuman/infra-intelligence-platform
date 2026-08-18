@@ -73,6 +73,8 @@
         "lookbackPeriods": 2,
         "evaluationDurationSeconds": 900,
         "baselineAggregation": "median",
+        "calendarAligned": false,
+        "timezone": null,
         "baselineTimeRanges": [
           {
             "start": "2026-08-09T09:15:00Z",

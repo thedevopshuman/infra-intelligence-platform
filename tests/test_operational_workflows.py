@@ -497,6 +497,133 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
             InvalidInvestigationError, "investigation.contract.invalid"
         ):
             service.execute(RunInvestigationCommand(self.actor, invalid_seasonal))
+
+        # 2025-11-02 is the US fall-back DST transition in America/New_York
+        # (02:00 EDT -> 01:00 EST). A calendar-aligned weekly lookback from
+        # 2025-11-09 01:30 EST must land on the same local wall-clock time on
+        # 2025-11-02 and 2025-10-26, one hour earlier in UTC than a raw
+        # elapsed-seconds shift would land once it crosses that transition.
+        # (The scope must be in the past relative to the real clock the
+        # investigation runs against, so this uses the most recent such
+        # transition rather than a future one.)
+        calendar_seasonal = copy.deepcopy(seasonal_request)
+        calendar_seasonal["metadata"]["id"] = (
+            "inv_21212121212121212121212121212121"
+        )
+        calendar_seasonal["spec"]["scope"]["timeRange"] = {
+            "start": "2025-10-25T00:00:00Z",
+            "end": "2025-11-09T06:30:00Z",
+        }
+        calendar_rule = calendar_seasonal["spec"]["telemetrySelections"][1][
+            "seasonalBaselineComparison"
+        ]
+        calendar_rule["evaluationDurationSeconds"] = 60
+        calendar_rule["calendarAligned"] = True
+        calendar_rule["timezone"] = "America/New_York"
+        backend.points = (
+            TelemetryMetricPoint("2025-10-26T05:29:30Z", 0.01),
+            TelemetryMetricPoint("2025-11-02T05:29:30Z", 0.03),
+            TelemetryMetricPoint("2025-11-09T06:29:30Z", 0.08),
+        )
+
+        calendar_report = service.execute(
+            RunInvestigationCommand(self.actor, calendar_seasonal)
+        )
+
+        calendar_assessment = calendar_report["spec"]["telemetryAssessments"][0]
+        self.assertIs(calendar_assessment["calendarAligned"], True)
+        self.assertEqual(calendar_assessment["timezone"], "America/New_York")
+        self.assertEqual(
+            calendar_assessment["baselineTimeRanges"],
+            [
+                {"start": "2025-11-02T05:29:00Z", "end": "2025-11-02T05:30:00Z"},
+                {"start": "2025-10-26T05:29:00Z", "end": "2025-10-26T05:30:00Z"},
+            ],
+        )
+        self.assertEqual(
+            calendar_assessment["evaluationTimeRange"],
+            {"start": "2025-11-09T06:29:00Z", "end": "2025-11-09T06:30:00Z"},
+        )
+        self.assertEqual(
+            calendar_assessment["baselinePeriodValues"], [0.03, 0.01]
+        )
+        self.assertEqual(calendar_assessment["disposition"], "supporting")
+        assert_schema(
+            self, "investigation-report.schema.json", calendar_report
+        )
+
+        elapsed_seasonal = copy.deepcopy(calendar_seasonal)
+        elapsed_seasonal["metadata"]["id"] = (
+            "inv_22222222222222222222222222222222"
+        )
+        elapsed_rule = elapsed_seasonal["spec"]["telemetrySelections"][1][
+            "seasonalBaselineComparison"
+        ]
+        del elapsed_rule["calendarAligned"]
+        del elapsed_rule["timezone"]
+
+        elapsed_report = service.execute(
+            RunInvestigationCommand(self.actor, elapsed_seasonal)
+        )
+
+        elapsed_assessment = elapsed_report["spec"]["telemetryAssessments"][0]
+        self.assertIs(elapsed_assessment["calendarAligned"], False)
+        self.assertIsNone(elapsed_assessment["timezone"])
+        self.assertEqual(
+            elapsed_assessment["baselineTimeRanges"],
+            [
+                {"start": "2025-11-02T06:29:00Z", "end": "2025-11-02T06:30:00Z"},
+                {"start": "2025-10-26T06:29:00Z", "end": "2025-10-26T06:30:00Z"},
+            ],
+        )
+        self.assertNotEqual(
+            elapsed_assessment["baselineTimeRanges"],
+            calendar_assessment["baselineTimeRanges"],
+        )
+        assert_schema(
+            self, "investigation-report.schema.json", elapsed_report
+        )
+        backend.points = None
+
+        invalid_timezone = copy.deepcopy(calendar_seasonal)
+        invalid_timezone["metadata"]["id"] = (
+            "inv_23232323232323232323232323232323"
+        )
+        invalid_timezone["spec"]["telemetrySelections"][1][
+            "seasonalBaselineComparison"
+        ]["timezone"] = "Mars/OlympusMons"
+        with self.assertRaisesRegex(
+            InvalidInvestigationError, "investigation.contract.invalid"
+        ):
+            service.execute(RunInvestigationCommand(self.actor, invalid_timezone))
+
+        misaligned_period = copy.deepcopy(calendar_seasonal)
+        misaligned_period["metadata"]["id"] = (
+            "inv_24242424242424242424242424242424"
+        )
+        misaligned_period["spec"]["telemetrySelections"][1][
+            "seasonalBaselineComparison"
+        ]["periodSeconds"] = 90000
+        with self.assertRaisesRegex(
+            InvalidInvestigationError, "investigation.contract.invalid"
+        ):
+            service.execute(
+                RunInvestigationCommand(self.actor, misaligned_period)
+            )
+
+        timezone_without_flag = copy.deepcopy(calendar_seasonal)
+        timezone_without_flag["metadata"]["id"] = (
+            "inv_25252525252525252525252525252525"
+        )
+        del timezone_without_flag["spec"]["telemetrySelections"][1][
+            "seasonalBaselineComparison"
+        ]["calendarAligned"]
+        with self.assertRaisesRegex(
+            InvalidInvestigationError, "investigation.contract.invalid"
+        ):
+            service.execute(
+                RunInvestigationCommand(self.actor, timezone_without_flag)
+            )
         backend.points = None
 
         oversized_rolling = copy.deepcopy(rolling_request)

@@ -86,3 +86,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0080](0080-mutual-tls-otlp-workload-identity-and-buffering.md) | Accepted | Bind OTLP channels to SPIFFE mTLS identities, commit before success, and keep durable outage queues in the customer Collector |
 | [0081](0081-backend-neutral-otlp-receiver-availability.md) | Accepted | Export privacy-bounded OTLP intake availability through the customer-selected telemetry backend |
 | [0082](0082-multi-window-telemetry-export-burn-rate.md) | Accepted | Calculate a two-window error-budget burn rate from the existing sampled exporter counters |
+| [0083](0083-calendar-aware-seasonal-baseline.md) | Accepted | Shift seasonal baseline lookbacks by whole calendar days in a declared timezone instead of raw elapsed seconds |

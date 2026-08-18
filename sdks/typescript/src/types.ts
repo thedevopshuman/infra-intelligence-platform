@@ -1162,19 +1162,38 @@ export interface InvestigationTelemetryRollingBaselineComparison {
   whenNotMatched: "supports" | "contradicts" | "neutral";
 }
 
-export interface InvestigationTelemetrySeasonalBaselineComparison {
-  statistic: "minimum" | "maximum" | "mean";
-  unit: string;
-  periodSeconds: number;
-  lookbackPeriods: number;
-  evaluationDurationSeconds: number;
-  baselineAggregation: "mean" | "median";
-  calculation: "difference" | "ratio";
-  operator: "lt" | "lte" | "gt" | "gte";
-  threshold: number;
-  whenMatched: "supports" | "contradicts" | "neutral";
-  whenNotMatched: "supports" | "contradicts" | "neutral";
-}
+export type InvestigationTelemetrySeasonalBaselineComparison =
+  | {
+      statistic: "minimum" | "maximum" | "mean";
+      unit: string;
+      periodSeconds: number;
+      lookbackPeriods: number;
+      evaluationDurationSeconds: number;
+      baselineAggregation: "mean" | "median";
+      calculation: "difference" | "ratio";
+      operator: "lt" | "lte" | "gt" | "gte";
+      threshold: number;
+      whenMatched: "supports" | "contradicts" | "neutral";
+      whenNotMatched: "supports" | "contradicts" | "neutral";
+    }
+  | {
+      statistic: "minimum" | "maximum" | "mean";
+      unit: string;
+      /** Calendar-aligned periods must be a whole number of days (multiple of 86400). */
+      periodSeconds: number;
+      lookbackPeriods: number;
+      evaluationDurationSeconds: number;
+      baselineAggregation: "mean" | "median";
+      calculation: "difference" | "ratio";
+      operator: "lt" | "lte" | "gt" | "gte";
+      threshold: number;
+      whenMatched: "supports" | "contradicts" | "neutral";
+      whenNotMatched: "supports" | "contradicts" | "neutral";
+      /** Shift lookback windows by whole calendar days in `timezone` instead of raw elapsed seconds. */
+      calendarAligned: true;
+      /** IANA timezone name, e.g. "America/New_York". */
+      timezone: string;
+    };
 
 export interface InvestigationCancellationRequest {
   apiVersion: "iip.platform/v1alpha1";
@@ -1472,6 +1491,8 @@ export interface InvestigationTelemetrySeasonalBaselineAssessment {
   lookbackPeriods: number;
   evaluationDurationSeconds: number;
   baselineAggregation: "mean" | "median";
+  calendarAligned: boolean;
+  timezone: string | null;
   baselineTimeRanges: { start: string; end: string }[];
   evaluationTimeRange: { start: string; end: string };
   calculation: "difference" | "ratio";

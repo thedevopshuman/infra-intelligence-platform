@@ -216,6 +216,9 @@ class QueryAvailabilityHttpBoundaryTests(unittest.TestCase):
             "/v1/operations/telemetry/export-burn-rate": (
                 "telemetry-export-burn-rate"
             ),
+            "/v1/operations/telemetry/collector-queue-loss": (
+                "collector-queue-loss"
+            ),
             "/v1/operations/events/delivery-health": "event-delivery-health",
             "/v1/operations/events/delivery-slo": "event-delivery-slo",
             "/v1/operations/investigations/completion-slo": (

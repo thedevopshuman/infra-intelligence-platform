@@ -121,6 +121,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "telemetry-export-burn-rate-report.schema.json": (
         "telemetry-export-burn-rate-report.json",
     ),
+    "collector-queue-loss-report.schema.json": (
+        "collector-queue-loss-report.json",
+    ),
     "integration-config.schema.json": ("integration-config.json",),
     "log-evidence-request.schema.json": ("log-evidence-request.json",),
     "log-evidence-result.schema.json": ("log-evidence-result.json",),

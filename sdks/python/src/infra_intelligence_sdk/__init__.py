@@ -10,6 +10,7 @@ from .models import (
     ActionResult,
     ActionWorkflow,
     ActionWorkflowPage,
+    CollectorQueueLossReport,
     ConsoleAuthenticationConfiguration,
     ContextEvidenceRequest,
     ContextEvidenceResult,
@@ -98,6 +99,7 @@ __all__ = [
     "ActionWorkflowPage",
     "ApiError",
     "Client",
+    "CollectorQueueLossReport",
     "ConsoleAuthenticationConfiguration",
     "ContextEvidenceRequest",
     "ContextEvidenceResult",
@@ -179,4 +181,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.44.0"
+__version__ = "0.45.0"

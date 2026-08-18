@@ -16,6 +16,7 @@ from .models import (
     ActionResult,
     ActionWorkflow,
     ActionWorkflowPage,
+    CollectorQueueLossReport,
     ConsoleAuthenticationConfiguration,
     ContextEvidenceRequest,
     Evidence,
@@ -228,6 +229,18 @@ class Client:
 
         return TelemetryExportBurnRateReport.from_dict(
             self._get("/v1/operations/telemetry/export-burn-rate")
+        )
+
+    def get_collector_queue_loss(self) -> CollectorQueueLossReport:
+        """Read the Collector-observed queue/loss objective as an administrator.
+
+        Distinct from get_telemetry_export_burn_rate, which measures IIP's
+        own outbound exporter attempts rather than the customer Collector's
+        internal queue for its pipeline to IIP.
+        """
+
+        return CollectorQueueLossReport.from_dict(
+            self._get("/v1/operations/telemetry/collector-queue-loss")
         )
 
     def get_event_delivery_health(

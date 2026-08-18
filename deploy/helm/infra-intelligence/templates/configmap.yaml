@@ -60,6 +60,11 @@ data:
   IIP_TELEMETRY_EXPORT_BURN_RATE_MINIMUM_ATTAINMENT_BASIS_POINTS: {{ .Values.telemetry.exportBurnRateMinimumAttainmentBasisPoints | quote }}
   IIP_TELEMETRY_EXPORT_BURN_RATE_MINIMUM_ELIGIBLE_ATTEMPTS: {{ .Values.telemetry.exportBurnRateMinimumEligibleAttempts | quote }}
   IIP_TELEMETRY_EXPORT_BURN_RATE_CRITICAL_HUNDREDTHS: {{ .Values.telemetry.exportBurnRateCriticalHundredths | quote }}
+  IIP_COLLECTOR_QUEUE_LOSS_BINDING_JSON: {{ .Values.collectorQueueLoss.bindingJson | quote }}
+  IIP_COLLECTOR_QUEUE_LOSS_WINDOW_SECONDS: {{ .Values.collectorQueueLoss.windowSeconds | quote }}
+  IIP_COLLECTOR_QUEUE_LOSS_MAX_LOSS_BASIS_POINTS: {{ .Values.collectorQueueLoss.maxLossBasisPoints | quote }}
+  IIP_COLLECTOR_QUEUE_LOSS_MAX_QUEUE_UTILIZATION_BASIS_POINTS: {{ .Values.collectorQueueLoss.maxQueueUtilizationBasisPoints | quote }}
+  IIP_COLLECTOR_QUEUE_LOSS_MINIMUM_ELIGIBLE_ATTEMPTS: {{ .Values.collectorQueueLoss.minimumEligibleAttempts | quote }}
   OTEL_SERVICE_NAME: {{ .Values.telemetry.serviceName | quote }}
   IIP_TELEMETRY_METRICS_BACKEND: {{ .Values.telemetryEvidence.backend | quote }}
   IIP_TELEMETRY_LOGS_BACKEND: {{ .Values.logEvidence.backend | quote }}

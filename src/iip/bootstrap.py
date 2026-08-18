@@ -145,6 +145,11 @@ from iip.application.query_telemetry_export_burn_rate import (
     TelemetryExportBurnRateObjectives,
     TelemetryExportBurnRateService,
 )
+from iip.application.query_collector_queue_loss import (
+    CollectorQueueLossBinding,
+    CollectorQueueLossObjectives,
+    CollectorQueueLossService,
+)
 from iip.application.report_telemetry_export_health import (
     TelemetryExportHealthReporter,
     TelemetryExportHealthReportingConfiguration,
@@ -187,6 +192,7 @@ class Runtime:
     telemetry_deployment_health: TelemetryDeploymentHealthService
     telemetry_export_slo: TelemetryExportSloService
     telemetry_export_burn_rate: TelemetryExportBurnRateService
+    collector_queue_loss: CollectorQueueLossService
     runtime_version: RuntimeVersionService
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
@@ -235,6 +241,8 @@ def build_local_runtime(
     telemetry_export_burn_rate_objectives: (
         TelemetryExportBurnRateObjectives | None
     ) = None,
+    collector_queue_loss_binding: CollectorQueueLossBinding | None = None,
+    collector_queue_loss_objectives: CollectorQueueLossObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     query_availability_sink: QueryAvailabilitySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
@@ -292,6 +300,8 @@ def build_local_runtime(
         telemetry_health_reporting,
         otlp_receiver_objectives,
         otlp_receiver_telemetry_sink,
+        collector_queue_loss_binding,
+        collector_queue_loss_objectives,
     )
 
 
@@ -329,6 +339,8 @@ def _compose_runtime(
     ) = None,
     otlp_receiver_objectives: OtlpReceiverObjectives | None = None,
     otlp_receiver_telemetry_sink: OtlpReceiverTelemetrySink | None = None,
+    collector_queue_loss_binding: CollectorQueueLossBinding | None = None,
+    collector_queue_loss_objectives: CollectorQueueLossObjectives | None = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -509,6 +521,13 @@ def _compose_runtime(
             clock,
             telemetry_export_burn_rate_objectives,
         ),
+        collector_queue_loss=CollectorQueueLossService(
+            metrics_backend,
+            policy,
+            clock,
+            collector_queue_loss_binding,
+            collector_queue_loss_objectives,
+        ),
         runtime_version=RuntimeVersionService(
             _runtime_version_identity_from_env(),
             clock,
@@ -607,6 +626,8 @@ def build_postgres_runtime(
     telemetry_export_burn_rate_objectives: (
         TelemetryExportBurnRateObjectives | None
     ) = None,
+    collector_queue_loss_binding: CollectorQueueLossBinding | None = None,
+    collector_queue_loss_objectives: CollectorQueueLossObjectives | None = None,
     ingestion_telemetry_sink: IngestionTelemetrySink | None = None,
     query_availability_sink: QueryAvailabilitySink | None = None,
     investigation_telemetry_sink: InvestigationTelemetrySink | None = None,
@@ -671,6 +692,8 @@ def build_postgres_runtime(
         telemetry_health_reporting,
         otlp_receiver_objectives,
         otlp_receiver_telemetry_sink,
+        collector_queue_loss_binding,
+        collector_queue_loss_objectives,
     )
 
 
@@ -742,6 +765,8 @@ def _build_runtime_from_env(
     telemetry_export_burn_rate_objectives = (
         _telemetry_export_burn_rate_objectives_from_env()
     )
+    collector_queue_loss_binding = _collector_queue_loss_binding_from_env()
+    collector_queue_loss_objectives = _collector_queue_loss_objectives_from_env()
     investigation_dispatch_limits = _investigation_dispatch_limits_from_env()
     evidence_retention_policy = _evidence_retention_policy_from_env()
     metrics_runtime = _otel_metrics_runtime_from_env()
@@ -819,6 +844,8 @@ def _build_runtime_from_env(
                 telemetry_export_burn_rate_objectives=(
                     telemetry_export_burn_rate_objectives
                 ),
+                collector_queue_loss_binding=collector_queue_loss_binding,
+                collector_queue_loss_objectives=collector_queue_loss_objectives,
                 ingestion_telemetry_sink=(
                     metrics_runtime.sink
                     if metrics_runtime is not None
@@ -870,6 +897,8 @@ def _build_runtime_from_env(
             telemetry_export_burn_rate_objectives=(
                 telemetry_export_burn_rate_objectives
             ),
+            collector_queue_loss_binding=collector_queue_loss_binding,
+            collector_queue_loss_objectives=collector_queue_loss_objectives,
             ingestion_telemetry_sink=(
                 metrics_runtime.sink if metrics_runtime is not None else None
             ),
@@ -927,6 +956,10 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
         telemetry_export_burn_rate_objectives = (
             _telemetry_export_burn_rate_objectives_from_env()
         )
+        collector_queue_loss_binding = _collector_queue_loss_binding_from_env()
+        collector_queue_loss_objectives = (
+            _collector_queue_loss_objectives_from_env()
+        )
         telemetry_health_reporting = (
             _telemetry_health_reporting_from_env("otlp-receiver")
             if metrics_runtime is not None
@@ -946,6 +979,8 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
             telemetry_export_burn_rate_objectives=(
                 telemetry_export_burn_rate_objectives
             ),
+            collector_queue_loss_binding=collector_queue_loss_binding,
+            collector_queue_loss_objectives=collector_queue_loss_objectives,
             otlp_metrics_receiver=metrics_receiver,
             otlp_logs_receiver=logs_receiver,
             telemetry_runtime=metrics_runtime,
@@ -1342,6 +1377,69 @@ def _telemetry_export_burn_rate_objectives_from_env() -> (
         critical_burn_rate_hundredths=value(
             "IIP_TELEMETRY_EXPORT_BURN_RATE_CRITICAL_HUNDREDTHS",
             defaults.critical_burn_rate_hundredths,
+        ),
+    )
+
+
+def _collector_queue_loss_binding_from_env() -> CollectorQueueLossBinding | None:
+    raw = os.environ.get("IIP_COLLECTOR_QUEUE_LOSS_BINDING_JSON")
+    if not raw:
+        return None
+    try:
+        document = json.loads(raw)
+        if not isinstance(document, dict) or not {
+            "integrationId",
+            "exporterName",
+        }.issubset(document):
+            raise KeyError
+        extra = set(document) - {"integrationId", "exporterName", "signals"}
+        if extra:
+            raise KeyError
+        signals = document.get("signals", ["metrics", "logs"])
+        if not isinstance(signals, list) or any(
+            not isinstance(item, str) for item in signals
+        ):
+            raise TypeError
+        return CollectorQueueLossBinding(
+            document["integrationId"],
+            document["exporterName"],
+            tuple(signals),
+        )
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        raise ValueError(
+            "telemetry.collector-queue-loss.configuration.invalid"
+        ) from None
+
+
+def _collector_queue_loss_objectives_from_env() -> CollectorQueueLossObjectives:
+    def value(name: str, default: int) -> int:
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            raise ValueError(
+                "telemetry.collector-queue-loss.configuration.invalid"
+            ) from None
+
+    defaults = CollectorQueueLossObjectives()
+    return CollectorQueueLossObjectives(
+        window_seconds=value(
+            "IIP_COLLECTOR_QUEUE_LOSS_WINDOW_SECONDS",
+            defaults.window_seconds,
+        ),
+        max_loss_basis_points=value(
+            "IIP_COLLECTOR_QUEUE_LOSS_MAX_LOSS_BASIS_POINTS",
+            defaults.max_loss_basis_points,
+        ),
+        max_queue_utilization_basis_points=value(
+            "IIP_COLLECTOR_QUEUE_LOSS_MAX_QUEUE_UTILIZATION_BASIS_POINTS",
+            defaults.max_queue_utilization_basis_points,
+        ),
+        minimum_eligible_attempts=value(
+            "IIP_COLLECTOR_QUEUE_LOSS_MINIMUM_ELIGIBLE_ATTEMPTS",
+            defaults.minimum_eligible_attempts,
         ),
     )
 

@@ -435,6 +435,48 @@ export interface TelemetryExportBurnRateReport {
   };
 }
 
+export type CollectorQueueLossStatus =
+  | "disabled"
+  | "no-data"
+  | "insufficient-data"
+  | "meeting"
+  | "breached";
+
+export interface CollectorQueueLossSignal {
+  signal: "metrics" | "logs";
+  status: CollectorQueueLossStatus;
+  sentDelta: number | null;
+  failedDelta: number | null;
+  lossBasisPoints: number | null;
+  queueSize: number | null;
+  queueCapacity: number | null;
+  queueUtilizationBasisPoints: number | null;
+}
+
+/**
+ * Customer OpenTelemetry Collector-observed sending-queue depth and
+ * send-loss objective for its pipeline to IIP's receiver. Distinct from
+ * TelemetryExportBurnRateReport and TelemetryExportSloReport, which measure
+ * IIP's own outbound exporter attempts rather than the Collector's internal
+ * queue.
+ */
+export interface CollectorQueueLossReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CollectorQueueLossReport";
+  metadata: { evaluatedAt: string };
+  spec: {
+    status: CollectorQueueLossStatus;
+    objective: {
+      maxLossBasisPoints: number;
+      maxQueueUtilizationBasisPoints: number;
+      minimumEligibleAttempts: number;
+    };
+    window: { durationSeconds: number; start: string; end: string };
+    binding: { integrationId: string; exporterName: string } | null;
+    signals: [CollectorQueueLossSignal, CollectorQueueLossSignal];
+  };
+}
+
 export type EventDeliveryHealthStatus = "healthy" | "backlogged" | "degraded";
 
 export interface QuarantinedEventDelivery {

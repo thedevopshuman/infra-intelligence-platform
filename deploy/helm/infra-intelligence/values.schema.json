@@ -26,6 +26,7 @@
     "policy",
     "credentialBroker",
     "telemetry",
+    "collectorQueueLoss",
     "telemetryEvidence",
     "logEvidence",
     "kubernetesEventEvidence",
@@ -632,6 +633,24 @@
         "exportBurnRateCriticalHundredths": { "type": "integer", "minimum": 101, "maximum": 1000000 },
         "existingSecret": { "$ref": "#/definitions/optionalName" },
         "headersSecretKey": { "$ref": "#/definitions/nonEmptyString" }
+      }
+    },
+    "collectorQueueLoss": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bindingJson",
+        "windowSeconds",
+        "maxLossBasisPoints",
+        "maxQueueUtilizationBasisPoints",
+        "minimumEligibleAttempts"
+      ],
+      "properties": {
+        "bindingJson": { "type": "string", "maxLength": 1048576 },
+        "windowSeconds": { "type": "integer", "minimum": 300, "maximum": 2592000 },
+        "maxLossBasisPoints": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "maxQueueUtilizationBasisPoints": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "minimumEligibleAttempts": { "type": "integer", "minimum": 1, "maximum": 1000000 }
       }
     },
     "telemetryEvidence": {

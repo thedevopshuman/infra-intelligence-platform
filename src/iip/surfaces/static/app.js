@@ -8,6 +8,7 @@ const state = {
   telemetryDeploymentHealth: null,
   telemetryExportSlo: null,
   telemetryExportBurnRate: null,
+  collectorQueueLoss: null,
   eventDeliveryHealth: null,
   eventDeliverySlo: null,
   investigationCompletionSlo: null,
@@ -533,6 +534,44 @@ async function refreshTelemetryExportBurnRate() {
   renderTelemetryExportBurnRate();
 }
 
+function renderCollectorQueueLoss() {
+  const spec = state.collectorQueueLoss?.spec;
+  const chip = $("#collector-queue-loss-state");
+  const renderSignal = (name) => {
+    const signal = spec?.signals?.find((item) => item.signal === name);
+    if (!signal) return "—";
+    if (signal.lossBasisPoints === null) return signal.status;
+    return `${(signal.lossBasisPoints / 100).toFixed(2)}% loss`;
+  };
+  $("#collector-queue-loss-metrics").textContent = renderSignal("metrics");
+  $("#collector-queue-loss-logs").textContent = renderSignal("logs");
+  if (!spec) {
+    chip.textContent = state.session && !hasRole("platform-admin")
+      ? "Platform admin required"
+      : "Collector queue/loss unavailable";
+    chip.className = "status-chip neutral";
+    $("#collector-queue-loss-details").disabled = true;
+    return;
+  }
+  chip.textContent = `Collector queue ${spec.status}`;
+  chip.className = `status-chip ${spec.status === "meeting" ? "success" : spec.status === "breached" ? "danger" : ["no-data", "insufficient-data"].includes(spec.status) ? "warning" : "neutral"}`;
+  $("#collector-queue-loss-details").disabled = false;
+}
+
+async function refreshCollectorQueueLoss() {
+  if (!state.session || !hasRole("platform-admin")) {
+    state.collectorQueueLoss = null;
+    renderCollectorQueueLoss();
+    return;
+  }
+  try {
+    state.collectorQueueLoss = await api("/v1/operations/telemetry/collector-queue-loss");
+  } catch (_error) {
+    state.collectorQueueLoss = null;
+  }
+  renderCollectorQueueLoss();
+}
+
 function renderEventDeliveryHealth() {
   const report = state.eventDeliveryHealth;
   const spec = report?.spec;
@@ -726,7 +765,7 @@ async function connect(token, remember) {
     if (remember) sessionStorage.setItem(REMEMBERED_TOKEN_KEY, token);
     else sessionStorage.removeItem(REMEMBERED_TOKEN_KEY);
     updateIdentity();
-    await Promise.all([refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshTelemetryExportBurnRate(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
+    await Promise.all([refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshTelemetryExportBurnRate(), refreshCollectorQueueLoss(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
     $("#connection-dialog").close();
     $("#connection-error").hidden = true;
     showNotice(`Connected as ${state.session.metadata.actorId} in tenant ${state.session.metadata.tenantId}.`);
@@ -1597,7 +1636,7 @@ function bindEvents() {
   $("#identity-button").addEventListener("click", () => $("#connection-dialog").showModal());
   $("#connection-close").addEventListener("click", () => $("#connection-dialog").close());
   $("#refresh-button").addEventListener("click", async () => {
-    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshTelemetryExportBurnRate(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
+    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshTelemetryExportBurnRate(), refreshCollectorQueueLoss(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
     showNotice("Live platform state refreshed.");
   });
   $("#connection-form").addEventListener("submit", async (event) => {
@@ -1691,6 +1730,14 @@ function bindEvents() {
     $("#detail-actions").hidden = true;
     $("#detail-dialog").showModal();
   });
+  $("#collector-queue-loss-details").addEventListener("click", () => {
+    if (!state.collectorQueueLoss) return;
+    $("#detail-kicker").textContent = "Portable observability path";
+    $("#detail-title").textContent = "Collector queue/loss objective";
+    $("#detail-content").textContent = JSON.stringify(state.collectorQueueLoss, null, 2);
+    $("#detail-actions").hidden = true;
+    $("#detail-dialog").showModal();
+  });
   $("#delivery-details").addEventListener("click", () => {
     if (!state.eventDeliveryHealth) return;
     $("#detail-kicker").textContent = "Event delivery";
@@ -1743,6 +1790,7 @@ async function start() {
   renderTelemetryDeploymentHealth();
   renderTelemetryExportSlo();
   renderTelemetryExportBurnRate();
+  renderCollectorQueueLoss();
   renderEventDeliverySlo();
   renderInvestigationCompletionSlo();
   renderEvidenceRetention();

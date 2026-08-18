@@ -44,6 +44,7 @@ import type {
   TelemetryExportHealthReport,
   TelemetryExportSloReport,
   TelemetryExportBurnRateReport,
+  CollectorQueueLossReport,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -297,6 +298,17 @@ export class InfrastructureIntelligenceClient {
   async getTelemetryExportBurnRate(): Promise<TelemetryExportBurnRateReport> {
     return this.get<TelemetryExportBurnRateReport>(
       "/v1/operations/telemetry/export-burn-rate",
+    );
+  }
+
+  /**
+   * Distinct from getTelemetryExportBurnRate, which measures IIP's own
+   * outbound exporter attempts rather than the customer Collector's
+   * internal queue for its pipeline to IIP.
+   */
+  async getCollectorQueueLoss(): Promise<CollectorQueueLossReport> {
+    return this.get<CollectorQueueLossReport>(
+      "/v1/operations/telemetry/collector-queue-loss",
     );
   }
 

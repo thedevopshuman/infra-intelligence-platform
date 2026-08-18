@@ -335,6 +335,34 @@ class TelemetryExportBurnRateReport:
 
 
 @dataclass(frozen=True)
+class CollectorQueueLossReport:
+    """Collector-observed sending-queue depth and send-loss objective.
+
+    Distinct from TelemetryExportBurnRateReport and TelemetryExportSloReport,
+    which measure IIP's own outbound exporter attempts rather than the
+    customer OpenTelemetry Collector's internal queue for its pipeline to
+    IIP's receiver.
+    """
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CollectorQueueLossReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CollectorQueueLossReport",
+                label="collector queue/loss report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class EventDeliveryHealthReport:
     """Tenant-scoped outbox backlog and quarantine state for operators."""
 

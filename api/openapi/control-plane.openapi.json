@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.59.0",
+    "version": "0.60.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence and retention observation, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions and invocation lifecycles. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -211,6 +211,22 @@
           "503": {
             "description": "Telemetry export samples are unavailable or inconsistent",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "telemetry.export-burn-rate.unavailable"}}}}
+          }
+        }
+      }
+    },
+    "/v1/operations/telemetry/collector-queue-loss": {
+      "get": {
+        "operationId": "getCollectorQueueLoss",
+        "description": "Return the customer OpenTelemetry Collector's own observed sending-queue depth and send-loss objective for its pipeline to IIP's receiver, sourced from the Collector's self-metrics through the customer's configured telemetry backend. Distinct from the export-burn-rate and export-SLO reports, which measure IIP's own outbound exporter attempts. The operation is administrator and policy protected and exposes no tenant telemetry, credentials, or provider details beyond the configured integration and exporter identifiers.",
+        "responses": {
+          "200": {"description": "Collector-observed sending-queue depth and send-loss objective", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/collector-queue-loss-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "503": {
+            "description": "The configured telemetry backend is unavailable, or returned an ambiguous or invalid result",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "telemetry.collector-queue-loss.unavailable"}}}}
           }
         }
       }

@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.59.0"
+  tag: "0.60.0"
   digest: ""
 
 worker:
@@ -224,6 +224,19 @@ telemetry:
   exportBurnRateCriticalHundredths: 600
   existingSecret: ""
   headersSecretKey: otlp-headers
+
+# Collector-observed sending-queue depth and send-loss objective (ADR 0087).
+# Distinct from telemetry.exportBurnRate*, which measures IIP's own
+# outbound exporter attempts rather than the customer Collector's internal
+# queue for its pipeline to IIP. bindingJson is non-secret (an integration
+# id and an exporter component name only, never a credential or endpoint)
+# and left empty by default, which disables the report.
+collectorQueueLoss:
+  bindingJson: ""
+  windowSeconds: 3600
+  maxLossBasisPoints: 100
+  maxQueueUtilizationBasisPoints: 8000
+  minimumEligibleAttempts: 20
 
 telemetryEvidence:
   backend: no-data

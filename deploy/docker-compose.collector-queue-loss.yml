@@ -1,0 +1,29 @@
+services:
+  collector:
+    image: otel/opentelemetry-collector:0.158.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel/collector-queue-loss-test.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:${IIP_COLLECTOR_QUEUE_LOSS_OTLP_PORT:-24320}:4318"
+
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./prometheus/prometheus-collector-queue-loss-test.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:${IIP_COLLECTOR_QUEUE_LOSS_PROMETHEUS_PORT:-19091}:9090"
+    depends_on:
+      - collector
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9090/-/ready"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+      start_period: 2s
+    read_only: true
+    tmpfs:
+      - /prometheus:uid=65534,gid=65534,mode=0750

@@ -813,6 +813,7 @@ class AllowTenantPolicy:
             "telemetry-export-health:read",
             "telemetry-export-slo:read",
             "telemetry-export-burn-rate:read",
+            "collector-queue-loss:read",
         ):
             return PolicyDecision(False, "action.unsupported")
         return PolicyDecision(True, "development.allow")

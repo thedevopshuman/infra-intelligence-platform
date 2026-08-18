@@ -1,0 +1,46 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CollectorQueueLossReport",
+  "metadata": {
+    "evaluatedAt": "2026-08-18T12:00:00Z"
+  },
+  "spec": {
+    "status": "meeting",
+    "objective": {
+      "maxLossBasisPoints": 100,
+      "maxQueueUtilizationBasisPoints": 8000,
+      "minimumEligibleAttempts": 20
+    },
+    "window": {
+      "durationSeconds": 3600,
+      "start": "2026-08-18T11:00:00Z",
+      "end": "2026-08-18T12:00:00Z"
+    },
+    "binding": {
+      "integrationId": "prometheus-local",
+      "exporterName": "otlphttp/iip"
+    },
+    "signals": [
+      {
+        "signal": "metrics",
+        "status": "meeting",
+        "sentDelta": 48213,
+        "failedDelta": 12,
+        "lossBasisPoints": 2,
+        "queueSize": 0,
+        "queueCapacity": 10000,
+        "queueUtilizationBasisPoints": 0
+      },
+      {
+        "signal": "logs",
+        "status": "meeting",
+        "sentDelta": 91870,
+        "failedDelta": 4,
+        "lossBasisPoints": 0,
+        "queueSize": 1,
+        "queueCapacity": 10000,
+        "queueUtilizationBasisPoints": 0
+      }
+    ]
+  }
+}

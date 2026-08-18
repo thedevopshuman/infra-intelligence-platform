@@ -116,6 +116,8 @@
                 <button class="text-button" id="telemetry-slo-details" type="button" disabled>View SLO →</button>
                 <span class="status-chip neutral" id="telemetry-burn-rate-state">Burn rate unavailable</span>
                 <button class="text-button" id="telemetry-burn-rate-details" type="button" disabled>View burn rate →</button>
+                <span class="status-chip neutral" id="collector-queue-loss-state">Collector queue/loss unavailable</span>
+                <button class="text-button" id="collector-queue-loss-details" type="button" disabled>View Collector queue/loss →</button>
               </div>
             </div>
             <div class="delivery-grid" aria-live="polite">
@@ -128,8 +130,10 @@
               <div><span>Trace export SLO</span><strong id="telemetry-slo-traces">—</strong></div>
               <div><span>Metric burn rate</span><strong id="telemetry-burn-rate-metrics">—</strong></div>
               <div><span>Trace burn rate</span><strong id="telemetry-burn-rate-traces">—</strong></div>
+              <div><span>Collector metrics queue loss</span><strong id="collector-queue-loss-metrics">—</strong></div>
+              <div><span>Collector logs queue loss</span><strong id="collector-queue-loss-logs">—</strong></div>
             </div>
-            <p class="delivery-note" id="telemetry-health-note">Platform administrators can verify API and worker export outcomes without exposing endpoints or credentials.</p>
+            <p class="delivery-note" id="telemetry-health-note">Platform administrators can verify API and worker export outcomes without exposing endpoints or credentials. Burn rate measures IIP's own exporter attempts to the Collector; Collector queue/loss measures the Collector's own queue for its pipeline to IIP.</p>
           </article>
 
           <article class="panel delivery-panel" aria-labelledby="delivery-heading">

@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-prometheus test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -20,6 +20,7 @@ help:
 	@echo "test-otel     Send reference metrics and traces to an OpenTelemetry Collector"
 	@echo "test-otlp-receiver Send official OTLP metrics and logs into the isolated receiver"
 	@echo "test-prometheus Query a real Prometheus server through the evidence adapter"
+	@echo "test-collector-queue-loss Drive a real Collector's own self-metrics into a queue/loss report"
 	@echo "test-loki     Query a real Loki server through the log evidence adapter"
 	@echo "test-opensearch Query a real OpenSearch server through the log evidence adapter"
 	@echo "test-kubernetes-events Query a local cluster through the Event evidence adapter"
@@ -86,6 +87,9 @@ test-otlp-receiver:
 
 test-prometheus:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_prometheus.sh
+
+test-collector-queue-loss:
+	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_collector_queue_loss.sh
 
 test-loki:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_loki.sh

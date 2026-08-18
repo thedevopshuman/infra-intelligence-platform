@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:collector-queue-loss-report:v1alpha1",
+  "title": "Infrastructure Intelligence Collector Queue/Loss Report",
+  "description": "Customer OpenTelemetry Collector sending-queue depth and send-loss objective, sourced from the Collector's own self-metrics through the customer's telemetry backend. Distinct from TelemetryExportBurnRateReport and TelemetryExportSloReport, which measure IIP's own outbound exporter attempts rather than the Collector's internal queue for its pipeline to IIP.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CollectorQueueLossReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evaluatedAt"],
+      "properties": {
+        "evaluatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "objective", "window", "binding", "signals"],
+      "properties": {
+        "status": {"$ref": "#/$defs/status"},
+        "objective": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "maxLossBasisPoints",
+            "maxQueueUtilizationBasisPoints",
+            "minimumEligibleAttempts"
+          ],
+          "properties": {
+            "maxLossBasisPoints": {"type": "integer", "minimum": 0, "maximum": 10000},
+            "maxQueueUtilizationBasisPoints": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "minimumEligibleAttempts": {"type": "integer", "minimum": 1, "maximum": 1000000}
+          }
+        },
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["durationSeconds", "start", "end"],
+          "properties": {
+            "durationSeconds": {"type": "integer", "minimum": 300, "maximum": 2592000},
+            "start": {"type": "string", "format": "date-time"},
+            "end": {"type": "string", "format": "date-time"}
+          }
+        },
+        "binding": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["integrationId", "exporterName"],
+              "properties": {
+                "integrationId": {"type": "string", "minLength": 1, "maxLength": 128},
+                "exporterName": {"type": "string", "minLength": 1, "maxLength": 256}
+              }
+            },
+            {"type": "null"}
+          ]
+        },
+        "signals": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {"allOf": [{"$ref": "#/$defs/signal"}, {"properties": {"signal": {"const": "metrics"}}}]},
+            {"allOf": [{"$ref": "#/$defs/signal"}, {"properties": {"signal": {"const": "logs"}}}]}
+          ],
+          "items": false
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"binding": {"type": "null"}}},
+          "then": {"properties": {"status": {"const": "disabled"}}}
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "count": {
+      "oneOf": [
+        {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        {"type": "null"}
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["disabled", "no-data", "insufficient-data", "meeting", "breached"]
+    },
+    "signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signal",
+        "status",
+        "sentDelta",
+        "failedDelta",
+        "lossBasisPoints",
+        "queueSize",
+        "queueCapacity",
+        "queueUtilizationBasisPoints"
+      ],
+      "properties": {
+        "signal": {"type": "string", "enum": ["metrics", "logs"]},
+        "status": {"$ref": "#/$defs/status"},
+        "sentDelta": {"$ref": "#/$defs/count"},
+        "failedDelta": {"$ref": "#/$defs/count"},
+        "lossBasisPoints": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0, "maximum": 10000},
+            {"type": "null"}
+          ]
+        },
+        "queueSize": {"$ref": "#/$defs/count"},
+        "queueCapacity": {"$ref": "#/$defs/count"},
+        "queueUtilizationBasisPoints": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0, "maximum": 10000},
+            {"type": "null"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"enum": ["disabled", "no-data"]}}},
+          "then": {
+            "properties": {
+              "sentDelta": {"type": "null"},
+              "failedDelta": {"type": "null"},
+              "lossBasisPoints": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"status": {"enum": ["insufficient-data", "meeting", "breached"]}}},
+          "then": {
+            "properties": {
+              "sentDelta": {"type": "integer"},
+              "failedDelta": {"type": "integer"},
+              "lossBasisPoints": {"type": "integer"}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

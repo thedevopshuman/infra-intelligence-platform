@@ -87,6 +87,18 @@ spec:
         - port: {{ .Values.networkPolicy.lokiEgress.port }}
           protocol: TCP
     {{- end }}
+    {{- if .Values.networkPolicy.opensearchEgress.enabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.opensearchEgress.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.opensearchEgress.podSelector | nindent 14 }}
+      ports:
+        - port: {{ .Values.networkPolicy.opensearchEgress.port }}
+          protocol: TCP
+    {{- end }}
     {{- if .Values.networkPolicy.kubernetesApiEgress.enabled }}
     - to:
         - ipBlock:
@@ -192,6 +204,18 @@ spec:
               {{- toYaml .Values.networkPolicy.lokiEgress.podSelector | nindent 14 }}
       ports:
         - port: {{ .Values.networkPolicy.lokiEgress.port }}
+          protocol: TCP
+    {{- end }}
+    {{- if .Values.networkPolicy.opensearchEgress.enabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.opensearchEgress.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.opensearchEgress.podSelector | nindent 14 }}
+      ports:
+        - port: {{ .Values.networkPolicy.opensearchEgress.port }}
           protocol: TCP
     {{- end }}
     {{- if .Values.networkPolicy.kubernetesApiEgress.enabled }}

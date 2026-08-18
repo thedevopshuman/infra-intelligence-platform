@@ -2,8 +2,8 @@ apiVersion: v2
 name: infra-intelligence
 description: Foundation chart for the Infrastructure Intelligence Platform control plane
 type: application
-version: 0.58.0
-appVersion: "0.56.0"
+version: 0.59.0
+appVersion: "0.57.0"
 kubeVersion: ">=1.28.0-0"
 annotations:
   iip.platform/status: foundation-not-production-ready

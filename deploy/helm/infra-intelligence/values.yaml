@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.56.0"
+  tag: "0.57.0"
   digest: ""
 
 worker:
@@ -238,6 +238,10 @@ logEvidence:
     integrationsJson: '{"integrations":[]}'
     credentialsExistingSecret: ""
     credentialsSecretKey: loki-credentials-json
+  opensearch:
+    integrationsJson: '{"integrations":[]}'
+    credentialsExistingSecret: ""
+    credentialsSecretKey: opensearch-credentials-json
 
 kubernetesEventEvidence:
   backend: no-data
@@ -373,6 +377,13 @@ networkPolicy:
       kubernetes.io/metadata.name: observability
     podSelector:
       app.kubernetes.io/name: loki
+  opensearchEgress:
+    enabled: false
+    port: 9200
+    namespaceSelector:
+      kubernetes.io/metadata.name: observability
+    podSelector:
+      app.kubernetes.io/name: opensearch
   kubernetesApiEgress:
     enabled: false
     cidr: 10.96.0.1/32

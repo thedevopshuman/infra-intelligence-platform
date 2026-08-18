@@ -1573,16 +1573,22 @@ def _telemetry_logs_backend_from_env(
     backend = os.environ.get("IIP_TELEMETRY_LOGS_BACKEND", "no-data")
     if backend == "no-data":
         return None
-    if backend != "loki":
-        from iip.adapters.loki import LokiConfigurationError
+    if backend == "loki":
+        from iip.adapters.loki import build_loki_backend_from_environment
 
-        raise LokiConfigurationError("logs.backend.configuration.invalid")
+        return build_loki_backend_from_environment(
+            os.environ, SystemClock(), credential_broker
+        )
+    if backend == "opensearch":
+        from iip.adapters.opensearch import build_opensearch_backend_from_environment
 
-    from iip.adapters.loki import build_loki_backend_from_environment
+        return build_opensearch_backend_from_environment(
+            os.environ, SystemClock(), credential_broker
+        )
 
-    return build_loki_backend_from_environment(
-        os.environ, SystemClock(), credential_broker
-    )
+    from iip.adapters.loki import LokiConfigurationError
+
+    raise LokiConfigurationError("logs.backend.configuration.invalid")
 
 
 def _context_documents_backend_from_env() -> ContextDocumentsBackend | None:

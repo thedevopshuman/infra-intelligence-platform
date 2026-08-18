@@ -14,7 +14,7 @@
       "containerRuntime": "docker",
       "containerRuntimeVersion": "28.3.3",
       "pythonVersion": "3.12.11",
-      "applicationVersion": "0.56.0"
+      "applicationVersion": "0.57.0"
     },
     "profile": {
       "name": "local-external-http-policy-v1",

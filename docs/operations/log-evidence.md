@@ -1,10 +1,10 @@
 # Log evidence and OTLP logs intake
 
-**Status:** Backend-neutral query, Loki adapter, and executable OTLP receiver; disabled/no-data by default
+**Status:** Backend-neutral query, Loki and OpenSearch adapters, and executable OTLP receiver; disabled/no-data by default
 
 The platform supports two deliberately separate log paths:
 
-1. `POST /v1/evidence/logs/queries` performs a bounded historical query through `TelemetryLogsBackend`. The default returns honest no-data; the first live adapter queries Loki.
+1. `POST /v1/evidence/logs/queries` performs a bounded historical query through `TelemetryLogsBackend`. The default returns honest no-data; the first live adapter queries Loki, and a second queries OpenSearch, proving the same backend-neutral boundary against two structurally different backends.
 2. `POST /v1/logs` accepts selected OTLP/HTTP Protobuf logs through a separately authenticated push channel and commits normalized `telemetry.logs.push` Evidence.
 
 OTLP does not define historical queries. Pointing a Collector at `/v1/logs` does not make the platform a general log store, and changing a customer's historical backend requires a backend adapter selected at composition.
@@ -54,6 +54,29 @@ make test-loki
 
 The gate pushes two current records, queries them through the public backend boundary, commits an immutable log Evidence artifact, and verifies that a deterministic investigation cites the supporting evidence. It removes its isolated container and storage on exit.
 
+## Query OpenSearch
+
+Select the adapter and load its non-secret registry:
+
+```bash
+export IIP_TELEMETRY_LOGS_BACKEND=opensearch
+export IIP_OPENSEARCH_INTEGRATIONS_JSON="$(tr -d '\n' < deploy/opensearch/integrations.example.json)"
+```
+
+Each registry entry belongs to one tenant and integration. It fixes the OpenSearch endpoint, one lowercase index (or index pattern), timeout and response limit, document field bindings, logical service catalog, severity mapping, and an optional logical credential reference. The example maps `resourceUid`, service, severity, the ECS-style `@timestamp`/`message` fields, trace/span correlation, and two allowlisted attributes. Extend mappings deliberately; arbitrary OpenSearch fields, aggregations, and query DSL are not public inputs.
+
+The adapter calls OpenSearch's [`POST /{index}/_search`](https://opensearch.org/docs/latest/api-reference/search/) with a generated `bool`/`filter` query and time-range bounds. It refuses redirects, limits URL/body/time/bytes/records, maps only configured values, and fails closed on malformed, timed-out, or cross-resource output. Log bodies are matched exactly, never scored or full-text searched.
+
+For a locally protected Bearer token, supply a secret document only through `IIP_OPENSEARCH_CREDENTIALS_JSON`, matching the same shape as `IIP_LOKI_CREDENTIALS_JSON` above with `credentialRef: "credential://local/opensearch/log-reader"`. Do not commit a populated document or put it in a ConfigMap. In production, use the shared [external credential broker](credential-broker.md); the adapter requests an exact `opensearch` / `logs:read` lease and accepts only a bounded Bearer result. OpenSearch's own security plugin (Basic auth, JWT) is a deployment decision independent of this adapter; self-hosted production deployments that need it require an authenticating gateway or reverse proxy that terminates to Bearer, the same posture already accepted for Loki.
+
+Exercise the real adapter, normalization, and investigation path against an isolated pinned OpenSearch container:
+
+```bash
+make test-opensearch
+```
+
+The gate indexes two current documents, queries them through the public backend boundary, commits an immutable log Evidence artifact, and verifies that a deterministic investigation cites the supporting evidence. It removes its isolated container and storage on exit.
+
 ## Enable OTLP logs locally
 
 Create a random channel token of at least 32 characters. Store only its SHA-256 digest in a protected channel document; [`deploy/otlp/log-receiver-channels.example.json`](../../deploy/otlp/log-receiver-channels.example.json) shows the strict shape with an illustrative, unusable verifier.
@@ -91,6 +114,8 @@ remain customer decisions.
 ## Helm and Docker verification
 
 For historical Loki queries, set `logEvidence.backend: loki`, put the non-secret registry in `logEvidence.loki.integrationsJson`, and reference a Kubernetes Secret through `logEvidence.loki.credentialsExistingSecret` when static credentials are required. With NetworkPolicy enabled, configure `networkPolicy.lokiEgress` for the exact Loki/gateway namespace, pod labels, and port. Prefer the external credential broker for production leases.
+
+For historical OpenSearch queries, set `logEvidence.backend: opensearch`, put the non-secret registry in `logEvidence.opensearch.integrationsJson`, and reference a Kubernetes Secret through `logEvidence.opensearch.credentialsExistingSecret` when static credentials are required. With NetworkPolicy enabled, configure `networkPolicy.opensearchEgress` for the exact OpenSearch/gateway namespace, pod labels, and port.
 
 For Helm, set `otlpLogsReceiver.enabled: true`, `database.existingSecret`, and place the complete channel JSON in a Kubernetes Secret referenced by `otlpLogsReceiver.channelsExistingSecret`. The chart never writes channel configuration into a ConfigMap or mounts it into the API pod.
 

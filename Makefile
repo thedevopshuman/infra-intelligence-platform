@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-prometheus test-loki test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-prometheus test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -21,6 +21,7 @@ help:
 	@echo "test-otlp-receiver Send official OTLP metrics and logs into the isolated receiver"
 	@echo "test-prometheus Query a real Prometheus server through the evidence adapter"
 	@echo "test-loki     Query a real Loki server through the log evidence adapter"
+	@echo "test-opensearch Query a real OpenSearch server through the log evidence adapter"
 	@echo "test-kubernetes-events Query a local cluster through the Event evidence adapter"
 	@echo "test-kubernetes-actions Verify server dry-run and a governed restart on a local cluster"
 	@echo "test-kubernetes-live Run the observer against an explicit local Kubernetes context"
@@ -88,6 +89,9 @@ test-prometheus:
 
 test-loki:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_loki.sh
+
+test-opensearch:
+	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_opensearch.sh
 
 test-kubernetes-events:
 	IIP_TEST_PYTHON=$(PYTHON) scripts/test_kubernetes_events.sh

@@ -655,10 +655,20 @@
     "logEvidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["backend", "loki"],
+      "required": ["backend", "loki", "opensearch"],
       "properties": {
-        "backend": { "type": "string", "enum": ["no-data", "loki"] },
+        "backend": { "type": "string", "enum": ["no-data", "loki", "opensearch"] },
         "loki": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["integrationsJson", "credentialsExistingSecret", "credentialsSecretKey"],
+          "properties": {
+            "integrationsJson": { "$ref": "#/definitions/jsonString" },
+            "credentialsExistingSecret": { "$ref": "#/definitions/optionalName" },
+            "credentialsSecretKey": { "$ref": "#/definitions/nonEmptyString" }
+          }
+        },
+        "opensearch": {
           "type": "object",
           "additionalProperties": false,
           "required": ["integrationsJson", "credentialsExistingSecret", "credentialsSecretKey"],
@@ -803,6 +813,7 @@
         "otlpEgress",
         "prometheusEgress",
         "lokiEgress",
+        "opensearchEgress",
         "kubernetesApiEgress",
         "credentialBrokerEgress",
         "oidcEgress",
@@ -836,6 +847,7 @@
         "otlpEgress": { "$ref": "#/definitions/selectedEgress" },
         "prometheusEgress": { "$ref": "#/definitions/selectedEgress" },
         "lokiEgress": { "$ref": "#/definitions/selectedEgress" },
+        "opensearchEgress": { "$ref": "#/definitions/selectedEgress" },
         "kubernetesApiEgress": { "$ref": "#/definitions/cidrEgress" },
         "credentialBrokerEgress": { "$ref": "#/definitions/cidrEgress" },
         "oidcEgress": { "$ref": "#/definitions/cidrEgress" },

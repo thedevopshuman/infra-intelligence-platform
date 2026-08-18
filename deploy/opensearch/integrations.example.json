@@ -1,0 +1,38 @@
+{
+  "integrations": [
+    {
+      "tenantId": "local",
+      "integrationId": "opensearch-local",
+      "provider": "opensearch",
+      "endpoint": "http://opensearch:9200",
+      "credentialRef": null,
+      "index": "logs-local",
+      "enabled": true,
+      "requestTimeoutSeconds": 10,
+      "maxResponseBytes": 1048576,
+      "fields": {
+        "resourceUid": "resource_uid",
+        "service": "service_name",
+        "severity": "level",
+        "timestamp": "@timestamp",
+        "body": "message",
+        "traceId": "trace_id",
+        "spanId": "span_id",
+        "attributes": {
+          "deployment.environment": "environment",
+          "k8s.namespace.name": "namespace"
+        }
+      },
+      "services": {
+        "api": "api"
+      },
+      "severities": {
+        "debug": "DEBUG",
+        "info": "INFO",
+        "warn": "WARN",
+        "error": "ERROR",
+        "fatal": "FATAL"
+      }
+    }
+  ]
+}

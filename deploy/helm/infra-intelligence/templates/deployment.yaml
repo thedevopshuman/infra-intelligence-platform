@@ -39,7 +39,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "infra-intelligence.fullname" . }}
-          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret .Values.telemetryEvidence.prometheus.credentialsExistingSecret .Values.logEvidence.loki.credentialsExistingSecret .Values.kubernetesEventEvidence.credentialsExistingSecret .Values.kubernetesActions.credentialsExistingSecret .Values.contextEvidence.integrationsExistingSecret .Values.investigationSignalCatalog.existingSecret }}
+          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret .Values.telemetryEvidence.prometheus.credentialsExistingSecret .Values.logEvidence.loki.credentialsExistingSecret .Values.logEvidence.opensearch.credentialsExistingSecret .Values.kubernetesEventEvidence.credentialsExistingSecret .Values.kubernetesActions.credentialsExistingSecret .Values.contextEvidence.integrationsExistingSecret .Values.investigationSignalCatalog.existingSecret }}
           env:
             {{- if .Values.database.existingSecret }}
             - name: IIP_DATABASE_URL
@@ -75,6 +75,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.logEvidence.loki.credentialsExistingSecret | quote }}
                   key: {{ .Values.logEvidence.loki.credentialsSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.logEvidence.opensearch.credentialsExistingSecret }}
+            - name: IIP_OPENSEARCH_CREDENTIALS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.logEvidence.opensearch.credentialsExistingSecret | quote }}
+                  key: {{ .Values.logEvidence.opensearch.credentialsSecretKey | quote }}
             {{- end }}
             {{- if .Values.kubernetesEventEvidence.credentialsExistingSecret }}
             - name: IIP_KUBERNETES_EVENTS_CREDENTIALS_JSON

@@ -37,6 +37,7 @@ from iip.application.telemetry_evidence import (
     TelemetryEvidenceService,
     TelemetryMetricsEvidenceProvider,
 )
+from tests.adversarial_corpus import ADVERSARIAL_PHRASES
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -95,6 +96,45 @@ class RecordingLogsBackend:
                 records[:1],
                 ("backend-partial",),
             )
+        return TelemetryLogsResult(request.end, "complete", records)
+
+
+class MultilingualRecordingLogsBackend:
+    """Returns one log record per ADVERSARIAL_PHRASES entry plus a benign record.
+
+    Exercises the same live log-evidence path as RecordingLogsBackend with a
+    multilingual, multi-technique instruction-shaped corpus instead of a
+    single English phrase, per ADR 0086.
+    """
+
+    def __init__(self) -> None:
+        self.requests: list[TelemetryLogsQuery] = []
+
+    def query_logs(self, request: TelemetryLogsQuery) -> TelemetryLogsResult:
+        self.requests.append(request)
+        digits = "3456789a"
+        records = tuple(
+            TelemetryLogRecord(
+                f"log_{digit * 32}",
+                request.resource_uids[0],
+                request.start,
+                "error",
+                "api",
+                phrase.text,
+                (("error.type", "ImagePullBackOff"),),
+            )
+            for digit, phrase in zip(digits, ADVERSARIAL_PHRASES)
+        ) + (
+            TelemetryLogRecord(
+                "log_22222222222222222222222222222222",
+                request.resource_uids[0],
+                request.end,
+                "error",
+                "api",
+                "Image pull failed for the selected revision.",
+                (("error.type", "ImagePullBackOff"),),
+            ),
+        )
         return TelemetryLogsResult(request.end, "complete", records)
 
 
@@ -272,6 +312,27 @@ class InvestigationLogTests(unittest.TestCase):
         self.assertNotIn(
             "ignore previous instructions", json.dumps(report).casefold()
         )
+        assert_schema(self, "investigation-report.schema.json", report)
+
+    def test_multilingual_and_technique_diverse_logs_never_leak_into_report(
+        self,
+    ) -> None:
+        backend = MultilingualRecordingLogsBackend()
+        service, store = self.service(backend)
+        request = self.request("inv_" + "7" * 32)
+
+        report = service.execute(RunInvestigationCommand(self.actor, request))
+
+        assessment = report["spec"]["logAssessments"][0]
+        self.assertEqual(assessment["observedRecordCount"], len(ADVERSARIAL_PHRASES) + 1)
+        self.assertEqual(assessment["disposition"], "supporting")
+        artifact = store.read_artifact(self.actor, assessment["evidenceId"])
+        self.assertIsNotNone(artifact)
+        rendered_report = json.dumps(report, ensure_ascii=False).casefold()
+        for phrase in ADVERSARIAL_PHRASES:
+            with self.subTest(language=phrase.language, technique=phrase.technique):
+                self.assertIn(phrase.text.encode("utf-8"), artifact or b"")
+                self.assertNotIn(phrase.text.casefold(), rendered_report)
         assert_schema(self, "investigation-report.schema.json", report)
 
     def test_no_data_and_partial_logs_cannot_become_citations(self) -> None:

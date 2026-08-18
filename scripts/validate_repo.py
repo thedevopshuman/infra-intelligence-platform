@@ -56,6 +56,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0025-loki-historical-log-evidence-adapter.md",
     "docs/decisions/0084-opensearch-historical-log-evidence-adapter.md",
     "docs/decisions/0085-otlp-receiver-expired-certificate-rejection-evidence.md",
+    "docs/decisions/0086-multilingual-adversarial-instruction-corpus.md",
     "docs/decisions/0026-resource-history-change-evidence.md",
     "docs/decisions/0029-investigation-context-correlation.md",
     "docs/decisions/0030-durable-investigation-lifecycle.md",

@@ -55,6 +55,7 @@ from iip.application.telemetry_evidence import (
 )
 from iip.bootstrap import build_local_runtime
 from iip.surfaces.http import ApiHandler
+from tests.adversarial_corpus import ADVERSARIAL_PHRASES
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -872,6 +873,49 @@ class InvestigationAndEvaluationTests(unittest.TestCase):
 
         report["spec"]["evidenceIds"] = required[:1]
         self.assertFalse(score_report(self.scenario, report, evidence).passed)
+
+    def test_instruction_boundary_gate_catches_multilingual_and_technique_diverse_injections(
+        self,
+    ) -> None:
+        report = copy.deepcopy(example("investigation-report.json"))
+        expectations = self.scenario["spec"]["expectations"]
+        required = expectations["requiredEvidenceIds"]
+        report["spec"]["hypotheses"][0]["rootCauseClass"] = expectations[
+            "rootCauseClass"
+        ]
+        report["spec"]["hypotheses"][0]["supportingEvidenceIds"] = required
+        report["spec"]["evidenceIds"] = required
+        report["spec"]["recommendations"][0]["evidenceIds"] = required
+        report["spec"]["usage"] = {
+            "toolCalls": 2,
+            "iterations": 1,
+            "modelTokens": 0,
+            "wallTimeSeconds": 1,
+            "costUsd": 0,
+            "evidenceItems": 2,
+        }
+        evidence = {
+            item["metadata"]["id"]: item
+            for item in self.scenario["spec"]["fixtures"]["evidence"]
+        }
+
+        for phrase in ADVERSARIAL_PHRASES:
+            with self.subTest(language=phrase.language, technique=phrase.technique):
+                scenario = copy.deepcopy(self.scenario)
+                scenario["spec"]["expectations"]["prohibitedOutputFragments"] = [
+                    phrase.text
+                ]
+
+                clean_score = score_report(scenario, report, evidence)
+                self.assertTrue(clean_score.passed)
+                self.assertTrue(clean_score.gates["instruction-boundary"])
+
+                injected = copy.deepcopy(report)
+                injected["spec"]["recommendations"][0]["description"] = phrase.text
+                injected_score = score_report(scenario, injected, evidence)
+                self.assertFalse(injected_score.passed)
+                self.assertFalse(injected_score.gates["instruction-boundary"])
+                self.assertEqual(injected_score.components["instructionBoundary"], 0)
 
 
 class GovernedActionTests(unittest.TestCase):

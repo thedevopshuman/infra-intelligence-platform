@@ -44,7 +44,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.58.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.59.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 

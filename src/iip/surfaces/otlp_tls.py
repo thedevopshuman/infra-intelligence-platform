@@ -27,6 +27,7 @@ _TLS_ENVIRONMENT_KEYS = (
     "IIP_OTLP_TLS_PRIVATE_KEY_PATH",
     "IIP_OTLP_TLS_CLIENT_CA_PATH",
     "IIP_OTLP_MTLS_IDENTITIES_JSON",
+    "IIP_OTLP_TLS_CLIENT_CRL_PATH",
 )
 
 
@@ -139,6 +140,7 @@ class OtlpTlsConfiguration:
     private_key_path: str | None = None
     client_ca_path: str | None = None
     client_identities: SpiffeClientIdentityRegistry | None = None
+    client_crl_path: str | None = None
 
     @classmethod
     def from_environment(
@@ -163,8 +165,10 @@ class OtlpTlsConfiguration:
         if certificate_path is None or private_key_path is None:
             raise OtlpReceiverConfigurationError("otlp.tls.configuration.invalid")
         if mode == "server":
-            if selected.get("IIP_OTLP_TLS_CLIENT_CA_PATH") or selected.get(
-                "IIP_OTLP_MTLS_IDENTITIES_JSON"
+            if (
+                selected.get("IIP_OTLP_TLS_CLIENT_CA_PATH")
+                or selected.get("IIP_OTLP_MTLS_IDENTITIES_JSON")
+                or selected.get("IIP_OTLP_TLS_CLIENT_CRL_PATH")
             ):
                 raise OtlpReceiverConfigurationError(
                     "otlp.tls.configuration.invalid"
@@ -176,12 +180,25 @@ class OtlpTlsConfiguration:
         identities = selected.get("IIP_OTLP_MTLS_IDENTITIES_JSON")
         if client_ca_path is None or identities is None:
             raise OtlpReceiverConfigurationError("otlp.tls.configuration.invalid")
+        # The CRL is optional even in mutual-spiffe mode: a deployment can run
+        # mTLS without a revocation list, the same way it can run without one
+        # for years before the first revocation. Absent, the receiver checks
+        # only the chain and validity window, as before.
+        raw_client_crl_path = selected.get("IIP_OTLP_TLS_CLIENT_CRL_PATH")
+        client_crl_path = (
+            _absolute_path(raw_client_crl_path)
+            if raw_client_crl_path
+            else None
+        )
+        if raw_client_crl_path and client_crl_path is None:
+            raise OtlpReceiverConfigurationError("otlp.tls.configuration.invalid")
         return cls(
             mode,
             certificate_path,
             private_key_path,
             client_ca_path,
             SpiffeClientIdentityRegistry.from_json(identities),
+            client_crl_path,
         )
 
     @property
@@ -204,6 +221,12 @@ class OtlpTlsConfiguration:
             if self.mode == "mutual-spiffe":
                 assert self.client_ca_path is not None
                 context.load_verify_locations(cafile=self.client_ca_path)
+                if self.client_crl_path is not None:
+                    # OpenSSL's verify store accumulates across calls, so a
+                    # second load_verify_locations() call adds the CRL to the
+                    # same trust store built above rather than replacing it.
+                    context.load_verify_locations(cafile=self.client_crl_path)
+                    context.verify_flags |= ssl.VERIFY_CRL_CHECK_LEAF
                 # Health and readiness expose only stable status and stay probeable
                 # without a client certificate. OTLP POST routes enforce a verified
                 # certificate and exact SPIFFE-to-channel binding in the handler.

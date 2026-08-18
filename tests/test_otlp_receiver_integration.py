@@ -284,6 +284,22 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
                 context=expired_identity,
             )
 
+    def test_revoked_client_certificate_is_rejected(self) -> None:
+        # Signed by the same trusted CA with a validity window that has not
+        # closed, so a handshake failure here can only be attributed to the
+        # certificate's serial number appearing on the receiver's configured
+        # CRL, not an untrusted issuer or an expired validity window.
+        revoked_identity = self.receiver_context(
+            certificate_variable="IIP_TEST_OTLP_REVOKED_CLIENT_CERT_FILE",
+            key_variable="IIP_TEST_OTLP_REVOKED_CLIENT_KEY_FILE",
+        )
+        with self.assertRaises((urllib.error.URLError, ssl.SSLError)):
+            self.receiver_request(
+                "/v1/metrics",
+                token=os.environ["IIP_TEST_OTLP_CHANNEL_TOKEN"],
+                context=revoked_identity,
+            )
+
     def test_certificate_rotation_preserves_the_same_spiffe_authority(self) -> None:
         rotated_identity = self.receiver_context(
             certificate_variable="IIP_TEST_OTLP_ROTATED_CLIENT_CERT_FILE",

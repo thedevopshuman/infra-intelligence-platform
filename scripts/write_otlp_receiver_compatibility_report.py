@@ -42,6 +42,7 @@ CHECK_IDS = (
     "official-logs-exporter",
     "certificate-rotation-without-restart",
     "expired-client-certificate-rejected",
+    "revoked-client-certificate-rejected",
     "health-probe-minimization",
     "durable-evidence-commit",
     "collector-persistent-queue-config",

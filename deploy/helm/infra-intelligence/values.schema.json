@@ -760,6 +760,9 @@
             "clientCaExistingSecret",
             "clientCaSecretKey",
             "clientCaMountPath",
+            "clientCrlExistingSecret",
+            "clientCrlSecretKey",
+            "clientCrlMountPath",
             "identitiesExistingSecret",
             "identitiesSecretKey"
           ],
@@ -772,6 +775,9 @@
             "clientCaExistingSecret": { "$ref": "#/definitions/optionalName" },
             "clientCaSecretKey": { "$ref": "#/definitions/nonEmptyString" },
             "clientCaMountPath": { "$ref": "#/definitions/absolutePath" },
+            "clientCrlExistingSecret": { "$ref": "#/definitions/optionalName" },
+            "clientCrlSecretKey": { "$ref": "#/definitions/nonEmptyString" },
+            "clientCrlMountPath": { "$ref": "#/definitions/absolutePath" },
             "identitiesExistingSecret": { "$ref": "#/definitions/optionalName" },
             "identitiesSecretKey": { "$ref": "#/definitions/nonEmptyString" }
           }

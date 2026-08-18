@@ -23,6 +23,7 @@ def write_tls_material(
     ip_address: str = "127.0.0.1",
     client_identities: Mapping[str, str] | None = None,
     expired_client_identities: Mapping[str, str] | None = None,
+    revoked_client_identities: Mapping[str, str] | None = None,
 ) -> None:
     """Write a one-hour CA/server chain and optional URI-SAN client identities.
 
@@ -30,6 +31,14 @@ def write_tls_material(
     ``client_identities`` but carry a validity window that already closed,
     proving the receiver rejects an otherwise-trusted identity once its
     certificate has expired rather than only rejecting an untrusted issuer.
+
+    ``revoked_client_identities`` are signed by the same CA with an
+    otherwise-valid validity window, but their serial numbers are listed on
+    a CA-signed CRL written to ``ca.crl``, proving the receiver rejects an
+    identity a customer has explicitly revoked even though its chain and
+    validity window both check out. Distinct from expiry: a deployment can
+    revoke a workload identity immediately without waiting for its
+    certificate's natural validity window to close.
     """
 
     now = datetime.now(timezone.utc)
@@ -142,7 +151,7 @@ def write_tls_material(
         *,
         not_valid_before: datetime,
         not_valid_after: datetime,
-    ) -> None:
+    ) -> x509.Certificate:
         if (
             re.fullmatch(r"[a-z][a-z0-9-]{0,63}", prefix) is None
             or not uri_san.startswith("spiffe://")
@@ -212,6 +221,7 @@ def write_tls_material(
         )
         os.chmod(directory / f"{prefix}.crt", 0o644)
         os.chmod(directory / f"{prefix}.key", 0o600)
+        return client_certificate
 
     for prefix, uri_san in (client_identities or {}).items():
         write_client_identity(
@@ -227,3 +237,31 @@ def write_tls_material(
             not_valid_before=now - timedelta(days=2),
             not_valid_after=now - timedelta(days=1),
         )
+
+    revoked_serials = []
+    for prefix, uri_san in (revoked_client_identities or {}).items():
+        revoked_serials.append(
+            write_client_identity(
+                prefix,
+                uri_san,
+                not_valid_before=now - timedelta(minutes=1),
+                not_valid_after=now + timedelta(hours=1),
+            ).serial_number
+        )
+    if revoked_client_identities is not None:
+        crl_builder = (
+            x509.CertificateRevocationListBuilder()
+            .issuer_name(ca_name)
+            .last_update(now - timedelta(minutes=1))
+            .next_update(now + timedelta(hours=1))
+        )
+        for serial_number in revoked_serials:
+            crl_builder = crl_builder.add_revoked_certificate(
+                x509.RevokedCertificateBuilder()
+                .serial_number(serial_number)
+                .revocation_date(now - timedelta(seconds=30))
+                .build()
+            )
+        crl = crl_builder.sign(ca_key, hashes.SHA256())
+        (directory / "ca.crl").write_bytes(crl.public_bytes(serialization.Encoding.PEM))
+        os.chmod(directory / "ca.crl", 0o644)

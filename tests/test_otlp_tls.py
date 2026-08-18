@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import socket
 import ssl
 import tempfile
+import threading
 import unittest
 from http import HTTPStatus
 from io import BytesIO
@@ -79,6 +81,19 @@ class OtlpTlsConfigurationTests(unittest.TestCase):
             }
         )
         self.assertIsNotNone(mutual.client_identities)
+        self.assertIsNone(mutual.client_crl_path)
+
+        mutual_with_crl = OtlpTlsConfiguration.from_environment(
+            {
+                "IIP_OTLP_TLS_MODE": "mutual-spiffe",
+                "IIP_OTLP_TLS_CERTIFICATE_PATH": "/tls/server.crt",
+                "IIP_OTLP_TLS_PRIVATE_KEY_PATH": "/tls/server.key",
+                "IIP_OTLP_TLS_CLIENT_CA_PATH": "/client-ca/ca.crt",
+                "IIP_OTLP_MTLS_IDENTITIES_JSON": identities(),
+                "IIP_OTLP_TLS_CLIENT_CRL_PATH": "/client-ca/ca.crl",
+            }
+        )
+        self.assertEqual(mutual_with_crl.client_crl_path, "/client-ca/ca.crl")
 
         for invalid in (
             {"IIP_OTLP_TLS_MODE": "other"},
@@ -87,15 +102,33 @@ class OtlpTlsConfigurationTests(unittest.TestCase):
                 "IIP_OTLP_TLS_CERTIFICATE_PATH": "/tls/server.crt",
             },
             {
+                "IIP_OTLP_TLS_MODE": "disabled",
+                "IIP_OTLP_TLS_CLIENT_CRL_PATH": "/client-ca/ca.crl",
+            },
+            {
                 "IIP_OTLP_TLS_MODE": "server",
                 "IIP_OTLP_TLS_CERTIFICATE_PATH": "relative.crt",
                 "IIP_OTLP_TLS_PRIVATE_KEY_PATH": "/tls/server.key",
+            },
+            {
+                "IIP_OTLP_TLS_MODE": "server",
+                "IIP_OTLP_TLS_CERTIFICATE_PATH": "/tls/server.crt",
+                "IIP_OTLP_TLS_PRIVATE_KEY_PATH": "/tls/server.key",
+                "IIP_OTLP_TLS_CLIENT_CRL_PATH": "/client-ca/ca.crl",
             },
             {
                 "IIP_OTLP_TLS_MODE": "mutual-spiffe",
                 "IIP_OTLP_TLS_CERTIFICATE_PATH": "/tls/server.crt",
                 "IIP_OTLP_TLS_PRIVATE_KEY_PATH": "/tls/server.key",
                 "IIP_OTLP_TLS_CLIENT_CA_PATH": "/client-ca/ca.crt",
+            },
+            {
+                "IIP_OTLP_TLS_MODE": "mutual-spiffe",
+                "IIP_OTLP_TLS_CERTIFICATE_PATH": "/tls/server.crt",
+                "IIP_OTLP_TLS_PRIVATE_KEY_PATH": "/tls/server.key",
+                "IIP_OTLP_TLS_CLIENT_CA_PATH": "/client-ca/ca.crt",
+                "IIP_OTLP_MTLS_IDENTITIES_JSON": identities(),
+                "IIP_OTLP_TLS_CLIENT_CRL_PATH": "relative.crl",
             },
         ):
             with self.subTest(invalid=invalid):
@@ -132,6 +165,87 @@ class OtlpTlsConfigurationTests(unittest.TestCase):
                 x509.SubjectAlternativeName
             ).value.get_values_for_type(x509.UniformResourceIdentifier)
             self.assertEqual(uri_names, [AUTHORIZED_SPIFFE_ID])
+
+    def test_crl_check_flag_is_set_only_when_a_crl_is_configured(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "fixture"
+            write_fixture(root)
+            base = {
+                "IIP_OTLP_TLS_MODE": "mutual-spiffe",
+                "IIP_OTLP_TLS_CERTIFICATE_PATH": str(root / "server.crt"),
+                "IIP_OTLP_TLS_PRIVATE_KEY_PATH": str(root / "server.key"),
+                "IIP_OTLP_TLS_CLIENT_CA_PATH": str(root / "ca.crt"),
+                "IIP_OTLP_MTLS_IDENTITIES_JSON": identities(),
+            }
+
+            without_crl = OtlpTlsConfiguration.from_environment(base).ssl_context()
+            assert without_crl is not None
+            self.assertFalse(without_crl.verify_flags & ssl.VERIFY_CRL_CHECK_LEAF)
+
+            with_crl = OtlpTlsConfiguration.from_environment(
+                {**base, "IIP_OTLP_TLS_CLIENT_CRL_PATH": str(root / "ca.crl")}
+            ).ssl_context()
+            assert with_crl is not None
+            self.assertTrue(with_crl.verify_flags & ssl.VERIFY_CRL_CHECK_LEAF)
+
+    def test_real_handshake_rejects_only_the_revoked_identity(self) -> None:
+        # A live TLS handshake against the configured CRL, not a fixture
+        # double: the valid identity must still connect and the revoked one
+        # (signed by the same CA, in its normal validity window) must not.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "fixture"
+            write_fixture(root)
+            server_context = OtlpTlsConfiguration.from_environment(
+                {
+                    "IIP_OTLP_TLS_MODE": "mutual-spiffe",
+                    "IIP_OTLP_TLS_CERTIFICATE_PATH": str(root / "server.crt"),
+                    "IIP_OTLP_TLS_PRIVATE_KEY_PATH": str(root / "server.key"),
+                    "IIP_OTLP_TLS_CLIENT_CA_PATH": str(root / "ca.crt"),
+                    "IIP_OTLP_MTLS_IDENTITIES_JSON": identities(),
+                    "IIP_OTLP_TLS_CLIENT_CRL_PATH": str(root / "ca.crl"),
+                }
+            ).ssl_context()
+            assert server_context is not None
+            server_context.verify_mode = ssl.CERT_REQUIRED
+
+            listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.addCleanup(listener.close)
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            port = listener.getsockname()[1]
+
+            def accept_once(outcomes: list[str]) -> None:
+                try:
+                    raw, _ = listener.accept()
+                    tls = server_context.wrap_socket(raw, server_side=True)
+                    outcomes.append("accepted")
+                    tls.close()
+                except ssl.SSLError:
+                    outcomes.append("rejected")
+
+            def attempt(prefix: str) -> str:
+                outcomes: list[str] = []
+                thread = threading.Thread(target=accept_once, args=(outcomes,))
+                thread.start()
+                client_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                client_context.load_verify_locations(cafile=str(root / "ca.crt"))
+                client_context.load_cert_chain(
+                    certfile=str(root / f"{prefix}.crt"),
+                    keyfile=str(root / f"{prefix}.key"),
+                )
+                try:
+                    with socket.create_connection(("127.0.0.1", port)) as raw:
+                        with client_context.wrap_socket(
+                            raw, server_hostname="otlp-receiver.fixture"
+                        ):
+                            pass
+                except ssl.SSLError:
+                    pass
+                thread.join(timeout=5)
+                return outcomes[0] if outcomes else "no-attempt"
+
+            self.assertEqual(attempt("collector-a"), "accepted")
+            self.assertEqual(attempt("collector-revoked"), "rejected")
 
     def test_missing_or_malformed_tls_files_fail_with_stable_configuration_code(
         self,

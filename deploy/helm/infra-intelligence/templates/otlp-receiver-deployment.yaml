@@ -138,6 +138,10 @@ spec:
             {{- if eq .Values.otlpIngest.tls.mode "mutual-spiffe" }}
             - name: IIP_OTLP_TLS_CLIENT_CA_PATH
               value: {{ printf "%s/ca.crt" .Values.otlpIngest.tls.clientCaMountPath | quote }}
+            {{- if .Values.otlpIngest.tls.clientCrlExistingSecret }}
+            - name: IIP_OTLP_TLS_CLIENT_CRL_PATH
+              value: {{ printf "%s/ca.crl" .Values.otlpIngest.tls.clientCrlMountPath | quote }}
+            {{- end }}
             - name: IIP_OTLP_MTLS_IDENTITIES_JSON
               valueFrom:
                 secretKeyRef:
@@ -199,6 +203,11 @@ spec:
             - name: otlp-client-ca
               mountPath: {{ .Values.otlpIngest.tls.clientCaMountPath | quote }}
               readOnly: true
+            {{- if .Values.otlpIngest.tls.clientCrlExistingSecret }}
+            - name: otlp-client-crl
+              mountPath: {{ .Values.otlpIngest.tls.clientCrlMountPath | quote }}
+              readOnly: true
+            {{- end }}
             {{- end }}
             {{- if eq .Values.policy.mode "external-http" }}
             {{- if .Values.policy.externalHttp.bearerTokenExistingSecret }}
@@ -232,6 +241,14 @@ spec:
             items:
               - key: {{ .Values.otlpIngest.tls.clientCaSecretKey | quote }}
                 path: ca.crt
+        {{- if .Values.otlpIngest.tls.clientCrlExistingSecret }}
+        - name: otlp-client-crl
+          secret:
+            secretName: {{ .Values.otlpIngest.tls.clientCrlExistingSecret | quote }}
+            items:
+              - key: {{ .Values.otlpIngest.tls.clientCrlSecretKey | quote }}
+                path: ca.crl
+        {{- end }}
         {{- end }}
         {{- if and (eq .Values.policy.mode "external-http") .Values.policy.externalHttp.bearerTokenExistingSecret }}
         - name: policy-token

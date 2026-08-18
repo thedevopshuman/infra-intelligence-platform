@@ -30,6 +30,10 @@ export IIP_OTLP_TLS_CERTIFICATE_PATH=/protected/server/tls.crt
 export IIP_OTLP_TLS_PRIVATE_KEY_PATH=/protected/server/tls.key
 export IIP_OTLP_TLS_CLIENT_CA_PATH=/protected/client-ca/ca.crt
 export IIP_OTLP_MTLS_IDENTITIES_JSON="$(tr -d '\n' < /protected/client-identities.json)"
+# Optional: reject a client certificate whose serial number appears on this
+# CA-signed CRL, even though its chain and validity window both still check
+# out (ADR 0088). Absent, the receiver checks only chain and validity window.
+export IIP_OTLP_TLS_CLIENT_CRL_PATH=/protected/client-ca/ca.crl
 PYTHONPATH=src python3 -m iip.surfaces.otlp_receiver
 ```
 
@@ -67,6 +71,14 @@ a receiver restart. A different SPIFFE ID or channel needs an explicit protected
 registry change. `/healthz` and `/readyz` are server-TLS verified but do not
 require a client certificate because they reveal only stable status.
 
+When `IIP_OTLP_TLS_CLIENT_CRL_PATH` is configured, the TLS handshake itself
+additionally fails closed for any presented certificate whose serial number
+appears on that CRL, before either of the two checks above runs. This lets a
+deployment revoke a workload identity immediately, without waiting for its
+certificate's `notAfter` or updating the SPIFFE identity registry. The
+receiver loads the CRL once at startup; keeping it current and distributing
+updates remains the customer's responsibility (ADR 0088).
+
 ## Protected channel configuration
 
 Each channel entry requires:
@@ -98,8 +110,10 @@ For Helm, set `otlpReceiver.enabled: true`, `database.existingSecret`, and
 `serverExistingSecret`, `clientCaExistingSecret`, and
 `identitiesExistingSecret`. The identity Secret value follows
 [`client-identities.example.json`](../../deploy/otlp/client-identities.example.json).
-The chart never puts channel or identity configuration in a ConfigMap or mounts
-it into the control-plane pod.
+Optionally set `clientCrlExistingSecret`/`clientCrlSecretKey` to enable CRL
+checking (ADR 0088); it may reference the same Secret as `clientCaExistingSecret`
+or a separate one, and is otherwise left empty. The chart never puts channel or
+identity configuration in a ConfigMap or mounts it into the control-plane pod.
 
 The chart creates a dedicated receiver Deployment and ClusterIP Service on
 OTLP/HTTP port `4318`. It exposes no console or control-plane operation, has no

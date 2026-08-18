@@ -71,6 +71,9 @@
 {{- if and (eq .Values.otlpIngest.tls.mode "mutual-spiffe") (not .Values.otlpIngest.tls.identitiesExistingSecret) }}
 {{- fail "otlpIngest.tls.identitiesExistingSecret is required in mutual-spiffe mode" }}
 {{- end }}
+{{- if and (ne .Values.otlpIngest.tls.mode "mutual-spiffe") .Values.otlpIngest.tls.clientCrlExistingSecret }}
+{{- fail "otlpIngest.tls.clientCrlExistingSecret is only meaningful in mutual-spiffe mode" }}
+{{- end }}
 {{- if .Values.backup.enabled }}
 {{- if not .Values.database.existingSecret }}
 {{- fail "database.existingSecret is required when backup.enabled=true" }}

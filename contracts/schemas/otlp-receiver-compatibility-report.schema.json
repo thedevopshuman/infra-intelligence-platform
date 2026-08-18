@@ -55,8 +55,8 @@
         },
         "checks": {
           "type": "array",
-          "minItems": 16,
-          "maxItems": 16,
+          "minItems": 17,
+          "maxItems": 17,
           "prefixItems": [
             {"$ref": "#/$defs/isolatedRouteSurfaceCheck"},
             {"$ref": "#/$defs/serverCaVerifiedTlsCheck"},
@@ -70,6 +70,7 @@
             {"$ref": "#/$defs/officialLogsExporterCheck"},
             {"$ref": "#/$defs/certificateRotationWithoutRestartCheck"},
             {"$ref": "#/$defs/expiredClientCertificateRejectedCheck"},
+            {"$ref": "#/$defs/revokedClientCertificateRejectedCheck"},
             {"$ref": "#/$defs/healthProbeMinimizationCheck"},
             {"$ref": "#/$defs/durableEvidenceCommitCheck"},
             {"$ref": "#/$defs/collectorPersistentQueueConfigCheck"},
@@ -82,9 +83,9 @@
           "additionalProperties": false,
           "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
           "properties": {
-            "totalChecks": {"const": 16},
-            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 16},
-            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 16},
+            "totalChecks": {"const": 17},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 17},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 17},
             "overallStatus": {"enum": ["compatible", "incompatible"]}
           }
         }
@@ -115,6 +116,7 @@
     "officialLogsExporterCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "official-logs-exporter"}}}]},
     "certificateRotationWithoutRestartCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "certificate-rotation-without-restart"}}}]},
     "expiredClientCertificateRejectedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "expired-client-certificate-rejected"}}}]},
+    "revokedClientCertificateRejectedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "revoked-client-certificate-rejected"}}}]},
     "healthProbeMinimizationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "health-probe-minimization"}}}]},
     "durableEvidenceCommitCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "durable-evidence-commit"}}}]},
     "collectorPersistentQueueConfigCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "collector-persistent-queue-config"}}}]},

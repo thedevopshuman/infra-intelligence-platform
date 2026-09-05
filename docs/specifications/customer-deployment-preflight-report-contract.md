@@ -50,8 +50,9 @@ new profile name and decision record.
 
 `install-ready` means only that the chart configuration and prerequisite
 objects passed this pre-install gate. `qualificationBoundary` is permanently
-`pre-install-only`, and `customerQualificationRequired` enumerates the
-interoperability, resilience, signing, and workload evidence that this report
+`pre-install-only`, and `customerQualificationRequired` enumerates release
+signing and vulnerability qualification plus the interoperability, resilience,
+and workload evidence that this report
 cannot establish. The existing `customer-workload-slo` requirement includes
 the separate clean-release external
 [ingress availability qualification](ingress-availability-qualification-report-contract.md);

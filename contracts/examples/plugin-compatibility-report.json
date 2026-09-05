@@ -12,7 +12,7 @@
       "platform": "linux/arm64",
       "containerRuntime": "docker",
       "containerRuntimeVersion": "29.7.2",
-      "applicationVersion": "0.75.0",
+      "applicationVersion": "0.76.0",
       "sdk": {"language": "python", "version": "0.52.0"}
     },
     "plugin": {

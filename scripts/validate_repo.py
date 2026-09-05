@@ -82,6 +82,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0104-minimized-customer-deployment-preflight.md",
     "docs/decisions/0105-external-ingress-availability-qualification.md",
     "docs/decisions/0107-exact-release-signature-verification.md",
+    "docs/decisions/0108-sbom-vulnerability-policy-and-qualification.md",
     "docs/operations/external-secrets.md",
     "deploy/helm/infra-intelligence/examples/iip-database.externalsecret.yaml",
     "scripts/test_external_secrets.sh",
@@ -177,6 +178,7 @@ REQUIRED_PATHS = (
     "docs/operations/investigation-signal-catalog.md",
     "docs/operations/investigation-capacity.md",
     "docs/operations/release-artifacts.md",
+    "docs/operations/release-vulnerability-qualification.md",
     "docs/operations/opentelemetry-export.md",
     "docs/operations/prometheus-evidence.md",
     "docs/operations/kubernetes-event-evidence.md",
@@ -201,6 +203,11 @@ REQUIRED_PATHS = (
     "contracts/schemas/release-qualification-report.schema.json",
     "contracts/schemas/release-signature-policy.schema.json",
     "contracts/schemas/release-signature-verification-report.schema.json",
+    "contracts/schemas/release-vulnerability-policy.schema.json",
+    "contracts/schemas/release-vulnerability-qualification-report.schema.json",
+    "scripts/release_vulnerability_qualification.py",
+    "scripts/test_release_vulnerabilities.sh",
+    "tests/test_release_vulnerability_qualification.py",
     "contracts/schemas/credential-lease-request.schema.json",
     "contracts/schemas/credential-lease.schema.json",
     "contracts/schemas/credential-broker-compatibility-report.schema.json",
@@ -370,6 +377,8 @@ REQUIRED_PATHS = (
     "contracts/examples/release-qualification-report.json",
     "contracts/examples/release-signature-policy.json",
     "contracts/examples/release-signature-verification-report.json",
+    "contracts/examples/release-vulnerability-policy.json",
+    "contracts/examples/release-vulnerability-qualification-report.json",
     "contracts/examples/page-info.json",
     "contracts/examples/error.json",
     "docs/specifications/evidence-contract.md",
@@ -397,6 +406,8 @@ REQUIRED_PATHS = (
     "docs/specifications/release-qualification-report-contract.md",
     "docs/specifications/release-signature-policy-contract.md",
     "docs/specifications/release-signature-verification-report-contract.md",
+    "docs/specifications/release-vulnerability-policy-contract.md",
+    "docs/specifications/release-vulnerability-qualification-report-contract.md",
     "docs/specifications/resource-change-evidence-contract.md",
     "requirements/verify.in",
     "requirements/verify.txt",
@@ -1693,6 +1704,43 @@ def validate_release_signature_examples(
         validate_report_document(report)
     except ReleaseSignatureError:
         fail(errors, "release signature report example must be semantically valid")
+
+
+def validate_release_vulnerability_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check release vulnerability policy and minimized-report semantics."""
+
+    try:
+        from release_vulnerability_qualification import (
+            ReleaseVulnerabilityError,
+            canonical_digest,
+            validate_policy_document,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "release vulnerability validator must be importable")
+        return
+    example_dir = ROOT / "contracts" / "examples"
+    policy = documents.get(example_dir / "release-vulnerability-policy.json")
+    report = documents.get(
+        example_dir / "release-vulnerability-qualification-report.json"
+    )
+    try:
+        validate_policy_document(policy)
+    except ReleaseVulnerabilityError:
+        fail(errors, "release vulnerability policy example must be semantically valid")
+    try:
+        validate_report_document(report)
+    except ReleaseVulnerabilityError:
+        fail(errors, "release vulnerability report example must be semantically valid")
+    if (
+        isinstance(policy, dict)
+        and isinstance(report, dict)
+        and report.get("spec", {}).get("policy", {}).get("digest")  # type: ignore[union-attr]
+        != canonical_digest(policy)
+    ):
+        fail(errors, "release vulnerability report must bind the example policy digest")
 
 
 def validate_customer_deployment_preflight_example(
@@ -4568,6 +4616,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_openai_instrumentation_compatibility_example(documents, errors)
     validate_release_qualification_example(documents, errors)
     validate_release_signature_examples(documents, errors)
+    validate_release_vulnerability_examples(documents, errors)
     validate_customer_deployment_preflight_example(documents, errors)
     validate_ingress_availability_qualification_example(documents, errors)
     validate_postgresql_recovery_qualification_example(documents, errors)

@@ -92,9 +92,9 @@ jobs:
       - run: make test-bedrock-instrumentation
       - run: make test-openai-instrumentation
 
-  release-signature-compatibility:
+  release-supply-chain-compatibility:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -106,3 +106,4 @@ jobs:
           cache-dependency-path: requirements/verify.txt
       - run: python -m pip install --requirement requirements/verify.txt
       - run: make test-release-signatures
+      - run: make test-release-vulnerabilities

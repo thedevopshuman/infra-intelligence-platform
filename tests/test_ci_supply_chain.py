@@ -35,6 +35,7 @@ class CiSupplyChainTests(unittest.TestCase):
         self.assertIn("version: v4.1.3", workflow)
         self.assertIn("make test-postgres-continuity", workflow)
         self.assertIn("make test-release-signatures", workflow)
+        self.assertIn("make test-release-vulnerabilities", workflow)
 
     def test_dependency_updates_remain_reviewed_pull_requests(self) -> None:
         configuration = (ROOT / ".github" / "dependabot.yml").read_text(

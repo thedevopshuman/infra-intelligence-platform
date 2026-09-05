@@ -21,6 +21,11 @@ identity, issuer, version, and transparency evidence under a reviewed policy.
 Its local public-key profile is explicitly non-promotable. The checked example
 retains placeholders until repository ownership and organizational release
 identity are accepted; see the [release procedure](docs/operations/release-artifacts.md).
+The next promotion gate extracts every platform SPDX attestation from both
+release images and evaluates it with a digest-pinned scanner and fresh database
+under closed severity thresholds and exact expiring exceptions. Only minimized
+counts, digests, and exception IDs are retained; see the [vulnerability
+qualification runbook](docs/operations/release-vulnerability-qualification.md).
 
 The Docker recovery gates retain separate source-bound logical
 `PostgreSQLRecoveryQualificationReport` and physical
@@ -153,6 +158,8 @@ make test-loki
 make test-plugin-compatibility
 make test-helm-install
 make release-bundle PYTHON=.venv/bin/python
+# Exercise the digest-pinned SBOM scanner and its no-network scan path:
+make test-release-vulnerabilities PYTHON=.venv/bin/python
 # After building a bundle, prove its install and the selected N-1 transition:
 # IIP_RELEASE_BUNDLE=/absolute/path/to/bundle make test-release-install
 # IIP_RELEASE_BUNDLE=/absolute/path/to/bundle IIP_UPGRADE_FROM_REVISION=<revision> make test-release-upgrade

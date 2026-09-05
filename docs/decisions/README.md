@@ -111,3 +111,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0105](0105-external-ingress-availability-qualification.md) | Accepted | Qualify external liveness, readiness, authentication, release identity, availability, and latency with minimized evidence |
 | [0106](0106-protected-github-repository-context-adapter.md) | Accepted | Read allowlisted GitHub context at an immutable commit through exact brokered authority and direct verified HTTPS |
 | [0107](0107-exact-release-signature-verification.md) | Accepted | Verify both published OCI indexes at manifest digests against exact organizational signer identity and transparency evidence |
+| [0108](0108-sbom-vulnerability-policy-and-qualification.md) | Accepted | Scan every exact release SPDX attestation with a pinned tool and fresh database under closed thresholds and expiring exceptions |

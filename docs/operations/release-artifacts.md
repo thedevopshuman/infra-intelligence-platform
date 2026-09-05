@@ -1,6 +1,6 @@
 # Release artifacts and supply-chain evidence
 
-**Status:** Executable unsigned candidate and signed-promotion verification path
+**Status:** Executable unsigned candidate with signature and SBOM promotion gates
 
 ## Build from one revision
 
@@ -21,6 +21,7 @@ make test-postgres-continuity PYTHON=.venv/bin/python
 make test-deployment-preflight PYTHON=.venv/bin/python
 make test-github-context PYTHON=.venv/bin/python
 make test-release-signatures PYTHON=.venv/bin/python
+make test-release-vulnerabilities PYTHON=.venv/bin/python
 make release-bundle PYTHON=.venv/bin/python
 ```
 
@@ -73,7 +74,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.75.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.76.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 
@@ -85,7 +86,7 @@ After verification, prove that the packaged chart and OCI image—not checkout
 copies—install on the explicit local Kind cluster:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.75.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.76.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -105,7 +106,7 @@ selected supported prior revision. The target may retain the same latest
 migration or add a newer one; migration regression is rejected:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.75.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.76.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
@@ -134,7 +135,7 @@ Run both packaged profiles in sequence and require their machine-readable
 evidence to agree on the candidate and local environment:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.75.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.76.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=<supported-ancestor> \
   make qualify-release PYTHON=.venv/bin/python
 ```
@@ -147,7 +148,7 @@ platform, Kubernetes, and Docker identity match. Verify a transported report
 and bundle with:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.75.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.76.0-0123456789ab \
 IIP_RELEASE_QUALIFICATION_REPORT=/absolute/path/to/report.json \
   make verify-release-qualification PYTHON=.venv/bin/python
 ```
@@ -173,7 +174,8 @@ The local bundle is explicitly unsigned. It proves artifact integrity and build 
 4. publish both OCI indexes and the Helm chart to immutable registry digests;
 5. sign both OCI digests with the accepted organizational identity;
 6. verify both signatures, identities, issuers, and transparency evidence under a checked-in policy;
-7. scan the attached SBOM under a documented vulnerability exception policy;
+7. qualify every exact attached SPDX SBOM under the checked vulnerability
+   policy and retain the minimized report;
 8. distribute only the verified digest and matching manifest/checksums through a trusted release channel.
 
 The repository implements step 6 without selecting the organization. Copy the
@@ -183,7 +185,7 @@ increment its generation when trust changes, and run from the same clean
 release checkout:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.75.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.76.0-0123456789ab \
 IIP_RELEASE_SIGNATURE_POLICY=/absolute/protected/release-signature-policy.json \
 IIP_RELEASE_SIGNATURE_REPORT=/absolute/path/to/release-signatures.json \
 COSIGN=/absolute/path/to/cosign \
@@ -214,6 +216,28 @@ release evidence channel. The checked example is intentionally non-promotable.
 See the [trust-policy contract](../specifications/release-signature-policy-contract.md),
 [report contract](../specifications/release-signature-verification-report-contract.md),
 and [ADR 0107](../decisions/0107-exact-release-signature-verification.md).
+
+Step 7 is implemented by the separate vulnerability qualification gate. It
+verifies the bundle again, binds every platform subject and SPDX layer digest,
+fetches the policy-pinned scanner database with constrained network authority,
+and then scans offline:
+
+```bash
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.76.0-0123456789ab \
+IIP_RELEASE_VULNERABILITY_POLICY=/absolute/protected/release-vulnerability-policy.json \
+IIP_RELEASE_VULNERABILITY_REPORT=/absolute/path/to/release-vulnerabilities.json \
+  make qualify-release-vulnerabilities PYTHON=.venv/bin/python
+```
+
+The production command requires clean source and a `qualified` result. Its
+report contains only release/policy/scanner/database identities, platform and
+SBOM digests, aggregate severity counts, and used exception IDs. It excludes
+raw dependency and vulnerability inventory. Verify retained evidence with
+`make verify-release-vulnerability-report`; that check does not rescan or
+replace the fresh-database qualification. See the [runbook](release-vulnerability-qualification.md),
+[policy contract](../specifications/release-vulnerability-policy-contract.md),
+[report contract](../specifications/release-vulnerability-qualification-report-contract.md),
+and [ADR 0108](../decisions/0108-sbom-vulnerability-policy-and-qualification.md).
 
 Deploy that verified OCI index as `image.repository@image.digest` through the Helm values contract. The chart resolves the same immutable reference for its API, worker, OTLP receiver, and schema-migration Job; a mutable tag is only a local-development fallback.
 

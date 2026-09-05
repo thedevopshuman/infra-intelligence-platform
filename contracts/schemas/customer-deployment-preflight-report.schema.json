@@ -218,10 +218,11 @@
     },
     "coreCustomerRequirements": {
       "type": "array",
-      "minItems": 7,
-      "maxItems": 7,
+      "minItems": 8,
+      "maxItems": 8,
       "prefixItems": [
         {"const": "signed-published-release"},
+        {"const": "vulnerability-qualified-release"},
         {"const": "customer-oidc-browser-issuer"},
         {"const": "customer-policy-bundle"},
         {"const": "customer-workload-identity-broker"},
@@ -233,10 +234,11 @@
     },
     "aiCustomerRequirements": {
       "type": "array",
-      "minItems": 10,
-      "maxItems": 10,
+      "minItems": 11,
+      "maxItems": 11,
       "prefixItems": [
         {"const": "signed-published-release"},
+        {"const": "vulnerability-qualified-release"},
         {"const": "customer-oidc-browser-issuer"},
         {"const": "customer-policy-bundle"},
         {"const": "customer-workload-identity-broker"},

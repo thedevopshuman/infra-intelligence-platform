@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "IngressAvailabilityQualificationReport",
   "metadata": {
-    "id": "iaq_126884ce75ea7dd943aa378167225ba7",
+    "id": "iaq_09512592b16fbc6be2f10906351af9f4",
     "generatedAt": "2026-09-06T12:00:05Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
@@ -12,12 +12,12 @@
     "qualificationLevel": "customer-ingress",
     "targetBindingDigest": "sha256:67f7aaa3a40b5a2a295d84c806d41b6a1f226a432f8ebe6742019f464f6f4c1f",
     "targetIdentity": {
-      "applicationVersion": "0.75.0",
+      "applicationVersion": "0.76.0",
       "contractsApiVersion": "iip.platform/v1alpha1",
       "requiredMigration": "0022_ai_retry_savings_rule.sql",
       "buildMode": "release",
       "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
-      "chartVersion": "0.78.0",
+      "chartVersion": "0.79.0",
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "objective": {

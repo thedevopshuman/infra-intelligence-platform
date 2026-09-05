@@ -87,6 +87,7 @@ NOT_RUN_ERROR_CODES = {
 }
 COMMON_CUSTOMER_REQUIREMENTS = (
     "signed-published-release",
+    "vulnerability-qualified-release",
     "customer-oidc-browser-issuer",
     "customer-policy-bundle",
     "customer-workload-identity-broker",

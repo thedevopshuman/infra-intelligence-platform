@@ -104,6 +104,8 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | Release qualification report | [release-qualification-report-contract.md](release-qualification-report-contract.md) | `contracts/schemas/release-qualification-report.schema.json` | `contracts/examples/release-qualification-report.json` |
 | Release signature policy | [release-signature-policy-contract.md](release-signature-policy-contract.md) | `contracts/schemas/release-signature-policy.schema.json` | `contracts/examples/release-signature-policy.json` |
 | Release signature verification report | [release-signature-verification-report-contract.md](release-signature-verification-report-contract.md) | `contracts/schemas/release-signature-verification-report.schema.json` | `contracts/examples/release-signature-verification-report.json` |
+| Release vulnerability policy | [release-vulnerability-policy-contract.md](release-vulnerability-policy-contract.md) | `contracts/schemas/release-vulnerability-policy.schema.json` | `contracts/examples/release-vulnerability-policy.json` |
+| Release vulnerability qualification report | [release-vulnerability-qualification-report-contract.md](release-vulnerability-qualification-report-contract.md) | `contracts/schemas/release-vulnerability-qualification-report.schema.json` | `contracts/examples/release-vulnerability-qualification-report.json` |
 
 `v1alpha1` means consumers should pin versions and expect deliberate evolution. Breaking changes create a new API/schema version. Fields are never silently repurposed.
 

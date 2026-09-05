@@ -303,6 +303,196 @@ assert_seed_resource() {
             'import json,sys,urllib.request; token=sys.stdin.read(); request=urllib.request.Request("http://127.0.0.1:8080/v1/resources", headers={"Authorization":"Bearer "+token}); document=json.load(urllib.request.urlopen(request, timeout=5)); matches=[item for item in document["items"] if item["spec"]["externalId"] == "cluster-upgrade/default/api"]; assert len(matches) == 1; assert matches[0]["metadata"]["tenantId"] == "upgrade-test"'
 }
 
+start_availability_probe() {
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" create secret generic \
+        iip-upgrade-probe --from-literal="bearer-token=$IIP_AUTH_BEARER_TOKEN" \
+        >/dev/null
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" apply -f - >/dev/null <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: iip-upgrade-probe
+  labels:
+    app.kubernetes.io/name: iip-upgrade-probe
+spec:
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: probe
+      image: "$IIP_TARGET_REPOSITORY@$IIP_TARGET_IMAGE_DIGEST"
+      imagePullPolicy: Never
+      command: ["python", "-c"]
+      args:
+        - |
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          expected = json.loads(os.environ["IIP_EXPECTED_RELEASES_JSON"])
+          token = Path("/var/run/iip-probe/bearer-token").read_text().strip()
+          state_path = Path("/tmp/probe-state.json")
+          temp_path = Path("/tmp/probe-state.tmp")
+          stop_path = Path("/tmp/stop")
+          state = {
+              "attemptCount": 0,
+              "requestCount": 0,
+              "successCount": 0,
+              "failureCount": 0,
+              "failureKinds": {},
+              "versionCounts": {},
+              "stopped": False,
+          }
+
+          def commit_state():
+              temp_path.write_text(json.dumps(state, sort_keys=True))
+              temp_path.replace(state_path)
+
+          def record_failure(kind):
+              state["failureCount"] += 1
+              state["failureKinds"][kind] = state["failureKinds"].get(kind, 0) + 1
+
+          def fetch(path):
+              state["requestCount"] += 1
+              request = urllib.request.Request(
+                  "http://iip-infra-intelligence" + path,
+                  headers={"Authorization": "Bearer " + token},
+              )
+              with urllib.request.urlopen(request, timeout=2) as response:
+                  if response.status != 200:
+                      raise RuntimeError("non-success-status")
+                  return json.load(response)
+
+          while not stop_path.exists():
+              state["attemptCount"] += 1
+              try:
+                  version_document = fetch("/v1/system/version")
+                  version_spec = version_document["spec"]
+                  version = version_spec["application"]["version"]
+                  revision = version_spec["build"]["revision"]
+                  if version_spec["build"]["mode"] != "release":
+                      raise ValueError("non-release-runtime")
+                  if expected.get(version) != revision:
+                      raise ValueError("unexpected-release-identity")
+                  resources = fetch("/v1/resources")
+                  matches = [
+                      item for item in resources["items"]
+                      if item["spec"]["externalId"] == "cluster-upgrade/default/api"
+                      and item["metadata"]["tenantId"] == "upgrade-test"
+                  ]
+                  if len(matches) != 1:
+                      raise ValueError("tenant-resource-unavailable")
+                  state["successCount"] += 1
+                  state["versionCounts"][version] = (
+                      state["versionCounts"].get(version, 0) + 1
+                  )
+              except (urllib.error.URLError, TimeoutError):
+                  record_failure("transport")
+              except Exception:
+                  record_failure("invalid-response")
+              commit_state()
+              time.sleep(0.05)
+
+          state["stopped"] = True
+          commit_state()
+          while True:
+              time.sleep(60)
+      env:
+        - name: IIP_EXPECTED_RELEASES_JSON
+          value: '{"$IIP_BASE_VERSION":"$IIP_BASE_REVISION","$IIP_TARGET_VERSION":"$IIP_TARGET_REVISION"}'
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+      volumeMounts:
+        - name: credential
+          mountPath: /var/run/iip-probe
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+  volumes:
+    - name: credential
+      secret:
+        secretName: iip-upgrade-probe
+    - name: tmp
+      emptyDir: {}
+EOF
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" wait pod/iip-upgrade-probe \
+        --for=condition=Ready --timeout=60s >/dev/null
+}
+
+probe_version_count() {
+    version=$1
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" exec iip-upgrade-probe -- \
+        python -c \
+        'import json,sys; print(json.load(open("/tmp/probe-state.json"))["versionCounts"].get(sys.argv[1], 0))' \
+        "$version"
+}
+
+wait_for_probe_version() {
+    version=$1
+    minimum=$2
+    attempt=0
+    while [ "$attempt" -lt 100 ]; do
+        if actual=$(probe_version_count "$version" 2>/dev/null) && \
+            [ "$actual" -ge "$minimum" ]; then
+            return
+        fi
+        attempt=$((attempt + 1))
+        sleep 0.1
+    done
+    echo "Sustained availability probe did not observe the expected release" >&2
+    exit 1
+}
+
+stop_and_assert_availability_probe() {
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" exec iip-upgrade-probe -- \
+        python -c 'from pathlib import Path; Path("/tmp/stop").touch()'
+    attempt=0
+    while [ "$attempt" -lt 50 ]; do
+        if "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+            --namespace "$IIP_TEST_NAMESPACE" exec iip-upgrade-probe -- \
+            python -c \
+            'import json; assert json.load(open("/tmp/probe-state.json"))["stopped"]' \
+            >/dev/null 2>&1; then
+            break
+        fi
+        attempt=$((attempt + 1))
+        sleep 0.1
+    done
+    if [ "$attempt" -ge 50 ]; then
+        echo "Sustained availability probe did not stop cleanly" >&2
+        exit 1
+    fi
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" exec iip-upgrade-probe -- \
+        python -c \
+        'import json,sys; state=json.load(open("/tmp/probe-state.json")); base,target=sys.argv[1:]; assert state["failureCount"] == 0, state["failureKinds"]; assert state["requestCount"] >= 40; assert state["successCount"] >= 20; assert state["versionCounts"].get(base, 0) >= 10; assert state["versionCounts"].get(target, 0) >= 10; print(f"sustained availability passed: {state['"'"'requestCount'"'"']} authenticated requests, zero failures")' \
+        "$IIP_BASE_VERSION" "$IIP_TARGET_VERSION"
+}
+
 IIP_BASE_CHART="$IIP_BASE_ROOT/deploy/helm/infra-intelligence"
 IIP_TARGET_CHART="$IIP_RELEASE_BUNDLE/infra-intelligence-$IIP_TARGET_CHART_VERSION.tgz"
 install_revision "$IIP_BASE_CHART" "$IIP_BASE_REPOSITORY" \
@@ -324,6 +514,8 @@ IIP_SEED_RESOURCE=$(
     deployment/iip-infra-intelligence -- python -c \
     'import json,sys,urllib.request; token=sys.stdin.readline().rstrip("\n"); payload=sys.stdin.read().encode(); request=urllib.request.Request("http://127.0.0.1:8080/v1/resources", data=payload, method="POST", headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"}); response=urllib.request.urlopen(request, timeout=5); document=json.load(response); assert response.status == 202; assert document["metadata"]["tenantId"] == "upgrade-test"; assert document["spec"]["externalId"] == "cluster-upgrade/default/api"'
 assert_seed_resource
+start_availability_probe
+wait_for_probe_version "$IIP_BASE_VERSION" 5
 
 install_revision "$IIP_TARGET_CHART" "$IIP_TARGET_REPOSITORY" \
     "$IIP_TARGET_VERSION" "$IIP_TARGET_IMAGE_DIGEST"
@@ -331,7 +523,9 @@ assert_runtime "$IIP_TARGET_VERSION" "$IIP_TARGET_CHART_VERSION" \
     "$IIP_TARGET_IMAGE_DIGEST" "$IIP_TARGET_REVISION" "$IIP_TARGET_MIGRATION"
 assert_migration "$IIP_TARGET_MIGRATION"
 assert_seed_resource
+wait_for_probe_version "$IIP_TARGET_VERSION" 5
 
+IIP_BASE_PROBE_COUNT=$(probe_version_count "$IIP_BASE_VERSION")
 "$IIP_HELM_BIN" rollback iip 1 \
     --kube-context "$IIP_KUBE_CONTEXT" \
     --namespace "$IIP_TEST_NAMESPACE" \
@@ -343,13 +537,17 @@ assert_runtime "$IIP_BASE_VERSION" "$IIP_BASE_CHART_VERSION" \
     "$IIP_BASE_IMAGE_DIGEST" "$IIP_BASE_REVISION" "$IIP_BASE_MIGRATION"
 assert_migration "$IIP_TARGET_MIGRATION"
 assert_seed_resource
+wait_for_probe_version "$IIP_BASE_VERSION" "$((IIP_BASE_PROBE_COUNT + 5))"
 
+IIP_TARGET_PROBE_COUNT=$(probe_version_count "$IIP_TARGET_VERSION")
 install_revision "$IIP_TARGET_CHART" "$IIP_TARGET_REPOSITORY" \
     "$IIP_TARGET_VERSION" "$IIP_TARGET_IMAGE_DIGEST"
 assert_runtime "$IIP_TARGET_VERSION" "$IIP_TARGET_CHART_VERSION" \
     "$IIP_TARGET_IMAGE_DIGEST" "$IIP_TARGET_REVISION" "$IIP_TARGET_MIGRATION"
 assert_migration "$IIP_TARGET_MIGRATION"
 assert_seed_resource
+wait_for_probe_version "$IIP_TARGET_VERSION" "$((IIP_TARGET_PROBE_COUNT + 5))"
+stop_and_assert_availability_probe
 
 IIP_APPLIED_MIGRATION_COUNT=$(
     "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
@@ -366,4 +564,4 @@ fi
     "$IIP_TEST_PYTHON" -c \
         'import json,sys; rows=json.load(sys.stdin); assert len(rows) == 4; assert [row["status"] for row in rows] == ["superseded","superseded","superseded","deployed"]'
 
-echo "Packaged N-1 upgrade passed: release identity -> preserved tenant data -> forward migration -> application rollback -> idempotent re-upgrade"
+echo "Packaged N-1 upgrade passed: sustained availability -> release identity -> preserved tenant data -> forward migration -> application rollback -> idempotent re-upgrade"

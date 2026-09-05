@@ -85,9 +85,12 @@ digest, and writes a tenant Resource through the authenticated public API. It
 then upgrades with the verified target bundle, rolls only the application back
 while retaining the forward migration, and upgrades to the target again. Every
 stage must report the expected runtime identity and return the same tenant data;
-the final database must contain every target migration exactly once. This proves
-the selected N-1 pair, not arbitrary-version compatibility or uninterrupted
-availability under live traffic.
+the final database must contain every target migration exactly once. An
+independent least-authority pod continuously reads both release identity and the
+seeded Resource through the Kubernetes Service; any failed request or unknown
+revision fails the gate. This proves bounded in-cluster availability for the
+selected N-1 pair, not arbitrary-version compatibility, customer-ingress
+behavior, production load, or failure-injected availability.
 
 ## Production promotion boundary
 

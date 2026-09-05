@@ -36,7 +36,7 @@ help:
 	@echo "test-local-product Exercise the customer workflow against the running Docker stack"
 	@echo "test-helm-install Build and install the chart on the explicit local kind cluster"
 	@echo "test-release-install Install a verified packaged release on the explicit local kind cluster"
-	@echo "test-release-upgrade Prove a packaged N-1 upgrade and application rollback on kind"
+	@echo "test-release-upgrade Prove sustained availability across a packaged N-1 transition"
 	@echo "db-migrate    Apply PostgreSQL migrations using IIP_DATABASE_URL"
 	@echo "helm-lint     Lint and render the Helm chart"
 	@echo "verify        Run all local quality gates"

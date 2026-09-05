@@ -101,3 +101,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0095](0095-openai-instrumentation-compatibility-profile.md) | Accepted | Qualify one exact official OpenAI instrumentation profile without importing its SDK or guessing missing usage meters |
 | [0096](0096-source-bound-retry-amplification.md) | Accepted | Detect mapped retry amplification while leaving monetary savings unresolved until billing evidence exists |
 | [0097](0097-packaged-n-minus-one-upgrade-conformance.md) | Accepted | Prove packaged N-1 upgrade, application rollback, data preservation, and idempotent re-upgrade compatibility |
+| [0098](0098-sustained-upgrade-availability-conformance.md) | Accepted | Require zero-failure authenticated Service reads throughout the packaged N-1 transition |

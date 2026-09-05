@@ -374,10 +374,13 @@ The N-1 gate separately seeds data through the public API, upgrades to the
 packaged target, rolls the application back without reversing the forward-only
 database migration, and re-upgrades. It requires both application versions to
 remain ready against the expected schema, preserves the tenant record throughout,
-and rejects duplicate or missing migrations.
+and rejects duplicate or missing migrations. A separate non-service-account pod
+sends authenticated release-identity and Resource reads through the Service for
+the full transition. It accepts only the two exact source revisions and requires
+zero request or data failures.
 
 The first revision additionally proves the public local console-authentication discovery document, the investigation-completion objective, and the disabled-by-default Evidence retention report from inside the installed pod.
 
 ## Production gaps
 
-This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance and 128-tenant PostgreSQL overload evidence; the chart declares guarded TLS ingress and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; the kind gate restores one; and the N-1 gate proves a data-preserving upgrade, application rollback against the forward schema, and idempotent re-upgrade. Organizational image signing, external secret-controller integration, controller-specific TLS conformance, high availability, uninterrupted availability under sustained upgrade traffic, customer-environment sustained workload and failover tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.
+This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance and 128-tenant PostgreSQL overload evidence; the chart declares guarded TLS ingress and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; the kind gate restores one; and the N-1 gate proves a data-preserving upgrade, application rollback against the forward schema, idempotent re-upgrade, and zero-failure bounded reads through the internal Service. Organizational image signing, external secret-controller integration, controller-specific end-to-end TLS and upgrade conformance, production-scale latency/load and failure-injected availability, high availability, customer-environment sustained workload and failover tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.

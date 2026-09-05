@@ -29,6 +29,24 @@ class ReleaseUpgradeGateTests(unittest.TestCase):
         self.assertIn("assert len(rows) == 4", script)
         self.assertIn("application rollback -> idempotent re-upgrade", script)
 
+    def test_gate_sends_sustained_authenticated_data_reads(self) -> None:
+        script = (ROOT / "scripts" / "test_release_upgrade.sh").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("automountServiceAccountToken: false", script)
+        self.assertIn("readOnlyRootFilesystem: true", script)
+        self.assertIn('Path("/var/run/iip-probe/bearer-token")', script)
+        self.assertIn('fetch("/v1/system/version")', script)
+        self.assertIn('fetch("/v1/resources")', script)
+        self.assertIn('"http://iip-infra-intelligence" + path', script)
+        self.assertNotIn('"http://iip-infra-intelligence:8080" + path', script)
+        self.assertIn("unexpected-release-identity", script)
+        self.assertIn("tenant-resource-unavailable", script)
+        self.assertIn('state["failureCount"] == 0', script)
+        self.assertIn('state["requestCount"] >= 40', script)
+        self.assertIn("stop_and_assert_availability_probe", script)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -188,6 +188,13 @@ spec:
                   name: {{ .Values.contextEvidence.integrationsExistingSecret | quote }}
                   key: {{ .Values.contextEvidence.integrationsSecretKey | quote }}
             {{- end }}
+            {{- if and (eq .Values.contextEvidence.backend "github") .Values.contextEvidence.credentialsExistingSecret }}
+            - name: IIP_GITHUB_CONTEXT_CREDENTIALS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.contextEvidence.credentialsExistingSecret | quote }}
+                  key: {{ .Values.contextEvidence.credentialsSecretKey | quote }}
+            {{- end }}
             {{- if .Values.investigationSignalCatalog.existingSecret }}
             - name: IIP_INVESTIGATION_SIGNAL_CATALOG_JSON
               valueFrom:
@@ -230,6 +237,11 @@ spec:
             {{- if .Values.contextEvidence.documentsExistingConfigMap }}
             - name: context-documents
               mountPath: {{ .Values.contextEvidence.documentsMountPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- if and (eq .Values.contextEvidence.backend "github") .Values.contextEvidence.caBundleExistingSecret }}
+            - name: github-context-ca
+              mountPath: {{ .Values.contextEvidence.caBundleMountPath | quote }}
               readOnly: true
             {{- end }}
             {{- if eq .Values.eventPublisher.mode "https-webhook" }}
@@ -290,6 +302,14 @@ spec:
         - name: context-documents
           configMap:
             name: {{ .Values.contextEvidence.documentsExistingConfigMap | quote }}
+        {{- end }}
+        {{- if and (eq .Values.contextEvidence.backend "github") .Values.contextEvidence.caBundleExistingSecret }}
+        - name: github-context-ca
+          secret:
+            secretName: {{ .Values.contextEvidence.caBundleExistingSecret | quote }}
+            items:
+              - key: {{ .Values.contextEvidence.caBundleSecretKey | quote }}
+                path: ca.crt
         {{- end }}
         {{- if eq .Values.eventPublisher.mode "https-webhook" }}
         - name: event-publisher-token

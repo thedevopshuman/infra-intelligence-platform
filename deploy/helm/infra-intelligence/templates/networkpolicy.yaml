@@ -99,6 +99,14 @@ spec:
         - port: {{ .Values.networkPolicy.opensearchEgress.port }}
           protocol: TCP
     {{- end }}
+    {{- if .Values.networkPolicy.contextEgress.enabled }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.contextEgress.cidr | quote }}
+      ports:
+        - port: {{ .Values.networkPolicy.contextEgress.port }}
+          protocol: TCP
+    {{- end }}
     {{- if .Values.networkPolicy.kubernetesApiEgress.enabled }}
     - to:
         - ipBlock:
@@ -216,6 +224,14 @@ spec:
               {{- toYaml .Values.networkPolicy.opensearchEgress.podSelector | nindent 14 }}
       ports:
         - port: {{ .Values.networkPolicy.opensearchEgress.port }}
+          protocol: TCP
+    {{- end }}
+    {{- if .Values.networkPolicy.contextEgress.enabled }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.contextEgress.cidr | quote }}
+      ports:
+        - port: {{ .Values.networkPolicy.contextEgress.port }}
           protocol: TCP
     {{- end }}
     {{- if .Values.networkPolicy.kubernetesApiEgress.enabled }}

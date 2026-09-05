@@ -52,6 +52,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     ),
     "context-evidence-request.schema.json": ("context-evidence-request.json",),
     "context-evidence-result.schema.json": ("context-evidence-result.json",),
+    "github-context-compatibility-report.schema.json": (
+        "github-context-compatibility-report.json",
+    ),
     "console-authentication.schema.json": (
         "console-authentication-local.json",
         "console-authentication-oidc.json",

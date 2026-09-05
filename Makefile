@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -22,6 +22,7 @@ IIP_INGRESS_MINIMUM_AVAILABILITY_BASIS_POINTS ?= 9990
 IIP_INGRESS_MAXIMUM_P95_LATENCY_MILLISECONDS ?= 2000
 IIP_INGRESS_REQUEST_TIMEOUT_MILLISECONDS ?= 2000
 IIP_INGRESS_INTERVAL_MILLISECONDS ?= 1000
+IIP_GITHUB_CONTEXT_COMPATIBILITY_REPORT ?= dist/github-context-compatibility-report.json
 
 help:
 	@echo "install-verify-deps Install pinned verification-only Python dependencies"
@@ -29,7 +30,7 @@ help:
 	@echo "validate-schemas Validate contract examples against JSON Schemas"
 	@echo "test          Run the reference-kernel and SDK tests"
 	@echo "test-typescript Install locked TypeScript tooling and type-check the SDK"
-	@echo "test-deployment-preflight Validate both sanitized production Helm profiles"
+	@echo "test-deployment-preflight Validate the sanitized core, GitHub-context, and AI profiles"
 	@echo "preflight-deployment-live Check a customer values file and explicit Kubernetes context"
 	@echo "verify-deployment-preflight-report Verify current source/configuration-bound preflight evidence"
 	@echo "test-ingress-availability Exercise the minimized external probe against real local routes"
@@ -40,6 +41,9 @@ help:
 	@echo "test-credential-broker Certify the external broker client over local TLS"
 	@echo "test-oidc     Certify OIDC/JWKS authentication over local TLS"
 	@echo "test-policy-engine Certify external policy decisions over local TLS"
+	@echo "test-github-context Exercise the protected GitHub adapter and real-TLS fixture"
+	@echo "qualify-github-context Retain clean-current GitHub adapter compatibility evidence"
+	@echo "verify-github-context-report Verify clean-current GitHub adapter evidence"
 	@echo "test-external-secrets Certify exact-key secret synchronization and rotation on local Kind"
 	@echo "test-backup-restore Measure and verify PostgreSQL recovery with Docker Desktop"
 	@echo "verify-backup-restore-report Verify clean-current PostgreSQL recovery evidence"
@@ -115,6 +119,15 @@ test-deployment-preflight:
 		--report dist/customer-ai-finops-preflight-report.json \
 		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml \
 		--values deploy/helm/infra-intelligence/examples/production-ai-finops.values.yaml
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/deployment_preflight.py generate \
+		--profile production-core-v1 \
+		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml \
+		--values deploy/helm/infra-intelligence/examples/production-github-context.values.yaml \
+		--output dist/customer-github-context-preflight-report.json
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/deployment_preflight.py verify \
+		--report dist/customer-github-context-preflight-report.json \
+		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml \
+		--values deploy/helm/infra-intelligence/examples/production-github-context.values.yaml
 
 preflight-deployment-live:
 	@test -n "$(IIP_KUBERNETES_CONTEXT)" || \
@@ -176,6 +189,20 @@ test-oidc:
 test-policy-engine:
 	IIP_DOCKER_BIN=$(DOCKER) PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/run_policy_engine_compatibility.py \
 		--report dist/policy-engine-compatibility-report.json
+
+test-github-context:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_github_context_backend tests.test_github_context_compatibility -v
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/run_github_context_compatibility.py \
+		--output "$(IIP_GITHUB_CONTEXT_COMPATIBILITY_REPORT)"
+
+qualify-github-context:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/run_github_context_compatibility.py \
+		--output "$(IIP_GITHUB_CONTEXT_COMPATIBILITY_REPORT)" --require-clean
+
+verify-github-context-report:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/run_github_context_compatibility.py \
+		--verify "$(IIP_GITHUB_CONTEXT_COMPATIBILITY_REPORT)" --require-clean
 
 test-external-secrets:
 	IIP_KUBECTL_BIN=$(KUBECTL) IIP_HELM_BIN=$(HELM) scripts/test_external_secrets.sh
@@ -362,6 +389,12 @@ helm-lint:
 		--set networkPolicy.enabled=true \
 		--set networkPolicy.databaseEgress.enabled=true >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set contextEvidence.backend=github \
+		--set contextEvidence.integrationsExistingSecret=iip-github-context \
+		--set contextEvidence.credentialsExistingSecret=iip-github-context-token \
+		--set networkPolicy.enabled=true \
+		--set networkPolicy.contextEgress.enabled=true >/dev/null
+	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set ingress.enabled=true \
 		--set ingress.className=nginx \
 		--set ingress.host=iip.example.test \
@@ -429,6 +462,13 @@ helm-lint:
 		--set backup.enabled=true \
 		--set backup.destination.existingClaim=iip-backups >/dev/null 2>&1; then \
 		echo "Helm validation accepted backup without database-only NetworkPolicy" >&2; exit 1; \
+	fi
+	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set contextEvidence.backend=github \
+		--set contextEvidence.integrationsExistingSecret=iip-github-context \
+		--set contextEvidence.credentialsExistingSecret=iip-github-context-token \
+		--set networkPolicy.enabled=true >/dev/null 2>&1; then \
+		echo "Helm validation accepted GitHub context without explicit provider egress" >&2; exit 1; \
 	fi
 
 verify: validate validate-schemas test test-typescript helm-lint test-deployment-preflight

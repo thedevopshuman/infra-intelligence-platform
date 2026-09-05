@@ -220,6 +220,35 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             self.assertIn("investigationSignalCatalog.existingSecret", template)
             self.assertIn("investigationSignalCatalog.secretKey", template)
 
+    def test_github_context_is_secret_broker_and_egress_bounded(self) -> None:
+        api = (CHART / "templates" / "deployment.yaml").read_text(encoding="utf-8")
+        worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+        network = (CHART / "templates" / "networkpolicy.yaml").read_text(
+            encoding="utf-8"
+        )
+        validation = (CHART / "templates" / "validation.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+
+        for template in (api, worker):
+            self.assertIn("IIP_GITHUB_CONTEXT_CREDENTIALS_JSON", template)
+            self.assertIn("contextEvidence.integrationsExistingSecret", template)
+            self.assertIn("contextEvidence.credentialsExistingSecret", template)
+            self.assertIn("contextEvidence.caBundleExistingSecret", template)
+            self.assertIn("github-context-ca", template)
+        self.assertIn("github-context-credentials-json", values)
+        self.assertGreaterEqual(network.count("networkPolicy.contextEgress"), 6)
+        for message in (
+            "contextEvidence.integrationsExistingSecret is required",
+            "contextEvidence.credentialsExistingSecret or the external credential broker is required",
+            "networkPolicy.contextEgress.enabled must be true",
+        ):
+            with self.subTest(message=message):
+                self.assertIn(message, validation)
+
     def test_event_delivery_retry_budget_is_explicit(self) -> None:
         worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
             encoding="utf-8"

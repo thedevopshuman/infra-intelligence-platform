@@ -33,8 +33,8 @@ def rendered_profile() -> dict[str, object]:
         "schemaVersion": "1",
         "chart": {
             "name": "infra-intelligence",
-            "version": "0.76.0",
-            "applicationVersion": "0.73.0",
+            "version": "0.77.0",
+            "applicationVersion": "0.74.0",
         },
         "image": {
             "repository": "registry.example.test/iip/control-plane",
@@ -81,6 +81,7 @@ def rendered_profile() -> dict[str, object]:
             "prometheusEgress": True,
             "lokiEgress": True,
             "opensearchEgress": False,
+            "contextEgress": False,
             "kubernetesApiEgress": True,
             "oidcEgress": True,
             "policyEgress": True,

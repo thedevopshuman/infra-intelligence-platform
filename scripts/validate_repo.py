@@ -1159,6 +1159,86 @@ def validate_policy_engine_compatibility_example(
     validate_policy_engine_compatibility_document(documents.get(path), errors)
 
 
+GITHUB_CONTEXT_COMPATIBILITY_CHECKS = (
+    "ca-verified-tls",
+    "untrusted-ca-denial",
+    "bearer-authentication",
+    "exact-api-version",
+    "immutable-commit-ref",
+    "path-response-binding",
+    "credential-scope",
+    "tenant-isolation",
+    "redirect-denial",
+    "response-size-denial",
+    "outage-fail-closed",
+    "service-recovery",
+    "secret-minimization",
+)
+
+
+def validate_github_context_compatibility_document(
+    report: object, errors: List[str]
+) -> None:
+    """Check the closed GitHub Contents profile and its derived summary."""
+
+    if not isinstance(report, dict):
+        fail(errors, "GitHub context compatibility report must be an object")
+        return
+    metadata = report.get("metadata")
+    spec = report.get("spec")
+    checks = spec.get("checks") if isinstance(spec, dict) else None
+    summary = spec.get("summary") if isinstance(spec, dict) else None
+    if (
+        not isinstance(metadata, dict)
+        or not isinstance(checks, list)
+        or not isinstance(summary, dict)
+    ):
+        fail(errors, "GitHub context compatibility report must contain checks and summary")
+        return
+    check_ids = tuple(
+        check.get("id") if isinstance(check, dict) else None for check in checks
+    )
+    if check_ids != GITHUB_CONTEXT_COMPATIBILITY_CHECKS:
+        fail(errors, "GitHub context compatibility checks must match the closed profile")
+    passed = sum(
+        1
+        for check in checks
+        if isinstance(check, dict)
+        and check.get("status") == "passed"
+        and "errorCode" not in check
+    )
+    failed = len(checks) - passed
+    status = "compatible" if failed == 0 else "incompatible"
+    if spec.get("status") != status:
+        fail(errors, "GitHub context compatibility status must match its checks")
+    if summary != {
+        "totalChecks": len(checks),
+        "passedChecks": passed,
+        "failedChecks": failed,
+        "overallStatus": status,
+    }:
+        fail(errors, "GitHub context compatibility summary must match its checks")
+    try:
+        from run_github_context_compatibility import report_id
+
+        if metadata.get("id") != report_id(report):
+            fail(errors, "GitHub context compatibility report ID must be content-derived")
+    except (ImportError, KeyError, TypeError, ValueError):
+        fail(errors, "GitHub context compatibility report ID must be content-derived")
+
+
+def validate_github_context_compatibility_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "github-context-compatibility-report.json"
+    )
+    validate_github_context_compatibility_document(documents.get(path), errors)
+
+
 OTLP_RECEIVER_COMPATIBILITY_CHECKS = (
     "isolated-route-surface",
     "server-ca-verified-tls",
@@ -4443,6 +4523,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_credential_broker_compatibility_example(documents, errors)
     validate_oidc_issuer_compatibility_example(documents, errors)
     validate_policy_engine_compatibility_example(documents, errors)
+    validate_github_context_compatibility_example(documents, errors)
     validate_otlp_receiver_compatibility_example(documents, errors)
     validate_bedrock_instrumentation_compatibility_example(documents, errors)
     validate_openai_instrumentation_compatibility_example(documents, errors)

@@ -359,6 +359,7 @@ def _validate_rendered_profile(profile: Mapping[str, Any]) -> None:
                 "prometheusEgress",
                 "lokiEgress",
                 "opensearchEgress",
+                "contextEgress",
                 "kubernetesApiEgress",
                 "oidcEgress",
                 "policyEgress",
@@ -448,6 +449,9 @@ def _static_checks(
     ) or (
         evidence["logs"] == "opensearch" and network["opensearchEgress"] is True
     )
+    context_network = (
+        evidence["context"] != "github" or network["contextEgress"] is True
+    )
     network_ready = all(
         network[key] is True
         for key in (
@@ -461,7 +465,7 @@ def _static_checks(
             "policyEgress",
             "credentialBrokerEgress",
         )
-    ) and logs_network
+    ) and logs_network and context_network
     checks = [
         _check("helm-render", True, "preflight.helm.render-failed"),
         _check("immutable-image", DIGEST.fullmatch(image["digest"]) is not None, "preflight.image.digest-required"),

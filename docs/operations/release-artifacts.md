@@ -19,12 +19,13 @@ make test-openai-instrumentation PYTHON=.venv/bin/python
 make test-backup-restore PYTHON=.venv/bin/python
 make test-postgres-continuity PYTHON=.venv/bin/python
 make test-deployment-preflight PYTHON=.venv/bin/python
+make test-github-context PYTHON=.venv/bin/python
 make release-bundle PYTHON=.venv/bin/python
 ```
 
 Retain the clean-revision capacity, credential-broker, OIDC-issuer,
 policy-engine, OTLP-receiver, Bedrock `Converse`/`ConverseStream`, OpenAI
-compatibility, PostgreSQL logical-recovery, and PostgreSQL physical-continuity
+compatibility, protected GitHub-context, PostgreSQL logical-recovery, and PostgreSQL physical-continuity
 qualification reports under `dist/` beside the release candidate as
 environment-specific evidence. Verify both recovery
 reports against the clean checkout with `make verify-backup-restore-report` and
@@ -35,8 +36,8 @@ certification environment, not every installation target.
 The external-secret profile emits no report or secret material; retain its
 terminal pass/fail result in the release workflow log. It proves the local
 Kubernetes provider handoff, not the selected customer secret backend.
-The static deployment-preflight reports prove the shipped non-secret core and
-AI FinOps configuration profiles. Before customer installation, generate an
+The static deployment-preflight reports prove the shipped non-secret core,
+protected GitHub context, and AI FinOps configuration profiles. Before customer installation, generate an
 `install-ready` report from the clean release checkout against an explicit
 customer context and the exact protected values generation, verify it with
 `make verify-deployment-preflight-report`, and retain it beside—not inside—the
@@ -71,7 +72,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.73.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.74.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 
@@ -83,7 +84,7 @@ After verification, prove that the packaged chart and OCI image—not checkout
 copies—install on the explicit local Kind cluster:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.73.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.74.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -103,7 +104,7 @@ selected supported prior revision. The target may retain the same latest
 migration or add a newer one; migration regression is rejected:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.73.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.74.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
@@ -132,7 +133,7 @@ Run both packaged profiles in sequence and require their machine-readable
 evidence to agree on the candidate and local environment:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.73.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.74.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=<supported-ancestor> \
   make qualify-release PYTHON=.venv/bin/python
 ```
@@ -145,7 +146,7 @@ platform, Kubernetes, and Docker identity match. Verify a transported report
 and bundle with:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.73.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.74.0-0123456789ab \
 IIP_RELEASE_QUALIFICATION_REPORT=/absolute/path/to/report.json \
   make verify-release-qualification PYTHON=.venv/bin/python
 ```
@@ -166,11 +167,13 @@ The local bundle is explicitly unsigned. It proves artifact integrity and build 
 1. rerun all local, PostgreSQL, kind, and customer workflow gates against the release revision;
 2. retain a clean, `install-ready` deployment-preflight report for the exact
    customer values generation and explicit Kubernetes context;
-3. publish both OCI indexes and the Helm chart to immutable registry digests;
-4. sign both OCI digests with the accepted organizational identity;
-5. verify both signatures, identities, issuers, and transparency evidence under a checked-in policy;
-6. scan the attached SBOM under a documented vulnerability exception policy;
-7. distribute only the verified digest and matching manifest/checksums through a trusted release channel.
+3. qualify the protected GitHub or GitHub Enterprise repository profile when
+   it is enabled and retain the clean-revision compatibility report;
+4. publish both OCI indexes and the Helm chart to immutable registry digests;
+5. sign both OCI digests with the accepted organizational identity;
+6. verify both signatures, identities, issuers, and transparency evidence under a checked-in policy;
+7. scan the attached SBOM under a documented vulnerability exception policy;
+8. distribute only the verified digest and matching manifest/checksums through a trusted release channel.
 
 Deploy that verified OCI index as `image.repository@image.digest` through the Helm values contract. The chart resolves the same immutable reference for its API, worker, OTLP receiver, and schema-migration Job; a mutable tag is only a local-development fallback.
 

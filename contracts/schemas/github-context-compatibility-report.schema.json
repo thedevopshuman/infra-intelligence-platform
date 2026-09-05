@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:github-context-compatibility-report:v1alpha1",
+  "title": "GitHub Context Compatibility Report",
+  "description": "Source-bound local real-TLS evidence for the protected read-only GitHub repository context adapter.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "GithubContextCompatibilityReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^gcr_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "environment", "profile", "checks", "summary"],
+      "properties": {
+        "status": {"enum": ["compatible", "incompatible"]},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["platform", "pythonVersion", "applicationVersion"],
+          "properties": {
+            "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+            "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+            "applicationVersion": {"$ref": "#/$defs/semver"}
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "transport",
+            "apiVersion",
+            "credentialMode",
+            "credentialScope",
+            "revisionMode",
+            "maximumFileBytes",
+            "proxyMode",
+            "redirectMode"
+          ],
+          "properties": {
+            "name": {"const": "local-github-rest-contents-v1"},
+            "transport": {"const": "ca-verified-https-json"},
+            "apiVersion": {"const": "2026-03-10"},
+            "credentialMode": {"const": "request-scoped-bearer"},
+            "credentialScope": {"const": "repository:contents:read"},
+            "revisionMode": {"const": "immutable-commit-and-blob"},
+            "maximumFileBytes": {"const": 1048576},
+            "proxyMode": {"const": "disabled"},
+            "redirectMode": {"const": "deny"}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 13,
+          "maxItems": 13,
+          "prefixItems": [
+            {"$ref": "#/$defs/caVerifiedTlsCheck"},
+            {"$ref": "#/$defs/untrustedCaDenialCheck"},
+            {"$ref": "#/$defs/bearerAuthenticationCheck"},
+            {"$ref": "#/$defs/exactApiVersionCheck"},
+            {"$ref": "#/$defs/immutableCommitRefCheck"},
+            {"$ref": "#/$defs/pathResponseBindingCheck"},
+            {"$ref": "#/$defs/credentialScopeCheck"},
+            {"$ref": "#/$defs/tenantIsolationCheck"},
+            {"$ref": "#/$defs/redirectDenialCheck"},
+            {"$ref": "#/$defs/responseSizeDenialCheck"},
+            {"$ref": "#/$defs/outageFailClosedCheck"},
+            {"$ref": "#/$defs/serviceRecoveryCheck"},
+            {"$ref": "#/$defs/secretMinimizationCheck"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 13},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 13},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 13},
+            "overallStatus": {"enum": ["compatible", "incompatible"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "caVerifiedTlsCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "ca-verified-tls"}}}]},
+    "untrustedCaDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "untrusted-ca-denial"}}}]},
+    "bearerAuthenticationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "bearer-authentication"}}}]},
+    "exactApiVersionCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "exact-api-version"}}}]},
+    "immutableCommitRefCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "immutable-commit-ref"}}}]},
+    "pathResponseBindingCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "path-response-binding"}}}]},
+    "credentialScopeCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "credential-scope"}}}]},
+    "tenantIsolationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "tenant-isolation"}}}]},
+    "redirectDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "redirect-denial"}}}]},
+    "responseSizeDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "response-size-denial"}}}]},
+    "outageFailClosedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "outage-fail-closed"}}}]},
+    "serviceRecoveryCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "service-recovery"}}}]},
+    "secretMinimizationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "secret-minimization"}}}]}
+  }
+}

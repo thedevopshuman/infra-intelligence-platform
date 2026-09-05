@@ -1,0 +1,14 @@
+# Merge after production-core.values.yaml. The referenced Secret contains only
+# protected repository mappings; the production credential comes from the
+# separately configured external credential broker.
+contextEvidence:
+  backend: github
+  integrationsExistingSecret: iip-github-context-integrations
+  integrationsSecretKey: context-integrations-json
+
+networkPolicy:
+  contextEgress:
+    enabled: true
+    # Replace with the reviewed GitHub/GitHub Enterprise API destination range.
+    cidr: 203.0.113.20/32
+    port: 443

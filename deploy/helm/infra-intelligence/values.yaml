@@ -7,7 +7,7 @@ apiTermination:
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.73.0"
+  tag: "0.74.0"
   digest: ""
 
 worker:
@@ -311,6 +311,11 @@ contextEvidence:
   backend: no-data
   integrationsExistingSecret: ""
   integrationsSecretKey: context-integrations-json
+  credentialsExistingSecret: ""
+  credentialsSecretKey: github-context-credentials-json
+  caBundleExistingSecret: ""
+  caBundleSecretKey: ca.crt
+  caBundleMountPath: /var/run/iip-github-context-ca
   documentsExistingConfigMap: ""
   documentsMountPath: /var/run/iip-context
 
@@ -444,6 +449,10 @@ networkPolicy:
       kubernetes.io/metadata.name: observability
     podSelector:
       app.kubernetes.io/name: opensearch
+  contextEgress:
+    enabled: false
+    cidr: 10.96.0.1/32
+    port: 443
   kubernetesApiEgress:
     enabled: false
     cidr: 10.96.0.1/32

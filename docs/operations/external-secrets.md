@@ -55,6 +55,8 @@ anything.
 | `kubernetesActions.credentialsExistingSecret` | `kubernetes-actions-credentials-json` | Request-scoped governed Kubernetes action bindings |
 | `kubernetesActions.caBundleExistingSecret` | `ca.crt` | Kubernetes action API trust anchor |
 | `contextEvidence.integrationsExistingSecret` | `context-integrations-json` | Protected context catalog and roots |
+| `contextEvidence.credentialsExistingSecret` | `github-context-credentials-json` | Development-only GitHub context credential mapping; production uses the external broker |
+| `contextEvidence.caBundleExistingSecret` | `ca.crt` | Optional GitHub Enterprise trust anchor |
 | `investigationSignalCatalog.existingSecret` | `investigation-signal-catalog-json` | Tenant-scoped investigation candidate policy |
 | `aiAttribution.policiesExistingSecret` | `ai-attribution-policies-json` | Protected application/team attribution policy |
 | `aiCostEngine.catalogsExistingSecret` | `ai-price-catalogs-json` | Versioned AI price catalogs |

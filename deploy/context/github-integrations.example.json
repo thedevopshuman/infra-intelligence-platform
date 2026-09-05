@@ -1,0 +1,31 @@
+{
+  "integrations": [
+    {
+      "tenantId": "local",
+      "integrationId": "github-context",
+      "provider": "github",
+      "endpoint": "https://api.github.com",
+      "apiVersion": "2026-03-10",
+      "credentialRef": "credential://local/github/context",
+      "caBundlePath": null,
+      "requestTimeoutSeconds": 10,
+      "maxResponseBytes": 2097152,
+      "repositories": [
+        {
+          "owner": "replace-me",
+          "name": "operations",
+          "commitSha": "0123456789abcdef0123456789abcdef01234567",
+          "documents": [
+            {
+              "referenceId": "runbooks/api-rollout",
+              "resourceRefs": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+              "kind": "runbook",
+              "title": "API rollout recovery",
+              "path": "runbooks/api-rollout.md"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

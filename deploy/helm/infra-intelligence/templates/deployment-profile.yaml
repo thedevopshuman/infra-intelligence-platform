@@ -47,6 +47,12 @@
 {{- if .Values.contextEvidence.integrationsExistingSecret -}}
 {{- $dependencies = append $dependencies (dict "purpose" "context-integrations" "kind" "Secret" "name" .Values.contextEvidence.integrationsExistingSecret "keys" (list .Values.contextEvidence.integrationsSecretKey)) -}}
 {{- end -}}
+{{- if and (eq .Values.contextEvidence.backend "github") .Values.contextEvidence.credentialsExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "github-context-credentials" "kind" "Secret" "name" .Values.contextEvidence.credentialsExistingSecret "keys" (list .Values.contextEvidence.credentialsSecretKey)) -}}
+{{- end -}}
+{{- if and (eq .Values.contextEvidence.backend "github") .Values.contextEvidence.caBundleExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "github-context-ca" "kind" "Secret" "name" .Values.contextEvidence.caBundleExistingSecret "keys" (list .Values.contextEvidence.caBundleSecretKey)) -}}
+{{- end -}}
 {{- if .Values.contextEvidence.documentsExistingConfigMap -}}
 {{- $dependencies = append $dependencies (dict "purpose" "context-documents" "kind" "ConfigMap" "name" .Values.contextEvidence.documentsExistingConfigMap "keys" (list)) -}}
 {{- end -}}
@@ -107,7 +113,7 @@
   "evidenceRetention" (dict "enabled" .Values.evidenceRetention.enabled)
   "evidenceBackends" (dict "metrics" .Values.telemetryEvidence.backend "logs" .Values.logEvidence.backend "kubernetesEvents" .Values.kubernetesEventEvidence.backend "context" .Values.contextEvidence.backend)
   "telemetry" (dict "metricsEnabled" .Values.telemetry.metricsEnabled "tracesEnabled" .Values.telemetry.tracesEnabled "endpointConfigured" (not (empty .Values.telemetry.otlpEndpoint)) "collectorQueueLossConfigured" (not (empty .Values.collectorQueueLoss.bindingJson)))
-  "networkPolicy" (dict "enabled" .Values.networkPolicy.enabled "ingressController" .Values.networkPolicy.ingressController.enabled "databaseEgress" .Values.networkPolicy.databaseEgress.enabled "otlpEgress" .Values.networkPolicy.otlpEgress.enabled "prometheusEgress" .Values.networkPolicy.prometheusEgress.enabled "lokiEgress" .Values.networkPolicy.lokiEgress.enabled "opensearchEgress" .Values.networkPolicy.opensearchEgress.enabled "kubernetesApiEgress" .Values.networkPolicy.kubernetesApiEgress.enabled "oidcEgress" .Values.networkPolicy.oidcEgress.enabled "policyEgress" .Values.networkPolicy.policyEgress.enabled "credentialBrokerEgress" .Values.networkPolicy.credentialBrokerEgress.enabled "otlpReceiverIngress" .Values.networkPolicy.otlpReceiverIngress.enabled)
+  "networkPolicy" (dict "enabled" .Values.networkPolicy.enabled "ingressController" .Values.networkPolicy.ingressController.enabled "databaseEgress" .Values.networkPolicy.databaseEgress.enabled "otlpEgress" .Values.networkPolicy.otlpEgress.enabled "prometheusEgress" .Values.networkPolicy.prometheusEgress.enabled "lokiEgress" .Values.networkPolicy.lokiEgress.enabled "opensearchEgress" .Values.networkPolicy.opensearchEgress.enabled "contextEgress" .Values.networkPolicy.contextEgress.enabled "kubernetesApiEgress" .Values.networkPolicy.kubernetesApiEgress.enabled "oidcEgress" .Values.networkPolicy.oidcEgress.enabled "policyEgress" .Values.networkPolicy.policyEgress.enabled "credentialBrokerEgress" .Values.networkPolicy.credentialBrokerEgress.enabled "otlpReceiverIngress" .Values.networkPolicy.otlpReceiverIngress.enabled)
   "podDisruptionBudget" (dict "enabled" .Values.podDisruptionBudget.enabled "minAvailable" .Values.podDisruptionBudget.minAvailable)
   "security" (dict "serviceAccountTokenAutomount" .Values.serviceAccount.automount "runAsNonRoot" .Values.podSecurityContext.runAsNonRoot "readOnlyRootFilesystem" .Values.securityContext.readOnlyRootFilesystem "allowPrivilegeEscalation" .Values.securityContext.allowPrivilegeEscalation)
   "receivers" (dict "metricsEnabled" .Values.otlpReceiver.enabled "logsEnabled" .Values.otlpLogsReceiver.enabled "aiUsageEnabled" .Values.aiUsageReceiver.enabled "replicaCount" .Values.otlpIngest.replicaCount "tlsMode" .Values.otlpIngest.tls.mode "crlConfigured" (not (empty .Values.otlpIngest.tls.clientCrlExistingSecret)))

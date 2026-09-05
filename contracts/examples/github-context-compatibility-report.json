@@ -1,0 +1,50 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "GithubContextCompatibilityReport",
+  "metadata": {
+    "id": "gcr_449d77c4694a06e3addbccdb4130a3ab",
+    "generatedAt": "2026-09-06T12:00:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "compatible",
+    "environment": {
+      "platform": "darwin/arm64",
+      "pythonVersion": "3.14.3",
+      "applicationVersion": "0.74.0"
+    },
+    "profile": {
+      "name": "local-github-rest-contents-v1",
+      "transport": "ca-verified-https-json",
+      "apiVersion": "2026-03-10",
+      "credentialMode": "request-scoped-bearer",
+      "credentialScope": "repository:contents:read",
+      "revisionMode": "immutable-commit-and-blob",
+      "maximumFileBytes": 1048576,
+      "proxyMode": "disabled",
+      "redirectMode": "deny"
+    },
+    "checks": [
+      {"id": "ca-verified-tls", "status": "passed"},
+      {"id": "untrusted-ca-denial", "status": "passed"},
+      {"id": "bearer-authentication", "status": "passed"},
+      {"id": "exact-api-version", "status": "passed"},
+      {"id": "immutable-commit-ref", "status": "passed"},
+      {"id": "path-response-binding", "status": "passed"},
+      {"id": "credential-scope", "status": "passed"},
+      {"id": "tenant-isolation", "status": "passed"},
+      {"id": "redirect-denial", "status": "passed"},
+      {"id": "response-size-denial", "status": "passed"},
+      {"id": "outage-fail-closed", "status": "passed"},
+      {"id": "service-recovery", "status": "passed"},
+      {"id": "secret-minimization", "status": "passed"}
+    ],
+    "summary": {
+      "totalChecks": 13,
+      "passedChecks": 13,
+      "failedChecks": 0,
+      "overallStatus": "compatible"
+    }
+  }
+}

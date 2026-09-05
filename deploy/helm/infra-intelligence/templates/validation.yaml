@@ -95,6 +95,27 @@
 {{- if and (eq .Values.credentialBroker.mode "external-http") (eq .Values.credentialBroker.externalHttp.configJson "{}") }}
 {{- fail "credentialBroker.externalHttp.configJson is required in external-http mode" }}
 {{- end }}
+{{- if eq .Values.contextEvidence.backend "github" }}
+{{- if not .Values.contextEvidence.integrationsExistingSecret }}
+{{- fail "contextEvidence.integrationsExistingSecret is required for the GitHub backend" }}
+{{- end }}
+{{- if and (ne .Values.credentialBroker.mode "external-http") (not .Values.contextEvidence.credentialsExistingSecret) }}
+{{- fail "contextEvidence.credentialsExistingSecret or the external credential broker is required for the GitHub backend" }}
+{{- end }}
+{{- if .Values.contextEvidence.documentsExistingConfigMap }}
+{{- fail "contextEvidence.documentsExistingConfigMap is not used by the GitHub backend" }}
+{{- end }}
+{{- if not .Values.networkPolicy.enabled }}
+{{- fail "networkPolicy.enabled must be true for the GitHub context backend" }}
+{{- end }}
+{{- if not .Values.networkPolicy.contextEgress.enabled }}
+{{- fail "networkPolicy.contextEgress.enabled must be true for the GitHub context backend" }}
+{{- end }}
+{{- else }}
+{{- if or .Values.contextEvidence.credentialsExistingSecret .Values.contextEvidence.caBundleExistingSecret }}
+{{- fail "GitHub context credential and CA Secrets require contextEvidence.backend=github" }}
+{{- end }}
+{{- end }}
 {{- if and .Values.otlpReceiver.enabled (not .Values.otlpReceiver.channelsExistingSecret) }}
 {{- fail "otlpReceiver.channelsExistingSecret is required when the metrics receiver is enabled" }}
 {{- end }}

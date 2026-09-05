@@ -1010,7 +1010,9 @@ def _build_runtime_from_env(
         kubernetes_events_backend = _kubernetes_events_backend_from_env(
             credential_broker
         )
-        context_documents_backend = _context_documents_backend_from_env()
+        context_documents_backend = _context_documents_backend_from_env(
+            credential_broker
+        )
         signal_catalog = build_investigation_signal_catalog(os.environ)
         (
             ai_attribution_policies,
@@ -1962,10 +1964,22 @@ def _telemetry_logs_backend_from_env(
     raise LokiConfigurationError("logs.backend.configuration.invalid")
 
 
-def _context_documents_backend_from_env() -> ContextDocumentsBackend | None:
+def _context_documents_backend_from_env(
+    credential_broker: CredentialBroker | None = None,
+) -> ContextDocumentsBackend | None:
     backend = os.environ.get("IIP_CONTEXT_BACKEND", "no-data")
     if backend == "no-data":
         return None
+    if backend == "github":
+        from iip.adapters.github_context import (
+            build_github_context_backend_from_environment,
+        )
+
+        return build_github_context_backend_from_environment(
+            os.environ,
+            SystemClock(),
+            credential_broker,
+        )
     if backend != "files":
         from iip.adapters.context import ContextConfigurationError
 

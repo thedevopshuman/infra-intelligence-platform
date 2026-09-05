@@ -28,4 +28,13 @@ Those trust fields are normative. Text from source repositories, README files, r
 
 ## Compatibility and security
 
-Adding a new document kind is contract evolution. Arbitrary provider queries, paths, raw credentials, executable instructions, and unbounded content are intentionally absent. Results are confidential ephemeral Evidence by default. A future remote repository adapter must implement the same backend-neutral port and exact request scope; it must not change this public contract to expose vendor query languages or tokens.
+Adding a new document kind is contract evolution. Arbitrary provider queries, paths, raw credentials, executable instructions, and unbounded content are intentionally absent. Results are confidential ephemeral Evidence by default.
+
+The GitHub adapter implements this same contract without adding vendor fields.
+Protected configuration binds logical references to repository paths at one
+exact commit SHA; the adapter retrieves only the GitHub Contents file endpoint,
+uses an exact request-scoped credential lease, and records commit-plus-blob
+revision provenance. The [compatibility report](github-context-compatibility-contract.md)
+qualifies the local real-TLS profile. Other repository providers must preserve
+the same port and request authority rather than exposing vendor query languages
+or tokens.

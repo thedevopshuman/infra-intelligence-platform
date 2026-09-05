@@ -3,13 +3,13 @@
 **Status:** Executable production-profile gate
 
 The preflight catches incomplete production values and missing Kubernetes
-dependencies before Helm applies a workload. It supports the read-only core
-and AI FinOps V0 profiles. A pass is necessary for a customer installation but
-is not production certification.
+dependencies before Helm applies a workload. It supports the read-only core,
+protected GitHub context, and AI FinOps V0 profiles. A pass is necessary for a
+customer installation but is not production certification.
 
 ## Start from the non-secret profiles
 
-The chart ships two composable examples:
+The chart ships three composable examples:
 
 - [`production-core.values.yaml`](../../deploy/helm/infra-intelligence/examples/production-core.values.yaml)
   enables the redundant API/worker, external identity/policy/credential
@@ -19,6 +19,10 @@ The chart ships two composable examples:
   is an overlay that adds metadata-only AI usage intake, mutual-SPIFFE TLS and
   CRL references, redundant receiver replicas, attribution, pricing, saving,
   allocation, and Collector queue/loss monitoring.
+- [`production-github-context.values.yaml`](../../deploy/helm/infra-intelligence/examples/production-github-context.values.yaml)
+  is an overlay that replaces local context files with allowlisted GitHub or
+  GitHub Enterprise paths at exact commit revisions, brokered read credentials,
+  an optional private CA reference, and explicit provider egress.
 
 Copy and merge the required settings into a protected customer values file.
 Replace every example registry, endpoint, identity, and CIDR. Values contain
@@ -26,7 +30,7 @@ only configuration and object references; create actual Secret values through
 the customer's secret-management workflow. Never pass secrets through Helm
 `--set`, a values file, or the preflight command.
 
-The repository regression gate renders and verifies both static profiles:
+The repository regression gate renders and verifies all static profiles:
 
 ```bash
 make test-deployment-preflight PYTHON=.venv/bin/python
@@ -59,12 +63,14 @@ IIP_KUBERNETES_CONTEXT=customer-production \
 make preflight-deployment-live PYTHON=.venv/bin/python
 ```
 
-For `production-ai-finops-v0`, merge the core and AI overlay into the one
-protected values file passed through `IIP_DEPLOYMENT_VALUES`. A successful
-cluster run writes `dist/customer-deployment-preflight-report.json` with
-`install-ready`. Any unavailable cluster, inaccessible or missing object,
-missing required Secret or ConfigMap key, or unbound PVC returns a stable
-failure and writes `blocked` evidence when the chart could be rendered.
+For `production-ai-finops-v0`, merge the core and AI overlay. For protected
+repository context, use `production-core-v1` with the GitHub overlay. Pass the
+selected combination as the one protected values file through
+`IIP_DEPLOYMENT_VALUES`. A successful cluster run writes
+`dist/customer-deployment-preflight-report.json` with `install-ready`. Any
+unavailable cluster, inaccessible or missing object, missing required Secret
+or ConfigMap key, or unbound PVC returns a stable failure and writes `blocked`
+evidence when the chart could be rendered.
 
 The Secret read makes `kubectl` emit only object UID, resource version, and key
 names through a Kubernetes Go template; no data value crosses into the Python
@@ -96,6 +102,9 @@ Preflight intentionally leaves the following gates explicit:
 - organizational artifact signing and trusted publication;
 - real customer OIDC browser/issuer behavior;
 - policy bundle and credential-broker correctness, rotation, and recovery;
+- customer GitHub or GitHub Enterprise API, repository permission, private-CA,
+  throttling, outage, and recovery behavior; retain an exact-environment
+  [GitHub context compatibility report](../specifications/github-context-compatibility-contract.md);
 - customer Collector, PKI, CRL lifecycle, buffering, and loss behavior;
 - PostgreSQL HA, fencing, storage durability, PITR, and disaster recovery;
 - workload-specific capacity plus clean, exact-release external ingress

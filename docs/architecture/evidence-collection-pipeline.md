@@ -67,7 +67,19 @@ Resource-change evidence uses the same pipeline with the tenant-scoped immutable
 
 The investigator may select root-cause-scoped resource changes after Kubernetes Events and before external telemetry. It derives identity, resources, time, deadline, and budgets from the investigation, then assesses only the committed artifact. Complete results apply a predeclared change-count rule and expose only stable IDs and counts in the report. No-data stays explicit; partial, corrupt, missing, or mismatched results cannot become citations. [ADR 0027](../decisions/0027-investigation-change-correlation.md) records this correlation boundary.
 
-Repository and runbook context uses a separate `ContextDocumentsBackend`. Public callers select logical allowlisted references and closed kinds, never paths, repository queries, endpoints, or credentials. The first file adapter confines reads to a protected root and the provider redacts every excerpt before constructing the normalized result. All context documents are explicitly untrusted data and cannot carry instruction or authority semantics. [ADR 0028](../decisions/0028-untrusted-context-evidence.md) fixes this boundary.
+Repository and runbook context uses a separate `ContextDocumentsBackend`.
+Public callers select logical allowlisted references and closed kinds, never
+paths, repository queries, endpoints, or credentials. The file adapter confines
+reads to a protected root. The GitHub adapter maps those same logical
+references through protected tenant configuration to one repository path at an
+exact commit, obtains an exact `repository:contents:read` broker lease, and
+validates the returned path, size, Base64 UTF-8 content, and Git blob identity
+over direct verified HTTPS. Both feed the same provider that redacts every
+excerpt before constructing the normalized result. All context documents are
+explicitly untrusted data and cannot carry instruction or authority semantics.
+[ADR 0028](../decisions/0028-untrusted-context-evidence.md) fixes the trust
+boundary; [ADR 0106](../decisions/0106-protected-github-repository-context-adapter.md)
+fixes the first remote adapter and its compatibility evidence.
 
 The investigator may select root-cause-scoped context through the same public query/limit fragment. It inherits authenticated scope and budgets, then re-reads and structurally validates only the committed artifact. Complete results apply a predeclared document-count rule and expose only stable document IDs and logical references in the report; excerpts never leave the protected Evidence artifact or become instructions. No-data, partial, corrupt, missing, or scope-mismatched results remain explicit gaps and cannot become citations. [ADR 0029](../decisions/0029-investigation-context-correlation.md) records this correlation boundary.
 

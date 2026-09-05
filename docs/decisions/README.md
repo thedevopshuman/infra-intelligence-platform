@@ -109,3 +109,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0103](0103-source-bound-postgresql-physical-continuity-evidence.md) | Accepted | Qualify physical replication, manual promotion, and named-target recovery without overstating local evidence |
 | [0104](0104-minimized-customer-deployment-preflight.md) | Accepted | Fail closed on incomplete production profiles and retain only digests/counts from explicit-context dependency checks |
 | [0105](0105-external-ingress-availability-qualification.md) | Accepted | Qualify external liveness, readiness, authentication, release identity, availability, and latency with minimized evidence |
+| [0106](0106-protected-github-repository-context-adapter.md) | Accepted | Read allowlisted GitHub context at an immutable commit through exact brokered authority and direct verified HTTPS |

@@ -6,6 +6,15 @@ The chart can install the control-plane API against an existing PostgreSQL datab
 
 Reviewed automatic investigation candidates are optional. Set `investigationSignalCatalog.existingSecret` and `secretKey` to project the same tenant-bound [signal catalog](investigation-signal-catalog.md) into the API and worker. The chart never renders the catalog body into a ConfigMap or values-derived manifest.
 
+Protected repository context is optional and disabled by default. The
+`production-github-context.values.yaml` overlay selects immutable-revision
+GitHub reads, projects the allowlist and private CA from existing protected
+objects, and requires explicit provider egress. Production uses the shared
+request-scoped credential broker; the static credential Secret is a local
+development fallback only. Follow the [context evidence
+runbook](context-evidence.md) and retain compatibility evidence before enabling
+the adapter for a customer repository.
+
 The optional AI cost engine is worker-owned and disabled by default. Its
 protected catalog wrapper comes from an existing Secret. It is mounted into
 the API only when generation-bound allocation reporting is explicitly enabled,
@@ -63,7 +72,8 @@ helm template iip deploy/helm/infra-intelligence \
 
 For a production-shaped deployment, use the closed source- and
 configuration-bound gate instead of treating a successful render as enough.
-It ships non-secret core and AI FinOps examples, checks the complete profile,
+It ships non-secret core, protected GitHub context, and AI FinOps examples,
+checks the complete profile,
 and can verify exact prerequisite objects and keys in an explicitly named
 context before Helm applies anything. Follow the
 [customer deployment preflight](customer-deployment-preflight.md). Only a
@@ -229,7 +239,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.73.0
+  tag: 0.74.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -371,7 +381,7 @@ To test the actual packaged release chart and attested OCI archive instead of
 checkout artifacts, first build the release bundle and then run:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.73.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.74.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -380,7 +390,7 @@ and the explicit prior release revision. Equal latest migrations are allowed;
 a migration regression is not:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.73.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.74.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```

@@ -65,6 +65,9 @@ The first supported profile is metadata-only Bedrock `Converse` and
 `ConverseStream` traffic using on-demand pricing for one explicitly configured
 region and model. Broader API, model, region, purchase-mode, and language
 support must be claimed only after executable compatibility evidence exists.
+The pinned official Python instrumentation now has separate no-network evidence
+for both operations; live support remains bound to an explicitly qualified
+model, region, and operation.
 
 ## Attribution
 

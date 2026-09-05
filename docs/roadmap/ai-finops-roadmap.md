@@ -37,11 +37,13 @@ content crosses the boundary; and stopping the observability path does not fail
 the model request.
 
 Implementation status: items 1, 2, 4, 5, 6, and 7 are delivered. Item 3 has an
-executable Bedrock-shaped OTLP fixture, strict metadata/content boundary, and a
-no-network gate against the exact pinned official Python botocore `Converse`
-instrumentation. The gate normalizes the shipped legacy provider attribute and
-service-specific scope without guessing absent cache/reasoning usage. Live
-model/region and `ConverseStream` auto-instrumentation qualification remain.
+executable Bedrock-shaped OTLP fixture, strict metadata/content boundary, and
+separate no-network gates against the exact pinned official Python botocore
+`Converse` and `ConverseStream` instrumentation. The streaming gate consumes
+the actual wrapped event stream through final usage metadata and proves span
+completion is deferred until then. Both gates normalize the shipped legacy
+provider attribute and service-specific scope without guessing absent
+cache/reasoning usage. Live model/region/operation qualification remains.
 Item 7 includes the privacy-bounded OTLP aggregate projection, finding view,
 and a disposable Collector/Prometheus/Loki/Grafana topology. Item 8 now has a
 deterministic full-flow gate covering deduplication, visible unpriced usage,

@@ -24,9 +24,12 @@ and make local and CI verification non-deterministic.
 Add a source-bound compatibility report and two explicit qualification levels:
 
 1. the default offline gate runs the pinned boto3 client and official botocore
-   instrumentation against `botocore.stub.Stubber` in a no-network container;
-2. the opt-in live gate makes one bounded `Converse` request only when the
-   operator supplies an explicit enable flag, model, region, and short-lived
+   instrumentation for both `Converse` and `ConverseStream` against
+   `botocore.stub.Stubber` in a no-network container; the streaming fixture is
+   injected through a scoped public botocore event handler as an actual
+   `EventStream` after Stubber response-shape validation;
+2. the opt-in live gate makes one bounded explicitly selected operation only
+   when the operator supplies an enable flag, model, region, and short-lived
    AWS credentials;
 3. both levels keep message-content capture disabled, capture the actual span,
    pass its encoded OTLP payload through the real IIP receiver adapter, and
@@ -36,7 +39,10 @@ Add a source-bound compatibility report and two explicit qualification levels:
 5. the official service-specific instrumentation scope must be explicitly
    allowlisted by the protected channel configuration; and
 6. absent cache/reasoning breakdowns remain missing. They are never converted
-   to zero without a separately qualified model/billing profile.
+   to zero without a separately qualified model/billing profile; and
+7. `ConverseStream` compatibility requires complete stream consumption, a
+   final metadata event with provider totals, and proof that the official span
+   did not finish before consumption.
 
 ## Consequences
 
@@ -44,9 +50,9 @@ Add a source-bound compatibility report and two explicit qualification levels:
   an IIP application SDK or placing IIP in the inference path.
 - Offline evidence is reproducible and safe but does not claim a live AWS
   qualification.
-- A live report is model- and region-specific and still does not prove
-  streaming behavior, invoice agreement, customer PKI/Collector behavior, or
-  production load.
+- A live report is model-, region-, and operation-specific. Streaming is
+  claimed only by a `ConverseStream` report; neither operation proves invoice
+  agreement, customer PKI/Collector behavior, or production load.
 - Cost calculation for this conservative upstream profile stays unresolved
   until a model-specific breakdown policy or richer standard instrumentation
   is qualified.

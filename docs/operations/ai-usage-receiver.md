@@ -197,6 +197,7 @@ waits on cost calculation.
 The Docker gate sends metrics, logs, and a GenAI trace through official Python
 OTLP exporters over the existing intermediate-CA and CRL-tested receiver, then
 queries PostgreSQL for the committed metadata-only usage record. Offline
-exact-profile qualification covers botocore `Converse` and OpenAI Python
-`chat.completions.create`. Live Bedrock/OpenAI behavior and streaming remain
-explicit provider qualification work.
+exact-profile qualification covers botocore `Converse`, botocore
+`ConverseStream` through complete event consumption, and OpenAI Python
+`chat.completions.create`. Live Bedrock/OpenAI model, region, operation, and
+streaming behavior remain explicit provider qualification work.

@@ -23,6 +23,14 @@ class BedrockInstrumentationCompatibilityContractTests(unittest.TestCase):
                 / "bedrock-instrumentation-compatibility-report.json"
             ).read_text(encoding="utf-8")
         )
+        self.stream_example = json.loads(
+            (
+                ROOT
+                / "contracts"
+                / "examples"
+                / "bedrock-converse-stream-instrumentation-compatibility-report.json"
+            ).read_text(encoding="utf-8")
+        )
 
     def errors(self, document: object) -> list[str]:
         errors: list[str] = []
@@ -38,6 +46,15 @@ class BedrockInstrumentationCompatibilityContractTests(unittest.TestCase):
             "offline-sdk-interoperability",
         )
         self.assertFalse(self.example["spec"]["result"]["exactCostEligible"])
+        self.assertEqual(self.errors(self.stream_example), [])
+        self.assertEqual(
+            self.stream_example["spec"]["profile"]["operation"],
+            "ConverseStream",
+        )
+        self.assertTrue(
+            self.stream_example["spec"]["result"]["streamingVerified"]
+        )
+        self.assertEqual(self.stream_example["spec"]["summary"]["totalChecks"], 9)
 
     def test_semantics_reject_live_overclaim_and_partial_exact_cost(self) -> None:
         live_overclaim = copy.deepcopy(self.example)
@@ -51,6 +68,20 @@ class BedrockInstrumentationCompatibilityContractTests(unittest.TestCase):
         reordered = copy.deepcopy(self.example)
         reordered["spec"]["checks"].reverse()
         self.assertTrue(self.errors(reordered))
+
+        stream_overclaim = copy.deepcopy(self.example)
+        stream_overclaim["spec"]["result"]["streamingVerified"] = True
+        self.assertTrue(self.errors(stream_overclaim))
+
+        missing_stream_check = copy.deepcopy(self.stream_example)
+        missing_stream_check["spec"]["checks"].pop()
+        missing_stream_check["spec"]["summary"] = {
+            "totalChecks": 8,
+            "passedChecks": 8,
+            "failedChecks": 0,
+            "overallStatus": "compatible",
+        }
+        self.assertTrue(self.errors(missing_stream_check))
 
 
 class BedrockInstrumentationCompatibilityHarnessTests(unittest.TestCase):
@@ -79,6 +110,8 @@ class BedrockInstrumentationCompatibilityHarnessTests(unittest.TestCase):
         self.assertIn("--read-only", runner)
         self.assertIn("--cap-drop ALL", runner)
         self.assertNotIn("/.aws", runner)
+        self.assertIn("--operation converse-stream", runner)
+        self.assertIn("IIP_BEDROCK_OPERATION", runner)
 
     def test_harness_uses_real_sdk_boundary_and_conservative_breakdowns(self) -> None:
         harness = (
@@ -87,6 +120,9 @@ class BedrockInstrumentationCompatibilityHarnessTests(unittest.TestCase):
 
         self.assertIn("Stubber(client)", harness)
         self.assertIn("client.converse(**parameters)", harness)
+        self.assertIn("client.converse_stream(**parameters)", harness)
+        self.assertIn("_FixtureEventStream", harness)
+        self.assertIn("stream-consumption-completed", harness)
         self.assertIn(
             'os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "false"',
             harness,

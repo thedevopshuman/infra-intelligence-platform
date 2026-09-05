@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "BedrockInstrumentationCompatibilityReport",
   "metadata": {
-    "id": "bic_0123456789abcdef0123456789abcdef",
+    "id": "bic_fedcba9876543210fedcba9876543210",
     "generatedAt": "2026-09-05T12:00:00Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
@@ -22,10 +22,10 @@
       "otelSdkVersion": "1.44.0"
     },
     "profile": {
-      "name": "otel-python-botocore-converse-v1",
+      "name": "otel-python-botocore-converse-stream-v1",
       "provider": "aws.bedrock",
       "service": "bedrock-runtime",
-      "operation": "Converse",
+      "operation": "ConverseStream",
       "modelId": "example.foundation-model-v1:0",
       "region": "us-east-1",
       "invocationTarget": "botocore-stubber",
@@ -48,7 +48,7 @@
       "rawPayloadPersisted": false,
       "exactCostEligible": false,
       "liveProviderVerified": false,
-      "streamingVerified": false
+      "streamingVerified": true
     },
     "checks": [
       {"id": "provider-call-completed", "status": "passed"},
@@ -58,11 +58,12 @@
       {"id": "metadata-only-span", "status": "passed"},
       {"id": "provider-token-totals", "status": "passed"},
       {"id": "receiver-normalization", "status": "passed"},
-      {"id": "async-export-failure-isolated", "status": "passed"}
+      {"id": "async-export-failure-isolated", "status": "passed"},
+      {"id": "stream-consumption-completed", "status": "passed"}
     ],
     "summary": {
-      "totalChecks": 8,
-      "passedChecks": 8,
+      "totalChecks": 9,
+      "passedChecks": 9,
       "failedChecks": 0,
       "overallStatus": "compatible"
     }

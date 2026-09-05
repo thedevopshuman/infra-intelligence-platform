@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 import boto3
+from botocore.eventstream import EventStream
 from botocore.stub import Stubber
 from jsonschema import Draft202012Validator, FormatChecker
 from opentelemetry.exporter.otlp.proto.common.trace_encoder import encode_spans
@@ -50,7 +51,7 @@ SERVICE_NAME = "iip-bedrock-compatibility"
 SCOPE_NAME = "opentelemetry.instrumentation.botocore.bedrock-runtime"
 SEMANTIC_CONVENTION_VERSION = "1.37.0-development"
 OFFLINE_MODEL = "example.foundation-model-v1:0"
-CHECK_IDS = (
+COMMON_CHECK_IDS = (
     "provider-call-completed",
     "official-instrumentation-span",
     "supported-instrumentation-scope",
@@ -60,6 +61,7 @@ CHECK_IDS = (
     "receiver-normalization",
     "async-export-failure-isolated",
 )
+STREAM_CHECK_ID = "stream-consumption-completed"
 MISSING_USAGE_FIELDS = (
     "cacheReadInputTokens",
     "cacheWriteInputTokens",
@@ -89,6 +91,20 @@ class _FailingAsyncExporter(SpanExporter):
 
     def shutdown(self) -> None:
         return None
+
+
+class _FixtureEventStream(EventStream):
+    """Stubber-compatible EventStream injected after response validation."""
+
+    def __init__(self, events: Sequence[Mapping[str, object]]) -> None:
+        self._events = tuple(events)
+        self.closed = False
+
+    def __iter__(self):
+        yield from self._events
+
+    def close(self) -> None:
+        self.closed = True
 
 
 def timestamp() -> str:
@@ -122,6 +138,43 @@ def offline_response() -> dict[str, object]:
     }
 
 
+def offline_stream_response() -> dict[str, object]:
+    return {
+        "stream": {},
+        "ResponseMetadata": {
+            "RequestId": "offline-stream-request-id",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {},
+            "RetryAttempts": 0,
+        },
+    }
+
+
+def offline_stream_events() -> tuple[Mapping[str, object], ...]:
+    return (
+        {"messageStart": {"role": "assistant"}},
+        {"contentBlockStart": {"start": {}, "contentBlockIndex": 0}},
+        {
+            "contentBlockDelta": {
+                "delta": {"text": "acknowledged"},
+                "contentBlockIndex": 0,
+            }
+        },
+        {"contentBlockStop": {"contentBlockIndex": 0}},
+        {"messageStop": {"stopReason": "end_turn"}},
+        {
+            "metadata": {
+                "usage": {
+                    "inputTokens": 17,
+                    "outputTokens": 5,
+                    "totalTokens": 22,
+                },
+                "metrics": {"latencyMs": 12},
+            }
+        },
+    )
+
+
 def request_parameters(model_id: str) -> dict[str, object]:
     return {
         "modelId": model_id,
@@ -147,8 +200,49 @@ def provider_client(mode: str, region: str):
     return boto3.client("bedrock-runtime", region_name=region)
 
 
+def _consume_stream(response: Mapping[str, object]) -> Mapping[str, object]:
+    stream = response.get("stream")
+    require(
+        stream is not None and hasattr(stream, "__iter__"),
+        "provider-stream.missing",
+    )
+    usage: Mapping[str, object] | None = None
+    event_names: list[str] = []
+    try:
+        for event in stream:
+            require(
+                isinstance(event, Mapping) and len(event) == 1,
+                "provider-stream.event-invalid",
+            )
+            event_name = next(iter(event))
+            require(isinstance(event_name, str), "provider-stream.event-invalid")
+            event_names.append(event_name)
+            if event_name == "metadata":
+                metadata = event[event_name]
+                require(
+                    isinstance(metadata, Mapping),
+                    "provider-stream.metadata-invalid",
+                )
+                candidate = metadata.get("usage")
+                require(isinstance(candidate, Mapping), "provider-usage.missing")
+                usage = candidate
+    finally:
+        close = getattr(stream, "close", None)
+        if callable(close):
+            close()
+    require(
+        event_names.count("messageStart") == 1
+        and event_names.count("messageStop") == 1
+        and event_names.count("metadata") == 1
+        and event_names[-1:] == ["metadata"],
+        "provider-stream.incomplete",
+    )
+    require(usage is not None, "provider-usage.missing")
+    return usage
+
+
 def instrumented_call(
-    *, mode: str, model_id: str, region: str
+    *, mode: str, operation: str, model_id: str, region: str
 ) -> tuple[Mapping[str, object], ReadableSpan, int]:
     os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "false"
     capture = InMemorySpanExporter()
@@ -175,16 +269,43 @@ def instrumented_call(
     client = provider_client(mode, region)
     parameters = request_parameters(model_id)
     stubber = None
+    fixture_event_name = "after-call.bedrock-runtime.ConverseStream"
+    fixture_event_id = "iip-bedrock-converse-stream-fixture"
     if mode == "offline":
         stubber = Stubber(client)
-        stubber.add_response("converse", offline_response(), parameters)
+        if operation == "converse-stream":
+            stubber.add_response(
+                "converse_stream",
+                offline_stream_response(),
+                parameters,
+            )
+
+            def replace_stream(parsed: dict[str, object], **_: object) -> None:
+                parsed["stream"] = _FixtureEventStream(offline_stream_events())
+
+            client.meta.events.register(
+                fixture_event_name,
+                replace_stream,
+                unique_id=fixture_event_id,
+            )
+        else:
+            stubber.add_response("converse", offline_response(), parameters)
         stubber.activate()
 
     instrumentor.instrument(tracer_provider=provider)
     try:
-        response = client.converse(**parameters)
-        require(isinstance(response, Mapping), "provider-response.invalid")
-        usage = response.get("usage")
+        if operation == "converse-stream":
+            response = client.converse_stream(**parameters)
+            require(isinstance(response, Mapping), "provider-response.invalid")
+            require(
+                not capture.get_finished_spans(),
+                "provider-stream.span-ended-before-consumption",
+            )
+            usage = _consume_stream(response)
+        else:
+            response = client.converse(**parameters)
+            require(isinstance(response, Mapping), "provider-response.invalid")
+            usage = response.get("usage")
         require(isinstance(usage, Mapping), "provider-usage.missing")
         require(
             isinstance(usage.get("inputTokens"), int)
@@ -198,6 +319,11 @@ def instrumented_call(
         instrumentor.uninstrument()
         if stubber is not None:
             stubber.deactivate()
+        if mode == "offline" and operation == "converse-stream":
+            client.meta.events.unregister(
+                fixture_event_name,
+                unique_id=fixture_event_id,
+            )
         provider.shutdown()
 
     spans = tuple(
@@ -207,7 +333,7 @@ def instrumented_call(
     )
     require(len(spans) == 1, "instrumentation-span.count")
     require(failed_export.calls >= 1, "async-export.not-attempted")
-    return response, spans[0], failed_export.calls
+    return usage, spans[0], failed_export.calls
 
 
 def channel_document(model_id: str, region: str) -> dict[str, object]:
@@ -270,7 +396,7 @@ def channel_document(model_id: str, region: str) -> dict[str, object]:
 def normalize_span(
     span: ReadableSpan,
     *,
-    response: Mapping[str, object],
+    usage: Mapping[str, object],
     model_id: str,
     region: str,
 ) -> Mapping[str, object]:
@@ -308,8 +434,6 @@ def normalize_span(
         ),
         "span-content.present",
     )
-    usage = response["usage"]
-    assert isinstance(usage, Mapping)
     require(
         attributes.get("gen_ai.usage.input_tokens") == usage["inputTokens"]
         and attributes.get("gen_ai.usage.output_tokens") == usage["outputTokens"],
@@ -359,14 +483,15 @@ def normalize_span(
 
 
 def compatibility_report(
-    *, mode: str, model_id: str, region: str
+    *, mode: str, operation: str, model_id: str, region: str
 ) -> dict[str, object]:
-    response, span, failed_export_calls = instrumented_call(
+    usage, span, failed_export_calls = instrumented_call(
         mode=mode,
+        operation=operation,
         model_id=model_id,
         region=region,
     )
-    normalize_span(span, response=response, model_id=model_id, region=region)
+    normalize_span(span, usage=usage, model_id=model_id, region=region)
     require(failed_export_calls >= 1, "async-export.not-attempted")
 
     source_revision = os.environ.get("IIP_SOURCE_REVISION", "")
@@ -386,6 +511,7 @@ def compatibility_report(
         {
             "sourceRevision": source_revision,
             "qualificationLevel": qualification,
+            "operation": operation,
             "modelId": model_id,
             "region": region,
             "versions": {
@@ -398,7 +524,11 @@ def compatibility_report(
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
-    checks = [{"id": check_id, "status": "passed"} for check_id in CHECK_IDS]
+    check_ids = COMMON_CHECK_IDS + (
+        (STREAM_CHECK_ID,) if operation == "converse-stream" else ()
+    )
+    checks = [{"id": check_id, "status": "passed"} for check_id in check_ids]
+    streaming = operation == "converse-stream"
     return {
         "apiVersion": "iip.platform/v1alpha1",
         "kind": "BedrockInstrumentationCompatibilityReport",
@@ -427,10 +557,14 @@ def compatibility_report(
                 "otelSdkVersion": version("opentelemetry-sdk"),
             },
             "profile": {
-                "name": "otel-python-botocore-converse-v1",
+                "name": (
+                    "otel-python-botocore-converse-stream-v1"
+                    if streaming
+                    else "otel-python-botocore-converse-v1"
+                ),
                 "provider": "aws.bedrock",
                 "service": "bedrock-runtime",
-                "operation": "Converse",
+                "operation": "ConverseStream" if streaming else "Converse",
                 "modelId": model_id,
                 "region": region,
                 "invocationTarget": (
@@ -451,7 +585,7 @@ def compatibility_report(
                 "rawPayloadPersisted": False,
                 "exactCostEligible": False,
                 "liveProviderVerified": mode == "live",
-                "streamingVerified": False,
+                "streamingVerified": streaming,
             },
             "checks": checks,
             "summary": {
@@ -486,11 +620,58 @@ def validate_report(report: Mapping[str, object]) -> None:
         == (result["liveProviderVerified"] is True),
         "report.qualification-inconsistent",
     )
+    streaming = profile["operation"] == "ConverseStream"
+    expected_name = (
+        "otel-python-botocore-converse-stream-v1"
+        if streaming
+        else "otel-python-botocore-converse-v1"
+    )
+    require(
+        profile["name"] == expected_name
+        and (result["streamingVerified"] is True) == streaming,
+        "report.operation-inconsistent",
+    )
+    checks = spec["checks"]
+    summary = spec["summary"]
+    require(
+        isinstance(checks, list) and isinstance(summary, Mapping),
+        "report.checks-invalid",
+    )
+    expected_checks = COMMON_CHECK_IDS + ((STREAM_CHECK_ID,) if streaming else ())
+    require(
+        tuple(
+            check.get("id") if isinstance(check, Mapping) else None
+            for check in checks
+        )
+        == expected_checks
+        and all(
+            isinstance(check, Mapping)
+            and check.get("status") == "passed"
+            and "errorCode" not in check
+            for check in checks
+        ),
+        "report.checks-invalid",
+    )
+    require(
+        summary
+        == {
+            "totalChecks": len(checks),
+            "passedChecks": len(checks),
+            "failedChecks": 0,
+            "overallStatus": "compatible",
+        },
+        "report.summary-invalid",
+    )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=("offline", "live"), default="offline")
+    parser.add_argument(
+        "--operation",
+        choices=("converse", "converse-stream"),
+        default="converse",
+    )
     parser.add_argument("--report", type=Path, required=True)
     return parser.parse_args()
 
@@ -512,6 +693,7 @@ def main() -> int:
             region = "us-east-1"
         report = compatibility_report(
             mode=arguments.mode,
+            operation=arguments.operation,
             model_id=model_id,
             region=region,
         )

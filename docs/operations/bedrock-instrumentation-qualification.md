@@ -20,10 +20,11 @@ make test-bedrock-instrumentation
 
 Docker builds the pinned compatibility image, then runs it with no network,
 read-only root files, no Linux capabilities, bounded CPU, memory, PIDs, and
-temporary storage. The harness calls the real boto3 Bedrock Runtime
-`Converse` method through `botocore.stub.Stubber`; this exercises botocore's
-normal call boundary and the official OpenTelemetry wrapper without contacting
-AWS.
+temporary storage. The harness calls the real boto3 Bedrock Runtime `Converse`
+and `ConverseStream` methods through `botocore.stub.Stubber`; this exercises
+botocore's call boundary and both official OpenTelemetry wrappers without
+contacting AWS. The stream fixture is an actual botocore `EventStream` inserted
+by a scoped `after-call` handler after Stubber validates the modeled response.
 
 The gate verifies:
 
@@ -37,13 +38,15 @@ The gate verifies:
   `gen_ai.provider.name`;
 - provider-reported input/output totals, metadata-only span contents, and the
   real IIP protobuf decoder, channel allowlist, ingestion service, and ledger;
-  and
+- complete stream consumption, final metadata usage, and deferred span
+  completion for `ConverseStream`; and
 - a deterministic failed exporter behind a batch processor does not change the
   successful provider response.
 
-The generated source-bound report is
-`dist/bedrock-instrumentation-offline-report.json`. Its
-`qualificationLevel` is `offline-sdk-interoperability`; it must never be
+The generated source-bound reports are
+`dist/bedrock-instrumentation-offline-report.json` and
+`dist/bedrock-converse-stream-instrumentation-offline-report.json`. Their
+`qualificationLevel` is `offline-sdk-interoperability`; neither may be
 presented as evidence of live AWS behavior.
 
 ## Important cost limitation
@@ -60,10 +63,11 @@ proof answer different questions.
 
 ## Opt-in live qualification
 
-The live gate makes one bounded `Converse` call. It is deliberately excluded
+The live gate makes one bounded selected operation. It is deliberately excluded
 from `make verify` and requires an explicit enable flag, exact model and region,
 and short-lived session credentials. The wrapper does not mount an AWS profile
-or search the host for credentials.
+or search the host for credentials. `converse` is the default; select
+`converse-stream` explicitly for streaming evidence.
 
 ```bash
 export IIP_BEDROCK_LIVE_TEST_ENABLED=true
@@ -73,19 +77,26 @@ export AWS_ACCESS_KEY_ID='<short-lived-access-key>'
 export AWS_SECRET_ACCESS_KEY='<short-lived-secret-key>'
 export AWS_SESSION_TOKEN='<short-lived-session-token>'
 make test-bedrock-live
+# Separately qualify streaming for the same exact model and region:
+IIP_BEDROCK_OPERATION=converse-stream make test-bedrock-live
 unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 ```
 
-Use a temporary identity restricted to `bedrock:InvokeModel` for the exact
-approved model. The fixed synthetic request asks for one short response; the
+Use a temporary identity restricted to `bedrock:InvokeModel` for `Converse` or
+`bedrock:InvokeModelWithResponseStream` for `ConverseStream`, scoped to the
+exact approved model, as documented by the
+[AWS ConverseStream API](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ConverseStream.html).
+The fixed synthetic request asks for one short response; the
 harness never prints or writes the prompt, response, provider request ID,
 credentials, trace/span IDs, or token quantities. It writes
-`dist/bedrock-instrumentation-live-report.json`, which retains model and region
-because compatibility evidence cannot be generalized across untested
-profiles.
+`dist/bedrock-instrumentation-live-report.json` or
+`dist/bedrock-converse-stream-instrumentation-live-report.json`, which retains
+operation, model, and region because compatibility evidence cannot be
+generalized across untested profiles.
 
 The live gate sends the captured span through the real in-process IIP adapter
 and ingestion service. It does not qualify a customer Collector, PKI, receiver
-network path, streaming API, price catalog, invoice agreement, or sustained
-load. Run `make test-otlp-receiver` separately for the isolated Collector-to-IIP
-transport evidence. `ConverseStream` requires its own future live profile.
+network path, price catalog, invoice agreement, or sustained load. A streaming
+live report proves only its exact selected operation; a non-streaming report
+cannot be reused. Run `make test-otlp-receiver` separately for isolated
+Collector-to-IIP transport evidence.

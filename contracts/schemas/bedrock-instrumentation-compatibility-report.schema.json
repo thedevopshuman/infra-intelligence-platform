@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:iip:contracts:bedrock-instrumentation-compatibility-report:v1alpha1",
   "title": "Bedrock Instrumentation Compatibility Report",
-  "description": "Source-bound evidence for one exact OpenTelemetry Python botocore Bedrock Converse profile.",
+  "description": "Source-bound evidence for one exact OpenTelemetry Python botocore Bedrock Converse or ConverseStream profile.",
   "type": "object",
   "additionalProperties": false,
   "required": ["apiVersion", "kind", "metadata", "spec"],
@@ -48,10 +48,10 @@
           "additionalProperties": false,
           "required": ["name", "provider", "service", "operation", "modelId", "region", "invocationTarget", "instrumentationScope", "providerAttribute", "contentCapture", "requestPath", "telemetryPath"],
           "properties": {
-            "name": {"const": "otel-python-botocore-converse-v1"},
+            "name": {"enum": ["otel-python-botocore-converse-v1", "otel-python-botocore-converse-stream-v1"]},
             "provider": {"const": "aws.bedrock"},
             "service": {"const": "bedrock-runtime"},
-            "operation": {"const": "Converse"},
+            "operation": {"enum": ["Converse", "ConverseStream"]},
             "modelId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{1,255}$"},
             "region": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"},
             "invocationTarget": {"enum": ["botocore-stubber", "aws-bedrock"]},
@@ -85,33 +85,23 @@
             "rawPayloadPersisted": {"const": false},
             "exactCostEligible": {"const": false},
             "liveProviderVerified": {"type": "boolean"},
-            "streamingVerified": {"const": false}
+            "streamingVerified": {"type": "boolean"}
           }
         },
         "checks": {
-          "type": "array",
-          "minItems": 8,
-          "maxItems": 8,
-          "prefixItems": [
-            {"$ref": "#/$defs/providerCallCompletedCheck"},
-            {"$ref": "#/$defs/officialInstrumentationSpanCheck"},
-            {"$ref": "#/$defs/supportedInstrumentationScopeCheck"},
-            {"$ref": "#/$defs/providerAliasNormalizedCheck"},
-            {"$ref": "#/$defs/metadataOnlySpanCheck"},
-            {"$ref": "#/$defs/providerTokenTotalsCheck"},
-            {"$ref": "#/$defs/receiverNormalizationCheck"},
-            {"$ref": "#/$defs/asyncExportFailureIsolatedCheck"}
-          ],
-          "items": false
+          "oneOf": [
+            {"$ref": "#/$defs/converseChecks"},
+            {"$ref": "#/$defs/converseStreamChecks"}
+          ]
         },
         "summary": {
           "type": "object",
           "additionalProperties": false,
           "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
           "properties": {
-            "totalChecks": {"const": 8},
-            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 8},
-            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 8},
+            "totalChecks": {"enum": [8, 9]},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 9},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 9},
             "overallStatus": {"enum": ["compatible", "incompatible"]}
           }
         }
@@ -141,6 +131,40 @@
     "metadataOnlySpanCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "metadata-only-span"}}}]},
     "providerTokenTotalsCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "provider-token-totals"}}}]},
     "receiverNormalizationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "receiver-normalization"}}}]},
-    "asyncExportFailureIsolatedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "async-export-failure-isolated"}}}]}
+    "asyncExportFailureIsolatedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "async-export-failure-isolated"}}}]},
+    "streamConsumptionCompletedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "stream-consumption-completed"}}}]},
+    "converseChecks": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "prefixItems": [
+        {"$ref": "#/$defs/providerCallCompletedCheck"},
+        {"$ref": "#/$defs/officialInstrumentationSpanCheck"},
+        {"$ref": "#/$defs/supportedInstrumentationScopeCheck"},
+        {"$ref": "#/$defs/providerAliasNormalizedCheck"},
+        {"$ref": "#/$defs/metadataOnlySpanCheck"},
+        {"$ref": "#/$defs/providerTokenTotalsCheck"},
+        {"$ref": "#/$defs/receiverNormalizationCheck"},
+        {"$ref": "#/$defs/asyncExportFailureIsolatedCheck"}
+      ],
+      "items": false
+    },
+    "converseStreamChecks": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "prefixItems": [
+        {"$ref": "#/$defs/providerCallCompletedCheck"},
+        {"$ref": "#/$defs/officialInstrumentationSpanCheck"},
+        {"$ref": "#/$defs/supportedInstrumentationScopeCheck"},
+        {"$ref": "#/$defs/providerAliasNormalizedCheck"},
+        {"$ref": "#/$defs/metadataOnlySpanCheck"},
+        {"$ref": "#/$defs/providerTokenTotalsCheck"},
+        {"$ref": "#/$defs/receiverNormalizationCheck"},
+        {"$ref": "#/$defs/asyncExportFailureIsolatedCheck"},
+        {"$ref": "#/$defs/streamConsumptionCompletedCheck"}
+      ],
+      "items": false
+    }
   }
 }

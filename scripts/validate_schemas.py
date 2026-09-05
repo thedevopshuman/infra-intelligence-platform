@@ -168,6 +168,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     ),
     "bedrock-instrumentation-compatibility-report.schema.json": (
         "bedrock-instrumentation-compatibility-report.json",
+        "bedrock-converse-stream-instrumentation-compatibility-report.json",
     ),
     "openai-instrumentation-compatibility-report.schema.json": (
         "openai-instrumentation-compatibility-report.json",

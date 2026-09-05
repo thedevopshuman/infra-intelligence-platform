@@ -35,7 +35,7 @@ help:
 	@echo "test-otel     Send reference metrics and traces to an OpenTelemetry Collector"
 	@echo "test-otlp-receiver Send official OTLP metrics, logs, and AI usage-to-cost traces"
 	@echo "test-ai-finops Prove the local multi-provider AI economics slice"
-	@echo "test-bedrock-instrumentation Qualify pinned official Bedrock instrumentation offline"
+	@echo "test-bedrock-instrumentation Qualify pinned Bedrock Converse and ConverseStream instrumentation offline"
 	@echo "test-bedrock-live Make one explicitly enabled live Bedrock compatibility call"
 	@echo "test-openai-instrumentation Qualify pinned official OpenAI instrumentation offline"
 	@echo "test-openai-live Make one explicitly enabled live OpenAI compatibility call"

@@ -199,6 +199,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/policy-engine-compatibility-report.schema.json",
     "contracts/schemas/otlp-receiver-compatibility-report.schema.json",
     "contracts/schemas/bedrock-instrumentation-compatibility-report.schema.json",
+    "contracts/examples/bedrock-converse-stream-instrumentation-compatibility-report.json",
     "contracts/schemas/openai-instrumentation-compatibility-report.schema.json",
     "contracts/schemas/integration-config.schema.json",
     "contracts/schemas/action-proposal.schema.json",
@@ -1237,6 +1238,10 @@ BEDROCK_INSTRUMENTATION_COMPATIBILITY_CHECKS = (
     "receiver-normalization",
     "async-export-failure-isolated",
 )
+BEDROCK_STREAM_INSTRUMENTATION_COMPATIBILITY_CHECKS = (
+    *BEDROCK_INSTRUMENTATION_COMPATIBILITY_CHECKS,
+    "stream-consumption-completed",
+)
 
 
 def validate_bedrock_instrumentation_compatibility_document(
@@ -1271,10 +1276,16 @@ def validate_bedrock_instrumentation_compatibility_document(
     assert isinstance(summary, dict)
     assert isinstance(profile, dict)
     assert isinstance(result, dict)
+    streaming = profile.get("operation") == "ConverseStream"
+    expected_check_ids = (
+        BEDROCK_STREAM_INSTRUMENTATION_COMPATIBILITY_CHECKS
+        if streaming
+        else BEDROCK_INSTRUMENTATION_COMPATIBILITY_CHECKS
+    )
     check_ids = tuple(
         check.get("id") if isinstance(check, dict) else None for check in checks
     )
-    if check_ids != BEDROCK_INSTRUMENTATION_COMPATIBILITY_CHECKS:
+    if check_ids != expected_check_ids:
         fail(errors, "Bedrock instrumentation checks must match the closed profile")
     passed = sum(
         1
@@ -1300,6 +1311,18 @@ def validate_bedrock_instrumentation_compatibility_document(
         or (result.get("liveProviderVerified") is True) != live
     ):
         fail(errors, "Bedrock instrumentation qualification level must match its result")
+    expected_operation = "ConverseStream" if streaming else "Converse"
+    expected_name = (
+        "otel-python-botocore-converse-stream-v1"
+        if streaming
+        else "otel-python-botocore-converse-v1"
+    )
+    if (
+        profile.get("operation") != expected_operation
+        or profile.get("name") != expected_name
+        or (result.get("streamingVerified") is True) != streaming
+    ):
+        fail(errors, "Bedrock instrumentation operation profile must match its result")
     if (
         result.get("usageCompleteness") == "partial"
         and result.get("exactCostEligible") is not False
@@ -4246,6 +4269,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ),
         (
             "bedrock-instrumentation-compatibility-report.json",
+            "BedrockInstrumentationCompatibilityReport",
+        ),
+        (
+            "bedrock-converse-stream-instrumentation-compatibility-report.json",
             "BedrockInstrumentationCompatibilityReport",
         ),
         (

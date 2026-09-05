@@ -187,13 +187,15 @@ content spans for both channels. Pricing selection is solely catalog-driven;
 the kernel contains no provider pricing branch. This proves the local contract
 flow, not live provider instrumentation or invoice compatibility.
 
-The exact pinned Python botocore `Converse` profile now has a separate
-no-network interoperability gate. It exposed two upstream facts hidden by the
-synthetic flow: the shipped scope is service-specific and the provider still
-arrives as legacy `gen_ai.system`. The adapter normalizes that alias with
-conflict rejection. Missing cache/reasoning subsets remain missing, so this
-profile is not promoted to exact-cost eligibility. Live model/region and
-`ConverseStream` qualification remain separate evidence.
+The exact pinned Python botocore `Converse` and `ConverseStream` profiles now
+have separate source-bound no-network evidence. They exposed two upstream facts
+hidden by the synthetic flow: the shipped scope is service-specific and the
+provider still arrives as legacy `gen_ai.system`. The streaming gate also
+proves the official span stays open until final metadata is consumed. The
+adapter normalizes that alias with conflict rejection. Missing cache/reasoning
+subsets remain missing, so neither profile is promoted to exact-cost
+eligibility. Live model/region/operation qualification remains separate
+evidence.
 
 The pinned official OpenAI Python chat-completions profile also has a separate
 no-network SDK interoperability gate. It emits the standard provider identity

@@ -85,14 +85,15 @@ saving through the existing OTLP metrics boundary. A disposable
 Collector/Prometheus/Loki/Grafana topology and deterministic multi-provider
 full-flow gate now renders the usage, cost, change, saving, coverage, and protected
 application/team allocation dashboard. Separate
-no-network gate exercises the exact pinned official botocore `Converse`
-instrumentation, its shipped legacy provider attribute and service-specific
-scope; another exercises the real OpenAI Python client and official
+no-network gates exercise the exact pinned official botocore `Converse` and
+`ConverseStream` instrumentation, including deferred stream-span completion,
+the shipped legacy provider attribute, and service-specific scope; another
+exercises the real OpenAI Python client and official
 chat-completions instrumentation. Both prove receiver normalization and
 asynchronous exporter failure isolation without importing provider SDKs into
 the product image. Missing upstream token breakdowns remain unresolved rather
-than becoming zero. Live model/region, streaming, private endpoint, and invoice
-qualification remain. See the
+than becoming zero. Live Bedrock model/region/operation, live OpenAI
+streaming/private-endpoint behavior, and invoice qualification remain. See the
 [receiver runbook](docs/operations/ai-usage-receiver.md),
 [attribution runbook](docs/operations/ai-attribution.md),
 [cost-engine runbook](docs/operations/ai-cost-engine.md),

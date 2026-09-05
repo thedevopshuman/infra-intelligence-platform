@@ -3,6 +3,7 @@ set -eu
 
 IIP_DOCKER_BIN=${IIP_DOCKER_BIN:-docker}
 IIP_BEDROCK_COMPATIBILITY_MODE=${IIP_BEDROCK_COMPATIBILITY_MODE:-offline}
+IIP_BEDROCK_OPERATION=${IIP_BEDROCK_OPERATION:-converse}
 IIP_BEDROCK_COMPATIBILITY_IMAGE=iip-bedrock-compatibility:0.65b0
 
 if ! command -v "$IIP_DOCKER_BIN" >/dev/null 2>&1; then
@@ -12,6 +13,11 @@ fi
 if [ "$IIP_BEDROCK_COMPATIBILITY_MODE" != offline ] \
     && [ "$IIP_BEDROCK_COMPATIBILITY_MODE" != live ]; then
     echo "IIP_BEDROCK_COMPATIBILITY_MODE must be offline or live" >&2
+    exit 2
+fi
+if [ "$IIP_BEDROCK_OPERATION" != converse ] \
+    && [ "$IIP_BEDROCK_OPERATION" != converse-stream ]; then
+    echo "IIP_BEDROCK_OPERATION must be converse or converse-stream" >&2
     exit 2
 fi
 if [ "$IIP_BEDROCK_COMPATIBILITY_MODE" = live ]; then
@@ -69,8 +75,22 @@ else
         -e AWS_SESSION_TOKEN
 fi
 
-"$IIP_DOCKER_BIN" "$@" "$IIP_BEDROCK_COMPATIBILITY_IMAGE" \
-    --mode "$IIP_BEDROCK_COMPATIBILITY_MODE" \
-    --report "/out/bedrock-instrumentation-${IIP_BEDROCK_COMPATIBILITY_MODE}-report.json"
+if [ "$IIP_BEDROCK_COMPATIBILITY_MODE" = offline ]; then
+    "$IIP_DOCKER_BIN" "$@" "$IIP_BEDROCK_COMPATIBILITY_IMAGE" \
+        --mode offline --operation converse \
+        --report /out/bedrock-instrumentation-offline-report.json
+    "$IIP_DOCKER_BIN" "$@" "$IIP_BEDROCK_COMPATIBILITY_IMAGE" \
+        --mode offline --operation converse-stream \
+        --report /out/bedrock-converse-stream-instrumentation-offline-report.json
+else
+    if [ "$IIP_BEDROCK_OPERATION" = converse-stream ]; then
+        IIP_BEDROCK_REPORT=/out/bedrock-converse-stream-instrumentation-live-report.json
+    else
+        IIP_BEDROCK_REPORT=/out/bedrock-instrumentation-live-report.json
+    fi
+    "$IIP_DOCKER_BIN" "$@" "$IIP_BEDROCK_COMPATIBILITY_IMAGE" \
+        --mode live --operation "$IIP_BEDROCK_OPERATION" \
+        --report "$IIP_BEDROCK_REPORT"
+fi
 
-echo "Pinned official botocore Bedrock instrumentation and IIP normalization passed"
+echo "Pinned official botocore Bedrock Converse/ConverseStream instrumentation and IIP normalization passed"

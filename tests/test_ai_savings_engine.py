@@ -344,6 +344,38 @@ class AiSavingsRuleTests(unittest.TestCase):
                 self.assertEqual(result.qualified, 0)
                 self.assertEqual(store.ai_savings_findings, ())
 
+    def test_unpriced_cost_is_unresolved_and_reports_coverage(self) -> None:
+        store = InMemoryResourceStore()
+        clock = MutableClock()
+        documents = seed_standard_cohorts(store, clock, calculate_cost=False)
+        catalog = copy.deepcopy(fixture("ai-price-catalog"))
+        catalog["spec"]["entries"][0]["modelId"] = "other.foundation-model-v1:0"
+        cost = AiCostCalculationService(
+            store,
+            clock,
+            (catalog,),
+            allow_test_fixtures=True,
+        ).run_once("local", "cost-test")
+        self.assertEqual(cost.unpriced, len(documents))
+        telemetry = RecordingAiEconomicsSink()
+
+        result = AiSavingsEvaluationService(
+            store,
+            clock,
+            (profile(),),
+            telemetry_sink=telemetry,
+        ).run_once("local", "savings-test")
+
+        self.assertEqual(result.unresolved, 1)
+        self.assertEqual(result.failures, 0)
+        self.assertEqual(len(telemetry.measurements), 1)
+        measurement = telemetry.measurements[0]
+        self.assertEqual(measurement.unpriced_requests, 2)
+        self.assertEqual(measurement.priced_requests, 0)
+        self.assertIsNone(measurement.calculated_cost_subunits)
+        self.assertIsNone(measurement.currency)
+        self.assertIsNone(measurement.currency_scale)
+
     def test_profile_is_closed_adjacent_equal_duration_and_bounded(self) -> None:
         valid = validate_context_growth_profile(profile())
         self.assertEqual(valid.minimum_requests, 2)

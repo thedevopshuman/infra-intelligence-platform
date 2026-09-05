@@ -166,5 +166,7 @@ make test-postgres PYTHON=.venv/bin/python
 The privacy-bounded aggregate metric projection is executable through the
 existing OTLP exporter and documented in the
 [AI economics telemetry contract](../specifications/ai-economics-telemetry-contract.md).
-The Grafana dashboard, full Bedrock-shaped end-to-end gate, and live Bedrock
-instrumentation qualification remain separate Phase A exit work.
+The provisioned Grafana dashboard and deterministic Bedrock-shaped end-to-end
+gate are executable through the
+[local AI FinOps topology](ai-finops-local-demo.md). Live Bedrock
+instrumentation qualification remains separate Phase A exit work.

@@ -1,0 +1,217 @@
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    environment:
+      POSTGRES_DB: iip
+      POSTGRES_USER: iip
+      POSTGRES_HOST_AUTH_METHOD: trust
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iip -d iip"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    ports:
+      - "127.0.0.1:${IIP_AI_FINOPS_POSTGRES_PORT:-15435}:5432"
+    tmpfs:
+      - /var/lib/postgresql
+
+  api:
+    image: iip-ai-finops:0.63.0
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_AUTO_MIGRATE: "true"
+      IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
+      IIP_AUTH_IDENTITIES_JSON: >-
+        {"identities":[{"tokenSha256":"sha256:d52e86d5eeda090d11d9c961632390e6da1356df217d662abde728312befb25d","actorId":"ai-finops-local-operator","tenantId":"local","roles":["developer","platform-admin"]}]}
+      IIP_OTLP_RECEIVER_MODE: disabled
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=3)"]
+      interval: 2s
+      timeout: 4s
+      retries: 30
+    ports:
+      - "127.0.0.1:${IIP_AI_FINOPS_API_PORT:-18082}:8080"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+
+  ai-usage-receiver:
+    image: iip-ai-finops:0.63.0
+    pull_policy: never
+    command: ["python", "-m", "iip.surfaces.otlp_receiver"]
+    environment:
+      IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_AUTO_MIGRATE: "false"
+      IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
+      IIP_OTLP_HTTP_PORT: "4318"
+      IIP_OTLP_TLS_MODE: disabled
+      IIP_OTLP_MAX_REQUESTS_PER_SECOND: "50"
+      IIP_OTLP_REQUEST_BURST: "100"
+      IIP_OTLP_RECEIVER_ENABLED: "false"
+      IIP_OTLP_LOGS_RECEIVER_ENABLED: "false"
+      IIP_AI_USAGE_RECEIVER_ENABLED: "true"
+      IIP_AI_USAGE_RECEIVER_CHANNELS_JSON: ${IIP_AI_USAGE_RECEIVER_CHANNELS_JSON:?set IIP_AI_USAGE_RECEIVER_CHANNELS_JSON}
+      IIP_OTEL_METRICS_ENABLED: "false"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4318/readyz', timeout=3)"]
+      interval: 2s
+      timeout: 4s
+      retries: 30
+    ports:
+      - "127.0.0.1:${IIP_AI_FINOPS_RECEIVER_PORT:-14320}:4318"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+
+  workflow-worker:
+    image: iip-ai-finops:0.63.0
+    pull_policy: never
+    command: ["python", "-m", "iip.surfaces.worker"]
+    environment:
+      IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_AUTO_MIGRATE: "false"
+      IIP_AUTH_IDENTITIES_JSON: >-
+        {"identities":[{"tokenSha256":"sha256:d52e86d5eeda090d11d9c961632390e6da1356df217d662abde728312befb25d","actorId":"ai-finops-local-operator","tenantId":"local","roles":["developer","platform-admin"]}]}
+      IIP_WORKER_ID: ai-finops-worker
+      IIP_WORKER_TENANTS: local
+      IIP_AI_COST_ENGINE_ENABLED: "true"
+      IIP_AI_PRICE_CATALOGS_JSON: ${IIP_AI_PRICE_CATALOGS_JSON:?set IIP_AI_PRICE_CATALOGS_JSON}
+      IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES: "true"
+      IIP_AI_COST_BATCH_SIZE: "100"
+      IIP_AI_COST_INTERVAL_SECONDS: "1"
+      IIP_AI_SAVINGS_ENGINE_ENABLED: "true"
+      IIP_AI_SAVINGS_PROFILES_JSON: ${IIP_AI_SAVINGS_PROFILES_JSON:?set IIP_AI_SAVINGS_PROFILES_JSON}
+      IIP_AI_SAVINGS_INTERVAL_SECONDS: "1"
+      IIP_EVENT_PUBLISHER_MODE: disabled
+      IIP_OTEL_METRICS_ENABLED: "true"
+      IIP_OTEL_TRACES_ENABLED: "false"
+      IIP_OTEL_INGESTION_ATTRIBUTE_MODE: none
+      IIP_OTEL_AI_ECONOMICS_ATTRIBUTE_MODE: tenant-scope
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRIC_EXPORT_INTERVAL: "1000"
+      OTEL_METRIC_EXPORT_TIMEOUT: "1000"
+      OTEL_SERVICE_NAME: infra-intelligence-ai-finops-worker
+    depends_on:
+      api:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib@sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      IIP_AI_USAGE_CHANNEL_TOKEN: ${IIP_AI_USAGE_CHANNEL_TOKEN:?set IIP_AI_USAGE_CHANNEL_TOKEN}
+    volumes:
+      - ./otel/ai-finops-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    depends_on:
+      ai-usage-receiver:
+        condition: service_healthy
+      loki:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${IIP_AI_FINOPS_COLLECTOR_PORT:-14319}:4318"
+      - "127.0.0.1:${IIP_AI_FINOPS_COLLECTOR_HEALTH_PORT:-13134}:13133"
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./prometheus/ai-finops-prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9090/-/ready"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    ports:
+      - "127.0.0.1:${IIP_AI_FINOPS_PROMETHEUS_PORT:-19091}:9090"
+    read_only: true
+    tmpfs:
+      - /prometheus:uid=65534,gid=65534,mode=0750
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+
+  loki:
+    image: grafana/loki:3.7.0
+    command: ["-config.file=/etc/loki/ai-finops-loki.yaml"]
+    volumes:
+      - ./loki/ai-finops-loki.yaml:/etc/loki/ai-finops-loki.yaml:ro
+    ports:
+      - "127.0.0.1:${IIP_AI_FINOPS_LOKI_PORT:-13101}:3100"
+    read_only: true
+    tmpfs:
+      - /loki:uid=10001,gid=10001,mode=0750
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+
+  grafana:
+    image: grafana/grafana@sha256:e932bd6ed0e026595b08483cd0141e5103e1ab7ff8604839ff899b8dc54cabcb
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:3000/api/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    ports:
+      - "127.0.0.1:${IIP_AI_FINOPS_GRAFANA_PORT:-13000}:3000"
+    read_only: true
+    tmpfs:
+      - /tmp:uid=472,gid=0,mode=1777
+      - /var/lib/grafana:uid=472,gid=0,mode=0750
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true

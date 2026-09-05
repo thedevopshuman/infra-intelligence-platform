@@ -1,0 +1,326 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Metadata-only AI usage, calculated cost, attribution, change, and evidence-backed savings from the IIP reference slice.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Successful observed invocations in the current protected profile window.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(iip_ai_usage_requests{job=\"iip-ai-economics\"})",
+          "instant": true,
+          "legendFormat": "requests",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "How much usage?",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Calculated estimate for priced requests. This is not invoice cost.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 6,
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(iip_ai_cost_amount{iip_ai_currency=\"USD\",iip_ai_currency_scale=\"9\",job=\"iip-ai-economics\"}) / 1e9",
+          "instant": true,
+          "legendFormat": "USD calculated estimate",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "How much cost?",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Calculated estimate grouped only by protected service, model, region, and environment dimensions.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 6,
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (service_name,gen_ai_response_model,cloud_region,deployment_environment_name) (iip_ai_cost_amount{job=\"iip-ai-economics\"}) / 1e9",
+          "instant": true,
+          "legendFormat": "{{service_name}} · {{gen_ai_response_model}} · {{cloud_region}} · {{deployment_environment_name}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Where is spend happening?",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Signed current-versus-baseline input-token growth from the deterministic context-growth rule.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 25},
+              {"color": "red", "value": 50}
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "iip_ai_context_growth_change{job=\"iip-ai-economics\"} / 100",
+          "instant": true,
+          "legendFormat": "input tokens/request",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "What changed?",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Potential saving backed by the committed context-growth cohort and exact catalog rate.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 6,
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 8
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(iip_ai_savings_potential_amount{iip_ai_savings_rule_id=\"context-growth\",job=\"iip-ai-economics\"}) / 1e9",
+          "instant": true,
+          "legendFormat": "USD potential",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "One potential saving",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Coverage stays explicit: unpriced, ambiguous, pending, and incomplete observations are never displayed as zero cost.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "id": 6,
+      "options": {
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (iip_ai_cost_status) (iip_ai_cost_requests{job=\"iip-ai-economics\"})",
+          "instant": true,
+          "legendFormat": "{{iip_ai_cost_status}}",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(iip_ai_usage_incomplete_requests{job=\"iip-ai-economics\"})",
+          "instant": true,
+          "legendFormat": "incomplete usage",
+          "range": false,
+          "refId": "B"
+        }
+      ],
+      "title": "Can I trust the coverage?",
+      "type": "bargauge"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 41,
+  "tags": ["iip", "ai-finops", "opentelemetry", "metadata-only"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "IIP AI FinOps — Bedrock V0",
+  "uid": "iip-ai-finops",
+  "version": 1,
+  "weekStart": ""
+}

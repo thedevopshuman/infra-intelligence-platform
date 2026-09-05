@@ -1,0 +1,175 @@
+from __future__ import annotations
+
+import json
+import stat
+import sys
+import tempfile
+import unittest
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import patch
+
+from iip.adapters.otlp_ai_usage_receiver import ConfiguredAiUsageReceiver
+from iip.application.calculate_ai_cost import validate_ai_price_catalog
+from iip.application.evaluate_ai_savings import validate_context_growth_profile
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import ai_finops_fixture  # noqa: E402
+import ai_finops_stack  # noqa: E402
+
+
+class AiFinOpsTopologyTests(unittest.TestCase):
+    def test_time_relative_fixture_uses_valid_protected_configuration(self) -> None:
+        anchor = datetime(2026, 9, 5, 7, 30, tzinfo=timezone.utc)
+        channel = ai_finops_fixture.channel_configuration()
+        receiver = ConfiguredAiUsageReceiver.from_json(json.dumps(channel))
+
+        authenticated = receiver.authenticate_bearer(
+            ai_finops_fixture.CHANNEL_TOKEN
+        )
+        self.assertEqual(authenticated.actor.tenant_id, "local")
+        self.assertEqual(
+            authenticated.model_ids,
+            (
+                ai_finops_fixture.KNOWN_MODEL,
+                ai_finops_fixture.UNKNOWN_MODEL,
+            ),
+        )
+
+        catalogs = ai_finops_fixture.price_catalog_configuration(anchor)
+        catalog = validate_ai_price_catalog(catalogs["catalogs"][0])
+        self.assertEqual(catalog.tenant_id, "local")
+        profiles = ai_finops_fixture.savings_profile_configuration(anchor)
+        validated = tuple(
+            validate_context_growth_profile(item)
+            for item in profiles["profiles"]
+        )
+        self.assertEqual(len(validated), 2)
+        self.assertEqual(
+            {item.profile_id for item in validated},
+            {
+                "support-assistant-context",
+                "research-assistant-coverage",
+            },
+        )
+
+    def test_dashboard_answers_v0_questions_and_exposes_coverage(self) -> None:
+        dashboard = json.loads(
+            (
+                ROOT
+                / "deploy"
+                / "grafana"
+                / "dashboards"
+                / "iip-ai-finops.json"
+            ).read_text(encoding="utf-8")
+        )
+        panels = {panel["title"]: panel for panel in dashboard["panels"]}
+
+        for title in (
+            "How much usage?",
+            "How much cost?",
+            "Where is spend happening?",
+            "What changed?",
+            "One potential saving",
+            "Can I trust the coverage?",
+        ):
+            self.assertIn(title, panels)
+        expressions = tuple(
+            target["expr"]
+            for panel in panels.values()
+            for target in panel["targets"]
+        )
+        for metric in (
+            "iip_ai_usage_requests",
+            "iip_ai_cost_amount",
+            "iip_ai_context_growth_change",
+            "iip_ai_savings_potential_amount",
+            "iip_ai_cost_requests",
+        ):
+            self.assertTrue(any(metric in expression for expression in expressions))
+        serialized = json.dumps(dashboard).lower()
+        for prohibited in ("trace_id", "span_id", "request_id", "gen_ai.prompt"):
+            self.assertNotIn(prohibited, serialized)
+
+    def test_compose_keeps_pricing_in_worker_and_receiver_is_isolated(self) -> None:
+        compose = (
+            ROOT / "deploy" / "docker-compose.ai-finops.yml"
+        ).read_text(encoding="utf-8")
+        api, remainder = compose.split("  ai-usage-receiver:", maxsplit=1)
+        receiver, worker_and_backends = remainder.split(
+            "  workflow-worker:", maxsplit=1
+        )
+
+        self.assertNotIn("IIP_AI_PRICE_CATALOGS_JSON", api)
+        self.assertNotIn("IIP_AI_PRICE_CATALOGS_JSON", receiver)
+        self.assertIn("IIP_AI_PRICE_CATALOGS_JSON", worker_and_backends)
+        self.assertIn("IIP_AI_USAGE_RECEIVER_ENABLED: \"true\"", receiver)
+        self.assertIn('IIP_OTLP_RECEIVER_ENABLED: "false"', receiver)
+        self.assertIn('IIP_OTLP_LOGS_RECEIVER_ENABLED: "false"', receiver)
+        self.assertIn("127.0.0.1:", compose)
+        self.assertIn('cap_drop: ["ALL"]', compose)
+        self.assertIn("no-new-privileges:true", compose)
+
+    def test_collector_uses_env_credential_and_separate_signal_routes(self) -> None:
+        collector = (
+            ROOT / "deploy" / "otel" / "ai-finops-collector.yaml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("${env:IIP_AI_USAGE_CHANNEL_TOKEN}", collector)
+        self.assertNotIn(ai_finops_fixture.CHANNEL_TOKEN, collector)
+        self.assertIn("exporters: [otlp_http/iip]", collector)
+        self.assertIn("exporters: [prometheus]", collector)
+        self.assertIn("exporters: [otlp_http/loki]", collector)
+
+    def test_visible_stack_configuration_is_protected_and_time_bound(self) -> None:
+        anchor = datetime(2026, 9, 5, 7, 30, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as temporary:
+            state = Path(temporary) / ".iip"
+            env_path = state / "ai-finops.env"
+            with patch.multiple(
+                ai_finops_stack,
+                STATE_DIR=state,
+                ENV_PATH=env_path,
+            ):
+                created = ai_finops_stack.create_configuration(anchor)
+
+            self.assertEqual(created, env_path)
+            self.assertEqual(stat.S_IMODE(env_path.stat().st_mode), 0o600)
+            values = dict(
+                line.split("=", maxsplit=1)
+                for line in env_path.read_text(encoding="utf-8").splitlines()
+            )
+            self.assertEqual(
+                values["IIP_AI_FINOPS_ANCHOR"],
+                "2026-09-05T07:30:00Z",
+            )
+            self.assertEqual(
+                values["IIP_AI_USAGE_CHANNEL_TOKEN"],
+                ai_finops_fixture.CHANNEL_TOKEN,
+            )
+            profiles = json.loads(values["IIP_AI_SAVINGS_PROFILES_JSON"])
+            self.assertEqual(len(profiles["profiles"]), 2)
+
+    def test_visible_stack_compose_does_not_use_a_shell(self) -> None:
+        with patch.object(ai_finops_stack, "ENV_PATH", Path("/tmp/iip.env")):
+            with patch("ai_finops_stack.subprocess.run") as run:
+                run.return_value.stdout = "container-id\n"
+                output = ai_finops_stack.compose(
+                    ("ps", "--quiet"),
+                    capture_output=True,
+                )
+
+        command = run.call_args.args[0]
+        self.assertEqual(command[:3], ["docker", "compose", "--project-name"])
+        self.assertEqual(command[3], "iip-ai-finops")
+        self.assertIn("--env-file", command)
+        self.assertEqual(command[-2:], ["ps", "--quiet"])
+        self.assertTrue(run.call_args.kwargs["check"])
+        self.assertEqual(output, "container-id\n")
+
+
+if __name__ == "__main__":
+    unittest.main()

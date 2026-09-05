@@ -57,6 +57,7 @@ The documentation tree is the product and engineering system of record. A change
 - [AI usage OTLP trace receiver](operations/ai-usage-receiver.md)
 - [AI cost engine](operations/ai-cost-engine.md)
 - [AI savings engine](operations/ai-savings-engine.md)
+- [Local AI FinOps reference dashboard](operations/ai-finops-local-demo.md)
 - [Log evidence and OTLP logs intake](operations/log-evidence.md)
 - [Resource and deployment change evidence](operations/resource-change-evidence.md)
 - [Repository and runbook context evidence](operations/context-evidence.md)

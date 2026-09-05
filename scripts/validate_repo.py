@@ -31,6 +31,7 @@ REQUIRED_PATHS = (
     "docs/architecture/opentelemetry-portability.md",
     "docs/architecture/ai-economics.md",
     "docs/product/ai-finops-vision.md",
+    "docs/operations/ai-finops-local-demo.md",
     "docs/research/opensre-reference-analysis.md",
     "docs/research/brand/README.md",
     "docs/roadmap/initial-roadmap.md",

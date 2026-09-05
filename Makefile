@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-ai-finops test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -19,6 +19,7 @@ help:
 	@echo "test-backup-restore Measure and verify PostgreSQL recovery with Docker Desktop"
 	@echo "test-otel     Send reference metrics and traces to an OpenTelemetry Collector"
 	@echo "test-otlp-receiver Send official OTLP metrics, logs, and AI usage-to-cost traces"
+	@echo "test-ai-finops Prove the local Bedrock-to-Grafana AI economics slice"
 	@echo "test-prometheus Query a real Prometheus server through the evidence adapter"
 	@echo "test-collector-queue-loss Drive a real Collector's own self-metrics into a queue/loss report"
 	@echo "test-loki     Query a real Loki server through the log evidence adapter"
@@ -38,6 +39,9 @@ help:
 	@echo "dev-status    Show the durable local stack status"
 	@echo "dev-credentials Show the local console URL and operator token"
 	@echo "dev-down      Stop the local stack while preserving its database"
+	@echo "ai-finops-up  Start and seed the disposable Bedrock-to-Grafana slice"
+	@echo "ai-finops-status Show the local AI FinOps containers"
+	@echo "ai-finops-down Stop and remove the disposable AI FinOps slice"
 	@echo "package-chart Package the Helm chart under dist/"
 	@echo "release-bundle Build an unsigned multi-platform release bundle with SBOM/provenance"
 	@echo "verify-release-bundle Verify IIP_RELEASE_BUNDLE checksums and OCI attestations"
@@ -84,6 +88,9 @@ test-otel:
 
 test-otlp-receiver:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_otlp_receiver.sh
+
+test-ai-finops:
+	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_ai_finops.sh
 
 test-prometheus:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_prometheus.sh
@@ -284,6 +291,15 @@ dev-credentials:
 
 dev-down:
 	$(PYTHON) scripts/local_stack.py down
+
+ai-finops-up:
+	$(PYTHON) scripts/ai_finops_stack.py up
+
+ai-finops-status:
+	$(PYTHON) scripts/ai_finops_stack.py status
+
+ai-finops-down:
+	$(PYTHON) scripts/ai_finops_stack.py down
 
 package-chart:
 	mkdir -p dist

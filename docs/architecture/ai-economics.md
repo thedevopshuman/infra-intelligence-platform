@@ -1,6 +1,6 @@
 # AI economics architecture
 
-**Status:** Accepted V0 boundary; usage, cost, rule, and aggregate metrics executable
+**Status:** Accepted V0 boundary; deterministic local flow executable
 **Date:** 2026-09-05
 
 ## Context
@@ -136,6 +136,14 @@ profiles; invocation, trace, usage, cost, finding, evidence, and catalog
 identities never become labels. More than the configured cohort maximum
 suppresses the aggregate rather than presenting a truncated total. Recording
 or export failure is isolated from ledger and rule outcomes.
+
+The reference Compose topology routes Bedrock-shaped spans through an upstream
+Collector into the isolated receiver, exports the worker's bounded aggregates
+back through OTLP, and renders them through Prometheus and a provisioned
+Grafana dashboard. Loki is provisioned as the replaceable log destination but
+is not an accounting authority. The time-relative fixture includes priced and
+unpriced scopes, idempotent replay, and a separately rejected content span.
+This proves the local contract flow, not live AWS instrumentation compatibility.
 
 ## Privacy and security
 

@@ -34,13 +34,14 @@ duplicate delivery does not duplicate cost; unknown pricing is visible; no
 content crosses the boundary; and stopping the observability path does not fail
 the model request.
 
-Implementation status: items 1, 2, 4, 5, and 6 are delivered. Item 3 has an
+Implementation status: items 1, 2, 4, 5, 6, and 7 are delivered. Item 3 has an
 executable Bedrock-shaped OTLP fixture and strict metadata/content boundary;
 live `Converse`/`ConverseStream` auto-instrumentation qualification remains.
-Item 7 now has an executable privacy-bounded OTLP aggregate metric projection.
-Its finding view and Collector/Prometheus/Loki/Grafana topology remain. Item 8
-still requires the deterministic full-flow and real-provider compatibility
-gates.
+Item 7 includes the privacy-bounded OTLP aggregate projection, finding view,
+and a disposable Collector/Prometheus/Loki/Grafana topology. Item 8 now has a
+deterministic full-flow gate covering deduplication, visible unpriced usage,
+content rejection, exact cost, and one saving. The real-provider compatibility
+gate and inference/telemetry failure-isolation qualification remain.
 
 ## Phase B — application and team attribution
 

@@ -752,7 +752,7 @@ def _cohort_item(
             int(result["currencyScale"]),
             int(line["priceSubunitsPerMillionTokens"]),
         )
-    except _UnsupportedCohort:
+    except (_UnsupportedCohort, _UnresolvedCohort):
         raise
     except (KeyError, StopIteration, TypeError, ValueError, InvalidAiCostInputError):
         raise InvalidAiSavingsInputError("ai.savings.sources.invalid") from None

@@ -57,6 +57,18 @@ query, and AI economics metrics plus an investigation trace through the
 official Python SDK, verifies that the Collector debug exporter received them,
 and removes the container afterward.
 
+The AI economics topology uses the same exporter boundary with a Prometheus
+exporter and provisioned Grafana dashboard:
+
+```bash
+make test-ai-finops PYTHON=.venv/bin/python
+make ai-finops-up PYTHON=.venv/bin/python
+```
+
+The first command is an ephemeral release gate; the second leaves the verified
+dashboard visible in Docker Desktop. See the
+[local AI FinOps runbook](ai-finops-local-demo.md).
+
 To add a Collector to the long-running development stack, first configure the database password and hashed Bearer identity described in [local development](local-development.md), then run:
 
 ```bash

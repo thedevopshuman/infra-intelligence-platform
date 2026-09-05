@@ -1,0 +1,25 @@
+apiVersion: 1
+
+deleteDatasources:
+  - name: IIP Prometheus
+    orgId: 1
+  - name: IIP Loki
+    orgId: 1
+
+datasources:
+  - name: IIP Prometheus
+    uid: iip-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      timeInterval: 1s
+  - name: IIP Loki
+    uid: iip-loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false

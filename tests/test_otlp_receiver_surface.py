@@ -4,6 +4,7 @@ import json
 import os
 import unittest
 from io import BytesIO
+from pathlib import Path
 from unittest.mock import patch
 
 from iip.adapters.auth import DenyAllAuthenticator
@@ -105,6 +106,25 @@ class DedicatedOtlpSurfaceTests(unittest.TestCase):
 
 
 class DedicatedOtlpCompositionTests(unittest.TestCase):
+    def test_receiver_drains_active_requests_on_process_signals(self) -> None:
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "iip"
+            / "surfaces"
+            / "otlp_receiver.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "server = DrainingThreadingHTTPServer((host, port), OtlpReceiverHandler)",
+            source,
+        )
+        self.assertIn("IIP OTLP receiver draining active requests", source)
+        self.assertIn(
+            "for shutdown_signal in (signal.SIGTERM, signal.SIGINT)", source
+        )
+        self.assertLess(source.rindex("server.server_close()"), source.rindex("runtime.close()"))
+
     def test_receiver_requires_a_durable_database(self) -> None:
         with patch.dict(
             os.environ,

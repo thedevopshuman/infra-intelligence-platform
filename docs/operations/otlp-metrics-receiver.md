@@ -123,8 +123,9 @@ If an operator updates the contents of the existing Secret name instead, an
 explicit receiver Deployment restart and rollout wait are mandatory. A
 projected-volume update alone does not replace the process-local SSL context.
 Schedule rotation with overlap before `nextUpdate`; do not wait for readiness
-to fail. For more than one replica, qualify rolling availability, disruption
-budgets, Collector retry behavior, and rollback in the customer environment.
+to fail. The production profile supplies a zero-unavailable rollout, receiver
+disruption budget, and hard topology spread. Qualify actual eviction, node
+loss, Collector retry behavior, and rollback in the customer environment.
 
 ## Protected channel configuration
 
@@ -168,7 +169,11 @@ control-plane pod.
 The chart creates a dedicated receiver Deployment and ClusterIP Service on
 OTLP/HTTP port `4318`. It exposes no console or control-plane operation, has no
 interactive identity configuration or ambient service-account token, and
-applies per-channel process admission. If NetworkPolicy is enabled, both
+applies per-channel process admission. On `SIGTERM` it stops accepting new
+requests and joins active handlers before closing runtime state; a bounded
+pre-stop delay lets Service endpoint removal propagate. Size
+`otlpIngest.terminationGracePeriodSeconds` above that delay and the longest
+qualified request. If NetworkPolicy is enabled, both
 `networkPolicy.databaseEgress` and an exact
 `networkPolicy.otlpReceiverIngress` must be configured. The chart supports the
 versioned-Secret receiver rollout fixed by ADR 0090; automating CRL publication,

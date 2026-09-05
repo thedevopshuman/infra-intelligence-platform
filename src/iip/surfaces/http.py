@@ -202,6 +202,9 @@ class DrainingThreadingHTTPServer(ThreadingHTTPServer):
 def _shutdown_handler(
     server: ThreadingHTTPServer,
     shutdown_requested: Event,
+    *,
+    message: str = "IIP reference API draining active requests",
+    thread_name: str = "iip-http-shutdown",
 ) -> Callable[[int, object], None]:
     """Build an idempotent signal handler without blocking the main server thread."""
 
@@ -209,10 +212,10 @@ def _shutdown_handler(
         if shutdown_requested.is_set():
             return
         shutdown_requested.set()
-        print("IIP reference API draining active requests", flush=True)
+        print(message, flush=True)
         Thread(
             target=server.shutdown,
-            name="iip-http-shutdown",
+            name=thread_name,
             daemon=True,
         ).start()
 
@@ -223,7 +226,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.76.0"
+    server_version = "IIPReference/0.77.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),

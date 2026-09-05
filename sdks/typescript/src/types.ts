@@ -545,6 +545,7 @@ export type CustomerDeploymentPreflightCoreCheckId =
   | "tls-ingress"
   | "network-isolation"
   | "pod-disruption-budget"
+  | "hard-topology-spread"
   | "scheduled-backup"
   | "evidence-retention"
   | "platform-telemetry"
@@ -567,6 +568,7 @@ export type CustomerDeploymentPreflightCheckId =
 
 export type CustomerDeploymentPreflightRequirement =
   | "signed-published-release"
+  | "vulnerability-qualified-release"
   | "customer-oidc-browser-issuer"
   | "customer-policy-bundle"
   | "customer-workload-identity-broker"
@@ -633,7 +635,7 @@ export interface CustomerDeploymentPreflightReport {
     >;
     customerQualificationRequired: CustomerDeploymentPreflightRequirement[];
     summary: {
-      totalChecks: 22 | 27;
+      totalChecks: 23 | 28;
       passedChecks: number;
       failedChecks: number;
       notRunChecks: number;

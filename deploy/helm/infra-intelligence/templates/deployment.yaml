@@ -303,7 +303,20 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.topologySpreadConstraints }}
+      {{- if or .Values.availability.topologySpread.enabled .Values.topologySpreadConstraints }}
       topologySpreadConstraints:
+        {{- if .Values.availability.topologySpread.enabled }}
+        - maxSkew: {{ .Values.availability.topologySpread.maxSkew }}
+          {{- if eq .Values.availability.topologySpread.whenUnsatisfiable "DoNotSchedule" }}
+          minDomains: {{ .Values.availability.topologySpread.minDomains }}
+          {{- end }}
+          topologyKey: {{ .Values.availability.topologySpread.topologyKey | quote }}
+          whenUnsatisfiable: {{ .Values.availability.topologySpread.whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "infra-intelligence.selectorLabels" . | nindent 14 }}
+        {{- end }}
+        {{- with .Values.topologySpreadConstraints }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}

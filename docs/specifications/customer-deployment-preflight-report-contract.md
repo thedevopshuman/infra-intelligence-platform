@@ -24,18 +24,23 @@ context, namespace, dependency name, endpoint, CIDR, tenant, or secret value.
 - `production-core-v1` requires immutable image selection, redundant API and
   worker replicas, explicit worker enrollment, external PostgreSQL with
   controlled migrations, OIDC, external policy and credential broker, TLS
-  ingress, least-authority network policy, a disruption budget, scheduled
-  backup, evidence retention, outbound OTLP telemetry, and live metric, log,
-  and Kubernetes Event evidence backends.
+  ingress, least-authority network policy, component-specific disruption
+  budgets, hard two-domain single-skew topology spreading, scheduled backup,
+  evidence retention, outbound OTLP telemetry, and live metric, log, and
+  Kubernetes Event evidence backends.
 - `production-ai-finops-v0` adds tenant-bound AI usage intake, redundant
-  mutual-SPIFFE receiver replicas with a current-CRL reference, attribution,
-  pricing, saving, allocation reporting, and the customer-Collector queue/loss
-  objective. Test pricing and attribution fixtures are forbidden in both
-  production profiles.
+  mutual-SPIFFE receiver replicas with their own disruption budget and a
+  current-CRL reference, attribution, pricing, saving, allocation reporting,
+  and the customer-Collector queue/loss objective. Test pricing and attribution
+  fixtures are forbidden in both production profiles.
 
-The check identifiers and order are closed. Adding a required check is an
-additive contract and profile revision; weakening a named profile requires a
-new profile name and decision record.
+The check identifiers and order are closed. `pod-disruption-budget` covers the
+API, worker, and every enabled receiver; it accepts only a minimum that both
+preserves one replica and permits one voluntary disruption.
+`hard-topology-spread` requires the chart-generated component selectors,
+`maxSkew: 1`, `minDomains: 2`, and `DoNotSchedule`. Adding a required check is
+an additive contract and profile revision; weakening a named profile requires
+a new profile name and decision record.
 
 ## Modes and status
 
@@ -93,7 +98,8 @@ cluster or dependency set requires a fresh cluster-mode report.
 
 ## Compatibility
 
-This additive `v1alpha1` report does not change the release qualification,
-runtime identity, Helm values, or external compatibility contracts. It may be
-stored beside release and customer-environment evidence but must not be placed
-inside or used to rewrite an immutable release bundle.
+This additive `v1alpha1` revision strengthens the production Helm values and
+preflight checks without changing release qualification, runtime identity, or
+external compatibility contracts. It may be stored beside release and
+customer-environment evidence but must not be placed inside or used to rewrite
+an immutable release bundle.

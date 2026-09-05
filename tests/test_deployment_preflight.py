@@ -33,8 +33,8 @@ def rendered_profile() -> dict[str, object]:
         "schemaVersion": "1",
         "chart": {
             "name": "infra-intelligence",
-            "version": "0.79.0",
-            "applicationVersion": "0.76.0",
+            "version": "0.80.0",
+            "applicationVersion": "0.77.0",
         },
         "image": {
             "repository": "registry.example.test/iip/control-plane",
@@ -88,7 +88,17 @@ def rendered_profile() -> dict[str, object]:
             "credentialBrokerEgress": True,
             "otlpReceiverIngress": False,
         },
-        "podDisruptionBudget": {"enabled": True, "minAvailable": 1},
+        "podDisruptionBudget": {
+            "api": {"enabled": True, "minAvailable": 1},
+            "worker": {"enabled": True, "minAvailable": 1},
+            "receiver": {"enabled": False, "minAvailable": 1},
+        },
+        "topologySpread": {
+            "enabled": True,
+            "maxSkew": 1,
+            "minDomains": 2,
+            "hard": True,
+        },
         "security": {
             "serviceAccountTokenAutomount": False,
             "runAsNonRoot": True,
@@ -301,6 +311,7 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
             "tlsMode": "mutual-spiffe",
             "crlConfigured": True,
         }
+        profile["podDisruptionBudget"]["receiver"]["enabled"] = True  # type: ignore[index]
         profile["aiEconomics"] = {
             "attributionEnabled": True,
             "costEngineEnabled": True,
@@ -315,7 +326,7 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
         report = self.generate(profile, profile_name="production-ai-finops-v0")
 
         self.assertEqual(report["spec"]["status"], "configuration-ready")
-        self.assertEqual(report["spec"]["summary"]["totalChecks"], 27)
+        self.assertEqual(report["spec"]["summary"]["totalChecks"], 28)
         self.assertEqual(
             report["spec"]["customerQualificationRequired"][-3:],
             [
@@ -340,6 +351,71 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
                 "errorCode": "preflight.image.digest-required",
             },
         )
+
+    def test_every_enabled_workload_requires_a_usable_disruption_budget(self) -> None:
+        for component in ("api", "worker"):
+            with self.subTest(component=component):
+                profile = rendered_profile()
+                profile["podDisruptionBudget"][component]["enabled"] = False  # type: ignore[index]
+
+                report = self.generate(profile)
+
+                self.assertEqual(report["spec"]["status"], "blocked")
+                self.assertEqual(
+                    next(
+                        check
+                        for check in report["spec"]["checks"]
+                        if check["id"] == "pod-disruption-budget"
+                    ),
+                    {
+                        "id": "pod-disruption-budget",
+                        "status": "failed",
+                        "errorCode": "preflight.pdb.required",
+                    },
+                )
+
+        profile = rendered_profile()
+        profile["podDisruptionBudget"]["api"]["minAvailable"] = 2  # type: ignore[index]
+        report = self.generate(profile)
+        self.assertEqual(report["spec"]["status"], "blocked")
+
+    def test_receiver_budget_is_required_only_when_intake_is_enabled(self) -> None:
+        profile = rendered_profile()
+        report = self.generate(profile)
+        self.assertEqual(report["spec"]["status"], "configuration-ready")
+
+        profile["receivers"]["metricsEnabled"] = True  # type: ignore[index]
+        report = self.generate(profile)
+        self.assertEqual(report["spec"]["status"], "blocked")
+        failed = {
+            check["id"]: check.get("errorCode")
+            for check in report["spec"]["checks"]
+            if check["status"] == "failed"
+        }
+        self.assertEqual(failed, {"pod-disruption-budget": "preflight.pdb.required"})
+
+    def test_topology_spread_must_be_hard_and_single_skew(self) -> None:
+        for topology in (
+            {"enabled": False, "maxSkew": 1, "minDomains": 2, "hard": True},
+            {"enabled": True, "maxSkew": 2, "minDomains": 2, "hard": True},
+            {"enabled": True, "maxSkew": 1, "minDomains": 1, "hard": True},
+            {"enabled": True, "maxSkew": 1, "minDomains": 2, "hard": False},
+        ):
+            with self.subTest(topology=topology):
+                profile = rendered_profile()
+                profile["topologySpread"] = topology
+
+                report = self.generate(profile)
+
+                self.assertEqual(report["spec"]["status"], "blocked")
+                failed = next(
+                    check
+                    for check in report["spec"]["checks"]
+                    if check["id"] == "hard-topology-spread"
+                )
+                self.assertEqual(
+                    failed["errorCode"], "preflight.topology-spread.required"
+                )
 
     def test_semantic_verifier_rejects_reordered_or_rewritten_report(self) -> None:
         report = self.generate()
@@ -413,8 +489,8 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
         }
         forged["spec"]["status"] = "configuration-ready"
         forged["spec"]["summary"] = {
-            "totalChecks": 22,
-            "passedChecks": 20,
+            "totalChecks": 23,
+            "passedChecks": 21,
             "failedChecks": 0,
             "notRunChecks": 2,
             "overallStatus": "configuration-ready",

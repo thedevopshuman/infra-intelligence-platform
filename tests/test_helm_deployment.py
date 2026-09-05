@@ -64,6 +64,60 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn("appProtocol:", service)
         self.assertIn("}}https{{", service)
 
+    def test_every_long_running_component_has_explicit_availability_controls(self) -> None:
+        api = (CHART / "templates" / "deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+        worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+        receiver = (
+            CHART / "templates" / "otlp-receiver-deployment.yaml"
+        ).read_text(encoding="utf-8")
+        worker_pdb = (
+            CHART / "templates" / "worker-poddisruptionbudget.yaml"
+        ).read_text(encoding="utf-8")
+        receiver_pdb = (
+            CHART / "templates" / "otlp-receiver-poddisruptionbudget.yaml"
+        ).read_text(encoding="utf-8")
+        production = (
+            CHART / "examples" / "production-core.values.yaml"
+        ).read_text(encoding="utf-8")
+        production_ai = (
+            CHART / "examples" / "production-ai-finops.values.yaml"
+        ).read_text(encoding="utf-8")
+
+        for workload in (api, worker, receiver):
+            for expected in (
+                "maxUnavailable: 0",
+                "maxSurge: 1",
+                "minReadySeconds: 2",
+                "availability.topologySpread",
+                "if eq .Values.availability.topologySpread.whenUnsatisfiable "
+                '"DoNotSchedule"',
+                "minDomains:",
+                "whenUnsatisfiable:",
+                "labelSelector:",
+            ):
+                with self.subTest(expected=expected):
+                    self.assertIn(expected, workload)
+
+        self.assertIn("worker.terminationGracePeriodSeconds", worker)
+        self.assertIn("otlpIngest.terminationGracePeriodSeconds", receiver)
+        self.assertIn("otlpIngest.endpointDrainSeconds", receiver)
+        self.assertIn("preStop:", receiver)
+        self.assertIn("app.kubernetes.io/component: workflow-worker", worker_pdb)
+        self.assertIn("worker.podDisruptionBudget.minAvailable", worker_pdb)
+        self.assertIn("app.kubernetes.io/component: otlp-receiver", receiver_pdb)
+        self.assertIn("otlpIngest.podDisruptionBudget.minAvailable", receiver_pdb)
+        self.assertIn("topologySpread:\n    enabled: true", production)
+        self.assertIn(
+            "minDomains: 2",
+            (CHART / "values.yaml").read_text(encoding="utf-8"),
+        )
+        self.assertIn("podDisruptionBudget:\n    enabled: true", production)
+        self.assertIn("podDisruptionBudget:\n    enabled: true", production_ai)
+
     def test_otlp_receiver_observability_is_backend_neutral_and_network_bounded(self) -> None:
         deployment = (
             CHART / "templates" / "otlp-receiver-deployment.yaml"

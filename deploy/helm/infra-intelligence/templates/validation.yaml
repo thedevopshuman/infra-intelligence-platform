@@ -4,6 +4,24 @@
 {{- if ge (int .Values.apiTermination.endpointDrainSeconds) (int .Values.apiTermination.gracePeriodSeconds) }}
 {{- fail "apiTermination.endpointDrainSeconds must be less than apiTermination.gracePeriodSeconds" }}
 {{- end }}
+{{- if ge (int .Values.otlpIngest.endpointDrainSeconds) (int .Values.otlpIngest.terminationGracePeriodSeconds) }}
+{{- fail "otlpIngest.endpointDrainSeconds must be less than otlpIngest.terminationGracePeriodSeconds" }}
+{{- end }}
+{{- if and .Values.worker.podDisruptionBudget.enabled (not .Values.worker.enabled) }}
+{{- fail "worker.enabled must be true when worker.podDisruptionBudget.enabled=true" }}
+{{- end }}
+{{- if and .Values.otlpIngest.podDisruptionBudget.enabled (not (or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled .Values.aiUsageReceiver.enabled)) }}
+{{- fail "an OTLP receiver must be enabled when otlpIngest.podDisruptionBudget.enabled=true" }}
+{{- end }}
+{{- if and .Values.podDisruptionBudget.enabled (not (kindIs "string" .Values.podDisruptionBudget.minAvailable)) (ge (int .Values.podDisruptionBudget.minAvailable) (int .Values.replicaCount)) }}
+{{- fail "podDisruptionBudget.minAvailable must be less than replicaCount" }}
+{{- end }}
+{{- if and .Values.worker.podDisruptionBudget.enabled (not (kindIs "string" .Values.worker.podDisruptionBudget.minAvailable)) (ge (int .Values.worker.podDisruptionBudget.minAvailable) (int .Values.worker.replicaCount)) }}
+{{- fail "worker.podDisruptionBudget.minAvailable must be less than worker.replicaCount" }}
+{{- end }}
+{{- if and .Values.otlpIngest.podDisruptionBudget.enabled (not (kindIs "string" .Values.otlpIngest.podDisruptionBudget.minAvailable)) (ge (int .Values.otlpIngest.podDisruptionBudget.minAvailable) (int .Values.otlpIngest.replicaCount)) }}
+{{- fail "otlpIngest.podDisruptionBudget.minAvailable must be less than otlpIngest.replicaCount" }}
+{{- end }}
 {{- if gt (int .Values.eventPublisher.retryBaseSeconds) (int .Values.eventPublisher.retryMaxSeconds) }}
 {{- fail "eventPublisher.retryBaseSeconds must not exceed eventPublisher.retryMaxSeconds" }}
 {{- end }}

@@ -1,0 +1,16 @@
+{{- if and (or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled .Values.aiUsageReceiver.enabled) .Values.otlpIngest.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "infra-intelligence.fullname" . }}-otlp-receiver
+  labels:
+    {{- include "infra-intelligence.labels" . | nindent 4 }}
+    app.kubernetes.io/component: otlp-receiver
+spec:
+  minAvailable: {{ .Values.otlpIngest.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "infra-intelligence.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: otlp-receiver
+{{- end }}

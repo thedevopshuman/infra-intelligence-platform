@@ -63,9 +63,9 @@
           "additionalProperties": false,
           "required": ["totalChecks", "passedChecks", "failedChecks", "notRunChecks", "overallStatus"],
           "properties": {
-            "totalChecks": {"enum": [22, 27]},
-            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 27},
-            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 27},
+            "totalChecks": {"enum": [23, 28]},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 28},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 28},
             "notRunChecks": {"type": "integer", "minimum": 0, "maximum": 2},
             "overallStatus": {"enum": ["blocked", "configuration-ready", "install-ready"]}
           }
@@ -179,6 +179,7 @@
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "tls-ingress"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "network-isolation"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "pod-disruption-budget"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "hard-topology-spread"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "scheduled-backup"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "evidence-retention"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "platform-telemetry"}}},
@@ -189,11 +190,11 @@
     },
     "coreChecks": {
       "type": "array",
-      "minItems": 22,
-      "maxItems": 22,
+      "minItems": 23,
+      "maxItems": 23,
       "allOf": [{"$ref": "#/$defs/commonCheckPrefix"}],
       "prefixItems": [
-        {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+        {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "cluster-api"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "referenced-dependencies"}}}
       ],
@@ -201,11 +202,11 @@
     },
     "aiChecks": {
       "type": "array",
-      "minItems": 27,
-      "maxItems": 27,
+      "minItems": 28,
+      "maxItems": 28,
       "allOf": [{"$ref": "#/$defs/commonCheckPrefix"}],
       "prefixItems": [
-        {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+        {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-usage-intake"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-receiver-mtls"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-receiver-redundancy"}}},

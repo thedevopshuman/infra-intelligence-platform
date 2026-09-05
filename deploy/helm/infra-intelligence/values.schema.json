@@ -45,7 +45,8 @@
     "resources",
     "probes",
     "networkPolicy",
-    "podDisruptionBudget"
+    "podDisruptionBudget",
+    "availability"
   ],
   "properties": {
     "replicaCount": { "$ref": "#/definitions/replicas" },
@@ -98,6 +99,8 @@
       "required": [
         "enabled",
         "replicaCount",
+        "terminationGracePeriodSeconds",
+        "podDisruptionBudget",
         "tenants",
         "leaseSeconds",
         "heartbeatSeconds",
@@ -113,6 +116,12 @@
       "properties": {
         "enabled": { "type": "boolean" },
         "replicaCount": { "$ref": "#/definitions/replicas" },
+        "terminationGracePeriodSeconds": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 900
+        },
+        "podDisruptionBudget": { "$ref": "#/definitions/podDisruptionBudget" },
         "tenants": {
           "type": "array",
           "maxItems": 1000,
@@ -846,6 +855,9 @@
       "additionalProperties": false,
       "required": [
         "replicaCount",
+        "terminationGracePeriodSeconds",
+        "endpointDrainSeconds",
+        "podDisruptionBudget",
         "httpHost",
         "httpPort",
         "tls",
@@ -857,6 +869,17 @@
       ],
       "properties": {
         "replicaCount": { "$ref": "#/definitions/replicas" },
+        "terminationGracePeriodSeconds": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 600
+        },
+        "endpointDrainSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "podDisruptionBudget": { "$ref": "#/definitions/podDisruptionBudget" },
         "httpHost": { "type": "string", "enum": ["0.0.0.0", "::"] },
         "httpPort": { "$ref": "#/definitions/port" },
         "tls": {
@@ -993,6 +1016,40 @@
         "eventPublisherEgress": { "$ref": "#/definitions/cidrEgress" }
       }
     },
+    "podDisruptionBudget": { "$ref": "#/definitions/podDisruptionBudget" },
+    "availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topologySpread"],
+      "properties": {
+        "topologySpread": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "maxSkew", "minDomains", "topologyKey", "whenUnsatisfiable"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "maxSkew": { "type": "integer", "minimum": 1, "maximum": 10 },
+            "minDomains": { "type": "integer", "minimum": 2, "maximum": 16 },
+            "topologyKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[A-Za-z0-9]([A-Za-z0-9._/-]*[A-Za-z0-9])?$"
+            },
+            "whenUnsatisfiable": {
+              "type": "string",
+              "enum": ["DoNotSchedule", "ScheduleAnyway"]
+            }
+          }
+        }
+      }
+    },
+    "nodeSelector": { "$ref": "#/definitions/stringMap" },
+    "tolerations": { "type": "array", "maxItems": 64, "items": { "type": "object" } },
+    "affinity": { "type": "object" },
+    "topologySpreadConstraints": { "$ref": "#/definitions/topologySpreadConstraints" }
+  },
+  "definitions": {
     "podDisruptionBudget": {
       "type": "object",
       "additionalProperties": false,
@@ -1005,16 +1062,11 @@
         ] }
       }
     },
-    "nodeSelector": { "$ref": "#/definitions/stringMap" },
-    "tolerations": { "type": "array", "maxItems": 64, "items": { "type": "object" } },
-    "affinity": { "type": "object" },
     "topologySpreadConstraints": {
       "type": "array",
       "maxItems": 64,
       "items": { "type": "object" }
-    }
-  },
-  "definitions": {
+    },
     "nonEmptyString": { "type": "string", "minLength": 1, "maxLength": 1024 },
     "optionalName": { "type": "string", "maxLength": 253 },
     "absolutePath": { "type": "string", "pattern": "^/", "maxLength": 4096 },

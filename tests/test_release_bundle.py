@@ -21,9 +21,9 @@ from scripts.release_bundle import (
 )
 
 
-VERSION = "0.76.0"
-CHART_VERSION = "0.79.0"
-SDK_VERSION = "0.52.0"
+VERSION = "0.77.0"
+CHART_VERSION = "0.80.0"
+SDK_VERSION = "0.53.0"
 REVISION = "0123456789abcdef0123456789abcdef01234567"
 SOURCE_DATE = "2026-08-17T04:45:00+00:00"
 PLATFORMS = ("linux/amd64", "linux/arm64")

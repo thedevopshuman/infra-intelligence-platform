@@ -7,12 +7,16 @@ apiTermination:
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.76.0"
+  tag: "0.77.0"
   digest: ""
 
 worker:
   enabled: false
   replicaCount: 1
+  terminationGracePeriodSeconds: 120
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
   tenants: []
   leaseSeconds: 30
   heartbeatSeconds: 10
@@ -340,6 +344,11 @@ aiUsageReceiver:
 
 otlpIngest:
   replicaCount: 1
+  terminationGracePeriodSeconds: 60
+  endpointDrainSeconds: 5
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
   httpHost: 0.0.0.0
   httpPort: 4318
   tls:
@@ -477,6 +486,14 @@ networkPolicy:
 podDisruptionBudget:
   enabled: false
   minAvailable: 1
+
+availability:
+  topologySpread:
+    enabled: false
+    maxSkew: 1
+    minDomains: 2
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
 
 nodeSelector: {}
 tolerations: []

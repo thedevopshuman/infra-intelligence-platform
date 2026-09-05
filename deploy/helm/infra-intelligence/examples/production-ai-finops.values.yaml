@@ -26,6 +26,9 @@ aiUsageReceiver:
 
 otlpIngest:
   replicaCount: 2
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
   tls:
     mode: mutual-spiffe
     serverExistingSecret: iip-otlp-server-tls

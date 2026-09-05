@@ -106,3 +106,8 @@ customer RPO/RTO claim.
 Version 0.52 adds the offline `CustomerDeploymentPreflightReport`, its closed
 core and AI FinOps checks, and minimized prerequisite summary types. It adds no
 cluster credential, deployment mutation, or customer production claim.
+
+Version 0.53 adds the hard topology-spread check and the previously omitted
+vulnerability-qualified-release requirement to the closed preflight unions.
+It does not turn Kubernetes placement configuration into live availability
+evidence.

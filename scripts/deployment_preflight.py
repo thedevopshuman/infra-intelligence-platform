@@ -37,6 +37,7 @@ COMMON_CHECKS = (
     "tls-ingress",
     "network-isolation",
     "pod-disruption-budget",
+    "hard-topology-spread",
     "scheduled-backup",
     "evidence-retention",
     "platform-telemetry",
@@ -67,6 +68,7 @@ FAILURE_ERROR_CODES = {
     "tls-ingress": "preflight.ingress.tls-required",
     "network-isolation": "preflight.network-policy.incomplete",
     "pod-disruption-budget": "preflight.pdb.required",
+    "hard-topology-spread": "preflight.topology-spread.required",
     "scheduled-backup": "preflight.backup.required",
     "evidence-retention": "preflight.evidence-retention.required",
     "platform-telemetry": "preflight.telemetry.required",
@@ -118,6 +120,7 @@ EXPECTED_PROFILE_KEYS = frozenset(
         "telemetry",
         "networkPolicy",
         "podDisruptionBudget",
+        "topologySpread",
         "security",
         "receivers",
         "aiEconomics",
@@ -397,10 +400,21 @@ def _validate_rendered_profile(profile: Mapping[str, Any]) -> None:
     for key in evidence:
         _string(evidence, key)
     pdb = _object(profile, "podDisruptionBudget")
-    if set(pdb) != {"enabled", "minAvailable"}:
+    if set(pdb) != {"api", "worker", "receiver"}:
         _fail("preflight.profile.invalid")
-    _boolean(pdb, "enabled")
-    _integer(pdb, "minAvailable")
+    for component in ("api", "worker", "receiver"):
+        component_pdb = _object(pdb, component)
+        if set(component_pdb) != {"enabled", "minAvailable"}:
+            _fail("preflight.profile.invalid")
+        _boolean(component_pdb, "enabled")
+        _integer(component_pdb, "minAvailable")
+    spread = _object(profile, "topologySpread")
+    if set(spread) != {"enabled", "maxSkew", "minDomains", "hard"}:
+        _fail("preflight.profile.invalid")
+    _boolean(spread, "enabled")
+    _integer(spread, "maxSkew")
+    _integer(spread, "minDomains")
+    _boolean(spread, "hard")
     receivers = _object(profile, "receivers")
     if set(receivers) != {
         "metricsEnabled",
@@ -424,6 +438,19 @@ def _check(check_id: str, condition: bool, error_code: str) -> dict[str, str]:
     return {"id": check_id, "status": "failed", "errorCode": error_code}
 
 
+def _pdb_preserves_one_replica(
+    pdb: Mapping[str, Any], replica_count: object
+) -> bool:
+    return (
+        pdb.get("enabled") is True
+        and isinstance(pdb.get("minAvailable"), int)
+        and not isinstance(pdb.get("minAvailable"), bool)
+        and isinstance(replica_count, int)
+        and not isinstance(replica_count, bool)
+        and 1 <= pdb["minAvailable"] < replica_count
+    )
+
+
 def _static_checks(
     profile_name: str, profile: Mapping[str, Any]
 ) -> list[dict[str, str]]:
@@ -437,6 +464,7 @@ def _static_checks(
     ingress = _object(profile, "ingress")
     network = _object(profile, "networkPolicy")
     pdb = _object(profile, "podDisruptionBudget")
+    spread = _object(profile, "topologySpread")
     backup = _object(profile, "backup")
     retention = _object(profile, "evidenceRetention")
     telemetry = _object(profile, "telemetry")
@@ -444,6 +472,22 @@ def _static_checks(
     security = _object(profile, "security")
     ai = _object(profile, "aiEconomics")
     receivers = _object(profile, "receivers")
+    receiver_active = any(
+        receivers[key] is True
+        for key in ("metricsEnabled", "logsEnabled", "aiUsageEnabled")
+    )
+    disruption_ready = (
+        _pdb_preserves_one_replica(_object(pdb, "api"), api["replicaCount"])
+        and _pdb_preserves_one_replica(
+            _object(pdb, "worker"), worker["replicaCount"]
+        )
+        and (
+            not receiver_active
+            or _pdb_preserves_one_replica(
+                _object(pdb, "receiver"), receivers["replicaCount"]
+            )
+        )
+    )
 
     logs_network = (
         evidence["logs"] == "loki" and network["lokiEgress"] is True
@@ -481,7 +525,8 @@ def _static_checks(
         _check("workload-identity-broker", broker["mode"] == "external-http" and broker["configurationReviewed"] is True, "preflight.credential-broker.external-required"),
         _check("tls-ingress", all(ingress[key] is True for key in ("enabled", "classConfigured", "hostConfigured", "tlsConfigured", "redirectConfigured")), "preflight.ingress.tls-required"),
         _check("network-isolation", network_ready, "preflight.network-policy.incomplete"),
-        _check("pod-disruption-budget", pdb["enabled"] is True and pdb["minAvailable"] >= 1, "preflight.pdb.required"),
+        _check("pod-disruption-budget", disruption_ready, "preflight.pdb.required"),
+        _check("hard-topology-spread", spread == {"enabled": True, "maxSkew": 1, "minDomains": 2, "hard": True}, "preflight.topology-spread.required"),
         _check("scheduled-backup", backup["enabled"] is True and backup["destinationConfigured"] is True, "preflight.backup.required"),
         _check("evidence-retention", retention["enabled"] is True, "preflight.evidence-retention.required"),
         _check("platform-telemetry", telemetry["metricsEnabled"] is True and telemetry["tracesEnabled"] is True and telemetry["endpointConfigured"] is True, "preflight.telemetry.required"),

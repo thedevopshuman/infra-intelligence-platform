@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import os
+import signal
 import threading
 import time
 from collections.abc import Callable
 from http import HTTPStatus
-from http.server import ThreadingHTTPServer
 from urllib.parse import urlparse
 
 from iip.application.ingest_otlp_metrics import OtlpReceiverConfigurationError
 from iip.bootstrap import build_otlp_receiver_runtime_from_env
-from iip.surfaces.http import ApiHandler
+from iip.surfaces.http import (
+    ApiHandler,
+    DrainingThreadingHTTPServer,
+    _shutdown_handler,
+)
 from iip.surfaces.otlp_tls import (
     ClientCrlFreshnessPolicy,
     OtlpTlsConfiguration,
@@ -59,7 +63,7 @@ class TokenBucketRateLimiter:
 class OtlpReceiverHandler(ApiHandler):
     """Expose only health and selected OTLP signal endpoints."""
 
-    server_version = "IIPOtlpReceiver/0.76.0"
+    server_version = "IIPOtlpReceiver/0.77.0"
     rate_limiter = TokenBucketRateLimiter(50, 100)
     client_identities: SpiffeClientIdentityRegistry | None = None
     client_crl_freshness: ClientCrlFreshnessPolicy | None = None
@@ -142,15 +146,28 @@ def main() -> None:
         OtlpReceiverHandler.rate_limiter = TokenBucketRateLimiter(rate, burst)
         OtlpReceiverHandler.client_identities = tls.client_identities
         OtlpReceiverHandler.client_crl_freshness = client_crl_freshness
-        server = ThreadingHTTPServer((host, port), OtlpReceiverHandler)
+        server = DrainingThreadingHTTPServer((host, port), OtlpReceiverHandler)
         if ssl_context is not None:
             server.socket = ssl_context.wrap_socket(server.socket, server_side=True)
+        shutdown_requested = threading.Event()
+        stop = _shutdown_handler(
+            server,
+            shutdown_requested,
+            message="IIP OTLP receiver draining active requests",
+            thread_name="iip-otlp-http-shutdown",
+        )
+        previous_handlers = {
+            shutdown_signal: signal.signal(shutdown_signal, stop)
+            for shutdown_signal in (signal.SIGTERM, signal.SIGINT)
+        }
         print(f"IIP OTLP receiver listening on {tls.scheme}://{host}:{port}")
         try:
             server.serve_forever()
         except KeyboardInterrupt:
             print("IIP OTLP receiver stopped")
         finally:
+            for shutdown_signal, previous_handler in previous_handlers.items():
+                signal.signal(shutdown_signal, previous_handler)
             server.server_close()
     finally:
         runtime.close()

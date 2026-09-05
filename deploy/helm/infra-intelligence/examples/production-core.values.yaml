@@ -5,12 +5,15 @@ replicaCount: 2
 
 image:
   repository: registry.example.test/iip/control-plane
-  tag: "0.76.0"
+  tag: "0.77.0"
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 worker:
   enabled: true
   replicaCount: 2
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
   tenants: [tenant-example]
 
 database:
@@ -112,3 +115,11 @@ networkPolicy:
 podDisruptionBudget:
   enabled: true
   minAvailable: 1
+
+availability:
+  topologySpread:
+    enabled: true
+    maxSkew: 1
+    minDomains: 2
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule

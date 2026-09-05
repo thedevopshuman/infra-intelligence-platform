@@ -117,3 +117,7 @@ Version 0.52 adds `CustomerDeploymentPreflightReport` for minimized offline
 deployment evidence tooling. It carries closed configuration and prerequisite
 outcomes, counts, and digests only; it grants no cluster access and does not
 turn a pre-install pass into customer production certification.
+
+Version 0.53 aligns the preflight model with component disruption budgets,
+hard topology spread, and vulnerability-qualified release evidence. The model
+remains an opaque validated envelope and grants no Kubernetes authority.

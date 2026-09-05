@@ -14,11 +14,13 @@ The chart ships three composable examples:
 - [`production-core.values.yaml`](../../deploy/helm/infra-intelligence/examples/production-core.values.yaml)
   enables the redundant API/worker, external identity/policy/credential
   boundaries, live evidence adapters, telemetry, TLS ingress, retention,
-  backup, disruption, and least-authority network settings.
+  backup, component disruption budgets, hard node spreading, and
+  least-authority network settings.
 - [`production-ai-finops.values.yaml`](../../deploy/helm/infra-intelligence/examples/production-ai-finops.values.yaml)
   is an overlay that adds metadata-only AI usage intake, mutual-SPIFFE TLS and
-  CRL references, redundant receiver replicas, attribution, pricing, saving,
-  allocation, and Collector queue/loss monitoring.
+  CRL references, redundant receiver replicas with their own disruption
+  budget, attribution, pricing, saving, allocation, and Collector queue/loss
+  monitoring.
 - [`production-github-context.values.yaml`](../../deploy/helm/infra-intelligence/examples/production-github-context.values.yaml)
   is an overlay that replaces local context files with allowlisted GitHub or
   GitHub Enterprise paths at exact commit revisions, brokered read credentials,
@@ -39,6 +41,15 @@ make test-deployment-preflight PYTHON=.venv/bin/python
 Static success produces `configuration-ready`: the complete chart rendered,
 all production configuration checks passed, and the cluster checks are
 explicitly `not-run`.
+
+The production profiles require two or more API and worker replicas, and two
+or more receiver replicas when intake is enabled. Each enabled component must
+retain at least one replica during a voluntary disruption while allowing one
+replica to drain. The shared topology setting generates exact component label
+selectors with `maxSkew: 1`, `minDomains: 2`, and `DoNotSchedule`. Ensure the
+intended cluster has at least two eligible nodes for the configured topology
+key; otherwise the correct result is Pending redundant replicas rather than
+silently co-locating them.
 
 ## Run against the intended cluster
 

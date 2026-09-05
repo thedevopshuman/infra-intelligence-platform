@@ -82,6 +82,12 @@ class HelmValuesContractTests(unittest.TestCase):
         for expected in (
             "worker.heartbeatSeconds must be less than worker.leaseSeconds",
             "apiTermination.endpointDrainSeconds must be less than",
+            "otlpIngest.endpointDrainSeconds must be less than",
+            "worker.enabled must be true when worker.podDisruptionBudget.enabled=true",
+            "an OTLP receiver must be enabled when otlpIngest.podDisruptionBudget.enabled=true",
+            "podDisruptionBudget.minAvailable must be less than replicaCount",
+            "worker.podDisruptionBudget.minAvailable must be less than worker.replicaCount",
+            "otlpIngest.podDisruptionBudget.minAvailable must be less than otlpIngest.replicaCount",
             "eventPublisher.retryBaseSeconds must not exceed",
             "eventDeliverySlo.maximumDeliveryLatencySeconds must be less than",
             "investigationCompletionSlo.maximumCompletionSeconds must be less than",
@@ -167,6 +173,26 @@ class HelmValuesContractTests(unittest.TestCase):
             termination["properties"]["gracePeriodSeconds"]["maximum"],
             600,
         )
+        properties = self.schema["properties"]
+        self.assertEqual(
+            properties["worker"]["properties"]["terminationGracePeriodSeconds"][
+                "maximum"
+            ],
+            900,
+        )
+        self.assertEqual(
+            properties["otlpIngest"]["properties"][
+                "terminationGracePeriodSeconds"
+            ]["maximum"],
+            600,
+        )
+        topology = properties["availability"]["properties"]["topologySpread"]
+        self.assertFalse(properties["availability"]["additionalProperties"])
+        self.assertEqual(
+            topology["properties"]["whenUnsatisfiable"]["enum"],
+            ["DoNotSchedule", "ScheduleAnyway"],
+        )
+        self.assertEqual(topology["properties"]["minDomains"]["minimum"], 2)
         self.assertEqual(
             termination["properties"]["endpointDrainSeconds"]["maximum"],
             60,

@@ -42,7 +42,7 @@ Delivered:
 - resource, event, agent, and plugin `v1alpha1` contracts and examples;
 - runnable resource-ingestion vertical slice with ports/adapters;
 - Python and TypeScript SDK boundaries;
-- Helm/Kubernetes deployment skeleton, strict customer values contract, immutable application image selection, controlled schema-migration hook, guarded existing-certificate TLS Ingress, a controller-neutral value-free external-secret handoff with exact-key/rotation/least-authority local conformance, least-authority scheduled logical backups, surge-first API rollout and bounded endpoint/request draining, immutable bounded CI dependencies, source and packaged install/upgrade/recovery quality gates, data-preserving packaged N-1 application rollback/re-upgrade conformance with sustained zero-failure authenticated Service reads and a blocked in-flight read, a manifest-bound environment-scoped qualification report, closed non-secret production core and AI FinOps values examples plus a minimized static/explicit-context customer deployment preflight, an attested unsigned release bundle, an exact-digest organizational signature-verification boundary with explicit non-promotable local evidence, and exact-SBOM vulnerability qualification under pinned scanner, fresh database, closed threshold, and expiring-exception policy.
+- Helm/Kubernetes deployment skeleton, strict customer values contract, immutable application image selection, controlled schema-migration hook, guarded existing-certificate TLS Ingress, a controller-neutral value-free external-secret handoff with exact-key/rotation/least-authority local conformance, least-authority scheduled logical backups, surge-first zero-unavailable API/worker/receiver rollouts, component-specific disruption budgets, hard topology spread, bounded API/receiver endpoint and request draining, immutable bounded CI dependencies, source and packaged install/upgrade/recovery quality gates, data-preserving packaged N-1 application rollback/re-upgrade conformance with sustained zero-failure authenticated Service reads and a blocked in-flight read, a manifest-bound environment-scoped qualification report, closed non-secret production core and AI FinOps values examples plus a minimized static/explicit-context customer deployment preflight, an attested unsigned release bundle, an exact-digest organizational signature-verification boundary with explicit non-promotable local evidence, and exact-SBOM vulnerability qualification under pinned scanner, fresh database, closed threshold, and expiring-exception policy.
 
 Exit gate: `make verify` passes and a new contributor can trace resource ingress through authorization, storage, and event emission.
 
@@ -108,6 +108,13 @@ with aggregate-only source/target-bound availability and latency evidence. This
 closes the portable bounded external qualification harness described above;
 continuous multi-region probing, long-term aggregation, burn-rate policy, and
 alert routing remain open.
+
+Deployment update: ADR 0109 adds zero-unavailable worker and receiver rollouts,
+component-specific disruption budgets, chart-generated hard topology spread,
+and bounded OTLP active-request draining. These close avoidable application
+placement and planned-disruption gaps; involuntary node loss, customer ingress,
+database, storage, sustained-load, and regional availability remain external
+qualification work.
 
 Update: ADR 0058 adds a deployment-configured rolling useful-completion SLO over durable asynchronous jobs, including explicit late, failed, cancelled, and unfinished misses. ADR 0059 adds a privacy-bounded query availability counter and duration histogram with explicit objective values over the replaceable OTLP metrics boundary. Bounded external ingress qualification is delivered by ADR 0105; continuous regional coverage and notification routing remain open.
 

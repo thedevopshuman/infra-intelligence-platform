@@ -17,6 +17,12 @@ metadata:
     app.kubernetes.io/component: workflow-worker
 spec:
   replicas: {{ .Values.worker.replicaCount }}
+  minReadySeconds: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "infra-intelligence.name" . }}
@@ -33,6 +39,7 @@ spec:
     spec:
       serviceAccountName: {{ include "infra-intelligence.serviceAccountName" . }}
       automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ .Values.worker.terminationGracePeriodSeconds }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       {{- with .Values.imagePullSecrets }}
@@ -338,5 +345,19 @@ spec:
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.availability.topologySpread.enabled }}
+      topologySpreadConstraints:
+        - maxSkew: {{ .Values.availability.topologySpread.maxSkew }}
+          {{- if eq .Values.availability.topologySpread.whenUnsatisfiable "DoNotSchedule" }}
+          minDomains: {{ .Values.availability.topologySpread.minDomains }}
+          {{- end }}
+          topologyKey: {{ .Values.availability.topologySpread.topologyKey | quote }}
+          whenUnsatisfiable: {{ .Values.availability.topologySpread.whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ include "infra-intelligence.name" . }}
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: workflow-worker
       {{- end }}
 {{- end }}

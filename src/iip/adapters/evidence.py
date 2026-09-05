@@ -11,6 +11,10 @@ from datetime import datetime, timedelta, timezone
 from threading import RLock
 from typing import Iterable, Mapping, Optional
 
+from iip.adapters.evidence_redaction import (
+    EvidenceRedactionPolicyRegistry,
+    ValidatedEvidenceRedactionPolicy,
+)
 from iip.application.ports import (
     ActorContext,
     EvidenceProviderRequest,
@@ -39,6 +43,14 @@ _BEARER = re.compile(r"(?i)\bbearer\s+[^\s,;]+")
 _PRIVATE_KEY = re.compile(
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----",
     re.DOTALL,
+)
+_EMAIL_ADDRESS = re.compile(
+    r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]{1,64}"
+    r"@[A-Za-z0-9.-]{1,253}[.][A-Za-z]{2,63}"
+    r"(?![A-Za-z0-9.-])"
+)
+_IPV4_ADDRESS = re.compile(
+    r"(?<![A-Za-z0-9])(?:[0-9]{1,3}[.]){3}[0-9]{1,3}(?![A-Za-z0-9])"
 )
 
 
@@ -386,44 +398,66 @@ class NoDataKubernetesEventsBackend:
 
 
 class StructuredTextRedactor:
-    """Inspect JSON and UTF-8 text for common credential-bearing patterns."""
+    """Apply mandatory credential and optional exact-tenant privacy detectors."""
+
+    def __init__(
+        self,
+        policies: EvidenceRedactionPolicyRegistry | None = None,
+    ) -> None:
+        self._policies = policies or EvidenceRedactionPolicyRegistry()
 
     def redact(
         self,
         content: bytes,
         *,
+        tenant_id: str,
         media_type: str,
         evidence_type: str,
     ) -> EvidenceRedactionResult:
-        del evidence_type
+        policy = self._policies.get(tenant_id)
+        value_classes = (
+            policy.value_classes_for(evidence_type)
+            if policy is not None
+            else frozenset()
+        )
         normalized_media_type = media_type.lower().split(";", 1)[0]
         if normalized_media_type == "application/json" or normalized_media_type.endswith(
             "+json"
         ):
-            return self._redact_json(content)
+            return self._redact_json(content, value_classes, policy)
         if normalized_media_type.startswith("text/"):
-            return self._redact_utf8_text(content)
+            return self._redact_utf8_text(content, value_classes, policy)
         raise ValueError("evidence.redaction.unsupported-media-type")
 
-    def _redact_json(self, content: bytes) -> EvidenceRedactionResult:
+    def _redact_json(
+        self,
+        content: bytes,
+        value_classes: frozenset[str],
+        policy: ValidatedEvidenceRedactionPolicy | None,
+    ) -> EvidenceRedactionResult:
         try:
             parsed = json.loads(content.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             raise ValueError("evidence.redaction.invalid-json") from None
 
         methods: set[str] = set()
-        redacted = self._walk_json(parsed, methods)
+        redacted = self._walk_json(parsed, methods, value_classes)
         if not methods:
-            return EvidenceRedactionResult(content=content, methods=())
+            return self._result(content, (), policy)
         encoded = json.dumps(
             redacted,
             ensure_ascii=False,
             separators=(",", ":"),
             sort_keys=True,
         ).encode("utf-8")
-        return EvidenceRedactionResult(content=encoded, methods=tuple(sorted(methods)))
+        return self._result(encoded, tuple(sorted(methods)), policy)
 
-    def _walk_json(self, value: object, methods: set[str]) -> object:
+    def _walk_json(
+        self,
+        value: object,
+        methods: set[str],
+        value_classes: frozenset[str],
+    ) -> object:
         if isinstance(value, dict):
             result = {}
             for key, item in value.items():
@@ -432,36 +466,80 @@ class StructuredTextRedactor:
                     result[key] = "[REDACTED]"
                     methods.add("structured-secret-fields")
                 else:
-                    result[key] = self._walk_json(item, methods)
+                    result[key] = self._walk_json(item, methods, value_classes)
             return result
         if isinstance(value, list):
-            return [self._walk_json(item, methods) for item in value]
+            return [
+                self._walk_json(item, methods, value_classes) for item in value
+            ]
         if isinstance(value, str):
-            redacted, changed = self._redact_text(value)
-            if changed:
-                methods.add("secret-pattern")
+            redacted, applied = self._redact_text(value, value_classes)
+            methods.update(applied)
             return redacted
         return value
 
-    def _redact_utf8_text(self, content: bytes) -> EvidenceRedactionResult:
+    def _redact_utf8_text(
+        self,
+        content: bytes,
+        value_classes: frozenset[str],
+        policy: ValidatedEvidenceRedactionPolicy | None,
+    ) -> EvidenceRedactionResult:
         try:
             text = content.decode("utf-8")
         except UnicodeDecodeError:
             raise ValueError("evidence.redaction.invalid-utf8") from None
-        redacted, changed = self._redact_text(text)
-        if not changed:
-            return EvidenceRedactionResult(content=content, methods=())
-        return EvidenceRedactionResult(
+        redacted, methods = self._redact_text(text, value_classes)
+        if not methods:
+            return self._result(content, (), policy)
+        return self._result(
             content=redacted.encode("utf-8"),
-            methods=("secret-pattern",),
+            methods=tuple(sorted(methods)),
+            policy=policy,
         )
 
     @staticmethod
-    def _redact_text(value: str) -> tuple[str, bool]:
+    def _redact_text(
+        value: str,
+        value_classes: frozenset[str],
+    ) -> tuple[str, set[str]]:
         redacted = _PRIVATE_KEY.sub("[REDACTED PRIVATE KEY]", value)
         redacted = _BEARER.sub("Bearer [REDACTED]", redacted)
         redacted = _SECRET_ASSIGNMENT.sub(
             lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]",
             redacted,
         )
-        return redacted, redacted != value
+        methods = {"secret-pattern"} if redacted != value else set()
+        if "email-address" in value_classes:
+            updated = _EMAIL_ADDRESS.sub("[REDACTED EMAIL]", redacted)
+            if updated != redacted:
+                methods.add("policy-email-address")
+            redacted = updated
+        if "ipv4-address" in value_classes:
+            updated = _IPV4_ADDRESS.sub(
+                StructuredTextRedactor._redact_ipv4,
+                redacted,
+            )
+            if updated != redacted:
+                methods.add("policy-ipv4-address")
+            redacted = updated
+        return redacted, methods
+
+    @staticmethod
+    def _redact_ipv4(match: re.Match[str]) -> str:
+        octets = match.group(0).split(".")
+        if all(0 <= int(octet) <= 255 for octet in octets):
+            return "[REDACTED IPV4]"
+        return match.group(0)
+
+    @staticmethod
+    def _result(
+        content: bytes,
+        methods: tuple[str, ...],
+        policy: ValidatedEvidenceRedactionPolicy | None,
+    ) -> EvidenceRedactionResult:
+        return EvidenceRedactionResult(
+            content=content,
+            methods=methods,
+            policy_id=(policy.policy_id if policy is not None else None),
+            policy_version=(policy.version if policy is not None else None),
+        )

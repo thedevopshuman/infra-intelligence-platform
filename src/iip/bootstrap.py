@@ -37,6 +37,7 @@ from iip.adapters.evidence import (
     SystemClock,
     UuidEvidenceIdGenerator,
 )
+from iip.adapters.evidence_redaction import EvidenceRedactionPolicyRegistry
 from iip.adapters.health import AlwaysReadyProbe
 from iip.adapters.investigation_catalog import build_investigation_signal_catalog
 from iip.adapters.memory import AllowTenantPolicy, InMemoryResourceStore
@@ -314,6 +315,7 @@ def build_local_runtime(
     ai_allocation_source_record_limit: int = 10_000,
     ai_allocation_telemetry_sink: AiAllocationTelemetrySink | None = None,
     ai_allocation_window_seconds: int = 86_400,
+    evidence_redaction_policies: tuple[Mapping[str, object], ...] | None = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -371,6 +373,7 @@ def build_local_runtime(
         ai_allocation_source_record_limit,
         ai_allocation_telemetry_sink,
         ai_allocation_window_seconds,
+        evidence_redaction_policies,
     )
 
 
@@ -429,6 +432,7 @@ def _compose_runtime(
     ai_allocation_source_record_limit: int = 10_000,
     ai_allocation_telemetry_sink: AiAllocationTelemetrySink | None = None,
     ai_allocation_window_seconds: int = 86_400,
+    evidence_redaction_policies: tuple[Mapping[str, object], ...] | None = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -469,7 +473,9 @@ def _compose_runtime(
     )
     kubernetes_event_provider = KubernetesEventsEvidenceProvider(event_backend, store)
     resource_change_provider = ResourceHistoryChangeEvidenceProvider(store, clock)
-    redactor = StructuredTextRedactor()
+    redactor = StructuredTextRedactor(
+        EvidenceRedactionPolicyRegistry(evidence_redaction_policies or ())
+    )
     context_backend = (
         context_documents_backend
         if context_documents_backend is not None
@@ -829,6 +835,7 @@ def build_postgres_runtime(
     ai_allocation_source_record_limit: int = 10_000,
     ai_allocation_telemetry_sink: AiAllocationTelemetrySink | None = None,
     ai_allocation_window_seconds: int = 86_400,
+    evidence_redaction_policies: tuple[Mapping[str, object], ...] | None = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -893,6 +900,7 @@ def build_postgres_runtime(
         ai_allocation_source_record_limit,
         ai_allocation_telemetry_sink,
         ai_allocation_window_seconds,
+        evidence_redaction_policies,
     )
 
 
@@ -971,6 +979,7 @@ def _build_runtime_from_env(
     collector_queue_loss_objectives = _collector_queue_loss_objectives_from_env()
     investigation_dispatch_limits = _investigation_dispatch_limits_from_env()
     evidence_retention_policy = _evidence_retention_policy_from_env()
+    evidence_redaction_policies = _evidence_redaction_policies_from_env()
     metrics_runtime = _otel_metrics_runtime_from_env()
     try:
         traces_runtime = _otel_traces_runtime_from_env()
@@ -1162,6 +1171,7 @@ def _build_runtime_from_env(
                     else None
                 ),
                 ai_allocation_window_seconds=ai_allocation_window_seconds,
+                evidence_redaction_policies=evidence_redaction_policies,
             )
         auto_migrate = (
             os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
@@ -1247,6 +1257,7 @@ def _build_runtime_from_env(
                 else None
             ),
             ai_allocation_window_seconds=ai_allocation_window_seconds,
+            evidence_redaction_policies=evidence_redaction_policies,
         )
     except Exception:
         if telemetry_runtime is not None:
@@ -1316,6 +1327,7 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
             ),
             policy=_policy_from_env(),
             readiness_timeout_seconds=_readiness_timeout_from_env(),
+            evidence_redaction_policies=_evidence_redaction_policies_from_env(),
         )
     except Exception:
         if metrics_runtime is not None:
@@ -1874,6 +1886,17 @@ def _evidence_retention_policy_from_env() -> EvidenceRetentionPolicy:
             defaults.batch_size,
         ),
     )
+
+
+def _evidence_redaction_policies_from_env() -> (
+    tuple[Mapping[str, object], ...] | None
+):
+    """Load optional protected exact-tenant additive redaction policies."""
+
+    raw = os.environ.get("IIP_EVIDENCE_REDACTION_POLICIES_JSON")
+    if raw in (None, ""):
+        return None
+    return EvidenceRedactionPolicyRegistry.from_json(raw).documents()
 
 
 def _otel_metrics_runtime_from_env() -> Any:

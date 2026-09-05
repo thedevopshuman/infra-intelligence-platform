@@ -58,6 +58,7 @@ anything.
 | `contextEvidence.credentialsExistingSecret` | `github-context-credentials-json` | Development-only GitHub context credential mapping; production uses the external broker |
 | `contextEvidence.caBundleExistingSecret` | `ca.crt` | Optional GitHub Enterprise trust anchor |
 | `investigationSignalCatalog.existingSecret` | `investigation-signal-catalog-json` | Tenant-scoped investigation candidate policy |
+| `evidenceRedaction.policiesExistingSecret` | `evidence-redaction-policies-json` | Content-addressed exact-tenant additive Evidence privacy policy |
 | `aiAttribution.policiesExistingSecret` | `ai-attribution-policies-json` | Protected application/team attribution policy |
 | `aiCostEngine.catalogsExistingSecret` | `ai-price-catalogs-json` | Versioned AI price catalogs |
 | `aiCostEngine.qualificationsExistingSecret` | `ai-price-catalog-qualifications-json` | Exact protected catalog qualification policies and current reports |

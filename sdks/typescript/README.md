@@ -13,7 +13,7 @@ const client = new InfrastructureIntelligenceClient({
 });
 ```
 
-The package exports `Evidence`, `InvestigationRequest`, and `InvestigationReport` as transport-independent `v1alpha1` contract types and provides executable investigation/evidence client methods.
+The package exports `Evidence`, `EvidenceRedactionPolicy`, `InvestigationRequest`, and `InvestigationReport` as transport-independent `v1alpha1` contract types and provides executable investigation/evidence client methods. The policy type is for protected configuration tooling; public callers cannot install or select tenant policies.
 
 `InvestigationSignalCatalog` describes protected tenant profile documents for configuration tooling. `InvestigationRequest.catalogSnapshot` is readonly server-owned provenance on accepted work; clients must omit it when submitting an investigation. `InvestigationSignalPlan` and `InvestigationSignalPromotion` type the fixed plan and its optional one-candidate adaptive transition without returning protected query configuration or provider details.
 
@@ -88,6 +88,10 @@ instrumentation dependency.
 Version 0.56 adds protected price-catalog qualification policy and minimized
 report types without a provider pricing client, promotion method, or negotiated
 rate exposure.
+
+Version 0.58 adds the protected `EvidenceRedactionPolicy` type and optional
+Evidence policy provenance without a policy-installation API, arbitrary
+detector expressions, or a credential-redaction disable switch.
 
 Version 0.47 adds protected attribution-policy and immutable usage-attribution
 record types without exposing policy installation or workload-controlled

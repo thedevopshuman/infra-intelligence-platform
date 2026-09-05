@@ -1,6 +1,7 @@
 export type ResourceHealth = "healthy" | "degraded" | "unhealthy" | "unknown";
 export type ResourceUid = `res_${string}`;
 export type EvidenceId = `evd_${string}`;
+export type EvidenceRedactionPolicyId = `erp_${string}`;
 export type InvestigationId = `inv_${string}`;
 export type InvestigationCancellationId = `can_${string}`;
 export type ActionId = `act_${string}`;
@@ -1952,11 +1953,36 @@ export interface Evidence {
       redaction: {
         status: "not-required" | "applied";
         methods: string[];
+        policyRef?: {
+          id: EvidenceRedactionPolicyId;
+          version: string;
+        };
       };
       sensitivity: "public" | "internal" | "confidential" | "restricted";
       retentionClass: "ephemeral" | "standard" | "extended" | "legal-hold";
       expiresAt?: string;
     };
+  };
+}
+
+export type EvidenceRedactionValueClass =
+  | "email-address"
+  | "ipv4-address";
+
+export interface EvidenceRedactionPolicy {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "EvidenceRedactionPolicy";
+  metadata: {
+    id: EvidenceRedactionPolicyId;
+    tenantId: string;
+    version: string;
+  };
+  spec: {
+    rules: Array<{
+      id: string;
+      evidenceTypes: string[];
+      valueClasses: EvidenceRedactionValueClass[];
+    }>;
   };
 }
 

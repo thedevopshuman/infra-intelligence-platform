@@ -59,6 +59,9 @@
 {{- if .Values.investigationSignalCatalog.existingSecret -}}
 {{- $dependencies = append $dependencies (dict "purpose" "investigation-signal-catalog" "kind" "Secret" "name" .Values.investigationSignalCatalog.existingSecret "keys" (list .Values.investigationSignalCatalog.secretKey)) -}}
 {{- end -}}
+{{- if .Values.evidenceRedaction.policiesExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "evidence-redaction-policies" "kind" "Secret" "name" .Values.evidenceRedaction.policiesExistingSecret "keys" (list .Values.evidenceRedaction.policiesSecretKey)) -}}
+{{- end -}}
 {{- if .Values.otlpReceiver.channelsExistingSecret -}}
 {{- $dependencies = append $dependencies (dict "purpose" "metrics-receiver-channels" "kind" "Secret" "name" .Values.otlpReceiver.channelsExistingSecret "keys" (list .Values.otlpReceiver.channelsSecretKey)) -}}
 {{- end -}}
@@ -114,6 +117,7 @@
   "ingress" (dict "enabled" .Values.ingress.enabled "classConfigured" (not (empty .Values.ingress.className)) "hostConfigured" (not (empty .Values.ingress.host)) "tlsConfigured" (not (empty .Values.ingress.tls.existingSecret)) "redirectConfigured" (not (empty .Values.ingress.tlsRedirectAnnotation)))
   "backup" (dict "enabled" .Values.backup.enabled "destinationConfigured" (not (empty .Values.backup.destination.existingClaim)))
   "evidenceRetention" (dict "enabled" .Values.evidenceRetention.enabled)
+  "evidenceRedaction" (dict "customPoliciesConfigured" (not (empty .Values.evidenceRedaction.policiesExistingSecret)))
   "evidenceBackends" (dict "metrics" .Values.telemetryEvidence.backend "logs" .Values.logEvidence.backend "kubernetesEvents" .Values.kubernetesEventEvidence.backend "context" .Values.contextEvidence.backend)
   "telemetry" (dict "metricsEnabled" .Values.telemetry.metricsEnabled "tracesEnabled" .Values.telemetry.tracesEnabled "endpointConfigured" (not (empty .Values.telemetry.otlpEndpoint)) "collectorQueueLossConfigured" (not (empty .Values.collectorQueueLoss.bindingJson)))
   "networkPolicy" (dict "enabled" .Values.networkPolicy.enabled "ingressController" .Values.networkPolicy.ingressController.enabled "databaseEgress" .Values.networkPolicy.databaseEgress.enabled "otlpEgress" .Values.networkPolicy.otlpEgress.enabled "prometheusEgress" .Values.networkPolicy.prometheusEgress.enabled "lokiEgress" .Values.networkPolicy.lokiEgress.enabled "opensearchEgress" .Values.networkPolicy.opensearchEgress.enabled "contextEgress" .Values.networkPolicy.contextEgress.enabled "kubernetesApiEgress" .Values.networkPolicy.kubernetesApiEgress.enabled "oidcEgress" .Values.networkPolicy.oidcEgress.enabled "policyEgress" .Values.networkPolicy.policyEgress.enabled "credentialBrokerEgress" .Values.networkPolicy.credentialBrokerEgress.enabled "otlpReceiverIngress" .Values.networkPolicy.otlpReceiverIngress.enabled)

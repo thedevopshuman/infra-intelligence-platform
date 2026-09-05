@@ -53,7 +53,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "infra-intelligence.fullname" . }}
-          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret .Values.telemetryEvidence.prometheus.credentialsExistingSecret .Values.logEvidence.loki.credentialsExistingSecret .Values.logEvidence.opensearch.credentialsExistingSecret .Values.kubernetesEventEvidence.credentialsExistingSecret .Values.kubernetesActions.credentialsExistingSecret .Values.contextEvidence.integrationsExistingSecret .Values.investigationSignalCatalog.existingSecret .Values.aiAllocationReporting.enabled }}
+          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret .Values.telemetryEvidence.prometheus.credentialsExistingSecret .Values.logEvidence.loki.credentialsExistingSecret .Values.logEvidence.opensearch.credentialsExistingSecret .Values.kubernetesEventEvidence.credentialsExistingSecret .Values.kubernetesActions.credentialsExistingSecret .Values.contextEvidence.integrationsExistingSecret .Values.investigationSignalCatalog.existingSecret .Values.evidenceRedaction.policiesExistingSecret .Values.aiAllocationReporting.enabled }}
           env:
             {{- if .Values.database.existingSecret }}
             - name: IIP_DATABASE_URL
@@ -131,6 +131,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.investigationSignalCatalog.existingSecret | quote }}
                   key: {{ .Values.investigationSignalCatalog.secretKey | quote }}
+            {{- end }}
+            {{- if .Values.evidenceRedaction.policiesExistingSecret }}
+            - name: IIP_EVIDENCE_REDACTION_POLICIES_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.evidenceRedaction.policiesExistingSecret | quote }}
+                  key: {{ .Values.evidenceRedaction.policiesSecretKey | quote }}
             {{- end }}
             {{- if .Values.aiAllocationReporting.enabled }}
             - name: IIP_AI_ATTRIBUTION_POLICIES_JSON

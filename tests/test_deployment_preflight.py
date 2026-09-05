@@ -33,8 +33,8 @@ def rendered_profile() -> dict[str, object]:
         "schemaVersion": "1",
         "chart": {
             "name": "infra-intelligence",
-            "version": "0.84.0",
-            "applicationVersion": "0.81.0",
+            "version": "0.85.0",
+            "applicationVersion": "0.82.0",
         },
         "image": {
             "repository": "registry.example.test/iip/control-plane",
@@ -61,6 +61,7 @@ def rendered_profile() -> dict[str, object]:
         },
         "backup": {"enabled": True, "destinationConfigured": True},
         "evidenceRetention": {"enabled": True},
+        "evidenceRedaction": {"customPoliciesConfigured": False},
         "evidenceBackends": {
             "metrics": "prometheus",
             "logs": "loki",

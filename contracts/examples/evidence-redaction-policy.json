@@ -1,0 +1,33 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "EvidenceRedactionPolicy",
+  "metadata": {
+    "id": "erp_8ad2ccb73bb70b8a87e7ed42d64bfd48",
+    "tenantId": "tenant-a",
+    "version": "2026-09-06.1"
+  },
+  "spec": {
+    "rules": [
+      {
+        "id": "context-personal-identifiers",
+        "evidenceTypes": [
+          "repository.context"
+        ],
+        "valueClasses": [
+          "email-address",
+          "ipv4-address"
+        ]
+      },
+      {
+        "id": "log-personal-identifiers",
+        "evidenceTypes": [
+          "telemetry.logs",
+          "telemetry.logs.push"
+        ],
+        "valueClasses": [
+          "email-address"
+        ]
+      }
+    ]
+  }
+}

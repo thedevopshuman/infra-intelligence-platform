@@ -30,6 +30,10 @@ _INTEGRATION = re.compile(r"[a-z][a-z0-9._-]{2,127}")
 _EVIDENCE_TYPE = re.compile(r"[a-z][a-z0-9._/-]{2,127}")
 _RESOURCE_UID = re.compile(r"res_[a-f0-9]{32}")
 _EVIDENCE_ID = re.compile(r"evd_[a-f0-9]{32}")
+_REDACTION_POLICY_ID = re.compile(r"erp_[a-f0-9]{32}")
+_REDACTION_POLICY_VERSION = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}[.][0-9]+"
+)
 _MEDIA_TYPE = re.compile(r"[^/\s]+/[^/\s]+")
 _REDACTION_METHOD = re.compile(r"[a-z][a-z0-9._-]{2,63}")
 _SENSITIVE_TEXT = re.compile(
@@ -195,6 +199,7 @@ class EvidenceCollectionService:
         try:
             redacted = self._redactor.redact(
                 artifact.content,
+                tenant_id=command.actor.tenant_id,
                 media_type=artifact.media_type,
                 evidence_type=command.evidence_type,
             )
@@ -221,6 +226,18 @@ class EvidenceCollectionService:
             or len(set(methods)) != len(methods)
         ):
             raise EvidenceRedactionError("evidence.redaction.invalid-metadata")
+        policy_id = redacted.policy_id
+        policy_version = redacted.policy_version
+        if (policy_id is None) != (policy_version is None) or (
+            policy_id is not None
+            and (
+                not isinstance(policy_id, str)
+                or _REDACTION_POLICY_ID.fullmatch(policy_id) is None
+                or not isinstance(policy_version, str)
+                or _REDACTION_POLICY_VERSION.fullmatch(policy_version) is None
+            )
+        ):
+            raise EvidenceRedactionError("evidence.redaction.invalid-metadata")
 
         recorded_at = self._now()
         self._enforce_deadline(recorded_at, deadline)
@@ -236,11 +253,17 @@ class EvidenceCollectionService:
             raise InvalidEvidenceRequestError("evidence.id.invalid")
 
         digest = "sha256:" + hashlib.sha256(redacted.content).hexdigest()
+        redaction: dict[str, object] = {
+            "status": "applied" if methods else "not-required",
+            "methods": list(methods),
+        }
+        if policy_id is not None:
+            redaction["policyRef"] = {
+                "id": policy_id,
+                "version": policy_version,
+            }
         handling: dict[str, object] = {
-            "redaction": {
-                "status": "applied" if methods else "not-required",
-                "methods": list(methods),
-            },
+            "redaction": redaction,
             "sensitivity": command.sensitivity,
             "retentionClass": command.retention_class,
         }

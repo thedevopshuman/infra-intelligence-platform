@@ -310,6 +310,7 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_EVIDENCE_RETENTION_STANDARD_SECONDS` | `2592000` | Default `standard` lifetime when Evidence has no explicit expiry |
 | `IIP_EVIDENCE_RETENTION_EXTENDED_SECONDS` | `31536000` | Default `extended` lifetime when Evidence has no explicit expiry |
 | `IIP_EVIDENCE_RETENTION_BATCH_SIZE` | `100` | Maximum artifact bodies expired per tenant pass |
+| `IIP_EVIDENCE_REDACTION_POLICIES_JSON` | unset | Protected, content-addressed exact-tenant wrapper for additive email/IPv4 Evidence detectors; mandatory credential redaction remains enabled |
 | `IIP_EVENT_PUBLISHER_MODE` | `disabled` | Transactional-outbox publisher; local `stdout-json` or production-oriented `https-webhook` are explicit opt-ins |
 | `IIP_EVENT_PUBLISHER_CONFIG_JSON` | unset | TLS endpoint, exact tenant IDs, mounted token/CA paths, and bounds for HTTPS publishing |
 | `IIP_OUTBOX_BATCH_SIZE` | `100` | Maximum outbox messages claimed for one tenant pass |

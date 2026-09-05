@@ -28,6 +28,7 @@ from .models import (
     ContextEvidenceRequest,
     ContextEvidenceResult,
     Evidence,
+    EvidenceRedactionPolicy,
     EvidenceRetentionReport,
     EventDeliveryReplayCommand,
     EventDeliveryHealthReport,
@@ -134,6 +135,7 @@ __all__ = [
     "ContextEvidenceRequest",
     "ContextEvidenceResult",
     "Evidence",
+    "EvidenceRedactionPolicy",
     "EvidenceRetentionReport",
     "EventDeliveryReplayCommand",
     "EventDeliveryHealthReport",
@@ -215,4 +217,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.57.0"
+__version__ = "0.58.0"

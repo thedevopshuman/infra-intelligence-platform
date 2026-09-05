@@ -263,6 +263,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/plugin-action-mediation-response.schema.json",
     "contracts/schemas/plugin-compatibility-report.schema.json",
     "contracts/schemas/evidence.schema.json",
+    "contracts/schemas/evidence-redaction-policy.schema.json",
     "contracts/schemas/evidence-retention-report.schema.json",
     "contracts/schemas/kubernetes-event-evidence-request.schema.json",
     "contracts/schemas/kubernetes-event-evidence-result.schema.json",
@@ -300,6 +301,8 @@ REQUIRED_PATHS = (
     "contracts/schemas/console-authentication.schema.json",
     "contracts/schemas/evaluation-scenario.schema.json",
     "contracts/examples/evidence.json",
+    "contracts/examples/evidence-redaction-policy.json",
+    "deploy/evidence-redaction-policies.example.json",
     "contracts/examples/ai-usage-record.json",
     "contracts/examples/ai-attribution-policy.json",
     "contracts/examples/ai-usage-attribution-record.json",
@@ -433,17 +436,22 @@ REQUIRED_PATHS = (
     "docs/specifications/ai-price-catalog-qualification-contract.md",
     "docs/specifications/aws-bedrock-price-catalog-import-contract.md",
     "docs/operations/aws-bedrock-price-catalog-import.md",
+    "docs/specifications/evidence-redaction-policy-contract.md",
+    "docs/operations/evidence-redaction.md",
     "docs/decisions/0111-qualified-expensive-model-anomaly.md",
     "docs/decisions/0112-minimized-ai-price-catalog-qualification.md",
     "docs/decisions/0113-runtime-ai-price-catalog-promotion.md",
     "docs/decisions/0114-exact-aws-bedrock-public-price-import.md",
+    "docs/decisions/0115-tenant-bound-additive-evidence-redaction.md",
     "scripts/import_aws_bedrock_price_catalog.py",
     "scripts/qualify_ai_price_catalog.py",
     "src/iip/adapters/aws_bedrock_price_catalog.py",
+    "src/iip/adapters/evidence_redaction.py",
     "src/iip/adapters/ai_price_catalog_qualifications.py",
     "src/iip/application/qualify_ai_price_catalog.py",
     "tests/test_ai_price_catalog_qualification.py",
     "tests/test_aws_bedrock_price_catalog_import.py",
+    "tests/test_evidence_redaction_policy.py",
     "tests/fixtures/aws-bedrock-price-list.json",
     "requirements/verify.in",
     "requirements/verify.txt",
@@ -4481,6 +4489,40 @@ def validate_ai_economics_examples(
         fail(errors, "AI attribution CloudEvent must omit usage, cost, and content data")
 
 
+def validate_evidence_redaction_policy_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Bind the public policy example to its protected deployment wrapper."""
+
+    policy = documents.get(
+        ROOT / "contracts" / "examples" / "evidence-redaction-policy.json"
+    )
+    wrapper = documents.get(ROOT / "deploy" / "evidence-redaction-policies.example.json")
+    if not isinstance(policy, dict) or not isinstance(wrapper, dict):
+        fail(errors, "evidence redaction policy examples must be objects")
+        return
+
+    from iip.adapters.evidence_redaction import (
+        EvidenceRedactionPolicyConfigurationError,
+        EvidenceRedactionPolicyRegistry,
+        validate_evidence_redaction_policy,
+    )
+
+    try:
+        validate_evidence_redaction_policy(policy)
+        registry = EvidenceRedactionPolicyRegistry.from_json(
+            json.dumps(wrapper, sort_keys=True, separators=(",", ":"))
+        )
+    except EvidenceRedactionPolicyConfigurationError as exc:
+        fail(errors, f"evidence redaction policy example is invalid: {exc}")
+        return
+    if registry.documents() != (policy,):
+        fail(
+            errors,
+            "deployment redaction policy wrapper must contain the canonical contract example",
+        )
+
+
 def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> None:
     from iip.domain.models import ContractError, Resource
 
@@ -4607,6 +4649,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("policy-decision-request.json", "PolicyDecisionRequest"),
         ("policy-decision.json", "PolicyDecision"),
         ("evidence.json", "Evidence"),
+        ("evidence-redaction-policy.json", "EvidenceRedactionPolicy"),
         ("context-evidence-request.json", "ContextEvidenceRequest"),
         ("context-evidence-result.json", "ContextEvidenceResult"),
         ("telemetry-evidence-request.json", "TelemetryEvidenceRequest"),
@@ -4700,6 +4743,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         manifest = documents.get(example_dir / name)
         validate_versioned_envelope(manifest, filename=name, kind=kind, errors=errors)
 
+    validate_evidence_redaction_policy_example(documents, errors)
     validate_collection_examples(documents, errors)
     validate_resource_query_examples(documents, errors)
     validate_kubernetes_event_evidence_examples(documents, errors)

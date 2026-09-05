@@ -60,6 +60,14 @@ The offline evaluation contract identifies instruction-shaped fixture evidence a
 
 Log bodies receive confidential handling by default and remain untrusted after redaction: retrieved or pushed text cannot grant authority or become instructions. OTLP channel credentials are independent of interactive control-plane identities, and channel configuration—not payload resource attributes—fixes tenant, integration, resource, service catalog, retention, and admission limits. The isolated mutual-TLS receiver binds one SPIFFE identity to that channel, supports an intermediate-issued client chain, rejects expired and CRL-revoked client certificates, and fails readiness plus intake when a configured CRL reaches `nextUpdate`; a newer CRL becomes authoritative only through a receiver rollout, while liveness remains non-secret and dependency-free.
 
+Every supported Evidence artifact receives non-configurable credential
+inspection before hashing and persistence. A reviewed
+`EvidenceRedactionPolicy` may add only bounded built-in detectors for exact
+evidence types in one authenticated tenant. It cannot turn off credential
+inspection, select another tenant, accept arbitrary regular expressions, or
+rewrite previously committed Evidence. Policy ID and version provide minimized
+provenance without exposing matched values or rules.
+
 ## Plugin threats
 
 Plugins are signed artifacts with immutable version and digest, explicit network/secret/resource/action permissions, protocol compatibility, resource limits, and an audit identity. Default execution is out-of-process. A crash, timeout, or malformed response fails the capability closed without destabilizing the control plane.

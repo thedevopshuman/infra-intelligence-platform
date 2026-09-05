@@ -6,6 +6,13 @@ The chart can install the control-plane API against an existing PostgreSQL datab
 
 Reviewed automatic investigation candidates are optional. Set `investigationSignalCatalog.existingSecret` and `secretKey` to project the same tenant-bound [signal catalog](investigation-signal-catalog.md) into the API and worker. The chart never renders the catalog body into a ConfigMap or values-derived manifest.
 
+Additional tenant privacy detectors are optional. Set
+`evidenceRedaction.policiesExistingSecret` and `policiesSecretKey` to project
+one protected, content-addressed [redaction policy set](evidence-redaction.md)
+into the API, worker, and isolated receiver. Invalid configuration prevents a
+process from serving; omitting it disables only the optional email/IPv4
+detectors and never disables mandatory credential redaction.
+
 Protected repository context is optional and disabled by default. The
 `production-github-context.values.yaml` overlay selects immutable-revision
 GitHub reads, projects the allowlist and private CA from existing protected
@@ -244,7 +251,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.81.0
+  tag: 0.82.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -407,7 +414,7 @@ To test the actual packaged release chart and attested OCI archive instead of
 checkout artifacts, first build the release bundle and then run:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.81.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.82.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -416,7 +423,7 @@ and the explicit prior release revision. Equal latest migrations are allowed;
 a migration regression is not:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.81.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.82.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```

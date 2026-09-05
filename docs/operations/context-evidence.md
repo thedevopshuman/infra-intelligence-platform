@@ -24,7 +24,7 @@ Ingest the canonical resource example, then update the request timestamps/deadli
 
 Set `contextEvidence.backend=files`, place the catalog JSON in a Secret key, set `contextEvidence.integrationsExistingSecret`, and mount the cataloged documents through `contextEvidence.documentsExistingConfigMap`. Every configured `root` must equal or contain the chart mount path. Large or frequently changing repositories should use the protected GitHub adapter below or an immutable synchronized volume instead of a ConfigMap.
 
-Do not put repository credentials, secrets, private keys, tokens, or sensitive configuration values in the catalog JSON or example documents. The adapter performs mandatory text redaction, but prevention and least-privilege source access remain primary controls.
+Do not put repository credentials, secrets, private keys, tokens, or sensitive configuration values in the catalog JSON or example documents. The adapter performs mandatory text redaction, but prevention and least-privilege source access remain primary controls. A reviewed [tenant redaction policy](evidence-redaction.md) can additionally remove email and validated IPv4 values from `repository.context`; it does not make unrestricted repository ingestion safe.
 
 ## Protected GitHub repository reads
 

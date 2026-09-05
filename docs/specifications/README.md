@@ -52,6 +52,7 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | Error | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/error.schema.json` | `contracts/examples/error.json` |
 | Event | [event-contract.md](event-contract.md) | `contracts/schemas/event.schema.json` | `contracts/examples/event.json`, `contracts/examples/ai-usage-recorded-event.json`, `contracts/examples/ai-usage-attributed-event.json`, `contracts/examples/ai-cost-calculated-event.json`, `contracts/examples/ai-savings-finding-event.json`, `contracts/examples/ai-retry-savings-finding-event.json` |
 | Evidence | [evidence-contract.md](evidence-contract.md) | `contracts/schemas/evidence.schema.json` | `contracts/examples/evidence.json` |
+| Evidence redaction policy | [evidence-redaction-policy-contract.md](evidence-redaction-policy-contract.md) | `contracts/schemas/evidence-redaction-policy.schema.json` | `contracts/examples/evidence-redaction-policy.json` |
 | AI usage record | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-usage-record.schema.json` | `contracts/examples/ai-usage-record.json` |
 | AI attribution policy | [ai-attribution-contracts.md](ai-attribution-contracts.md) | `contracts/schemas/ai-attribution-policy.schema.json` | `contracts/examples/ai-attribution-policy.json` |
 | AI usage attribution record | [ai-attribution-contracts.md](ai-attribution-contracts.md) | `contracts/schemas/ai-usage-attribution-record.schema.json` | `contracts/examples/ai-usage-attribution-record.json` |

@@ -98,7 +98,7 @@ The configured resource must already exist in the bound tenant. Each payload mus
 
 Each protected channel fixes request/artifact bytes, record count, mapped attributes, body bytes, record age, future skew, and processing time. Configure smaller values than the platform maxima wherever possible.
 
-String bodies may contain secrets or hostile instructions. They are treated as confidential untrusted text and redacted before hashing/persistence. Do not route unrestricted production logs into this receiver. Use a Collector to filter service pipelines and inject the channel authorization header outside application workloads.
+String bodies may contain secrets or hostile instructions. They are treated as confidential untrusted text and redacted before hashing/persistence. A reviewed [tenant redaction policy](evidence-redaction.md) can additionally remove email and validated IPv4 values from the exact configured log evidence type. Do not route unrestricted production logs into this receiver. Use a Collector to filter service pipelines and inject the channel authorization header outside application workloads.
 
 Metrics and logs share a dedicated OTLP intake process, not the control-plane
 listener. The production profile requires both a CA-verified SPIFFE client

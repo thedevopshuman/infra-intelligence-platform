@@ -7,7 +7,7 @@ apiTermination:
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.81.0"
+  tag: "0.82.0"
   digest: ""
 
 worker:
@@ -107,6 +107,10 @@ evidenceRetention:
   standardSeconds: 2592000
   extendedSeconds: 31536000
   batchSize: 100
+
+evidenceRedaction:
+  policiesExistingSecret: ""
+  policiesSecretKey: evidence-redaction-policies-json
 
 queryAvailabilitySlo:
   windowSeconds: 3600

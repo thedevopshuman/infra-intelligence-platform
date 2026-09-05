@@ -291,6 +291,7 @@ class ContextEvidenceProvider:
             try:
                 inspected = self._redactor.redact(
                     excerpt.encode("utf-8"),
+                    tenant_id=request.tenant_id,
                     media_type="text/plain; charset=utf-8",
                     evidence_type="repository.context",
                 )

@@ -125,6 +125,8 @@ class LocalStackConfigurationTests(unittest.TestCase):
         compose = local_stack.COMPOSE_PATH.read_text(encoding="utf-8")
         api, worker = compose.split("  workflow-worker:", maxsplit=1)
 
+        self.assertIn("IIP_EVIDENCE_REDACTION_POLICIES_JSON", api)
+        self.assertIn("IIP_EVIDENCE_REDACTION_POLICIES_JSON", worker)
         self.assertNotIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", api)
         self.assertIn(
             "IIP_AI_ATTRIBUTION_ENABLED: ${IIP_AI_ATTRIBUTION_ENABLED:-false}",

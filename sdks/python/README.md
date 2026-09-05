@@ -9,7 +9,7 @@ client = Client("http://localhost:8080", bearer_token=token)
 accepted = client.ingest_resource(ResourceObservation.from_dict(payload))
 ```
 
-`Evidence`, `InvestigationRequest`, and `InvestigationReport` expose the corresponding `v1alpha1` public envelopes without importing server implementation classes. `run_investigation`, `get_investigation`, and `get_evidence` use the executable reference API.
+`Evidence`, `EvidenceRedactionPolicy`, `InvestigationRequest`, and `InvestigationReport` expose the corresponding `v1alpha1` public envelopes without importing server implementation classes. The redaction policy type supports protected configuration tooling only; there is no API that lets a caller install or select a tenant policy. `run_investigation`, `get_investigation`, and `get_evidence` use the executable reference API.
 
 `InvestigationSignalCatalog` models protected tenant profile documents for configuration tooling. `InvestigationRequest.catalog_snapshot` reads server-owned profile and resolved-subset provenance from an accepted request; clients must not populate that field when submitting work. Report `signalPlan` entries identify request versus protected-catalog origin without exposing protected query configuration. `InvestigationReport.signal_promotions` returns typed `InvestigationSignalPromotion` provenance when one accepted candidate was promoted after a provider gap; fixed plans return an empty tuple.
 
@@ -94,6 +94,10 @@ instrumentation SDK.
 Version 0.56 adds protected AI price-catalog qualification policy and minimized
 report envelopes. These types add no provider pricing client, promotion API, or
 access to negotiated rates.
+
+Version 0.58 adds the protected `EvidenceRedactionPolicy` envelope and optional
+Evidence policy provenance. It adds no policy installation method, arbitrary
+detector expression, or ability to disable mandatory credential redaction.
 
 Version 0.47 adds protected attribution-policy and immutable usage-attribution
 record models. It does not let clients install policies or self-assign

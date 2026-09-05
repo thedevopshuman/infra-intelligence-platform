@@ -118,6 +118,7 @@ EXPECTED_PROFILE_KEYS = frozenset(
         "ingress",
         "backup",
         "evidenceRetention",
+        "evidenceRedaction",
         "evidenceBackends",
         "telemetry",
         "networkPolicy",
@@ -354,6 +355,7 @@ def _validate_rendered_profile(profile: Mapping[str, Any]) -> None:
         ("ingress", ("enabled", "classConfigured", "hostConfigured", "tlsConfigured", "redirectConfigured")),
         ("backup", ("enabled", "destinationConfigured")),
         ("evidenceRetention", ("enabled",)),
+        ("evidenceRedaction", ("customPoliciesConfigured",)),
         ("telemetry", ("metricsEnabled", "tracesEnabled", "endpointConfigured", "collectorQueueLossConfigured")),
         (
             "networkPolicy",

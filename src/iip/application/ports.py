@@ -488,6 +488,8 @@ class EvidenceRedactionResult:
 
     content: bytes
     methods: tuple[str, ...]
+    policy_id: Optional[str] = None
+    policy_version: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -1195,6 +1197,7 @@ class EvidenceRedactor(Protocol):
         self,
         content: bytes,
         *,
+        tenant_id: str,
         media_type: str,
         evidence_type: str,
     ) -> EvidenceRedactionResult:

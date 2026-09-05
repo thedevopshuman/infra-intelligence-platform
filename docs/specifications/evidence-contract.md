@@ -37,6 +37,14 @@ The normalized `summary` is for retrieval and display. It cannot replace the art
 
 Redaction occurs before hashing and persistence. `redaction.status` is `applied` when one or more declared methods transformed the artifact, or `not-required` when policy determined that no transformation was needed. Credentials and raw secrets are prohibited regardless of status.
 
+Mandatory credential detectors cannot be disabled. When a reviewed
+[tenant evidence-redaction policy](evidence-redaction-policy-contract.md) is
+configured, the application selects it from authenticated tenant context and
+may apply additional bounded detectors for the exact evidence type. The
+optional `redaction.policyRef` records only the selected content-derived policy
+ID and reviewed version; it is present even when no optional detector matched.
+Existing Evidence is never rewritten after policy rotation.
+
 Sensitivity and retention class are policy inputs, not self-authorizing labels. Reading an evidence record or artifact requires tenant, actor, resource-scope, and sensitivity checks. Expiry makes the artifact unavailable under the [retention contract](evidence-retention-contract.md) but does not silently rewrite historical report citations; consumers surface an unavailable-evidence state. An explicit `expiresAt` overrides the class duration, while `legal-hold` always prevents automatic artifact deletion.
 
 ## Validation invariants

@@ -747,6 +747,26 @@ class Evidence:
 
 
 @dataclass(frozen=True)
+class EvidenceRedactionPolicy:
+    """Protected exact-tenant additive evidence privacy policy."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "EvidenceRedactionPolicy":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="EvidenceRedactionPolicy",
+                label="evidence redaction policy",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class TelemetryEvidenceRequest:
     """Bounded backend-neutral request for tenant-scoped metric evidence."""
 

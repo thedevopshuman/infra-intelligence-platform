@@ -274,6 +274,26 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             self.assertIn("investigationSignalCatalog.existingSecret", template)
             self.assertIn("investigationSignalCatalog.secretKey", template)
 
+    def test_tenant_redaction_policies_reach_every_evidence_producer(self) -> None:
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+        profile = (
+            CHART / "templates" / "deployment-profile.yaml"
+        ).read_text(encoding="utf-8")
+        workloads = (
+            CHART / "templates" / "deployment.yaml",
+            CHART / "templates" / "worker-deployment.yaml",
+            CHART / "templates" / "otlp-receiver-deployment.yaml",
+        )
+        self.assertIn("evidenceRedaction:", values)
+        self.assertIn("policiesExistingSecret", values)
+        self.assertIn("evidence-redaction-policies", profile)
+        for path in workloads:
+            with self.subTest(workload=path.name):
+                template = path.read_text(encoding="utf-8")
+                self.assertIn("IIP_EVIDENCE_REDACTION_POLICIES_JSON", template)
+                self.assertIn("evidenceRedaction.policiesExistingSecret", template)
+                self.assertIn("evidenceRedaction.policiesSecretKey", template)
+
     def test_github_context_is_secret_broker_and_egress_bounded(self) -> None:
         api = (CHART / "templates" / "deployment.yaml").read_text(encoding="utf-8")
         worker = (CHART / "templates" / "worker-deployment.yaml").read_text(

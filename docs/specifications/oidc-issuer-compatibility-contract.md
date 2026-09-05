@@ -4,7 +4,7 @@
 
 **Machine contract:** `contracts/schemas/oidc-issuer-compatibility-report.schema.json`
 
-This report is executable, source-bound evidence that the production-facing OIDC/JWKS authenticator satisfies the repository's local real-TLS RS256 profile. `make test-oidc` generates it outside the control-plane API by exercising the shipped verifier against a disposable public-JWKS fixture in Docker. Private signing keys remain on the host and exist only for the duration of the test.
+This report is executable, source-bound evidence that the production-facing OIDC/JWKS authenticator satisfies the repository's local real-TLS RS256 profile. `make test-oidc-verifier` generates it outside the control-plane API by exercising the shipped verifier against a disposable public-JWKS fixture in Docker. `make test-oidc` runs this profile and the separate browser-flow profile. Private signing keys remain on the host and exist only for the duration of the test.
 
 The closed profile verifies CA-trusted HTTPS, untrusted-CA and redirect denial, RS256-only validation, exact issuer/audience/time/claim handling, tenant/actor/role derivation, rejection of untrusted header indirection, minimized `S256` PKCE discovery, bounded JWKS caching and refresh throttling, key rotation without restart, removed-key denial, fail-closed behavior after an expired cache during issuer outage, recovery, and secret-free evidence. Check order and identifiers are fixed for release automation.
 

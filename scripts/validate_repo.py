@@ -223,6 +223,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/credential-lease.schema.json",
     "contracts/schemas/credential-broker-compatibility-report.schema.json",
     "contracts/schemas/oidc-issuer-compatibility-report.schema.json",
+    "contracts/schemas/oidc-browser-compatibility-report.schema.json",
     "contracts/schemas/policy-engine-compatibility-report.schema.json",
     "contracts/schemas/otlp-receiver-compatibility-report.schema.json",
     "contracts/schemas/bedrock-instrumentation-compatibility-report.schema.json",
@@ -324,6 +325,7 @@ REQUIRED_PATHS = (
     "contracts/examples/credential-lease.json",
     "contracts/examples/credential-broker-compatibility-report.json",
     "contracts/examples/oidc-issuer-compatibility-report.json",
+    "contracts/examples/oidc-browser-compatibility-report.json",
     "contracts/examples/policy-engine-compatibility-report.json",
     "contracts/examples/otlp-receiver-compatibility-report.json",
     "contracts/examples/kubernetes-event-evidence-request.json",
@@ -437,12 +439,14 @@ REQUIRED_PATHS = (
     "docs/specifications/aws-bedrock-price-catalog-import-contract.md",
     "docs/operations/aws-bedrock-price-catalog-import.md",
     "docs/specifications/evidence-redaction-policy-contract.md",
+    "docs/specifications/oidc-browser-compatibility-contract.md",
     "docs/operations/evidence-redaction.md",
     "docs/decisions/0111-qualified-expensive-model-anomaly.md",
     "docs/decisions/0112-minimized-ai-price-catalog-qualification.md",
     "docs/decisions/0113-runtime-ai-price-catalog-promotion.md",
     "docs/decisions/0114-exact-aws-bedrock-public-price-import.md",
     "docs/decisions/0115-tenant-bound-additive-evidence-redaction.md",
+    "docs/decisions/0116-executable-oidc-browser-pkce-evidence.md",
     "scripts/import_aws_bedrock_price_catalog.py",
     "scripts/qualify_ai_price_catalog.py",
     "src/iip/adapters/aws_bedrock_price_catalog.py",
@@ -553,6 +557,7 @@ REQUIRED_PATHS = (
     "scripts/test_capacity.sh",
     "scripts/run_credential_broker_compatibility.py",
     "scripts/run_oidc_issuer_compatibility.py",
+    "scripts/run_oidc_browser_compatibility.py",
     "scripts/run_policy_engine_compatibility.py",
     "scripts/write_otlp_receiver_compatibility_report.py",
     "scripts/compatibility_tls.py",
@@ -564,6 +569,7 @@ REQUIRED_PATHS = (
     "tests/fixtures/policy_engine_fixture.py",
     "tests/test_credential_broker_compatibility.py",
     "tests/test_oidc_issuer_compatibility.py",
+    "tests/test_oidc_browser_compatibility.py",
     "tests/test_policy_engine_compatibility.py",
     "tests/test_otlp_receiver_compatibility.py",
     "sdks/typescript/package-lock.json",
@@ -1153,6 +1159,108 @@ def validate_oidc_issuer_compatibility_example(
         / "oidc-issuer-compatibility-report.json"
     )
     validate_oidc_issuer_compatibility_document(documents.get(path), errors)
+
+
+OIDC_BROWSER_COMPATIBILITY_CHECKS = (
+    "ca-verified-browser-endpoints",
+    "exact-authorization-request",
+    "s256-required",
+    "redirect-state-issuer-binding",
+    "token-preflight-cors",
+    "exact-origin-enforcement",
+    "public-client-no-secret-or-cookie",
+    "s256-token-exchange",
+    "wrong-verifier-denial",
+    "authorization-code-replay-denial",
+    "exchanged-token-authentication",
+    "secret-redaction",
+)
+
+
+def validate_oidc_browser_compatibility_document(
+    report: object, errors: List[str]
+) -> None:
+    """Check the closed browser profile, summary, and content identity."""
+
+    if not isinstance(report, dict):
+        fail(errors, "OIDC browser compatibility report must be an object")
+        return
+    metadata = report.get("metadata")
+    spec = report.get("spec")
+    checks = spec.get("checks") if isinstance(spec, dict) else None
+    summary = spec.get("summary") if isinstance(spec, dict) else None
+    if (
+        not isinstance(metadata, dict)
+        or not isinstance(spec, dict)
+        or not isinstance(checks, list)
+        or not isinstance(summary, dict)
+    ):
+        fail(
+            errors,
+            "OIDC browser compatibility report must contain metadata, checks, and summary",
+        )
+        return
+    check_ids = tuple(
+        check.get("id") if isinstance(check, dict) else None for check in checks
+    )
+    if check_ids != OIDC_BROWSER_COMPATIBILITY_CHECKS:
+        fail(
+            errors,
+            "OIDC browser compatibility checks must match the closed profile",
+        )
+    passed = sum(
+        1
+        for check in checks
+        if isinstance(check, dict)
+        and check.get("status") == "passed"
+        and "errorCode" not in check
+    )
+    failed = len(checks) - passed
+    status = "compatible" if failed == 0 else "incompatible"
+    if spec.get("status") != status:
+        fail(errors, "OIDC browser compatibility status must match its checks")
+    if summary != {
+        "totalChecks": len(checks),
+        "passedChecks": passed,
+        "failedChecks": failed,
+        "overallStatus": status,
+    }:
+        fail(errors, "OIDC browser compatibility summary must match its checks")
+    required_identity = (
+        "sourceRevision",
+        "sourceDirty",
+    )
+    environment = spec.get("environment")
+    profile = spec.get("profile")
+    if (
+        any(key not in metadata for key in required_identity)
+        or not isinstance(environment, dict)
+        or not isinstance(profile, dict)
+    ):
+        fail(errors, "OIDC browser compatibility identity inputs are invalid")
+        return
+    identity = {
+        "sourceRevision": metadata["sourceRevision"],
+        "sourceDirty": metadata["sourceDirty"],
+        "environment": environment,
+        "profile": profile,
+        "checks": checks,
+    }
+    expected = "obc_" + canonical_digest(identity)[7:39]
+    if metadata.get("id") != expected:
+        fail(errors, "OIDC browser compatibility ID must match its content")
+
+
+def validate_oidc_browser_compatibility_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "oidc-browser-compatibility-report.json"
+    )
+    validate_oidc_browser_compatibility_document(documents.get(path), errors)
 
 
 POLICY_ENGINE_COMPATIBILITY_CHECKS = (
@@ -4713,6 +4821,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "OidcIssuerCompatibilityReport",
         ),
         (
+            "oidc-browser-compatibility-report.json",
+            "OidcBrowserCompatibilityReport",
+        ),
+        (
             "policy-engine-compatibility-report.json",
             "PolicyEngineCompatibilityReport",
         ),
@@ -4764,6 +4876,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_plugin_compatibility_example(documents, errors)
     validate_credential_broker_compatibility_example(documents, errors)
     validate_oidc_issuer_compatibility_example(documents, errors)
+    validate_oidc_browser_compatibility_example(documents, errors)
     validate_policy_engine_compatibility_example(documents, errors)
     validate_github_context_compatibility_example(documents, errors)
     validate_otlp_receiver_compatibility_example(documents, errors)

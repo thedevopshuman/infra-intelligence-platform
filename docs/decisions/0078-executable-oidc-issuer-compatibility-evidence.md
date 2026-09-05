@@ -14,7 +14,7 @@ Add a disposable Docker JWKS fixture and closed `local-oidc-rs256-jwks-v1` compa
 
 Exercise the shipped HTTPS transport and OIDC authenticator. Prove CA verification, stable denial for untrusted trust roots and redirects, exact RS256/issuer/audience/time/claim enforcement, tenant/actor/role derivation, algorithm/header-indirection denial, public PKCE discovery minimization, one-fetch cache behavior, unknown-key refresh throttling, rotation without process restart, removed-key denial, outage failure after cache expiry, recovery, and secret-free evidence. Use a deterministic monotonic clock only to cross the accepted five-second refresh and 30-second cache boundaries without sleeping; network and TLS remain real.
 
-Emit a closed report bound to source revision, dirty state, application/runtime identity, and Docker server. Keep the fixture out of bootstrap, Helm, public APIs, and SDKs. It serves no authorization or token endpoint and is not an identity provider.
+Emit a closed report bound to source revision, dirty state, application/runtime identity, and Docker server. Keep the fixture out of bootstrap, Helm, public APIs, and SDKs. This `v1` profile exercises no authorization or token endpoint and is not an identity provider. [ADR 0116](0116-executable-oidc-browser-pkce-evidence.md) later adds a separate report and runner for strict fixture-only browser endpoints without changing this verifier profile.
 
 ## Consequences
 

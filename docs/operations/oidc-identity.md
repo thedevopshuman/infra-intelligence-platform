@@ -1,6 +1,6 @@
 # OIDC identity-provider qualification
 
-**Status:** Executable verifier profile; customer issuer qualification required
+**Status:** Executable verifier and browser-flow profiles; customer issuer qualification required
 
 The production-facing authenticator verifies RS256 access tokens against one explicitly configured HTTPS JWKS endpoint and derives actor, tenant, and roles only from signed claims. The optional browser profile exposes non-secret Authorization Code + `S256` PKCE discovery; the platform never holds an OAuth client secret, refresh token, identity-provider password, or server session.
 
@@ -12,9 +12,39 @@ Run the real-transport profile with Docker Desktop:
 make test-oidc
 ```
 
-The target generates a one-hour CA/server chain and two ephemeral RSA signing generations, keeps private signing keys on the host, and starts a non-root read-only public-JWKS fixture over HTTPS. It exercises the shipped verifier and writes `dist/oidc-issuer-compatibility-report.json` before removing the isolated Compose project.
+The target runs two separate profiles. The verifier profile generates a
+one-hour CA/server chain and two ephemeral RSA signing generations, keeps
+private signing keys on the host, and starts a non-root read-only public-JWKS
+fixture over HTTPS. It writes
+`dist/oidc-issuer-compatibility-report.json`.
 
-The closed profile verifies CA trust and untrusted-CA denial, redirect refusal, RS256 and header restrictions, exact issuer/audience/time/claim checks, tenant/actor/role derivation, minimized PKCE discovery, JWKS caching and refresh throttling, live key rotation, removed-key denial, expired-cache outage behavior, recovery, and secret-free evidence. The fixture serves no authorization or token endpoint and is not an identity provider.
+The closed verifier profile proves CA trust and untrusted-CA denial, redirect
+refusal, RS256 and header restrictions, exact issuer/audience/time/claim checks,
+tenant/actor/role derivation, minimized PKCE discovery, JWKS caching and refresh
+throttling, live key rotation, removed-key denial, expired-cache outage
+behavior, recovery, and secret-free evidence.
+
+The separate browser profile enables strict fixture-only `/authorize` and
+`/token` endpoints and writes
+`dist/oidc-browser-compatibility-report.json`. It drives those endpoints from
+the runtime's public discovery document, inspects the redirect without
+following it, and proves:
+
+- the exact public client, scope, redirect, state, issuer, and `S256` request;
+- exact-origin preflight and token-response CORS without credentialed CORS;
+- no client secret, cookie, refresh token, or ID token dependence;
+- wrong-verifier, other-origin, and consumed-code replay denial; and
+- verification of the exchanged access token through the shipped API
+  authenticator.
+
+Each browser run receives a host-signed ephemeral access token, but the
+container receives no RSA private signing key. Authorization codes, PKCE
+material, state, tokens, identity, endpoints, and origins are absent from both
+reports and the fixture audit. Both Compose projects are removed after their
+profile finishes.
+
+Run one boundary alone while developing with `make test-oidc-verifier` or
+`make test-oidc-browser`. The fixture is still not a general identity provider.
 
 ## Customer qualification
 

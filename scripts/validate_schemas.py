@@ -208,6 +208,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "oidc-issuer-compatibility-report.schema.json": (
         "oidc-issuer-compatibility-report.json",
     ),
+    "oidc-browser-compatibility-report.schema.json": (
+        "oidc-browser-compatibility-report.json",
+    ),
     "telemetry-evidence-request.schema.json": ("telemetry-evidence-request.json",),
     "telemetry-evidence-result.schema.json": ("telemetry-evidence-result.json",),
     "plugin-manifest.schema.json": ("plugin-manifest.json",),

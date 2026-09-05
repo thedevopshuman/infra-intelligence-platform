@@ -1,0 +1,51 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "OidcBrowserCompatibilityReport",
+  "metadata": {
+    "id": "obc_4a9d23f654696d1996403a0742ebbe94",
+    "generatedAt": "2026-09-06T00:00:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "compatible",
+    "environment": {
+      "platform": "linux/arm64",
+      "containerRuntime": "docker",
+      "containerRuntimeVersion": "29.1.3",
+      "pythonVersion": "3.12.12",
+      "applicationVersion": "0.83.0"
+    },
+    "profile": {
+      "name": "local-oidc-browser-pkce-v1",
+      "flow": "authorization-code",
+      "pkceMethod": "S256",
+      "responseMode": "query",
+      "tokenEndpointAuthentication": "none",
+      "redirectProfile": "exact-loopback-console",
+      "corsProfile": "exact-console-origin",
+      "authorizationCodeLifetimeSeconds": 120,
+      "maximumOutstandingAuthorizationCodes": 128
+    },
+    "checks": [
+      {"id": "ca-verified-browser-endpoints", "status": "passed"},
+      {"id": "exact-authorization-request", "status": "passed"},
+      {"id": "s256-required", "status": "passed"},
+      {"id": "redirect-state-issuer-binding", "status": "passed"},
+      {"id": "token-preflight-cors", "status": "passed"},
+      {"id": "exact-origin-enforcement", "status": "passed"},
+      {"id": "public-client-no-secret-or-cookie", "status": "passed"},
+      {"id": "s256-token-exchange", "status": "passed"},
+      {"id": "wrong-verifier-denial", "status": "passed"},
+      {"id": "authorization-code-replay-denial", "status": "passed"},
+      {"id": "exchanged-token-authentication", "status": "passed"},
+      {"id": "secret-redaction", "status": "passed"}
+    ],
+    "summary": {
+      "totalChecks": 12,
+      "passedChecks": 12,
+      "failedChecks": 0,
+      "overallStatus": "compatible"
+    }
+  }
+}

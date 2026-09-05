@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:oidc-browser-compatibility-report:v1alpha1",
+  "title": "OIDC Browser Compatibility Report",
+  "description": "Source-bound real-TLS evidence for the console's public Authorization Code and S256 PKCE boundary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "OidcBrowserCompatibilityReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^obc_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "environment", "profile", "checks", "summary"],
+      "properties": {
+        "status": {"enum": ["compatible", "incompatible"]},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["platform", "containerRuntime", "containerRuntimeVersion", "pythonVersion", "applicationVersion"],
+          "properties": {
+            "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+            "containerRuntime": {"const": "docker"},
+            "containerRuntimeVersion": {"type": "string", "minLength": 1, "maxLength": 64},
+            "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+            "applicationVersion": {"$ref": "#/$defs/semver"}
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "flow", "pkceMethod", "responseMode", "tokenEndpointAuthentication", "redirectProfile", "corsProfile", "authorizationCodeLifetimeSeconds", "maximumOutstandingAuthorizationCodes"],
+          "properties": {
+            "name": {"const": "local-oidc-browser-pkce-v1"},
+            "flow": {"const": "authorization-code"},
+            "pkceMethod": {"const": "S256"},
+            "responseMode": {"const": "query"},
+            "tokenEndpointAuthentication": {"const": "none"},
+            "redirectProfile": {"const": "exact-loopback-console"},
+            "corsProfile": {"const": "exact-console-origin"},
+            "authorizationCodeLifetimeSeconds": {"const": 120},
+            "maximumOutstandingAuthorizationCodes": {"const": 128}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "prefixItems": [
+            {"$ref": "#/$defs/caVerifiedEndpointsCheck"},
+            {"$ref": "#/$defs/exactAuthorizationRequestCheck"},
+            {"$ref": "#/$defs/s256RequiredCheck"},
+            {"$ref": "#/$defs/redirectBindingCheck"},
+            {"$ref": "#/$defs/preflightCorsCheck"},
+            {"$ref": "#/$defs/originEnforcementCheck"},
+            {"$ref": "#/$defs/publicClientCheck"},
+            {"$ref": "#/$defs/tokenExchangeCheck"},
+            {"$ref": "#/$defs/wrongVerifierCheck"},
+            {"$ref": "#/$defs/codeReplayCheck"},
+            {"$ref": "#/$defs/tokenAuthenticationCheck"},
+            {"$ref": "#/$defs/secretRedactionCheck"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 12},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 12},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 12},
+            "overallStatus": {"enum": ["compatible", "incompatible"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "caVerifiedEndpointsCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "ca-verified-browser-endpoints"}}}]},
+    "exactAuthorizationRequestCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "exact-authorization-request"}}}]},
+    "s256RequiredCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "s256-required"}}}]},
+    "redirectBindingCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "redirect-state-issuer-binding"}}}]},
+    "preflightCorsCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "token-preflight-cors"}}}]},
+    "originEnforcementCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "exact-origin-enforcement"}}}]},
+    "publicClientCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "public-client-no-secret-or-cookie"}}}]},
+    "tokenExchangeCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "s256-token-exchange"}}}]},
+    "wrongVerifierCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "wrong-verifier-denial"}}}]},
+    "codeReplayCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "authorization-code-replay-denial"}}}]},
+    "tokenAuthenticationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "exchanged-token-authentication"}}}]},
+    "secretRedactionCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "secret-redaction"}}}]}
+  }
+}

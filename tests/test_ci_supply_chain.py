@@ -14,7 +14,7 @@ class CiSupplyChainTests(unittest.TestCase):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         action_references = re.findall(r"^\s*- uses: ([^\s#]+)", workflow, re.M)
 
-        self.assertEqual(len(action_references), 11)
+        self.assertEqual(len(action_references), 13)
         for reference in action_references:
             with self.subTest(reference=reference):
                 self.assertRegex(reference, r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[a-f0-9]{40}$")

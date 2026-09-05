@@ -500,6 +500,10 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn("build --provenance=false", script)
         self.assertIn('IIP_IMAGE_VERSION=$IIP_APP_VERSION', script)
         self.assertIn("IIP_IMAGE_REVISION=development", script)
+        self.assertIn('scripts/release_bundle.py verify "$IIP_RELEASE_BUNDLE"', script)
+        self.assertIn('"$IIP_DOCKER_BIN" load --input', script)
+        self.assertIn("IIP_EXPECTED_BUILD_MODE=release", script)
+        self.assertIn("Release bundle revision does not match", script)
         self.assertIn("ctr -n k8s.io images tag --force", script)
         self.assertIn('basename "$IIP_EXPECTED_MIGRATION"', script)
         self.assertNotIn('basename "$IIP_EXPECTED_MIGRATION" .sql', script)
@@ -545,7 +549,9 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             ),
             2,
         )
-        self.assertIn("iip-local-platform@$IIP_TEST_IMAGE_DIGEST", script)
+        self.assertIn(
+            "$IIP_TEST_IMAGE_REPOSITORY@$IIP_TEST_IMAGE_DIGEST", script
+        )
         self.assertIn("--set ingress.tls.existingSecret=iip-tls", script)
         self.assertIn("--set backup.destination.existingClaim=iip-backups", script)
         self.assertIn("--from=cronjob/iip-infra-intelligence-backup", script)

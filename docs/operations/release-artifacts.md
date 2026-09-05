@@ -50,6 +50,25 @@ IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.66.0-0123456789ab \
 
 Verification does not trust the manifest by itself. It recalculates each byte length and SHA-256 digest, compares the exact checksum file, traverses both content-addressed OCI descriptor graphs, matches declared platform digests, requires the same platform set, and requires both accepted attestation predicates per platform. A current bundle with a missing bridge, modified artifact, omitted platform, missing SBOM, missing provenance statement, or rewritten manifest fails closed with a stable release error.
 
+## Install the packaged candidate locally
+
+After verification, prove that the packaged chart and OCI image—not checkout
+copies—install on the explicit local Kind cluster:
+
+```bash
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.66.0-0123456789ab \
+  make test-release-install PYTHON=.venv/bin/python
+```
+
+The gate verifies the bundle again, requires its source revision to match the
+checked-out gate, loads the host-platform image from the OCI archive, and
+deploys the packaged chart by immutable release index digest. The authenticated
+runtime report must identify release mode, the exact source revision, chart
+version, image digest, and latest migration. It then repeats the two-revision
+Helm, TLS ingress, backup, checksum, and isolated restore checks used by the
+source-install gate. It refuses non-Kind contexts and removes its disposable
+namespace unless explicitly retained for debugging.
+
 ## Production promotion boundary
 
 The local bundle is explicitly unsigned. It proves artifact integrity and build evidence, not who published it. Once repository hosting and organizational release identity are accepted, production promotion must:

@@ -335,7 +335,31 @@ With Docker Desktop and the explicit `kind-iip-dev` context available, run:
 make test-helm-install
 ```
 
-The gate builds and loads the current image, registers its exact host-platform digest on every disposable kind node, creates an exact-name namespace and PostgreSQL instance, installs the chart with migrations enabled, verifies the hook applied the latest packaged migration, and proves API readiness from inside the pod. It then authenticates without printing the generated credential and requires the runtime report, event-delivery health, and rolling publication objective to match the installed configuration. A second Helm revision adds two API replicas, a TLS Ingress declaration, and scheduled backup configuration. The gate proves immutable image selection, runtime identity, migration idempotency, and exact ingress binding; runs the installed backup CronJob on demand; verifies its persisted checksum; restores it into a separate database; confirms every packaged migration; and checks rollout and Helm history. It removes the namespace and claim, refuses non-kind contexts, and never prints generated credentials, database contents, or private keys. Set `IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for debugging is intentional.
+To test the actual packaged release chart and attested OCI archive instead of
+checkout artifacts, first build the release bundle and then run:
+
+```bash
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.66.0-0123456789ab \
+  make test-release-install PYTHON=.venv/bin/python
+```
+
+The source gate builds and loads the current image; the release gate verifies
+the bundle, loads its OCI image, and uses its packaged chart. Both register the
+exact immutable digest on every disposable Kind node, create an exact-name
+namespace and PostgreSQL instance, install with migrations enabled, verify the
+hook applied the latest packaged migration, and prove API readiness from inside
+the pod. They authenticate without printing the generated credential and
+require the runtime report, event-delivery health, and rolling publication
+objective to match the installed configuration. A second Helm revision adds
+two API replicas, a TLS Ingress declaration, and scheduled backup
+configuration. The gates prove immutable image selection, runtime identity,
+migration idempotency, and exact ingress binding; run the installed backup
+CronJob on demand; verify its persisted checksum; restore it into a separate
+database; confirm every packaged migration; and check rollout and Helm history.
+They remove the namespace and claim, refuse non-Kind contexts, and never print
+generated credentials, database contents, or private keys. Set
+`IIP_KEEP_TEST_NAMESPACE=true` only when retaining a failed local fixture for
+debugging is intentional.
 
 The first revision additionally proves the public local console-authentication discovery document, the investigation-completion objective, and the disabled-by-default Evidence retention report from inside the installed pod.
 

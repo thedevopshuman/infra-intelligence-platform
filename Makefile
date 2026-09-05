@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -35,6 +35,7 @@ help:
 	@echo "test-plugin-compatibility Generate the executable plugin compatibility matrix"
 	@echo "test-local-product Exercise the customer workflow against the running Docker stack"
 	@echo "test-helm-install Build and install the chart on the explicit local kind cluster"
+	@echo "test-release-install Install a verified packaged release on the explicit local kind cluster"
 	@echo "db-migrate    Apply PostgreSQL migrations using IIP_DATABASE_URL"
 	@echo "helm-lint     Lint and render the Helm chart"
 	@echo "verify        Run all local quality gates"
@@ -144,6 +145,12 @@ test-local-product:
 
 test-helm-install:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_HELM_BIN=$(HELM) IIP_TEST_PYTHON=$(PYTHON) scripts/test_helm_install.sh
+
+test-release-install:
+	@test -n "$(IIP_RELEASE_BUNDLE)" || \
+		(echo "IIP_RELEASE_BUNDLE is required" >&2; exit 2)
+	IIP_RELEASE_BUNDLE="$(IIP_RELEASE_BUNDLE)" IIP_DOCKER_BIN=$(DOCKER) \
+		IIP_HELM_BIN=$(HELM) IIP_TEST_PYTHON=$(PYTHON) scripts/test_helm_install.sh
 
 db-migrate:
 	PYTHONPATH=src $(PYTHON) -m iip.adapters.postgres

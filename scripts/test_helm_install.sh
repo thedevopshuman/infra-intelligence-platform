@@ -9,6 +9,7 @@ IIP_TEST_PYTHON=${IIP_TEST_PYTHON:-python3}
 IIP_KUBE_CONTEXT=${IIP_KUBE_CONTEXT:-kind-iip-dev}
 IIP_TEST_NAMESPACE=${IIP_TEST_NAMESPACE:-iip-helm-install-test}
 IIP_KEEP_TEST_NAMESPACE=${IIP_KEEP_TEST_NAMESPACE:-false}
+IIP_RELEASE_BUNDLE=${IIP_RELEASE_BUNDLE:-}
 IIP_TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/iip-helm-install.XXXXXX")
 
 case "$IIP_KUBE_CONTEXT" in
@@ -57,12 +58,6 @@ while "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" get namespace \
     sleep 1
 done
 
-IIP_APP_VERSION=$(
-    "$IIP_TEST_PYTHON" -c \
-        'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])'
-)
-IIP_CHART_VERSION=$(awk '$1 == "version:" {print $2; exit}' deploy/helm/infra-intelligence/Chart.yaml)
-IIP_TEST_IMAGE="iip-local-platform:$IIP_APP_VERSION"
 IIP_KIND_CLUSTER=${IIP_KUBE_CONTEXT#kind-}
 IIP_DB_PASSWORD=$(openssl rand -hex 24)
 IIP_AUTH_BEARER_TOKEN=$(openssl rand -hex 32)
@@ -71,17 +66,71 @@ IIP_AUTH_IDENTITIES_JSON=$(printf '%s' \
     "{\"identities\":[{\"tokenSha256\":\"$IIP_AUTH_VERIFIER\",\"actorId\":\"helm-test-operator\",\"tenantId\":\"helm-test\",\"roles\":[\"developer\",\"platform-admin\"]}]}"
 )
 
-"$IIP_DOCKER_BIN" build --provenance=false \
-    --build-arg "IIP_IMAGE_VERSION=$IIP_APP_VERSION" \
-    --build-arg IIP_IMAGE_REVISION=development \
-    --tag "$IIP_TEST_IMAGE" . >/dev/null
-IIP_TEST_IMAGE_REFERENCE=$(
-    "$IIP_DOCKER_BIN" image inspect "$IIP_TEST_IMAGE" \
-        --format '{{index .RepoDigests 0}}'
-)
-IIP_TEST_IMAGE_DIGEST=${IIP_TEST_IMAGE_REFERENCE#*@}
+IIP_EXPECTED_BUILD_MODE=development
+IIP_EXPECTED_BUILD_REVISION=
+if [ -n "$IIP_RELEASE_BUNDLE" ]; then
+    case "$IIP_RELEASE_BUNDLE" in
+        /*) ;;
+        *)
+            echo "IIP_RELEASE_BUNDLE must be an absolute directory" >&2
+            exit 2
+            ;;
+    esac
+    "$IIP_TEST_PYTHON" scripts/release_bundle.py verify "$IIP_RELEASE_BUNDLE"
+    IIP_RELEASE_MANIFEST="$IIP_RELEASE_BUNDLE/release-manifest.json"
+    IIP_APP_VERSION=$(
+        "$IIP_TEST_PYTHON" -c \
+            'import json,sys; print(json.load(open(sys.argv[1]))["metadata"]["version"])' \
+            "$IIP_RELEASE_MANIFEST"
+    )
+    IIP_CHART_VERSION=$(
+        "$IIP_TEST_PYTHON" -c \
+            'import json,sys; print(json.load(open(sys.argv[1]))["metadata"]["chartVersion"])' \
+            "$IIP_RELEASE_MANIFEST"
+    )
+    IIP_EXPECTED_BUILD_REVISION=$(
+        "$IIP_TEST_PYTHON" -c \
+            'import json,sys; print(json.load(open(sys.argv[1]))["metadata"]["revision"])' \
+            "$IIP_RELEASE_MANIFEST"
+    )
+    IIP_TEST_IMAGE_DIGEST=$(
+        "$IIP_TEST_PYTHON" -c \
+            'import json,sys; print(json.load(open(sys.argv[1]))["spec"]["image"]["indexDigest"])' \
+            "$IIP_RELEASE_MANIFEST"
+    )
+    if [ "$IIP_EXPECTED_BUILD_REVISION" != "$(git rev-parse HEAD)" ]; then
+        echo "Release bundle revision does not match the checked-out install gate" >&2
+        exit 1
+    fi
+    IIP_EXPECTED_BUILD_MODE=release
+    IIP_TEST_CHART="$IIP_RELEASE_BUNDLE/infra-intelligence-$IIP_CHART_VERSION.tgz"
+    IIP_TEST_IMAGE_REPOSITORY=iip-release-control-plane
+    IIP_TEST_IMAGE="$IIP_TEST_IMAGE_REPOSITORY:$IIP_APP_VERSION-$(printf '%s' "$IIP_EXPECTED_BUILD_REVISION" | cut -c1-12)"
+    "$IIP_DOCKER_BIN" load --input \
+        "$IIP_RELEASE_BUNDLE/infra-intelligence-control-plane-$IIP_APP_VERSION.oci.tar" \
+        >/dev/null
+    "$IIP_DOCKER_BIN" tag "$IIP_TEST_IMAGE_DIGEST" "$IIP_TEST_IMAGE"
+else
+    IIP_APP_VERSION=$(
+        "$IIP_TEST_PYTHON" -c \
+            'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])'
+    )
+    IIP_CHART_VERSION=$(awk '$1 == "version:" {print $2; exit}' deploy/helm/infra-intelligence/Chart.yaml)
+    IIP_TEST_CHART=deploy/helm/infra-intelligence
+    IIP_TEST_IMAGE_REPOSITORY=iip-local-platform
+    IIP_TEST_IMAGE="$IIP_TEST_IMAGE_REPOSITORY:$IIP_APP_VERSION"
+    "$IIP_DOCKER_BIN" build --provenance=false \
+        --build-arg "IIP_IMAGE_VERSION=$IIP_APP_VERSION" \
+        --build-arg IIP_IMAGE_REVISION=development \
+        --tag "$IIP_TEST_IMAGE" . >/dev/null
+    IIP_TEST_IMAGE_REFERENCE=$(
+        "$IIP_DOCKER_BIN" image inspect "$IIP_TEST_IMAGE" \
+            --format '{{index .RepoDigests 0}}'
+    )
+    IIP_TEST_IMAGE_DIGEST=${IIP_TEST_IMAGE_REFERENCE#*@}
+fi
 if ! printf '%s\n' "$IIP_TEST_IMAGE_DIGEST" | rg -q '^sha256:[a-f0-9]{64}$'; then
-    echo "Local Helm test image did not produce an immutable digest" >&2
+    echo "Helm install test image did not produce an immutable digest" >&2
     exit 1
 fi
 "$IIP_KIND_BIN" load docker-image "$IIP_TEST_IMAGE" \
@@ -89,7 +138,8 @@ fi
 for IIP_KIND_NODE in $("$IIP_KIND_BIN" get nodes --name "$IIP_KIND_CLUSTER"); do
     "$IIP_DOCKER_BIN" exec "$IIP_KIND_NODE" ctr -n k8s.io images tag --force \
         "docker.io/library/$IIP_TEST_IMAGE" \
-        "docker.io/library/iip-local-platform@$IIP_TEST_IMAGE_DIGEST" >/dev/null
+        "docker.io/library/$IIP_TEST_IMAGE_REPOSITORY@$IIP_TEST_IMAGE_DIGEST" \
+        >/dev/null
 done
 
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" create namespace \
@@ -176,10 +226,10 @@ EOF
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
     rollout status deployment/iip-postgres --timeout=180s >/dev/null
 
-"$IIP_HELM_BIN" upgrade --install iip deploy/helm/infra-intelligence \
+"$IIP_HELM_BIN" upgrade --install iip "$IIP_TEST_CHART" \
     --kube-context "$IIP_KUBE_CONTEXT" \
     --namespace "$IIP_TEST_NAMESPACE" \
-    --set image.repository=iip-local-platform \
+    --set "image.repository=$IIP_TEST_IMAGE_REPOSITORY" \
     --set "image.tag=$IIP_APP_VERSION" \
     --set-string "image.digest=$IIP_TEST_IMAGE_DIGEST" \
     --set image.pullPolicy=Never \
@@ -230,9 +280,10 @@ IIP_RUNTIME_VERSION_JSON=$(
             'import json,sys,urllib.request; token=sys.stdin.read(); request=urllib.request.Request("http://127.0.0.1:8080/v1/system/version", headers={"Authorization": "Bearer " + token}); print(json.dumps(json.load(urllib.request.urlopen(request, timeout=5)), separators=(",", ":")))'
 )
 printf '%s' "$IIP_RUNTIME_VERSION_JSON" | "$IIP_TEST_PYTHON" -c \
-    'import json,sys; document=json.load(sys.stdin); app,chart,digest,migration=sys.argv[1:]; spec=document["spec"]; assert document["kind"] == "RuntimeVersionReport"; assert document["metadata"]["tenantId"] == "helm-test"; assert spec["application"]["version"] == app; assert spec["contracts"]["apiVersion"] == "iip.platform/v1alpha1"; assert spec["storage"]["requiredMigration"] == migration; assert spec["build"] == {"mode":"development"}; assert spec["deployment"] == {"helmChartVersion":chart,"imageDigest":digest}' \
+    'import json,sys; document=json.load(sys.stdin); app,chart,digest,migration,mode,revision=sys.argv[1:]; spec=document["spec"]; expected_build={"mode":mode}; expected_build.update({"revision":revision} if revision else {}); assert document["kind"] == "RuntimeVersionReport"; assert document["metadata"]["tenantId"] == "helm-test"; assert spec["application"]["version"] == app; assert spec["contracts"]["apiVersion"] == "iip.platform/v1alpha1"; assert spec["storage"]["requiredMigration"] == migration; assert spec["build"] == expected_build; assert spec["deployment"] == {"helmChartVersion":chart,"imageDigest":digest}' \
     "$IIP_APP_VERSION" "$IIP_CHART_VERSION" "$IIP_TEST_IMAGE_DIGEST" \
-    "$IIP_EXPECTED_MIGRATION"
+    "$IIP_EXPECTED_MIGRATION" "$IIP_EXPECTED_BUILD_MODE" \
+    "$IIP_EXPECTED_BUILD_REVISION"
 
 IIP_TELEMETRY_DEPLOYMENT_HEALTH_JSON=$(
     printf '%s' "$IIP_AUTH_BEARER_TOKEN" | \
@@ -298,10 +349,10 @@ IIP_EXPECTED_MIGRATION_COUNT=$(
     rg --files src/iip/adapters/postgres/migrations -g '*.sql' | wc -l | tr -d ' '
 )
 
-"$IIP_HELM_BIN" upgrade --install iip deploy/helm/infra-intelligence \
+"$IIP_HELM_BIN" upgrade --install iip "$IIP_TEST_CHART" \
     --kube-context "$IIP_KUBE_CONTEXT" \
     --namespace "$IIP_TEST_NAMESPACE" \
-    --set image.repository=iip-local-platform \
+    --set "image.repository=$IIP_TEST_IMAGE_REPOSITORY" \
     --set "image.tag=$IIP_APP_VERSION" \
     --set-string "image.digest=$IIP_TEST_IMAGE_DIGEST" \
     --set image.pullPolicy=Never \
@@ -351,7 +402,7 @@ IIP_DEPLOYED_IMAGE=$(
         --namespace "$IIP_TEST_NAMESPACE" get deployment/iip-infra-intelligence \
         -o 'jsonpath={.spec.template.spec.containers[0].image}'
 )
-if [ "$IIP_DEPLOYED_IMAGE" != "iip-local-platform@$IIP_TEST_IMAGE_DIGEST" ]; then
+if [ "$IIP_DEPLOYED_IMAGE" != "$IIP_TEST_IMAGE_REPOSITORY@$IIP_TEST_IMAGE_DIGEST" ]; then
     echo "Helm rollout did not preserve the immutable application image digest" >&2
     exit 1
 fi
@@ -450,4 +501,8 @@ EOF
     "$IIP_TEST_PYTHON" -c \
         'import json,sys; rows=json.load(sys.stdin); assert len(rows) == 2 and str(rows[-1]["revision"]) == "2" and rows[-1]["status"] == "deployed"'
 
-echo "Helm install/upgrade test passed: immutable image -> runtime identity -> delivery/SLO/retention operations -> migrations -> TLS ingress -> backup/restore"
+if [ "$IIP_EXPECTED_BUILD_MODE" = "release" ]; then
+    echo "Packaged release install/upgrade test passed: verified bundle -> immutable image -> release identity -> migrations -> TLS ingress -> backup/restore"
+else
+    echo "Helm install/upgrade test passed: immutable image -> runtime identity -> delivery/SLO/retention operations -> migrations -> TLS ingress -> backup/restore"
+fi

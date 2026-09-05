@@ -1,0 +1,57 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiPriceCatalog",
+  "metadata": {
+    "id": "apc_704aec0f9ea40a700f59eae85457acce",
+    "publishedAt": "2026-09-05T10:00:00Z",
+    "tenantId": "local",
+    "version": "2026-09-05.2"
+  },
+  "spec": {
+    "currency": "USD",
+    "currencyScale": 9,
+    "entries": [
+      {
+        "effectiveFrom": "2026-09-01T00:00:00Z",
+        "id": "aws-bedrock.example-foundation-model-v1.us-east-1.on-demand",
+        "modelId": "example.foundation-model-v1:0",
+        "provider": "aws.bedrock",
+        "purchaseModes": [
+          "on-demand"
+        ],
+        "rates": {
+          "cacheReadInputTokens": {
+            "priceSubunitsPerMillionTokens": 300000000
+          },
+          "cacheWriteInputTokens": {
+            "priceSubunitsPerMillionTokens": 3750000000
+          },
+          "nonReasoningOutputTokens": {
+            "priceSubunitsPerMillionTokens": 15000000000
+          },
+          "reasoningOutputTokens": {
+            "priceSubunitsPerMillionTokens": 15000000000
+          },
+          "uncachedInputTokens": {
+            "priceSubunitsPerMillionTokens": 3000000000
+          }
+        },
+        "regions": [
+          "us-east-1"
+        ],
+        "routingModes": [
+          "in-region"
+        ],
+        "serviceTiers": [
+          "standard"
+        ]
+      }
+    ],
+    "source": {
+      "contentHash": "sha256:a3b7b811d3a7a47727342b8c690cce23ef7e4340dc1e49b9221ff3eae4f233da",
+      "kind": "provider-published",
+      "locator": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/20260905090000/index.json",
+      "retrievedAt": "2026-09-05T10:00:00Z"
+    }
+  }
+}

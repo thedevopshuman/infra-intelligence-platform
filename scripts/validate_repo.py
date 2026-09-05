@@ -287,6 +287,8 @@ REQUIRED_PATHS = (
     "contracts/schemas/ai-attribution-policy.schema.json",
     "contracts/schemas/ai-usage-attribution-record.schema.json",
     "contracts/schemas/ai-price-catalog.schema.json",
+    "contracts/schemas/aws-bedrock-price-catalog-import-policy.schema.json",
+    "contracts/schemas/ai-price-catalog-import-report.schema.json",
     "contracts/schemas/ai-cost-record.schema.json",
     "contracts/schemas/ai-savings-finding.schema.json",
     "contracts/schemas/ai-model-suitability-report.schema.json",
@@ -303,6 +305,9 @@ REQUIRED_PATHS = (
     "contracts/examples/ai-usage-attribution-record.json",
     "contracts/examples/ai-usage-attributed-event.json",
     "contracts/examples/ai-price-catalog.json",
+    "contracts/examples/aws-bedrock-price-catalog-import-policy.json",
+    "contracts/examples/ai-price-catalog-provider-published.json",
+    "contracts/examples/ai-price-catalog-import-report.json",
     "contracts/examples/ai-cost-record.json",
     "contracts/examples/ai-savings-finding.json",
     "contracts/examples/ai-expensive-model-savings-finding.json",
@@ -426,13 +431,20 @@ REQUIRED_PATHS = (
     "docs/specifications/resource-change-evidence-contract.md",
     "docs/specifications/ai-model-suitability-report-contract.md",
     "docs/specifications/ai-price-catalog-qualification-contract.md",
+    "docs/specifications/aws-bedrock-price-catalog-import-contract.md",
+    "docs/operations/aws-bedrock-price-catalog-import.md",
     "docs/decisions/0111-qualified-expensive-model-anomaly.md",
     "docs/decisions/0112-minimized-ai-price-catalog-qualification.md",
     "docs/decisions/0113-runtime-ai-price-catalog-promotion.md",
+    "docs/decisions/0114-exact-aws-bedrock-public-price-import.md",
+    "scripts/import_aws_bedrock_price_catalog.py",
     "scripts/qualify_ai_price_catalog.py",
+    "src/iip/adapters/aws_bedrock_price_catalog.py",
     "src/iip/adapters/ai_price_catalog_qualifications.py",
     "src/iip/application/qualify_ai_price_catalog.py",
     "tests/test_ai_price_catalog_qualification.py",
+    "tests/test_aws_bedrock_price_catalog_import.py",
+    "tests/fixtures/aws-bedrock-price-list.json",
     "requirements/verify.in",
     "requirements/verify.txt",
     "scripts/validate_schemas.py",
@@ -4112,6 +4124,15 @@ def validate_ai_economics_examples(
     price_qualification_report = documents.get(
         example_dir / "ai-price-catalog-qualification-report.json"
     )
+    price_import_policy = documents.get(
+        example_dir / "aws-bedrock-price-catalog-import-policy.json"
+    )
+    imported_catalog = documents.get(
+        example_dir / "ai-price-catalog-provider-published.json"
+    )
+    price_import_report = documents.get(
+        example_dir / "ai-price-catalog-import-report.json"
+    )
     named = {
         "AI usage": usage,
         "AI price catalog": catalog,
@@ -4125,6 +4146,9 @@ def validate_ai_economics_examples(
         "AI attribution event": attribution_event,
         "AI price qualification policy": price_qualification_policy,
         "AI price qualification report": price_qualification_report,
+        "AWS Bedrock price import policy": price_import_policy,
+        "AI imported price catalog": imported_catalog,
+        "AI price import report": price_import_report,
     }
     for label, document in named.items():
         if not isinstance(document, dict):
@@ -4144,6 +4168,24 @@ def validate_ai_economics_examples(
     assert isinstance(attribution_event, dict)
     assert isinstance(price_qualification_policy, dict)
     assert isinstance(price_qualification_report, dict)
+    assert isinstance(price_import_policy, dict)
+    assert isinstance(imported_catalog, dict)
+    assert isinstance(price_import_report, dict)
+
+    from iip.adapters.aws_bedrock_price_catalog import (
+        AwsBedrockPriceCatalogImportError,
+        verify_aws_bedrock_price_catalog_import,
+    )
+
+    try:
+        verify_aws_bedrock_price_catalog_import(
+            (ROOT / "tests" / "fixtures" / "aws-bedrock-price-list.json").read_bytes(),
+            price_import_policy,
+            imported_catalog,
+            price_import_report,
+        )
+    except (OSError, AwsBedrockPriceCatalogImportError):
+        fail(errors, "AWS Bedrock price import examples must recalculate exactly")
 
     from iip.application.qualify_ai_price_catalog import (
         AiPriceCatalogQualificationError,
@@ -4509,6 +4551,12 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("ai-attribution-policy.json", "AiAttributionPolicy"),
         ("ai-usage-attribution-record.json", "AiUsageAttributionRecord"),
         ("ai-price-catalog.json", "AiPriceCatalog"),
+        (
+            "aws-bedrock-price-catalog-import-policy.json",
+            "AwsBedrockPriceCatalogImportPolicy",
+        ),
+        ("ai-price-catalog-provider-published.json", "AiPriceCatalog"),
+        ("ai-price-catalog-import-report.json", "AiPriceCatalogImportReport"),
         (
             "ai-price-catalog-qualification-policy.json",
             "AiPriceCatalogQualificationPolicy",

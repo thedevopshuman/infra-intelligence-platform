@@ -7,7 +7,7 @@ apiTermination:
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.80.0"
+  tag: "0.81.0"
   digest: ""
 
 worker:

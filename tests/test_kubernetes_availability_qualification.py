@@ -167,8 +167,8 @@ class KubernetesAvailabilityQualificationTests(unittest.TestCase):
                 qualification,
                 "_repository_identity",
                 return_value={
-                    "applicationVersion": "0.80.0",
-                    "chartVersion": "0.83.0",
+                    "applicationVersion": "0.81.0",
+                    "chartVersion": "0.84.0",
                     "requiredMigration": "0023_ai_model_suitability.sql",
                 },
             ),

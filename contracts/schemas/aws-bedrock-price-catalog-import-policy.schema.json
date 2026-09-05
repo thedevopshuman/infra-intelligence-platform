@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:aws-bedrock-price-catalog-import-policy:v1alpha1",
+  "title": "AWS Bedrock Price Catalog Import Policy",
+  "description": "Protected exact mappings from an AWS Price List snapshot into a tenant AI price catalog.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "AwsBedrockPriceCatalogImportPolicy"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "version"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^abp_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$"},
+        "version": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][0-9]+$"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "catalog", "entries"],
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profile", "serviceCode", "locator", "maximumBytes"],
+          "properties": {
+            "profile": {"const": "aws-price-list-v1"},
+            "serviceCode": {"const": "AmazonBedrock"},
+            "locator": {
+              "type": "string",
+              "pattern": "^https://pricing\\.us-east-1\\.amazonaws\\.com/offers/v1\\.0/aws/AmazonBedrock/(?:current|[0-9]{8,14})/index\\.json$",
+              "maxLength": 256
+            },
+            "maximumBytes": {"type": "integer", "minimum": 1048576, "maximum": 67108864}
+          }
+        },
+        "catalog": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "currency", "currencyScale"],
+          "properties": {
+            "version": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][0-9]+$"},
+            "currency": {"const": "USD"},
+            "currencyScale": {"type": "integer", "enum": [6, 9, 12]}
+          }
+        },
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10000,
+          "items": {"$ref": "#/$defs/entry"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "rateReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sku", "offerTermCode", "rateCode", "expectedUnit", "expectedAttributes"],
+      "properties": {
+        "sku": {"type": "string", "pattern": "^[A-Z0-9]{8,32}$"},
+        "offerTermCode": {"type": "string", "pattern": "^[A-Z0-9]{8,32}$"},
+        "rateCode": {"type": "string", "pattern": "^[A-Z0-9]{8,32}\\.[A-Z0-9]{8,32}\\.[A-Z0-9]{8,32}$"},
+        "expectedUnit": {"enum": ["1K tokens", "1M tokens"]},
+        "expectedAttributes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["feature", "inferenceType", "model", "provider", "regionCode", "usagetype"],
+          "properties": {
+            "feature": {"type": "string", "minLength": 1, "maxLength": 256},
+            "inferenceType": {"type": "string", "minLength": 1, "maxLength": 256},
+            "model": {"type": "string", "minLength": 1, "maxLength": 256},
+            "provider": {"type": "string", "minLength": 1, "maxLength": 256},
+            "regionCode": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"},
+            "usagetype": {"type": "string", "minLength": 1, "maxLength": 256}
+          }
+        }
+      }
+    },
+    "rates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uncachedInputTokens", "cacheReadInputTokens", "cacheWriteInputTokens", "nonReasoningOutputTokens", "reasoningOutputTokens"],
+      "properties": {
+        "uncachedInputTokens": {"$ref": "#/$defs/rateReference"},
+        "cacheReadInputTokens": {"$ref": "#/$defs/rateReference"},
+        "cacheWriteInputTokens": {"$ref": "#/$defs/rateReference"},
+        "nonReasoningOutputTokens": {"$ref": "#/$defs/rateReference"},
+        "reasoningOutputTokens": {"$ref": "#/$defs/rateReference"}
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "modelId", "region", "serviceTier", "routingMode", "purchaseMode", "effectiveFrom", "rates"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "modelId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "region": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"},
+        "serviceTier": {"enum": ["default", "standard", "flex", "priority", "reserved", "unknown"]},
+        "routingMode": {"enum": ["in-region", "geographic", "global", "unknown"]},
+        "purchaseMode": {"enum": ["on-demand", "batch", "provisioned-throughput", "unknown"]},
+        "effectiveFrom": {"type": "string", "format": "date-time"},
+        "effectiveUntil": {"type": "string", "format": "date-time"},
+        "rates": {"$ref": "#/$defs/rates"}
+      }
+    }
+  }
+}

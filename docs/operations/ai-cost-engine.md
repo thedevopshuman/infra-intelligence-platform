@@ -56,10 +56,13 @@ PYTHONPATH=src:sdks/python/src .venv/bin/python \
 ```
 
 The report omits rates, model names, source locators, and required-scope
-details. It proves deterministic static qualification only; it does not prove
-that the upstream source is authoritative, that negotiated prices are correct,
-or that an organization approved promotion. The runtime gate below binds that
-evidence to use, but does not add those customer-specific claims.
+details. For public Bedrock prices, first use the [exact AWS price import
+workflow](aws-bedrock-price-catalog-import.md) to bind an official retained
+source snapshot and protected mapping into the candidate catalog. Static
+qualification still does not prove that negotiated prices are correct, that an
+organization approved promotion, or that estimates agree with invoices. The
+runtime gate below binds qualification evidence to use, but does not add those
+customer-specific claims.
 
 ## Configuration shape
 

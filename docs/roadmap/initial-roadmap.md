@@ -20,7 +20,12 @@ candidate-model cohort with the reference-model cohort and calculating a
 scenario saving. The reference dashboard topology and separate pinned official
 botocore `Converse`/`ConverseStream`
 offline interoperability gates are executable; live Bedrock
-model/region/operation qualification remains.
+model/region/operation qualification remains. Public Bedrock price acquisition
+is now an executable exact-source operation: a protected mapping turns a
+retained official Price List Bulk API snapshot into the provider-neutral
+catalog and minimized reproducibility evidence before separate qualification
+and runtime promotion. Organizational approval, private rates, and invoice
+reconciliation remain outside that import claim.
 The first Phase B unit is also executable: protected effective-time policies
 map observed service/resource identity to separate immutable application/team
 attribution facts, including explicit unallocated coverage. Bounded

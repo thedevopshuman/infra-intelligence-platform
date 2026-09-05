@@ -15,11 +15,13 @@ from .models import (
     AiCostRecord,
     AiModelSuitabilityReport,
     AiPriceCatalog,
+    AiPriceCatalogImportReport,
     AiPriceCatalogQualificationPolicy,
     AiPriceCatalogQualificationReport,
     AiSavingsFinding,
     AiUsageRecord,
     AiUsageAttributionRecord,
+    AwsBedrockPriceCatalogImportPolicy,
     CollectorQueueLossReport,
     ConsoleAuthenticationConfiguration,
     CustomerDeploymentPreflightReport,
@@ -117,11 +119,13 @@ __all__ = [
     "AiCostRecord",
     "AiModelSuitabilityReport",
     "AiPriceCatalog",
+    "AiPriceCatalogImportReport",
     "AiPriceCatalogQualificationPolicy",
     "AiPriceCatalogQualificationReport",
     "AiSavingsFinding",
     "AiUsageRecord",
     "AiUsageAttributionRecord",
+    "AwsBedrockPriceCatalogImportPolicy",
     "ApiError",
     "Client",
     "CollectorQueueLossReport",
@@ -211,4 +215,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.56.0"
+__version__ = "0.57.0"

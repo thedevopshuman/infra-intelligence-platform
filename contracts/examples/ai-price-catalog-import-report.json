@@ -1,0 +1,67 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiPriceCatalogImportReport",
+  "metadata": {
+    "generatedAt": "2026-09-05T10:00:00Z",
+    "id": "apir_f9f5fed1b91f7bb0808f8305879678bd",
+    "tenantId": "local"
+  },
+  "spec": {
+    "catalog": {
+      "currency": "USD",
+      "currencyScale": 9,
+      "documentDigest": "sha256:39f3bb0a466964a4f6e864815150f5ac1fda8c728f512a4b4deacb86f79ae65f",
+      "entryCount": 1,
+      "id": "apc_704aec0f9ea40a700f59eae85457acce",
+      "version": "2026-09-05.2"
+    },
+    "checks": [
+      {
+        "id": "source-envelope",
+        "status": "passed"
+      },
+      {
+        "id": "policy-identity",
+        "status": "passed"
+      },
+      {
+        "id": "exact-rate-references",
+        "status": "passed"
+      },
+      {
+        "id": "decimal-conversion",
+        "status": "passed"
+      },
+      {
+        "id": "catalog-contract",
+        "status": "passed"
+      }
+    ],
+    "importerVersion": "0.1.0",
+    "measurements": {
+      "rateReferenceCount": 5,
+      "uniquePriceDimensionCount": 4
+    },
+    "policy": {
+      "documentDigest": "sha256:ad26948df78706c616cf65d21c1ef7e46dc2246cd0bb68339397f09123879b5d",
+      "id": "abp_33d94d33dd08fc3c8edc4c6d16f98604",
+      "version": "2026-09-05.1"
+    },
+    "source": {
+      "contentHash": "sha256:a3b7b811d3a7a47727342b8c690cce23ef7e4340dc1e49b9221ff3eae4f233da",
+      "publicationDate": "2026-09-05T09:00:00Z",
+      "retrievedAt": "2026-09-05T10:00:00Z",
+      "serviceCode": "AmazonBedrock",
+      "sizeBytes": 4765,
+      "version": "20260905090000"
+    },
+    "sourceProfile": "aws-price-list-v1",
+    "status": "imported",
+    "summary": {
+      "failedChecks": 0,
+      "overallStatus": "imported",
+      "passedChecks": 5,
+      "totalChecks": 5
+    }
+  }
+}

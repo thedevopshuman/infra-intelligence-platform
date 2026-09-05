@@ -18,6 +18,8 @@ export type AiUsageRecordId = `aiu_${string}`;
 export type AiAttributionPolicyId = `aap_${string}`;
 export type AiUsageAttributionRecordId = `aia_${string}`;
 export type AiPriceCatalogId = `apc_${string}`;
+export type AwsBedrockPriceCatalogImportPolicyId = `abp_${string}`;
+export type AiPriceCatalogImportReportId = `apir_${string}`;
 export type AiPriceCatalogQualificationPolicyId = `apqp_${string}`;
 export type AiPriceCatalogQualificationReportId = `apq_${string}`;
 export type AiCostRecordId = `aic_${string}`;
@@ -322,6 +324,118 @@ export interface AiPriceCatalog {
       contentHash: Sha256Digest;
     };
     entries: AiPriceCatalogEntry[];
+  };
+}
+
+export interface AwsPriceRateReference {
+  sku: string;
+  offerTermCode: string;
+  rateCode: string;
+  expectedUnit: "1K tokens" | "1M tokens";
+  expectedAttributes: {
+    feature: string;
+    inferenceType: string;
+    model: string;
+    provider: string;
+    regionCode: string;
+    usagetype: string;
+  };
+}
+
+export interface AwsBedrockPriceCatalogImportPolicy {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AwsBedrockPriceCatalogImportPolicy";
+  metadata: {
+    id: AwsBedrockPriceCatalogImportPolicyId;
+    tenantId: string;
+    version: string;
+  };
+  spec: {
+    source: {
+      profile: "aws-price-list-v1";
+      serviceCode: "AmazonBedrock";
+      locator: string;
+      maximumBytes: number;
+    };
+    catalog: {
+      version: string;
+      currency: "USD";
+      currencyScale: AiCurrencyScale;
+    };
+    entries: Array<{
+      id: string;
+      modelId: string;
+      region: string;
+      serviceTier: AiServiceTier;
+      routingMode: AiRoutingMode;
+      purchaseMode: AiPurchaseMode;
+      effectiveFrom: string;
+      effectiveUntil?: string;
+      rates: {
+        uncachedInputTokens: AwsPriceRateReference;
+        cacheReadInputTokens: AwsPriceRateReference;
+        cacheWriteInputTokens: AwsPriceRateReference;
+        nonReasoningOutputTokens: AwsPriceRateReference;
+        reasoningOutputTokens: AwsPriceRateReference;
+      };
+    }>;
+  };
+}
+
+export type AiPriceCatalogImportCheckId =
+  | "source-envelope"
+  | "policy-identity"
+  | "exact-rate-references"
+  | "decimal-conversion"
+  | "catalog-contract";
+
+export interface AiPriceCatalogImportReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiPriceCatalogImportReport";
+  metadata: {
+    id: AiPriceCatalogImportReportId;
+    tenantId: string;
+    generatedAt: string;
+  };
+  spec: {
+    status: "imported";
+    sourceProfile: "aws-price-list-v1";
+    importerVersion: "0.1.0";
+    source: {
+      serviceCode: "AmazonBedrock";
+      version: string;
+      contentHash: Sha256Digest;
+      publicationDate: string;
+      retrievedAt: string;
+      sizeBytes: number;
+    };
+    policy: {
+      id: AwsBedrockPriceCatalogImportPolicyId;
+      version: string;
+      documentDigest: Sha256Digest;
+    };
+    catalog: {
+      id: AiPriceCatalogId;
+      version: string;
+      documentDigest: Sha256Digest;
+      currency: "USD";
+      currencyScale: AiCurrencyScale;
+      entryCount: number;
+    };
+    measurements: {
+      rateReferenceCount: number;
+      uniquePriceDimensionCount: number;
+    };
+    checks: Array<{
+      id: AiPriceCatalogImportCheckId;
+      status: "passed";
+    }>;
+    summary: {
+      totalChecks: 5;
+      passedChecks: 5;
+      failedChecks: 0;
+      overallStatus: "imported";
+    };
   };
 }
 

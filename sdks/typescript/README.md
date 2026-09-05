@@ -46,7 +46,8 @@ TypeScript package intentionally provides types only because Unix-domain socket
 transport is runtime-specific.
 
 `AiUsageRecord`, `AiAttributionPolicy`, `AiUsageAttributionRecord`,
-`AiPriceCatalog`, `AiPriceCatalogQualificationPolicy`,
+`AiPriceCatalog`, `AwsBedrockPriceCatalogImportPolicy`,
+`AiPriceCatalogImportReport`, `AiPriceCatalogQualificationPolicy`,
 `AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`, `AiModelSuitabilityReport`,
 and `AiAllocationReport`
 describe the

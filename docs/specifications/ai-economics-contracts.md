@@ -7,6 +7,8 @@
 - `contracts/schemas/ai-attribution-policy.schema.json`
 - `contracts/schemas/ai-usage-attribution-record.schema.json`
 - `contracts/schemas/ai-price-catalog.schema.json`
+- `contracts/schemas/aws-bedrock-price-catalog-import-policy.schema.json`
+- `contracts/schemas/ai-price-catalog-import-report.schema.json`
 - `contracts/schemas/ai-price-catalog-qualification-policy.schema.json`
 - `contracts/schemas/ai-price-catalog-qualification-report.schema.json`
 - `contracts/schemas/ai-cost-record.schema.json`
@@ -68,6 +70,13 @@ contracts](ai-price-catalog-qualification-contract.md). Qualification neither
 selects an authoritative source nor turns calculated estimates into invoices.
 The production runtime gate requires one current exact qualified report before
 registering or using each tenant catalog.
+
+The first provider-source adapter uses the separate [AWS Bedrock price-catalog
+import contracts](aws-bedrock-price-catalog-import-contract.md). It exact-maps
+one retained official Price List snapshot under protected policy and produces
+minimized reproducibility evidence before the ordinary qualification and
+promotion stages. The checked import examples are synthetic contract data, not
+deployable prices.
 
 An entry matches provider, model, region, service tier, routing mode, purchase
 mode, and invocation start time. `effectiveFrom` is inclusive;

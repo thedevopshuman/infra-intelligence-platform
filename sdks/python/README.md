@@ -50,7 +50,8 @@ code, selecting a destination, or receiving a credential. It returns stable
 host-created failures for plugin handling; it is not a control-plane HTTP client.
 
 `AiUsageRecord`, `AiAttributionPolicy`, `AiUsageAttributionRecord`,
-`AiPriceCatalog`, `AiPriceCatalogQualificationPolicy`,
+`AiPriceCatalog`, `AwsBedrockPriceCatalogImportPolicy`,
+`AiPriceCatalogImportReport`, `AiPriceCatalogQualificationPolicy`,
 `AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`, and `AiAllocationReport`
 expose the AI economics
 records as public metadata-only envelopes. They do not

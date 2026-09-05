@@ -1,0 +1,105 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AwsBedrockPriceCatalogImportPolicy",
+  "metadata": {
+    "id": "abp_33d94d33dd08fc3c8edc4c6d16f98604",
+    "tenantId": "local",
+    "version": "2026-09-05.1"
+  },
+  "spec": {
+    "source": {
+      "profile": "aws-price-list-v1",
+      "serviceCode": "AmazonBedrock",
+      "locator": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/20260905090000/index.json",
+      "maximumBytes": 1048576
+    },
+    "catalog": {
+      "version": "2026-09-05.2",
+      "currency": "USD",
+      "currencyScale": 9
+    },
+    "entries": [
+      {
+        "id": "aws-bedrock.example-foundation-model-v1.us-east-1.on-demand",
+        "modelId": "example.foundation-model-v1:0",
+        "region": "us-east-1",
+        "serviceTier": "standard",
+        "routingMode": "in-region",
+        "purchaseMode": "on-demand",
+        "effectiveFrom": "2026-09-01T00:00:00Z",
+        "rates": {
+          "uncachedInputTokens": {
+            "sku": "ABCD1234INPUT",
+            "offerTermCode": "JRTCKXETXF",
+            "rateCode": "ABCD1234INPUT.JRTCKXETXF.6YS6EN2CT7",
+            "expectedUnit": "1K tokens",
+            "expectedAttributes": {
+              "feature": "On-demand Inference",
+              "inferenceType": "Input tokens",
+              "model": "Example Foundation Model V1",
+              "provider": "Example Provider",
+              "regionCode": "us-east-1",
+              "usagetype": "USE1-Example-input-tokens"
+            }
+          },
+          "cacheReadInputTokens": {
+            "sku": "ABCD1234CREAD",
+            "offerTermCode": "JRTCKXETXF",
+            "rateCode": "ABCD1234CREAD.JRTCKXETXF.6YS6EN2CT7",
+            "expectedUnit": "1K tokens",
+            "expectedAttributes": {
+              "feature": "On-demand Inference",
+              "inferenceType": "Prompt cache read input tokens",
+              "model": "Example Foundation Model V1",
+              "provider": "Example Provider",
+              "regionCode": "us-east-1",
+              "usagetype": "USE1-Example-cache-read-input-tokens"
+            }
+          },
+          "cacheWriteInputTokens": {
+            "sku": "ABCD1234CWRITE",
+            "offerTermCode": "JRTCKXETXF",
+            "rateCode": "ABCD1234CWRITE.JRTCKXETXF.6YS6EN2CT7",
+            "expectedUnit": "1K tokens",
+            "expectedAttributes": {
+              "feature": "On-demand Inference",
+              "inferenceType": "Prompt cache write input tokens",
+              "model": "Example Foundation Model V1",
+              "provider": "Example Provider",
+              "regionCode": "us-east-1",
+              "usagetype": "USE1-Example-cache-write-input-tokens"
+            }
+          },
+          "nonReasoningOutputTokens": {
+            "sku": "ABCD1234OUTPUT",
+            "offerTermCode": "JRTCKXETXF",
+            "rateCode": "ABCD1234OUTPUT.JRTCKXETXF.6YS6EN2CT7",
+            "expectedUnit": "1K tokens",
+            "expectedAttributes": {
+              "feature": "On-demand Inference",
+              "inferenceType": "Output tokens",
+              "model": "Example Foundation Model V1",
+              "provider": "Example Provider",
+              "regionCode": "us-east-1",
+              "usagetype": "USE1-Example-output-tokens"
+            }
+          },
+          "reasoningOutputTokens": {
+            "sku": "ABCD1234OUTPUT",
+            "offerTermCode": "JRTCKXETXF",
+            "rateCode": "ABCD1234OUTPUT.JRTCKXETXF.6YS6EN2CT7",
+            "expectedUnit": "1K tokens",
+            "expectedAttributes": {
+              "feature": "On-demand Inference",
+              "inferenceType": "Output tokens",
+              "model": "Example Foundation Model V1",
+              "provider": "Example Provider",
+              "regionCode": "us-east-1",
+              "usagetype": "USE1-Example-output-tokens"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

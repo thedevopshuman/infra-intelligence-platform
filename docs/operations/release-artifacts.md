@@ -74,7 +74,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.80.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.81.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 
@@ -86,7 +86,7 @@ After verification, prove that the packaged chart and OCI image—not checkout
 copies—install on the explicit local Kind cluster:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.80.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.81.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -106,7 +106,7 @@ selected supported prior revision. The target may retain the same latest
 migration or add a newer one; migration regression is rejected:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.80.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.81.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
@@ -135,7 +135,7 @@ Run both packaged profiles in sequence and require their machine-readable
 evidence to agree on the candidate and local environment:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.80.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.81.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=<supported-ancestor> \
   make qualify-release PYTHON=.venv/bin/python
 ```
@@ -148,7 +148,7 @@ platform, Kubernetes, and Docker identity match. Verify a transported report
 and bundle with:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.80.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.81.0-0123456789ab \
 IIP_RELEASE_QUALIFICATION_REPORT=/absolute/path/to/report.json \
   make verify-release-qualification PYTHON=.venv/bin/python
 ```
@@ -185,7 +185,7 @@ increment its generation when trust changes, and run from the same clean
 release checkout:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.80.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.81.0-0123456789ab \
 IIP_RELEASE_SIGNATURE_POLICY=/absolute/protected/release-signature-policy.json \
 IIP_RELEASE_SIGNATURE_REPORT=/absolute/path/to/release-signatures.json \
 COSIGN=/absolute/path/to/cosign \
@@ -223,7 +223,7 @@ fetches the policy-pinned scanner database with constrained network authority,
 and then scans offline:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.80.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.81.0-0123456789ab \
 IIP_RELEASE_VULNERABILITY_POLICY=/absolute/protected/release-vulnerability-policy.json \
 IIP_RELEASE_VULNERABILITY_REPORT=/absolute/path/to/release-vulnerabilities.json \
   make qualify-release-vulnerabilities PYTHON=.venv/bin/python

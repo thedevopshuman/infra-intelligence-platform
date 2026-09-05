@@ -76,8 +76,13 @@ overlapping effective prices, and proves every required scope resolves once.
 It exposes no rates, model names, locators, credentials, or scope details. The
 production worker and Helm preflight now require one current exact
 `production-catalog` report per catalog tenant and reject a stale, altered,
-offline-only, or cross-tenant binding before catalog registration. Authoritative
-source selection and organizational approval remain open.
+offline-only, or cross-tenant binding before catalog registration. For AWS
+Bedrock public token pricing, exact provider-source selection is now
+executable: a protected content-addressed mapping converts one retained
+official `AmazonBedrock` Bulk API snapshot without description parsing,
+floating point, or runtime network access, and emits minimized reproducibility
+evidence. Organizational approval, private/negotiated rates, and invoice
+agreement remain open.
 
 ## Phase B — application and team attribution
 
@@ -153,7 +158,8 @@ those outcomes.
 
 - stable public product/company name and package migration;
 - open-source license and commercial boundary;
-- authoritative provider price ingestion and organizational approval workflow;
+- organizational approval workflow, private-price ingestion, and invoice
+  reconciliation;
 - first real Bedrock model/region and OpenAI API/model qualification targets;
 - long-term analytics backend and retention objectives;
 - optional business-attribution helper;

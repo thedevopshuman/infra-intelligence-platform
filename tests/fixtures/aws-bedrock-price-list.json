@@ -1,0 +1,142 @@
+{
+  "formatVersion": "aws_v1",
+  "disclaimer": "Deterministic synthetic AWS Price List shape for offline contract tests; not commercial pricing.",
+  "offerCode": "AmazonBedrock",
+  "version": "20260905090000",
+  "publicationDate": "2026-09-05T09:00:00Z",
+  "products": {
+    "ABCD1234INPUT": {
+      "sku": "ABCD1234INPUT",
+      "productFamily": "Bedrock",
+      "attributes": {
+        "servicecode": "AmazonBedrock",
+        "feature": "On-demand Inference",
+        "inferenceType": "Input tokens",
+        "model": "Example Foundation Model V1",
+        "provider": "Example Provider",
+        "regionCode": "us-east-1",
+        "usagetype": "USE1-Example-input-tokens"
+      }
+    },
+    "ABCD1234CREAD": {
+      "sku": "ABCD1234CREAD",
+      "productFamily": "Bedrock",
+      "attributes": {
+        "servicecode": "AmazonBedrock",
+        "feature": "On-demand Inference",
+        "inferenceType": "Prompt cache read input tokens",
+        "model": "Example Foundation Model V1",
+        "provider": "Example Provider",
+        "regionCode": "us-east-1",
+        "usagetype": "USE1-Example-cache-read-input-tokens"
+      }
+    },
+    "ABCD1234CWRITE": {
+      "sku": "ABCD1234CWRITE",
+      "productFamily": "Bedrock",
+      "attributes": {
+        "servicecode": "AmazonBedrock",
+        "feature": "On-demand Inference",
+        "inferenceType": "Prompt cache write input tokens",
+        "model": "Example Foundation Model V1",
+        "provider": "Example Provider",
+        "regionCode": "us-east-1",
+        "usagetype": "USE1-Example-cache-write-input-tokens"
+      }
+    },
+    "ABCD1234OUTPUT": {
+      "sku": "ABCD1234OUTPUT",
+      "productFamily": "Bedrock",
+      "attributes": {
+        "servicecode": "AmazonBedrock",
+        "feature": "On-demand Inference",
+        "inferenceType": "Output tokens",
+        "model": "Example Foundation Model V1",
+        "provider": "Example Provider",
+        "regionCode": "us-east-1",
+        "usagetype": "USE1-Example-output-tokens"
+      }
+    }
+  },
+  "terms": {
+    "OnDemand": {
+      "ABCD1234INPUT": {
+        "ABCD1234INPUT.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "ABCD1234INPUT",
+          "effectiveDate": "2026-09-01T00:00:00Z",
+          "priceDimensions": {
+            "ABCD1234INPUT.JRTCKXETXF.6YS6EN2CT7": {
+              "rateCode": "ABCD1234INPUT.JRTCKXETXF.6YS6EN2CT7",
+              "description": "Synthetic input token dimension",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "unit": "1K tokens",
+              "pricePerUnit": {"USD": "0.0030000000"},
+              "appliesTo": []
+            }
+          },
+          "termAttributes": {}
+        }
+      },
+      "ABCD1234CREAD": {
+        "ABCD1234CREAD.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "ABCD1234CREAD",
+          "effectiveDate": "2026-09-01T00:00:00Z",
+          "priceDimensions": {
+            "ABCD1234CREAD.JRTCKXETXF.6YS6EN2CT7": {
+              "rateCode": "ABCD1234CREAD.JRTCKXETXF.6YS6EN2CT7",
+              "description": "Synthetic cache-read token dimension",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "unit": "1K tokens",
+              "pricePerUnit": {"USD": "0.0003000000"},
+              "appliesTo": []
+            }
+          },
+          "termAttributes": {}
+        }
+      },
+      "ABCD1234CWRITE": {
+        "ABCD1234CWRITE.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "ABCD1234CWRITE",
+          "effectiveDate": "2026-09-01T00:00:00Z",
+          "priceDimensions": {
+            "ABCD1234CWRITE.JRTCKXETXF.6YS6EN2CT7": {
+              "rateCode": "ABCD1234CWRITE.JRTCKXETXF.6YS6EN2CT7",
+              "description": "Synthetic cache-write token dimension",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "unit": "1K tokens",
+              "pricePerUnit": {"USD": "0.0037500000"},
+              "appliesTo": []
+            }
+          },
+          "termAttributes": {}
+        }
+      },
+      "ABCD1234OUTPUT": {
+        "ABCD1234OUTPUT.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "ABCD1234OUTPUT",
+          "effectiveDate": "2026-09-01T00:00:00Z",
+          "priceDimensions": {
+            "ABCD1234OUTPUT.JRTCKXETXF.6YS6EN2CT7": {
+              "rateCode": "ABCD1234OUTPUT.JRTCKXETXF.6YS6EN2CT7",
+              "description": "Synthetic output token dimension",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "unit": "1K tokens",
+              "pricePerUnit": {"USD": "0.0150000000"},
+              "appliesTo": []
+            }
+          },
+          "termAttributes": {}
+        }
+      }
+    }
+  },
+  "attributesList": []
+}

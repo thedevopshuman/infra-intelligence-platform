@@ -156,7 +156,16 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "ai-usage-attribution-record.json",
     ),
     "ai-allocation-report.schema.json": ("ai-allocation-report.json",),
-    "ai-price-catalog.schema.json": ("ai-price-catalog.json",),
+    "ai-price-catalog.schema.json": (
+        "ai-price-catalog.json",
+        "ai-price-catalog-provider-published.json",
+    ),
+    "aws-bedrock-price-catalog-import-policy.schema.json": (
+        "aws-bedrock-price-catalog-import-policy.json",
+    ),
+    "ai-price-catalog-import-report.schema.json": (
+        "ai-price-catalog-import-report.json",
+    ),
     "ai-price-catalog-qualification-policy.schema.json": (
         "ai-price-catalog-qualification-policy.json",
     ),

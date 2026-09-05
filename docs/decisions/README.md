@@ -117,3 +117,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0111](0111-qualified-expensive-model-anomaly.md) | Accepted | Require exact workload suitability evidence before calculating a lower-cost model scenario |
 | [0112](0112-minimized-ai-price-catalog-qualification.md) | Accepted | Qualify exact AI price catalogs for freshness, overlap, and protected scope coverage without exposing rates |
 | [0113](0113-runtime-ai-price-catalog-promotion.md) | Accepted | Require current exact production qualification before a cost worker registers or uses an AI price catalog |
+| [0114](0114-exact-aws-bedrock-public-price-import.md) | Accepted | Import exact AWS Bedrock public price dimensions into reproducible provider-neutral catalogs |

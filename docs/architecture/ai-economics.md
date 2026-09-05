@@ -23,6 +23,10 @@ flowchart LR
     Ownership["Protected application/team policy"] --> Attribution
     Attribution --> AttributionFacts["Immutable attribution facts"]
     Ledger --> Cost["Versioned cost engine"]
+    AwsPrices["Retained AWS public price snapshot"] --> Importer["Exact Bedrock price importer"]
+    ImportPolicy["Protected import policy"] --> Importer
+    Importer --> Catalog
+    Importer --> ImportEvidence["Minimized import evidence"]
     Catalog["Protected price catalog"] --> Cost
     PricePolicy["Protected qualification policy"] --> Qualification["Catalog qualification"]
     Catalog --> Qualification
@@ -108,8 +112,12 @@ The production worker requires that report at the `production-catalog` level,
 reconstructs its exact catalog/policy binding at startup, and rechecks its
 validity window before every registration and cost pass. It stops before
 catalog registration if any binding is missing, altered, cross-tenant,
-offline-only, unqualified, or expired. The evidence still does not choose an
-authoritative source or record organizational approval; those remain explicit
+offline-only, unqualified, or expired. For AWS Bedrock public token prices, the
+exact import adapter selects the official Price List Bulk API origin, binds a
+retained raw snapshot and protected SKU/term/dimension mapping, performs
+integer-only conversion, and emits a minimized reproducibility report. Import
+remains outside the worker and model request path. Operator-managed/private
+prices, organizational approval, and invoice agreement remain explicit
 customer decisions.
 
 ## Application and team attribution

@@ -3677,6 +3677,58 @@ class AiPriceCatalog:
 
 
 @dataclass(frozen=True)
+class AwsBedrockPriceCatalogImportPolicy:
+    """Protected exact mapping from an AWS price snapshot into a catalog."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "AwsBedrockPriceCatalogImportPolicy":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AwsBedrockPriceCatalogImportPolicy",
+                label="AWS Bedrock price catalog import policy",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class AiPriceCatalogImportReport:
+    """Minimized reproducibility evidence for one provider price import."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "AiPriceCatalogImportReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiPriceCatalogImportReport",
+                label="AI price catalog import report",
+            )
+        )
+
+    @property
+    def status(self) -> Optional[str]:
+        spec = self.payload.get("spec")
+        value = spec.get("status") if isinstance(spec, Mapping) else None
+        return value if isinstance(value, str) else None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class AiPriceCatalogQualificationPolicy:
     """Protected freshness and exact-scope requirements for a price catalog."""
 

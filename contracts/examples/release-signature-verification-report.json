@@ -2,7 +2,7 @@
   "apiVersion": "iip.dev/v1alpha1",
   "kind": "ReleaseSignatureVerificationReport",
   "metadata": {
-    "id": "rsv_d774dfebcd49a3dbd90db96fbcc47411",
+    "id": "rsv_90dbb2bf64ee622155725d2f6667b7c3",
     "generatedAt": "2026-09-07T01:00:00Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
@@ -11,9 +11,9 @@
     "status": "verified",
     "qualificationLevel": "sigstore-keyless-v1",
     "release": {
-      "version": "0.80.0",
+      "version": "0.81.0",
       "revision": "0123456789abcdef0123456789abcdef01234567",
-      "manifestDigest": "sha256:04b547763513f559b639b5b5d3076e4fc6958db2ddb4d0fbeb1f68a12c8843b2"
+      "manifestDigest": "sha256:a0bf3bbb9def007501193b2b9268a974e32edd61f1d9f28b854d8421ff24835a"
     },
     "policy": {
       "id": "rsp_organizational-release",

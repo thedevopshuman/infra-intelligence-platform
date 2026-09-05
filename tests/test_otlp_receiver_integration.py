@@ -5,6 +5,7 @@ import http.client
 import logging
 import os
 import ssl
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -172,7 +173,9 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
             handler.close()
             provider.shutdown()
 
-    def test_official_trace_exporter_commits_metadata_only_ai_usage(self) -> None:
+    def test_official_trace_exporter_commits_metadata_only_ai_usage_and_cost(
+        self,
+    ) -> None:
         receiver_url = os.environ["IIP_TEST_OTLP_RECEIVER_ENDPOINT"].rstrip("/")
         channel_token = os.environ["IIP_TEST_OTLP_CHANNEL_TOKEN"]
         exporter = OTLPSpanExporter(
@@ -220,15 +223,30 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
         finally:
             provider.shutdown()
 
+        deadline = time.monotonic() + 10
+        row = None
+        while row is None and time.monotonic() < deadline:
+            with psycopg.connect(
+                os.environ["IIP_TEST_OTLP_DATABASE_URL"]
+            ) as connection:
+                row = connection.execute(
+                    """
+                    SELECT usage.document, cost.document
+                    FROM iip.ai_usage_records AS usage
+                    JOIN iip.ai_cost_records AS cost
+                      ON cost.tenant_id = usage.tenant_id
+                     AND cost.usage_record_id = usage.usage_record_id
+                    WHERE usage.tenant_id = 'local'
+                    """
+                ).fetchone()
+            if row is None:
+                time.sleep(0.1)
+
         with psycopg.connect(os.environ["IIP_TEST_OTLP_DATABASE_URL"]) as connection:
-            row = connection.execute(
-                """
-                SELECT document, count(*) OVER () AS record_count
-                FROM iip.ai_usage_records
-                WHERE tenant_id = 'local'
-                """
-            ).fetchone()
-            event_count = connection.execute(
+            usage_count = connection.execute(
+                "SELECT count(*) FROM iip.ai_usage_records WHERE tenant_id = 'local'"
+            ).fetchone()[0]
+            usage_event_count = connection.execute(
                 """
                 SELECT count(*)
                 FROM iip.event_log
@@ -236,14 +254,36 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
                   AND event_type = 'io.iip.ai.usage-recorded.v1'
                 """
             ).fetchone()[0]
+            cost_event_count = connection.execute(
+                """
+                SELECT count(*)
+                FROM iip.event_log AS event
+                JOIN iip.event_outbox AS outbox
+                  ON outbox.tenant_id = event.tenant_id
+                 AND outbox.event_offset = event.event_offset
+                WHERE event.tenant_id = 'local'
+                  AND event.event_type = 'io.iip.ai.cost-calculated.v1'
+                """
+            ).fetchone()[0]
 
         self.assertIsNotNone(row)
-        self.assertEqual(row[1], 1)
-        document = row[0]
-        self.assertEqual(document["spec"]["usage"]["inputTokens"], 2400)
-        self.assertFalse(document["spec"]["privacy"]["contentCaptured"])
-        self.assertNotIn("docker-provider-request", json.dumps(document))
-        self.assertEqual(event_count, 1)
+        self.assertEqual(usage_count, 1)
+        usage_document, cost_document = row
+        self.assertEqual(usage_document["spec"]["usage"]["inputTokens"], 2400)
+        self.assertFalse(usage_document["spec"]["privacy"]["contentCaptured"])
+        self.assertNotIn("docker-provider-request", json.dumps(usage_document))
+        self.assertEqual(
+            cost_document["spec"]["usageRecordId"],
+            usage_document["metadata"]["id"],
+        )
+        self.assertEqual(cost_document["spec"]["result"]["costStatus"], "priced")
+        self.assertEqual(cost_document["spec"]["result"]["totalSubunits"], 16_200_000)
+        self.assertEqual(
+            cost_document["spec"]["result"]["warnings"],
+            ["calculated-cost-not-invoice", "test-fixture-pricing"],
+        )
+        self.assertEqual(usage_event_count, 1)
+        self.assertEqual(cost_event_count, 1)
 
     def test_control_and_receiver_routes_are_process_isolated(self) -> None:
         control_url = os.environ["IIP_TEST_CONTROL_ENDPOINT"].rstrip("/")

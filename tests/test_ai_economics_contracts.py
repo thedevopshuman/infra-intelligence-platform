@@ -37,6 +37,7 @@ def example_documents() -> dict[Path, object]:
         "ai-cost-record.json",
         "ai-savings-finding.json",
         "ai-usage-recorded-event.json",
+        "ai-cost-calculated-event.json",
     )
     return {EXAMPLES / name: load(EXAMPLES / name) for name in names}
 

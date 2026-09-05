@@ -210,6 +210,15 @@ This is the long-running development stack visible in Docker Desktop: PostgreSQL
 
 The API migrates the local Compose database on startup. Automatic migration is disabled in Helm serving pods; `database.migrations.enabled=true` explicitly runs the isolated pre-install/pre-upgrade Job described in the [Helm deployment guide](helm-deployment.md).
 
+The local cost worker remains disabled unless
+`IIP_AI_COST_ENGINE_ENABLED=true` and a protected
+`IIP_AI_PRICE_CATALOGS_JSON` wrapper for the exact `local` tenant are supplied
+to `make dev-up`. Fixture catalogs additionally require
+`IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES=true`; use that gate only for the
+repository example. The control-plane container never receives the catalog.
+See the [AI cost-engine runbook](ai-cost-engine.md) for the configuration and
+rotation rules.
+
 ### Verify or rebuild resource projections
 
 The PostgreSQL maintenance command verifies one explicit tenant against immutable accepted observation history. It is read-only unless `--apply` is present and prints only stable counts and canonical digests.
@@ -256,6 +265,11 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_DATABASE_AUTO_MIGRATE` | `false` | Apply packaged migrations at startup; local Compose only |
 | `IIP_WORKER_TENANTS` | unset | Required comma-separated exact tenant enrollment for the workflow worker; wildcard is invalid |
 | `IIP_WORKER_ID` | pod/host name | Stable workflow-worker identity |
+| `IIP_AI_COST_ENGINE_ENABLED` | `false` | Enable bounded asynchronous AI cost calculation in the workflow worker only. |
+| `IIP_AI_PRICE_CATALOGS_JSON` | required when cost is enabled | Protected closed price-catalog wrapper with one exact catalog per enrolled tenant. |
+| `IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES` | `false` | Explicitly permit non-production fixture pricing. |
+| `IIP_AI_COST_BATCH_SIZE` | `100` | Maximum usage records calculated per tenant/pass; range 1–1000. |
+| `IIP_AI_COST_INTERVAL_SECONDS` | `10` | Cost worker pass interval; range 1–3600 seconds. |
 | `IIP_ACTION_RECONCILIATION_BATCH_SIZE` | `100` | Maximum expired action leases scanned per enrolled tenant and timer pass |
 | `IIP_EVIDENCE_RETENTION_ENABLED` | `false` | Enable bounded artifact-byte expiration for worker-enrolled tenants only |
 | `IIP_EVIDENCE_RETENTION_INTERVAL_SECONDS` | `3600` | Worker cleanup cadence from 60–86400 seconds |

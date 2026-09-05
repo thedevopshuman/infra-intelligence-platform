@@ -127,6 +127,10 @@ same isolated identity, admission, availability, and durability boundary to
 metadata-only GenAI client spans. The `/v1/traces` adapter drops unknown values,
 rejects content-bearing structures, and commits normalized usage plus its event
 atomically; pricing and recommendations remain separate downstream use cases.
+The tenant-explicit workflow worker now implements the separate pricing use
+case: protected immutable catalogs drive bounded integer cost calculation, and
+each new cost fact, minimized event, and outbox row commit atomically. Saving
+rules and dashboard aggregates remain separate downstream work.
 
 Evidence providers cross a separate application-owned boundary. The [reference collection pipeline](evidence-collection-pipeline.md) authorizes an exact tenant, integration, evidence type, and resource scope before a provider runs, then validates and redacts provider output before hashing and atomic persistence. Providers do not receive ambient credentials through the application contract.
 

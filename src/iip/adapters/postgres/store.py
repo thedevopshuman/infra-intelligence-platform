@@ -14,6 +14,12 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from iip.adapters.ai_cost_store import (
+    prepare_ai_cost_writes,
+    prepare_ai_price_catalog,
+    validate_ai_cost_actor,
+    validate_ai_cost_usage_binding,
+)
 from iip.adapters.ai_usage_store import prepare_ai_usage_writes
 from iip.application.ports import (
     ActorContext,
@@ -60,6 +66,7 @@ SCHEMA_MIGRATIONS = (
     "0016_telemetry_export_health.sql",
     "0017_telemetry_export_slo_samples.sql",
     "0018_ai_usage_ledger.sql",
+    "0019_ai_cost_ledger.sql",
 )
 
 
@@ -540,6 +547,260 @@ class PostgresResourceStore:
 
             return tuple(
                 stored[(item.tenant_id, item.deduplication_key)]
+                for item in prepared
+            )
+
+    @_translate_database_errors
+    def register_price_catalog(
+        self,
+        actor: ActorContext,
+        catalog: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        """Idempotently register one immutable tenant price catalog."""
+
+        prepared = prepare_ai_price_catalog(actor, catalog)
+        with self._connect() as connection:
+            lock_names = sorted(
+                (
+                    "iip.ai-price-catalog-id\x1f"
+                    f"{prepared.tenant_id}\x1f{prepared.catalog_id}",
+                    "iip.ai-price-catalog-version\x1f"
+                    f"{prepared.tenant_id}\x1f{prepared.catalog_version}",
+                )
+            )
+            for name in lock_names:
+                connection.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (name,),
+                )
+            row = connection.execute(
+                """
+                SELECT catalog_id, catalog_version, document_hash, document
+                FROM iip.ai_price_catalogs
+                WHERE tenant_id = %s
+                  AND (catalog_id = %s OR catalog_version = %s)
+                FOR UPDATE
+                """,
+                (
+                    prepared.tenant_id,
+                    prepared.catalog_id,
+                    prepared.catalog_version,
+                ),
+            ).fetchone()
+            if row is not None:
+                if (
+                    row["catalog_id"] != prepared.catalog_id
+                    or row["catalog_version"] != prepared.catalog_version
+                    or row["document_hash"] != prepared.document_hash
+                ):
+                    raise PersistenceError("storage.conflict")
+                return row["document"]
+            connection.execute(
+                """
+                INSERT INTO iip.ai_price_catalogs (
+                    tenant_id, catalog_id, catalog_version, document_hash,
+                    source_hash, published_at, document
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    prepared.tenant_id,
+                    prepared.catalog_id,
+                    prepared.catalog_version,
+                    prepared.document_hash,
+                    prepared.source_hash,
+                    prepared.published_at,
+                    Jsonb(dict(prepared.document)),
+                ),
+            )
+            return prepared.document
+
+    @_translate_database_errors
+    def list_usage_without_cost(
+        self,
+        actor: ActorContext,
+        catalog_id: str,
+        engine_version: str,
+        *,
+        limit: int = 100,
+    ) -> tuple[Mapping[str, object], ...]:
+        validate_ai_cost_actor(
+            actor,
+            catalog_id=catalog_id,
+            engine_version=engine_version,
+            limit=limit,
+        )
+        with self._connect() as connection:
+            catalog_exists = connection.execute(
+                """
+                SELECT 1
+                FROM iip.ai_price_catalogs
+                WHERE tenant_id = %s AND catalog_id = %s
+                """,
+                (actor.tenant_id, catalog_id),
+            ).fetchone()
+            if catalog_exists is None:
+                raise PersistenceError("storage.request.invalid")
+            rows = connection.execute(
+                """
+                SELECT usage.document
+                FROM iip.ai_usage_records AS usage
+                WHERE usage.tenant_id = %s
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM iip.ai_cost_records AS cost
+                      WHERE cost.tenant_id = usage.tenant_id
+                        AND cost.usage_record_id = usage.usage_record_id
+                        AND cost.catalog_id = %s
+                        AND cost.engine_version = %s
+                  )
+                ORDER BY usage.invocation_started_at, usage.usage_record_id
+                LIMIT %s
+                """,
+                (actor.tenant_id, catalog_id, engine_version, limit),
+            ).fetchall()
+        return tuple(row["document"] for row in rows)
+
+    @_translate_database_errors
+    def commit_cost_batch(
+        self,
+        actor: ActorContext,
+        records: tuple[Mapping[str, object], ...],
+        events: tuple[PlatformEvent, ...],
+    ) -> tuple[Mapping[str, object], ...]:
+        """Commit cost facts, CloudEvents, and outbox rows atomically."""
+
+        prepared = prepare_ai_cost_writes(actor, records, events)
+        with self._connect() as connection:
+            lock_names = sorted(
+                {
+                    "iip.ai-cost\x1f"
+                    f"{item.tenant_id}\x1f{item.usage_record_id}\x1f"
+                    f"{item.catalog_id}\x1f{item.engine_version}"
+                    for item in prepared
+                }
+            )
+            for name in lock_names:
+                connection.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (name,),
+                )
+
+            stored: dict[tuple[str, str], Mapping[str, object]] = {}
+            new_items = []
+            for item in prepared:
+                catalog = connection.execute(
+                    """
+                    SELECT catalog_version, source_hash,
+                           document->'spec'->'source'->>'kind' AS source_kind,
+                           document->'spec'->>'currency' AS currency,
+                           (document->'spec'->>'currencyScale')::smallint
+                               AS currency_scale
+                    FROM iip.ai_price_catalogs
+                    WHERE tenant_id = %s AND catalog_id = %s
+                    """,
+                    (item.tenant_id, item.catalog_id),
+                ).fetchone()
+                usage = connection.execute(
+                    """
+                    SELECT document FROM iip.ai_usage_records
+                    WHERE tenant_id = %s AND usage_record_id = %s
+                    """,
+                    (item.tenant_id, item.usage_record_id),
+                ).fetchone()
+                if (
+                    catalog is None
+                    or usage is None
+                    or catalog["catalog_version"] != item.catalog_version
+                    or catalog["source_hash"] != item.catalog_source_hash
+                    or (
+                        "test-fixture-pricing" in item.warnings
+                    ) != (catalog["source_kind"] == "test-fixture")
+                    or (
+                        item.cost_status == "priced"
+                        and (
+                            item.currency != catalog["currency"]
+                            or item.currency_scale != catalog["currency_scale"]
+                        )
+                    )
+                ):
+                    raise PersistenceError("storage.request.invalid")
+                validate_ai_cost_usage_binding(item, usage["document"])
+                row = connection.execute(
+                    """
+                    SELECT cost_record_id, document_hash, document
+                    FROM iip.ai_cost_records
+                    WHERE tenant_id = %s
+                      AND (
+                          cost_record_id = %s
+                          OR (
+                              usage_record_id = %s
+                              AND catalog_id = %s
+                              AND engine_version = %s
+                          )
+                      )
+                    FOR UPDATE
+                    """,
+                    (
+                        item.tenant_id,
+                        item.cost_record_id,
+                        item.usage_record_id,
+                        item.catalog_id,
+                        item.engine_version,
+                    ),
+                ).fetchone()
+                if row is None:
+                    new_items.append(item)
+                    continue
+                if (
+                    row["cost_record_id"] != item.cost_record_id
+                    or row["document_hash"] != item.document_hash
+                ):
+                    raise PersistenceError("storage.conflict")
+                stored[(item.tenant_id, item.cost_record_id)] = row["document"]
+
+            for item in new_items:
+                connection.execute(
+                    """
+                    INSERT INTO iip.ai_cost_records (
+                        tenant_id, cost_record_id, usage_record_id,
+                        catalog_id, catalog_version, catalog_source_hash,
+                        engine_version,
+                        document_hash, cost_status, currency, currency_scale,
+                        total_subunits, calculated_at, document
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s
+                    )
+                    """,
+                    (
+                        item.tenant_id,
+                        item.cost_record_id,
+                        item.usage_record_id,
+                        item.catalog_id,
+                        item.catalog_version,
+                        item.catalog_source_hash,
+                        item.engine_version,
+                        item.document_hash,
+                        item.cost_status,
+                        item.currency,
+                        item.currency_scale,
+                        item.total_subunits,
+                        item.calculated_at,
+                        Jsonb(dict(item.document)),
+                    ),
+                )
+                event_offset = self._append_event(connection, item.event)
+                connection.execute(
+                    """
+                    INSERT INTO iip.event_outbox (tenant_id, event_offset)
+                    VALUES (%s, %s)
+                    """,
+                    (item.tenant_id, event_offset),
+                )
+                stored[(item.tenant_id, item.cost_record_id)] = item.document
+
+            return tuple(
+                stored[(item.tenant_id, item.cost_record_id)]
                 for item in prepared
             )
 

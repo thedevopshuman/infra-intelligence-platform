@@ -30,9 +30,12 @@ AWS Bedrock → OTLP traces → normalized usage → data-driven calculated cost
 one evidence-backed saving → Grafana. IIP remains outside the inference path
 and does not collect prompts or responses by default. An isolated, tenant-bound
 `/v1/traces` route now normalizes approved Bedrock-shaped GenAI client metadata
-and atomically stores usage plus its event; live Bedrock qualification, the
-cost runtime, rule runtime, aggregate export, and dashboard remain. See the
+and atomically stores usage plus its event. A tenant-explicit background cost
+service now loads protected versioned catalogs and atomically records
+explainable calculated estimates plus value-minimized events. Live Bedrock
+qualification, the rule runtime, aggregate export, and dashboard remain. See the
 [receiver runbook](docs/operations/ai-usage-receiver.md),
+[cost-engine runbook](docs/operations/ai-cost-engine.md),
 [product direction](docs/product/ai-finops-vision.md),
 [architecture](docs/architecture/ai-economics.md), [contracts](docs/specifications/ai-economics-contracts.md),
 and [roadmap](docs/roadmap/ai-finops-roadmap.md).

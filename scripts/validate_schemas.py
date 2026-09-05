@@ -57,7 +57,11 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "console-authentication-oidc.json",
     ),
     "evaluation-scenario.schema.json": ("evaluation-scenario.json",),
-    "event.schema.json": ("event.json", "ai-usage-recorded-event.json"),
+    "event.schema.json": (
+        "event.json",
+        "ai-usage-recorded-event.json",
+        "ai-cost-calculated-event.json",
+    ),
     "event-delivery-health-report.schema.json": (
         "event-delivery-health-report.json",
     ),

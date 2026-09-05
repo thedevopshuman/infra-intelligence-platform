@@ -634,6 +634,33 @@ class AiUsageLedger(Protocol):
         """Atomically persist normalized usage and events with exact deduplication."""
 
 
+class AiEconomicsLedger(AiUsageLedger, Protocol):
+    def register_price_catalog(
+        self,
+        actor: ActorContext,
+        catalog: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        """Idempotently register one immutable protected price snapshot."""
+
+    def list_usage_without_cost(
+        self,
+        actor: ActorContext,
+        catalog_id: str,
+        engine_version: str,
+        *,
+        limit: int = 100,
+    ) -> tuple[Mapping[str, object], ...]:
+        """List a bounded exact-tenant usage page not evaluated by this engine/catalog."""
+
+    def commit_cost_batch(
+        self,
+        actor: ActorContext,
+        records: tuple[Mapping[str, object], ...],
+        events: tuple[PlatformEvent, ...],
+    ) -> tuple[Mapping[str, object], ...]:
+        """Atomically persist cost records and their event/outbox side effects."""
+
+
 class EventOutbox(Protocol):
     def claim_outbox(
         self,

@@ -46,6 +46,10 @@ from iip.adapters.policy import ExternalHttpPolicyDecisionPoint
 from iip.adapters.telemetry_health import PeriodicTelemetryExportHealthReporter
 from iip.application.action_reconciliation import ActionReconciliationService
 from iip.application.actions import GovernedActionService
+from iip.application.calculate_ai_cost import (
+    AiCostCalculationService,
+    AiCostConfigurationError,
+)
 from iip.application.collect_evidence import EvidenceCollectionService
 from iip.application.context_evidence import ContextEvidenceProvider, ContextEvidenceService
 from iip.application.deliver_events import EventDeliveryService
@@ -209,6 +213,7 @@ class Runtime:
     otlp_metrics_ingestion: OtlpMetricsIngestionService | None
     otlp_logs_ingestion: OtlpLogsIngestionService | None
     ai_usage_ingestion: AiUsageIngestionService | None
+    ai_cost_calculation: AiCostCalculationService | None
     investigations: DeterministicInvestigationService
     investigation_lifecycle: InvestigationLifecycleService
     investigation_dispatch: InvestigationDispatchService
@@ -270,6 +275,9 @@ def build_local_runtime(
     ) = None,
     otlp_receiver_objectives: OtlpReceiverObjectives | None = None,
     otlp_receiver_telemetry_sink: OtlpReceiverTelemetrySink | None = None,
+    ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
+    ai_cost_allow_test_fixtures: bool = False,
+    ai_cost_batch_size: int = 100,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -309,6 +317,9 @@ def build_local_runtime(
         otlp_receiver_telemetry_sink,
         collector_queue_loss_binding,
         collector_queue_loss_objectives,
+        ai_cost_catalogs,
+        ai_cost_allow_test_fixtures,
+        ai_cost_batch_size,
     )
 
 
@@ -349,6 +360,9 @@ def _compose_runtime(
     otlp_receiver_telemetry_sink: OtlpReceiverTelemetrySink | None = None,
     collector_queue_loss_binding: CollectorQueueLossBinding | None = None,
     collector_queue_loss_objectives: CollectorQueueLossObjectives | None = None,
+    ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
+    ai_cost_allow_test_fixtures: bool = False,
+    ai_cost_batch_size: int = 100,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -568,6 +582,17 @@ def _compose_runtime(
             if ai_usage_receiver is not None
             else None
         ),
+        ai_cost_calculation=(
+            AiCostCalculationService(
+                store,
+                clock,
+                ai_cost_catalogs,
+                allow_test_fixtures=ai_cost_allow_test_fixtures,
+                batch_size=ai_cost_batch_size,
+            )
+            if ai_cost_catalogs is not None
+            else None
+        ),
         investigations=investigations,
         investigation_lifecycle=investigation_lifecycle,
         investigation_dispatch=InvestigationDispatchService(
@@ -663,6 +688,9 @@ def build_postgres_runtime(
     ) = None,
     otlp_receiver_objectives: OtlpReceiverObjectives | None = None,
     otlp_receiver_telemetry_sink: OtlpReceiverTelemetrySink | None = None,
+    ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
+    ai_cost_allow_test_fixtures: bool = False,
+    ai_cost_batch_size: int = 100,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -709,6 +737,9 @@ def build_postgres_runtime(
         otlp_receiver_telemetry_sink,
         collector_queue_loss_binding,
         collector_queue_loss_objectives,
+        ai_cost_catalogs,
+        ai_cost_allow_test_fixtures,
+        ai_cost_batch_size,
     )
 
 
@@ -751,6 +782,7 @@ def build_runtime_from_env(*, include_action_executor: bool = True) -> Runtime:
     return _build_runtime_from_env(
         _authenticator_from_env(),
         include_action_executor=include_action_executor,
+        include_ai_cost_engine=False,
     )
 
 
@@ -760,6 +792,7 @@ def build_workflow_worker_runtime_from_env() -> Runtime:
     return _build_runtime_from_env(
         DenyAllAuthenticator(),
         include_action_executor=False,
+        include_ai_cost_engine=True,
     )
 
 
@@ -767,6 +800,7 @@ def _build_runtime_from_env(
     authenticator: Authenticator,
     *,
     include_action_executor: bool,
+    include_ai_cost_engine: bool,
 ) -> Runtime:
     policy = _policy_from_env()
     objectives = _ingestion_objectives_from_env()
@@ -851,6 +885,15 @@ def _build_runtime_from_env(
         )
         context_documents_backend = _context_documents_backend_from_env()
         signal_catalog = build_investigation_signal_catalog(os.environ)
+        (
+            ai_cost_catalogs,
+            ai_cost_allow_test_fixtures,
+            ai_cost_batch_size,
+        ) = (
+            _ai_cost_engine_configuration_from_env()
+            if include_ai_cost_engine
+            else (None, False, 100)
+        )
         if not database_url:
             return build_local_runtime(
                 authenticator,
@@ -899,6 +942,9 @@ def _build_runtime_from_env(
                     if metrics_runtime is not None
                     else None
                 ),
+                ai_cost_catalogs=ai_cost_catalogs,
+                ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
+                ai_cost_batch_size=ai_cost_batch_size,
             )
         auto_migrate = (
             os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
@@ -952,6 +998,9 @@ def _build_runtime_from_env(
                 else None
             ),
             readiness_timeout_seconds=_readiness_timeout_from_env(),
+            ai_cost_catalogs=ai_cost_catalogs,
+            ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
+            ai_cost_batch_size=ai_cost_batch_size,
         )
     except Exception:
         if telemetry_runtime is not None:
@@ -1801,3 +1850,49 @@ def _ai_usage_receiver_from_env() -> AiUsageReceiverAdapter | None:
     from iip.adapters.otlp_ai_usage_receiver import ConfiguredAiUsageReceiver
 
     return ConfiguredAiUsageReceiver.from_json(configuration)
+
+
+def _ai_cost_engine_configuration_from_env() -> tuple[
+    tuple[Mapping[str, object], ...] | None,
+    bool,
+    int,
+]:
+    enabled = os.environ.get("IIP_AI_COST_ENGINE_ENABLED", "false").lower()
+    if enabled not in ("false", "true"):
+        raise AiCostConfigurationError("ai.cost.configuration.invalid")
+    if enabled == "false":
+        return None, False, 100
+    raw_catalogs = os.environ.get("IIP_AI_PRICE_CATALOGS_JSON")
+    if raw_catalogs is None:
+        raise AiCostConfigurationError("ai.cost.configuration.required")
+    allow_raw = os.environ.get(
+        "IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES",
+        "false",
+    ).lower()
+    if allow_raw not in ("false", "true"):
+        raise AiCostConfigurationError("ai.cost.configuration.invalid")
+    try:
+        batch_size = int(os.environ.get("IIP_AI_COST_BATCH_SIZE", "100"))
+    except ValueError:
+        raise AiCostConfigurationError("ai.cost.configuration.invalid") from None
+    if not 1 <= batch_size <= 1000:
+        raise AiCostConfigurationError("ai.cost.configuration.invalid")
+
+    from iip.adapters.ai_price_catalogs import ai_price_catalogs_from_json
+
+    catalogs = ai_price_catalogs_from_json(raw_catalogs)
+    worker_tenants = {
+        item.strip()
+        for item in os.environ.get("IIP_WORKER_TENANTS", "").split(",")
+        if item.strip()
+    }
+    try:
+        catalog_tenants = {
+            item["metadata"]["tenantId"]  # type: ignore[index]
+            for item in catalogs
+        }
+    except (KeyError, TypeError):
+        raise AiCostConfigurationError("ai.cost.configuration.invalid") from None
+    if not worker_tenants or catalog_tenants != worker_tenants:
+        raise AiCostConfigurationError("ai.cost.tenants.invalid")
+    return catalogs, allow_raw == "true", batch_size

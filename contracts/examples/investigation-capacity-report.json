@@ -16,7 +16,7 @@
       "database": {
         "engine": "postgresql",
         "version": "18.4",
-        "migration": "0018_ai_usage_ledger.sql"
+        "migration": "0019_ai_cost_ledger.sql"
       }
     },
     "profile": {

@@ -211,6 +211,30 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn("IIP_WORKER_INVESTIGATION_CONCURRENCY", worker)
         self.assertIn("IIP_WORKER_MAX_TENANT_CONCURRENCY", worker)
 
+    def test_ai_cost_engine_is_disabled_secret_backed_and_worker_owned(self) -> None:
+        worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+        api = (CHART / "templates" / "deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("aiCostEngine:", values)
+        self.assertIn("  enabled: false", values)
+        for expected in (
+            "IIP_AI_COST_ENGINE_ENABLED",
+            "IIP_AI_PRICE_CATALOGS_JSON",
+            "aiCostEngine.catalogsExistingSecret",
+            "aiCostEngine.catalogsSecretKey",
+            "IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES",
+            "IIP_AI_COST_BATCH_SIZE",
+            "IIP_AI_COST_INTERVAL_SECONDS",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, worker)
+        self.assertNotIn("IIP_AI_PRICE_CATALOGS_JSON", api)
+
     def test_event_delivery_slo_objective_is_explicit_and_api_visible(self) -> None:
         config_map = (CHART / "templates" / "configmap.yaml").read_text(
             encoding="utf-8"

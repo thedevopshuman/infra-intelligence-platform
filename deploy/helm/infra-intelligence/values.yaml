@@ -27,6 +27,14 @@ worker:
       cpu: 500m
       memory: 256Mi
 
+aiCostEngine:
+  enabled: false
+  catalogsExistingSecret: ""
+  catalogsSecretKey: ai-price-catalogs-json
+  allowTestFixtures: false
+  batchSize: 100
+  intervalSeconds: 10
+
 eventPublisher:
   mode: disabled
   batchSize: 100

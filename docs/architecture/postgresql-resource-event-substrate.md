@@ -17,6 +17,8 @@ This page describes the executable Phase 1 persistence slice. Public contracts r
 | `iip.event_outbox` | At-least-once delivery state for event-log rows | Unique event offset and tenant-scoped lease |
 | `iip.source_checkpoints` | Last explicitly committed aggregate checkpoint and opaque provider cursor map | `(tenant_id, source_id)` |
 | `iip.ai_usage_records` | Immutable metadata-only GenAI invocation usage | Tenant-scoped usage ID and deduplication key |
+| `iip.ai_price_catalogs` | Immutable protected AI price snapshots | Tenant-scoped catalog ID and unique version |
+| `iip.ai_cost_records` | Reproducible per-usage calculated-cost facts | Tenant, usage, catalog, and engine identity |
 
 Canonical documents are stored as `jsonb`, but frequently enforced identity, tenancy, ordering, lifecycle, and delivery fields are relational columns. The relational columns are not a second public contract; migrations and adapter tests keep them aligned with the canonical document.
 
@@ -55,6 +57,16 @@ resource projection. An accepted normalized span commits the immutable
 tenant, AI channel actor, stable span-derived identity, and document hash are
 checked again at the storage port. An exact retry returns the first document;
 reuse of the identity with different usage fails closed.
+
+AI cost calculation remains a separate transaction after intake. The
+tenant-explicit worker idempotently registers a protected catalog, selects a
+bounded ordered page of usage not yet evaluated by that catalog and engine,
+and commits each immutable `ai_cost_records` document with its value-minimized
+CloudEvent and outbox row. Catalog ID and catalog version have independent
+transaction advisory locks, while cost writes lock their complete semantic
+identity. Storage rechecks the cited usage, catalog version/source hash,
+fixture-warning state, event identity, and event routing fields before commit.
+No partial record/event/outbox state survives a failure.
 
 The HTTP surface never sets the safe-checkpoint signal. A collector workflow may set it only after all resource mutations represented by that opaque cursor are included. Resource-collection resume state must exactly match the current tenant/source checkpoint, and provider cursor maps update in the same transaction as complete reconciliation membership. Reconciliation completion markers are never inferred from the last resource received.
 

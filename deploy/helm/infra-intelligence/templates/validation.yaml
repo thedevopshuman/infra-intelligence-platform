@@ -19,6 +19,15 @@
 {{- if and .Values.evidenceRetention.enabled (not .Values.worker.enabled) }}
 {{- fail "worker.enabled must be true when evidenceRetention.enabled=true" }}
 {{- end }}
+{{- if and .Values.aiCostEngine.enabled (not .Values.worker.enabled) }}
+{{- fail "worker.enabled must be true when aiCostEngine.enabled=true" }}
+{{- end }}
+{{- if and .Values.aiCostEngine.enabled (not .Values.aiCostEngine.catalogsExistingSecret) }}
+{{- fail "aiCostEngine.catalogsExistingSecret is required when aiCostEngine.enabled=true" }}
+{{- end }}
+{{- if and .Values.aiCostEngine.allowTestFixtures (not .Values.aiCostEngine.enabled) }}
+{{- fail "aiCostEngine.enabled must be true when test fixtures are allowed" }}
+{{- end }}
 {{- if gt (int .Values.telemetry.traceMaxExportBatchSize) (int .Values.telemetry.traceMaxQueueSize) }}
 {{- fail "telemetry.traceMaxExportBatchSize must not exceed telemetry.traceMaxQueueSize" }}
 {{- end }}

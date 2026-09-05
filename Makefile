@@ -18,7 +18,7 @@ help:
 	@echo "test-policy-engine Certify external policy decisions over local TLS"
 	@echo "test-backup-restore Measure and verify PostgreSQL recovery with Docker Desktop"
 	@echo "test-otel     Send reference metrics and traces to an OpenTelemetry Collector"
-	@echo "test-otlp-receiver Send official OTLP metrics and logs into the isolated receiver"
+	@echo "test-otlp-receiver Send official OTLP metrics, logs, and AI usage-to-cost traces"
 	@echo "test-prometheus Query a real Prometheus server through the evidence adapter"
 	@echo "test-collector-queue-loss Drive a real Collector's own self-metrics into a queue/loss report"
 	@echo "test-loki     Query a real Loki server through the log evidence adapter"

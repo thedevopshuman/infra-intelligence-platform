@@ -9,8 +9,9 @@ The roadmap is outcome-based. Dates should be added after team size and pilot co
 
 The separately sequenced [AI FinOps roadmap](ai-finops-roadmap.md) extends this
 foundation with an OpenTelemetry-native AWS Bedrock vertical slice. Its
-contract and architecture unit is delivered; trace intake, normalization,
-ledger, pricing runtime, rules, and dashboard remain implementation work.
+contract, architecture, metadata-only trace intake, usage ledger, and
+versioned pricing runtime are delivered. Live Bedrock qualification, savings
+rules, bounded aggregate export, and the reference dashboard remain.
 
 ## Phase 0 — foundation (current repository)
 

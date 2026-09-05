@@ -93,6 +93,32 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  workflow-worker:
+    image: iip-otlp-receiver-test:0.63.0
+    pull_policy: never
+    command: ["python", "-m", "iip.surfaces.worker"]
+    environment:
+      IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_AUTO_MIGRATE: "false"
+      IIP_WORKER_ID: otlp-cost-worker
+      IIP_WORKER_TENANTS: local
+      IIP_AI_COST_ENGINE_ENABLED: "true"
+      IIP_AI_PRICE_CATALOGS_JSON: ${IIP_AI_PRICE_CATALOGS_JSON:?set IIP_AI_PRICE_CATALOGS_JSON}
+      IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES: "true"
+      IIP_AI_COST_BATCH_SIZE: "100"
+      IIP_AI_COST_INTERVAL_SECONDS: "1"
+      IIP_EVENT_PUBLISHER_MODE: disabled
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+
   otel-collector:
     image: otel/opentelemetry-collector:0.158.0
     command: ["--config=/etc/otelcol/config.yaml"]

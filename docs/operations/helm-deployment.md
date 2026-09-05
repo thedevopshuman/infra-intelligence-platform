@@ -6,6 +6,13 @@ The chart can install the control-plane API against an existing PostgreSQL datab
 
 Reviewed automatic investigation candidates are optional. Set `investigationSignalCatalog.existingSecret` and `secretKey` to project the same tenant-bound [signal catalog](investigation-signal-catalog.md) into the API and worker. The chart never renders the catalog body into a ConfigMap or values-derived manifest.
 
+The optional AI cost engine is worker-owned and disabled by default. Its
+protected catalog wrapper comes from an existing Secret and is never mounted
+into the API or OTLP receiver. `aiCostEngine.enabled=true` requires the worker,
+an exact tenant enrollment, and `aiCostEngine.catalogsExistingSecret`; fixture
+pricing remains separately prohibited by default. Follow the
+[AI cost-engine runbook](ai-cost-engine.md) before enabling it.
+
 ## Required inputs
 
 Before installation, provide:

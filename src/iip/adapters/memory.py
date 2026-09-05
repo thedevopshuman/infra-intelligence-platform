@@ -24,6 +24,12 @@ from iip.application.ports import (
     SourceIngestionState,
     StoredEvent,
 )
+from iip.adapters.ai_cost_store import (
+    prepare_ai_cost_writes,
+    prepare_ai_price_catalog,
+    validate_ai_cost_actor,
+    validate_ai_cost_usage_binding,
+)
 from iip.adapters.ai_usage_store import prepare_ai_usage_writes
 from iip.domain.models import (
     ObservationDisposition,
@@ -63,6 +69,14 @@ class InMemoryResourceStore:
             tuple[str, str], tuple[str, Mapping[str, object]]
         ] = {}
         self._ai_usage_ids: Dict[tuple[str, str], str] = {}
+        self._ai_price_catalogs: Dict[
+            tuple[str, str], tuple[str, Mapping[str, object]]
+        ] = {}
+        self._ai_price_catalog_versions: Dict[tuple[str, str], str] = {}
+        self._ai_costs: Dict[
+            tuple[str, str], tuple[str, Mapping[str, object]]
+        ] = {}
+        self._ai_cost_identities: Dict[tuple[str, str, str, str], str] = {}
         self._lock = RLock()
 
     @property
@@ -267,6 +281,170 @@ class InMemoryResourceStore:
                     item.recorded_at,
                 )
                 results.append(self._json_copy(document))
+            return tuple(results)
+
+    def register_price_catalog(
+        self,
+        actor: ActorContext,
+        catalog: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        """Register one immutable exact-tenant price snapshot."""
+
+        prepared = prepare_ai_price_catalog(actor, catalog)
+        key = (prepared.tenant_id, prepared.catalog_id)
+        version_key = (prepared.tenant_id, prepared.catalog_version)
+        with self._lock:
+            existing = self._ai_price_catalogs.get(key)
+            version_catalog = self._ai_price_catalog_versions.get(version_key)
+            if existing is not None:
+                if existing[0] != prepared.document_hash:
+                    raise PersistenceError("storage.conflict")
+                return self._json_copy(existing[1])
+            if version_catalog is not None and version_catalog != prepared.catalog_id:
+                raise PersistenceError("storage.conflict")
+            copied = self._json_copy(prepared.document)
+            self._ai_price_catalogs[key] = (prepared.document_hash, copied)
+            self._ai_price_catalog_versions[version_key] = prepared.catalog_id
+            return self._json_copy(copied)
+
+    def list_usage_without_cost(
+        self,
+        actor: ActorContext,
+        catalog_id: str,
+        engine_version: str,
+        *,
+        limit: int = 100,
+    ) -> tuple[Mapping[str, object], ...]:
+        validate_ai_cost_actor(
+            actor,
+            catalog_id=catalog_id,
+            engine_version=engine_version,
+            limit=limit,
+        )
+        with self._lock:
+            if (actor.tenant_id, catalog_id) not in self._ai_price_catalogs:
+                raise PersistenceError("storage.request.invalid")
+            candidates: list[Mapping[str, object]] = []
+            for (tenant_id, _deduplication_key), (_digest, document) in self._ai_usage.items():
+                if tenant_id != actor.tenant_id:
+                    continue
+                metadata = document["metadata"]
+                spec = document["spec"]
+                assert isinstance(metadata, Mapping)
+                assert isinstance(spec, Mapping)
+                usage_record_id = metadata["id"]
+                if not isinstance(usage_record_id, str):
+                    raise PersistenceError("storage.state.invalid")
+                identity = (
+                    tenant_id,
+                    usage_record_id,
+                    catalog_id,
+                    engine_version,
+                )
+                if identity not in self._ai_cost_identities:
+                    candidates.append(document)
+            candidates.sort(key=self._ai_usage_order)
+            return tuple(self._json_copy(item) for item in candidates[:limit])
+
+    def commit_cost_batch(
+        self,
+        actor: ActorContext,
+        records: tuple[Mapping[str, object], ...],
+        events: tuple[PlatformEvent, ...],
+    ) -> tuple[Mapping[str, object], ...]:
+        """Atomically retain calculated cost and enqueue each new event."""
+
+        prepared = prepare_ai_cost_writes(actor, records, events)
+        with self._lock:
+            event_identities = {
+                (item.event.tenant_id, item.event.source, item.event.event_id)
+                for item in self._event_log
+            }
+            for item in prepared:
+                catalog = self._ai_price_catalogs.get(
+                    (item.tenant_id, item.catalog_id)
+                )
+                usage_key = self._ai_usage_ids.get(
+                    (item.tenant_id, item.usage_record_id)
+                )
+                usage = (
+                    self._ai_usage.get((item.tenant_id, usage_key))
+                    if usage_key is not None
+                    else None
+                )
+                existing = self._ai_costs.get(
+                    (item.tenant_id, item.cost_record_id)
+                )
+                identity = (
+                    item.tenant_id,
+                    item.usage_record_id,
+                    item.catalog_id,
+                    item.engine_version,
+                )
+                existing_id = self._ai_cost_identities.get(identity)
+                if catalog is None or usage is None:
+                    raise PersistenceError("storage.request.invalid")
+                validate_ai_cost_usage_binding(item, usage[1])
+                catalog_document = catalog[1]
+                catalog_metadata = catalog_document["metadata"]
+                catalog_spec = catalog_document["spec"]
+                assert isinstance(catalog_metadata, Mapping)
+                assert isinstance(catalog_spec, Mapping)
+                catalog_source = catalog_spec["source"]
+                assert isinstance(catalog_source, Mapping)
+                if (
+                    catalog_metadata["version"] != item.catalog_version
+                    or catalog_source["contentHash"]
+                    != item.catalog_source_hash
+                    or (
+                        "test-fixture-pricing" in item.warnings
+                    ) != (catalog_source["kind"] == "test-fixture")
+                    or item.cost_status == "priced"
+                    and (
+                        item.currency != catalog_spec["currency"]
+                        or item.currency_scale != catalog_spec["currencyScale"]
+                    )
+                ):
+                    raise PersistenceError("storage.request.invalid")
+                if (
+                    (existing is not None and existing[0] != item.document_hash)
+                    or (
+                        existing_id is not None
+                        and existing_id != item.cost_record_id
+                    )
+                    or (
+                        existing is None
+                        and (item.tenant_id, item.event.source, item.event.event_id)
+                        in event_identities
+                    )
+                ):
+                    raise PersistenceError("storage.conflict")
+
+            results: list[Mapping[str, object]] = []
+            for item in prepared:
+                key = (item.tenant_id, item.cost_record_id)
+                existing = self._ai_costs.get(key)
+                if existing is not None:
+                    results.append(self._json_copy(existing[1]))
+                    continue
+                copied = self._json_copy(item.document)
+                self._ai_costs[key] = (item.document_hash, copied)
+                self._ai_cost_identities[
+                    (
+                        item.tenant_id,
+                        item.usage_record_id,
+                        item.catalog_id,
+                        item.engine_version,
+                    )
+                ] = item.cost_record_id
+                event_offset = len(self._event_log) + 1
+                self._event_log.append(StoredEvent(event_offset, item.event))
+                self._outbox[event_offset] = _MemoryOutboxEntry(
+                    event_offset,
+                    item.event,
+                    item.calculated_at,
+                )
+                results.append(self._json_copy(copied))
             return tuple(results)
 
     def claim_outbox(
@@ -832,6 +1010,21 @@ class InMemoryResourceStore:
         return json.loads(
             json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
         )
+
+    @staticmethod
+    def _ai_usage_order(value: Mapping[str, object]) -> tuple[str, str]:
+        metadata = value.get("metadata")
+        spec = value.get("spec")
+        if not isinstance(metadata, Mapping) or not isinstance(spec, Mapping):
+            raise PersistenceError("storage.state.invalid")
+        invocation = spec.get("invocation")
+        if not isinstance(invocation, Mapping):
+            raise PersistenceError("storage.state.invalid")
+        started_at = invocation.get("startedAt")
+        usage_record_id = metadata.get("id")
+        if not isinstance(started_at, str) or not isinstance(usage_record_id, str):
+            raise PersistenceError("storage.state.invalid")
+        return started_at, usage_record_id
 
 
 class InMemoryEventPublisher:

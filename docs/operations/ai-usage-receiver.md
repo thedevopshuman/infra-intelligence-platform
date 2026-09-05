@@ -84,7 +84,10 @@ partial usage and preventing an unsupported exact cost.
 
 ## Run the isolated process
 
-Apply migration `0018_ai_usage_ledger.sql`, then configure the receiver:
+Apply all packaged migrations through `0019_ai_cost_ledger.sql`, then configure
+the receiver. The usage ledger itself is introduced by
+`0018_ai_usage_ledger.sql`; the later migration adds the separately operated
+price and cost ledgers:
 
 ```bash
 export IIP_DATABASE_URL=postgresql://...
@@ -156,6 +159,12 @@ Helm rendering. With Docker Desktop running:
 ```bash
 make test-otlp-receiver PYTHON=.venv/bin/python
 ```
+
+The Docker profile also starts the tenant-explicit workflow worker with the
+test-only price catalog, then proves the committed usage is asynchronously
+converted into one linked priced cost fact and one atomic cost event/outbox
+record. The receiver still returns after its own PostgreSQL commit and never
+waits on cost calculation.
 
 The Docker gate sends metrics, logs, and a GenAI trace through official Python
 OTLP exporters over the existing intermediate-CA and CRL-tested receiver, then

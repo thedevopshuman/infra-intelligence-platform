@@ -48,8 +48,10 @@ presented as a provider price.
 
 An entry matches provider, model, region, service tier, routing mode, purchase
 mode, and invocation start time. `effectiveFrom` is inclusive;
-`effectiveUntil`, when present, is exclusive. Applicable entries must not
-overlap. Zero matches are unpriced and multiple matches are ambiguous.
+`effectiveUntil`, when present, is exclusive. Catalog review should prevent
+applicable entries from overlapping; the runtime deliberately retains a
+defensive multiple-match path so a bad snapshot becomes `ambiguous` rather
+than selecting a rate silently. Zero matches are unpriced.
 
 Every entry supplies five canonical rates:
 
@@ -80,6 +82,16 @@ entry ID, and amount; `totalSubunits` equals the sum of line amounts.
 means multiple applicable catalog entries or another unresolved choice exists.
 Neither shape contains a numeric total.
 
+Every result carries `calculated-cost-not-invoice`. Unresolved results also
+carry `cost-unresolved`; safe-integer overflow additionally carries
+`cost-overflow`. These warnings are part of the semantic validation boundary,
+not display-only text.
+
+The engine selects `responseModel` when instrumentation reports it and falls
+back to `requestModel`; this prices the model that actually served the
+invocation. Catalogs sourced from `test-fixture` require explicit non-production
+enablement, and their cost results carry `test-fixture-pricing` in `warnings`.
+
 For a complete usage record:
 
 ```text
@@ -108,8 +120,12 @@ latency, safety, and compliance evaluation.
 `io.iip.ai.usage-recorded.v1` is emitted after the usage record commits. Its
 subject and `data.usageRecordId` are the immutable usage identity. The event
 contains only bounded routing metadata and the deduplication digest, not token
-content or pricing. Cost and finding events will be added with their runtime
-use cases rather than speculatively.
+content or pricing.
+
+`io.iip.ai.cost-calculated.v1` commits atomically with a new cost record. It
+contains usage, catalog, status, provider, model, and service routing identity,
+but never contains quantities, rates, monetary totals, or catalog contents.
+An exact retry creates no second cost event.
 
 ## Compatibility
 

@@ -43,6 +43,18 @@ class EvidenceRetentionPass:
     failures: int
 
 
+@dataclass(frozen=True)
+class AiCostWorkerPass:
+    """Value-minimized result across explicitly enrolled tenant catalogs."""
+
+    tenants: int
+    processed: int
+    priced: int
+    unpriced: int
+    ambiguous: int
+    failures: int
+
+
 class TenantFairInvestigationScheduler:
     """Keep at most one process-local task in flight for each tenant."""
 
@@ -183,6 +195,46 @@ def evidence_retention_interval_seconds() -> int:
     return interval
 
 
+def ai_cost_interval_seconds() -> int:
+    try:
+        interval = int(os.environ.get("IIP_AI_COST_INTERVAL_SECONDS", "10"))
+    except ValueError:
+        raise ValueError("ai.cost.configuration.invalid") from None
+    if interval < 1 or interval > 3600:
+        raise ValueError("ai.cost.configuration.invalid")
+    return interval
+
+
+def run_ai_cost_pass(
+    service: Any,
+    tenants: tuple[str, ...],
+    worker_id: str,
+) -> AiCostWorkerPass:
+    processed = 0
+    priced = 0
+    unpriced = 0
+    ambiguous = 0
+    failures = 0
+    for tenant_id in tenants:
+        try:
+            result = service.run_once(tenant_id, worker_id)
+            processed += result.processed
+            priced += result.priced
+            unpriced += result.unpriced
+            ambiguous += result.ambiguous
+        except Exception:
+            # Catalog prices, tenant identity, usage IDs, and errors stay out of logs.
+            failures += 1
+    return AiCostWorkerPass(
+        len(tenants),
+        processed,
+        priced,
+        unpriced,
+        ambiguous,
+        failures,
+    )
+
+
 def run_evidence_retention_pass(
     service: Any,
     tenants: tuple[str, ...],
@@ -228,6 +280,9 @@ def main() -> None:
     arguments = parser.parse_args()
     tenants = configured_tenants()
     runtime = build_workflow_worker_runtime_from_env()
+    worker_id = os.environ.get("IIP_WORKER_ID") or os.environ.get("HOSTNAME")
+    if worker_id is None:
+        raise ValueError("investigation.worker.configuration.required")
     worker = build_investigation_worker_from_env(runtime)
     scheduler = TenantFairInvestigationScheduler(
         worker,
@@ -246,6 +301,11 @@ def main() -> None:
         evidence_retention_interval_seconds() if retention_enabled else 3600
     )
     next_retention_at = time.monotonic()
+    ai_cost_service = runtime.ai_cost_calculation
+    ai_cost_interval = (
+        ai_cost_interval_seconds() if ai_cost_service is not None else 10
+    )
+    next_ai_cost_at = time.monotonic()
     stopped = Event()
 
     def stop(_signum: int, _frame: object) -> None:
@@ -273,6 +333,26 @@ def main() -> None:
                         sort_keys=True,
                     )
                 )
+            if ai_cost_service is not None and time.monotonic() >= next_ai_cost_at:
+                cost_pass = run_ai_cost_pass(ai_cost_service, tenants, worker_id)
+                if cost_pass.processed or cost_pass.failures or arguments.once:
+                    print(
+                        json.dumps(
+                            {
+                                "event": "ai-cost.calculation.pass",
+                                "tenants": cost_pass.tenants,
+                                "processed": cost_pass.processed,
+                                "priced": cost_pass.priced,
+                                "unpriced": cost_pass.unpriced,
+                                "ambiguous": cost_pass.ambiguous,
+                                "failures": cost_pass.failures,
+                            },
+                            separators=(",", ":"),
+                            sort_keys=True,
+                        )
+                    )
+                next_ai_cost_at = time.monotonic() + ai_cost_interval
+                worked = worked or cost_pass.processed > 0
             for tenant_id in tenants:
                 if stopped.is_set():
                     break

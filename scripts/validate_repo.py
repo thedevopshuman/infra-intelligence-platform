@@ -147,6 +147,8 @@ REQUIRED_PATHS = (
     "docs/operations/oidc-identity.md",
     "docs/operations/policy-engine.md",
     "docs/operations/otlp-metrics-receiver.md",
+    "docs/operations/ai-usage-receiver.md",
+    "docs/operations/ai-cost-engine.md",
     "docs/operations/log-evidence.md",
     "docs/operations/resource-change-evidence.md",
     "docs/operations/postgresql-backup-restore.md",
@@ -230,6 +232,7 @@ REQUIRED_PATHS = (
     "contracts/examples/ai-cost-record.json",
     "contracts/examples/ai-savings-finding.json",
     "contracts/examples/ai-usage-recorded-event.json",
+    "contracts/examples/ai-cost-calculated-event.json",
     "contracts/examples/evidence-retention-report.json",
     "contracts/examples/credential-lease-request.json",
     "contracts/examples/credential-lease.json",
@@ -371,6 +374,9 @@ REQUIRED_PATHS = (
     "src/iip/adapters/otlp_logs_receiver.py",
     "src/iip/adapters/otlp_ai_usage_receiver.py",
     "src/iip/adapters/ai_usage_store.py",
+    "src/iip/application/calculate_ai_cost.py",
+    "src/iip/adapters/ai_cost_store.py",
+    "src/iip/adapters/ai_price_catalogs.py",
     "src/iip/adapters/postgres/migrations/0006_source_checkpoint_provider_cursors.sql",
     "src/iip/adapters/postgres/migrations/0007_investigation_lifecycle.sql",
     "src/iip/adapters/postgres/migrations/0008_action_execution_lifecycle.sql",
@@ -382,9 +388,11 @@ REQUIRED_PATHS = (
     "src/iip/adapters/postgres/migrations/0016_telemetry_export_health.sql",
     "src/iip/adapters/postgres/migrations/0017_telemetry_export_slo_samples.sql",
     "src/iip/adapters/postgres/migrations/0018_ai_usage_ledger.sql",
+    "src/iip/adapters/postgres/migrations/0019_ai_cost_ledger.sql",
     "src/iip/adapters/postgres/health.py",
     "tests/test_evidence_collection.py",
     "tests/test_ai_usage_receiver.py",
+    "tests/test_ai_cost_engine.py",
     "tests/test_telemetry_export_health.py",
     "tests/test_kubernetes_event_evidence.py",
     "tests/test_telemetry_evidence.py",
@@ -3319,12 +3327,14 @@ def validate_ai_economics_examples(
     cost = documents.get(example_dir / "ai-cost-record.json")
     finding = documents.get(example_dir / "ai-savings-finding.json")
     event = documents.get(example_dir / "ai-usage-recorded-event.json")
+    cost_event = documents.get(example_dir / "ai-cost-calculated-event.json")
     named = {
         "AI usage": usage,
         "AI price catalog": catalog,
         "AI cost": cost,
         "AI savings finding": finding,
         "AI usage event": event,
+        "AI cost event": cost_event,
     }
     for label, document in named.items():
         if not isinstance(document, dict):
@@ -3337,6 +3347,7 @@ def validate_ai_economics_examples(
     assert isinstance(cost, dict)
     assert isinstance(finding, dict)
     assert isinstance(event, dict)
+    assert isinstance(cost_event, dict)
 
     tenant_ids = {
         document.get("metadata", {}).get("tenantId")
@@ -3534,6 +3545,24 @@ def validate_ai_economics_examples(
         or event_data.get("outcome") != invocation.get("outcome")
     ):
         fail(errors, "AI usage CloudEvent must match the normalized usage example")
+
+    cost_event_data = cost_event.get("data", {})
+    cost_metadata = cost.get("metadata", {})
+    if (
+        cost_event.get("tenantid") not in tenant_ids
+        or cost_event.get("subject") != cost_metadata.get("id")
+        or cost_event.get("causationid") != usage_metadata.get("id")
+        or cost_event_data.get("costRecordId") != cost_metadata.get("id")
+        or cost_event_data.get("usageRecordId") != usage_metadata.get("id")
+        or cost_event_data.get("catalogId") != catalog_metadata.get("id")
+        or cost_event_data.get("catalogVersion") != catalog_metadata.get("version")
+        or cost_event_data.get("costStatus") != result.get("costStatus")
+        or cost_event_data.get("provider") != invocation.get("provider")
+        or cost_event_data.get("modelId")
+        != invocation.get("responseModel", invocation.get("requestModel"))
+        or cost_event_data.get("serviceName") != attribution.get("serviceName")
+    ):
+        fail(errors, "AI cost CloudEvent must match usage, catalog, and cost examples")
 
 
 def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> None:

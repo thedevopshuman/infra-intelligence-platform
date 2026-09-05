@@ -87,6 +87,9 @@ class HelmValuesContractTests(unittest.TestCase):
             "evidenceRetention.ephemeralSeconds must not exceed",
             "evidenceRetention.standardSeconds must not exceed",
             "worker.enabled must be true when evidenceRetention.enabled=true",
+            "worker.enabled must be true when aiCostEngine.enabled=true",
+            "aiCostEngine.catalogsExistingSecret is required",
+            "aiCostEngine.enabled must be true when test fixtures are allowed",
             "telemetry.traceMaxExportBatchSize must not exceed",
             "telemetry.otlpEndpoint is required",
             "auth.existingSecret is required",
@@ -112,6 +115,10 @@ class HelmValuesContractTests(unittest.TestCase):
             retention["properties"]["batchSize"]["maximum"],
             1000,
         )
+
+        ai_cost = self.schema["properties"]["aiCostEngine"]
+        self.assertFalse(ai_cost["additionalProperties"])
+        self.assertEqual(ai_cost["properties"]["batchSize"]["maximum"], 1000)
 
 
 if __name__ == "__main__":

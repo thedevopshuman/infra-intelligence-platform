@@ -62,7 +62,7 @@
         "chargeCategory": "uncached-input-tokens",
         "priceSubunitsPerMillionTokens": 3000000000
       },
-      "costRecordRefs": ["aic_22222222222222222222222222222222"]
+      "costRecordRefs": ["aic_4ca516c7ef66bdad4deae447ae0290cd"]
     },
     "recommendation": {
       "actionCode": "review-context-retention",
@@ -76,7 +76,7 @@
       },
       {
         "type": "ai-cost-record",
-        "id": "aic_22222222222222222222222222222222"
+        "id": "aic_4ca516c7ef66bdad4deae447ae0290cd"
       }
     ]
   }

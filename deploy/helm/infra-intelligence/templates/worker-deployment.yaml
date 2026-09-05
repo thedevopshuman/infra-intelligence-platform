@@ -63,6 +63,21 @@ spec:
                   fieldPath: metadata.name
             - name: IIP_WORKER_TENANTS
               value: {{ join "," .Values.worker.tenants | quote }}
+            - name: IIP_AI_COST_ENGINE_ENABLED
+              value: {{ .Values.aiCostEngine.enabled | quote }}
+            {{- if .Values.aiCostEngine.enabled }}
+            - name: IIP_AI_PRICE_CATALOGS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aiCostEngine.catalogsExistingSecret | quote }}
+                  key: {{ .Values.aiCostEngine.catalogsSecretKey | quote }}
+            - name: IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES
+              value: {{ .Values.aiCostEngine.allowTestFixtures | quote }}
+            - name: IIP_AI_COST_BATCH_SIZE
+              value: {{ .Values.aiCostEngine.batchSize | quote }}
+            - name: IIP_AI_COST_INTERVAL_SECONDS
+              value: {{ .Values.aiCostEngine.intervalSeconds | quote }}
+            {{- end }}
             - name: IIP_WORKER_LEASE_SECONDS
               value: {{ .Values.worker.leaseSeconds | quote }}
             - name: IIP_WORKER_HEARTBEAT_SECONDS

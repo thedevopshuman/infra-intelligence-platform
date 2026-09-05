@@ -1,6 +1,6 @@
 # AI economics architecture
 
-**Status:** Accepted V0 boundary  
+**Status:** Accepted V0 boundary; usage intake and cost engine executable
 **Date:** 2026-09-05
 
 ## Context
@@ -91,6 +91,14 @@ data, does not include discounts or commitments unless represented by an exact
 catalog entry, and can be recomputed without altering the source usage record.
 Future reconciliation with provider billing creates separate variance facts.
 
+The executable cost service lives in the tenant-explicit workflow worker, not
+the API or OTLP receiver. It reads one protected immutable catalog per enrolled
+tenant, processes a bounded page, and uses the PostgreSQL adapter to commit the
+cost record, cost-calculated CloudEvent, and outbox row atomically. Catalog ID
+and version registration plus cost identity are concurrency-safe and
+idempotent. A replacement catalog creates a new calculation lineage without
+mutating prior facts.
+
 ## Finding semantics
 
 `AiSavingsFinding` is the output of a versioned deterministic rule, not an AI
@@ -127,4 +135,3 @@ receiver outage relies on the customer's bounded persistent Collector queue;
 once that queue is exhausted, telemetry loss is explicit in Collector
 self-metrics. Optional IIP export failure never blocks ledger persistence or
 API readiness.
-

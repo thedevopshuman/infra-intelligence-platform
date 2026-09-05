@@ -66,6 +66,8 @@ Pre-promotion freshness, global overlap, and exact required-scope coverage use
 the separate minimized [price-catalog qualification
 contracts](ai-price-catalog-qualification-contract.md). Qualification neither
 selects an authoritative source nor turns calculated estimates into invoices.
+The production runtime gate requires one current exact qualified report before
+registering or using each tenant catalog.
 
 An entry matches provider, model, region, service tier, routing mode, purchase
 mode, and invocation start time. `effectiveFrom` is inclusive;

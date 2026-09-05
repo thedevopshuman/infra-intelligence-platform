@@ -20,7 +20,10 @@ protected catalog wrapper comes from an existing Secret. It is mounted into
 the API only when generation-bound allocation reporting is explicitly enabled,
 and is never mounted into the OTLP receiver. `aiCostEngine.enabled=true` requires the worker,
 an exact tenant enrollment, and `aiCostEngine.catalogsExistingSecret`; fixture
-pricing remains separately prohibited by default. Follow the
+pricing remains separately prohibited by default. Production additionally
+requires `aiCostEngine.requireQualification=true` and a protected
+`qualificationsExistingSecret`; the worker revalidates the exact report,
+catalog, policy, level, and current time before every pass. Follow the
 [AI cost-engine runbook](ai-cost-engine.md) before enabling it.
 
 The optional AI savings engine is also worker-owned and disabled by default.
@@ -241,7 +244,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.79.0
+  tag: 0.80.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -289,6 +292,8 @@ aiAttribution:
 aiCostEngine:
   enabled: true
   catalogsExistingSecret: iip-ai-prices
+  requireQualification: true
+  qualificationsExistingSecret: iip-ai-price-qualifications
 
 aiAllocationReporting:
   enabled: true
@@ -402,7 +407,7 @@ To test the actual packaged release chart and attested OCI archive instead of
 checkout artifacts, first build the release bundle and then run:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.79.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.80.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -411,7 +416,7 @@ and the explicit prior release revision. Equal latest migrations are allowed;
 a migration regression is not:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.79.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.80.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```

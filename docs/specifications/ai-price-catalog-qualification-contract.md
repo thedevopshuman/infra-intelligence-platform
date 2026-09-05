@@ -61,7 +61,18 @@ entire report from the supplied exact catalog and policy, validates the
 content-derived identifier, and can require that the evaluation time falls in
 `[generatedAt, validUntil)`.
 
-This first unit is qualification evidence, not runtime promotion authority.
-Binding production cost workers to a current `production-catalog` report is a
-separate deployment decision so existing protected catalog operation does not
-silently change semantics.
+## Runtime promotion binding
+
+The cost worker can require production qualification as a protected deployment
+gate. Its closed wrapper contains exactly `policies` and `reports` arrays, with
+one policy and one report for every configured catalog tenant. Startup
+recalculates each report against the exact catalog and policy, requires
+`qualified` status at the `production-catalog` level, and rejects fixture mode,
+missing tenants, duplicates, or unused evidence.
+
+Every cost pass recalculates the report before catalog registration and requires
+the worker clock to fall in `[generatedAt, validUntil)`. A stale or altered
+report therefore stops new pricing work without requiring a restart. This gate
+is required by the `production-ai-finops-v0` Helm profile; disabling it is a
+development-only posture and cannot pass that preflight. See
+[ADR 0113](../decisions/0113-runtime-ai-price-catalog-promotion.md).

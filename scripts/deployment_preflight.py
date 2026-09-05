@@ -50,6 +50,7 @@ AI_CHECKS = (
     "ai-receiver-mtls",
     "ai-receiver-redundancy",
     "ai-cost-allocation-savings",
+    "ai-price-catalog-qualification",
     "collector-loss-objective",
 )
 LIVE_CHECKS = ("cluster-api", "referenced-dependencies")
@@ -79,6 +80,7 @@ FAILURE_ERROR_CODES = {
     "ai-receiver-mtls": "preflight.ai.receiver-mtls-required",
     "ai-receiver-redundancy": "preflight.ai.receiver-replicas-insufficient",
     "ai-cost-allocation-savings": "preflight.ai.pipeline-required",
+    "ai-price-catalog-qualification": "preflight.ai.price-qualification-required",
     "collector-loss-objective": "preflight.ai.collector-objective-required",
     "cluster-api": "preflight.cluster.unavailable",
     "referenced-dependencies": "preflight.dependencies.incomplete",
@@ -372,7 +374,7 @@ def _validate_rendered_profile(profile: Mapping[str, Any]) -> None:
             ),
         ),
         ("security", ("serviceAccountTokenAutomount", "runAsNonRoot", "readOnlyRootFilesystem", "allowPrivilegeEscalation")),
-        ("aiEconomics", ("attributionEnabled", "costEngineEnabled", "savingsEngineEnabled", "allocationReportingEnabled", "attributionTestFixtures", "priceTestFixtures", "savingsTestFixtures")),
+        ("aiEconomics", ("attributionEnabled", "costEngineEnabled", "savingsEngineEnabled", "allocationReportingEnabled", "attributionTestFixtures", "priceTestFixtures", "priceQualificationRequired", "savingsTestFixtures")),
     ):
         item = _object(profile, section)
         if set(item) != set(booleans):
@@ -541,6 +543,7 @@ def _static_checks(
                 _check("ai-receiver-mtls", receivers["tlsMode"] == "mutual-spiffe" and receivers["crlConfigured"] is True, "preflight.ai.receiver-mtls-required"),
                 _check("ai-receiver-redundancy", receivers["replicaCount"] >= 2, "preflight.ai.receiver-replicas-insufficient"),
                 _check("ai-cost-allocation-savings", all(ai[key] is True for key in ("attributionEnabled", "costEngineEnabled", "savingsEngineEnabled", "allocationReportingEnabled")), "preflight.ai.pipeline-required"),
+                _check("ai-price-catalog-qualification", ai["priceQualificationRequired"] is True, "preflight.ai.price-qualification-required"),
                 _check("collector-loss-objective", telemetry["collectorQueueLossConfigured"] is True, "preflight.ai.collector-objective-required"),
             )
         )

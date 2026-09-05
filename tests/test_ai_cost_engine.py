@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 from threading import Barrier
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 try:
     import psycopg
@@ -20,6 +20,9 @@ except ModuleNotFoundError:
     PostgresResourceStore = None
 
 from iip.adapters.ai_price_catalogs import ai_price_catalogs_from_json
+from iip.adapters.ai_price_catalog_qualifications import (
+    ai_price_catalog_qualifications_from_json,
+)
 from iip.adapters.memory import InMemoryResourceStore
 from iip.application.calculate_ai_cost import (
     ENGINE_VERSION,
@@ -30,6 +33,7 @@ from iip.application.calculate_ai_cost import (
     validate_ai_price_catalog,
 )
 from iip.application.ports import ActorContext, PersistenceError
+from iip.application.qualify_ai_price_catalog import qualify_ai_price_catalog
 from iip.bootstrap import _ai_cost_engine_configuration_from_env, build_local_runtime
 from iip.domain.models import PlatformEvent
 from iip.surfaces.worker import run_ai_cost_pass
@@ -52,6 +56,24 @@ class MutableClock:
 
 def fixture(name: str) -> dict:
     return json.loads((ROOT / "contracts" / "examples" / f"{name}.json").read_text())
+
+
+def production_qualification() -> tuple[dict, dict, dict]:
+    catalog = fixture("ai-price-catalog")
+    catalog["spec"]["source"].update(
+        {
+            "kind": "operator-managed",
+            "locator": "urn:customer:approved-ai-prices:2026-09-05",
+        }
+    )
+    policy = fixture("ai-price-catalog-qualification-policy")
+    report = qualify_ai_price_catalog(
+        catalog,
+        policy,
+        generated_at="2026-09-05T10:00:00Z",
+        qualification_level="production-catalog",
+    )
+    return catalog, policy, dict(report)
 
 
 def usage_event(record: dict) -> PlatformEvent:
@@ -306,6 +328,61 @@ class AiCostLedgerAndWorkerTests(unittest.TestCase):
         self.assertEqual(replay.processed, 0)
         self.assertEqual(len(self.store.events), 2)
 
+    def test_production_qualification_is_current_before_catalog_registration(
+        self,
+    ) -> None:
+        catalog, policy, report = production_qualification()
+        ledger = Mock()
+        service = AiCostCalculationService(
+            ledger,
+            self.clock,
+            (catalog,),
+            qualification_policies=(policy,),
+            qualification_reports=(report,),
+            require_production_qualification=True,
+        )
+        ledger.list_usage_without_cost.return_value = ()
+        result = service.run_once("local", "worker-1")
+        self.assertEqual(result.processed, 0)
+        ledger.register_price_catalog.assert_called_once()
+
+        ledger.reset_mock()
+        self.clock.value = report["metadata"]["validUntil"]
+        with self.assertRaisesRegex(
+            AiCostConfigurationError,
+            "ai.cost.catalog-qualification.invalid",
+        ):
+            service.run_once("local", "worker-1")
+        ledger.register_price_catalog.assert_not_called()
+
+    def test_production_qualification_configuration_is_exact_and_fail_closed(
+        self,
+    ) -> None:
+        catalog, policy, report = production_qualification()
+        invalid_cases = (
+            {"qualification_policies": (policy,)},
+            {
+                "qualification_policies": (policy,),
+                "qualification_reports": (fixture("ai-price-catalog-qualification-report"),),
+                "require_production_qualification": True,
+            },
+            {
+                "qualification_policies": (policy,),
+                "qualification_reports": (report,),
+                "require_production_qualification": True,
+                "allow_test_fixtures": True,
+            },
+        )
+        for arguments in invalid_cases:
+            with self.subTest(arguments=arguments):
+                with self.assertRaises(AiCostConfigurationError):
+                    AiCostCalculationService(
+                        self.store,
+                        self.clock,
+                        (catalog,),
+                        **arguments,
+                    )
+
     def test_fixture_gate_tenant_scope_and_value_minimized_worker_pass(self) -> None:
         with self.assertRaisesRegex(
             AiCostConfigurationError, "ai.cost.test-fixture.prohibited"
@@ -394,9 +471,19 @@ class AiCostCompositionTests(unittest.TestCase):
             "IIP_WORKER_TENANTS": "local",
         }
         with patch.dict("os.environ", environment, clear=True):
-            parsed, allow, batch_size = _ai_cost_engine_configuration_from_env()
+            (
+                parsed,
+                policies,
+                reports,
+                allow,
+                require,
+                batch_size,
+            ) = _ai_cost_engine_configuration_from_env()
         self.assertEqual(len(parsed or ()), 1)
+        self.assertIsNone(policies)
+        self.assertIsNone(reports)
         self.assertTrue(allow)
+        self.assertFalse(require)
         self.assertEqual(batch_size, 25)
 
         runtime = build_local_runtime(
@@ -408,6 +495,68 @@ class AiCostCompositionTests(unittest.TestCase):
         disabled = build_local_runtime()
         self.assertIsNone(disabled.ai_cost_calculation)
         disabled.close()
+
+    def test_production_qualification_wrapper_and_composition(self) -> None:
+        catalog, policy, report = production_qualification()
+        qualifications = {"policies": [policy], "reports": [report]}
+        parsed_policies, parsed_reports = ai_price_catalog_qualifications_from_json(
+            json.dumps(qualifications)
+        )
+        self.assertEqual((len(parsed_policies), len(parsed_reports)), (1, 1))
+        with self.assertRaisesRegex(
+            AiCostConfigurationError,
+            "ai.cost.configuration.invalid",
+        ):
+            ai_price_catalog_qualifications_from_json(
+                json.dumps({**qualifications, "extra": True})
+            )
+
+        environment = {
+            "IIP_AI_COST_ENGINE_ENABLED": "true",
+            "IIP_AI_PRICE_CATALOGS_JSON": json.dumps({"catalogs": [catalog]}),
+            "IIP_AI_PRICE_CATALOG_REQUIRE_QUALIFICATION": "true",
+            "IIP_AI_PRICE_CATALOG_QUALIFICATIONS_JSON": json.dumps(
+                qualifications
+            ),
+            "IIP_WORKER_TENANTS": "local",
+        }
+        with patch.dict("os.environ", environment, clear=True):
+            parsed = _ai_cost_engine_configuration_from_env()
+        self.assertEqual(tuple(len(items or ()) for items in parsed[:3]), (1, 1, 1))
+        self.assertEqual(parsed[3:], (False, True, 100))
+
+        runtime = build_local_runtime(
+            ai_cost_catalogs=(catalog,),
+            ai_cost_qualification_policies=(policy,),
+            ai_cost_qualification_reports=(report,),
+            ai_cost_require_production_qualification=True,
+        )
+        self.assertIsNotNone(runtime.ai_cost_calculation)
+        runtime.close()
+
+    def test_qualification_secret_and_gate_must_be_supplied_together(self) -> None:
+        catalog, policy, report = production_qualification()
+        base = {
+            "IIP_AI_COST_ENGINE_ENABLED": "true",
+            "IIP_AI_PRICE_CATALOGS_JSON": json.dumps({"catalogs": [catalog]}),
+            "IIP_WORKER_TENANTS": "local",
+        }
+        for extra in (
+            {"IIP_AI_PRICE_CATALOG_REQUIRE_QUALIFICATION": "true"},
+            {
+                "IIP_AI_PRICE_CATALOG_QUALIFICATIONS_JSON": json.dumps(
+                    {"policies": [policy], "reports": [report]}
+                )
+            },
+        ):
+            with self.subTest(extra=extra), patch.dict(
+                "os.environ", {**base, **extra}, clear=True
+            ):
+                with self.assertRaisesRegex(
+                    AiCostConfigurationError,
+                    "ai.cost.configuration.required",
+                ):
+                    _ai_cost_engine_configuration_from_env()
 
     def test_catalog_tenants_must_exactly_match_worker_enrollment(self) -> None:
         environment = {

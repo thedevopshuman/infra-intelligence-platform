@@ -117,6 +117,9 @@ class AiCostCalculationService:
         catalogs: tuple[Mapping[str, object], ...],
         *,
         allow_test_fixtures: bool = False,
+        qualification_policies: tuple[Mapping[str, object], ...] | None = None,
+        qualification_reports: tuple[Mapping[str, object], ...] | None = None,
+        require_production_qualification: bool = False,
         batch_size: int = 100,
     ) -> None:
         if (
@@ -124,6 +127,7 @@ class AiCostCalculationService:
             or not catalogs
             or len(catalogs) > 1000
             or not isinstance(allow_test_fixtures, bool)
+            or not isinstance(require_production_qualification, bool)
             or isinstance(batch_size, bool)
             or not isinstance(batch_size, int)
             or not 1 <= batch_size <= 1000
@@ -137,10 +141,103 @@ class AiCostCalculationService:
             raise AiCostConfigurationError("ai.cost.test-fixture.prohibited")
         if len({item.tenant_id for item in validated}) != len(validated):
             raise AiCostConfigurationError("ai.cost.catalog.ambiguous")
+        qualifications = self._validate_qualifications(
+            validated,
+            qualification_policies,
+            qualification_reports,
+            allow_test_fixtures=allow_test_fixtures,
+            required=require_production_qualification,
+        )
         self._ledger = ledger
         self._clock = clock
         self._catalogs = {item.tenant_id: item for item in validated}
+        self._qualifications = qualifications
+        self._require_production_qualification = require_production_qualification
         self._batch_size = batch_size
+
+    @staticmethod
+    def _validate_qualifications(
+        catalogs: tuple[ValidatedAiPriceCatalog, ...],
+        policies: tuple[Mapping[str, object], ...] | None,
+        reports: tuple[Mapping[str, object], ...] | None,
+        *,
+        allow_test_fixtures: bool,
+        required: bool,
+    ) -> Mapping[str, tuple[Mapping[str, object], Mapping[str, object]]]:
+        if not required:
+            if policies is not None or reports is not None:
+                raise AiCostConfigurationError("ai.cost.configuration.invalid")
+            return {}
+        if (
+            allow_test_fixtures
+            or not isinstance(policies, tuple)
+            or not isinstance(reports, tuple)
+            or not policies
+            or not reports
+            or len(policies) != len(catalogs)
+            or len(reports) != len(catalogs)
+        ):
+            raise AiCostConfigurationError("ai.cost.catalog-qualification.invalid")
+
+        from iip.application.qualify_ai_price_catalog import (
+            AiPriceCatalogQualificationError,
+            validate_ai_price_catalog_qualification_policy,
+            verify_ai_price_catalog_qualification_report,
+        )
+
+        try:
+            validated_policies = tuple(
+                validate_ai_price_catalog_qualification_policy(item)
+                for item in policies
+            )
+            policy_by_tenant = {
+                item.tenant_id: item.document for item in validated_policies
+            }
+            report_by_tenant: dict[str, Mapping[str, object]] = {}
+            for report in reports:
+                if not isinstance(report, Mapping):
+                    raise ValueError
+                metadata = report.get("metadata")
+                if not isinstance(metadata, Mapping):
+                    raise ValueError
+                tenant_id = metadata.get("tenantId")
+                if not isinstance(tenant_id, str) or tenant_id in report_by_tenant:
+                    raise ValueError
+                report_by_tenant[tenant_id] = report
+            catalog_by_tenant = {item.tenant_id: item for item in catalogs}
+            if (
+                len(policy_by_tenant) != len(validated_policies)
+                or set(policy_by_tenant) != set(catalog_by_tenant)
+                or set(report_by_tenant) != set(catalog_by_tenant)
+            ):
+                raise ValueError
+            result: dict[
+                str, tuple[Mapping[str, object], Mapping[str, object]]
+            ] = {}
+            for tenant_id, catalog in catalog_by_tenant.items():
+                policy = policy_by_tenant[tenant_id]
+                verified = verify_ai_price_catalog_qualification_report(
+                    report_by_tenant[tenant_id],
+                    catalog.document,
+                    policy,
+                )
+                spec = verified.get("spec")
+                if (
+                    not isinstance(spec, Mapping)
+                    or spec.get("qualificationLevel") != "production-catalog"
+                ):
+                    raise ValueError
+                result[tenant_id] = (policy, verified)
+            return result
+        except (
+            AiPriceCatalogQualificationError,
+            KeyError,
+            TypeError,
+            ValueError,
+        ):
+            raise AiCostConfigurationError(
+                "ai.cost.catalog-qualification.invalid"
+            ) from None
 
     @property
     def tenant_ids(self) -> tuple[str, ...]:
@@ -151,6 +248,25 @@ class AiCostCalculationService:
         catalog = self._catalogs.get(tenant_id)
         if catalog is None:
             raise AiCostConfigurationError("ai.cost.catalog.missing")
+        now = _format_time(_parse_time(self._clock.now()))
+        if self._require_production_qualification:
+            policy, report = self._qualifications[tenant_id]
+            from iip.application.qualify_ai_price_catalog import (
+                AiPriceCatalogQualificationError,
+                verify_ai_price_catalog_qualification_report,
+            )
+
+            try:
+                verify_ai_price_catalog_qualification_report(
+                    report,
+                    catalog.document,
+                    policy,
+                    evaluated_at=now,
+                )
+            except AiPriceCatalogQualificationError:
+                raise AiCostConfigurationError(
+                    "ai.cost.catalog-qualification.invalid"
+                ) from None
         self._ledger.register_price_catalog(actor, catalog.document)
         usage_records = self._ledger.list_usage_without_cost(
             actor,
@@ -170,7 +286,7 @@ class AiCostCalculationService:
                 catalog.version,
             )
 
-        calculated_at = _format_time(_parse_time(self._clock.now()))
+        calculated_at = now
         records: list[Mapping[str, object]] = []
         events: list[PlatformEvent] = []
         counts = {"priced": 0, "unpriced": 0, "ambiguous": 0}

@@ -111,7 +111,10 @@ exact catalog to a protected required-scope policy and proves source freshness,
 publication order, non-overlapping effective prices, and unique coverage. Its
 tamper-evident report contains digests and aggregate counts—not negotiated
 rates, model names, source locators, or credentials—and does not choose an
-authoritative source or grant promotion authority. Separate bounded projections export request/token volume,
+authoritative source or record organizational approval. The production worker
+now requires one current exact `production-catalog` report per catalog tenant
+and revalidates it before every registration/cost pass; expired or altered
+evidence stops work before the catalog enters the ledger. Separate bounded projections export request/token volume,
 pricing coverage, calculated cost, context change, retry change, qualified
 model-cost difference, and potential saving through the existing OTLP metrics
 boundary. A disposable

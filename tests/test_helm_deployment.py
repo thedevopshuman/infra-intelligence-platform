@@ -339,6 +339,10 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             "aiCostEngine.catalogsExistingSecret",
             "aiCostEngine.catalogsSecretKey",
             "IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES",
+            "IIP_AI_PRICE_CATALOG_REQUIRE_QUALIFICATION",
+            "IIP_AI_PRICE_CATALOG_QUALIFICATIONS_JSON",
+            "aiCostEngine.qualificationsExistingSecret",
+            "aiCostEngine.qualificationsSecretKey",
             "IIP_AI_COST_BATCH_SIZE",
             "IIP_AI_COST_INTERVAL_SECONDS",
         ):

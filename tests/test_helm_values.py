@@ -100,6 +100,10 @@ class HelmValuesContractTests(unittest.TestCase):
             "worker.enabled must be true when aiCostEngine.enabled=true",
             "aiCostEngine.catalogsExistingSecret is required",
             "aiCostEngine.enabled must be true when test fixtures are allowed",
+            "aiCostEngine.enabled must be true when catalog qualification is required",
+            "aiCostEngine.qualificationsExistingSecret is required",
+            "aiCostEngine.requireQualification must be true",
+            "AI price test fixtures cannot be allowed",
             "worker.enabled must be true when aiSavingsEngine.enabled=true",
             "aiCostEngine.enabled must be true when aiSavingsEngine.enabled=true",
             "aiSavingsEngine.profilesExistingSecret is required",
@@ -136,6 +140,8 @@ class HelmValuesContractTests(unittest.TestCase):
         ai_cost = self.schema["properties"]["aiCostEngine"]
         self.assertFalse(ai_cost["additionalProperties"])
         self.assertEqual(ai_cost["properties"]["batchSize"]["maximum"], 1000)
+        self.assertIn("requireQualification", ai_cost["required"])
+        self.assertIn("qualificationsExistingSecret", ai_cost["required"])
         ai_attribution = self.schema["properties"]["aiAttribution"]
         self.assertFalse(ai_attribution["additionalProperties"])
         self.assertEqual(

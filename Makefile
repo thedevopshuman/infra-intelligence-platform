@@ -552,6 +552,14 @@ helm-lint:
 		echo "Helm validation accepted evidence retention without a worker" >&2; exit 1; \
 	fi
 	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set worker.enabled=true \
+		--set 'worker.tenants[0]=tenant-a' \
+		--set aiCostEngine.enabled=true \
+		--set aiCostEngine.catalogsExistingSecret=iip-ai-prices \
+		--set aiCostEngine.requireQualification=true >/dev/null 2>&1; then \
+		echo "Helm validation accepted required AI price qualification without its Secret" >&2; exit 1; \
+	fi
+	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set evidenceRetention.ephemeralSeconds=200000 \
 		--set evidenceRetention.standardSeconds=100000 >/dev/null 2>&1; then \
 		echo "Helm validation accepted unordered evidence retention durations" >&2; exit 1; \

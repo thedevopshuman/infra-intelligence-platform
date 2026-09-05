@@ -7,7 +7,7 @@ apiTermination:
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.79.0"
+  tag: "0.80.0"
   digest: ""
 
 worker:
@@ -47,6 +47,9 @@ aiCostEngine:
   enabled: false
   catalogsExistingSecret: ""
   catalogsSecretKey: ai-price-catalogs-json
+  requireQualification: false
+  qualificationsExistingSecret: ""
+  qualificationsSecretKey: ai-price-catalog-qualifications-json
   allowTestFixtures: false
   batchSize: 100
   intervalSeconds: 10

@@ -11,6 +11,8 @@ aiAttribution:
 aiCostEngine:
   enabled: true
   catalogsExistingSecret: iip-ai-prices
+  requireQualification: true
+  qualificationsExistingSecret: iip-ai-price-qualifications
   allowTestFixtures: false
 
 aiSavingsEngine:

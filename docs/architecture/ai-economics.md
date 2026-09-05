@@ -27,6 +27,7 @@ flowchart LR
     PricePolicy["Protected qualification policy"] --> Qualification["Catalog qualification"]
     Catalog --> Qualification
     Qualification --> PriceEvidence["Minimized qualification evidence"]
+    PriceEvidence -->|"current exact production report"| Cost
     Cost --> Facts["Calculated cost facts"]
     Facts --> Rules["Deterministic savings rules"]
     Rules --> Findings["Evidence-backed findings"]
@@ -103,8 +104,13 @@ catalog to a protected required-scope policy and prove source freshness,
 publication order, non-overlapping effective prices, and unique required
 coverage. Its immutable report carries only digests, timestamps, currency, and
 aggregate counts—not prices, model names, source locators, or scope details.
-This evidence does not choose an authoritative source or grant runtime
-promotion authority; those remain explicit customer decisions.
+The production worker requires that report at the `production-catalog` level,
+reconstructs its exact catalog/policy binding at startup, and rechecks its
+validity window before every registration and cost pass. It stops before
+catalog registration if any binding is missing, altered, cross-tenant,
+offline-only, unqualified, or expired. The evidence still does not choose an
+authoritative source or record organizational approval; those remain explicit
+customer decisions.
 
 ## Application and team attribution
 

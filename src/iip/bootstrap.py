@@ -302,6 +302,9 @@ def build_local_runtime(
     ai_attribution_batch_size: int = 100,
     ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_cost_allow_test_fixtures: bool = False,
+    ai_cost_qualification_policies: tuple[Mapping[str, object], ...] | None = None,
+    ai_cost_qualification_reports: tuple[Mapping[str, object], ...] | None = None,
+    ai_cost_require_production_qualification: bool = False,
     ai_cost_batch_size: int = 100,
     ai_savings_profiles: tuple[Mapping[str, object], ...] | None = None,
     ai_savings_allow_test_fixtures: bool = False,
@@ -356,6 +359,9 @@ def build_local_runtime(
         ai_attribution_batch_size,
         ai_cost_catalogs,
         ai_cost_allow_test_fixtures,
+        ai_cost_qualification_policies,
+        ai_cost_qualification_reports,
+        ai_cost_require_production_qualification,
         ai_cost_batch_size,
         ai_savings_profiles,
         ai_savings_allow_test_fixtures,
@@ -411,6 +417,9 @@ def _compose_runtime(
     ai_attribution_batch_size: int = 100,
     ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_cost_allow_test_fixtures: bool = False,
+    ai_cost_qualification_policies: tuple[Mapping[str, object], ...] | None = None,
+    ai_cost_qualification_reports: tuple[Mapping[str, object], ...] | None = None,
+    ai_cost_require_production_qualification: bool = False,
     ai_cost_batch_size: int = 100,
     ai_savings_profiles: tuple[Mapping[str, object], ...] | None = None,
     ai_savings_allow_test_fixtures: bool = False,
@@ -656,6 +665,11 @@ def _compose_runtime(
                 clock,
                 ai_cost_catalogs,
                 allow_test_fixtures=ai_cost_allow_test_fixtures,
+                qualification_policies=ai_cost_qualification_policies,
+                qualification_reports=ai_cost_qualification_reports,
+                require_production_qualification=(
+                    ai_cost_require_production_qualification
+                ),
                 batch_size=ai_cost_batch_size,
             )
             if ai_cost_catalogs is not None
@@ -803,6 +817,9 @@ def build_postgres_runtime(
     ai_attribution_batch_size: int = 100,
     ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_cost_allow_test_fixtures: bool = False,
+    ai_cost_qualification_policies: tuple[Mapping[str, object], ...] | None = None,
+    ai_cost_qualification_reports: tuple[Mapping[str, object], ...] | None = None,
+    ai_cost_require_production_qualification: bool = False,
     ai_cost_batch_size: int = 100,
     ai_savings_profiles: tuple[Mapping[str, object], ...] | None = None,
     ai_savings_allow_test_fixtures: bool = False,
@@ -864,6 +881,9 @@ def build_postgres_runtime(
         ai_attribution_batch_size,
         ai_cost_catalogs,
         ai_cost_allow_test_fixtures,
+        ai_cost_qualification_policies,
+        ai_cost_qualification_reports,
+        ai_cost_require_production_qualification,
         ai_cost_batch_size,
         ai_savings_profiles,
         ai_savings_allow_test_fixtures,
@@ -1031,12 +1051,15 @@ def _build_runtime_from_env(
         )
         (
             ai_cost_catalogs,
+            ai_cost_qualification_policies,
+            ai_cost_qualification_reports,
             ai_cost_allow_test_fixtures,
+            ai_cost_require_production_qualification,
             ai_cost_batch_size,
         ) = (
             _ai_cost_engine_configuration_from_env()
             if include_ai_economics_engine
-            else (None, False, 100)
+            else (None, None, None, False, False, 100)
         )
         ai_savings_configuration = (
             _ai_savings_engine_configuration_from_env(ai_cost_catalogs)
@@ -1115,6 +1138,11 @@ def _build_runtime_from_env(
                 ai_attribution_batch_size=ai_attribution_batch_size,
                 ai_cost_catalogs=ai_cost_catalogs,
                 ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
+                ai_cost_qualification_policies=ai_cost_qualification_policies,
+                ai_cost_qualification_reports=ai_cost_qualification_reports,
+                ai_cost_require_production_qualification=(
+                    ai_cost_require_production_qualification
+                ),
                 ai_cost_batch_size=ai_cost_batch_size,
                 ai_savings_profiles=ai_savings_profiles,
                 ai_savings_allow_test_fixtures=(
@@ -1199,6 +1227,11 @@ def _build_runtime_from_env(
             ai_attribution_batch_size=ai_attribution_batch_size,
             ai_cost_catalogs=ai_cost_catalogs,
             ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
+            ai_cost_qualification_policies=ai_cost_qualification_policies,
+            ai_cost_qualification_reports=ai_cost_qualification_reports,
+            ai_cost_require_production_qualification=(
+                ai_cost_require_production_qualification
+            ),
             ai_cost_batch_size=ai_cost_batch_size,
             ai_savings_profiles=ai_savings_profiles,
             ai_savings_allow_test_fixtures=ai_savings_allow_test_fixtures,
@@ -2195,6 +2228,9 @@ def _ai_allocation_report_configuration_from_env() -> tuple[
 
 def _ai_cost_engine_configuration_from_env() -> tuple[
     tuple[Mapping[str, object], ...] | None,
+    tuple[Mapping[str, object], ...] | None,
+    tuple[Mapping[str, object], ...] | None,
+    bool,
     bool,
     int,
 ]:
@@ -2202,7 +2238,7 @@ def _ai_cost_engine_configuration_from_env() -> tuple[
     if enabled not in ("false", "true"):
         raise AiCostConfigurationError("ai.cost.configuration.invalid")
     if enabled == "false":
-        return None, False, 100
+        return None, None, None, False, False, 100
     raw_catalogs = os.environ.get("IIP_AI_PRICE_CATALOGS_JSON")
     if raw_catalogs is None:
         raise AiCostConfigurationError("ai.cost.configuration.required")
@@ -2212,6 +2248,17 @@ def _ai_cost_engine_configuration_from_env() -> tuple[
     ).lower()
     if allow_raw not in ("false", "true"):
         raise AiCostConfigurationError("ai.cost.configuration.invalid")
+    require_raw = os.environ.get(
+        "IIP_AI_PRICE_CATALOG_REQUIRE_QUALIFICATION",
+        "false",
+    ).lower()
+    if require_raw not in ("false", "true"):
+        raise AiCostConfigurationError("ai.cost.configuration.invalid")
+    raw_qualifications = os.environ.get(
+        "IIP_AI_PRICE_CATALOG_QUALIFICATIONS_JSON"
+    )
+    if (require_raw == "true") != (raw_qualifications is not None):
+        raise AiCostConfigurationError("ai.cost.configuration.required")
     try:
         batch_size = int(os.environ.get("IIP_AI_COST_BATCH_SIZE", "100"))
     except ValueError:
@@ -2220,8 +2267,17 @@ def _ai_cost_engine_configuration_from_env() -> tuple[
         raise AiCostConfigurationError("ai.cost.configuration.invalid")
 
     from iip.adapters.ai_price_catalogs import ai_price_catalogs_from_json
+    from iip.adapters.ai_price_catalog_qualifications import (
+        ai_price_catalog_qualifications_from_json,
+    )
 
     catalogs = ai_price_catalogs_from_json(raw_catalogs)
+    policies: tuple[Mapping[str, object], ...] | None = None
+    reports: tuple[Mapping[str, object], ...] | None = None
+    if raw_qualifications is not None:
+        policies, reports = ai_price_catalog_qualifications_from_json(
+            raw_qualifications
+        )
     worker_tenants = {
         item.strip()
         for item in os.environ.get("IIP_WORKER_TENANTS", "").split(",")
@@ -2236,7 +2292,14 @@ def _ai_cost_engine_configuration_from_env() -> tuple[
         raise AiCostConfigurationError("ai.cost.configuration.invalid") from None
     if not worker_tenants or catalog_tenants != worker_tenants:
         raise AiCostConfigurationError("ai.cost.tenants.invalid")
-    return catalogs, allow_raw == "true", batch_size
+    return (
+        catalogs,
+        policies,
+        reports,
+        allow_raw == "true",
+        require_raw == "true",
+        batch_size,
+    )
 
 
 def _ai_savings_engine_configuration_from_env(

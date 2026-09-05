@@ -58,6 +58,18 @@
 {{- if and .Values.aiCostEngine.allowTestFixtures (not .Values.aiCostEngine.enabled) }}
 {{- fail "aiCostEngine.enabled must be true when test fixtures are allowed" }}
 {{- end }}
+{{- if and .Values.aiCostEngine.requireQualification (not .Values.aiCostEngine.enabled) }}
+{{- fail "aiCostEngine.enabled must be true when catalog qualification is required" }}
+{{- end }}
+{{- if and .Values.aiCostEngine.requireQualification (not .Values.aiCostEngine.qualificationsExistingSecret) }}
+{{- fail "aiCostEngine.qualificationsExistingSecret is required when catalog qualification is required" }}
+{{- end }}
+{{- if and .Values.aiCostEngine.qualificationsExistingSecret (not .Values.aiCostEngine.requireQualification) }}
+{{- fail "aiCostEngine.requireQualification must be true when a qualification Secret is configured" }}
+{{- end }}
+{{- if and .Values.aiCostEngine.requireQualification .Values.aiCostEngine.allowTestFixtures }}
+{{- fail "AI price test fixtures cannot be allowed when catalog qualification is required" }}
+{{- end }}
 {{- if and .Values.aiSavingsEngine.enabled (not .Values.worker.enabled) }}
 {{- fail "worker.enabled must be true when aiSavingsEngine.enabled=true" }}
 {{- end }}

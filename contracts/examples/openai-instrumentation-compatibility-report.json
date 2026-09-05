@@ -15,7 +15,7 @@
       "containerRuntime": "docker",
       "containerRuntimeVersion": "28.3.3",
       "pythonVersion": "3.12.11",
-      "applicationVersion": "0.79.0",
+      "applicationVersion": "0.80.0",
       "openaiVersion": "3.8.0",
       "instrumentationVersion": "1.1b0",
       "otelUtilVersion": "1.1b0",

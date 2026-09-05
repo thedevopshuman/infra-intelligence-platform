@@ -95,6 +95,15 @@ spec:
                   key: {{ .Values.aiCostEngine.catalogsSecretKey | quote }}
             - name: IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES
               value: {{ .Values.aiCostEngine.allowTestFixtures | quote }}
+            - name: IIP_AI_PRICE_CATALOG_REQUIRE_QUALIFICATION
+              value: {{ .Values.aiCostEngine.requireQualification | quote }}
+            {{- if .Values.aiCostEngine.requireQualification }}
+            - name: IIP_AI_PRICE_CATALOG_QUALIFICATIONS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aiCostEngine.qualificationsExistingSecret | quote }}
+                  key: {{ .Values.aiCostEngine.qualificationsSecretKey | quote }}
+            {{- end }}
             - name: IIP_AI_COST_BATCH_SIZE
               value: {{ .Values.aiCostEngine.batchSize | quote }}
             - name: IIP_AI_COST_INTERVAL_SECONDS

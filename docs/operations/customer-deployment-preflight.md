@@ -19,8 +19,8 @@ The chart ships three composable examples:
 - [`production-ai-finops.values.yaml`](../../deploy/helm/infra-intelligence/examples/production-ai-finops.values.yaml)
   is an overlay that adds metadata-only AI usage intake, mutual-SPIFFE TLS and
   CRL references, redundant receiver replicas with their own disruption
-  budget, attribution, pricing, saving, allocation, and Collector queue/loss
-  monitoring.
+  budget, attribution, pricing with exact current catalog qualification,
+  saving, allocation, and Collector queue/loss monitoring.
 - [`production-github-context.values.yaml`](../../deploy/helm/infra-intelligence/examples/production-github-context.values.yaml)
   is an overlay that replaces local context files with allowlisted GitHub or
   GitHub Enterprise paths at exact commit revisions, brokered read credentials,

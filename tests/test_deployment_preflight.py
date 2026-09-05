@@ -33,8 +33,8 @@ def rendered_profile() -> dict[str, object]:
         "schemaVersion": "1",
         "chart": {
             "name": "infra-intelligence",
-            "version": "0.82.0",
-            "applicationVersion": "0.79.0",
+            "version": "0.83.0",
+            "applicationVersion": "0.80.0",
         },
         "image": {
             "repository": "registry.example.test/iip/control-plane",
@@ -120,6 +120,7 @@ def rendered_profile() -> dict[str, object]:
             "allocationReportingEnabled": False,
             "attributionTestFixtures": False,
             "priceTestFixtures": False,
+            "priceQualificationRequired": False,
             "savingsTestFixtures": False,
         },
         "dependencies": [
@@ -320,6 +321,7 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
             "allocationReportingEnabled": True,
             "attributionTestFixtures": False,
             "priceTestFixtures": False,
+            "priceQualificationRequired": True,
             "savingsTestFixtures": False,
         }
         profile["telemetry"]["collectorQueueLossConfigured"] = True  # type: ignore[index]
@@ -328,7 +330,7 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
         report = self.generate(profile, profile_name="production-ai-finops-v0")
 
         self.assertEqual(report["spec"]["status"], "configuration-ready")
-        self.assertEqual(report["spec"]["summary"]["totalChecks"], 28)
+        self.assertEqual(report["spec"]["summary"]["totalChecks"], 29)
         self.assertEqual(
             report["spec"]["customerQualificationRequired"][-3:],
             [

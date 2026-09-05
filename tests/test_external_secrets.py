@@ -63,7 +63,7 @@ class ExternalSecretHandoffTests(unittest.TestCase):
             if not value or value.lstrip().startswith("#"):
                 stack.append((indent, key))
 
-        self.assertEqual(32, len(boundaries))
+        self.assertEqual(33, len(boundaries))
         for boundary in sorted(boundaries):
             with self.subTest(boundary=boundary):
                 self.assertIn(f"`{boundary}`", runbook)

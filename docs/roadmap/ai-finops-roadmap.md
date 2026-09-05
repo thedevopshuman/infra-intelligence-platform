@@ -73,9 +73,11 @@ protected content-addressed policy declares exact required commercial scopes,
 source age, and report validity. The minimized report binds the exact catalog
 and policy digests, checks source profile/freshness/publication order, detects
 overlapping effective prices, and proves every required scope resolves once.
-It exposes no rates, model names, locators, credentials, or scope details.
-Authoritative source selection, organizational approval, and runtime promotion
-enforcement remain open.
+It exposes no rates, model names, locators, credentials, or scope details. The
+production worker and Helm preflight now require one current exact
+`production-catalog` report per catalog tenant and reject a stale, altered,
+offline-only, or cross-tenant binding before catalog registration. Authoritative
+source selection and organizational approval remain open.
 
 ## Phase B — application and team attribution
 
@@ -152,7 +154,6 @@ those outcomes.
 - stable public product/company name and package migration;
 - open-source license and commercial boundary;
 - authoritative provider price ingestion and organizational approval workflow;
-- runtime promotion enforcement for a current production catalog qualification report;
 - first real Bedrock model/region and OpenAI API/model qualification targets;
 - long-term analytics backend and retention objectives;
 - optional business-attribution helper;

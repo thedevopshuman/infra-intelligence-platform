@@ -10,8 +10,8 @@
   "spec": {
     "status": "qualified",
     "candidate": {
-      "version": "0.79.0",
-      "chartVersion": "0.82.0",
+      "version": "0.80.0",
+      "chartVersion": "0.83.0",
       "revision": "0123456789abcdef0123456789abcdef01234567",
       "releaseManifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
       "controlPlaneImageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -46,8 +46,8 @@
         ],
         "measurement": {
           "runtime": {
-            "version": "0.79.0",
-            "chartVersion": "0.82.0",
+            "version": "0.80.0",
+            "chartVersion": "0.83.0",
             "revision": "0123456789abcdef0123456789abcdef01234567",
             "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -85,8 +85,8 @@
             "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
           },
           "target": {
-            "version": "0.79.0",
-            "chartVersion": "0.82.0",
+            "version": "0.80.0",
+            "chartVersion": "0.83.0",
             "revision": "0123456789abcdef0123456789abcdef01234567",
             "migration": "0023_ai_model_suitability.sql",
             "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

@@ -130,6 +130,11 @@ atomically; pricing and recommendations remain separate downstream use cases.
 The tenant-explicit workflow worker now implements the separate pricing use
 case: protected immutable catalogs drive bounded integer cost calculation, and
 each new cost fact, minimized event, and outbox row commit atomically. Saving
+The production promotion boundary additionally requires a current minimized
+qualification report bound to the exact tenant catalog and protected scope
+policy, then revalidates it before every catalog registration and cost pass as
+fixed by [ADR 0113](../decisions/0113-runtime-ai-price-catalog-promotion.md).
+Saving
 evaluation remains a separate downstream use case: executable context-growth
 and retry-amplification rules plus a qualified model-cost comparison evaluate
 protected fixed windows, revalidate exact source evidence in storage, and

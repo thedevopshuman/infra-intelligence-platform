@@ -63,9 +63,9 @@
           "additionalProperties": false,
           "required": ["totalChecks", "passedChecks", "failedChecks", "notRunChecks", "overallStatus"],
           "properties": {
-            "totalChecks": {"enum": [23, 28]},
-            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 28},
-            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 28},
+            "totalChecks": {"enum": [23, 29]},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 29},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 29},
             "notRunChecks": {"type": "integer", "minimum": 0, "maximum": 2},
             "overallStatus": {"enum": ["blocked", "configuration-ready", "install-ready"]}
           }
@@ -202,8 +202,8 @@
     },
     "aiChecks": {
       "type": "array",
-      "minItems": 28,
-      "maxItems": 28,
+      "minItems": 29,
+      "maxItems": 29,
       "allOf": [{"$ref": "#/$defs/commonCheckPrefix"}],
       "prefixItems": [
         {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
@@ -211,6 +211,7 @@
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-receiver-mtls"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-receiver-redundancy"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-cost-allocation-savings"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-price-catalog-qualification"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "collector-loss-objective"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "cluster-api"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "referenced-dependencies"}}}

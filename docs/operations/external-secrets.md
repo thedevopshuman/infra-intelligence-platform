@@ -60,6 +60,7 @@ anything.
 | `investigationSignalCatalog.existingSecret` | `investigation-signal-catalog-json` | Tenant-scoped investigation candidate policy |
 | `aiAttribution.policiesExistingSecret` | `ai-attribution-policies-json` | Protected application/team attribution policy |
 | `aiCostEngine.catalogsExistingSecret` | `ai-price-catalogs-json` | Versioned AI price catalogs |
+| `aiCostEngine.qualificationsExistingSecret` | `ai-price-catalog-qualifications-json` | Exact protected catalog qualification policies and current reports |
 | `aiSavingsEngine.profilesExistingSecret` | `ai-savings-profiles-json` | Deterministic savings-rule profiles |
 | `otlpReceiver.channelsExistingSecret` | `otlp-receiver-channels-json` | Tenant-bound metrics intake channels |
 | `otlpLogsReceiver.channelsExistingSecret` | `otlp-logs-receiver-channels-json` | Tenant-bound logs intake channels |

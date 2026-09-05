@@ -305,6 +305,104 @@
       ],
       "title": "Can I trust the coverage?",
       "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Calculated estimate grouped only by application IDs from the protected effective-time attribution policy. Unallocated and pending coverage remain visible as separate series.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 6,
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "id": 7,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (iip_ai_application_id,iip_ai_allocation_status) (iip_ai_allocation_cost_amount{iip_ai_allocation_dimension=\"application\",iip_ai_currency=\"USD\",iip_ai_currency_scale=\"9\",job=\"iip-ai-economics\"}) / 1e9",
+          "instant": true,
+          "legendFormat": "{{iip_ai_application_id}} · {{iip_ai_allocation_status}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Cost by protected application",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Calculated estimate grouped only by team IDs from the protected effective-time attribution policy. Telemetry cannot self-assert these ownership labels.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 6,
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "id": 8,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (iip_ai_team_id,iip_ai_allocation_status) (iip_ai_allocation_cost_amount{iip_ai_allocation_dimension=\"team\",iip_ai_currency=\"USD\",iip_ai_currency_scale=\"9\",job=\"iip-ai-economics\"}) / 1e9",
+          "instant": true,
+          "legendFormat": "{{iip_ai_team_id}} · {{iip_ai_allocation_status}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Cost by protected team",
+      "type": "bargauge"
     }
   ],
   "refresh": "5s",

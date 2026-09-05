@@ -6,6 +6,7 @@ import type {
   ActionResult,
   ActionWorkflow,
   ActionWorkflowPage,
+  AiAllocationReport,
   ApiErrorBody,
   ContextEvidenceRequest,
   ConsoleAuthenticationConfiguration,
@@ -496,6 +497,21 @@ export class InfrastructureIntelligenceClient {
     const query = new URLSearchParams({ limit: String(options.limit ?? 50) });
     if (options.cursor) query.set("cursor", options.cursor);
     return this.get<ActionWorkflowPage>(`/v1/actions?${query}`);
+  }
+
+  async getAiAllocationReport(options: {
+    start: string;
+    end: string;
+    groupBy: "application" | "team";
+  }): Promise<AiAllocationReport> {
+    const query = new URLSearchParams({
+      start: options.start,
+      end: options.end,
+      groupBy: options.groupBy,
+    });
+    return this.get<AiAllocationReport>(
+      `/v1/ai/economics/allocation?${query}`,
+    );
   }
 
   async openPluginSession(command: {

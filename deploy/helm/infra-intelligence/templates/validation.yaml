@@ -46,6 +46,15 @@
 {{- if and .Values.aiSavingsEngine.enabled (not .Values.aiSavingsEngine.profilesExistingSecret) }}
 {{- fail "aiSavingsEngine.profilesExistingSecret is required when aiSavingsEngine.enabled=true" }}
 {{- end }}
+{{- if and .Values.aiAllocationReporting.enabled (not .Values.worker.enabled) }}
+{{- fail "worker.enabled must be true when aiAllocationReporting.enabled=true" }}
+{{- end }}
+{{- if and .Values.aiAllocationReporting.enabled (not .Values.aiAttribution.enabled) }}
+{{- fail "aiAttribution.enabled must be true when aiAllocationReporting.enabled=true" }}
+{{- end }}
+{{- if and .Values.aiAllocationReporting.enabled (not .Values.aiCostEngine.enabled) }}
+{{- fail "aiCostEngine.enabled must be true when aiAllocationReporting.enabled=true" }}
+{{- end }}
 {{- if gt (int .Values.telemetry.traceMaxExportBatchSize) (int .Values.telemetry.traceMaxQueueSize) }}
 {{- fail "telemetry.traceMaxExportBatchSize must not exceed telemetry.traceMaxQueueSize" }}
 {{- end }}

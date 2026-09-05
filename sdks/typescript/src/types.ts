@@ -196,6 +196,87 @@ export interface AiUsageAttributionRecord {
   };
 }
 
+export interface AiAllocationMoney {
+  currency: string;
+  currencyScale: AiCurrencyScale;
+  totalSubunits: number;
+  costBasis: "calculated-estimate";
+}
+
+export interface AiAllocationCoverage {
+  usageRecords: number;
+  allocatedRecords: number;
+  unallocatedRecords: number;
+  pendingAttributionRecords: number;
+  pricedRecords: number;
+  unpricedRecords: number;
+  ambiguousRecords: number;
+  pendingCostRecords: number;
+}
+
+export interface AiAllocationTotals {
+  inputTokens: number;
+  inputTokenRecords: number;
+  outputTokens: number;
+  outputTokenRecords: number;
+  pricedCost?: AiAllocationMoney;
+}
+
+export type AiAllocationGroup = AiAllocationTotals & {
+  usageRecords: number;
+  pricedRecords: number;
+  unpricedRecords: number;
+  ambiguousRecords: number;
+  pendingCostRecords: number;
+} & (
+    | {
+        allocationStatus: "allocated";
+        dimension: AiOrganizationalUnit;
+      }
+    | {
+        allocationStatus: "unallocated";
+        reasonCode: "no-matching-rule";
+      }
+    | {
+        allocationStatus: "pending";
+        reasonCode: "not-yet-attributed";
+      }
+  );
+
+export interface AiAllocationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiAllocationReport";
+  metadata: { tenantId: string; generatedAt: string };
+  spec: {
+    scope: {
+      start: string;
+      end: string;
+      groupBy: "application" | "team";
+      sourceRecordLimit: number;
+    };
+    sources: {
+      attribution: {
+        id: AiAttributionPolicyId;
+        version: string;
+        sourceHash: Sha256Digest;
+        engineVersion: string;
+      };
+      pricing: {
+        id: AiPriceCatalogId;
+        version: string;
+        sourceHash: Sha256Digest;
+        engineVersion: string;
+        currency: string;
+        currencyScale: AiCurrencyScale;
+        costBasis: "calculated-estimate";
+      };
+    };
+    coverage: AiAllocationCoverage;
+    totals: AiAllocationTotals;
+    groups: AiAllocationGroup[];
+  };
+}
+
 export interface AiTokenPrice {
   priceSubunitsPerMillionTokens: number;
 }

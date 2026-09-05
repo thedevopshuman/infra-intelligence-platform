@@ -18,6 +18,10 @@ CHANNEL_TOKEN = "ai-finops-channel-token-0123456789abcdef"
 CHANNEL_TOKEN_SHA256 = (
     "sha256:dcc4a1c70125fb81b9ba226ac4b3bb9d709b3c84c7d60eeffd87d8688d5f806a"
 )
+CONTROL_TOKEN = "ai-finops-local-operator-token-0123456789abcdef"
+CONTROL_TOKEN_SHA256 = (
+    "sha256:d52e86d5eeda090d11d9c961632390e6da1356df217d662abde728312befb25d"
+)
 KNOWN_MODEL = "example.foundation-model-v1:0"
 UNKNOWN_MODEL = "unpriced.foundation-model-v1:0"
 CATALOG_ID = "apc_11111111111111111111111111111111"
@@ -338,8 +342,13 @@ def send_fixture(
         privacy_probe.shutdown()
 
 
-def _json_url(url: str) -> Mapping[str, object]:
-    with urllib.request.urlopen(url, timeout=5) as response:
+def _json_url(
+    url: str,
+    *,
+    headers: Mapping[str, str] | None = None,
+) -> Mapping[str, object]:
+    request = urllib.request.Request(url, headers=dict(headers or {}))
+    with urllib.request.urlopen(request, timeout=5) as response:
         payload = json.loads(response.read())
     if not isinstance(payload, dict):
         raise RuntimeError("ai-finops.fixture.response.invalid")
@@ -429,7 +438,9 @@ def _assert_equal(actual: object, expected: object, name: str) -> None:
 
 def verify_fixture(
     *,
+    anchor: datetime,
     database_url: str,
+    api_endpoint: str,
     prometheus_endpoint: str,
     grafana_endpoint: str,
     loki_endpoint: str,
@@ -481,6 +492,10 @@ def verify_fixture(
                 7_200_000,
                 "evidence-backed saving",
             )
+            priced_total = sum(
+                item["spec"]["result"].get("totalSubunits", 0)
+                for item in costs
+            )
 
             _assert_equal(
                 _scalar(prometheus_endpoint, "sum(iip_ai_usage_requests)"),
@@ -513,9 +528,40 @@ def verify_fixture(
                 7_200_000.0,
                 "potential saving metric",
             )
+            for dimension, protected_id in (
+                ("application", "support-experience"),
+                ("team", "customer-experience"),
+            ):
+                _assert_equal(
+                    _scalar(
+                        prometheus_endpoint,
+                        "sum(iip_ai_allocation_requests"
+                        f'{{iip_ai_allocation_dimension="{dimension}"}})',
+                    ),
+                    8.0,
+                    f"{dimension} allocation coverage",
+                )
+                _assert_equal(
+                    _scalar(
+                        prometheus_endpoint,
+                        "sum(iip_ai_allocation_requests"
+                        f'{{iip_ai_{dimension}_id="{protected_id}"}})',
+                    ),
+                    4.0,
+                    f"protected {dimension} allocation",
+                )
+                _assert_equal(
+                    _scalar(
+                        prometheus_endpoint,
+                        "sum(iip_ai_allocation_cost_amount"
+                        f'{{iip_ai_allocation_dimension="{dimension}"}})',
+                    ),
+                    float(priced_total),
+                    f"{dimension} allocated cost",
+                )
             series = _prometheus_query(
                 prometheus_endpoint,
-                "iip_ai_usage_requests",
+                "{__name__=~\"iip_ai_(usage_requests|allocation_requests)\"}",
             )
             labels = tuple(
                 key
@@ -532,6 +578,41 @@ def verify_fixture(
                 for fragment in ("trace", "span", "request_id", "prompt")
             ):
                 raise AssertionError("high-cardinality or content label exported")
+
+            report_start = format_timestamp(anchor - timedelta(minutes=10))
+            report_end = format_timestamp(anchor)
+            for group_by, protected_id in (
+                ("application", "support-experience"),
+                ("team", "customer-experience"),
+            ):
+                parameters = urllib.parse.urlencode(
+                    {
+                        "start": report_start,
+                        "end": report_end,
+                        "groupBy": group_by,
+                    }
+                )
+                report = _json_url(
+                    api_endpoint.rstrip("/")
+                    + "/v1/ai/economics/allocation?"
+                    + parameters,
+                    headers={"Authorization": f"Bearer {CONTROL_TOKEN}"},
+                )
+                coverage = report.get("spec", {}).get("coverage", {})
+                _assert_equal(coverage.get("usageRecords"), 8, "API usage coverage")
+                _assert_equal(coverage.get("allocatedRecords"), 4, "API allocated coverage")
+                _assert_equal(coverage.get("unallocatedRecords"), 4, "API unallocated coverage")
+                groups = report.get("spec", {}).get("groups", [])
+                allocated_ids = {
+                    item.get("dimension", {}).get("id")
+                    for item in groups
+                    if item.get("allocationStatus") == "allocated"
+                }
+                _assert_equal(
+                    allocated_ids,
+                    {protected_id},
+                    f"API protected {group_by} group",
+                )
 
             dashboard = _json_url(
                 grafana_endpoint.rstrip("/")
@@ -579,7 +660,9 @@ def main() -> None:
     send.add_argument("--receiver", required=True)
 
     verify = subparsers.add_parser("verify")
+    verify.add_argument("--anchor", required=True)
     verify.add_argument("--database", required=True)
+    verify.add_argument("--api", required=True)
     verify.add_argument("--prometheus", required=True)
     verify.add_argument("--grafana", required=True)
     verify.add_argument("--loki", required=True)
@@ -608,7 +691,9 @@ def main() -> None:
         )
         return
     verify_fixture(
+        anchor=_parse_anchor(arguments.anchor),
         database_url=arguments.database,
+        api_endpoint=arguments.api,
         prometheus_endpoint=arguments.prometheus,
         grafana_endpoint=arguments.grafana,
         loki_endpoint=arguments.loki,

@@ -41,6 +41,10 @@ data:
   IIP_OTEL_INGESTION_ATTRIBUTE_MODE: {{ .Values.telemetry.attributeMode | quote }}
   IIP_OTEL_AI_ECONOMICS_ATTRIBUTE_MODE: {{ .Values.telemetry.aiEconomicsAttributeMode | quote }}
   IIP_OTEL_INVESTIGATION_ATTRIBUTE_MODE: {{ .Values.telemetry.investigationAttributeMode | quote }}
+  IIP_AI_ALLOCATION_REPORTING_ENABLED: {{ .Values.aiAllocationReporting.enabled | quote }}
+  IIP_AI_ALLOCATION_SOURCE_RECORD_LIMIT: {{ .Values.aiAllocationReporting.sourceRecordLimit | quote }}
+  IIP_AI_ALLOCATION_WINDOW_SECONDS: {{ .Values.aiAllocationReporting.windowSeconds | quote }}
+  IIP_AI_ALLOCATION_INTERVAL_SECONDS: {{ .Values.aiAllocationReporting.intervalSeconds | quote }}
   OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.telemetry.otlpEndpoint | quote }}
   OTEL_EXPORTER_OTLP_PROTOCOL: {{ .Values.telemetry.protocol | quote }}
   OTEL_METRIC_EXPORT_INTERVAL: {{ .Values.telemetry.exportIntervalMillis | quote }}

@@ -84,6 +84,8 @@ class AiFinOpsTopologyTests(unittest.TestCase):
             "What changed?",
             "One potential saving",
             "Can I trust the coverage?",
+            "Cost by protected application",
+            "Cost by protected team",
         ):
             self.assertIn(title, panels)
         expressions = tuple(
@@ -97,13 +99,14 @@ class AiFinOpsTopologyTests(unittest.TestCase):
             "iip_ai_context_growth_change",
             "iip_ai_savings_potential_amount",
             "iip_ai_cost_requests",
+            "iip_ai_allocation_cost_amount",
         ):
             self.assertTrue(any(metric in expression for expression in expressions))
         serialized = json.dumps(dashboard).lower()
         for prohibited in ("trace_id", "span_id", "request_id", "gen_ai.prompt"):
             self.assertNotIn(prohibited, serialized)
 
-    def test_compose_keeps_pricing_in_worker_and_receiver_is_isolated(self) -> None:
+    def test_compose_keeps_engines_in_worker_and_receiver_is_isolated(self) -> None:
         compose = (
             ROOT / "deploy" / "docker-compose.ai-finops.yml"
         ).read_text(encoding="utf-8")
@@ -112,12 +115,19 @@ class AiFinOpsTopologyTests(unittest.TestCase):
             "  workflow-worker:", maxsplit=1
         )
 
-        self.assertNotIn("IIP_AI_PRICE_CATALOGS_JSON", api)
+        self.assertIn("IIP_AI_PRICE_CATALOGS_JSON", api)
         self.assertNotIn("IIP_AI_PRICE_CATALOGS_JSON", receiver)
         self.assertIn("IIP_AI_PRICE_CATALOGS_JSON", worker_and_backends)
-        self.assertNotIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", api)
+        self.assertIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", api)
         self.assertNotIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", receiver)
         self.assertIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", worker_and_backends)
+        self.assertIn('IIP_AI_ALLOCATION_REPORTING_ENABLED: "true"', api)
+        self.assertIn(
+            'IIP_AI_ALLOCATION_REPORTING_ENABLED: "true"',
+            worker_and_backends,
+        )
+        self.assertNotIn("IIP_AI_COST_ENGINE_ENABLED", api)
+        self.assertNotIn("IIP_AI_ATTRIBUTION_ENABLED", api)
         self.assertIn("IIP_AI_USAGE_RECEIVER_ENABLED: \"true\"", receiver)
         self.assertIn('IIP_OTLP_RECEIVER_ENABLED: "false"', receiver)
         self.assertIn('IIP_OTLP_LOGS_RECEIVER_ENABLED: "false"', receiver)

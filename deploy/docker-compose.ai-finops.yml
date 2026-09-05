@@ -16,7 +16,7 @@ services:
       - /var/lib/postgresql
 
   api:
-    image: iip-ai-finops:0.63.0
+    image: iip-ai-finops:0.64.0
     build:
       context: ..
       dockerfile: Dockerfile
@@ -27,6 +27,13 @@ services:
       IIP_AUTH_IDENTITIES_JSON: >-
         {"identities":[{"tokenSha256":"sha256:d52e86d5eeda090d11d9c961632390e6da1356df217d662abde728312befb25d","actorId":"ai-finops-local-operator","tenantId":"local","roles":["developer","platform-admin"]}]}
       IIP_OTLP_RECEIVER_MODE: disabled
+      IIP_AI_ALLOCATION_REPORTING_ENABLED: "true"
+      IIP_AI_ATTRIBUTION_POLICIES_JSON: ${IIP_AI_ATTRIBUTION_POLICIES_JSON:?set IIP_AI_ATTRIBUTION_POLICIES_JSON}
+      IIP_AI_PRICE_CATALOGS_JSON: ${IIP_AI_PRICE_CATALOGS_JSON:?set IIP_AI_PRICE_CATALOGS_JSON}
+      IIP_AI_ATTRIBUTION_ALLOW_TEST_FIXTURES: "true"
+      IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES: "true"
+      IIP_AI_ALLOCATION_SOURCE_RECORD_LIMIT: "10000"
+      IIP_AI_ALLOCATION_WINDOW_SECONDS: "86400"
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,7 +53,7 @@ services:
       - no-new-privileges:true
 
   ai-usage-receiver:
-    image: iip-ai-finops:0.63.0
+    image: iip-ai-finops:0.64.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.otlp_receiver"]
     environment:
@@ -81,7 +88,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-ai-finops:0.63.0
+    image: iip-ai-finops:0.64.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:
@@ -104,6 +111,10 @@ services:
       IIP_AI_SAVINGS_ENGINE_ENABLED: "true"
       IIP_AI_SAVINGS_PROFILES_JSON: ${IIP_AI_SAVINGS_PROFILES_JSON:?set IIP_AI_SAVINGS_PROFILES_JSON}
       IIP_AI_SAVINGS_INTERVAL_SECONDS: "1"
+      IIP_AI_ALLOCATION_REPORTING_ENABLED: "true"
+      IIP_AI_ALLOCATION_SOURCE_RECORD_LIMIT: "10000"
+      IIP_AI_ALLOCATION_WINDOW_SECONDS: "86400"
+      IIP_AI_ALLOCATION_INTERVAL_SECONDS: "1"
       IIP_EVENT_PUBLISHER_MODE: disabled
       IIP_OTEL_METRICS_ENABLED: "true"
       IIP_OTEL_TRACES_ENABLED: "false"

@@ -11,6 +11,7 @@ from typing import Dict, Iterable, Mapping, Optional
 
 from iip.application.ports import (
     ActorContext,
+    AiAllocationLedgerQuery,
     AiSavingsCohortQuery,
     EventDeliverySloState,
     EventDeliveryState,
@@ -25,6 +26,7 @@ from iip.application.ports import (
     SourceIngestionState,
     StoredEvent,
 )
+from iip.application.query_ai_allocations import validate_ai_allocation_ledger_query
 from iip.adapters.ai_attribution_store import (
     prepare_ai_attribution_policy,
     prepare_ai_attribution_writes,
@@ -714,6 +716,93 @@ class InMemoryResourceStore:
                     self._json_copy(cost) if cost is not None else None,
                 )
                 for _started_at, _usage_id, usage, cost in candidates[: query.limit]
+            )
+
+    def list_ai_allocation_rows(
+        self,
+        actor: ActorContext,
+        query: AiAllocationLedgerQuery,
+    ) -> tuple[
+        tuple[
+            Mapping[str, object],
+            Mapping[str, object] | None,
+            Mapping[str, object] | None,
+        ],
+        ...,
+    ]:
+        """Read a bounded interval with exact attribution and cost generations."""
+
+        start, end = validate_ai_allocation_ledger_query(actor, query)
+        with self._lock:
+            candidates: list[
+                tuple[
+                    str,
+                    str,
+                    Mapping[str, object],
+                    Mapping[str, object] | None,
+                    Mapping[str, object] | None,
+                ]
+            ] = []
+            for (tenant_id, _deduplication_key), (_digest, usage) in self._ai_usage.items():
+                if tenant_id != actor.tenant_id:
+                    continue
+                try:
+                    metadata = usage["metadata"]
+                    spec = usage["spec"]
+                    assert isinstance(metadata, Mapping) and isinstance(spec, Mapping)
+                    invocation = spec["invocation"]
+                    assert isinstance(invocation, Mapping)
+                    usage_id = metadata["id"]
+                    started_text = invocation["startedAt"]
+                    if not isinstance(usage_id, str) or not isinstance(started_text, str):
+                        raise ValueError
+                    started_at = datetime.fromisoformat(
+                        started_text.replace("Z", "+00:00")
+                    )
+                except (AssertionError, KeyError, TypeError, ValueError):
+                    raise PersistenceError("storage.state.invalid") from None
+                if not start <= started_at < end:
+                    continue
+                attribution_id = self._ai_attribution_identities.get(
+                    (
+                        tenant_id,
+                        usage_id,
+                        query.policy_id,
+                        query.attribution_engine_version,
+                    )
+                )
+                attribution = (
+                    self._ai_attributions[(tenant_id, attribution_id)][1]
+                    if attribution_id is not None
+                    and (tenant_id, attribution_id) in self._ai_attributions
+                    else None
+                )
+                cost_id = self._ai_cost_identities.get(
+                    (
+                        tenant_id,
+                        usage_id,
+                        query.catalog_id,
+                        query.cost_engine_version,
+                    )
+                )
+                cost = (
+                    self._ai_costs[(tenant_id, cost_id)][1]
+                    if cost_id is not None and (tenant_id, cost_id) in self._ai_costs
+                    else None
+                )
+                candidates.append(
+                    (started_text, usage_id, usage, attribution, cost)
+                )
+            candidates.sort(key=lambda item: (item[0], item[1]))
+            return tuple(
+                (
+                    self._json_copy(usage),
+                    self._json_copy(attribution) if attribution is not None else None,
+                    self._json_copy(cost) if cost is not None else None,
+                )
+                for _started, _usage_id, usage, attribution, cost in candidates[
+                    : query.limit
+                ]
             )
 
     def commit_ai_savings_batch(
@@ -1451,6 +1540,7 @@ class AllowTenantPolicy:
             "action:execute",
             "action:propose",
             "action:read",
+            "ai-economics:read",
             "evidence:collect",
             "evidence-retention:expire",
             "evidence-retention:read",

@@ -140,7 +140,9 @@ def start() -> None:
         "http://127.0.0.1:14320",
     )
     ai_finops_fixture.verify_fixture(
+        anchor=anchor,
         database_url="postgresql://iip@127.0.0.1:15435/iip",
+        api_endpoint="http://127.0.0.1:18082",
         prometheus_endpoint="http://127.0.0.1:19091",
         grafana_endpoint="http://127.0.0.1:13000",
         loki_endpoint="http://127.0.0.1:13101",

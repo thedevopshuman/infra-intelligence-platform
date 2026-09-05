@@ -211,7 +211,7 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn("IIP_WORKER_INVESTIGATION_CONCURRENCY", worker)
         self.assertIn("IIP_WORKER_MAX_TENANT_CONCURRENCY", worker)
 
-    def test_ai_cost_engine_is_disabled_secret_backed_and_worker_owned(self) -> None:
+    def test_ai_cost_engine_is_disabled_secret_backed_and_worker_executed(self) -> None:
         worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
             encoding="utf-8"
         )
@@ -233,9 +233,9 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, worker)
-        self.assertNotIn("IIP_AI_PRICE_CATALOGS_JSON", api)
+        self.assertNotIn("IIP_AI_COST_ENGINE_ENABLED", api)
 
-    def test_ai_attribution_is_disabled_secret_backed_and_worker_owned(self) -> None:
+    def test_ai_attribution_is_disabled_secret_backed_and_worker_executed(self) -> None:
         worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
             encoding="utf-8"
         )
@@ -256,7 +256,7 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, worker)
-        self.assertNotIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", api)
+        self.assertNotIn("IIP_AI_ATTRIBUTION_ENABLED", api)
 
     def test_ai_savings_engine_is_disabled_secret_backed_and_worker_owned(self) -> None:
         worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
@@ -278,6 +278,39 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             with self.subTest(expected=expected):
                 self.assertIn(expected, worker)
         self.assertNotIn("IIP_AI_SAVINGS_PROFILES_JSON", api)
+
+    def test_ai_allocation_reporting_is_disabled_and_generation_bound(self) -> None:
+        api = (CHART / "templates" / "deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+        worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+        config_map = (CHART / "templates" / "configmap.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("aiAllocationReporting:", values)
+        for expected in (
+            "IIP_AI_ALLOCATION_REPORTING_ENABLED",
+            "IIP_AI_ALLOCATION_SOURCE_RECORD_LIMIT",
+            "IIP_AI_ALLOCATION_WINDOW_SECONDS",
+            "IIP_AI_ALLOCATION_INTERVAL_SECONDS",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, config_map)
+        for expected in (
+            "IIP_AI_ATTRIBUTION_POLICIES_JSON",
+            "IIP_AI_PRICE_CATALOGS_JSON",
+            "aiAllocationReporting.enabled",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, api)
+        self.assertIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", worker)
+        self.assertIn("IIP_AI_PRICE_CATALOGS_JSON", worker)
+        self.assertNotIn("IIP_AI_COST_ENGINE_ENABLED", api)
+        self.assertNotIn("IIP_AI_ATTRIBUTION_ENABLED", api)
 
     def test_event_delivery_slo_objective_is_explicit_and_api_visible(self) -> None:
         config_map = (CHART / "templates" / "configmap.yaml").read_text(

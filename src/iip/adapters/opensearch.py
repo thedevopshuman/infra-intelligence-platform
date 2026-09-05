@@ -433,7 +433,7 @@ class OpenSearchTelemetryLogsBackend:
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "User-Agent": "iip-opensearch-adapter/0.63.0",
+            "User-Agent": "iip-opensearch-adapter/0.64.0",
         }
         if integration.credential_ref is not None:
             try:

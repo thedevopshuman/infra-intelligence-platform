@@ -17,8 +17,9 @@ botocore offline interoperability gate are executable; live Bedrock
 model/region and streaming qualification remain.
 The first Phase B unit is also executable: protected effective-time policies
 map observed service/resource identity to separate immutable application/team
-attribution facts, including explicit unallocated coverage. Allocation queries,
-cost joins, export dimensions, and dashboard views remain.
+attribution facts, including explicit unallocated coverage. Bounded
+generation-bound allocation queries, cost joins, privacy-safe export
+dimensions, and application/team dashboard views are executable.
 
 ## Phase 0 — foundation (current repository)
 

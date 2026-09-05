@@ -50,7 +50,8 @@ code, selecting a destination, or receiving a credential. It returns stable
 host-created failures for plugin handling; it is not a control-plane HTTP client.
 
 `AiUsageRecord`, `AiAttributionPolicy`, `AiUsageAttributionRecord`,
-`AiPriceCatalog`, `AiCostRecord`, and `AiSavingsFinding` expose the AI economics
+`AiPriceCatalog`, `AiCostRecord`, `AiSavingsFinding`, and `AiAllocationReport`
+expose the AI economics
 records as public metadata-only envelopes. They do not
 instrument provider calls, send OTLP, or import an AWS SDK. Standard
 OpenTelemetry instrumentation remains the collection boundary.
@@ -91,3 +92,7 @@ instrumentation SDK.
 Version 0.47 adds protected attribution-policy and immutable usage-attribution
 record models. It does not let clients install policies or self-assign
 application/team ownership.
+
+Version 0.48 adds the bounded `Client.get_ai_allocation_report` read and its
+generation-bound application/team report model. Tenant identity and policy/
+catalog selection remain server-owned.

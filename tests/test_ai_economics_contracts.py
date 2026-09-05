@@ -8,6 +8,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator, FormatChecker
 
 from infra_intelligence_sdk import (
+    AiAllocationReport,
     AiAttributionPolicy,
     AiCostRecord,
     AiPriceCatalog,
@@ -22,6 +23,7 @@ from scripts.validate_repo import ROOT, validate_ai_economics_examples
 EXAMPLES = ROOT / "contracts" / "examples"
 SCHEMAS = ROOT / "contracts" / "schemas"
 CONTRACTS = (
+    ("ai-allocation-report", AiAllocationReport),
     ("ai-usage-record", AiUsageRecord),
     ("ai-attribution-policy", AiAttributionPolicy),
     ("ai-usage-attribution-record", AiUsageAttributionRecord),
@@ -38,6 +40,7 @@ def load(path: Path) -> dict[str, object]:
 def example_documents() -> dict[Path, object]:
     names = (
         "ai-usage-record.json",
+        "ai-allocation-report.json",
         "ai-price-catalog.json",
         "ai-cost-record.json",
         "ai-savings-finding.json",

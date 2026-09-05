@@ -46,7 +46,8 @@ TypeScript package intentionally provides types only because Unix-domain socket
 transport is runtime-specific.
 
 `AiUsageRecord`, `AiAttributionPolicy`, `AiUsageAttributionRecord`,
-`AiPriceCatalog`, `AiCostRecord`, and `AiSavingsFinding` describe the
+`AiPriceCatalog`, `AiCostRecord`, `AiSavingsFinding`, and `AiAllocationReport`
+describe the
 metadata-only AI economics ledger. The SDK does not instrument or
 proxy model calls; applications continue using standard OpenTelemetry
 instrumentation and a customer-controlled Collector.
@@ -84,3 +85,7 @@ instrumentation dependency.
 Version 0.47 adds protected attribution-policy and immutable usage-attribution
 record types without exposing policy installation or workload-controlled
 ownership authority.
+
+Version 0.48 adds `getAiAllocationReport()` for a bounded UTC interval grouped
+by protected application or team. Authentication determines the tenant and
+deployment configuration determines the policy and price generations.

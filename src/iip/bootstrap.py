@@ -79,6 +79,7 @@ from iip.application.ingest_otlp_logs import (
 )
 from iip.application.ports import (
     ActionExecutor,
+    AiAllocationTelemetrySink,
     AiEconomicsTelemetrySink,
     AuthenticationConfigurationError,
     Authenticator,
@@ -136,6 +137,11 @@ from iip.application.observe_otlp_receiver import (
 from iip.application.plugin_sessions import PluginSessionService
 from iip.application.plugin_invocations import PluginInvocationLifecycleService
 from iip.application.query_actions import ActionWorkflowQueryService
+from iip.application.query_ai_allocations import (
+    AiAllocationConfigurationError,
+    AiAllocationProjectionService,
+    AiAllocationReportService,
+)
 from iip.application.query_event_delivery_health import EventDeliveryHealthService
 from iip.application.query_event_delivery_slo import (
     EventDeliverySloObjectives,
@@ -227,6 +233,8 @@ class Runtime:
     ai_attribution_resolution: AiAttributionService | None
     ai_cost_calculation: AiCostCalculationService | None
     ai_savings_evaluation: AiSavingsEvaluationService | None
+    ai_allocation_reports: AiAllocationReportService | None
+    ai_allocation_projection: AiAllocationProjectionService | None
     investigations: DeterministicInvestigationService
     investigation_lifecycle: InvestigationLifecycleService
     investigation_dispatch: InvestigationDispatchService
@@ -296,6 +304,12 @@ def build_local_runtime(
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
     ai_savings_profiles: tuple[Mapping[str, object], ...] | None = None,
+    ai_allocation_policies: tuple[Mapping[str, object], ...] | None = None,
+    ai_allocation_catalogs: tuple[Mapping[str, object], ...] | None = None,
+    ai_allocation_allow_test_fixtures: bool = False,
+    ai_allocation_source_record_limit: int = 10_000,
+    ai_allocation_telemetry_sink: AiAllocationTelemetrySink | None = None,
+    ai_allocation_window_seconds: int = 86_400,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -343,6 +357,12 @@ def build_local_runtime(
         ai_cost_allow_test_fixtures,
         ai_cost_batch_size,
         ai_savings_profiles,
+        ai_allocation_policies,
+        ai_allocation_catalogs,
+        ai_allocation_allow_test_fixtures,
+        ai_allocation_source_record_limit,
+        ai_allocation_telemetry_sink,
+        ai_allocation_window_seconds,
     )
 
 
@@ -391,6 +411,12 @@ def _compose_runtime(
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
     ai_savings_profiles: tuple[Mapping[str, object], ...] | None = None,
+    ai_allocation_policies: tuple[Mapping[str, object], ...] | None = None,
+    ai_allocation_catalogs: tuple[Mapping[str, object], ...] | None = None,
+    ai_allocation_allow_test_fixtures: bool = False,
+    ai_allocation_source_record_limit: int = 10_000,
+    ai_allocation_telemetry_sink: AiAllocationTelemetrySink | None = None,
+    ai_allocation_window_seconds: int = 86_400,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -642,6 +668,36 @@ def _compose_runtime(
             if ai_savings_profiles is not None
             else None
         ),
+        ai_allocation_reports=(
+            AiAllocationReportService(
+                store,
+                policy,
+                clock,
+                ai_allocation_policies,
+                ai_allocation_catalogs,
+                allow_test_fixtures=ai_allocation_allow_test_fixtures,
+                source_record_limit=ai_allocation_source_record_limit,
+            )
+            if ai_allocation_policies is not None
+            and ai_allocation_catalogs is not None
+            else None
+        ),
+        ai_allocation_projection=(
+            AiAllocationProjectionService(
+                store,
+                clock,
+                ai_allocation_policies,
+                ai_allocation_catalogs,
+                ai_allocation_telemetry_sink,
+                allow_test_fixtures=ai_allocation_allow_test_fixtures,
+                source_record_limit=ai_allocation_source_record_limit,
+                window_seconds=ai_allocation_window_seconds,
+            )
+            if ai_allocation_policies is not None
+            and ai_allocation_catalogs is not None
+            and ai_allocation_telemetry_sink is not None
+            else None
+        ),
         investigations=investigations,
         investigation_lifecycle=investigation_lifecycle,
         investigation_dispatch=InvestigationDispatchService(
@@ -745,6 +801,12 @@ def build_postgres_runtime(
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
     ai_savings_profiles: tuple[Mapping[str, object], ...] | None = None,
+    ai_allocation_policies: tuple[Mapping[str, object], ...] | None = None,
+    ai_allocation_catalogs: tuple[Mapping[str, object], ...] | None = None,
+    ai_allocation_allow_test_fixtures: bool = False,
+    ai_allocation_source_record_limit: int = 10_000,
+    ai_allocation_telemetry_sink: AiAllocationTelemetrySink | None = None,
+    ai_allocation_window_seconds: int = 86_400,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -799,6 +861,12 @@ def build_postgres_runtime(
         ai_cost_allow_test_fixtures,
         ai_cost_batch_size,
         ai_savings_profiles,
+        ai_allocation_policies,
+        ai_allocation_catalogs,
+        ai_allocation_allow_test_fixtures,
+        ai_allocation_source_record_limit,
+        ai_allocation_telemetry_sink,
+        ai_allocation_window_seconds,
     )
 
 
@@ -967,6 +1035,13 @@ def _build_runtime_from_env(
             if include_ai_economics_engine
             else None
         )
+        (
+            ai_allocation_policies,
+            ai_allocation_catalogs,
+            ai_allocation_allow_test_fixtures,
+            ai_allocation_source_record_limit,
+            ai_allocation_window_seconds,
+        ) = _ai_allocation_report_configuration_from_env()
         if not database_url:
             return build_local_runtime(
                 authenticator,
@@ -1029,6 +1104,20 @@ def _build_runtime_from_env(
                 ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
                 ai_cost_batch_size=ai_cost_batch_size,
                 ai_savings_profiles=ai_savings_profiles,
+                ai_allocation_policies=ai_allocation_policies,
+                ai_allocation_catalogs=ai_allocation_catalogs,
+                ai_allocation_allow_test_fixtures=(
+                    ai_allocation_allow_test_fixtures
+                ),
+                ai_allocation_source_record_limit=(
+                    ai_allocation_source_record_limit
+                ),
+                ai_allocation_telemetry_sink=(
+                    metrics_runtime.ai_allocation_sink
+                    if metrics_runtime is not None
+                    else None
+                ),
+                ai_allocation_window_seconds=ai_allocation_window_seconds,
             )
         auto_migrate = (
             os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
@@ -1096,6 +1185,18 @@ def _build_runtime_from_env(
             ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
             ai_cost_batch_size=ai_cost_batch_size,
             ai_savings_profiles=ai_savings_profiles,
+            ai_allocation_policies=ai_allocation_policies,
+            ai_allocation_catalogs=ai_allocation_catalogs,
+            ai_allocation_allow_test_fixtures=(
+                ai_allocation_allow_test_fixtures
+            ),
+            ai_allocation_source_record_limit=ai_allocation_source_record_limit,
+            ai_allocation_telemetry_sink=(
+                metrics_runtime.ai_allocation_sink
+                if metrics_runtime is not None
+                else None
+            ),
+            ai_allocation_window_seconds=ai_allocation_window_seconds,
         )
     except Exception:
         if telemetry_runtime is not None:
@@ -1998,6 +2099,69 @@ def _ai_attribution_engine_configuration_from_env() -> tuple[
     if not worker_tenants or policy_tenants != worker_tenants:
         raise AiAttributionConfigurationError("ai.attribution.tenants.invalid")
     return policies, allow_raw == "true", batch_size
+
+
+def _ai_allocation_report_configuration_from_env() -> tuple[
+    tuple[Mapping[str, object], ...] | None,
+    tuple[Mapping[str, object], ...] | None,
+    bool,
+    int,
+    int,
+]:
+    enabled = os.environ.get("IIP_AI_ALLOCATION_REPORTING_ENABLED", "false").lower()
+    if enabled not in ("false", "true"):
+        raise AiAllocationConfigurationError(
+            "ai.allocation.configuration.invalid"
+        )
+    if enabled == "false":
+        return None, None, False, 10_000, 86_400
+    raw_policies = os.environ.get("IIP_AI_ATTRIBUTION_POLICIES_JSON")
+    raw_catalogs = os.environ.get("IIP_AI_PRICE_CATALOGS_JSON")
+    if raw_policies is None or raw_catalogs is None:
+        raise AiAllocationConfigurationError(
+            "ai.allocation.configuration.required"
+        )
+    attribution_fixtures = os.environ.get(
+        "IIP_AI_ATTRIBUTION_ALLOW_TEST_FIXTURES",
+        "false",
+    ).lower()
+    price_fixtures = os.environ.get(
+        "IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES",
+        "false",
+    ).lower()
+    if attribution_fixtures not in ("false", "true") or price_fixtures not in (
+        "false",
+        "true",
+    ):
+        raise AiAllocationConfigurationError(
+            "ai.allocation.configuration.invalid"
+        )
+    try:
+        source_record_limit = int(
+            os.environ.get("IIP_AI_ALLOCATION_SOURCE_RECORD_LIMIT", "10000")
+        )
+        window_seconds = int(
+            os.environ.get("IIP_AI_ALLOCATION_WINDOW_SECONDS", "86400")
+        )
+    except ValueError:
+        raise AiAllocationConfigurationError(
+            "ai.allocation.configuration.invalid"
+        ) from None
+    if not 1 <= source_record_limit <= 10_000 or not 60 <= window_seconds <= 2_678_400:
+        raise AiAllocationConfigurationError(
+            "ai.allocation.configuration.invalid"
+        )
+    from iip.adapters.ai_attribution_policies import (
+        ai_attribution_policies_from_json,
+    )
+    from iip.adapters.ai_price_catalogs import ai_price_catalogs_from_json
+
+    policies = ai_attribution_policies_from_json(raw_policies)
+    catalogs = ai_price_catalogs_from_json(raw_catalogs)
+    allow_fixtures = (
+        attribution_fixtures == "true" and price_fixtures == "true"
+    )
+    return policies, catalogs, allow_fixtures, source_record_limit, window_seconds
 
 
 def _ai_cost_engine_configuration_from_env() -> tuple[

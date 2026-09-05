@@ -1,0 +1,92 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiAllocationReport",
+  "metadata": {
+    "tenantId": "local",
+    "generatedAt": "2026-09-05T10:05:00Z"
+  },
+  "spec": {
+    "scope": {
+      "start": "2026-09-05T10:00:00Z",
+      "end": "2026-09-05T10:05:00Z",
+      "groupBy": "application",
+      "sourceRecordLimit": 10000
+    },
+    "sources": {
+      "attribution": {
+        "id": "aap_22222222222222222222222222222222",
+        "version": "2026-09-05.1",
+        "sourceHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "engineVersion": "0.1.0"
+      },
+      "pricing": {
+        "id": "apc_11111111111111111111111111111111",
+        "version": "2026-09-05.1",
+        "sourceHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "engineVersion": "0.1.0",
+        "currency": "USD",
+        "currencyScale": 9,
+        "costBasis": "calculated-estimate"
+      }
+    },
+    "coverage": {
+      "usageRecords": 3,
+      "allocatedRecords": 2,
+      "unallocatedRecords": 1,
+      "pendingAttributionRecords": 0,
+      "pricedRecords": 2,
+      "unpricedRecords": 1,
+      "ambiguousRecords": 0,
+      "pendingCostRecords": 0
+    },
+    "totals": {
+      "inputTokens": 7200,
+      "inputTokenRecords": 3,
+      "outputTokens": 1800,
+      "outputTokenRecords": 3,
+      "pricedCost": {
+        "currency": "USD",
+        "currencyScale": 9,
+        "totalSubunits": 31470000,
+        "costBasis": "calculated-estimate"
+      }
+    },
+    "groups": [
+      {
+        "allocationStatus": "allocated",
+        "dimension": {
+          "id": "support-experience",
+          "name": "Support Experience"
+        },
+        "usageRecords": 2,
+        "inputTokens": 4800,
+        "inputTokenRecords": 2,
+        "outputTokens": 1200,
+        "outputTokenRecords": 2,
+        "pricedRecords": 2,
+        "unpricedRecords": 0,
+        "ambiguousRecords": 0,
+        "pendingCostRecords": 0,
+        "pricedCost": {
+          "currency": "USD",
+          "currencyScale": 9,
+          "totalSubunits": 31470000,
+          "costBasis": "calculated-estimate"
+        }
+      },
+      {
+        "allocationStatus": "unallocated",
+        "reasonCode": "no-matching-rule",
+        "usageRecords": 1,
+        "inputTokens": 2400,
+        "inputTokenRecords": 1,
+        "outputTokens": 600,
+        "outputTokenRecords": 1,
+        "pricedRecords": 0,
+        "unpricedRecords": 1,
+        "ambiguousRecords": 0,
+        "pendingCostRecords": 0
+      }
+    ]
+  }
+}

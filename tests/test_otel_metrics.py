@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from iip.adapters.auth import HashedBearerAuthenticator
 from iip.adapters.otel import (
+    OpenTelemetryAiAllocationSink,
     OpenTelemetryConfigurationError,
     OpenTelemetryAiEconomicsSink,
     OpenTelemetryIngestionSink,
@@ -16,6 +17,7 @@ from iip.adapters.otel import (
     OtlpMetricsRuntime,
 )
 from iip.application.ports import (
+    AiAllocationMeasurement,
     AiEconomicsMeasurement,
     IngestionFreshnessMeasurement,
     QueryAvailabilityMeasurement,
@@ -105,6 +107,27 @@ def ai_economics_measurement() -> AiEconomicsMeasurement:
         finding_count=1,
         finding_severity="medium",
         potential_savings_subunits=7_200_000,
+    )
+
+
+def ai_allocation_measurement() -> AiAllocationMeasurement:
+    return AiAllocationMeasurement(
+        tenant_id="local",
+        dimension="application",
+        allocation_status="allocated",
+        dimension_id="support-experience",
+        request_count=2,
+        input_tokens=4800,
+        input_token_records=2,
+        output_tokens=200,
+        output_token_records=2,
+        priced_requests=2,
+        unpriced_requests=0,
+        ambiguous_requests=0,
+        pending_cost_requests=0,
+        calculated_cost_subunits=17_400_000,
+        currency="USD",
+        currency_scale=9,
     )
 
 
@@ -388,6 +411,96 @@ class OpenTelemetryAiEconomicsSinkTests(unittest.TestCase):
                     },
                 )
             ],
+        )
+
+
+class OpenTelemetryAiAllocationSinkTests(unittest.TestCase):
+    def test_snapshot_uses_stable_ids_and_zeros_disappeared_groups(self) -> None:
+        meter = RecordingMeter()
+        sink = OpenTelemetryAiAllocationSink(meter)
+
+        sink.record_ai_allocation_snapshot("local", (ai_allocation_measurement(),))
+        sink.record_ai_allocation_snapshot("local", ())
+
+        requests = meter.instruments["iip.ai.allocation.requests"].records
+        self.assertEqual([item[0] for item in requests], [2, 0])
+        self.assertEqual(
+            requests[0][1],
+            {
+                "iip.ai.allocation.dimension": "application",
+                "iip.ai.allocation.status": "allocated",
+                "iip.ai.application.id": "support-experience",
+                "iip.tenant.id": "local",
+            },
+        )
+        self.assertNotIn("Support Experience", repr(meter.instruments))
+        self.assertEqual(sink.record_failures, 0)
+
+    def test_snapshot_replacement_is_isolated_per_tenant(self) -> None:
+        meter = RecordingMeter()
+        sink = OpenTelemetryAiAllocationSink(meter)
+        local = ai_allocation_measurement()
+        secondary = replace(
+            local,
+            tenant_id="secondary",
+            request_count=3,
+            priced_requests=3,
+        )
+
+        sink.record_ai_allocation_snapshot("local", (local,))
+        sink.record_ai_allocation_snapshot("secondary", (secondary,))
+        sink.record_ai_allocation_snapshot("local", ())
+
+        requests = meter.instruments["iip.ai.allocation.requests"].records
+        self.assertEqual([item[0] for item in requests], [2, 3, 0])
+        self.assertEqual(requests[1][1]["iip.tenant.id"], "secondary")
+        self.assertEqual(requests[2][1]["iip.tenant.id"], "local")
+        self.assertEqual(sink.record_failures, 0)
+
+    def test_invalid_cardinality_input_is_failure_isolated(self) -> None:
+        meter = RecordingMeter()
+        sink = OpenTelemetryAiAllocationSink(meter)
+        invalid = replace(ai_allocation_measurement(), dimension_id="User Supplied")
+
+        sink.record_ai_allocation_snapshot("local", (invalid,))
+
+        self.assertEqual(sink.record_failures, 1)
+        self.assertEqual(
+            meter.instruments["iip.telemetry.record.failures"].records[0][1][
+                "iip.telemetry.instrument"
+            ],
+            "ai-allocation",
+        )
+
+    def test_unpriced_group_does_not_invent_zero_cost_and_clears_prior_cost(
+        self,
+    ) -> None:
+        meter = RecordingMeter()
+        sink = OpenTelemetryAiAllocationSink(meter)
+        priced = ai_allocation_measurement()
+        unpriced = replace(
+            priced,
+            priced_requests=0,
+            unpriced_requests=2,
+            calculated_cost_subunits=None,
+        )
+
+        sink.record_ai_allocation_snapshot("local", (unpriced,))
+        self.assertEqual(
+            meter.instruments["iip.ai.allocation.cost_amount"].records,
+            [],
+        )
+
+        sink.record_ai_allocation_snapshot("local", (priced,))
+        sink.record_ai_allocation_snapshot("local", (unpriced,))
+        self.assertEqual(
+            [
+                item[0]
+                for item in meter.instruments[
+                    "iip.ai.allocation.cost_amount"
+                ].records
+            ],
+            [17_400_000, 0],
         )
 
 

@@ -192,7 +192,10 @@ helm-lint:
 		--set aiCostEngine.enabled=true \
 		--set aiCostEngine.catalogsExistingSecret=iip-ai-prices \
 		--set aiSavingsEngine.enabled=true \
-		--set aiSavingsEngine.profilesExistingSecret=iip-ai-savings >/dev/null
+		--set aiSavingsEngine.profilesExistingSecret=iip-ai-savings \
+		--set aiAllocationReporting.enabled=true \
+		--set telemetry.metricsEnabled=true \
+		--set telemetry.otlpEndpoint=http://otel-collector.observability:4318 >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
 		--set worker.enabled=true \

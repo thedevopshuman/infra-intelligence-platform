@@ -39,7 +39,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "infra-intelligence.fullname" . }}
-          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret .Values.telemetryEvidence.prometheus.credentialsExistingSecret .Values.logEvidence.loki.credentialsExistingSecret .Values.logEvidence.opensearch.credentialsExistingSecret .Values.kubernetesEventEvidence.credentialsExistingSecret .Values.kubernetesActions.credentialsExistingSecret .Values.contextEvidence.integrationsExistingSecret .Values.investigationSignalCatalog.existingSecret }}
+          {{- if or .Values.database.existingSecret .Values.auth.existingSecret .Values.telemetry.existingSecret .Values.telemetryEvidence.prometheus.credentialsExistingSecret .Values.logEvidence.loki.credentialsExistingSecret .Values.logEvidence.opensearch.credentialsExistingSecret .Values.kubernetesEventEvidence.credentialsExistingSecret .Values.kubernetesActions.credentialsExistingSecret .Values.contextEvidence.integrationsExistingSecret .Values.investigationSignalCatalog.existingSecret .Values.aiAllocationReporting.enabled }}
           env:
             {{- if .Values.database.existingSecret }}
             - name: IIP_DATABASE_URL
@@ -110,6 +110,22 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.investigationSignalCatalog.existingSecret | quote }}
                   key: {{ .Values.investigationSignalCatalog.secretKey | quote }}
+            {{- end }}
+            {{- if .Values.aiAllocationReporting.enabled }}
+            - name: IIP_AI_ATTRIBUTION_POLICIES_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aiAttribution.policiesExistingSecret | quote }}
+                  key: {{ .Values.aiAttribution.policiesSecretKey | quote }}
+            - name: IIP_AI_PRICE_CATALOGS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aiCostEngine.catalogsExistingSecret | quote }}
+                  key: {{ .Values.aiCostEngine.catalogsSecretKey | quote }}
+            - name: IIP_AI_ATTRIBUTION_ALLOW_TEST_FIXTURES
+              value: {{ .Values.aiAttribution.allowTestFixtures | quote }}
+            - name: IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES
+              value: {{ .Values.aiCostEngine.allowTestFixtures | quote }}
             {{- end }}
           {{- end }}
           ports:

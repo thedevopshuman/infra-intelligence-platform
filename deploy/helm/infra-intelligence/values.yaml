@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.63.0"
+  tag: "0.64.0"
   digest: ""
 
 worker:
@@ -47,6 +47,12 @@ aiSavingsEngine:
   enabled: false
   profilesExistingSecret: ""
   profilesSecretKey: ai-savings-profiles-json
+  intervalSeconds: 60
+
+aiAllocationReporting:
+  enabled: false
+  sourceRecordLimit: 10000
+  windowSeconds: 86400
   intervalSeconds: 60
 
 eventPublisher:

@@ -40,6 +40,7 @@ from iip.application.attribute_ai_usage import (
 )
 from iip.application.ports import (
     ActorContext,
+    AiAllocationLedgerQuery,
     AiSavingsCohortQuery,
     EventDeliverySloState,
     EventDeliveryState,
@@ -54,6 +55,7 @@ from iip.application.ports import (
     SourceIngestionState,
     StoredEvent,
 )
+from iip.application.query_ai_allocations import validate_ai_allocation_ledger_query
 from iip.domain.models import (
     ContractError,
     ObservationDisposition,
@@ -1118,6 +1120,65 @@ class PostgresResourceStore:
             ).fetchall()
         return tuple(
             (row["usage_document"], row["cost_document"])
+            for row in rows
+        )
+
+    @_translate_database_errors
+    def list_ai_allocation_rows(
+        self,
+        actor: ActorContext,
+        query: AiAllocationLedgerQuery,
+    ) -> tuple[
+        tuple[
+            Mapping[str, object],
+            Mapping[str, object] | None,
+            Mapping[str, object] | None,
+        ],
+        ...,
+    ]:
+        """Read a tenant interval with exact attribution and cost generations."""
+
+        validate_ai_allocation_ledger_query(actor, query)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT usage.document AS usage_document,
+                       attribution.document AS attribution_document,
+                       cost.document AS cost_document
+                FROM iip.ai_usage_records AS usage
+                LEFT JOIN iip.ai_usage_attributions AS attribution
+                  ON attribution.tenant_id = usage.tenant_id
+                 AND attribution.usage_record_id = usage.usage_record_id
+                 AND attribution.policy_id = %s
+                 AND attribution.engine_version = %s
+                LEFT JOIN iip.ai_cost_records AS cost
+                  ON cost.tenant_id = usage.tenant_id
+                 AND cost.usage_record_id = usage.usage_record_id
+                 AND cost.catalog_id = %s
+                 AND cost.engine_version = %s
+                WHERE usage.tenant_id = %s
+                  AND usage.invocation_started_at >= %s
+                  AND usage.invocation_started_at < %s
+                ORDER BY usage.invocation_started_at, usage.usage_record_id
+                LIMIT %s
+                """,
+                (
+                    query.policy_id,
+                    query.attribution_engine_version,
+                    query.catalog_id,
+                    query.cost_engine_version,
+                    actor.tenant_id,
+                    query.start,
+                    query.end,
+                    query.limit,
+                ),
+            ).fetchall()
+        return tuple(
+            (
+                row["usage_document"],
+                row["attribution_document"],
+                row["cost_document"],
+            )
             for row in rows
         )
 

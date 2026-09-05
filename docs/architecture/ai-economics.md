@@ -110,8 +110,14 @@ decision from the stored sources before atomically committing the fact, its
 value-minimized CloudEvent, and outbox row. Only the tenant-enrolled worker has
 that authority; neither telemetry nor an API caller can select ownership.
 
-Queries that join attribution to calculated cost, allocation metric dimensions,
-and application/team dashboard panels are intentionally the next Phase B unit.
+The bounded allocation query joins usage to exact attribution and cost
+generations in the authoritative ledger. It accepts only an authenticated
+tenant, a half-open interval of at most 31 days, and `application` or `team`;
+it fails without partial totals above its source-row ceiling. The worker
+projects the same report using protected stable IDs only, and the reference
+dashboard exposes application/team cost beside unallocated and pricing
+coverage. Historical display names remain in immutable API groups but never
+become metric labels.
 
 The executable cost service lives in the tenant-explicit workflow worker, not
 the API or OTLP receiver. It reads one protected immutable catalog per enrolled

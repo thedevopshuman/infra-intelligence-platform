@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Control Plane API",
-    "version": "0.63.0",
+    "version": "0.64.0",
     "description": "Executable control-plane API for authenticated session and runtime identity, collection ingestion, freshness telemetry, backend-neutral evidence and retention observation, resource queries, synchronous or durably queued investigation assessment, governed actions, and bounded plugin sessions and invocation lifecycles. OTLP intake has a separate process and OpenAPI document."
   },
   "servers": [{"url": "http://localhost:8080"}],
@@ -580,6 +580,25 @@
         }
       }
     },
+    "/v1/ai/economics/allocation": {
+      "get": {
+        "operationId": "getAiAllocationReport",
+        "description": "Return a bounded tenant-scoped ledger aggregate grouped by protected application or team attribution. Policy and price generations come only from deployment configuration; calculated cost is not an invoice.",
+        "parameters": [
+          {"name": "start", "in": "query", "required": true, "schema": {"type": "string", "format": "date-time"}, "description": "Inclusive canonical UTC start. The interval may not exceed 31 days."},
+          {"name": "end", "in": "query", "required": true, "schema": {"type": "string", "format": "date-time"}, "description": "Exclusive canonical UTC end."},
+          {"name": "groupBy", "in": "query", "required": true, "schema": {"type": "string", "enum": ["application", "team"]}}
+        ],
+        "responses": {
+          "200": {"description": "Complete allocation and pricing-coverage report", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/ai-allocation-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "422": {"description": "The source-record ceiling was exceeded; no partial aggregate is returned", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
     "/v1/actions": {
       "get": {
         "operationId": "listActionWorkflows",
@@ -829,6 +848,7 @@
       "ActionResult": {"$ref": "../../contracts/schemas/action-result.schema.json"},
       "ActionWorkflow": {"$ref": "../../contracts/schemas/action-workflow.schema.json"},
       "ActionWorkflowPage": {"$ref": "../../contracts/schemas/action-workflow-page.schema.json"},
+      "AiAllocationReport": {"$ref": "../../contracts/schemas/ai-allocation-report.schema.json"},
       "PluginSession": {"$ref": "../../contracts/schemas/plugin-session.schema.json"},
       "PluginManifest": {"$ref": "../../contracts/schemas/plugin-manifest.schema.json"},
       "PluginInvocation": {"$ref": "../../contracts/schemas/plugin-invocation.schema.json"},

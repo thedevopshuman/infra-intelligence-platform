@@ -15,6 +15,12 @@ One measurement represents the current window of one protected
 worker derives it from the same bounded cohort used by the rule and offers it
 to the telemetry sink only after any qualifying finding has committed.
 
+A separate allocation snapshot represents one tenant's complete bounded
+rolling ledger report, projected once by protected application and once by
+protected team. It uses the exact configured attribution-policy, price-catalog,
+and engine generations. Replacing a snapshot zeros disappeared series for that
+tenant only; it never changes another tenant's last-value series.
+
 The source snapshot contains:
 
 - successful request count and known input/output token totals;
@@ -52,11 +58,20 @@ platform telemetry sinks.
 | `iip.ai.savings.profile_status` | `1` | One-hot deterministic evaluation status. |
 | `iip.ai.savings.findings` | `{finding}` | Zero or one committed finding for the profile snapshot. |
 | `iip.ai.savings.potential_amount` | `{currency-subunit}` | Calculated potential saving for a committed finding. |
+| `iip.ai.allocation.requests` | `{request}` | Invocations grouped by protected application or team allocation. |
+| `iip.ai.allocation.input_tokens` | `{token}` | Known input tokens in an allocation group. |
+| `iip.ai.allocation.output_tokens` | `{token}` | Known output tokens in an allocation group. |
+| `iip.ai.allocation.metered_requests` | `{request}` | Allocation-group requests with the `input` or `output` token total present. |
+| `iip.ai.allocation.cost_requests` | `{request}` | Allocation-group requests in each exact cost status. |
+| `iip.ai.allocation.cost_amount` | `{currency-subunit}` | Calculated-estimate priced cost for an allocation group. |
 
 `iip.ai.cost.amount` is only the priced subset. Consumers must display its
 four coverage gauges beside it and must label it as calculated cost, not
 provider billing. Convert subunits for display with
 `amount / 10^iip.ai.currency_scale`; do not change the stored/exported integer.
+The allocation cost instrument is likewise absent when a group has no priced
+records; its coverage series carries the unresolved state. A zero is emitted
+only to retire a previously exported priced last-value series.
 
 ## Attribute allowlist
 
@@ -85,9 +100,15 @@ Individual instruments add only their declared closed dimensions:
 | `iip.ai.currency` | Three-letter uppercase currency code from the catalog. |
 | `iip.ai.currency_scale` | `6`, `9`, or `12` |
 | `iip.ai.cost.basis` | `calculated-estimate` |
+| `iip.ai.allocation.dimension` | `application`, `team` |
+| `iip.ai.allocation.status` | `allocated`, `unallocated`, `pending` |
+| `iip.ai.application.id` | Stable IDs from the protected attribution policy; present only for allocated application groups. |
+| `iip.ai.team.id` | Stable IDs from the protected attribution policy; present only for allocated team groups. |
 
-Profile count is bounded to 1,000 per worker, so the label set cannot expand
-from arbitrary invocation attributes. Usage, cost, finding, trace, span,
+Profile and policy rule counts are bounded to 1,000 per configured tenant, and
+allocation source reads are capped at 10,000 records, so label sets cannot
+expand from arbitrary invocation attributes. Application/team display names
+never become labels. Usage, cost, finding, trace, span,
 request, and evidence IDs; timestamps; catalog IDs; quantities/rates inside
 formulas; prompts; responses; messages; tool arguments; and raw payload fields
 are prohibited as attributes.
@@ -101,7 +122,8 @@ not grant cross-tenant query authority; the customer must independently route
 and authorize backend access.
 
 Recording is best effort. A rejected measurement increments
-`iip.telemetry.record.failures` with instrument `ai-economics`. Collector or
+`iip.telemetry.record.failures` with instrument `ai-economics` or
+`ai-allocation`. Collector or
 backend delivery is covered by the existing metrics exporter-health path.
 Neither failure changes cost/finding persistence, worker success, API
 readiness, or customer inference.

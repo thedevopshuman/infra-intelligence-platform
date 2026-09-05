@@ -96,6 +96,9 @@ class HelmValuesContractTests(unittest.TestCase):
             "worker.enabled must be true when aiSavingsEngine.enabled=true",
             "aiCostEngine.enabled must be true when aiSavingsEngine.enabled=true",
             "aiSavingsEngine.profilesExistingSecret is required",
+            "worker.enabled must be true when aiAllocationReporting.enabled=true",
+            "aiAttribution.enabled must be true when aiAllocationReporting.enabled=true",
+            "aiCostEngine.enabled must be true when aiAllocationReporting.enabled=true",
             "telemetry.traceMaxExportBatchSize must not exceed",
             "telemetry.otlpEndpoint is required",
             "auth.existingSecret is required",
@@ -135,6 +138,16 @@ class HelmValuesContractTests(unittest.TestCase):
         self.assertFalse(ai_savings["additionalProperties"])
         self.assertEqual(
             ai_savings["properties"]["intervalSeconds"]["maximum"], 3600
+        )
+        allocation = self.schema["properties"]["aiAllocationReporting"]
+        self.assertFalse(allocation["additionalProperties"])
+        self.assertEqual(
+            allocation["properties"]["sourceRecordLimit"]["maximum"],
+            10000,
+        )
+        self.assertEqual(
+            allocation["properties"]["windowSeconds"]["maximum"],
+            2678400,
         )
         telemetry = self.schema["properties"]["telemetry"]
         self.assertEqual(

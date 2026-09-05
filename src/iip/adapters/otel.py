@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import re
 from threading import Lock
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlsplit
 
 from iip.application.ports import (
+    AiAllocationMeasurement,
     AiEconomicsMeasurement,
     IngestionFreshnessMeasurement,
     InvestigationExecutionMeasurement,
@@ -39,6 +41,7 @@ _INVESTIGATION_ATTRIBUTE_MODES = frozenset(
 )
 _MAX_ENDPOINT_LENGTH = 2048
 _MAX_COUNTER = 9_007_199_254_740_991
+_SAFE_AI_DIMENSION_ID = re.compile(r"[a-z][a-z0-9._-]{2,127}")
 _SIGNALS = ("metrics", "traces")
 
 
@@ -999,6 +1002,276 @@ class OpenTelemetryAiEconomicsSink:
             raise ValueError
 
 
+class OpenTelemetryAiAllocationSink:
+    """Export complete, bounded allocation snapshots using protected IDs only."""
+
+    def __init__(self, meter: Any, *, attribute_mode: str = "tenant-scope") -> None:
+        if attribute_mode not in _AI_ECONOMICS_ATTRIBUTE_MODES:
+            raise OpenTelemetryConfigurationError("telemetry.configuration.invalid")
+        self._attribute_mode = attribute_mode
+        self._requests = meter.create_gauge(
+            "iip.ai.allocation.requests",
+            unit="{request}",
+            description="Observed invocations grouped by protected allocation.",
+        )
+        self._input_tokens = meter.create_gauge(
+            "iip.ai.allocation.input_tokens",
+            unit="{token}",
+            description="Known input tokens grouped by protected allocation.",
+        )
+        self._output_tokens = meter.create_gauge(
+            "iip.ai.allocation.output_tokens",
+            unit="{token}",
+            description="Known output tokens grouped by protected allocation.",
+        )
+        self._metered_requests = meter.create_gauge(
+            "iip.ai.allocation.metered_requests",
+            unit="{request}",
+            description="Requests with the named token total present.",
+        )
+        self._cost_requests = meter.create_gauge(
+            "iip.ai.allocation.cost_requests",
+            unit="{request}",
+            description="Allocation requests grouped by exact cost coverage.",
+        )
+        self._cost_amount = meter.create_gauge(
+            "iip.ai.allocation.cost_amount",
+            unit="{currency-subunit}",
+            description="Calculated-estimate priced cost grouped by allocation.",
+        )
+        self._record_failure = meter.create_counter(
+            "iip.telemetry.record.failures",
+            unit="1",
+            description="Measurements rejected before reaching an exporter.",
+        )
+        self._previous: dict[
+            tuple[str, str, str, str | None, str, int], AiAllocationMeasurement
+        ] = {}
+        self._snapshot_lock = Lock()
+        self._failures = 0
+
+    @property
+    def record_failures(self) -> int:
+        with self._snapshot_lock:
+            return self._failures
+
+    def record_ai_allocation_snapshot(
+        self,
+        tenant_id: str,
+        measurements: tuple[AiAllocationMeasurement, ...],
+    ) -> None:
+        try:
+            if (
+                not isinstance(tenant_id, str)
+                or not 1 <= len(tenant_id) <= 128
+                or not isinstance(measurements, tuple)
+                or len(measurements) > 2004
+            ):
+                raise ValueError
+            current: dict[
+                tuple[str, str, str, str | None, str, int],
+                AiAllocationMeasurement,
+            ] = {}
+            for measurement in measurements:
+                self._validate(measurement)
+                if measurement.tenant_id != tenant_id:
+                    raise ValueError
+                key = self._key(measurement)
+                if key in current:
+                    raise ValueError
+                current[key] = measurement
+            with self._snapshot_lock:
+                previous = {
+                    key: value
+                    for key, value in self._previous.items()
+                    if key[0] == tenant_id
+                }
+                self._previous = {
+                    key: value
+                    for key, value in self._previous.items()
+                    if key[0] != tenant_id
+                }
+                self._previous.update(current)
+            for key, measurement in current.items():
+                prior = previous.get(key)
+                self._record(measurement)
+                if (
+                    prior is not None
+                    and prior.calculated_cost_subunits is not None
+                    and measurement.calculated_cost_subunits is None
+                ):
+                    self._record_cost_zero(prior)
+                previous.pop(key, None)
+            for measurement in previous.values():
+                self._record(self._zero(measurement))
+        except Exception:
+            with self._snapshot_lock:
+                self._failures += 1
+            try:
+                self._record_failure.add(
+                    1,
+                    {
+                        "iip.telemetry.signal": "metrics",
+                        "iip.telemetry.instrument": "ai-allocation",
+                    },
+                )
+            except Exception:
+                pass
+
+    def _record(self, measurement: AiAllocationMeasurement) -> None:
+        common = self._attributes(measurement)
+        self._requests.set(measurement.request_count, common)
+        self._input_tokens.set(measurement.input_tokens, common)
+        self._output_tokens.set(measurement.output_tokens, common)
+        for meter_name, value in (
+            ("input", measurement.input_token_records),
+            ("output", measurement.output_token_records),
+        ):
+            attributes = dict(common)
+            attributes["iip.ai.usage.meter"] = meter_name
+            self._metered_requests.set(value, attributes)
+        for status, value in (
+            ("priced", measurement.priced_requests),
+            ("unpriced", measurement.unpriced_requests),
+            ("ambiguous", measurement.ambiguous_requests),
+            ("pending", measurement.pending_cost_requests),
+        ):
+            attributes = dict(common)
+            attributes["iip.ai.cost.status"] = status
+            self._cost_requests.set(value, attributes)
+        if measurement.calculated_cost_subunits is not None:
+            self._cost_amount.set(
+                measurement.calculated_cost_subunits,
+                self._money_attributes(common, measurement),
+            )
+
+    def _record_cost_zero(self, measurement: AiAllocationMeasurement) -> None:
+        self._cost_amount.set(
+            0,
+            self._money_attributes(self._attributes(measurement), measurement),
+        )
+
+    @staticmethod
+    def _money_attributes(
+        common: Mapping[str, str | int],
+        measurement: AiAllocationMeasurement,
+    ) -> dict[str, str | int]:
+        return {
+            **common,
+            "iip.ai.currency": measurement.currency,
+            "iip.ai.currency_scale": measurement.currency_scale,
+            "iip.ai.cost.basis": "calculated-estimate",
+        }
+
+    def _attributes(
+        self, measurement: AiAllocationMeasurement
+    ) -> dict[str, str | int]:
+        attributes: dict[str, str | int] = {
+            "iip.ai.allocation.dimension": measurement.dimension,
+            "iip.ai.allocation.status": measurement.allocation_status,
+        }
+        if measurement.dimension_id is not None:
+            attributes[
+                f"iip.ai.{measurement.dimension}.id"
+            ] = measurement.dimension_id
+        if self._attribute_mode == "tenant-scope":
+            attributes["iip.tenant.id"] = measurement.tenant_id
+        return attributes
+
+    @staticmethod
+    def _key(
+        measurement: AiAllocationMeasurement,
+    ) -> tuple[str, str, str, str | None, str, int]:
+        return (
+            measurement.tenant_id,
+            measurement.dimension,
+            measurement.allocation_status,
+            measurement.dimension_id,
+            measurement.currency,
+            measurement.currency_scale,
+        )
+
+    @staticmethod
+    def _zero(measurement: AiAllocationMeasurement) -> AiAllocationMeasurement:
+        return AiAllocationMeasurement(
+            tenant_id=measurement.tenant_id,
+            dimension=measurement.dimension,
+            allocation_status=measurement.allocation_status,
+            dimension_id=measurement.dimension_id,
+            request_count=0,
+            input_tokens=0,
+            input_token_records=0,
+            output_tokens=0,
+            output_token_records=0,
+            priced_requests=0,
+            unpriced_requests=0,
+            ambiguous_requests=0,
+            pending_cost_requests=0,
+            calculated_cost_subunits=(
+                0
+                if measurement.calculated_cost_subunits is not None
+                else None
+            ),
+            currency=measurement.currency,
+            currency_scale=measurement.currency_scale,
+        )
+
+    @staticmethod
+    def _validate(measurement: AiAllocationMeasurement) -> None:
+        if not isinstance(measurement, AiAllocationMeasurement):
+            raise ValueError
+        if (
+            not isinstance(measurement.tenant_id, str)
+            or not 1 <= len(measurement.tenant_id) <= 128
+            or measurement.dimension not in {"application", "team"}
+            or measurement.allocation_status
+            not in {"allocated", "unallocated", "pending"}
+            or (measurement.allocation_status == "allocated")
+            != (measurement.dimension_id is not None)
+            or (
+                measurement.dimension_id is not None
+                and _SAFE_AI_DIMENSION_ID.fullmatch(measurement.dimension_id) is None
+            )
+            or not isinstance(measurement.currency, str)
+            or len(measurement.currency) != 3
+            or not measurement.currency.isupper()
+            or measurement.currency_scale not in (6, 9, 12)
+        ):
+            raise ValueError
+        counts = (
+            measurement.request_count,
+            measurement.input_tokens,
+            measurement.input_token_records,
+            measurement.output_tokens,
+            measurement.output_token_records,
+            measurement.priced_requests,
+            measurement.unpriced_requests,
+            measurement.ambiguous_requests,
+            measurement.pending_cost_requests,
+        )
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or not 0 <= value <= _MAX_COUNTER
+            for value in counts
+        ) or (
+            measurement.input_token_records > measurement.request_count
+            or measurement.output_token_records > measurement.request_count
+            or sum(counts[5:]) != measurement.request_count
+            or (
+                measurement.calculated_cost_subunits is not None
+                and (
+                    isinstance(measurement.calculated_cost_subunits, bool)
+                    or not isinstance(measurement.calculated_cost_subunits, int)
+                    or not 0
+                    <= measurement.calculated_cost_subunits
+                    <= _MAX_COUNTER
+                )
+            )
+        ):
+            raise ValueError
+
+
 class OpenTelemetryInvestigationSink:
     """Emit one bounded span from each durable terminal investigation report."""
 
@@ -1071,6 +1344,7 @@ class OtlpMetricsRuntime:
     query_sink: OpenTelemetryQueryAvailabilitySink | None = None
     receiver_sink: OpenTelemetryOtlpReceiverSink | None = None
     ai_economics_sink: OpenTelemetryAiEconomicsSink | None = None
+    ai_allocation_sink: OpenTelemetryAiAllocationSink | None = None
 
     def force_flush(self, timeout_millis: int = 10_000) -> bool:
         return bool(self.provider.force_flush(timeout_millis=timeout_millis))
@@ -1164,15 +1438,15 @@ def build_otlp_metrics_runtime(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.63.0",
+                    "service.version": "0.64.0",
                 }
             ),
             metric_readers=(reader,),
         )
-        ingestion_meter = provider.get_meter("iip.ingestion", "0.63.0")
-        query_meter = provider.get_meter("iip.query", "0.63.0")
-        receiver_meter = provider.get_meter("iip.otlp.receiver", "0.63.0")
-        ai_economics_meter = provider.get_meter("iip.ai.economics", "0.63.0")
+        ingestion_meter = provider.get_meter("iip.ingestion", "0.64.0")
+        query_meter = provider.get_meter("iip.query", "0.64.0")
+        receiver_meter = provider.get_meter("iip.otlp.receiver", "0.64.0")
+        ai_economics_meter = provider.get_meter("iip.ai.economics", "0.64.0")
         sink = OpenTelemetryIngestionSink(
             ingestion_meter,
             attribute_mode=configuration.attribute_mode,
@@ -1184,6 +1458,10 @@ def build_otlp_metrics_runtime(
             query_sink=OpenTelemetryQueryAvailabilitySink(query_meter),
             receiver_sink=OpenTelemetryOtlpReceiverSink(receiver_meter),
             ai_economics_sink=OpenTelemetryAiEconomicsSink(
+                ai_economics_meter,
+                attribute_mode=configuration.ai_economics_attribute_mode,
+            ),
+            ai_allocation_sink=OpenTelemetryAiAllocationSink(
                 ai_economics_meter,
                 attribute_mode=configuration.ai_economics_attribute_mode,
             ),
@@ -1220,7 +1498,7 @@ def build_otlp_traces_runtime(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.63.0",
+                    "service.version": "0.64.0",
                 }
             )
         )
@@ -1233,7 +1511,7 @@ def build_otlp_traces_runtime(
                 max_export_batch_size=configuration.max_export_batch_size,
             )
         )
-        tracer = provider.get_tracer("iip.investigation", "0.63.0")
+        tracer = provider.get_tracer("iip.investigation", "0.64.0")
         sink = OpenTelemetryInvestigationSink(
             tracer,
             attribute_mode=configuration.attribute_mode,

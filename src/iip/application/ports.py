@@ -265,6 +265,28 @@ class AiEconomicsMeasurement:
 
 
 @dataclass(frozen=True)
+class AiAllocationMeasurement:
+    """One bounded application or team allocation reporting projection."""
+
+    tenant_id: str
+    dimension: str
+    allocation_status: str
+    dimension_id: Optional[str]
+    request_count: int
+    input_tokens: int
+    input_token_records: int
+    output_tokens: int
+    output_token_records: int
+    priced_requests: int
+    unpriced_requests: int
+    ambiguous_requests: int
+    pending_cost_requests: int
+    calculated_cost_subunits: Optional[int]
+    currency: str
+    currency_scale: int
+
+
+@dataclass(frozen=True)
 class TelemetryExportSignalState:
     """Bounded, provider-neutral delivery state for one telemetry signal."""
 
@@ -710,6 +732,19 @@ class AiSavingsCohortQuery:
     limit: int
 
 
+@dataclass(frozen=True)
+class AiAllocationLedgerQuery:
+    """Exact generations and half-open interval for one bounded allocation read."""
+
+    start: str
+    end: str
+    policy_id: str
+    attribution_engine_version: str
+    catalog_id: str
+    cost_engine_version: str
+    limit: int
+
+
 class AiEconomicsLedger(AiAttributionLedger, Protocol):
     def register_price_catalog(
         self,
@@ -742,6 +777,20 @@ class AiEconomicsLedger(AiAttributionLedger, Protocol):
         query: AiSavingsCohortQuery,
     ) -> tuple[tuple[Mapping[str, object], Mapping[str, object] | None], ...]:
         """List scoped usage with the exact requested cost result when present."""
+
+    def list_ai_allocation_rows(
+        self,
+        actor: ActorContext,
+        query: AiAllocationLedgerQuery,
+    ) -> tuple[
+        tuple[
+            Mapping[str, object],
+            Mapping[str, object] | None,
+            Mapping[str, object] | None,
+        ],
+        ...,
+    ]:
+        """List bounded usage with exact attribution and cost generations."""
 
     def commit_ai_savings_batch(
         self,
@@ -875,6 +924,15 @@ class InvestigationTelemetrySink(Protocol):
 class AiEconomicsTelemetrySink(Protocol):
     def record_ai_economics(self, measurement: AiEconomicsMeasurement) -> None:
         """Record a bounded aggregate without becoming accounting authority."""
+
+
+class AiAllocationTelemetrySink(Protocol):
+    def record_ai_allocation_snapshot(
+        self,
+        tenant_id: str,
+        measurements: tuple[AiAllocationMeasurement, ...],
+    ) -> None:
+        """Replace one tenant's bounded projection without becoming accounting authority."""
 
 
 class InvestigationSignalCatalog(Protocol):

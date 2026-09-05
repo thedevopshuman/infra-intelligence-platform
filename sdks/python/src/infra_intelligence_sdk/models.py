@@ -3515,6 +3515,36 @@ class AiUsageAttributionRecord:
 
 
 @dataclass(frozen=True)
+class AiAllocationReport:
+    """Bounded application or team view over immutable AI economics facts."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "AiAllocationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiAllocationReport",
+                label="AI allocation report",
+            )
+        )
+
+    @property
+    def groups(self) -> tuple[Mapping[str, Any], ...]:
+        spec = self.payload.get("spec")
+        groups = spec.get("groups") if isinstance(spec, Mapping) else None
+        if not isinstance(groups, list) or any(
+            not isinstance(item, Mapping) for item in groups
+        ):
+            raise ValueError("AI allocation report groups are invalid")
+        return tuple(dict(item) for item in groups)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class AiPriceCatalog:
     """Versioned data-driven token prices used for calculated cost."""
 

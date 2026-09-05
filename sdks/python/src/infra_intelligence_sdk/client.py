@@ -16,6 +16,7 @@ from .models import (
     ActionResult,
     ActionWorkflow,
     ActionWorkflowPage,
+    AiAllocationReport,
     CollectorQueueLossReport,
     ConsoleAuthenticationConfiguration,
     ContextEvidenceRequest,
@@ -468,6 +469,20 @@ class Client:
             query["cursor"] = cursor
         return ActionWorkflowPage.from_dict(
             self._get(f"/v1/actions?{urlencode(query)}")
+        )
+
+    def get_ai_allocation_report(
+        self,
+        *,
+        start: str,
+        end: str,
+        group_by: str,
+    ) -> AiAllocationReport:
+        """Read one generation-bound application or team allocation report."""
+
+        query = urlencode({"start": start, "end": end, "groupBy": group_by})
+        return AiAllocationReport.from_dict(
+            self._get(f"/v1/ai/economics/allocation?{query}")
         )
 
     def open_plugin_session(self, command: Mapping[str, Any]) -> PluginSession:

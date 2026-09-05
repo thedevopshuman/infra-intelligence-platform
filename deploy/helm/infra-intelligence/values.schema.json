@@ -11,6 +11,7 @@
     "aiAttribution",
     "aiCostEngine",
     "aiSavingsEngine",
+    "aiAllocationReporting",
     "eventPublisher",
     "eventDeliverySlo",
     "investigationCompletionSlo",
@@ -194,6 +195,22 @@
         "enabled": {"type": "boolean"},
         "profilesExistingSecret": {"$ref": "#/definitions/optionalName"},
         "profilesSecretKey": {"$ref": "#/definitions/nonEmptyString"},
+        "intervalSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}
+      }
+    },
+    "aiAllocationReporting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "sourceRecordLimit",
+        "windowSeconds",
+        "intervalSeconds"
+      ],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "sourceRecordLimit": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "windowSeconds": {"type": "integer", "minimum": 60, "maximum": 2678400},
         "intervalSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}
       }
     },

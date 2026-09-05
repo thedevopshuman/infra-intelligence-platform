@@ -10,6 +10,7 @@ from .models import (
     ActionResult,
     ActionWorkflow,
     ActionWorkflowPage,
+    AiAllocationReport,
     AiAttributionPolicy,
     AiCostRecord,
     AiPriceCatalog,
@@ -103,6 +104,7 @@ __all__ = [
     "ActionResult",
     "ActionWorkflow",
     "ActionWorkflowPage",
+    "AiAllocationReport",
     "AiAttributionPolicy",
     "AiCostRecord",
     "AiPriceCatalog",
@@ -193,4 +195,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.47.0"
+__version__ = "0.48.0"

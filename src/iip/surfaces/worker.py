@@ -66,6 +66,16 @@ class AiAttributionWorkerPass:
     failures: int
 
 
+@dataclass(frozen=True)
+class AiAllocationWorkerPass:
+    """Value-minimized result from rolling allocation metric projections."""
+
+    tenants: int
+    usage_records: int
+    groups: int
+    failures: int
+
+
 class TenantFairInvestigationScheduler:
     """Keep at most one process-local task in flight for each tenant."""
 
@@ -240,6 +250,18 @@ def ai_savings_interval_seconds() -> int:
     return interval
 
 
+def ai_allocation_interval_seconds() -> int:
+    try:
+        interval = int(
+            os.environ.get("IIP_AI_ALLOCATION_INTERVAL_SECONDS", "60")
+        )
+    except ValueError:
+        raise ValueError("ai.allocation.configuration.invalid") from None
+    if interval < 1 or interval > 3600:
+        raise ValueError("ai.allocation.configuration.invalid")
+    return interval
+
+
 def run_ai_cost_pass(
     service: Any,
     tenants: tuple[str, ...],
@@ -293,6 +315,30 @@ def run_ai_attribution_pass(
         processed,
         allocated,
         unallocated,
+        failures,
+    )
+
+
+def run_ai_allocation_pass(
+    service: Any,
+    tenants: tuple[str, ...],
+    worker_id: str,
+) -> AiAllocationWorkerPass:
+    usage_records = 0
+    groups = 0
+    failures = 0
+    for tenant_id in tenants:
+        try:
+            result = service.run_once(tenant_id, worker_id)
+            usage_records += result.usage_records
+            groups += result.groups
+        except Exception:
+            # Tenant and organizational identities remain out of process logs.
+            failures += 1
+    return AiAllocationWorkerPass(
+        len(tenants),
+        usage_records,
+        groups,
         failures,
     )
 
@@ -380,6 +426,13 @@ def main() -> None:
         ai_savings_interval_seconds() if ai_savings_service is not None else 60
     )
     next_ai_savings_at = time.monotonic()
+    ai_allocation_service = runtime.ai_allocation_projection
+    ai_allocation_interval = (
+        ai_allocation_interval_seconds()
+        if ai_allocation_service is not None
+        else 60
+    )
+    next_ai_allocation_at = time.monotonic()
     stopped = Event()
 
     def stop(_signum: int, _frame: object) -> None:
@@ -459,6 +512,32 @@ def main() -> None:
                     )
                 next_ai_cost_at = time.monotonic() + ai_cost_interval
                 worked = worked or cost_pass.processed > 0
+            if (
+                ai_allocation_service is not None
+                and time.monotonic() >= next_ai_allocation_at
+            ):
+                allocation_pass = run_ai_allocation_pass(
+                    ai_allocation_service,
+                    tenants,
+                    worker_id,
+                )
+                if allocation_pass.failures or arguments.once:
+                    print(
+                        json.dumps(
+                            {
+                                "event": "ai-allocation.projection.pass",
+                                "tenants": allocation_pass.tenants,
+                                "usageRecords": allocation_pass.usage_records,
+                                "groups": allocation_pass.groups,
+                                "failures": allocation_pass.failures,
+                            },
+                            separators=(",", ":"),
+                            sort_keys=True,
+                        )
+                    )
+                next_ai_allocation_at = (
+                    time.monotonic() + ai_allocation_interval
+                )
             if (
                 ai_savings_service is not None
                 and time.monotonic() >= next_ai_savings_at

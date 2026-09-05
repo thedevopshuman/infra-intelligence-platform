@@ -126,6 +126,10 @@ from iip.application.query_actions import (
     ActionQueryError,
     ActionWorkflowNotFoundError,
 )
+from iip.application.query_ai_allocations import (
+    AiAllocationAuthorizationError,
+    AiAllocationQueryError,
+)
 from iip.application.query_event_delivery_health import (
     EventDeliveryHealthAuthorizationError,
     EventDeliveryHealthInputError,
@@ -190,7 +194,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.63.0"
+    server_version = "IIPReference/0.64.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -324,6 +328,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if path == "/v1/operations/evidence/retention":
             self._query_evidence_retention(actor, parsed.query)
+            return
+        if path == "/v1/ai/economics/allocation":
+            self._query_ai_allocation(actor, parsed.query)
             return
         if path == "/v1/actions":
             self._query_actions(actor, parsed.query)
@@ -475,6 +482,51 @@ class ApiHandler(BaseHTTPRequestHandler):
                 {"error": {"code": "ingestion.source_not_found"}},
             )
         except (IngestionTelemetryStateError, PersistenceError):
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "storage.unavailable"}},
+            )
+
+    def _query_ai_allocation(self, actor: ActorContext, query: str) -> None:
+        try:
+            parameters = parse_qs(query, keep_blank_values=True)
+            if set(parameters) != {"start", "end", "groupBy"}:
+                raise AiAllocationQueryError("request.invalid")
+            start = self._single(parameters, "start")
+            end = self._single(parameters, "end")
+            group_by = self._single(parameters, "groupBy")
+            if start is None or end is None or group_by is None:
+                raise AiAllocationQueryError("request.invalid")
+            service = self.runtime.ai_allocation_reports
+            if service is None:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"error": {"code": "ai.allocation.not-configured"}},
+                )
+                return
+            report = service.get(
+                actor,
+                start=start,
+                end=end,
+                group_by=group_by,
+            )
+            self._json(HTTPStatus.OK, dict(report))
+        except AiAllocationAuthorizationError:
+            self._json(
+                HTTPStatus.FORBIDDEN,
+                {"error": {"code": "policy.denied"}},
+            )
+        except AiAllocationQueryError as exc:
+            code = str(exc)
+            status = (
+                HTTPStatus.UNPROCESSABLE_ENTITY
+                if code == "ai.allocation.source-limit-exceeded"
+                else HTTPStatus.SERVICE_UNAVAILABLE
+                if code == "ai.allocation.not-configured"
+                else HTTPStatus.BAD_REQUEST
+            )
+            self._json(status, {"error": {"code": code}})
+        except PersistenceError:
             self._json(
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 {"error": {"code": "storage.unavailable"}},
@@ -1719,6 +1771,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "investigation-completion-slo"
             ),
             "/v1/operations/evidence/retention": "evidence-retention",
+            "/v1/ai/economics/allocation": "ai-allocation-report",
             "/v1/actions": "actions-list",
         }
         operation = exact.get(path)

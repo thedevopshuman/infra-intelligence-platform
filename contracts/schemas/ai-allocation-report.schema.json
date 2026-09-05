@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-allocation-report:v1alpha1",
+  "title": "AI Allocation Report",
+  "description": "A bounded tenant-scoped usage and calculated-cost report grouped by protected application or team attribution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "AiAllocationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId", "generatedAt"],
+      "properties": {
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "generatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "sources", "coverage", "totals", "groups"],
+      "properties": {
+        "scope": {"$ref": "#/$defs/scope"},
+        "sources": {"$ref": "#/$defs/sources"},
+        "coverage": {"$ref": "#/$defs/coverage"},
+        "totals": {"$ref": "#/$defs/totals"},
+        "groups": {
+          "type": "array",
+          "maxItems": 1002,
+          "items": {"$ref": "#/$defs/group"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "safeId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{2,127}$"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "groupBy", "sourceRecordLimit"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"},
+        "groupBy": {"type": "string", "enum": ["application", "team"]},
+        "sourceRecordLimit": {"type": "integer", "minimum": 1, "maximum": 10000}
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "sourceHash", "engineVersion"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^aap_[a-f0-9]{32}$"},
+        "version": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][0-9]+$"},
+        "sourceHash": {"$ref": "#/$defs/sha256"},
+        "engineVersion": {"type": "string", "pattern": "^[0-9]+[.][0-9]+[.][0-9]+$"}
+      }
+    },
+    "pricingGeneration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "sourceHash", "engineVersion", "currency", "currencyScale", "costBasis"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^apc_[a-f0-9]{32}$"},
+        "version": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][0-9]+$"},
+        "sourceHash": {"$ref": "#/$defs/sha256"},
+        "engineVersion": {"type": "string", "pattern": "^[0-9]+[.][0-9]+[.][0-9]+$"},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "currencyScale": {"type": "integer", "enum": [6, 9, 12]},
+        "costBasis": {"const": "calculated-estimate"}
+      }
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribution", "pricing"],
+      "properties": {
+        "attribution": {"$ref": "#/$defs/generation"},
+        "pricing": {"$ref": "#/$defs/pricingGeneration"}
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "usageRecords",
+        "allocatedRecords",
+        "unallocatedRecords",
+        "pendingAttributionRecords",
+        "pricedRecords",
+        "unpricedRecords",
+        "ambiguousRecords",
+        "pendingCostRecords"
+      ],
+      "properties": {
+        "usageRecords": {"$ref": "#/$defs/count"},
+        "allocatedRecords": {"$ref": "#/$defs/count"},
+        "unallocatedRecords": {"$ref": "#/$defs/count"},
+        "pendingAttributionRecords": {"$ref": "#/$defs/count"},
+        "pricedRecords": {"$ref": "#/$defs/count"},
+        "unpricedRecords": {"$ref": "#/$defs/count"},
+        "ambiguousRecords": {"$ref": "#/$defs/count"},
+        "pendingCostRecords": {"$ref": "#/$defs/count"}
+      }
+    },
+    "money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "currencyScale", "totalSubunits", "costBasis"],
+      "properties": {
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "currencyScale": {"type": "integer", "enum": [6, 9, 12]},
+        "totalSubunits": {"$ref": "#/$defs/count"},
+        "costBasis": {"const": "calculated-estimate"}
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputTokens", "inputTokenRecords", "outputTokens", "outputTokenRecords"],
+      "properties": {
+        "inputTokens": {"$ref": "#/$defs/count"},
+        "inputTokenRecords": {"$ref": "#/$defs/count"},
+        "outputTokens": {"$ref": "#/$defs/count"},
+        "outputTokenRecords": {"$ref": "#/$defs/count"},
+        "pricedCost": {"$ref": "#/$defs/money"}
+      }
+    },
+    "dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {"$ref": "#/$defs/safeId"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allocationStatus",
+        "usageRecords",
+        "inputTokens",
+        "inputTokenRecords",
+        "outputTokens",
+        "outputTokenRecords",
+        "pricedRecords",
+        "unpricedRecords",
+        "ambiguousRecords",
+        "pendingCostRecords"
+      ],
+      "properties": {
+        "allocationStatus": {"type": "string", "enum": ["allocated", "unallocated", "pending"]},
+        "dimension": {"$ref": "#/$defs/dimension"},
+        "reasonCode": {"type": "string", "enum": ["no-matching-rule", "not-yet-attributed"]},
+        "usageRecords": {"$ref": "#/$defs/count"},
+        "inputTokens": {"$ref": "#/$defs/count"},
+        "inputTokenRecords": {"$ref": "#/$defs/count"},
+        "outputTokens": {"$ref": "#/$defs/count"},
+        "outputTokenRecords": {"$ref": "#/$defs/count"},
+        "pricedRecords": {"$ref": "#/$defs/count"},
+        "unpricedRecords": {"$ref": "#/$defs/count"},
+        "ambiguousRecords": {"$ref": "#/$defs/count"},
+        "pendingCostRecords": {"$ref": "#/$defs/count"},
+        "pricedCost": {"$ref": "#/$defs/money"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"allocationStatus": {"const": "allocated"}}, "required": ["allocationStatus"]},
+          "then": {"required": ["dimension"], "not": {"required": ["reasonCode"]}},
+          "else": {"required": ["reasonCode"], "not": {"required": ["dimension"]}}
+        },
+        {
+          "if": {"properties": {"allocationStatus": {"const": "unallocated"}}, "required": ["allocationStatus"]},
+          "then": {"properties": {"reasonCode": {"const": "no-matching-rule"}}}
+        },
+        {
+          "if": {"properties": {"allocationStatus": {"const": "pending"}}, "required": ["allocationStatus"]},
+          "then": {"properties": {"reasonCode": {"const": "not-yet-attributed"}}}
+        }
+      ]
+    }
+  }
+}

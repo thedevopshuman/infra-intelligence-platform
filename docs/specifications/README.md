@@ -48,6 +48,7 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | AI usage record | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-usage-record.schema.json` | `contracts/examples/ai-usage-record.json` |
 | AI attribution policy | [ai-attribution-contracts.md](ai-attribution-contracts.md) | `contracts/schemas/ai-attribution-policy.schema.json` | `contracts/examples/ai-attribution-policy.json` |
 | AI usage attribution record | [ai-attribution-contracts.md](ai-attribution-contracts.md) | `contracts/schemas/ai-usage-attribution-record.schema.json` | `contracts/examples/ai-usage-attribution-record.json` |
+| AI allocation report | [ai-allocation-report-contract.md](ai-allocation-report-contract.md) | `contracts/schemas/ai-allocation-report.schema.json` | `contracts/examples/ai-allocation-report.json` |
 | AI price catalog | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-price-catalog.schema.json` | `contracts/examples/ai-price-catalog.json` |
 | AI cost record | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-cost-record.schema.json` | `contracts/examples/ai-cost-record.json` |
 | AI savings finding | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-savings-finding.schema.json` | `contracts/examples/ai-savings-finding.json` |
@@ -97,4 +98,4 @@ The authenticated control plane and the independently authenticated OTLP intake 
 
 `v1alpha1` means consumers should pin versions and expect deliberate evolution. Breaking changes create a new API/schema version. Fields are never silently repurposed.
 
-Planned contracts: evaluation results and AI economics query pages.
+Planned contracts: evaluation results and asynchronous AI economics exports.

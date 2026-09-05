@@ -100,7 +100,9 @@ PYTHONPATH=src:sdks/python/src "$IIP_TEST_PYTHON" \
 
 if ! PYTHONPATH=src:sdks/python/src "$IIP_TEST_PYTHON" \
     scripts/ai_finops_fixture.py verify \
+    --anchor "$IIP_AI_FINOPS_ANCHOR" \
     --database "postgresql://iip@127.0.0.1:${IIP_AI_FINOPS_POSTGRES_PORT}/iip" \
+    --api "http://127.0.0.1:${IIP_AI_FINOPS_API_PORT}" \
     --prometheus "http://127.0.0.1:${IIP_AI_FINOPS_PROMETHEUS_PORT}" \
     --grafana "http://127.0.0.1:${IIP_AI_FINOPS_GRAFANA_PORT}" \
     --loki "http://127.0.0.1:${IIP_AI_FINOPS_LOKI_PORT}" \

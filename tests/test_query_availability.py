@@ -205,6 +205,7 @@ class QueryAvailabilityHttpBoundaryTests(unittest.TestCase):
             "/v1/session": "session",
             "/v1/system/version": "runtime-version",
             "/v1/resources": "resources-list",
+            "/v1/ai/economics/allocation": "ai-allocation-report",
             "/v1/resources/res_secret/neighborhood": "resource-neighborhood",
             "/v1/resources/res_secret/timeline": "resource-timeline",
             "/v1/telemetry/ingestion": "ingestion-freshness",

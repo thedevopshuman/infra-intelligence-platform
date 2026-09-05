@@ -7,8 +7,9 @@ The chart can install the control-plane API against an existing PostgreSQL datab
 Reviewed automatic investigation candidates are optional. Set `investigationSignalCatalog.existingSecret` and `secretKey` to project the same tenant-bound [signal catalog](investigation-signal-catalog.md) into the API and worker. The chart never renders the catalog body into a ConfigMap or values-derived manifest.
 
 The optional AI cost engine is worker-owned and disabled by default. Its
-protected catalog wrapper comes from an existing Secret and is never mounted
-into the API or OTLP receiver. `aiCostEngine.enabled=true` requires the worker,
+protected catalog wrapper comes from an existing Secret. It is mounted into
+the API only when generation-bound allocation reporting is explicitly enabled,
+and is never mounted into the OTLP receiver. `aiCostEngine.enabled=true` requires the worker,
 an exact tenant enrollment, and `aiCostEngine.catalogsExistingSecret`; fixture
 pricing remains separately prohibited by default. Follow the
 [AI cost-engine runbook](ai-cost-engine.md) before enabling it.
@@ -21,6 +22,14 @@ never projected into the API or OTLP receiver. Follow the
 When OTLP metrics are enabled, its aggregate projection uses
 `telemetry.aiEconomicsAttributeMode`; retain the default `tenant-scope` unless
 the destination is independently isolated to one tenant.
+
+Protected AI attribution is worker-owned and disabled by default. Enabling
+`aiAllocationReporting` additionally gives the API read-only access to the
+same attribution-policy and price-catalog Secrets so it can validate every
+joined ledger fact against the configured generations. The API does not
+receive attribution or cost execution flags, and the receiver receives neither
+Secret. The reporting worker projects only stable protected application/team
+IDs; display names remain API data and never become metric labels.
 
 ## Required inputs
 
@@ -206,7 +215,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.63.0
+  tag: 0.64.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -246,6 +255,20 @@ worker:
   tenants: [tenant-a, tenant-b]
   investigationConcurrency: 4
   maxTenantInvestigationConcurrency: 1
+
+aiAttribution:
+  enabled: true
+  policiesExistingSecret: iip-ai-attribution
+
+aiCostEngine:
+  enabled: true
+  catalogsExistingSecret: iip-ai-prices
+
+aiAllocationReporting:
+  enabled: true
+  sourceRecordLimit: 10000
+  windowSeconds: 86400
+  intervalSeconds: 60
 
 queryAvailabilitySlo:
   windowSeconds: 3600

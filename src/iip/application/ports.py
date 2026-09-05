@@ -232,6 +232,39 @@ class InvestigationExecutionMeasurement:
 
 
 @dataclass(frozen=True)
+class AiEconomicsMeasurement:
+    """One bounded, profile-scoped AI economics reporting snapshot."""
+
+    tenant_id: str
+    profile_id: str
+    provider: str
+    model_id: str
+    region: str
+    service_name: str
+    deployment_environment: str
+    request_count: int
+    input_tokens: int
+    input_token_requests: int
+    output_tokens: int
+    output_token_requests: int
+    incomplete_requests: int
+    priced_requests: int
+    unpriced_requests: int
+    ambiguous_requests: int
+    pending_cost_requests: int
+    calculated_cost_subunits: Optional[int]
+    currency: Optional[str]
+    currency_scale: Optional[int]
+    baseline_input_tokens_per_request: Optional[int]
+    current_input_tokens_per_request: Optional[int]
+    context_growth_change_basis_points: Optional[int]
+    evaluation_status: str
+    finding_count: int
+    finding_severity: Optional[str]
+    potential_savings_subunits: Optional[int]
+
+
+@dataclass(frozen=True)
 class TelemetryExportSignalState:
     """Bounded, provider-neutral delivery state for one telemetry signal."""
 
@@ -810,6 +843,11 @@ class InvestigationTelemetrySink(Protocol):
         self, measurement: InvestigationExecutionMeasurement
     ) -> None:
         """Record terminal execution facts without becoming workflow authority."""
+
+
+class AiEconomicsTelemetrySink(Protocol):
+    def record_ai_economics(self, measurement: AiEconomicsMeasurement) -> None:
+        """Record a bounded aggregate without becoming accounting authority."""
 
 
 class InvestigationSignalCatalog(Protocol):

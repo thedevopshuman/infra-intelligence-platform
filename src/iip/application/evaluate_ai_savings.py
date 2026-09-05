@@ -18,7 +18,9 @@ from iip.application.calculate_ai_cost import (
 )
 from iip.application.ports import (
     ActorContext,
+    AiEconomicsMeasurement,
     AiEconomicsLedger,
+    AiEconomicsTelemetrySink,
     AiSavingsCohortQuery,
     Clock,
 )
@@ -83,6 +85,14 @@ class AiSavingsEvaluationPass:
 
 
 @dataclass(frozen=True)
+class _EvaluationOutcome:
+    status: str
+    finding: Mapping[str, object] | None
+    event: PlatformEvent | None
+    measurement: AiEconomicsMeasurement | None
+
+
+@dataclass(frozen=True)
 class _CohortItem:
     usage_id: str
     cost_id: str
@@ -101,6 +111,7 @@ class AiSavingsEvaluationService:
         ledger: AiEconomicsLedger,
         clock: Clock,
         profiles: tuple[Mapping[str, object], ...],
+        telemetry_sink: AiEconomicsTelemetrySink | None = None,
     ) -> None:
         if (
             not isinstance(profiles, tuple)
@@ -116,6 +127,7 @@ class AiSavingsEvaluationService:
             raise AiSavingsConfigurationError("ai.savings.profile.ambiguous")
         self._ledger = ledger
         self._clock = clock
+        self._telemetry_sink = telemetry_sink
         self._profiles = tuple(
             sorted(validated, key=lambda item: (item.tenant_id, item.profile_id))
         )
@@ -143,14 +155,16 @@ class AiSavingsEvaluationService:
         }
         for profile in profiles:
             try:
-                status, finding, event = self._evaluate(profile, actor, now)
-                counts[status] += 1
-                if finding is not None and event is not None:
+                outcome = self._evaluate(profile, actor, now)
+                counts[outcome.status] += 1
+                if outcome.finding is not None and outcome.event is not None:
                     self._ledger.commit_ai_savings_batch(
                         actor,
-                        (finding,),
-                        (event,),
+                        (outcome.finding,),
+                        (outcome.event,),
                     )
+                if outcome.measurement is not None:
+                    self._record_telemetry(outcome.measurement)
             except Exception:
                 # Source identifiers, prices, quantities, and errors stay out of logs.
                 counts["failures"] += 1
@@ -170,10 +184,10 @@ class AiSavingsEvaluationService:
         profile: ContextGrowthProfile,
         actor: ActorContext,
         now: datetime,
-    ) -> tuple[str, Mapping[str, object] | None, PlatformEvent | None]:
+    ) -> _EvaluationOutcome:
         current_end = _parse_time(profile.current_end)
         if now < current_end + timedelta(seconds=profile.evaluation_grace_seconds):
-            return "pending", None, None
+            return _EvaluationOutcome("pending", None, None, None)
         baseline_rows = self._ledger.list_ai_savings_cohort(
             actor,
             _cohort_query(profile, baseline=True),
@@ -182,18 +196,39 @@ class AiSavingsEvaluationService:
             actor,
             _cohort_query(profile, baseline=False),
         )
+
+        def outcome(
+            status: str,
+            finding: Mapping[str, object] | None = None,
+            event: PlatformEvent | None = None,
+        ) -> _EvaluationOutcome:
+            return _EvaluationOutcome(
+                status,
+                finding,
+                event,
+                _ai_economics_measurement(
+                    profile,
+                    baseline_rows,
+                    current_rows,
+                    evaluation_status=status,
+                    finding=finding,
+                ),
+            )
+
         if (
             len(baseline_rows) > profile.max_records_per_window
             or len(current_rows) > profile.max_records_per_window
         ):
-            return "unsupported", None, None
+            # The repository deliberately returns max + 1 as an overflow
+            # sentinel. Never export a partial aggregate as the window total.
+            return _EvaluationOutcome("unsupported", None, None, None)
         if (
             len(baseline_rows) < profile.minimum_requests
             or len(current_rows) < profile.minimum_requests
         ):
-            return "insufficient", None, None
+            return outcome("insufficient")
         if any(cost is None for _usage, cost in baseline_rows + current_rows):
-            return "unresolved", None, None
+            return outcome("unresolved")
         try:
             baseline = tuple(
                 _cohort_item(profile, usage, cost)
@@ -206,16 +241,16 @@ class AiSavingsEvaluationService:
                 if cost is not None
             )
         except _UnresolvedCohort:
-            return "unresolved", None, None
+            return outcome("unresolved")
         except _UnsupportedCohort:
-            return "unsupported", None, None
+            return outcome("unsupported")
         if not baseline or not current:
-            return "insufficient", None, None
+            return outcome("insufficient")
         if len({(item.currency, item.currency_scale) for item in baseline + current}) != 1:
-            return "unresolved", None, None
+            return outcome("unresolved")
         current_rates = {item.uncached_input_rate for item in current}
         if len(current_rates) != 1:
-            return "unresolved", None, None
+            return outcome("unresolved")
 
         baseline_mean = _half_up_divide(
             sum(item.input_tokens for item in baseline), len(baseline)
@@ -224,20 +259,20 @@ class AiSavingsEvaluationService:
             sum(item.input_tokens for item in current), len(current)
         )
         if baseline_mean == 0 or current_mean <= baseline_mean:
-            return "below-threshold", None, None
+            return outcome("below-threshold")
         change = _half_up_divide(
             (current_mean - baseline_mean) * 10_000,
             baseline_mean,
         )
         if change > 1_000_000_000:
-            return "unsupported", None, None
+            return outcome("unsupported")
         if change < profile.growth_threshold_basis_points:
-            return "below-threshold", None, None
+            return outcome("below-threshold")
         excess = (current_mean - baseline_mean) * len(current)
         rate = next(iter(current_rates))
         amount = _half_up_divide(excess * rate, _MILLION)
         if excess > MAX_SAFE_INTEGER or amount > MAX_SAFE_INTEGER:
-            return "unsupported", None, None
+            return outcome("unsupported")
 
         finding, event = _build_finding(
             profile,
@@ -251,7 +286,16 @@ class AiSavingsEvaluationService:
             price_subunits_per_million_tokens=rate,
             amount_subunits=amount,
         )
-        return "qualified", finding, event
+        return outcome("qualified", finding, event)
+
+    def _record_telemetry(self, measurement: AiEconomicsMeasurement) -> None:
+        if self._telemetry_sink is None:
+            return
+        try:
+            self._telemetry_sink.record_ai_economics(measurement)
+        except Exception:
+            # Observability cannot change persisted accounting or rule outcomes.
+            return
 
 
 class _UnsupportedCohort(ValueError):
@@ -712,6 +756,223 @@ def _cohort_item(
         raise
     except (KeyError, StopIteration, TypeError, ValueError, InvalidAiCostInputError):
         raise InvalidAiSavingsInputError("ai.savings.sources.invalid") from None
+
+
+def _ai_economics_measurement(
+    profile: ContextGrowthProfile,
+    baseline_rows: tuple[
+        tuple[Mapping[str, object], Mapping[str, object] | None], ...
+    ],
+    current_rows: tuple[
+        tuple[Mapping[str, object], Mapping[str, object] | None], ...
+    ],
+    *,
+    evaluation_status: str,
+    finding: Mapping[str, object] | None,
+) -> AiEconomicsMeasurement:
+    """Build one bounded snapshot from the same facts used by the rule."""
+
+    try:
+        if evaluation_status not in {
+            "qualified",
+            "insufficient",
+            "unresolved",
+            "unsupported",
+            "below-threshold",
+        }:
+            raise ValueError
+        baseline_usage = tuple(
+            _measurement_usage(profile, document) for document, _cost in baseline_rows
+        )
+        current_usage = tuple(
+            _measurement_usage(profile, document) for document, _cost in current_rows
+        )
+        input_values = tuple(
+            value
+            for value in (item["inputTokens"] for item in current_usage)
+            if isinstance(value, int) and not isinstance(value, bool)
+        )
+        output_values = tuple(
+            value
+            for value in (item["outputTokens"] for item in current_usage)
+            if isinstance(value, int) and not isinstance(value, bool)
+        )
+        input_total = _bounded_total(input_values)
+        output_total = _bounded_total(output_values)
+        incomplete = sum(
+            item["completeness"] != "complete" for item in current_usage
+        )
+
+        cost_counts = {"priced": 0, "unpriced": 0, "ambiguous": 0, "pending": 0}
+        priced_amounts: list[int] = []
+        money_units: set[tuple[str, int]] = set()
+        for (_usage_document, cost_document), usage in zip(
+            current_rows, current_usage
+        ):
+            if cost_document is None:
+                cost_counts["pending"] += 1
+                continue
+            cost = validate_ai_cost_record(cost_document)
+            metadata = cost["metadata"]
+            spec = cost["spec"]
+            assert isinstance(metadata, Mapping) and isinstance(spec, Mapping)
+            calculation = spec["calculation"]
+            result = spec["result"]
+            assert isinstance(calculation, Mapping) and isinstance(result, Mapping)
+            status = result["costStatus"]
+            if (
+                metadata["tenantId"] != profile.tenant_id
+                or spec["usageRecordId"] != usage["usage_record_id"]
+                or calculation["catalogId"] != profile.catalog_id
+                or calculation["engineVersion"] != profile.cost_engine_version
+                or status not in cost_counts
+                or status == "pending"
+            ):
+                raise ValueError
+            cost_counts[str(status)] += 1
+            if status == "priced":
+                amount = result["totalSubunits"]
+                currency = result["currency"]
+                scale = result["currencyScale"]
+                if (
+                    isinstance(amount, bool)
+                    or not isinstance(amount, int)
+                    or not isinstance(currency, str)
+                    or isinstance(scale, bool)
+                    or not isinstance(scale, int)
+                ):
+                    raise ValueError
+                priced_amounts.append(amount)
+                money_units.add((currency, scale))
+        if len(money_units) > 1:
+            raise ValueError
+        calculated_cost = (
+            _bounded_total(tuple(priced_amounts)) if priced_amounts else None
+        )
+        currency, currency_scale = (
+            next(iter(money_units)) if money_units else (None, None)
+        )
+
+        baseline_mean: int | None = None
+        current_mean: int | None = None
+        change: int | None = None
+        baseline_inputs = tuple(item["inputTokens"] for item in baseline_usage)
+        current_inputs = tuple(item["inputTokens"] for item in current_usage)
+        if (
+            baseline_inputs
+            and current_inputs
+            and all(
+                isinstance(value, int) and not isinstance(value, bool)
+                for value in baseline_inputs + current_inputs
+            )
+        ):
+            baseline_mean = _half_up_divide(
+                _bounded_total(tuple(int(value) for value in baseline_inputs)),
+                len(baseline_inputs),
+            )
+            current_mean = _half_up_divide(
+                _bounded_total(tuple(int(value) for value in current_inputs)),
+                len(current_inputs),
+            )
+            if baseline_mean > 0:
+                change = _signed_half_up_divide(
+                    (current_mean - baseline_mean) * 10_000,
+                    baseline_mean,
+                )
+                if not -MAX_SAFE_INTEGER <= change <= MAX_SAFE_INTEGER:
+                    raise ValueError
+
+        finding_count = 0
+        finding_severity: str | None = None
+        potential_savings: int | None = None
+        if finding is not None:
+            validated_finding = validate_ai_savings_finding(finding)
+            finding_spec = validated_finding["spec"]
+            assert isinstance(finding_spec, Mapping)
+            finding_value = finding_spec["finding"]
+            savings = finding_spec["potentialSavings"]
+            assert isinstance(finding_value, Mapping) and isinstance(savings, Mapping)
+            finding_count = 1
+            finding_severity = str(finding_value["severity"])
+            potential_savings = int(savings["amountSubunits"])
+            if (
+                savings["currency"] != currency
+                or savings["currencyScale"] != currency_scale
+            ):
+                raise ValueError
+
+        return AiEconomicsMeasurement(
+            tenant_id=profile.tenant_id,
+            profile_id=profile.profile_id,
+            provider=profile.provider,
+            model_id=profile.model_id,
+            region=profile.region,
+            service_name=profile.service_name,
+            deployment_environment=profile.deployment_environment,
+            request_count=len(current_usage),
+            input_tokens=input_total,
+            input_token_requests=len(input_values),
+            output_tokens=output_total,
+            output_token_requests=len(output_values),
+            incomplete_requests=incomplete,
+            priced_requests=cost_counts["priced"],
+            unpriced_requests=cost_counts["unpriced"],
+            ambiguous_requests=cost_counts["ambiguous"],
+            pending_cost_requests=cost_counts["pending"],
+            calculated_cost_subunits=calculated_cost,
+            currency=currency,
+            currency_scale=currency_scale,
+            baseline_input_tokens_per_request=baseline_mean,
+            current_input_tokens_per_request=current_mean,
+            context_growth_change_basis_points=change,
+            evaluation_status=evaluation_status,
+            finding_count=finding_count,
+            finding_severity=finding_severity,
+            potential_savings_subunits=potential_savings,
+        )
+    except (
+        AssertionError,
+        KeyError,
+        TypeError,
+        ValueError,
+        InvalidAiCostInputError,
+        InvalidAiSavingsInputError,
+    ):
+        raise InvalidAiSavingsInputError("ai.savings.measurement.invalid") from None
+
+
+def _measurement_usage(
+    profile: ContextGrowthProfile,
+    document: Mapping[str, object],
+) -> Mapping[str, object]:
+    usage = validate_ai_usage_for_economics(
+        document,
+        expected_tenant=profile.tenant_id,
+    )
+    if (
+        usage["provider"] != profile.provider
+        or usage["model_id"] != profile.model_id
+        or usage["region"] != profile.region
+        or usage["service_name"] != profile.service_name
+        or usage["deployment_environment"] != profile.deployment_environment
+        or usage["outcome"] != "success"
+    ):
+        raise InvalidAiSavingsInputError("ai.savings.measurement.invalid")
+    return usage
+
+
+def _bounded_total(values: tuple[int, ...]) -> int:
+    total = sum(values)
+    if total < 0 or total > MAX_SAFE_INTEGER:
+        raise ValueError
+    return total
+
+
+def _signed_half_up_divide(numerator: int, denominator: int) -> int:
+    if denominator <= 0:
+        raise ValueError
+    sign = -1 if numerator < 0 else 1
+    return sign * _half_up_divide(abs(numerator), denominator)
 
 
 def _build_finding(

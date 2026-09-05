@@ -127,6 +127,12 @@ class HelmValuesContractTests(unittest.TestCase):
         self.assertEqual(
             ai_savings["properties"]["intervalSeconds"]["maximum"], 3600
         )
+        telemetry = self.schema["properties"]["telemetry"]
+        self.assertEqual(
+            telemetry["properties"]["aiEconomicsAttributeMode"]["enum"],
+            ["scope", "tenant-scope"],
+        )
+        self.assertIn("aiEconomicsAttributeMode: tenant-scope", self.values)
 
 
 if __name__ == "__main__":

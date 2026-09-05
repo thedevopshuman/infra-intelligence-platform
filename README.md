@@ -35,11 +35,14 @@ service now loads protected versioned catalogs and atomically records
 explainable calculated estimates plus value-minimized events. A separate
 tenant-explicit deterministic service evaluates fixed context-growth windows,
 revalidates every cited usage and cost fact, and atomically records one
-evidence-backed saving plus a value-minimized event. Live Bedrock
-qualification, aggregate export, and the dashboard remain. See the
+evidence-backed saving plus a value-minimized event. The same bounded profile
+now exports request/token volume, pricing coverage, calculated cost, change,
+and potential saving through the existing OTLP metrics boundary. Live Bedrock
+qualification and the reference dashboard topology remain. See the
 [receiver runbook](docs/operations/ai-usage-receiver.md),
 [cost-engine runbook](docs/operations/ai-cost-engine.md),
 [savings-engine runbook](docs/operations/ai-savings-engine.md),
+[telemetry contract](docs/specifications/ai-economics-telemetry-contract.md),
 [product direction](docs/product/ai-finops-vision.md),
 [architecture](docs/architecture/ai-economics.md), [contracts](docs/specifications/ai-economics-contracts.md),
 and [roadmap](docs/roadmap/ai-finops-roadmap.md).

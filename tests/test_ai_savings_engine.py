@@ -27,7 +27,11 @@ from iip.application.evaluate_ai_savings import (
     validate_context_growth_profile,
     validate_context_growth_source_binding,
 )
-from iip.application.ports import ActorContext, PersistenceError
+from iip.application.ports import (
+    ActorContext,
+    AiEconomicsMeasurement,
+    PersistenceError,
+)
 from iip.bootstrap import _ai_savings_engine_configuration_from_env
 from iip.domain.models import PlatformEvent
 
@@ -45,6 +49,17 @@ class MutableClock:
 
     def now(self) -> str:
         return self.value
+
+
+class RecordingAiEconomicsSink:
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.measurements: list[AiEconomicsMeasurement] = []
+
+    def record_ai_economics(self, measurement: AiEconomicsMeasurement) -> None:
+        if self.fail:
+            raise RuntimeError("export unavailable")
+        self.measurements.append(measurement)
 
 
 def fixture(name: str) -> dict:
@@ -198,7 +213,13 @@ class AiSavingsRuleTests(unittest.TestCase):
         store = InMemoryResourceStore()
         clock = MutableClock()
         documents = seed_standard_cohorts(store, clock)
-        service = AiSavingsEvaluationService(store, clock, (profile(),))
+        telemetry = RecordingAiEconomicsSink()
+        service = AiSavingsEvaluationService(
+            store,
+            clock,
+            (profile(),),
+            telemetry_sink=telemetry,
+        )
 
         first = service.run_once("local", "savings-test")
         clock.value = "2026-09-05T11:05:00Z"
@@ -207,6 +228,19 @@ class AiSavingsRuleTests(unittest.TestCase):
         self.assertEqual(first.qualified, 1)
         self.assertEqual(first.failures, 0)
         self.assertEqual(second.qualified, 1)
+        self.assertEqual(len(telemetry.measurements), 2)
+        measurement = telemetry.measurements[0]
+        self.assertEqual(measurement.request_count, 2)
+        self.assertEqual(measurement.input_tokens, 4800)
+        self.assertEqual(measurement.output_tokens, 200)
+        self.assertEqual(measurement.priced_requests, 2)
+        self.assertEqual(measurement.calculated_cost_subunits, 17_400_000)
+        self.assertEqual(measurement.baseline_input_tokens_per_request, 1200)
+        self.assertEqual(measurement.current_input_tokens_per_request, 2400)
+        self.assertEqual(measurement.context_growth_change_basis_points, 10_000)
+        self.assertEqual(measurement.evaluation_status, "qualified")
+        self.assertEqual(measurement.finding_count, 1)
+        self.assertEqual(measurement.potential_savings_subunits, 7_200_000)
         self.assertEqual(len(store.ai_savings_findings), 1)
         finding = store.ai_savings_findings[0]
         observation = finding["spec"]["observations"][0]
@@ -246,6 +280,44 @@ class AiSavingsRuleTests(unittest.TestCase):
             ),
             [],
         )
+
+    def test_telemetry_failure_never_changes_committed_rule_outcome(self) -> None:
+        store = InMemoryResourceStore()
+        clock = MutableClock()
+        seed_standard_cohorts(store, clock)
+        result = AiSavingsEvaluationService(
+            store,
+            clock,
+            (profile(),),
+            telemetry_sink=RecordingAiEconomicsSink(fail=True),
+        ).run_once("local", "savings-test")
+
+        self.assertEqual(result.qualified, 1)
+        self.assertEqual(result.failures, 0)
+        self.assertEqual(len(store.ai_savings_findings), 1)
+
+    def test_unresolved_cost_exports_coverage_without_inventing_zero(self) -> None:
+        store = InMemoryResourceStore()
+        clock = MutableClock()
+        seed_standard_cohorts(store, clock, calculate_cost=False)
+        telemetry = RecordingAiEconomicsSink()
+
+        result = AiSavingsEvaluationService(
+            store,
+            clock,
+            (profile(),),
+            telemetry_sink=telemetry,
+        ).run_once("local", "savings-test")
+
+        self.assertEqual(result.unresolved, 1)
+        self.assertEqual(len(telemetry.measurements), 1)
+        measurement = telemetry.measurements[0]
+        self.assertEqual(measurement.pending_cost_requests, 2)
+        self.assertEqual(measurement.priced_requests, 0)
+        self.assertIsNone(measurement.calculated_cost_subunits)
+        self.assertIsNone(measurement.currency)
+        self.assertEqual(measurement.finding_count, 0)
+        self.assertIsNone(measurement.potential_savings_subunits)
 
     def test_rule_does_not_emit_without_complete_eligible_evidence(self) -> None:
         cases = (

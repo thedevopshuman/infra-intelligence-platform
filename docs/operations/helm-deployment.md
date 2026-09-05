@@ -18,6 +18,9 @@ It requires the cost engine, exact worker tenant enrollment, and a protected
 profile wrapper from an existing Secret. `aiSavingsEngine` configuration is
 never projected into the API or OTLP receiver. Follow the
 [AI savings-engine runbook](ai-savings-engine.md) before enabling it.
+When OTLP metrics are enabled, its aggregate projection uses
+`telemetry.aiEconomicsAttributeMode`; retain the default `tenant-scope` unless
+the destination is independently isolated to one tenant.
 
 ## Required inputs
 

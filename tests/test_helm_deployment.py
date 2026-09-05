@@ -374,6 +374,7 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         ):
             self.assertIn(setting, values)
         for variable in (
+            "IIP_OTEL_AI_ECONOMICS_ATTRIBUTE_MODE",
             "IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS",
             "IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS",
             "IIP_TELEMETRY_HEALTH_RETENTION_SECONDS",

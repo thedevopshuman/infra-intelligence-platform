@@ -11,7 +11,7 @@ from iip.adapters.otel import (
 )
 from iip.application.ports import QueryAvailabilityMeasurement
 
-from tests.test_otel_metrics import measurement
+from tests.test_otel_metrics import ai_economics_measurement, measurement
 from tests.test_otel_traces import measurement as investigation_measurement
 
 
@@ -45,9 +45,14 @@ class OtlpCollectorIntegrationTests(unittest.TestCase):
                     objective_minimum_eligible_requests=100,
                 )
             )
+            self.assertIsNotNone(runtime.ai_economics_sink)
+            runtime.ai_economics_sink.record_ai_economics(
+                ai_economics_measurement()
+            )
             self.assertTrue(runtime.force_flush(5_000))
             self.assertEqual(runtime.sink.record_failures, 0)
             self.assertEqual(runtime.query_sink.record_failures, 0)
+            self.assertEqual(runtime.ai_economics_sink.record_failures, 0)
             metrics = runtime.read_export_health()[0]
             self.assertEqual(metrics.status, "healthy")
             self.assertGreaterEqual(metrics.successes, 1)

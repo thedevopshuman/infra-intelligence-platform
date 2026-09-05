@@ -48,6 +48,7 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | AI price catalog | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-price-catalog.schema.json` | `contracts/examples/ai-price-catalog.json` |
 | AI cost record | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-cost-record.schema.json` | `contracts/examples/ai-cost-record.json` |
 | AI savings finding | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-savings-finding.schema.json` | `contracts/examples/ai-savings-finding.json` |
+| AI economics telemetry | [ai-economics-telemetry-contract.md](ai-economics-telemetry-contract.md) | OTLP Metrics protobuf semantic convention | n/a |
 | Kubernetes Event evidence request | [kubernetes-event-evidence-contract.md](kubernetes-event-evidence-contract.md) | `contracts/schemas/kubernetes-event-evidence-request.schema.json` | `contracts/examples/kubernetes-event-evidence-request.json` |
 | Kubernetes Event evidence result | [kubernetes-event-evidence-contract.md](kubernetes-event-evidence-contract.md) | `contracts/schemas/kubernetes-event-evidence-result.schema.json` | `contracts/examples/kubernetes-event-evidence-result.json` |
 | Telemetry evidence request | [telemetry-evidence-contract.md](telemetry-evidence-contract.md) | `contracts/schemas/telemetry-evidence-request.schema.json` | `contracts/examples/telemetry-evidence-request.json` |

@@ -310,6 +310,7 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_KUBERNETES_EVENTS_INTEGRATIONS_JSON` | unset | Protected non-secret tenant endpoint, CA path, cluster/scope allowlists, limits, and condition mappings required by the live adapter |
 | `IIP_KUBERNETES_EVENTS_CREDENTIALS_JSON` | unset | Secret-bearing local reference broker configuration required by the live adapter |
 | `IIP_OTEL_INGESTION_ATTRIBUTE_MODE` | `source` | Metric identity dimensions: `none`, `source`, or `tenant-source` |
+| `IIP_OTEL_AI_ECONOMICS_ATTRIBUTE_MODE` | `tenant-scope` | AI economics dimensions: `scope` or `tenant-scope` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | unset outside Compose | Standard OTLP base endpoint; the enabled signal path is appended |
 | `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | unset | Exact signal-specific OTLP metrics endpoint |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | unset | Exact signal-specific OTLP traces endpoint |

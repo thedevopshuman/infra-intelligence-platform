@@ -614,6 +614,7 @@
         "otlpEndpoint",
         "protocol",
         "attributeMode",
+        "aiEconomicsAttributeMode",
         "investigationAttributeMode",
         "serviceName",
         "workerServiceName",
@@ -645,6 +646,10 @@
         "otlpEndpoint": { "$ref": "#/definitions/optionalHttpUrl" },
         "protocol": { "const": "http/protobuf" },
         "attributeMode": { "type": "string", "enum": ["none", "source", "tenant-source"] },
+        "aiEconomicsAttributeMode": {
+          "type": "string",
+          "enum": ["scope", "tenant-scope"]
+        },
         "investigationAttributeMode": {
           "type": "string",
           "enum": ["none", "investigation", "tenant-investigation"]

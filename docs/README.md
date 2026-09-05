@@ -29,6 +29,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Event contract](specifications/event-contract.md)
 - [Evidence contract](specifications/evidence-contract.md)
 - [AI economics contracts](specifications/ai-economics-contracts.md)
+- [AI economics telemetry contract](specifications/ai-economics-telemetry-contract.md)
 - [Telemetry evidence request and result contracts](specifications/telemetry-evidence-contract.md)
 - [Log evidence request and result contracts](specifications/log-evidence-contract.md)
 - [OTLP metrics evidence contract](specifications/otlp-metrics-evidence-contract.md)

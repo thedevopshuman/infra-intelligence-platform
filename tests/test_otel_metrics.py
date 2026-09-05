@@ -3,17 +3,20 @@ from __future__ import annotations
 import json
 import os
 import unittest
+from dataclasses import replace
 from unittest.mock import patch
 
 from iip.adapters.auth import HashedBearerAuthenticator
 from iip.adapters.otel import (
     OpenTelemetryConfigurationError,
+    OpenTelemetryAiEconomicsSink,
     OpenTelemetryIngestionSink,
     OpenTelemetryQueryAvailabilitySink,
     OtlpMetricsConfiguration,
     OtlpMetricsRuntime,
 )
 from iip.application.ports import (
+    AiEconomicsMeasurement,
     IngestionFreshnessMeasurement,
     QueryAvailabilityMeasurement,
 )
@@ -73,6 +76,38 @@ def measurement() -> IngestionFreshnessMeasurement:
     )
 
 
+def ai_economics_measurement() -> AiEconomicsMeasurement:
+    return AiEconomicsMeasurement(
+        tenant_id="local",
+        profile_id="support-assistant-context",
+        provider="aws.bedrock",
+        model_id="example.foundation-model-v1:0",
+        region="us-east-1",
+        service_name="support-assistant",
+        deployment_environment="production",
+        request_count=2,
+        input_tokens=4800,
+        input_token_requests=2,
+        output_tokens=200,
+        output_token_requests=2,
+        incomplete_requests=0,
+        priced_requests=2,
+        unpriced_requests=0,
+        ambiguous_requests=0,
+        pending_cost_requests=0,
+        calculated_cost_subunits=17_400_000,
+        currency="USD",
+        currency_scale=9,
+        baseline_input_tokens_per_request=1200,
+        current_input_tokens_per_request=2400,
+        context_growth_change_basis_points=10_000,
+        evaluation_status="qualified",
+        finding_count=1,
+        finding_severity="medium",
+        potential_savings_subunits=7_200_000,
+    )
+
+
 class OtlpMetricsConfigurationTests(unittest.TestCase):
     def test_standard_base_endpoint_resolves_metrics_path(self) -> None:
         configuration = OtlpMetricsConfiguration.from_environment(
@@ -80,6 +115,7 @@ class OtlpMetricsConfigurationTests(unittest.TestCase):
                 "OTEL_EXPORTER_OTLP_ENDPOINT": "https://collector.example/otlp",
                 "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
                 "IIP_OTEL_INGESTION_ATTRIBUTE_MODE": "tenant-source",
+                "IIP_OTEL_AI_ECONOMICS_ATTRIBUTE_MODE": "scope",
                 "OTEL_SERVICE_NAME": "iip-reference-api",
                 "OTEL_METRIC_EXPORT_INTERVAL": "5000",
                 "OTEL_METRIC_EXPORT_TIMEOUT": "3000",
@@ -91,6 +127,7 @@ class OtlpMetricsConfigurationTests(unittest.TestCase):
             "https://collector.example/otlp/v1/metrics",
         )
         self.assertEqual(configuration.attribute_mode, "tenant-source")
+        self.assertEqual(configuration.ai_economics_attribute_mode, "scope")
         self.assertEqual(configuration.export_interval_millis, 5000)
         self.assertEqual(configuration.export_timeout_millis, 3000)
 
@@ -119,6 +156,10 @@ class OtlpMetricsConfigurationTests(unittest.TestCase):
             {
                 "OTEL_EXPORTER_OTLP_ENDPOINT": "https://example.com",
                 "IIP_OTEL_INGESTION_ATTRIBUTE_MODE": "everything",
+            },
+            {
+                "OTEL_EXPORTER_OTLP_ENDPOINT": "https://example.com",
+                "IIP_OTEL_AI_ECONOMICS_ATTRIBUTE_MODE": "record-identities",
             },
             {
                 "OTEL_EXPORTER_OTLP_ENDPOINT": "https://example.com",
@@ -260,6 +301,90 @@ class OpenTelemetryQueryAvailabilitySinkTests(unittest.TestCase):
                     {
                         "iip.telemetry.signal": "metrics",
                         "iip.telemetry.instrument": "query-availability",
+                    },
+                )
+            ],
+        )
+
+
+class OpenTelemetryAiEconomicsSinkTests(unittest.TestCase):
+    def test_sink_exports_bounded_scope_coverage_cost_change_and_saving(self) -> None:
+        meter = RecordingMeter()
+        sink = OpenTelemetryAiEconomicsSink(
+            meter,
+            attribute_mode="tenant-scope",
+        )
+
+        sink.record_ai_economics(ai_economics_measurement())
+
+        requests = meter.instruments["iip.ai.usage.requests"].records
+        self.assertEqual(requests[0][0], 2)
+        self.assertEqual(
+            requests[0][1],
+            {
+                "iip.ai.profile.id": "support-assistant-context",
+                "gen_ai.provider.name": "aws.bedrock",
+                "gen_ai.response.model": "example.foundation-model-v1:0",
+                "cloud.region": "us-east-1",
+                "service.name": "support-assistant",
+                "deployment.environment.name": "production",
+                "iip.tenant.id": "local",
+            },
+        )
+        cost = meter.instruments["iip.ai.cost.amount"].records[0]
+        self.assertEqual(cost[0], 17_400_000)
+        self.assertEqual(cost[1]["iip.ai.currency"], "USD")
+        self.assertEqual(cost[1]["iip.ai.currency_scale"], 9)
+        self.assertEqual(
+            meter.instruments["iip.ai.context_growth.change"].records[0][0],
+            10_000,
+        )
+        self.assertEqual(
+            meter.instruments["iip.ai.savings.potential_amount"].records[0][0],
+            7_200_000,
+        )
+        active_status = {
+            attributes["iip.ai.savings.status"]
+            for value, attributes in meter.instruments[
+                "iip.ai.savings.profile_status"
+            ].records
+            if value == 1
+        }
+        self.assertEqual(active_status, {"qualified"})
+        serialized = json.dumps(meter.instruments, default=lambda value: value.__dict__)
+        for forbidden in (
+            "aiu_",
+            "aic_",
+            "aif_",
+            "prompt",
+            "response content",
+            "priceSubunits",
+        ):
+            self.assertNotIn(forbidden, serialized)
+        self.assertEqual(sink.record_failures, 0)
+
+    def test_scope_mode_omits_tenant_and_invalid_snapshot_fails_locally(self) -> None:
+        meter = RecordingMeter()
+        sink = OpenTelemetryAiEconomicsSink(meter, attribute_mode="scope")
+
+        sink.record_ai_economics(ai_economics_measurement())
+        self.assertNotIn(
+            "iip.tenant.id",
+            meter.instruments["iip.ai.usage.requests"].records[0][1],
+        )
+        sink.record_ai_economics(
+            replace(ai_economics_measurement(), pending_cost_requests=1)
+        )
+
+        self.assertEqual(sink.record_failures, 1)
+        self.assertEqual(
+            meter.instruments["iip.telemetry.record.failures"].records,
+            [
+                (
+                    1,
+                    {
+                        "iip.telemetry.signal": "metrics",
+                        "iip.telemetry.instrument": "ai-economics",
                     },
                 )
             ],

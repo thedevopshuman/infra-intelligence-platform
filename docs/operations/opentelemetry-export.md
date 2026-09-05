@@ -28,6 +28,7 @@ Each newly committed terminal report can emit one `iip.investigation.execute` sp
 | `iip.query.duration` | seconds | Monotonic serving time for the same recognized read |
 | `iip.otlp.receiver.requests` | dimensionless | One increment per completed metrics/logs intake request, classified as available, unavailable, or excluded |
 | `iip.otlp.receiver.duration` | seconds | Monotonic serving time for the same intake request |
+| `iip.ai.*` | contract-specific | Bounded AI usage, coverage, calculated cost, comparison, and potential-saving gauges |
 | `iip.telemetry.record.failures` | dimensionless | Local instrument-recording failures; not network delivery failures |
 
 Every measurement has `iip.ingestion.status`. `IIP_OTEL_INGESTION_ATTRIBUTE_MODE` selects `none`, `source`, or `tenant-source` for identity attributes. The default `source` mode adds `iip.source.id`; choose `none` when source names are sensitive or the source count exceeds the deployment's cardinality budget. `tenant-source` must be an explicit privacy and cost decision.
@@ -35,6 +36,13 @@ Every measurement has `iip.ingestion.status`. `IIP_OTEL_INGESTION_ATTRIBUTE_MODE
 Query metrics use only closed operation, outcome, availability, and objective attributes. They never include raw paths, query values, tenant/actor identity, credentials, object identifiers, bodies, or error text. Invalid, unauthenticated, and denied requests are exported as `excluded`; valid successful/not-found/conflict responses are `available`; server and dependency failures are `unavailable`. The configured availability basis-point target, window, and minimum eligible count accompany each observation so the customer backend can aggregate the same semantics. See the [query availability telemetry contract](../specifications/query-availability-telemetry-contract.md) and [ADR 0059](../decisions/0059-backend-neutral-query-availability-telemetry.md).
 
 Receiver metrics use only signal, closed outcome, availability, and objective attributes. They exclude tenant/channel/SPIFFE identity, certificates, credentials, payloads, endpoints, paths, numeric status, and error text. An authenticated request rejected by the receiver rate limit is unavailable; invalid, unauthenticated, denied, or disabled requests are excluded. See the [receiver availability telemetry contract](../specifications/otlp-receiver-availability-telemetry-contract.md) and [ADR 0081](../decisions/0081-backend-neutral-otlp-receiver-availability.md).
+
+AI economics metrics are refreshed from one protected, bounded savings profile
+after its fixed current window ends. They expose only profile-controlled scope,
+coverage, aggregate integers, deterministic rule status, and calculated
+amounts; individual usage/cost/finding/evidence identities and content are
+never labels. See the
+[AI economics telemetry contract](../specifications/ai-economics-telemetry-contract.md).
 
 ## Docker Desktop verification
 
@@ -44,7 +52,10 @@ Run the isolated real-Collector gate:
 make test-otel
 ```
 
-The target starts OpenTelemetry Collector `0.158.0`, sends reference freshness and query metrics plus an investigation trace through the official Python SDK, verifies that the Collector debug exporter received `iip.ingestion.checkpoint.age`, `iip.query.requests`, and `iip.investigation.execute`, and removes the container afterward.
+The target starts OpenTelemetry Collector `0.158.0`, sends reference freshness,
+query, and AI economics metrics plus an investigation trace through the
+official Python SDK, verifies that the Collector debug exporter received them,
+and removes the container afterward.
 
 To add a Collector to the long-running development stack, first configure the database password and hashed Bearer identity described in [local development](local-development.md), then run:
 
@@ -70,6 +81,7 @@ The API and worker use the Collector through the Compose service network and app
 | `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` | unset | Signal-specific protocol override |
 | `OTEL_EXPORTER_OTLP_HEADERS` | unset | SDK header configuration supplied through protected runtime configuration |
 | `IIP_OTEL_INGESTION_ATTRIBUTE_MODE` | `source` | `none`, `source`, or `tenant-source` |
+| `IIP_OTEL_AI_ECONOMICS_ATTRIBUTE_MODE` | `tenant-scope` | `scope` or `tenant-scope`; controls the bounded tenant label only |
 | `IIP_OTEL_INVESTIGATION_ATTRIBUTE_MODE` | `none` | `none`, `investigation`, or `tenant-investigation` |
 | `IIP_QUERY_AVAILABILITY_SLO_WINDOW_SECONDS` | `3600` | Aggregation window carried on query metrics |
 | `IIP_QUERY_AVAILABILITY_SLO_MINIMUM_BASIS_POINTS` | `9990` | Availability target carried on query metrics |
@@ -103,7 +115,20 @@ The endpoint must be explicit HTTP(S), no longer than 2048 characters, and canno
 
 ## Helm
 
-Set `telemetry.metricsEnabled` and/or `telemetry.tracesEnabled`, `telemetry.otlpEndpoint`, and the matching NetworkPolicy egress selector. If the endpoint requires headers, put their standard SDK value in an existing Secret and configure `telemetry.existingSecret`; the chart references the Secret and does not render the value. `worker.ingestionMonitorTargets` enables automatic sampling for exact tenant/source pairs, `worker.ingestionMonitorIntervalSeconds` controls its cadence, and `telemetry.workerServiceName` and `telemetry.receiverServiceName` give worker and receiver exports distinct service identities. `otlpIngest.availabilitySlo` configures receiver metric objectives. Each target tenant must also appear in `worker.tenants` or startup fails closed.
+Set `telemetry.metricsEnabled` and/or `telemetry.tracesEnabled`,
+`telemetry.otlpEndpoint`, and the matching NetworkPolicy egress selector. Set
+`telemetry.aiEconomicsAttributeMode` to `scope` only when the backend is
+isolated to one tenant; the default `tenant-scope` keeps explicitly enrolled
+tenant series distinct. If the endpoint requires headers, put their standard
+SDK value in an existing Secret and configure `telemetry.existingSecret`; the
+chart references the Secret and does not render the value.
+`worker.ingestionMonitorTargets` enables automatic sampling for exact
+tenant/source pairs, `worker.ingestionMonitorIntervalSeconds` controls its
+cadence, and `telemetry.workerServiceName` and
+`telemetry.receiverServiceName` give worker and receiver exports distinct
+service identities. `otlpIngest.availabilitySlo` configures receiver metric
+objectives. Each target tenant must also appear in `worker.tenants` or startup
+fails closed.
 
 The Helm chart does not deploy a Collector because topology and backend selection belong to the customer deployment. Point it at a customer-controlled Collector so changing exporters or destinations does not require an IIP build. Configure `queryAvailabilitySlo` alongside `telemetry.metricsEnabled`; the backend computes `floor(available * 10000 / (available + unavailable))` over the declared window after the minimum eligible count. Add ingress or synthetic availability separately because an application process cannot emit when every replica is unreachable.
 

@@ -59,6 +59,20 @@ done
 attempt=0
 until "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
     -f "$IIP_COMPOSE_FILE" logs --no-color collector 2>&1 \
+    | rg -q "iip.ai.cost.amount"; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 15 ]; then
+        "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
+            -f "$IIP_COMPOSE_FILE" logs --no-color collector >&2
+        echo "Collector did not receive the expected IIP AI economics metric" >&2
+        exit 1
+    fi
+    sleep 1
+done
+
+attempt=0
+until "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
+    -f "$IIP_COMPOSE_FILE" logs --no-color collector 2>&1 \
     | rg -q "iip.query.requests"; do
     attempt=$((attempt + 1))
     if [ "$attempt" -ge 15 ]; then

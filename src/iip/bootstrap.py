@@ -74,6 +74,7 @@ from iip.application.ingest_otlp_logs import (
 )
 from iip.application.ports import (
     ActionExecutor,
+    AiEconomicsTelemetrySink,
     AuthenticationConfigurationError,
     Authenticator,
     EventLog,
@@ -281,6 +282,7 @@ def build_local_runtime(
     ) = None,
     otlp_receiver_objectives: OtlpReceiverObjectives | None = None,
     otlp_receiver_telemetry_sink: OtlpReceiverTelemetrySink | None = None,
+    ai_economics_telemetry_sink: AiEconomicsTelemetrySink | None = None,
     ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
@@ -322,6 +324,7 @@ def build_local_runtime(
         telemetry_health_reporting,
         otlp_receiver_objectives,
         otlp_receiver_telemetry_sink,
+        ai_economics_telemetry_sink,
         collector_queue_loss_binding,
         collector_queue_loss_objectives,
         ai_cost_catalogs,
@@ -366,6 +369,7 @@ def _compose_runtime(
     ) = None,
     otlp_receiver_objectives: OtlpReceiverObjectives | None = None,
     otlp_receiver_telemetry_sink: OtlpReceiverTelemetrySink | None = None,
+    ai_economics_telemetry_sink: AiEconomicsTelemetrySink | None = None,
     collector_queue_loss_binding: CollectorQueueLossBinding | None = None,
     collector_queue_loss_objectives: CollectorQueueLossObjectives | None = None,
     ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
@@ -603,7 +607,12 @@ def _compose_runtime(
             else None
         ),
         ai_savings_evaluation=(
-            AiSavingsEvaluationService(store, clock, ai_savings_profiles)
+            AiSavingsEvaluationService(
+                store,
+                clock,
+                ai_savings_profiles,
+                telemetry_sink=ai_economics_telemetry_sink,
+            )
             if ai_savings_profiles is not None
             else None
         ),
@@ -702,6 +711,7 @@ def build_postgres_runtime(
     ) = None,
     otlp_receiver_objectives: OtlpReceiverObjectives | None = None,
     otlp_receiver_telemetry_sink: OtlpReceiverTelemetrySink | None = None,
+    ai_economics_telemetry_sink: AiEconomicsTelemetrySink | None = None,
     ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
@@ -750,6 +760,7 @@ def build_postgres_runtime(
         telemetry_health_reporting,
         otlp_receiver_objectives,
         otlp_receiver_telemetry_sink,
+        ai_economics_telemetry_sink,
         collector_queue_loss_binding,
         collector_queue_loss_objectives,
         ai_cost_catalogs,
@@ -963,6 +974,11 @@ def _build_runtime_from_env(
                     if metrics_runtime is not None
                     else None
                 ),
+                ai_economics_telemetry_sink=(
+                    metrics_runtime.ai_economics_sink
+                    if metrics_runtime is not None
+                    else None
+                ),
                 ai_cost_catalogs=ai_cost_catalogs,
                 ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
                 ai_cost_batch_size=ai_cost_batch_size,
@@ -1016,6 +1032,11 @@ def _build_runtime_from_env(
             otlp_receiver_objectives=otlp_receiver_objectives,
             otlp_receiver_telemetry_sink=(
                 metrics_runtime.receiver_sink
+                if metrics_runtime is not None
+                else None
+            ),
+            ai_economics_telemetry_sink=(
+                metrics_runtime.ai_economics_sink
                 if metrics_runtime is not None
                 else None
             ),

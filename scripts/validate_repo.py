@@ -150,6 +150,7 @@ REQUIRED_PATHS = (
     "docs/operations/ai-usage-receiver.md",
     "docs/operations/ai-cost-engine.md",
     "docs/operations/ai-savings-engine.md",
+    "docs/specifications/ai-economics-telemetry-contract.md",
     "docs/operations/log-evidence.md",
     "docs/operations/resource-change-evidence.md",
     "docs/operations/postgresql-backup-restore.md",

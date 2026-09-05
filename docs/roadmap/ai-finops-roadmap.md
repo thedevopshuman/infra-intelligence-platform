@@ -37,8 +37,10 @@ the model request.
 Implementation status: items 1, 2, 4, 5, and 6 are delivered. Item 3 has an
 executable Bedrock-shaped OTLP fixture and strict metadata/content boundary;
 live `Converse`/`ConverseStream` auto-instrumentation qualification remains.
-Items 7–8 remain: bounded aggregate export, Grafana topology, deterministic
-full-flow gate, and real-provider compatibility gate.
+Item 7 now has an executable privacy-bounded OTLP aggregate metric projection.
+Its finding view and Collector/Prometheus/Loki/Grafana topology remain. Item 8
+still requires the deterministic full-flow and real-provider compatibility
+gates.
 
 ## Phase B — application and team attribution
 

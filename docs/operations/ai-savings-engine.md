@@ -76,6 +76,7 @@ engine. When savings are enabled, profile tenants must exactly equal
 | `IIP_AI_SAVINGS_ENGINE_ENABLED` | `false` | Enable deterministic savings evaluation in the workflow worker. |
 | `IIP_AI_SAVINGS_PROFILES_JSON` | required when enabled | Protected closed profile wrapper. |
 | `IIP_AI_SAVINGS_INTERVAL_SECONDS` | `60` | Delay between evaluation passes; range 1–3,600 seconds. |
+| `IIP_OTEL_AI_ECONOMICS_ATTRIBUTE_MODE` | `tenant-scope` | Export protected scope labels with tenant identity, or use `scope` for a single-tenant-isolated backend. |
 
 ## Exact V0 eligibility
 
@@ -162,6 +163,8 @@ make verify PYTHON=.venv/bin/python
 make test-postgres PYTHON=.venv/bin/python
 ```
 
-The aggregate exporter, Grafana dashboard, full Bedrock-shaped end-to-end gate,
-and live Bedrock instrumentation qualification remain separate Phase A exit
-work.
+The privacy-bounded aggregate metric projection is executable through the
+existing OTLP exporter and documented in the
+[AI economics telemetry contract](../specifications/ai-economics-telemetry-contract.md).
+The Grafana dashboard, full Bedrock-shaped end-to-end gate, and live Bedrock
+instrumentation qualification remain separate Phase A exit work.

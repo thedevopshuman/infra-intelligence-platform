@@ -11,8 +11,9 @@ The separately sequenced [AI FinOps roadmap](ai-finops-roadmap.md) extends this
 foundation with an OpenTelemetry-native AWS Bedrock vertical slice. Its
 contract, architecture, metadata-only trace intake, usage ledger, and
 versioned pricing runtime are delivered. The first evidence-backed
-context-growth rule is also executable. Live Bedrock qualification, bounded
-aggregate export, and the reference dashboard remain.
+context-growth rule and its privacy-bounded OTLP aggregate metric projection
+are also executable. Live Bedrock qualification and the reference dashboard
+topology remain.
 
 ## Phase 0 — foundation (current repository)
 

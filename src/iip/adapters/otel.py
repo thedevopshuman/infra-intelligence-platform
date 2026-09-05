@@ -9,6 +9,7 @@ from typing import Any, Iterable, Mapping
 from urllib.parse import urlsplit
 
 from iip.application.ports import (
+    AiEconomicsMeasurement,
     IngestionFreshnessMeasurement,
     InvestigationExecutionMeasurement,
     OtlpReceiverMeasurement,
@@ -25,6 +26,14 @@ _VIOLATIONS = (
     "pending-event-age-exceeded",
 )
 _ATTRIBUTE_MODES = frozenset({"none", "source", "tenant-source"})
+_AI_ECONOMICS_ATTRIBUTE_MODES = frozenset({"scope", "tenant-scope"})
+_AI_ECONOMICS_EVALUATION_STATUSES = (
+    "qualified",
+    "insufficient",
+    "unresolved",
+    "unsupported",
+    "below-threshold",
+)
 _INVESTIGATION_ATTRIBUTE_MODES = frozenset(
     {"none", "investigation", "tenant-investigation"}
 )
@@ -220,6 +229,7 @@ class OtlpMetricsConfiguration:
 
     endpoint: str
     attribute_mode: str = "source"
+    ai_economics_attribute_mode: str = "tenant-scope"
     service_name: str = "infra-intelligence-api"
     export_interval_millis: int = 60_000
     export_timeout_millis: int = 10_000
@@ -247,6 +257,9 @@ class OtlpMetricsConfiguration:
             endpoint=endpoint,
             attribute_mode=environment.get(
                 "IIP_OTEL_INGESTION_ATTRIBUTE_MODE", "source"
+            ),
+            ai_economics_attribute_mode=environment.get(
+                "IIP_OTEL_AI_ECONOMICS_ATTRIBUTE_MODE", "tenant-scope"
             ),
             service_name=environment.get(
                 "OTEL_SERVICE_NAME", "infra-intelligence-api"
@@ -284,6 +297,8 @@ class OtlpMetricsConfiguration:
             or parsed.fragment
             or (port is not None and not 1 <= port <= 65_535)
             or self.attribute_mode not in _ATTRIBUTE_MODES
+            or self.ai_economics_attribute_mode
+            not in _AI_ECONOMICS_ATTRIBUTE_MODES
             or not isinstance(self.service_name, str)
             or not 1 <= len(self.service_name) <= 128
             or any(character.isspace() for character in self.service_name)
@@ -674,6 +689,316 @@ class OpenTelemetryOtlpReceiverSink:
                 pass
 
 
+class OpenTelemetryAiEconomicsSink:
+    """Map one protected profile snapshot to bounded OTLP gauges."""
+
+    def __init__(self, meter: Any, *, attribute_mode: str = "tenant-scope") -> None:
+        if attribute_mode not in _AI_ECONOMICS_ATTRIBUTE_MODES:
+            raise OpenTelemetryConfigurationError("telemetry.configuration.invalid")
+        self._attribute_mode = attribute_mode
+        self._requests = meter.create_gauge(
+            "iip.ai.usage.requests",
+            unit="{request}",
+            description="Successful observed AI invocations in the profile window.",
+        )
+        self._input_tokens = meter.create_gauge(
+            "iip.ai.usage.input_tokens",
+            unit="{token}",
+            description="Known input tokens in the profile window.",
+        )
+        self._output_tokens = meter.create_gauge(
+            "iip.ai.usage.output_tokens",
+            unit="{token}",
+            description="Known output tokens in the profile window.",
+        )
+        self._metered_requests = meter.create_gauge(
+            "iip.ai.usage.metered_requests",
+            unit="{request}",
+            description="Requests with the named token total present.",
+        )
+        self._incomplete_requests = meter.create_gauge(
+            "iip.ai.usage.incomplete_requests",
+            unit="{request}",
+            description="Requests whose provider usage meters are incomplete.",
+        )
+        self._cost_requests = meter.create_gauge(
+            "iip.ai.cost.requests",
+            unit="{request}",
+            description="Requests grouped by exact calculation status.",
+        )
+        self._cost_amount = meter.create_gauge(
+            "iip.ai.cost.amount",
+            unit="{currency-subunit}",
+            description="Calculated-estimate cost for priced requests.",
+        )
+        self._input_tokens_per_request = meter.create_gauge(
+            "iip.ai.usage.input_tokens_per_request",
+            unit="{token}/{request}",
+            description="Mean input tokens per request for a comparison window.",
+        )
+        self._context_growth = meter.create_gauge(
+            "iip.ai.context_growth.change",
+            unit="1",
+            description="Current input-token mean change in basis points.",
+        )
+        self._evaluation_status = meter.create_gauge(
+            "iip.ai.savings.profile_status",
+            unit="1",
+            description="One for the current deterministic rule status, otherwise zero.",
+        )
+        self._findings = meter.create_gauge(
+            "iip.ai.savings.findings",
+            unit="{finding}",
+            description="Committed evidence-backed savings findings.",
+        )
+        self._potential_savings = meter.create_gauge(
+            "iip.ai.savings.potential_amount",
+            unit="{currency-subunit}",
+            description="Evidence-backed potential saving for the current window.",
+        )
+        self._record_failure = meter.create_counter(
+            "iip.telemetry.record.failures",
+            unit="1",
+            description="Measurements rejected before reaching an exporter.",
+        )
+        self._failures = 0
+        self._failure_lock = Lock()
+
+    @property
+    def record_failures(self) -> int:
+        with self._failure_lock:
+            return self._failures
+
+    def record_ai_economics(self, measurement: AiEconomicsMeasurement) -> None:
+        try:
+            self._validate(measurement)
+            common = self._attributes(measurement)
+            self._requests.set(measurement.request_count, common)
+            self._input_tokens.set(measurement.input_tokens, common)
+            self._output_tokens.set(measurement.output_tokens, common)
+            for meter_name, value in (
+                ("input", measurement.input_token_requests),
+                ("output", measurement.output_token_requests),
+            ):
+                attributes = dict(common)
+                attributes["iip.ai.usage.meter"] = meter_name
+                self._metered_requests.set(value, attributes)
+            self._incomplete_requests.set(measurement.incomplete_requests, common)
+            for status, value in (
+                ("priced", measurement.priced_requests),
+                ("unpriced", measurement.unpriced_requests),
+                ("ambiguous", measurement.ambiguous_requests),
+                ("pending", measurement.pending_cost_requests),
+            ):
+                attributes = dict(common)
+                attributes["iip.ai.cost.status"] = status
+                self._cost_requests.set(value, attributes)
+            if measurement.calculated_cost_subunits is not None:
+                self._cost_amount.set(
+                    measurement.calculated_cost_subunits,
+                    self._money_attributes(common, measurement),
+                )
+            for comparison, value in (
+                ("baseline", measurement.baseline_input_tokens_per_request),
+                ("current", measurement.current_input_tokens_per_request),
+            ):
+                if value is not None:
+                    attributes = dict(common)
+                    attributes["iip.ai.comparison.window"] = comparison
+                    self._input_tokens_per_request.set(value, attributes)
+            if measurement.context_growth_change_basis_points is not None:
+                self._context_growth.set(
+                    measurement.context_growth_change_basis_points,
+                    common,
+                )
+            for status in _AI_ECONOMICS_EVALUATION_STATUSES:
+                attributes = dict(common)
+                attributes["iip.ai.savings.status"] = status
+                self._evaluation_status.set(
+                    1 if status == measurement.evaluation_status else 0,
+                    attributes,
+                )
+            finding_attributes = dict(common)
+            finding_attributes.update(
+                {
+                    "iip.ai.savings.rule.id": "context-growth",
+                    "iip.ai.savings.rule.version": "1.0.0",
+                    "iip.ai.savings.severity": (
+                        measurement.finding_severity or "none"
+                    ),
+                }
+            )
+            self._findings.set(measurement.finding_count, finding_attributes)
+            if measurement.potential_savings_subunits is not None:
+                finding_attributes.update(
+                    self._money_attributes(common, measurement)
+                )
+                self._potential_savings.set(
+                    measurement.potential_savings_subunits,
+                    finding_attributes,
+                )
+        except Exception:
+            with self._failure_lock:
+                self._failures += 1
+            try:
+                self._record_failure.add(
+                    1,
+                    {
+                        "iip.telemetry.signal": "metrics",
+                        "iip.telemetry.instrument": "ai-economics",
+                    },
+                )
+            except Exception:
+                pass
+
+    def _attributes(
+        self,
+        measurement: AiEconomicsMeasurement,
+    ) -> dict[str, str | int]:
+        attributes: dict[str, str | int] = {
+            "iip.ai.profile.id": measurement.profile_id,
+            "gen_ai.provider.name": measurement.provider,
+            "gen_ai.response.model": measurement.model_id,
+            "cloud.region": measurement.region,
+            "service.name": measurement.service_name,
+            "deployment.environment.name": measurement.deployment_environment,
+        }
+        if self._attribute_mode == "tenant-scope":
+            attributes["iip.tenant.id"] = measurement.tenant_id
+        return attributes
+
+    @staticmethod
+    def _money_attributes(
+        common: Mapping[str, str | int],
+        measurement: AiEconomicsMeasurement,
+    ) -> dict[str, str | int]:
+        if measurement.currency is None or measurement.currency_scale is None:
+            raise ValueError
+        return {
+            **common,
+            "iip.ai.currency": measurement.currency,
+            "iip.ai.currency_scale": measurement.currency_scale,
+            "iip.ai.cost.basis": "calculated-estimate",
+        }
+
+    @staticmethod
+    def _validate(measurement: AiEconomicsMeasurement) -> None:
+        if not isinstance(measurement, AiEconomicsMeasurement):
+            raise ValueError
+        text_values = (
+            (measurement.tenant_id, 128),
+            (measurement.profile_id, 128),
+            (measurement.provider, 64),
+            (measurement.model_id, 256),
+            (measurement.region, 64),
+            (measurement.service_name, 256),
+            (measurement.deployment_environment, 128),
+        )
+        if any(
+            not isinstance(value, str)
+            or not 1 <= len(value) <= maximum
+            or any(
+                ord(character) < 32 or ord(character) == 127
+                for character in value
+            )
+            for value, maximum in text_values
+        ):
+            raise ValueError
+        counts = (
+            measurement.request_count,
+            measurement.input_tokens,
+            measurement.input_token_requests,
+            measurement.output_tokens,
+            measurement.output_token_requests,
+            measurement.incomplete_requests,
+            measurement.priced_requests,
+            measurement.unpriced_requests,
+            measurement.ambiguous_requests,
+            measurement.pending_cost_requests,
+            measurement.finding_count,
+        )
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or not 0 <= value <= _MAX_COUNTER
+            for value in counts
+        ):
+            raise ValueError
+        if (
+            measurement.input_token_requests > measurement.request_count
+            or measurement.output_token_requests > measurement.request_count
+            or measurement.incomplete_requests > measurement.request_count
+            or sum(
+                (
+                    measurement.priced_requests,
+                    measurement.unpriced_requests,
+                    measurement.ambiguous_requests,
+                    measurement.pending_cost_requests,
+                )
+            )
+            != measurement.request_count
+            or measurement.evaluation_status
+            not in _AI_ECONOMICS_EVALUATION_STATUSES
+            or measurement.finding_count not in (0, 1)
+        ):
+            raise ValueError
+        optional_non_negative_integers = (
+            measurement.calculated_cost_subunits,
+            measurement.baseline_input_tokens_per_request,
+            measurement.current_input_tokens_per_request,
+            measurement.potential_savings_subunits,
+        )
+        if any(
+            value is not None
+            and (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not 0 <= value <= _MAX_COUNTER
+            )
+            for value in optional_non_negative_integers
+        ) or (
+            measurement.context_growth_change_basis_points is not None
+            and (
+                isinstance(measurement.context_growth_change_basis_points, bool)
+                or not isinstance(
+                    measurement.context_growth_change_basis_points, int
+                )
+                or not -_MAX_COUNTER
+                <= measurement.context_growth_change_basis_points
+                <= _MAX_COUNTER
+            )
+        ):
+            raise ValueError
+        has_money = (
+            measurement.calculated_cost_subunits is not None
+            or measurement.potential_savings_subunits is not None
+        )
+        if (
+            has_money
+            and (
+                not isinstance(measurement.currency, str)
+                or len(measurement.currency) != 3
+                or not measurement.currency.isupper()
+                or measurement.currency_scale not in (6, 9, 12)
+            )
+        ):
+            raise ValueError
+        if (
+            measurement.finding_count == 0
+            and (
+                measurement.finding_severity is not None
+                or measurement.potential_savings_subunits is not None
+            )
+        ) or (
+            measurement.finding_count == 1
+            and (
+                measurement.finding_severity not in {"low", "medium", "high"}
+                or measurement.potential_savings_subunits is None
+            )
+        ):
+            raise ValueError
+
+
 class OpenTelemetryInvestigationSink:
     """Emit one bounded span from each durable terminal investigation report."""
 
@@ -745,6 +1070,7 @@ class OtlpMetricsRuntime:
     health: TelemetryExportHealthState | None = None
     query_sink: OpenTelemetryQueryAvailabilitySink | None = None
     receiver_sink: OpenTelemetryOtlpReceiverSink | None = None
+    ai_economics_sink: OpenTelemetryAiEconomicsSink | None = None
 
     def force_flush(self, timeout_millis: int = 10_000) -> bool:
         return bool(self.provider.force_flush(timeout_millis=timeout_millis))
@@ -846,6 +1172,7 @@ def build_otlp_metrics_runtime(
         ingestion_meter = provider.get_meter("iip.ingestion", "0.63.0")
         query_meter = provider.get_meter("iip.query", "0.63.0")
         receiver_meter = provider.get_meter("iip.otlp.receiver", "0.63.0")
+        ai_economics_meter = provider.get_meter("iip.ai.economics", "0.63.0")
         sink = OpenTelemetryIngestionSink(
             ingestion_meter,
             attribute_mode=configuration.attribute_mode,
@@ -856,6 +1183,10 @@ def build_otlp_metrics_runtime(
             health=export_health,
             query_sink=OpenTelemetryQueryAvailabilitySink(query_meter),
             receiver_sink=OpenTelemetryOtlpReceiverSink(receiver_meter),
+            ai_economics_sink=OpenTelemetryAiEconomicsSink(
+                ai_economics_meter,
+                attribute_mode=configuration.ai_economics_attribute_mode,
+            ),
         )
     except OpenTelemetryConfigurationError:
         raise

@@ -214,6 +214,7 @@ telemetry:
   otlpEndpoint: ""
   protocol: http/protobuf
   attributeMode: source
+  aiEconomicsAttributeMode: tenant-scope
   investigationAttributeMode: none
   serviceName: infra-intelligence-api
   workerServiceName: infra-intelligence-worker

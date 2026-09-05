@@ -1,6 +1,6 @@
 # AI economics architecture
 
-**Status:** Accepted V0 boundary; usage, cost, and context-growth rule executable
+**Status:** Accepted V0 boundary; usage, cost, rule, and aggregate metrics executable
 **Date:** 2026-09-05
 
 ## Context
@@ -127,6 +127,15 @@ requires validation before context retention changes. The PostgreSQL adapter
 reloads and recalculates the complete cohort before atomically committing the
 finding, value-minimized event, and outbox row. Pending, insufficient,
 unpriced, unsupported, and below-threshold profiles create no finding.
+
+After persistence, the same worker offers one bounded current-window aggregate
+to the existing OTLP metrics runtime. It reports request/token volume, meter
+and pricing coverage, calculated cost, baseline/current means, signed change,
+rule status, and potential saving. Series dimensions come only from protected
+profiles; invocation, trace, usage, cost, finding, evidence, and catalog
+identities never become labels. More than the configured cohort maximum
+suppresses the aggregate rather than presenting a truncated total. Recording
+or export failure is isolated from ledger and rule outcomes.
 
 ## Privacy and security
 

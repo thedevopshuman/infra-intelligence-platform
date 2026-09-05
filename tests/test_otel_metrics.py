@@ -19,6 +19,7 @@ from iip.adapters.otel import (
 from iip.application.ports import (
     AiAllocationMeasurement,
     AiEconomicsMeasurement,
+    AiRetryMeasurement,
     IngestionFreshnessMeasurement,
     QueryAvailabilityMeasurement,
 )
@@ -107,6 +108,28 @@ def ai_economics_measurement() -> AiEconomicsMeasurement:
         finding_count=1,
         finding_severity="medium",
         potential_savings_subunits=7_200_000,
+    )
+
+
+def ai_retry_measurement() -> AiRetryMeasurement:
+    return AiRetryMeasurement(
+        tenant_id="local",
+        profile_id="support-assistant-retries",
+        provider="aws.bedrock",
+        model_id="example.foundation-model-v1:0",
+        region="us-east-1",
+        service_name="support-assistant",
+        deployment_environment="production",
+        current_operations=2,
+        current_retry_fact_operations=2,
+        current_retrying_operations=2,
+        current_excess_attempts=3,
+        baseline_retry_rate_basis_points=0,
+        current_retry_rate_basis_points=10_000,
+        retry_rate_increase_basis_points=10_000,
+        evaluation_status="qualified",
+        finding_count=1,
+        finding_severity="high",
     )
 
 
@@ -383,6 +406,46 @@ class OpenTelemetryAiEconomicsSinkTests(unittest.TestCase):
             "response content",
             "priceSubunits",
         ):
+            self.assertNotIn(forbidden, serialized)
+        self.assertEqual(sink.record_failures, 0)
+
+    def test_retry_snapshot_exports_evidence_without_monetary_savings(self) -> None:
+        meter = RecordingMeter()
+        sink = OpenTelemetryAiEconomicsSink(
+            meter,
+            attribute_mode="tenant-scope",
+        )
+
+        sink.record_ai_retry(ai_retry_measurement())
+
+        retrying = meter.instruments["iip.ai.retry.operations"].records
+        self.assertEqual(
+            {
+                attributes["iip.ai.retry.status"]: value
+                for value, attributes in retrying
+            },
+            {"retrying": 2, "not-retrying": 0, "fact-missing": 0},
+        )
+        self.assertEqual(
+            meter.instruments["iip.ai.retry.excess_attempts"].records[0][0],
+            3,
+        )
+        self.assertEqual(
+            meter.instruments["iip.ai.retry.operation_rate_increase"].records[0][0],
+            10_000,
+        )
+        findings = meter.instruments["iip.ai.savings.findings"].records
+        self.assertEqual(findings[0][0], 1)
+        self.assertEqual(
+            findings[0][1]["iip.ai.savings.rule.id"],
+            "retry-amplification",
+        )
+        self.assertEqual(
+            meter.instruments["iip.ai.savings.potential_amount"].records,
+            [],
+        )
+        serialized = json.dumps(meter.instruments, default=lambda value: value.__dict__)
+        for forbidden in ("aiu_", "aic_", "aif_", "amountSubunits", "prompt"):
             self.assertNotIn(forbidden, serialized)
         self.assertEqual(sink.record_failures, 0)
 

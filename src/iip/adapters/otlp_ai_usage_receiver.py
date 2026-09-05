@@ -113,10 +113,17 @@ class _UsageProfile:
 
 
 @dataclass(frozen=True)
+class _InvocationProfile:
+    attributes: Mapping[str, str]
+    zero_when_absent: frozenset[str]
+
+
+@dataclass(frozen=True)
 class _ChannelProfile:
     channel: AiUsageChannel
     services: Mapping[str, _ServiceProfile]
     usage: _UsageProfile
+    invocation: _InvocationProfile
 
 
 class ConfiguredAiUsageReceiver:
@@ -305,17 +312,32 @@ class ConfiguredAiUsageReceiver:
         )
         error_type = cls._optional_string(span_attributes, "error.type", maximum=128)
         outcome, normalized_error = cls._outcome(source.status, error_type)
-        request_id = cls._optional_string(span_attributes, "aws.request_id")
+        request_id_attribute = profile.invocation.attributes.get("requestId")
+        request_id = (
+            cls._optional_string(span_attributes, request_id_attribute)
+            if request_id_attribute is not None
+            else None
+        )
         request_id_hash = (
             "sha256:" + hashlib.sha256(request_id.encode("utf-8")).hexdigest()
             if request_id is not None
             else None
         )
-        retry_count = cls._optional_integer(
-            span_attributes,
-            "aws.retry_count",
-            maximum=100,
+        retry_count_attribute = profile.invocation.attributes.get("retryCount")
+        retry_count = (
+            cls._optional_integer(
+                span_attributes,
+                retry_count_attribute,
+                maximum=100,
+            )
+            if retry_count_attribute is not None
+            else None
         )
+        if (
+            retry_count is None
+            and "retryCount" in profile.invocation.zero_when_absent
+        ):
+            retry_count = 0
 
         usage_values: dict[str, int | None] = {}
         for field, attribute in profile.usage.attributes.items():
@@ -350,8 +372,7 @@ class ConfiguredAiUsageReceiver:
             "gen_ai.request.model",
             "gen_ai.response.model",
             "error.type",
-            "aws.request_id",
-            "aws.retry_count",
+            *profile.invocation.attributes.values(),
             *profile.usage.attributes.values(),
         }
         dropped_count = sum(
@@ -430,6 +451,7 @@ class ConfiguredAiUsageReceiver:
             "operations",
             "regions",
             "instrumentationScopes",
+            "invocationAttributes",
             "usageAttributes",
             "commercial",
             "limits",
@@ -462,6 +484,7 @@ class ConfiguredAiUsageReceiver:
         operations = cls._string_list(entry["operations"], 64, _OPERATION)
         regions = cls._string_list(entry["regions"], 64, _REGION)
         scopes = cls._string_list(entry["instrumentationScopes"], 64)
+        invocation = cls._parse_invocation(entry["invocationAttributes"])
         usage = cls._parse_usage(entry["usageAttributes"])
         service_tier, routing_mode, purchase_mode = cls._parse_commercial(
             entry["commercial"]
@@ -490,7 +513,39 @@ class ConfiguredAiUsageReceiver:
             limits=limits,
         )
         validate_ai_usage_channel(channel)
-        return _ChannelProfile(channel, services, usage), verifier
+        return _ChannelProfile(channel, services, usage, invocation), verifier
+
+    @staticmethod
+    def _parse_invocation(value: object) -> _InvocationProfile:
+        if not isinstance(value, dict) or set(value) != {
+            "attributes",
+            "zeroWhenAbsent",
+        }:
+            raise ValueError
+        attributes = value["attributes"]
+        zero_when_absent = value["zeroWhenAbsent"]
+        allowed = {"requestId", "retryCount"}
+        if (
+            not isinstance(attributes, dict)
+            or not set(attributes).issubset(allowed)
+            or any(
+                not isinstance(name, str)
+                or not _ATTRIBUTE.fullmatch(name)
+                or ConfiguredAiUsageReceiver._prohibited_name(name)
+                for name in attributes.values()
+            )
+            or len(set(attributes.values())) != len(attributes)
+            or not isinstance(zero_when_absent, list)
+            or zero_when_absent != sorted(zero_when_absent)
+            or len(set(zero_when_absent)) != len(zero_when_absent)
+            or not set(zero_when_absent).issubset({"retryCount"})
+            or not set(zero_when_absent).issubset(attributes)
+        ):
+            raise ValueError
+        return _InvocationProfile(
+            dict(attributes),
+            frozenset(zero_when_absent),
+        )
 
     @classmethod
     def _parse_services(cls, value: object) -> Mapping[str, _ServiceProfile]:

@@ -46,7 +46,7 @@ from iip.adapters.ai_savings_store import (
 from iip.adapters.ai_usage_store import prepare_ai_usage_writes
 from iip.application.evaluate_ai_savings import (
     InvalidAiSavingsInputError,
-    validate_context_growth_source_binding,
+    validate_ai_savings_source_binding,
 )
 from iip.application.attribute_ai_usage import (
     InvalidAiAttributionInputError,
@@ -841,7 +841,7 @@ class InMemoryResourceStore:
                         raise PersistenceError("storage.request.invalid")
                     cost_documents.append(stored_cost[1])
                 try:
-                    validate_context_growth_source_binding(
+                    validate_ai_savings_source_binding(
                         item.document,
                         usage_documents,
                         tuple(cost_documents),

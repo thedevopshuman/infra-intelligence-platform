@@ -2,8 +2,8 @@
   "apiVersion": "iip.dev/v1alpha1",
   "kind": "ReleaseManifest",
   "metadata": {
-    "version": "0.65.0",
-    "chartVersion": "0.65.0",
+    "version": "0.66.0",
+    "chartVersion": "0.66.0",
     "pythonSdkVersion": "0.42.0",
     "typescriptSdkVersion": "0.42.0",
     "revision": "0123456789abcdef0123456789abcdef01234567",
@@ -13,28 +13,28 @@
   "spec": {
     "artifacts": [
       {
-        "path": "infra-intelligence-control-plane-0.65.0.oci.tar",
+        "path": "infra-intelligence-control-plane-0.66.0.oci.tar",
         "role": "control-plane-image",
         "mediaType": "application/vnd.oci.image.layout.v1.tar",
         "sizeBytes": 104857600,
         "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       {
-        "path": "infra-intelligence-plugin-mediation-bridge-0.65.0.oci.tar",
+        "path": "infra-intelligence-plugin-mediation-bridge-0.66.0.oci.tar",
         "role": "plugin-mediation-bridge-image",
         "mediaType": "application/vnd.oci.image.layout.v1.tar",
         "sizeBytes": 52428800,
         "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
       },
       {
-        "path": "infra-intelligence-0.65.0.tgz",
+        "path": "infra-intelligence-0.66.0.tgz",
         "role": "helm-chart",
         "mediaType": "application/vnd.cncf.helm.chart.content.v1.tar+gzip",
         "sizeBytes": 32768,
         "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
       },
       {
-        "path": "infra-intelligence-contracts-0.65.0.tar.gz",
+        "path": "infra-intelligence-contracts-0.66.0.tar.gz",
         "role": "public-contracts",
         "mediaType": "application/gzip",
         "sizeBytes": 65536,
@@ -56,7 +56,7 @@
       }
     ],
     "image": {
-      "path": "infra-intelligence-control-plane-0.65.0.oci.tar",
+      "path": "infra-intelligence-control-plane-0.66.0.oci.tar",
       "indexDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "platforms": [
         {
@@ -78,7 +78,7 @@
       ]
     },
     "pluginMediationBridgeImage": {
-      "path": "infra-intelligence-plugin-mediation-bridge-0.65.0.oci.tar",
+      "path": "infra-intelligence-plugin-mediation-bridge-0.66.0.oci.tar",
       "indexDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "platforms": [
         {

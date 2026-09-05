@@ -403,6 +403,58 @@
       ],
       "title": "Cost by protected team",
       "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Absolute increase in the share of successful operations reporting retries. IIP does not claim monetary savings until billed retry-attempt evidence exists.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 25},
+              {"color": "red", "value": 50}
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 23
+      },
+      "id": 9,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "iip_ai_retry_operation_rate_increase{job=\"iip-ai-economics\"} / 100",
+          "instant": true,
+          "legendFormat": "{{gen_ai_provider_name}} · {{service_name}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Are retries increasing?",
+      "type": "gauge"
     }
   ],
   "refresh": "5s",

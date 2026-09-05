@@ -24,12 +24,15 @@ from iip.application.evaluate_ai_savings import (
     AiSavingsEvaluationService,
     InvalidAiSavingsInputError,
     validate_ai_savings_finding,
+    validate_ai_savings_source_binding,
     validate_context_growth_profile,
     validate_context_growth_source_binding,
+    validate_retry_amplification_profile,
 )
 from iip.application.ports import (
     ActorContext,
     AiEconomicsMeasurement,
+    AiRetryMeasurement,
     PersistenceError,
 )
 from iip.bootstrap import _ai_savings_engine_configuration_from_env
@@ -55,11 +58,17 @@ class RecordingAiEconomicsSink:
     def __init__(self, *, fail: bool = False) -> None:
         self.fail = fail
         self.measurements: list[AiEconomicsMeasurement] = []
+        self.retry_measurements: list[AiRetryMeasurement] = []
 
     def record_ai_economics(self, measurement: AiEconomicsMeasurement) -> None:
         if self.fail:
             raise RuntimeError("export unavailable")
         self.measurements.append(measurement)
+
+    def record_ai_retry(self, measurement: AiRetryMeasurement) -> None:
+        if self.fail:
+            raise RuntimeError("export unavailable")
+        self.retry_measurements.append(measurement)
 
 
 def fixture(name: str) -> dict:
@@ -98,12 +107,29 @@ def profile(**changes: object) -> dict:
     return document
 
 
+def retry_profile(**changes: object) -> dict:
+    document = profile(
+        profileId="support-assistant-retries",
+        ruleId="retry-amplification",
+    )
+    document.pop("growthThresholdBasisPoints")
+    document.update(
+        {
+            "retryRateIncreaseThresholdBasisPoints": 2500,
+            "minimumCurrentRetryRateBasisPoints": 2500,
+        }
+    )
+    document.update(changes)
+    return document
+
+
 def usage_record(
     index: int,
     started_at: str,
     input_tokens: int,
     *,
     cache_read: int = 0,
+    retry_count: int | None = 0,
     tenant_id: str = "local",
 ) -> dict:
     document = copy.deepcopy(fixture("ai-usage-record"))
@@ -123,6 +149,10 @@ def usage_record(
             "outcome": "success",
         }
     )
+    if retry_count is None:
+        document["spec"]["invocation"].pop("retryCount", None)
+    else:
+        document["spec"]["invocation"]["retryCount"] = retry_count
     document["spec"]["attribution"]["deploymentEnvironment"] = "production"
     document["spec"]["usage"].update(
         {
@@ -296,6 +326,89 @@ class AiSavingsRuleTests(unittest.TestCase):
         self.assertEqual(result.failures, 0)
         self.assertEqual(len(store.ai_savings_findings), 1)
 
+    def test_retry_amplification_is_source_bound_without_invented_money(self) -> None:
+        store = InMemoryResourceStore()
+        clock = MutableClock()
+        documents = [
+            usage_record(1, "2026-09-03T12:00:00Z", 1200, retry_count=0),
+            usage_record(2, "2026-09-03T13:00:00Z", 1200, retry_count=0),
+            usage_record(101, "2026-09-04T12:00:00Z", 1200, retry_count=2),
+            usage_record(102, "2026-09-04T13:00:00Z", 1200, retry_count=1),
+        ]
+        seed_usage(store, documents)
+        telemetry = RecordingAiEconomicsSink()
+        service = AiSavingsEvaluationService(
+            store,
+            clock,
+            (retry_profile(),),
+            telemetry_sink=telemetry,
+        )
+
+        first = service.run_once("local", "retry-test")
+        clock.value = "2026-09-05T11:05:00Z"
+        second = service.run_once("local", "retry-test")
+
+        self.assertEqual((first.qualified, first.failures), (1, 0))
+        self.assertEqual((second.qualified, second.failures), (1, 0))
+        self.assertEqual(len(store.ai_savings_findings), 1)
+        finding = store.ai_savings_findings[0]
+        self.assertEqual(finding["spec"]["rule"]["id"], "retry-amplification")
+        self.assertEqual(
+            finding["spec"]["potentialSavings"],
+            {
+                "status": "unresolved",
+                "reasonCode": "retry-billing-unproven",
+                "period": finding["spec"]["scope"]["currentWindow"],
+            },
+        )
+        observation = finding["spec"]["observations"][0]
+        self.assertEqual(observation["baseline"]["value"], 0)
+        self.assertEqual(observation["current"]["value"], 10_000)
+        self.assertEqual(observation["changeBasisPoints"], 10_000)
+        self.assertNotIn("amountSubunits", json.dumps(finding))
+        self.assertFalse(
+            any(
+                reference["type"] == "ai-cost-record"
+                for reference in finding["spec"]["evidenceRefs"]
+            )
+        )
+        validate_ai_savings_source_binding(finding, tuple(documents), ())
+        self.assertEqual(len(telemetry.retry_measurements), 2)
+        measurement = telemetry.retry_measurements[0]
+        self.assertEqual(measurement.current_operations, 2)
+        self.assertEqual(measurement.current_retry_fact_operations, 2)
+        self.assertEqual(measurement.current_retrying_operations, 2)
+        self.assertEqual(measurement.current_excess_attempts, 3)
+        self.assertEqual(measurement.retry_rate_increase_basis_points, 10_000)
+        self.assertEqual(measurement.finding_count, 1)
+
+    def test_retry_rule_requires_complete_retry_facts_and_thresholds(self) -> None:
+        for name, retry_counts, expected in (
+            ("missing", (0, 0, 1, None), "unsupported"),
+            ("below", (0, 0, 0, 0), "below_threshold"),
+        ):
+            with self.subTest(name=name):
+                store = InMemoryResourceStore()
+                clock = MutableClock()
+                documents = [
+                    usage_record(1, "2026-09-03T12:00:00Z", 1200, retry_count=retry_counts[0]),
+                    usage_record(2, "2026-09-03T13:00:00Z", 1200, retry_count=retry_counts[1]),
+                    usage_record(101, "2026-09-04T12:00:00Z", 1200, retry_count=retry_counts[2]),
+                    usage_record(102, "2026-09-04T13:00:00Z", 1200, retry_count=retry_counts[3]),
+                ]
+                seed_usage(store, documents)
+                telemetry = RecordingAiEconomicsSink()
+                result = AiSavingsEvaluationService(
+                    store,
+                    clock,
+                    (retry_profile(),),
+                    telemetry_sink=telemetry,
+                ).run_once("local", "retry-test")
+                self.assertEqual(getattr(result, expected), 1)
+                self.assertEqual(result.qualified, 0)
+                self.assertEqual(store.ai_savings_findings, ())
+                self.assertEqual(len(telemetry.retry_measurements), 1)
+
     def test_unresolved_cost_exports_coverage_without_inventing_zero(self) -> None:
         store = InMemoryResourceStore()
         clock = MutableClock()
@@ -396,6 +509,18 @@ class AiSavingsRuleTests(unittest.TestCase):
                     AiSavingsConfigurationError, "ai.savings.profile.invalid"
                 ):
                     validate_context_growth_profile(profile(**mutation))
+        validated_retry = validate_retry_amplification_profile(retry_profile())
+        self.assertEqual(validated_retry.minimum_current_retry_rate_basis_points, 2500)
+        for mutation in (
+            {"minimumCurrentRetryRateBasisPoints": 0},
+            {"retryRateIncreaseThresholdBasisPoints": 10_001},
+            {"ruleId": "context-growth"},
+        ):
+            with self.subTest(retry_mutation=mutation), self.assertRaisesRegex(
+                AiSavingsConfigurationError,
+                "ai.savings.profile.invalid",
+            ):
+                validate_retry_amplification_profile(retry_profile(**mutation))
 
     def test_storage_rejects_cross_tenant_and_forged_finding(self) -> None:
         store = InMemoryResourceStore()
@@ -478,9 +603,9 @@ class AiSavingsPostgresTests(unittest.TestCase):
                 """
             )
         self.clock = MutableClock()
-        seed_standard_cohorts(self.store, self.clock)
 
     def test_finding_event_and_outbox_are_durable_and_idempotent(self) -> None:
+        seed_standard_cohorts(self.store, self.clock)
         service = AiSavingsEvaluationService(self.store, self.clock, (profile(),))
         with ThreadPoolExecutor(max_workers=2) as executor:
             results = tuple(
@@ -514,6 +639,35 @@ class AiSavingsPostgresTests(unittest.TestCase):
                 """
             ).fetchone()[0]
         self.assertEqual((finding_count, event_count, outbox_count), (1, 1, 1))
+
+    def test_retry_finding_is_durable_source_bound_and_has_no_cost_refs(self) -> None:
+        documents = [
+            usage_record(1, "2026-09-03T12:00:00Z", 1200, retry_count=0),
+            usage_record(2, "2026-09-03T13:00:00Z", 1200, retry_count=0),
+            usage_record(101, "2026-09-04T12:00:00Z", 1200, retry_count=2),
+            usage_record(102, "2026-09-04T13:00:00Z", 1200, retry_count=1),
+        ]
+        seed_usage(self.store, documents)
+        service = AiSavingsEvaluationService(
+            self.store,
+            self.clock,
+            (retry_profile(),),
+        )
+
+        result = service.run_once("local", "retry-postgres")
+
+        self.assertEqual((result.qualified, result.failures), (1, 0))
+        with psycopg.connect(DATABASE_URL) as connection:
+            row = connection.execute(
+                """
+                SELECT rule_id, document
+                FROM iip.ai_savings_findings
+                WHERE tenant_id = 'local'
+                """
+            ).fetchone()
+        self.assertEqual(row[0], "retry-amplification")
+        self.assertEqual(row[1]["spec"]["potentialSavings"]["status"], "unresolved")
+        self.assertNotIn("costRecordRefs", row[1]["spec"]["potentialSavings"])
 
 
 if __name__ == "__main__":

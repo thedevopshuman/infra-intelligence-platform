@@ -83,13 +83,15 @@ No partial record/event/outbox state survives a failure.
 AI savings evaluation is another separate worker transaction. The adapter
 queries only one exact tenant, commercial scope, catalog/engine lineage, and
 fixed time window. Before insert it reloads the complete adjacent-window cohort
-under a tenant/finding advisory lock, verifies the cited immutable usage and
-cost records, recalculates the context-growth result, and atomically writes the
-`ai_savings_findings` document, value-minimized CloudEvent, and outbox row.
-Deterministic identity makes exact retries idempotent; the same identity with
-different source-bound content is a conflict. Missing, partial, cached,
-unpriced, cross-tenant, or out-of-window source facts cannot be committed as a
-calculated finding.
+under a tenant/finding advisory lock and recalculates the rule. Context-growth
+findings verify every cited immutable usage and cost record; retry-amplification
+findings verify every cited usage record and prohibit cost references because
+billable hidden attempts are unproven. The finding, value-minimized CloudEvent,
+and outbox row commit atomically. Deterministic identity makes exact retries
+idempotent; the same identity with different source-bound content is a
+conflict. Missing, partial, cross-tenant, or out-of-window facts cannot be
+committed, and context-growth additionally rejects cached or unpriced source
+facts.
 
 The HTTP surface never sets the safe-checkpoint signal. A collector workflow may set it only after all resource mutations represented by that opaque cursor are included. Resource-collection resume state must exactly match the current tenant/source checkpoint, and provider cursor maps update in the same transaction as complete reconciliation membership. Reconciliation completion markers are never inferred from the last resource received.
 

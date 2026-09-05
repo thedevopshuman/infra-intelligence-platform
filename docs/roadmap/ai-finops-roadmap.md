@@ -24,6 +24,8 @@ Grafana.
 5. Load a protected, versioned price catalog and calculate explainable cost
    facts with cache/reasoning subset handling.
 6. Evaluate the context-growth rule over explicit baseline/current windows.
+   Add retry amplification only after its normalized source fact and honest
+   non-monetary semantics are executable.
 7. Export privacy-bounded aggregates/findings over OTLP and ship a
    Collector/Prometheus/Loki/Grafana reference topology.
 8. Prove the full flow against a deterministic Bedrock-shaped fixture and an
@@ -46,6 +48,13 @@ deterministic full-flow gate covering deduplication, visible unpriced usage,
 content rejection, exact cost, and one saving. A source-bound offline report
 now also proves official SDK interoperability and asynchronous exporter-failure
 isolation. The explicitly enabled real-provider call remains.
+
+The first additional deterministic rule is delivered: protected channel
+configuration maps provider retry attributes into `retryCount`, and the
+source-bound retry-amplification evaluator compares complete fixed-window
+cohorts. Its finding and dashboard signal carry an unresolved monetary status
+until billable-attempt evidence exists. Expensive-model anomaly detection
+remains open pending protected equivalence and workload-quality evidence.
 
 ## Phase B — application and team attribution
 

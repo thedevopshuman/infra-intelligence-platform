@@ -1,17 +1,19 @@
 # AI savings engine
 
-**Status:** Executable Phase A context-growth rule; disabled by default
+**Status:** Executable context-growth and retry-amplification rules; disabled by default
 **Date:** 2026-09-05
 
 The AI savings engine is a deterministic workflow-worker capability. It reads
-immutable, priced AI usage cohorts and records an evidence-backed
+immutable AI usage and calculated-cost cohorts and records an evidence-backed
 `AiSavingsFinding`, a value-minimized CloudEvent, and an outbox row in one
 transaction. It does not call a model, inspect prompt or response content, or
 run in the customer inference path.
 
-V0 implements only `context-growth` version `1.0.0`. It compares mean input
-tokens per successful request in two fixed, adjacent, equal-duration windows.
-Retry amplification and expensive-model anomaly rules remain future work.
+The runtime implements `context-growth` and `retry-amplification` version
+`1.0.0`. Context growth compares mean input tokens per successful request;
+retry amplification compares the share of successful operations reporting at
+least one retry. Both use fixed, adjacent, equal-duration windows. The
+expensive-model anomaly rule remains future work.
 
 ## Trust and authority boundary
 
@@ -22,10 +24,13 @@ Retry amplification and expensive-model anomaly rules remain future work.
   is bound to one explicit tenant.
 - Profiles are protected deployment policy. Span attributes cannot select a
   baseline, threshold, price catalog, environment, or commercial scope.
+- Provider retry attribute names and optional zero-on-absence behavior are
+  protected channel policy. The evaluator consumes only normalized
+  `retryCount` facts.
 - The engine reads metadata-only usage and calculated cost facts. It never
   reads prompts, responses, messages, tool arguments, or raw provider payloads.
 - The recommendation is advisory and always requires workload-specific
-  validation before context is changed.
+  validation before context or retry behavior is changed.
 
 ## Protected profile configuration
 
@@ -37,6 +42,7 @@ most 1,000 profiles, and each `(tenantId, profileId)` pair must be unique:
   "profiles": [
     {
       "profileId": "support-assistant-context",
+      "ruleId": "context-growth",
       "tenantId": "tenant-a",
       "catalogId": "apc_11111111111111111111111111111111",
       "costEngineVersion": "0.1.0",
@@ -64,6 +70,24 @@ most 1,000 profiles, and each `(tenantId, profileId)` pair must be unique:
 }
 ```
 
+A retry profile uses the same identity, catalog/query generation, scope,
+windows, minimum, ceiling, and grace fields, but replaces
+`growthThresholdBasisPoints` with:
+
+```json
+{
+  "profileId": "support-assistant-retries",
+  "ruleId": "retry-amplification",
+  "retryRateIncreaseThresholdBasisPoints": 2500,
+  "minimumCurrentRetryRateBasisPoints": 2500
+}
+```
+
+The abbreviated object shows only the rule-specific fields; it is not a
+standalone valid profile. Existing context-growth profiles without `ruleId`
+remain compatible and resolve to `context-growth`, but new configuration
+should always state the rule explicitly.
+
 The windows must be adjacent, equal in duration, and between one minute and
 31 days. Minimum requests are 2–100, the per-window record ceiling is at most
 100 and cannot be below the minimum, and grace is 0–86,400 seconds. The
@@ -78,7 +102,7 @@ engine. When savings are enabled, profile tenants must exactly equal
 | `IIP_AI_SAVINGS_INTERVAL_SECONDS` | `60` | Delay between evaluation passes; range 1–3,600 seconds. |
 | `IIP_OTEL_AI_ECONOMICS_ATTRIBUTE_MODE` | `tenant-scope` | Export protected scope labels with tenant identity, or use `scope` for a single-tenant-isolated backend. |
 
-## Exact V0 eligibility
+## Exact context-growth eligibility
 
 A profile emits a finding only when all of these conditions hold:
 
@@ -101,6 +125,26 @@ No finding is evidence, not zero savings. A pass reports aggregate counts for
 `failures` without logging tenant IDs, model IDs, token counts, rates, money,
 record IDs, or exception text.
 
+## Exact retry-amplification eligibility
+
+A retry profile emits a finding only when:
+
+1. its current window and grace have ended;
+2. both exact-scope windows meet the protected request minimum and ceiling;
+3. every record is a successful invocation with a normalized integer
+   `retryCount` from 0 through 100;
+4. the current share of operations with `retryCount > 0` meets the protected
+   minimum; and
+5. the absolute current-minus-baseline rate meets the protected increase
+   threshold.
+
+Missing retry facts make the profile `unsupported`; the rule does not infer
+zero. The finding cites the complete usage cohort and persists only after the
+adapter reloads and recalculates it. Its potential saving is always
+`unresolved/retry-billing-unproven` in version `1.0.0`, with no cost reference
+or amount. The final successful span cannot prove which hidden attempts were
+billable.
+
 ## Deterministic calculation
 
 All calculations use non-negative safe integers and round halves upward:
@@ -117,6 +161,13 @@ The finding ID is derived from the canonical finding specification. Evaluation
 time is excluded from the immutable document hash, so a later exact retry
 returns the first record and emits no duplicate event. Severity and confidence
 use fixed rule-version thresholds; they are not model judgments.
+
+Retry rate uses the same integer half-up convention:
+
+```text
+retryRateBasisPoints = roundHalfUp(retryingOperations * 10000 / operations)
+increaseBasisPoints = currentRetryRateBasisPoints - baselineRetryRateBasisPoints
+```
 
 The PostgreSQL adapter reloads the complete exact-scope cohort, every cited
 usage and cost fact, and recalculates the formula before committing. A forged,
@@ -143,16 +194,16 @@ aiSavingsEngine:
   intervalSeconds: 60
 ```
 
-Apply packaged migrations through `0020_ai_savings_ledger.sql` before enabling
-the worker. Chart validation rejects savings without the worker, cost engine,
-tenant enrollment, and profile Secret. The profile is mounted only into the
-worker.
+Apply packaged migrations through `0022_ai_retry_savings_rule.sql` before
+enabling the worker. Chart validation rejects savings without the worker, cost
+engine, tenant enrollment, and profile Secret. The profile is mounted only
+into the worker.
 
 ## Operations, recovery, and verification
 
 Publish a new profile or window as a reviewed Secret update and restart the
 worker. Existing findings remain immutable. Roll back by restoring the prior
-Secret and image; migration `0020` is forward-only and requires no destructive
+Secret and image; migrations `0020` and `0022` are forward-only and require no destructive
 database rollback. Do not delete findings to change a recommendation—publish a
 new rule version or profile window instead.
 
@@ -169,4 +220,5 @@ existing OTLP exporter and documented in the
 The provisioned Grafana dashboard and deterministic Bedrock-shaped end-to-end
 gate are executable through the
 [local AI FinOps topology](ai-finops-local-demo.md). Live Bedrock
-instrumentation qualification remains separate Phase A exit work.
+qualification remains opt-in and environment-specific; the pinned official
+instrumentation is qualified offline against the exact normalized boundary.

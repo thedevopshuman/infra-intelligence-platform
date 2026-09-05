@@ -27,7 +27,7 @@ tenant-bound telemetry channel.
 | Area | Semantics |
 | --- | --- |
 | `source` | Integration/channel provenance, OTLP trace signal, semantic-convention version, and instrumentation scope. |
-| `invocation` | Provider-neutral operation, model, region, commercial routing dimensions, timing, outcome, and trace correlation. |
+| `invocation` | Provider-neutral operation, model, region, commercial routing dimensions, timing, outcome, trace correlation, and optional protected-channel-mapped retry count. |
 | `attribution` | Standard service, namespace, environment, and optional IIP resource references. |
 | `usage` | Provider, instrumentation, or derived token totals with explicit completeness. |
 | `privacy` | Fixed metadata-only policy; content and raw payload persistence are false. |
@@ -45,6 +45,12 @@ when the missing data prevents exact catalog evaluation.
 Prompt, response, message, embedding, tool, retrieved-document, and raw payload
 fields are not extensions to this contract. They require a separate future
 privacy decision and contract version.
+
+`retryCount` is the number of reported attempts beyond the initial logical
+operation attempt. Its provider attribute and absence semantics are fixed by
+protected channel configuration, never by span data. If the channel has not
+qualified zero-on-absence behavior, a missing attribute remains unknown; the
+retry rule will not treat it as zero.
 
 ## `AiPriceCatalog`
 
@@ -114,13 +120,12 @@ attribution, baseline and current windows, observations, confidence, potential
 saving calculation, recommendation, and evidence references.
 
 The contract reserves `context-growth`, `retry-amplification`, and
-`expensive-model-anomaly`. The executable V0 runtime supports only
-`context-growth` version `1.0.0`; accepting another category in the public
-schema does not claim that its evaluator exists. Only a rule with complete
+`expensive-model-anomaly`. The executable runtime supports `context-growth`
+and `retry-amplification` version `1.0.0`; the expensive-model category remains
+reserved and does not imply an evaluator exists. Only a rule with complete
 source facts and a declared minimum cohort may emit a finding. Potential
-savings can be `calculated` or `unpriced`; a missing price is never zero
-savings. The V0 runtime emits only a calculated finding and emits no finding
-when exact pricing is unavailable.
+savings can be `calculated`, `unpriced`, or explicitly `unresolved`; missing
+price or billing evidence is never zero savings.
 
 The V0 profile fixes adjacent, equal-duration baseline and current windows and
 the exact tenant, provider, model, region, service, deployment environment,
@@ -144,6 +149,23 @@ specification SHA-256 digest with the `aif_` prefix. Evaluation time is not an
 identity input. Persistence must revalidate the exact source cohort and
 calculation before commit.
 
+The retry-amplification profile uses the same fixed scope and adjacent-window
+constraints, plus a minimum current retrying-operation rate and an absolute
+rate-increase threshold. Every successful operation in both cohorts must have
+a normalized `retryCount`. Its observation is the share of operations with
+`retryCount > 0`, expressed in basis points:
+
+```text
+retryRateBasisPoints = roundHalfUp(retryingOperations * 10000 / operations)
+increaseBasisPoints = currentRetryRateBasisPoints - baselineRetryRateBasisPoints
+```
+
+A qualifying retry finding cites every usage record but no cost record. Its
+potential saving is `unresolved` with `retry-billing-unproven`, because the
+final successful span does not establish whether hidden retry attempts used
+billable tokens. It recommends reviewing throttling, timeouts, and retry
+policy; it never manufactures a currency amount.
+
 Recommendations are advisory and always set `requiresValidation: true`. A
 lower-cost model suggestion requires separate workload-specific quality,
 latency, safety, and compliance evaluation.
@@ -165,6 +187,7 @@ finding. Its data contains the finding and rule identities plus bounded
 category, severity, provider, model, and service routing dimensions. It omits
 windows, samples, quantities, rates, currency, monetary values, and evidence
 record IDs. An exact deterministic retry creates no second finding or event.
+Both supported rules use this event type and a rule-specific source URN.
 
 ## Compatibility
 

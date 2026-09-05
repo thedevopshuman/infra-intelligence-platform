@@ -276,7 +276,7 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_AI_COST_BATCH_SIZE` | `100` | Maximum usage records calculated per tenant/pass; range 1–1000. |
 | `IIP_AI_COST_INTERVAL_SECONDS` | `10` | Cost worker pass interval; range 1–3600 seconds. |
 | `IIP_AI_SAVINGS_ENGINE_ENABLED` | `false` | Enable deterministic savings evaluation in the workflow worker only. |
-| `IIP_AI_SAVINGS_PROFILES_JSON` | required when savings are enabled | Protected closed context-growth profile wrapper for the exact enrolled tenants. |
+| `IIP_AI_SAVINGS_PROFILES_JSON` | required when savings are enabled | Protected closed context-growth or retry-amplification profile wrapper for the exact enrolled tenants. |
 | `IIP_AI_SAVINGS_INTERVAL_SECONDS` | `60` | Savings worker pass interval; range 1–3600 seconds. |
 | `IIP_ACTION_RECONCILIATION_BATCH_SIZE` | `100` | Maximum expired action leases scanned per enrolled tenant and timer pass |
 | `IIP_EVIDENCE_RETENTION_ENABLED` | `false` | Enable bounded artifact-byte expiration for worker-enrolled tenants only |

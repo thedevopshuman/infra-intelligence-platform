@@ -297,6 +297,10 @@ def channel_document(
                 "operations": ["chat"],
                 "regions": ["global"],
                 "instrumentationScopes": [SCOPE_NAME],
+                "invocationAttributes": {
+                    "attributes": {},
+                    "zeroWhenAbsent": [],
+                },
                 "usageAttributes": {
                     "inputTokens": "gen_ai.usage.input_tokens",
                     "outputTokens": "gen_ai.usage.output_tokens",

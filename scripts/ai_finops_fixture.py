@@ -90,6 +90,13 @@ def channel_configuration() -> Mapping[str, object]:
                 "operations": ["chat"],
                 "regions": ["us-east-1"],
                 "instrumentationScopes": [INSTRUMENTATION_SCOPE],
+                "invocationAttributes": {
+                    "attributes": {
+                        "requestId": "aws.request_id",
+                        "retryCount": "aws.retry_count",
+                    },
+                    "zeroWhenAbsent": [],
+                },
                 "usageAttributes": {
                     "inputTokens": "gen_ai.usage.input_tokens",
                     "outputTokens": "gen_ai.usage.output_tokens",
@@ -141,6 +148,10 @@ def channel_configuration() -> Mapping[str, object]:
                 "operations": ["chat"],
                 "regions": ["global"],
                 "instrumentationScopes": [OPENAI_INSTRUMENTATION_SCOPE],
+                "invocationAttributes": {
+                    "attributes": {},
+                    "zeroWhenAbsent": [],
+                },
                 "usageAttributes": {
                     "inputTokens": "gen_ai.usage.input_tokens",
                     "outputTokens": "gen_ai.usage.output_tokens",
@@ -279,9 +290,10 @@ def savings_profile_configuration(anchor: datetime) -> Mapping[str, object]:
         model_id: str,
         region: str,
         service_name: str,
-    ) -> Mapping[str, object]:
+    ) -> dict[str, object]:
         return {
             "profileId": profile_id,
+            "ruleId": "context-growth",
             "tenantId": "local",
             "catalogId": CATALOG_ID,
             "costEngineVersion": "0.1.0",
@@ -306,31 +318,46 @@ def savings_profile_configuration(anchor: datetime) -> Mapping[str, object]:
             "evaluationGraceSeconds": 0,
         }
 
-    return {
-        "profiles": [
-            profile(
-                "support-assistant-context",
-                "aws.bedrock",
-                KNOWN_MODEL,
-                "us-east-1",
-                "support-assistant",
-            ),
-            profile(
-                "research-assistant-coverage",
-                "aws.bedrock",
-                UNKNOWN_MODEL,
-                "us-east-1",
-                "research-assistant",
-            ),
-            profile(
-                "order-copilot-coverage",
-                "openai",
-                OPENAI_MODEL,
-                "global",
-                "order-copilot",
-            ),
-        ]
-    }
+    profiles = [
+        profile(
+            "support-assistant-context",
+            "aws.bedrock",
+            KNOWN_MODEL,
+            "us-east-1",
+            "support-assistant",
+        ),
+        profile(
+            "research-assistant-coverage",
+            "aws.bedrock",
+            UNKNOWN_MODEL,
+            "us-east-1",
+            "research-assistant",
+        ),
+        profile(
+            "order-copilot-coverage",
+            "openai",
+            OPENAI_MODEL,
+            "global",
+            "order-copilot",
+        ),
+    ]
+    retry_profile = profile(
+        "support-assistant-retries",
+        "aws.bedrock",
+        KNOWN_MODEL,
+        "us-east-1",
+        "support-assistant",
+    )
+    retry_profile["ruleId"] = "retry-amplification"
+    retry_profile.pop("growthThresholdBasisPoints")
+    retry_profile.update(
+        {
+            "retryRateIncreaseThresholdBasisPoints": 2500,
+            "minimumCurrentRetryRateBasisPoints": 2500,
+        }
+    )
+    profiles.append(retry_profile)
+    return {"profiles": profiles}
 
 
 def _span_times(anchor: datetime) -> tuple[datetime, ...]:
@@ -355,6 +382,7 @@ def _finished_spans(
     instrumentation_scope: str = INSTRUMENTATION_SCOPE,
     explicit_usage_breakdowns: bool = False,
     content_attribute: bool = False,
+    retry_counts: tuple[int, int, int, int] = (0, 0, 0, 0),
 ) -> tuple[object, ...]:
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
@@ -387,8 +415,8 @@ def _finished_spans(
         instrumentation_scope,
         "0.0.0-ai-finops-fixture",
     )
-    for index, (started_at, tokens) in enumerate(
-        zip(_span_times(anchor), input_tokens)
+    for index, (started_at, tokens, retry_count) in enumerate(
+        zip(_span_times(anchor), input_tokens, retry_counts)
     ):
         attributes: dict[str, object] = {
             "gen_ai.operation.name": "chat",
@@ -406,7 +434,7 @@ def _finished_spans(
                     "aws.request_id": (
                         f"ai-finops-provider-{service_name}-{index}"
                     ),
-                    "aws.retry_count": 0,
+                    "aws.retry_count": retry_count,
                 }
             )
         else:
@@ -459,6 +487,7 @@ def send_fixture(
         model_id=KNOWN_MODEL,
         service_name="support-assistant",
         input_tokens=(1200, 1200, 2400, 2400),
+        retry_counts=(0, 0, 2, 1),
     )
     unknown = _finished_spans(
         anchor,
@@ -647,7 +676,7 @@ def verify_fixture(
                 "attribution ledger count",
             )
             _assert_equal(len(snapshot["costs"]), 12, "cost ledger count")
-            _assert_equal(len(snapshot["findings"]), 1, "finding ledger count")
+            _assert_equal(len(snapshot["findings"]), 2, "finding ledger count")
 
             serialized = json.dumps(snapshot, sort_keys=True)
             if "must-never-cross-iip-boundary" in serialized:
@@ -675,11 +704,26 @@ def verify_fixture(
             statuses = [item["spec"]["result"]["costStatus"] for item in costs]
             _assert_equal(statuses.count("priced"), 8, "priced records")
             _assert_equal(statuses.count("unpriced"), 4, "unpriced records")
-            finding = snapshot["findings"][0]
+            findings = {
+                item["spec"]["rule"]["id"]: item
+                for item in snapshot["findings"]
+            }
+            finding = findings["context-growth"]
             _assert_equal(
                 finding["spec"]["potentialSavings"]["amountSubunits"],
                 7_200_000,
                 "evidence-backed saving",
+            )
+            retry_finding = findings["retry-amplification"]
+            _assert_equal(
+                retry_finding["spec"]["potentialSavings"]["status"],
+                "unresolved",
+                "honest retry saving status",
+            )
+            _assert_equal(
+                retry_finding["spec"]["observations"][0]["changeBasisPoints"],
+                10_000,
+                "retry amplification evidence",
             )
             priced_total = sum(
                 item["spec"]["result"].get("totalSubunits", 0)
@@ -716,6 +760,27 @@ def verify_fixture(
                 _scalar(prometheus_endpoint, "sum(iip_ai_savings_potential_amount)"),
                 7_200_000.0,
                 "potential saving metric",
+            )
+            _assert_equal(
+                _scalar(
+                    prometheus_endpoint,
+                    'sum(iip_ai_retry_operations{iip_ai_retry_status="retrying"})',
+                ),
+                2.0,
+                "retrying operations",
+            )
+            _assert_equal(
+                _scalar(prometheus_endpoint, "sum(iip_ai_retry_excess_attempts)"),
+                3.0,
+                "reported excess attempts",
+            )
+            _assert_equal(
+                _scalar(
+                    prometheus_endpoint,
+                    "max(iip_ai_retry_operation_rate_increase)",
+                ),
+                10_000.0,
+                "retry rate increase",
             )
             provider_series = _prometheus_query(
                 prometheus_endpoint,

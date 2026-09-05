@@ -1,0 +1,82 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiSavingsFinding",
+  "metadata": {
+    "id": "aif_8f29a496b948730ee31157930538ff1b",
+    "tenantId": "local",
+    "evaluatedAt": "2026-09-05T11:00:00Z"
+  },
+  "spec": {
+    "rule": {
+      "id": "retry-amplification",
+      "version": "1.0.0"
+    },
+    "scope": {
+      "baselineWindow": {
+        "start": "2026-09-03T10:00:00Z",
+        "end": "2026-09-04T10:00:00Z"
+      },
+      "currentWindow": {
+        "start": "2026-09-04T10:00:00Z",
+        "end": "2026-09-05T10:00:00Z"
+      },
+      "provider": "aws.bedrock",
+      "modelId": "example.foundation-model-v1:0",
+      "region": "us-east-1",
+      "serviceName": "support-assistant",
+      "deploymentEnvironment": "production"
+    },
+    "finding": {
+      "category": "retry-amplification",
+      "severity": "high",
+      "summary": "The share of successful operations reporting one or more retries increased against the preceding comparison window.",
+      "confidenceBasisPoints": 6000
+    },
+    "observations": [
+      {
+        "metric": "retrying-operations-rate",
+        "unit": "basis-points",
+        "baseline": {
+          "value": 0,
+          "sampleCount": 2
+        },
+        "current": {
+          "value": 10000,
+          "sampleCount": 2
+        },
+        "changeBasisPoints": 10000
+      }
+    ],
+    "potentialSavings": {
+      "status": "unresolved",
+      "reasonCode": "retry-billing-unproven",
+      "period": {
+        "start": "2026-09-04T10:00:00Z",
+        "end": "2026-09-05T10:00:00Z"
+      }
+    },
+    "recommendation": {
+      "actionCode": "review-retry-policy",
+      "summary": "Review provider throttling, timeout, and retry-policy evidence; validate reliability before changing retry behavior.",
+      "requiresValidation": true
+    },
+    "evidenceRefs": [
+      {
+        "type": "ai-usage-record",
+        "id": "aiu_00000000000000000000000000000001"
+      },
+      {
+        "type": "ai-usage-record",
+        "id": "aiu_00000000000000000000000000000002"
+      },
+      {
+        "type": "ai-usage-record",
+        "id": "aiu_00000000000000000000000000000065"
+      },
+      {
+        "type": "ai-usage-record",
+        "id": "aiu_00000000000000000000000000000066"
+      }
+    ]
+  }
+}

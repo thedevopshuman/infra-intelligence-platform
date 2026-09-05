@@ -50,6 +50,7 @@ def example_documents() -> dict[Path, object]:
         "ai-usage-attributed-event.json",
         "ai-cost-calculated-event.json",
         "ai-savings-finding-event.json",
+        "ai-retry-savings-finding-event.json",
     )
     return {EXAMPLES / name: load(EXAMPLES / name) for name in names}
 
@@ -74,6 +75,19 @@ class AiEconomicsContractTests(unittest.TestCase):
         validate_ai_economics_examples(example_documents(), errors)
         self.assertEqual([], errors)
         validate_ai_savings_finding(load(EXAMPLES / "ai-savings-finding.json"))
+        retry = load(EXAMPLES / "ai-retry-savings-finding.json")
+        schema = load(SCHEMAS / "ai-savings-finding.schema.json")
+        self.assertEqual(
+            [],
+            list(
+                Draft202012Validator(
+                    schema,
+                    format_checker=checker,
+                ).iter_errors(retry)
+            ),
+        )
+        self.assertEqual(retry, AiSavingsFinding.from_dict(retry).to_dict())
+        validate_ai_savings_finding(retry)
 
     def test_usage_contract_prohibits_content_and_raw_payload_capture(self) -> None:
         schema = load(SCHEMAS / "ai-usage-record.schema.json")

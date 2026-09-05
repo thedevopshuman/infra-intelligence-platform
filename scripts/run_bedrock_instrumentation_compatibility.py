@@ -233,6 +233,13 @@ def channel_document(model_id: str, region: str) -> dict[str, object]:
                 "operations": ["chat"],
                 "regions": [region],
                 "instrumentationScopes": [SCOPE_NAME],
+                "invocationAttributes": {
+                    "attributes": {
+                        "requestId": "aws.request_id",
+                        "retryCount": "aws.retry_count",
+                    },
+                    "zeroWhenAbsent": [],
+                },
                 "usageAttributes": {
                     "inputTokens": "gen_ai.usage.input_tokens",
                     "outputTokens": "gen_ai.usage.output_tokens",

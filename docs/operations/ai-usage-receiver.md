@@ -31,9 +31,9 @@ entire export when a span contains:
   receiver cannot prove what disappeared before admission.
 
 Unknown attributes with non-prohibited names are discarded and counted in
-`privacy.droppedAttributeCount`. AWS request IDs are SHA-256 hashed before the
-application boundary. Status descriptions, span names, raw protobuf bytes,
-and unknown attribute values are never persisted.
+`privacy.droppedAttributeCount`. Channel-mapped provider request IDs are
+SHA-256 hashed before the application boundary. Status descriptions, span
+names, raw protobuf bytes, and unknown attribute values are never persisted.
 
 ## Protected channel configuration
 
@@ -47,6 +47,8 @@ Each channel fixes:
   instrumentation scopes;
 - OTLP `service.name` to reviewed service/namespace/environment attribution;
 - allowed model, operation, and region values;
+- provider request-ID and retry-count attribute names plus the reviewed choice
+  of whether absent retry count means zero;
 - the five token-meter attribute names and which missing breakdown fields may
   be explicitly interpreted as zero;
 - service tier, routing mode, and purchase mode from protected configuration,
@@ -72,8 +74,15 @@ span:
 | Region | `cloud.region` on the resource, scope, or span |
 | Service | `service.name` on the resource |
 | Error | `error.type` (required for error status, otherwise normalized to `unknown`) |
-| Provider request | `aws.request_id` (optional and hashed) |
-| Retries | `aws.retry_count` (optional non-negative integer) |
+| Provider request | channel-configured; example `aws.request_id` (optional and hashed) |
+| Retries | channel-configured; example `aws.retry_count` (optional integer from 0 through 100) |
+
+`invocationAttributes.attributes` accepts only the canonical keys `requestId`
+and `retryCount`, mapped to exact provider attributes. An empty mapping keeps
+both facts absent. `zeroWhenAbsent` may contain only mapped `retryCount`; use it
+only after qualifying that the instrumentation's absence means no retry. This
+keeps provider-specific names out of the application and prevents unknown
+retry evidence from becoming a false zero.
 
 Official Python botocore `0.65b0` uses the service-specific instrumentation
 scope `opentelemetry.instrumentation.botocore.bedrock-runtime`; protected
@@ -99,10 +108,11 @@ See the [OpenAI instrumentation qualification](openai-instrumentation-qualificat
 
 ## Run the isolated process
 
-Apply all packaged migrations through `0021_ai_attribution_ledger.sql`, then
+Apply all packaged migrations through `0022_ai_retry_savings_rule.sql`, then
 configure the receiver. The usage ledger itself is introduced by
 `0018_ai_usage_ledger.sql`; migrations `0019` through `0021` add the separately
-operated price/cost, savings, and attribution ledgers:
+operated price/cost, savings, and attribution ledgers, while `0022` enables the
+source-bound retry finding:
 
 ```bash
 export IIP_DATABASE_URL=postgresql://...
@@ -167,7 +177,8 @@ content-bearing, or unallowlisted input fails closed without persistence.
 ## Verification
 
 `make verify PYTHON=.venv/bin/python` covers official protobuf decoding,
-metadata allowlists, content rejection, tenant binding, hashing, completeness,
+metadata allowlists, provider-neutral invocation mapping, content rejection,
+tenant binding, hashing, completeness,
 schema-valid output, duplicate/conflict behavior, HTTP errors, OpenAPI, and
 Helm rendering. With Docker Desktop running:
 

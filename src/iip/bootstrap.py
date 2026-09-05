@@ -58,7 +58,7 @@ from iip.application.attribute_ai_usage import (
 from iip.application.evaluate_ai_savings import (
     AiSavingsConfigurationError,
     AiSavingsEvaluationService,
-    validate_context_growth_profile,
+    validate_ai_savings_profile,
 )
 from iip.application.collect_evidence import EvidenceCollectionService
 from iip.application.context_evidence import ContextEvidenceProvider, ContextEvidenceService
@@ -2225,7 +2225,7 @@ def _ai_savings_engine_configuration_from_env(
     from iip.adapters.ai_savings_profiles import ai_savings_profiles_from_json
 
     profiles = ai_savings_profiles_from_json(raw_profiles)
-    validated = tuple(validate_context_growth_profile(item) for item in profiles)
+    validated = tuple(validate_ai_savings_profile(item) for item in profiles)
     worker_tenants = {
         item.strip()
         for item in os.environ.get("IIP_WORKER_TENANTS", "").split(",")

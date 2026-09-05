@@ -11,8 +11,6 @@ from typing import Mapping
 
 from iip.application.calculate_ai_cost import ENGINE_VERSION as COST_ENGINE_VERSION
 from iip.application.evaluate_ai_savings import (
-    RULE_ID,
-    RULE_VERSION,
     InvalidAiSavingsInputError,
     validate_ai_savings_finding,
 )
@@ -167,7 +165,10 @@ def _prepare_one(
             if isinstance(reference, Mapping)
             and reference.get("type") == "ai-usage-record"
         )
-        cost_ids = tuple(savings["costRecordRefs"])  # type: ignore[arg-type]
+        raw_cost_ids = savings.get("costRecordRefs", ())
+        if not isinstance(raw_cost_ids, (list, tuple)):
+            raise ValueError
+        cost_ids = tuple(raw_cost_ids)
         digest = hashlib.sha256(
             json.dumps(
                 spec,
@@ -182,7 +183,8 @@ def _prepare_one(
             or not isinstance(event, PlatformEvent)
             or event.event_id != "ai-savings-" + digest
             or event.event_type != "io.iip.ai.savings-finding-recorded.v1"
-            or event.source != f"urn:iip:ai-savings:{RULE_ID}:{RULE_VERSION}"
+            or event.source
+            != f"urn:iip:ai-savings:{rule['id']}:{rule['version']}"
             or event.time != evaluated_at
             or event.subject != finding_id
             or event.tenant_id != tenant_id
@@ -201,7 +203,6 @@ def _prepare_one(
                 "serviceName": service_name,
             }
             or not usage_ids
-            or not cost_ids
         ):
             raise ValueError
         hash_document = json.loads(

@@ -44,7 +44,8 @@
         "potentialSavings": {
           "oneOf": [
             {"$ref": "#/$defs/calculatedSavings"},
-            {"$ref": "#/$defs/unpricedSavings"}
+            {"$ref": "#/$defs/unpricedSavings"},
+            {"$ref": "#/$defs/unresolvedSavings"}
           ]
         },
         "recommendation": {"$ref": "#/$defs/recommendation"},
@@ -138,6 +139,7 @@
           "type": "string",
           "enum": [
             "input-tokens-per-request",
+            "retrying-operations-rate",
             "request-attempts-per-operation",
             "calculated-cost-per-request"
           ]
@@ -146,6 +148,7 @@
           "type": "string",
           "enum": [
             "tokens-per-request",
+            "basis-points",
             "attempts-per-operation",
             "currency-subunits-per-request"
           ]
@@ -215,6 +218,16 @@
           "type": "string",
           "enum": ["unpriced-usage", "ambiguous-pricing", "insufficient-baseline"]
         }
+      }
+    },
+    "unresolvedSavings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reasonCode", "period"],
+      "properties": {
+        "status": {"const": "unresolved"},
+        "reasonCode": {"const": "retry-billing-unproven"},
+        "period": {"$ref": "#/$defs/window"}
       }
     },
     "recommendation": {

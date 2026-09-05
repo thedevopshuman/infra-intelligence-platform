@@ -6,7 +6,7 @@ This Docker Desktop profile demonstrates the complete local metadata path:
 
 ```text
 Bedrock/OpenAI-shaped OTel spans -> protected Collector routes -> isolated IIP receiver -> PostgreSQL
--> attribution and cost workers -> context-growth rule -> allocation reports
+-> attribution and cost workers -> context-growth + retry-amplification rules -> allocation reports
 -> OTLP metrics -> Collector
 -> Prometheus -> Grafana
 ```
@@ -40,10 +40,11 @@ The dashboard answers:
 2. their calculated-estimate cost, explicitly not invoice cost;
 3. which protected service/model/region/environment scope produced spend;
 4. how input tokens per request changed against the preceding window;
-5. one evidence-backed potential saving;
-6. whether pricing and usage coverage are complete;
-7. calculated cost by protected application; and
-8. calculated cost by protected team.
+5. one evidence-backed potential monetary saving;
+6. whether retrying operations increased, without an invented cost claim;
+7. whether pricing, usage, and retry-fact coverage are complete;
+8. calculated cost by protected application; and
+9. calculated cost by protected team.
 
 The fixture includes one allowlisted model absent from the price catalog, so
 unpriced usage is visible instead of silently becoming zero cost. It replays a
@@ -74,10 +75,11 @@ make test-ai-finops PYTHON=.venv/bin/python
 
 It validates Collector and Prometheus configuration before startup, then
 asserts twelve unique usage facts, eight priced and four unpriced cost facts,
-two immutable application/team mappings, one committed finding, exact
-current-window and allocation aggregates, Bedrock/OpenAI provider coverage,
-visible unpriced/unallocated coverage, dashboard provisioning, Loki readiness,
-and privacy-safe labels.
+two immutable application/team mappings, context-growth and retry-amplification
+findings, exact current-window, retry, and allocation aggregates,
+Bedrock/OpenAI provider coverage, honest unresolved retry savings, visible
+unpriced/unallocated coverage, dashboard provisioning, Loki readiness, and
+privacy-safe labels.
 
 ## Components and replacement boundaries
 
@@ -86,7 +88,7 @@ and privacy-safe labels.
 | OpenTelemetry Collector | Receives fixture spans, authenticates to IIP, and exposes IIP aggregates | Keep OTLP; replace processors, queues, auth, and exporters through Collector configuration. |
 | IIP receiver | Tenant-bound metadata validation and durable normalized usage | Deploy the isolated Helm receiver with mTLS/SPIFFE and protected channels. |
 | PostgreSQL | Authoritative append-only usage, cost, finding, event, and outbox facts | Operate a supported PostgreSQL service with backup/restore evidence. |
-| IIP worker | Protected ownership attribution, data-driven cost calculation, allocation projection, and deterministic context-growth evaluation | Supply reviewed policies/catalogs/profiles through protected deployment configuration. |
+| IIP worker | Protected ownership attribution, data-driven cost calculation, allocation projection, and deterministic context-growth/retry evaluation | Supply reviewed policies/catalogs/profiles through protected deployment configuration. |
 | Prometheus | Reference aggregate metric store | Replace with any backend accepting the customer's chosen Collector exporter. |
 | Loki | Provisioned reference OTLP log destination | Optional; it is not an accounting source and the V0 finding panel uses bounded metrics. |
 | Grafana | Provisioned usage/cost/change/saving/coverage and application/team allocation visualization | Point equivalent queries at the selected telemetry backend. |

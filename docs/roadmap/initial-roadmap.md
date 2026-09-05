@@ -12,7 +12,9 @@ foundation with an OpenTelemetry-native AWS Bedrock vertical slice. Its
 contract, architecture, metadata-only trace intake, usage ledger, and
 versioned pricing runtime are delivered. The first evidence-backed
 context-growth rule and its privacy-bounded OTLP aggregate metric projection
-are also executable. The reference dashboard topology and pinned official
+are also executable. A second source-bound retry-amplification rule now maps
+provider attributes through protected channel policy and reports an unresolved
+monetary status rather than guessing billed retry cost. The reference dashboard topology and pinned official
 botocore offline interoperability gate are executable; live Bedrock
 model/region and streaming qualification remain.
 The first Phase B unit is also executable: protected effective-time policies

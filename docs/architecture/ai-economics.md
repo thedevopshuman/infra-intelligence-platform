@@ -132,15 +132,15 @@ mutating prior facts.
 
 `AiSavingsFinding` is the output of a versioned deterministic rule, not an AI
 agent. It freezes current and baseline windows, attribution scope, observations,
-potential-saving formula, supporting record references, and a validation-bound
-recommendation. A rule emits no finding when its minimum cohort or pricing
-requirements are not met.
+potential-saving status or formula, supporting record references, and a
+validation-bound recommendation. A rule emits no finding when its minimum
+cohort or evidence requirements are not met.
 
-The first rule is `context-growth`. Retry and expensive-model rules remain
-disabled until their source facts and evaluation profiles have executable
-coverage.
+The executable rules are `context-growth` and `retry-amplification` version
+`1.0.0`. The expensive-model rule remains disabled until protected model
+equivalence and workload quality evidence have executable coverage.
 
-The executable rule runs only in the tenant-explicit workflow worker. A
+The context-growth rule runs only in the tenant-explicit workflow worker. A
 protected profile fixes the exact provider, model, region, service,
 environment, catalog, engine version, threshold, and two adjacent
 equal-duration windows. V0 accepts only successful complete records with no
@@ -156,6 +156,16 @@ requires validation before context retention changes. The PostgreSQL adapter
 reloads and recalculates the complete cohort before atomically committing the
 finding, value-minimized event, and outbox row. Pending, insufficient,
 unpriced, unsupported, and below-threshold profiles create no finding.
+
+Retry amplification uses a separate protected rule profile over the same exact
+scope boundary. Provider-specific retry attributes are normalized only through
+reviewed channel configuration; missing retry facts are never interpreted as
+zero by the evaluator. The rule compares the absolute basis-point share of
+successful operations with `retryCount > 0`, cites every source usage record,
+and commits through the same tenant-bound transaction. Its monetary saving is
+explicitly unresolved because a final span does not establish the billable
+usage of hidden retry attempts. Retry reporting uses separate gauges so adding
+a second rule for one scope cannot double-count usage or cost totals.
 
 After persistence, the same worker offers one bounded current-window aggregate
 to the existing OTLP metrics runtime. It reports request/token volume, meter

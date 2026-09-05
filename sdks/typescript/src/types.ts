@@ -389,10 +389,12 @@ export type AiSavingsRule =
 export interface AiSavingsObservation {
   metric:
     | "input-tokens-per-request"
+    | "retrying-operations-rate"
     | "request-attempts-per-operation"
     | "calculated-cost-per-request";
   unit:
     | "tokens-per-request"
+    | "basis-points"
     | "attempts-per-operation"
     | "currency-subunits-per-request";
   baseline: { value: number; sampleCount: number };
@@ -429,6 +431,11 @@ export type AiPotentialSavings =
         | "unpriced-usage"
         | "ambiguous-pricing"
         | "insufficient-baseline";
+    }
+  | {
+      status: "unresolved";
+      reasonCode: "retry-billing-unproven";
+      period: { start: string; end: string };
     };
 
 export interface AiSavingsFinding {

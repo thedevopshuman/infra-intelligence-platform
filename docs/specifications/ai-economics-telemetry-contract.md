@@ -10,10 +10,12 @@ are not the accounting ledger or an invoice.
 
 ## Snapshot boundary
 
-One measurement represents the current window of one protected
-`context-growth` profile after its window and grace period have ended. The
-worker derives it from the same bounded cohort used by the rule and offers it
-to the telemetry sink only after any qualifying finding has committed.
+One economics measurement represents the current window of one protected
+`context-growth` profile after its window and grace period have ended. A
+separate retry measurement represents one `retry-amplification` profile and
+does not repeat the scope's usage or cost totals. The worker derives both from
+the exact bounded cohorts used by their rules and offers them to the telemetry
+sink only after any qualifying finding has committed.
 
 A separate allocation snapshot represents one tenant's complete bounded
 rolling ledger report, projected once by protected application and once by
@@ -32,6 +34,13 @@ The source snapshot contains:
 - baseline/current input-token means and their signed basis-point change when
   both cohorts have complete input totals and a nonzero baseline; and
 - zero or one committed context-growth finding and its potential saving.
+
+The retry snapshot contains current operation coverage split into retrying,
+not-retrying, and missing-fact statuses; reported excess attempts;
+baseline/current retrying-operation rates; their absolute basis-point
+increase; and zero or one committed retry finding. It deliberately contains no
+currency or potential-saving amount because a final successful span does not
+prove hidden attempts were billable.
 
 If a profile exceeds its configured record ceiling, no partial aggregate is
 exported as a window total. Missing cost is represented by coverage, never by
@@ -55,6 +64,10 @@ platform telemetry sinks.
 | `iip.ai.cost.amount` | `{currency-subunit}` | Calculated-estimate total for priced requests. |
 | `iip.ai.usage.input_tokens_per_request` | `{token}/{request}` | Half-up mean for the `baseline` or `current` comparison window. |
 | `iip.ai.context_growth.change` | `1` | Signed change in basis points from baseline to current mean. |
+| `iip.ai.retry.operations` | `{operation}` | Current operations partitioned into retrying, not-retrying, and missing retry facts. |
+| `iip.ai.retry.excess_attempts` | `{attempt}` | Sum of reported attempts beyond the initial attempt in the current window. |
+| `iip.ai.retry.operation_rate` | `1` | Baseline or current share of operations reporting retries, in basis points. |
+| `iip.ai.retry.operation_rate_increase` | `1` | Absolute current-minus-baseline retrying-operation rate, in basis points. |
 | `iip.ai.savings.profile_status` | `1` | One-hot deterministic evaluation status. |
 | `iip.ai.savings.findings` | `{finding}` | Zero or one committed finding for the profile snapshot. |
 | `iip.ai.savings.potential_amount` | `{currency-subunit}` | Calculated potential saving for a committed finding. |
@@ -93,8 +106,9 @@ Individual instruments add only their declared closed dimensions:
 | `iip.ai.usage.meter` | `input`, `output` |
 | `iip.ai.cost.status` | `priced`, `unpriced`, `ambiguous`, `pending` |
 | `iip.ai.comparison.window` | `baseline`, `current` |
+| `iip.ai.retry.status` | `retrying`, `not-retrying`, `fact-missing` |
 | `iip.ai.savings.status` | `qualified`, `insufficient`, `unresolved`, `unsupported`, `below-threshold` |
-| `iip.ai.savings.rule.id` | `context-growth` |
+| `iip.ai.savings.rule.id` | `context-growth`, `retry-amplification` |
 | `iip.ai.savings.rule.version` | `1.0.0` |
 | `iip.ai.savings.severity` | `none`, `low`, `medium`, `high` |
 | `iip.ai.currency` | Three-letter uppercase currency code from the catalog. |
@@ -122,7 +136,7 @@ not grant cross-tenant query authority; the customer must independently route
 and authorize backend access.
 
 Recording is best effort. A rejected measurement increments
-`iip.telemetry.record.failures` with instrument `ai-economics` or
+`iip.telemetry.record.failures` with instrument `ai-economics`, `ai-retry`, or
 `ai-allocation`. Collector or
 backend delivery is covered by the existing metrics exporter-health path.
 Neither failure changes cost/finding persistence, worker success, API

@@ -77,6 +77,8 @@ def trace_payload(
     started_at: datetime | None = None,
     provider_attribute: str | None = "gen_ai.provider.name",
     legacy_provider: str | None = None,
+    retry_attribute: str = "aws.retry_count",
+    retry_count: int | None = 0,
 ) -> bytes:
     request = ExportTraceServiceRequest()
     resource_spans = request.resource_spans.add()
@@ -124,7 +126,8 @@ def trace_payload(
         span.attributes.add(
             key="gen_ai.usage.output_tokens"
         ).value.int_value = output_tokens
-    span.attributes.add(key="aws.retry_count").value.int_value = 0
+    if retry_count is not None:
+        span.attributes.add(key=retry_attribute).value.int_value = retry_count
     if content_attribute is not None:
         span.attributes.add(key=content_attribute).value.string_value = "must-not-cross"
     return request.SerializeToString()
@@ -158,9 +161,35 @@ class AiUsageReceiverAdapterTests(unittest.TestCase):
         self.assertEqual(observed.cache_read_input_tokens, 0)
         self.assertEqual(observed.reasoning_output_tokens, 0)
         self.assertEqual(observed.completeness, "complete")
+        self.assertEqual(observed.retry_count, 0)
         self.assertEqual(observed.dropped_attribute_count, 1)
         self.assertRegex(observed.request_id_hash or "", r"^sha256:[a-f0-9]{64}$")
         self.assertNotIn("provider-request-123", repr(observed))
+
+    def test_invocation_facts_are_channel_mapped_and_absence_is_explicit(self) -> None:
+        document = channel_document()
+        invocation = document["channels"][0]["invocationAttributes"]
+        invocation["attributes"]["retryCount"] = "provider.retry.attempts"
+        invocation["zeroWhenAbsent"] = []
+        receiver = ConfiguredAiUsageReceiver.from_json(json.dumps(document))
+        channel = receiver.authenticate_bearer(CHANNEL_TOKEN)
+
+        mapped = receiver.decode_traces(
+            channel,
+            trace_payload(
+                retry_attribute="provider.retry.attempts",
+                retry_count=2,
+            ),
+            content_encoding="identity",
+        )
+        self.assertEqual(mapped.spans[0].retry_count, 2)
+
+        absent = receiver.decode_traces(
+            channel,
+            trace_payload(retry_count=None),
+            content_encoding="identity",
+        )
+        self.assertIsNone(absent.spans[0].retry_count)
 
     def test_shipped_botocore_provider_alias_is_exact_and_conflict_safe(self) -> None:
         batch = self.receiver.decode_traces(

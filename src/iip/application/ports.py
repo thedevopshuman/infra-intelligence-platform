@@ -265,6 +265,29 @@ class AiEconomicsMeasurement:
 
 
 @dataclass(frozen=True)
+class AiRetryMeasurement:
+    """One bounded retry-amplification reporting snapshot."""
+
+    tenant_id: str
+    profile_id: str
+    provider: str
+    model_id: str
+    region: str
+    service_name: str
+    deployment_environment: str
+    current_operations: int
+    current_retry_fact_operations: int
+    current_retrying_operations: int
+    current_excess_attempts: int
+    baseline_retry_rate_basis_points: Optional[int]
+    current_retry_rate_basis_points: Optional[int]
+    retry_rate_increase_basis_points: Optional[int]
+    evaluation_status: str
+    finding_count: int
+    finding_severity: Optional[str]
+
+
+@dataclass(frozen=True)
 class AiAllocationMeasurement:
     """One bounded application or team allocation reporting projection."""
 
@@ -924,6 +947,9 @@ class InvestigationTelemetrySink(Protocol):
 class AiEconomicsTelemetrySink(Protocol):
     def record_ai_economics(self, measurement: AiEconomicsMeasurement) -> None:
         """Record a bounded aggregate without becoming accounting authority."""
+
+    def record_ai_retry(self, measurement: AiRetryMeasurement) -> None:
+        """Record bounded retry facts without inferring billed retry cost."""
 
 
 class AiAllocationTelemetrySink(Protocol):

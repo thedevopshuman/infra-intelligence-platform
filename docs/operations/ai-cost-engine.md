@@ -103,10 +103,10 @@ application parser's defensive maximum. Split larger tenant fleets across
 separately enrolled worker releases until a protected catalog service is
 accepted. Never place catalog bodies directly in a committed values file.
 
-Apply packaged migrations through `0021_ai_attribution_ledger.sql` before enabling
+Apply packaged migrations through `0022_ai_retry_savings_rule.sql` before enabling
 the worker. The cost ledger itself is introduced by
-`0019_ai_cost_ledger.sql`; migrations `0020` and `0021` add the separately
-operated savings and attribution ledgers. The migration hook remains
+`0019_ai_cost_ledger.sql`; migrations `0020` through `0022` add the separately
+operated savings, attribution, and retry-rule support. The migration hook remains
 database-only; serving workloads never apply schema changes.
 
 ## Calculation and unresolved coverage

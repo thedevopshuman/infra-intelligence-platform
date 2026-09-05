@@ -130,10 +130,12 @@ atomically; pricing and recommendations remain separate downstream use cases.
 The tenant-explicit workflow worker now implements the separate pricing use
 case: protected immutable catalogs drive bounded integer cost calculation, and
 each new cost fact, minimized event, and outbox row commit atomically. Saving
-evaluation remains a separate downstream use case: the first executable
-context-growth rule compares protected fixed windows, revalidates exact usage
-and cost evidence in storage, and atomically records a deterministic finding,
-minimized event, and outbox row. Protected effective-time mappings separately
+evaluation remains a separate downstream use case: executable context-growth
+and retry-amplification rules compare protected fixed windows, revalidate exact
+source evidence in storage, and atomically record deterministic findings,
+minimized events, and outbox rows. Retry savings remain explicitly unresolved
+until billable-attempt evidence exists, as fixed by
+[ADR 0096](../decisions/0096-source-bound-retry-amplification.md). Protected effective-time mappings separately
 resolve observed service/resource identity into immutable application/team or
 explicit unallocated facts; telemetry cannot assign its own ownership. The
 local OTLP aggregate projection and Grafana V0 dashboard are executable.

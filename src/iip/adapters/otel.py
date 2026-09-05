@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from iip.application.ports import (
     AiAllocationMeasurement,
     AiEconomicsMeasurement,
+    AiRetryMeasurement,
     IngestionFreshnessMeasurement,
     InvestigationExecutionMeasurement,
     OtlpReceiverMeasurement,
@@ -744,6 +745,26 @@ class OpenTelemetryAiEconomicsSink:
             unit="1",
             description="Current input-token mean change in basis points.",
         )
+        self._retry_operations = meter.create_gauge(
+            "iip.ai.retry.operations",
+            unit="{operation}",
+            description="Operations grouped by normalized retry-fact status.",
+        )
+        self._retry_excess_attempts = meter.create_gauge(
+            "iip.ai.retry.excess_attempts",
+            unit="{attempt}",
+            description="Reported retry attempts beyond the initial operation attempt.",
+        )
+        self._retry_rate = meter.create_gauge(
+            "iip.ai.retry.operation_rate",
+            unit="1",
+            description="Operations reporting retries, expressed in basis points.",
+        )
+        self._retry_rate_increase = meter.create_gauge(
+            "iip.ai.retry.operation_rate_increase",
+            unit="1",
+            description="Absolute retrying-operation rate increase in basis points.",
+        )
         self._evaluation_status = meter.create_gauge(
             "iip.ai.savings.profile_status",
             unit="1",
@@ -854,9 +875,95 @@ class OpenTelemetryAiEconomicsSink:
             except Exception:
                 pass
 
+    def record_ai_retry(self, measurement: AiRetryMeasurement) -> None:
+        try:
+            self._validate_retry(measurement)
+            common = self._retry_attributes(measurement)
+            status_values = (
+                ("retrying", measurement.current_retrying_operations),
+                (
+                    "not-retrying",
+                    measurement.current_retry_fact_operations
+                    - measurement.current_retrying_operations,
+                ),
+                (
+                    "fact-missing",
+                    measurement.current_operations
+                    - measurement.current_retry_fact_operations,
+                ),
+            )
+            for status, value in status_values:
+                attributes = dict(common)
+                attributes["iip.ai.retry.status"] = status
+                self._retry_operations.set(value, attributes)
+            self._retry_excess_attempts.set(
+                measurement.current_excess_attempts,
+                common,
+            )
+            for comparison, value in (
+                ("baseline", measurement.baseline_retry_rate_basis_points),
+                ("current", measurement.current_retry_rate_basis_points),
+            ):
+                if value is not None:
+                    attributes = dict(common)
+                    attributes["iip.ai.comparison.window"] = comparison
+                    self._retry_rate.set(value, attributes)
+            if measurement.retry_rate_increase_basis_points is not None:
+                self._retry_rate_increase.set(
+                    measurement.retry_rate_increase_basis_points,
+                    common,
+                )
+            for status in _AI_ECONOMICS_EVALUATION_STATUSES:
+                attributes = dict(common)
+                attributes["iip.ai.savings.status"] = status
+                self._evaluation_status.set(
+                    1 if status == measurement.evaluation_status else 0,
+                    attributes,
+                )
+            finding_attributes = dict(common)
+            finding_attributes.update(
+                {
+                    "iip.ai.savings.rule.id": "retry-amplification",
+                    "iip.ai.savings.rule.version": "1.0.0",
+                    "iip.ai.savings.severity": (
+                        measurement.finding_severity or "none"
+                    ),
+                }
+            )
+            self._findings.set(measurement.finding_count, finding_attributes)
+        except Exception:
+            with self._failure_lock:
+                self._failures += 1
+            try:
+                self._record_failure.add(
+                    1,
+                    {
+                        "iip.telemetry.signal": "metrics",
+                        "iip.telemetry.instrument": "ai-retry",
+                    },
+                )
+            except Exception:
+                pass
+
     def _attributes(
         self,
         measurement: AiEconomicsMeasurement,
+    ) -> dict[str, str | int]:
+        attributes: dict[str, str | int] = {
+            "iip.ai.profile.id": measurement.profile_id,
+            "gen_ai.provider.name": measurement.provider,
+            "gen_ai.response.model": measurement.model_id,
+            "cloud.region": measurement.region,
+            "service.name": measurement.service_name,
+            "deployment.environment.name": measurement.deployment_environment,
+        }
+        if self._attribute_mode == "tenant-scope":
+            attributes["iip.tenant.id"] = measurement.tenant_id
+        return attributes
+
+    def _retry_attributes(
+        self,
+        measurement: AiRetryMeasurement,
     ) -> dict[str, str | int]:
         attributes: dict[str, str | int] = {
             "iip.ai.profile.id": measurement.profile_id,
@@ -998,6 +1105,80 @@ class OpenTelemetryAiEconomicsSink:
                 measurement.finding_severity not in {"low", "medium", "high"}
                 or measurement.potential_savings_subunits is None
             )
+        ):
+            raise ValueError
+
+    @staticmethod
+    def _validate_retry(measurement: AiRetryMeasurement) -> None:
+        if not isinstance(measurement, AiRetryMeasurement):
+            raise ValueError
+        text_values = (
+            (measurement.tenant_id, 128),
+            (measurement.profile_id, 128),
+            (measurement.provider, 64),
+            (measurement.model_id, 256),
+            (measurement.region, 64),
+            (measurement.service_name, 256),
+            (measurement.deployment_environment, 128),
+        )
+        if any(
+            not isinstance(value, str)
+            or not 1 <= len(value) <= maximum
+            or any(
+                ord(character) < 32 or ord(character) == 127
+                for character in value
+            )
+            for value, maximum in text_values
+        ):
+            raise ValueError
+        counts = (
+            measurement.current_operations,
+            measurement.current_retry_fact_operations,
+            measurement.current_retrying_operations,
+            measurement.current_excess_attempts,
+            measurement.finding_count,
+        )
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or not 0 <= value <= _MAX_COUNTER
+            for value in counts
+        ):
+            raise ValueError
+        if (
+            measurement.current_retry_fact_operations
+            > measurement.current_operations
+            or measurement.current_retrying_operations
+            > measurement.current_retry_fact_operations
+            or measurement.finding_count not in (0, 1)
+            or measurement.evaluation_status
+            not in _AI_ECONOMICS_EVALUATION_STATUSES
+            or measurement.finding_severity
+            not in (None, "low", "medium", "high")
+            or (measurement.finding_count == 0)
+            != (measurement.finding_severity is None)
+        ):
+            raise ValueError
+        rates = (
+            measurement.baseline_retry_rate_basis_points,
+            measurement.current_retry_rate_basis_points,
+            measurement.retry_rate_increase_basis_points,
+        )
+        if any(
+            value is not None
+            and (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not -10_000 <= value <= 10_000
+            )
+            for value in rates
+        ):
+            raise ValueError
+        if (
+            measurement.baseline_retry_rate_basis_points is not None
+            and measurement.baseline_retry_rate_basis_points < 0
+            or measurement.current_retry_rate_basis_points is not None
+            and measurement.current_retry_rate_basis_points < 0
         ):
             raise ValueError
 
@@ -1438,15 +1619,15 @@ def build_otlp_metrics_runtime(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.65.0",
+                    "service.version": "0.66.0",
                 }
             ),
             metric_readers=(reader,),
         )
-        ingestion_meter = provider.get_meter("iip.ingestion", "0.65.0")
-        query_meter = provider.get_meter("iip.query", "0.65.0")
-        receiver_meter = provider.get_meter("iip.otlp.receiver", "0.65.0")
-        ai_economics_meter = provider.get_meter("iip.ai.economics", "0.65.0")
+        ingestion_meter = provider.get_meter("iip.ingestion", "0.66.0")
+        query_meter = provider.get_meter("iip.query", "0.66.0")
+        receiver_meter = provider.get_meter("iip.otlp.receiver", "0.66.0")
+        ai_economics_meter = provider.get_meter("iip.ai.economics", "0.66.0")
         sink = OpenTelemetryIngestionSink(
             ingestion_meter,
             attribute_mode=configuration.attribute_mode,
@@ -1498,7 +1679,7 @@ def build_otlp_traces_runtime(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.65.0",
+                    "service.version": "0.66.0",
                 }
             )
         )
@@ -1511,7 +1692,7 @@ def build_otlp_traces_runtime(
                 max_export_batch_size=configuration.max_export_batch_size,
             )
         )
-        tracer = provider.get_tracer("iip.investigation", "0.65.0")
+        tracer = provider.get_tracer("iip.investigation", "0.66.0")
         sink = OpenTelemetryInvestigationSink(
             tracer,
             attribute_mode=configuration.attribute_mode,

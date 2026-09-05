@@ -507,6 +507,13 @@ def _usage_input(value: object, *, expected_tenant: str) -> Mapping[str, object]
             raise ValueError
         started_at, _ = _timestamp(invocation["startedAt"])
         trace_id = _matched(invocation["traceId"], _TRACE_ID)
+        retry_count = invocation.get("retryCount")
+        if retry_count is not None and (
+            isinstance(retry_count, bool)
+            or not isinstance(retry_count, int)
+            or not 0 <= retry_count <= 100
+        ):
+            raise ValueError
         service_name = _text(attribution["serviceName"], maximum=256)
         missing = usage["missingFields"]
         if (
@@ -555,6 +562,7 @@ def _usage_input(value: object, *, expected_tenant: str) -> Mapping[str, object]
         "purchase_mode": purchase_mode,
         "started_at": started_at,
         "trace_id": trace_id,
+        "retry_count": retry_count,
         "service_name": service_name,
         "deployment_environment": attribution.get("deploymentEnvironment"),
         "outcome": invocation["outcome"],

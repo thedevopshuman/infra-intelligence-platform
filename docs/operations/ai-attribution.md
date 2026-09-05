@@ -76,7 +76,7 @@ tenants must exactly equal `worker.tenants`.
 
 ## Rollout and recovery
 
-Apply database migrations through `0021_ai_attribution_ledger.sql` before
+Apply database migrations through `0022_ai_retry_savings_rule.sql` before
 enabling the worker. Start with a policy that intentionally covers known
 production services and monitor unallocated results. Publish ownership changes
 as a new immutable policy ID/version; do not edit existing rows or policies.
@@ -85,8 +85,8 @@ The worker logs only aggregate processed, allocated, and unallocated counts.
 A bad source record or forged mapping fails the transaction closed, while a
 worker or telemetry outage never affects the customer's model call.
 
-Roll back by restoring the previous Secret and image. Migration `0021` is
-forward-only and does not require destructive database rollback. Existing
+Roll back by restoring the previous Secret and image. Migrations `0021` and
+`0022` are forward-only and do not require destructive database rollback. Existing
 attribution facts remain immutable.
 
 Verify locally with:

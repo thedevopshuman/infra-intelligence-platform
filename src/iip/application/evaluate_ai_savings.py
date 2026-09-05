@@ -21,13 +21,16 @@ from iip.application.ports import (
     AiEconomicsMeasurement,
     AiEconomicsLedger,
     AiEconomicsTelemetrySink,
+    AiRetryMeasurement,
     AiSavingsCohortQuery,
     Clock,
 )
 from iip.domain.models import PlatformEvent
 
 
-RULE_ID = "context-growth"
+CONTEXT_GROWTH_RULE_ID = "context-growth"
+RETRY_AMPLIFICATION_RULE_ID = "retry-amplification"
+RULE_ID = CONTEXT_GROWTH_RULE_ID
 RULE_VERSION = "1.0.0"
 MAX_COHORT_RECORDS = 100
 _MILLION = 1_000_000
@@ -73,6 +76,28 @@ class ContextGrowthProfile:
 
 
 @dataclass(frozen=True)
+class RetryAmplificationProfile:
+    profile_id: str
+    tenant_id: str
+    catalog_id: str
+    cost_engine_version: str
+    provider: str
+    model_id: str
+    region: str
+    service_name: str
+    deployment_environment: str
+    baseline_start: str
+    baseline_end: str
+    current_start: str
+    current_end: str
+    minimum_requests: int
+    retry_rate_increase_threshold_basis_points: int
+    minimum_current_retry_rate_basis_points: int
+    max_records_per_window: int
+    evaluation_grace_seconds: int
+
+
+@dataclass(frozen=True)
 class AiSavingsEvaluationPass:
     profiles: int
     qualified: int
@@ -89,7 +114,7 @@ class _EvaluationOutcome:
     status: str
     finding: Mapping[str, object] | None
     event: PlatformEvent | None
-    measurement: AiEconomicsMeasurement | None
+    measurement: AiEconomicsMeasurement | AiRetryMeasurement | None
 
 
 @dataclass(frozen=True)
@@ -101,6 +126,13 @@ class _CohortItem:
     currency: str
     currency_scale: int
     uncached_input_rate: int
+
+
+@dataclass(frozen=True)
+class _RetryCohortItem:
+    usage_id: str
+    started_at: datetime
+    retry_count: int
 
 
 class AiSavingsEvaluationService:
@@ -121,7 +153,7 @@ class AiSavingsEvaluationService:
             raise AiSavingsConfigurationError(
                 "ai.savings.configuration.invalid"
             )
-        validated = tuple(validate_context_growth_profile(item) for item in profiles)
+        validated = tuple(validate_ai_savings_profile(item) for item in profiles)
         identities = tuple((item.tenant_id, item.profile_id) for item in validated)
         if len(set(identities)) != len(identities):
             raise AiSavingsConfigurationError("ai.savings.profile.ambiguous")
@@ -180,6 +212,16 @@ class AiSavingsEvaluationService:
         )
 
     def _evaluate(
+        self,
+        profile: ContextGrowthProfile | RetryAmplificationProfile,
+        actor: ActorContext,
+        now: datetime,
+    ) -> _EvaluationOutcome:
+        if isinstance(profile, RetryAmplificationProfile):
+            return self._evaluate_retry_amplification(profile, actor, now)
+        return self._evaluate_context_growth(profile, actor, now)
+
+    def _evaluate_context_growth(
         self,
         profile: ContextGrowthProfile,
         actor: ActorContext,
@@ -288,11 +330,93 @@ class AiSavingsEvaluationService:
         )
         return outcome("qualified", finding, event)
 
-    def _record_telemetry(self, measurement: AiEconomicsMeasurement) -> None:
+    def _evaluate_retry_amplification(
+        self,
+        profile: RetryAmplificationProfile,
+        actor: ActorContext,
+        now: datetime,
+    ) -> _EvaluationOutcome:
+        current_end = _parse_time(profile.current_end)
+        if now < current_end + timedelta(seconds=profile.evaluation_grace_seconds):
+            return _EvaluationOutcome("pending", None, None, None)
+        baseline_rows = self._ledger.list_ai_savings_cohort(
+            actor,
+            _cohort_query(profile, baseline=True),
+        )
+        current_rows = self._ledger.list_ai_savings_cohort(
+            actor,
+            _cohort_query(profile, baseline=False),
+        )
+
+        def outcome(
+            status: str,
+            finding: Mapping[str, object] | None = None,
+            event: PlatformEvent | None = None,
+        ) -> _EvaluationOutcome:
+            return _EvaluationOutcome(
+                status,
+                finding,
+                event,
+                _retry_measurement(
+                    profile,
+                    baseline_rows,
+                    current_rows,
+                    evaluation_status=status,
+                    finding=finding,
+                ),
+            )
+
+        if (
+            len(baseline_rows) > profile.max_records_per_window
+            or len(current_rows) > profile.max_records_per_window
+        ):
+            return _EvaluationOutcome("unsupported", None, None, None)
+        if (
+            len(baseline_rows) < profile.minimum_requests
+            or len(current_rows) < profile.minimum_requests
+        ):
+            return outcome("insufficient")
+        try:
+            baseline = tuple(
+                _retry_cohort_item(profile, usage) for usage, _cost in baseline_rows
+            )
+            current = tuple(
+                _retry_cohort_item(profile, usage) for usage, _cost in current_rows
+            )
+        except _UnsupportedCohort:
+            return outcome("unsupported")
+        if not baseline or not current:
+            return outcome("insufficient")
+        baseline_rate = _retry_rate_basis_points(baseline)
+        current_rate = _retry_rate_basis_points(current)
+        increase = current_rate - baseline_rate
+        if (
+            current_rate < profile.minimum_current_retry_rate_basis_points
+            or increase < profile.retry_rate_increase_threshold_basis_points
+        ):
+            return outcome("below-threshold")
+        finding, event = _build_retry_finding(
+            profile,
+            baseline,
+            current,
+            evaluated_at=_format_time(now),
+            baseline_rate_basis_points=baseline_rate,
+            current_rate_basis_points=current_rate,
+            increase_basis_points=increase,
+        )
+        return outcome("qualified", finding, event)
+
+    def _record_telemetry(
+        self,
+        measurement: AiEconomicsMeasurement | AiRetryMeasurement,
+    ) -> None:
         if self._telemetry_sink is None:
             return
         try:
-            self._telemetry_sink.record_ai_economics(measurement)
+            if isinstance(measurement, AiRetryMeasurement):
+                self._telemetry_sink.record_ai_retry(measurement)
+            else:
+                self._telemetry_sink.record_ai_economics(measurement)
         except Exception:
             # Observability cannot change persisted accounting or rule outcomes.
             return
@@ -308,8 +432,9 @@ class _UnresolvedCohort(ValueError):
 
 def validate_context_growth_profile(document: object) -> ContextGrowthProfile:
     try:
+        copied = _json_copy(document)
         root = _closed(
-            _json_copy(document),
+            copied,
             {
                 "profileId",
                 "tenantId",
@@ -323,7 +448,10 @@ def validate_context_growth_profile(document: object) -> ContextGrowthProfile:
                 "maxRecordsPerWindow",
                 "evaluationGraceSeconds",
             },
+            {"ruleId"},
         )
+        if root.get("ruleId", CONTEXT_GROWTH_RULE_ID) != CONTEXT_GROWTH_RULE_ID:
+            raise ValueError
         scope = _closed(
             root["scope"],
             {
@@ -384,12 +512,119 @@ def validate_context_growth_profile(document: object) -> ContextGrowthProfile:
         raise AiSavingsConfigurationError("ai.savings.profile.invalid") from None
 
 
-def validate_ai_savings_finding(document: object) -> Mapping[str, object]:
-    """Validate the closed finding shape and deterministic identity."""
+def validate_retry_amplification_profile(
+    document: object,
+) -> RetryAmplificationProfile:
+    try:
+        root = _closed(
+            _json_copy(document),
+            {
+                "profileId",
+                "ruleId",
+                "tenantId",
+                "catalogId",
+                "costEngineVersion",
+                "scope",
+                "baselineWindow",
+                "currentWindow",
+                "minimumRequestsPerWindow",
+                "retryRateIncreaseThresholdBasisPoints",
+                "minimumCurrentRetryRateBasisPoints",
+                "maxRecordsPerWindow",
+                "evaluationGraceSeconds",
+            },
+        )
+        if root["ruleId"] != RETRY_AMPLIFICATION_RULE_ID:
+            raise ValueError
+        scope = _closed(
+            root["scope"],
+            {
+                "provider",
+                "modelId",
+                "region",
+                "serviceName",
+                "deploymentEnvironment",
+            },
+        )
+        baseline_start, baseline_end = _window(root["baselineWindow"])
+        current_start, current_end = _window(root["currentWindow"])
+        if (
+            baseline_end != current_start
+            or baseline_end - baseline_start != current_end - current_start
+            or not timedelta(minutes=1)
+            <= baseline_end - baseline_start
+            <= timedelta(days=31)
+        ):
+            raise ValueError
+        minimum = _integer(root["minimumRequestsPerWindow"], minimum=2, maximum=100)
+        maximum = _integer(
+            root["maxRecordsPerWindow"],
+            minimum=minimum,
+            maximum=MAX_COHORT_RECORDS,
+        )
+        increase_threshold = _integer(
+            root["retryRateIncreaseThresholdBasisPoints"],
+            minimum=1,
+            maximum=10_000,
+        )
+        minimum_current_rate = _integer(
+            root["minimumCurrentRetryRateBasisPoints"],
+            minimum=1,
+            maximum=10_000,
+        )
+        grace = _integer(
+            root["evaluationGraceSeconds"], minimum=0, maximum=86_400
+        )
+        engine_version = _text(root["costEngineVersion"], maximum=64)
+        if engine_version != COST_ENGINE_VERSION:
+            raise ValueError
+        return RetryAmplificationProfile(
+            _matched(root["profileId"], _PROFILE_ID),
+            _matched(root["tenantId"], _TENANT_ID),
+            _matched(root["catalogId"], _CATALOG_ID),
+            engine_version,
+            _matched(scope["provider"], _PROVIDER),
+            _text(scope["modelId"], maximum=256),
+            _matched(scope["region"], _REGION),
+            _text(scope["serviceName"], maximum=256),
+            _text(scope["deploymentEnvironment"], maximum=128),
+            _format_time(baseline_start),
+            _format_time(baseline_end),
+            _format_time(current_start),
+            _format_time(current_end),
+            minimum,
+            increase_threshold,
+            minimum_current_rate,
+            maximum,
+            grace,
+        )
+    except (KeyError, TypeError, ValueError, OverflowError):
+        raise AiSavingsConfigurationError("ai.savings.profile.invalid") from None
+
+
+def validate_ai_savings_profile(
+    document: object,
+) -> ContextGrowthProfile | RetryAmplificationProfile:
+    if (
+        isinstance(document, Mapping)
+        and document.get("ruleId") == RETRY_AMPLIFICATION_RULE_ID
+    ):
+        return validate_retry_amplification_profile(document)
+    return validate_context_growth_profile(document)
+
+
+def _validate_context_growth_finding(document: object) -> Mapping[str, object]:
+    """Validate the closed context-growth finding shape and identity."""
 
     try:
-        root = _closed(_json_copy(document), {"apiVersion", "kind", "metadata", "spec"})
-        if root["apiVersion"] != "iip.platform/v1alpha1" or root["kind"] != "AiSavingsFinding":
+        root = _closed(
+            _json_copy(document),
+            {"apiVersion", "kind", "metadata", "spec"},
+        )
+        if (
+            root["apiVersion"] != "iip.platform/v1alpha1"
+            or root["kind"] != "AiSavingsFinding"
+        ):
             raise ValueError
         metadata = _closed(root["metadata"], {"id", "tenantId", "evaluatedAt"})
         spec = _closed(
@@ -475,12 +710,19 @@ def validate_ai_savings_finding(document: object) -> Mapping[str, object]:
                 "costRecordRefs",
             },
         )
-        if savings["status"] != "calculated" or savings["period"] != scope["currentWindow"]:
+        if (
+            savings["status"] != "calculated"
+            or savings["period"] != scope["currentWindow"]
+        ):
             raise ValueError
         currency = _text(savings["currency"], maximum=3)
         if not re.fullmatch(r"[A-Z]{3}", currency):
             raise ValueError
-        if _integer(savings["currencyScale"], minimum=6, maximum=12) not in (6, 9, 12):
+        if _integer(
+            savings["currencyScale"],
+            minimum=6,
+            maximum=12,
+        ) not in (6, 9, 12):
             raise ValueError
         _integer(savings["amountSubunits"], minimum=0, maximum=MAX_SAFE_INTEGER)
         calculation = _closed(
@@ -544,6 +786,154 @@ def validate_ai_savings_finding(document: object) -> Mapping[str, object]:
     return root
 
 
+def _validate_retry_amplification_finding(
+    document: object,
+) -> Mapping[str, object]:
+    try:
+        root = _closed(
+            _json_copy(document),
+            {"apiVersion", "kind", "metadata", "spec"},
+        )
+        if (
+            root["apiVersion"] != "iip.platform/v1alpha1"
+            or root["kind"] != "AiSavingsFinding"
+        ):
+            raise ValueError
+        metadata = _closed(root["metadata"], {"id", "tenantId", "evaluatedAt"})
+        spec = _closed(
+            root["spec"],
+            {
+                "rule",
+                "scope",
+                "finding",
+                "observations",
+                "potentialSavings",
+                "recommendation",
+                "evidenceRefs",
+            },
+        )
+        rule = _closed(spec["rule"], {"id", "version"})
+        if rule != {"id": RETRY_AMPLIFICATION_RULE_ID, "version": RULE_VERSION}:
+            raise ValueError
+        scope = _closed(
+            spec["scope"],
+            {
+                "baselineWindow",
+                "currentWindow",
+                "provider",
+                "modelId",
+                "region",
+                "serviceName",
+                "deploymentEnvironment",
+            },
+        )
+        baseline_start, baseline_end = _window(scope["baselineWindow"])
+        current_start, current_end = _window(scope["currentWindow"])
+        if (
+            baseline_end != current_start
+            or baseline_end - baseline_start != current_end - current_start
+        ):
+            raise ValueError
+        _matched(scope["provider"], _PROVIDER)
+        _text(scope["modelId"], maximum=256)
+        _matched(scope["region"], _REGION)
+        _text(scope["serviceName"], maximum=256)
+        _text(scope["deploymentEnvironment"], maximum=128)
+        finding = _closed(
+            spec["finding"],
+            {"category", "severity", "summary", "confidenceBasisPoints"},
+        )
+        if (
+            finding["category"] != RETRY_AMPLIFICATION_RULE_ID
+            or finding["severity"] not in {"info", "low", "medium", "high"}
+        ):
+            raise ValueError
+        _text(finding["summary"], maximum=1024)
+        _integer(finding["confidenceBasisPoints"], minimum=0, maximum=10_000)
+        observations = spec["observations"]
+        if not isinstance(observations, list) or len(observations) != 1:
+            raise ValueError
+        observation = _closed(
+            observations[0],
+            {"metric", "unit", "baseline", "current", "changeBasisPoints"},
+        )
+        if (
+            observation["metric"] != "retrying-operations-rate"
+            or observation["unit"] != "basis-points"
+        ):
+            raise ValueError
+        for name in ("baseline", "current"):
+            sample = _closed(observation[name], {"value", "sampleCount"})
+            _integer(sample["value"], minimum=0, maximum=10_000)
+            _integer(sample["sampleCount"], minimum=1, maximum=MAX_COHORT_RECORDS)
+        _integer(
+            observation["changeBasisPoints"],
+            minimum=-10_000,
+            maximum=10_000,
+        )
+        savings = _closed(
+            spec["potentialSavings"],
+            {"status", "reasonCode", "period"},
+        )
+        if (
+            savings["status"] != "unresolved"
+            or savings["reasonCode"] != "retry-billing-unproven"
+            or savings["period"] != scope["currentWindow"]
+        ):
+            raise ValueError
+        _window(savings["period"])
+        recommendation = _closed(
+            spec["recommendation"],
+            {"actionCode", "summary", "requiresValidation"},
+        )
+        if (
+            recommendation["actionCode"] != "review-retry-policy"
+            or recommendation["requiresValidation"] is not True
+        ):
+            raise ValueError
+        _text(recommendation["summary"], maximum=1024)
+        evidence = spec["evidenceRefs"]
+        if not isinstance(evidence, list) or not 1 <= len(evidence) <= 200:
+            raise ValueError
+        usage_ids: list[str] = []
+        for raw_reference in evidence:
+            reference = _closed(raw_reference, {"type", "id"})
+            if reference["type"] != "ai-usage-record":
+                raise ValueError
+            usage_ids.append(_matched(reference["id"], _USAGE_ID))
+        if usage_ids != sorted(usage_ids) or len(set(usage_ids)) != len(usage_ids):
+            raise ValueError
+        finding_id = _matched(metadata["id"], _FINDING_ID)
+        _matched(metadata["tenantId"], _TENANT_ID)
+        evaluated_at, _canonical_evaluated_at = _timestamp(metadata["evaluatedAt"])
+        if (
+            evaluated_at < current_end
+            or finding_id != "aif_" + _spec_digest(spec)[:32]
+        ):
+            raise ValueError
+    except (KeyError, TypeError, ValueError, OverflowError):
+        raise InvalidAiSavingsInputError("ai.savings.finding.invalid") from None
+    return root
+
+
+def validate_ai_savings_finding(document: object) -> Mapping[str, object]:
+    """Validate a supported closed finding shape and deterministic identity."""
+
+    try:
+        if not isinstance(document, Mapping):
+            raise ValueError
+        spec = document.get("spec")
+        rule = spec.get("rule") if isinstance(spec, Mapping) else None
+        rule_id = rule.get("id") if isinstance(rule, Mapping) else None
+    except (TypeError, ValueError):
+        raise InvalidAiSavingsInputError("ai.savings.finding.invalid") from None
+    if rule_id == CONTEXT_GROWTH_RULE_ID:
+        return _validate_context_growth_finding(document)
+    if rule_id == RETRY_AMPLIFICATION_RULE_ID:
+        return _validate_retry_amplification_finding(document)
+    raise InvalidAiSavingsInputError("ai.savings.finding.invalid")
+
+
 def validate_context_growth_source_binding(
     finding_document: object,
     usage_documents: tuple[Mapping[str, object], ...],
@@ -578,7 +968,10 @@ def validate_context_growth_source_binding(
             cost = validate_ai_cost_record(document)
             cost_metadata = cost["metadata"]
             cost_spec = cost["spec"]
-            assert isinstance(cost_metadata, Mapping) and isinstance(cost_spec, Mapping)
+            assert isinstance(cost_metadata, Mapping) and isinstance(
+                cost_spec,
+                Mapping,
+            )
             if cost_metadata["tenantId"] != tenant_id:
                 raise ValueError
             usage_id = cost_spec["usageRecordId"]
@@ -590,7 +983,9 @@ def validate_context_growth_source_binding(
                 raise ValueError
             cost_ids.append(cost_id)
         expected_cost_refs = savings["costRecordRefs"]
-        if sorted(cost_ids) != expected_cost_refs or set(cost_by_usage) != set(usage_by_id):
+        if sorted(cost_ids) != expected_cost_refs or set(cost_by_usage) != set(
+            usage_by_id
+        ):
             raise ValueError
 
         catalog_ids: set[str] = set()
@@ -629,7 +1024,10 @@ def validate_context_growth_source_binding(
         current.sort(key=lambda item: (item.started_at, item.usage_id))
         baseline_sample = observation["baseline"]
         current_sample = observation["current"]
-        assert isinstance(baseline_sample, Mapping) and isinstance(current_sample, Mapping)
+        assert isinstance(baseline_sample, Mapping) and isinstance(
+            current_sample,
+            Mapping,
+        )
         if (
             len(baseline) != baseline_sample["sampleCount"]
             or len(current) != current_sample["sampleCount"]
@@ -650,7 +1048,9 @@ def validate_context_growth_source_binding(
         )
         excess = (current_mean - baseline_mean) * len(current)
         rates = {item.uncached_input_rate for item in current}
-        currencies = {(item.currency, item.currency_scale) for item in baseline + current}
+        currencies = {
+            (item.currency, item.currency_scale) for item in baseline + current
+        }
         if len(rates) != 1 or len(currencies) != 1:
             raise ValueError
         rate = next(iter(rates))
@@ -684,8 +1084,134 @@ def validate_context_growth_source_binding(
             raise ValueError
         if spec["recommendation"] != _recommendation():
             raise ValueError
-    except (KeyError, TypeError, ValueError, InvalidAiCostInputError, InvalidAiSavingsInputError):
+    except (
+        KeyError,
+        TypeError,
+        ValueError,
+        InvalidAiCostInputError,
+        InvalidAiSavingsInputError,
+    ):
         raise InvalidAiSavingsInputError("ai.savings.sources.invalid") from None
+
+
+def validate_retry_amplification_source_binding(
+    finding_document: object,
+    usage_documents: tuple[Mapping[str, object], ...],
+    cost_documents: tuple[Mapping[str, object], ...],
+) -> None:
+    """Recalculate retry evidence without inferring a monetary amount."""
+
+    try:
+        finding = _validate_retry_amplification_finding(finding_document)
+        if cost_documents:
+            raise ValueError
+        metadata = finding["metadata"]
+        spec = finding["spec"]
+        assert isinstance(metadata, Mapping) and isinstance(spec, Mapping)
+        scope = spec["scope"]
+        observation = spec["observations"][0]  # type: ignore[index]
+        assert isinstance(scope, Mapping) and isinstance(observation, Mapping)
+        profile = _retry_profile_from_finding(finding)
+        usage_by_id: dict[str, Mapping[str, object]] = {}
+        for document in usage_documents:
+            usage = validate_ai_usage_for_economics(
+                document,
+                expected_tenant=str(metadata["tenantId"]),
+            )
+            usage_id = usage["usage_record_id"]
+            if not isinstance(usage_id, str) or usage_id in usage_by_id:
+                raise ValueError
+            usage_by_id[usage_id] = document
+        evidence_ids = [
+            reference["id"]
+            for reference in spec["evidenceRefs"]  # type: ignore[union-attr]
+            if isinstance(reference, Mapping)
+        ]
+        if sorted(usage_by_id) != evidence_ids:
+            raise ValueError
+        baseline: list[_RetryCohortItem] = []
+        current: list[_RetryCohortItem] = []
+        baseline_start = _parse_time(profile.baseline_start)
+        baseline_end = _parse_time(profile.baseline_end)
+        current_start = _parse_time(profile.current_start)
+        current_end = _parse_time(profile.current_end)
+        for document in usage_by_id.values():
+            item = _retry_cohort_item(profile, document)
+            if baseline_start <= item.started_at < baseline_end:
+                baseline.append(item)
+            elif current_start <= item.started_at < current_end:
+                current.append(item)
+            else:
+                raise ValueError
+        baseline.sort(key=lambda item: (item.started_at, item.usage_id))
+        current.sort(key=lambda item: (item.started_at, item.usage_id))
+        baseline_sample = observation["baseline"]
+        current_sample = observation["current"]
+        assert isinstance(baseline_sample, Mapping) and isinstance(
+            current_sample,
+            Mapping,
+        )
+        if not baseline or not current:
+            raise ValueError
+        baseline_rate = _retry_rate_basis_points(tuple(baseline))
+        current_rate = _retry_rate_basis_points(tuple(current))
+        increase = current_rate - baseline_rate
+        if (
+            increase <= 0
+            or current_rate <= 0
+            or baseline_sample
+            != {"value": baseline_rate, "sampleCount": len(baseline)}
+            or current_sample
+            != {"value": current_rate, "sampleCount": len(current)}
+            or observation["changeBasisPoints"] != increase
+            or spec["finding"]
+            != _retry_finding_summary(
+                _retry_severity(increase),
+                _confidence(len(baseline), len(current)),
+            )
+            or spec["recommendation"] != _retry_recommendation()
+        ):
+            raise ValueError
+        expected_savings = {
+            "status": "unresolved",
+            "reasonCode": "retry-billing-unproven",
+            "period": scope["currentWindow"],
+        }
+        if spec["potentialSavings"] != expected_savings:
+            raise ValueError
+    except (
+        AssertionError,
+        KeyError,
+        TypeError,
+        ValueError,
+        InvalidAiCostInputError,
+        InvalidAiSavingsInputError,
+    ):
+        raise InvalidAiSavingsInputError("ai.savings.sources.invalid") from None
+
+
+def validate_ai_savings_source_binding(
+    finding_document: object,
+    usage_documents: tuple[Mapping[str, object], ...],
+    cost_documents: tuple[Mapping[str, object], ...],
+) -> None:
+    finding = validate_ai_savings_finding(finding_document)
+    spec = finding["spec"]
+    assert isinstance(spec, Mapping)
+    rule = spec["rule"]
+    assert isinstance(rule, Mapping)
+    if rule["id"] == CONTEXT_GROWTH_RULE_ID:
+        validate_context_growth_source_binding(
+            finding,
+            usage_documents,
+            cost_documents,
+        )
+        return
+    validate_retry_amplification_source_binding(
+        finding,
+        usage_documents,
+        cost_documents,
+    )
 
 
 def _cohort_item(
@@ -756,6 +1282,50 @@ def _cohort_item(
         raise
     except (KeyError, StopIteration, TypeError, ValueError, InvalidAiCostInputError):
         raise InvalidAiSavingsInputError("ai.savings.sources.invalid") from None
+
+
+def _retry_cohort_item(
+    profile: RetryAmplificationProfile,
+    usage_document: Mapping[str, object],
+) -> _RetryCohortItem:
+    try:
+        usage = validate_ai_usage_for_economics(
+            usage_document,
+            expected_tenant=profile.tenant_id,
+        )
+        retry_count = usage["retry_count"]
+        started_at = usage["started_at"]
+        if (
+            usage["provider"] != profile.provider
+            or usage["model_id"] != profile.model_id
+            or usage["region"] != profile.region
+            or usage["service_name"] != profile.service_name
+            or usage["deployment_environment"] != profile.deployment_environment
+            or usage["outcome"] != "success"
+            or isinstance(retry_count, bool)
+            or not isinstance(retry_count, int)
+            or not 0 <= retry_count <= 100
+            or not isinstance(started_at, datetime)
+        ):
+            raise _UnsupportedCohort
+        return _RetryCohortItem(
+            str(usage["usage_record_id"]),
+            started_at,
+            retry_count,
+        )
+    except _UnsupportedCohort:
+        raise
+    except (KeyError, TypeError, ValueError, InvalidAiCostInputError):
+        raise InvalidAiSavingsInputError("ai.savings.sources.invalid") from None
+
+
+def _retry_rate_basis_points(items: tuple[_RetryCohortItem, ...]) -> int:
+    if not items:
+        raise ValueError
+    return _half_up_divide(
+        sum(item.retry_count > 0 for item in items) * 10_000,
+        len(items),
+    )
 
 
 def _ai_economics_measurement(
@@ -975,6 +1545,115 @@ def _signed_half_up_divide(numerator: int, denominator: int) -> int:
     return sign * _half_up_divide(abs(numerator), denominator)
 
 
+def _retry_measurement(
+    profile: RetryAmplificationProfile,
+    baseline_rows: tuple[
+        tuple[Mapping[str, object], Mapping[str, object] | None], ...
+    ],
+    current_rows: tuple[
+        tuple[Mapping[str, object], Mapping[str, object] | None], ...
+    ],
+    *,
+    evaluation_status: str,
+    finding: Mapping[str, object] | None,
+) -> AiRetryMeasurement:
+    try:
+        if evaluation_status not in {
+            "qualified",
+            "insufficient",
+            "unresolved",
+            "unsupported",
+            "below-threshold",
+        }:
+            raise ValueError
+
+        def facts(
+            rows: tuple[
+                tuple[Mapping[str, object], Mapping[str, object] | None], ...
+            ],
+        ) -> tuple[int | None, ...]:
+            values: list[int | None] = []
+            for document, _cost in rows:
+                usage = validate_ai_usage_for_economics(
+                    document,
+                    expected_tenant=profile.tenant_id,
+                )
+                if (
+                    usage["provider"] != profile.provider
+                    or usage["model_id"] != profile.model_id
+                    or usage["region"] != profile.region
+                    or usage["service_name"] != profile.service_name
+                    or usage["deployment_environment"]
+                    != profile.deployment_environment
+                    or usage["outcome"] != "success"
+                ):
+                    raise ValueError
+                value = usage["retry_count"]
+                if value is not None and (
+                    isinstance(value, bool)
+                    or not isinstance(value, int)
+                    or not 0 <= value <= 100
+                ):
+                    raise ValueError
+                values.append(value)
+            return tuple(values)
+
+        baseline = facts(baseline_rows)
+        current = facts(current_rows)
+        baseline_rate = None
+        current_rate = None
+        increase = None
+        if baseline and current and None not in baseline and None not in current:
+            baseline_rate = _half_up_divide(
+                sum(int(value) > 0 for value in baseline) * 10_000,
+                len(baseline),
+            )
+            current_rate = _half_up_divide(
+                sum(int(value) > 0 for value in current) * 10_000,
+                len(current),
+            )
+            increase = current_rate - baseline_rate
+        finding_count = 0
+        severity = None
+        if finding is not None:
+            validated = _validate_retry_amplification_finding(finding)
+            spec = validated["spec"]
+            assert isinstance(spec, Mapping)
+            finding_value = spec["finding"]
+            assert isinstance(finding_value, Mapping)
+            finding_count = 1
+            severity = str(finding_value["severity"])
+        present = tuple(int(value) for value in current if value is not None)
+        return AiRetryMeasurement(
+            tenant_id=profile.tenant_id,
+            profile_id=profile.profile_id,
+            provider=profile.provider,
+            model_id=profile.model_id,
+            region=profile.region,
+            service_name=profile.service_name,
+            deployment_environment=profile.deployment_environment,
+            current_operations=len(current),
+            current_retry_fact_operations=len(present),
+            current_retrying_operations=sum(value > 0 for value in present),
+            current_excess_attempts=sum(present),
+            baseline_retry_rate_basis_points=baseline_rate,
+            current_retry_rate_basis_points=current_rate,
+            retry_rate_increase_basis_points=increase,
+            evaluation_status=evaluation_status,
+            finding_count=finding_count,
+            finding_severity=severity,
+        )
+    except (
+        AssertionError,
+        KeyError,
+        TypeError,
+        ValueError,
+        InvalidAiCostInputError,
+        InvalidAiSavingsInputError,
+    ):
+        raise InvalidAiSavingsInputError("ai.savings.measurement.invalid") from None
+
+
 def _build_finding(
     profile: ContextGrowthProfile,
     baseline: tuple[_CohortItem, ...],
@@ -1082,6 +1761,100 @@ def _build_finding(
     return document, event
 
 
+def _build_retry_finding(
+    profile: RetryAmplificationProfile,
+    baseline: tuple[_RetryCohortItem, ...],
+    current: tuple[_RetryCohortItem, ...],
+    *,
+    evaluated_at: str,
+    baseline_rate_basis_points: int,
+    current_rate_basis_points: int,
+    increase_basis_points: int,
+) -> tuple[Mapping[str, object], PlatformEvent]:
+    severity = _retry_severity(increase_basis_points)
+    confidence = _confidence(len(baseline), len(current))
+    scope = {
+        "baselineWindow": {
+            "start": profile.baseline_start,
+            "end": profile.baseline_end,
+        },
+        "currentWindow": {
+            "start": profile.current_start,
+            "end": profile.current_end,
+        },
+        "provider": profile.provider,
+        "modelId": profile.model_id,
+        "region": profile.region,
+        "serviceName": profile.service_name,
+        "deploymentEnvironment": profile.deployment_environment,
+    }
+    evidence = [
+        {"type": "ai-usage-record", "id": usage_id}
+        for usage_id in sorted(item.usage_id for item in baseline + current)
+    ]
+    spec: Mapping[str, object] = {
+        "rule": {"id": RETRY_AMPLIFICATION_RULE_ID, "version": RULE_VERSION},
+        "scope": scope,
+        "finding": _retry_finding_summary(severity, confidence),
+        "observations": [
+            {
+                "metric": "retrying-operations-rate",
+                "unit": "basis-points",
+                "baseline": {
+                    "value": baseline_rate_basis_points,
+                    "sampleCount": len(baseline),
+                },
+                "current": {
+                    "value": current_rate_basis_points,
+                    "sampleCount": len(current),
+                },
+                "changeBasisPoints": increase_basis_points,
+            }
+        ],
+        "potentialSavings": {
+            "status": "unresolved",
+            "reasonCode": "retry-billing-unproven",
+            "period": scope["currentWindow"],
+        },
+        "recommendation": _retry_recommendation(),
+        "evidenceRefs": evidence,
+    }
+    digest = _spec_digest(spec)
+    finding_id = "aif_" + digest[:32]
+    document: Mapping[str, object] = {
+        "apiVersion": "iip.platform/v1alpha1",
+        "kind": "AiSavingsFinding",
+        "metadata": {
+            "id": finding_id,
+            "tenantId": profile.tenant_id,
+            "evaluatedAt": evaluated_at,
+        },
+        "spec": spec,
+    }
+    event = PlatformEvent(
+        event_id="ai-savings-" + digest,
+        event_type="io.iip.ai.savings-finding-recorded.v1",
+        source=(
+            f"urn:iip:ai-savings:{RETRY_AMPLIFICATION_RULE_ID}:{RULE_VERSION}"
+        ),
+        time=evaluated_at,
+        subject=finding_id,
+        tenant_id=profile.tenant_id,
+        data={
+            "findingId": finding_id,
+            "ruleId": RETRY_AMPLIFICATION_RULE_ID,
+            "ruleVersion": RULE_VERSION,
+            "category": RETRY_AMPLIFICATION_RULE_ID,
+            "severity": severity,
+            "provider": profile.provider,
+            "modelId": profile.model_id,
+            "serviceName": profile.service_name,
+        },
+    )
+    validate_ai_savings_finding(document)
+    return document, event
+
+
 def _profile_from_finding(
     finding: Mapping[str, object],
     *,
@@ -1118,8 +1891,41 @@ def _profile_from_finding(
     )
 
 
+def _retry_profile_from_finding(
+    finding: Mapping[str, object],
+) -> RetryAmplificationProfile:
+    metadata = finding["metadata"]
+    spec = finding["spec"]
+    assert isinstance(metadata, Mapping) and isinstance(spec, Mapping)
+    scope = spec["scope"]
+    assert isinstance(scope, Mapping)
+    baseline = scope["baselineWindow"]
+    current = scope["currentWindow"]
+    assert isinstance(baseline, Mapping) and isinstance(current, Mapping)
+    return RetryAmplificationProfile(
+        "finding-source-validation",
+        str(metadata["tenantId"]),
+        "apc_" + "0" * 32,
+        COST_ENGINE_VERSION,
+        str(scope["provider"]),
+        str(scope["modelId"]),
+        str(scope["region"]),
+        str(scope["serviceName"]),
+        str(scope["deploymentEnvironment"]),
+        str(baseline["start"]),
+        str(baseline["end"]),
+        str(current["start"]),
+        str(current["end"]),
+        1,
+        1,
+        1,
+        MAX_COHORT_RECORDS,
+        0,
+    )
+
+
 def _cohort_query(
-    profile: ContextGrowthProfile,
+    profile: ContextGrowthProfile | RetryAmplificationProfile,
     *,
     baseline: bool,
 ) -> AiSavingsCohortQuery:
@@ -1141,6 +1947,14 @@ def _severity(change_basis_points: int) -> str:
     if change_basis_points >= 25_000:
         return "high"
     if change_basis_points >= 10_000:
+        return "medium"
+    return "low"
+
+
+def _retry_severity(increase_basis_points: int) -> str:
+    if increase_basis_points >= 5000:
+        return "high"
+    if increase_basis_points >= 2500:
         return "medium"
     return "low"
 
@@ -1168,12 +1982,38 @@ def _finding_summary(severity: str, confidence: int) -> Mapping[str, object]:
     }
 
 
+def _retry_finding_summary(
+    severity: str,
+    confidence: int,
+) -> Mapping[str, object]:
+    return {
+        "category": RETRY_AMPLIFICATION_RULE_ID,
+        "severity": severity,
+        "summary": (
+            "The share of successful operations reporting one or more retries "
+            "increased against the preceding comparison window."
+        ),
+        "confidenceBasisPoints": confidence,
+    }
+
+
 def _recommendation() -> Mapping[str, object]:
     return {
         "actionCode": "review-context-retention",
         "summary": (
             "Review retained conversation context and retrieval payload size; "
             "validate quality before reducing either."
+        ),
+        "requiresValidation": True,
+    }
+
+
+def _retry_recommendation() -> Mapping[str, object]:
+    return {
+        "actionCode": "review-retry-policy",
+        "summary": (
+            "Review provider throttling, timeout, and retry-policy evidence; "
+            "validate reliability before changing retry behavior."
         ),
         "requiresValidation": True,
     }
@@ -1215,8 +2055,17 @@ def _window(value: object) -> tuple[datetime, datetime]:
     return start, end
 
 
-def _closed(value: object, required: set[str]) -> dict[str, object]:
-    if not isinstance(value, dict) or set(value) != required:
+def _closed(
+    value: object,
+    required: set[str],
+    optional: set[str] | None = None,
+) -> dict[str, object]:
+    allowed = required | (optional or set())
+    if (
+        not isinstance(value, dict)
+        or not required.issubset(value)
+        or not set(value).issubset(allowed)
+    ):
         raise ValueError
     return value
 
@@ -1300,12 +2149,19 @@ __all__ = [
     "AiSavingsConfigurationError",
     "AiSavingsEvaluationPass",
     "AiSavingsEvaluationService",
+    "CONTEXT_GROWTH_RULE_ID",
     "ContextGrowthProfile",
     "InvalidAiSavingsInputError",
     "MAX_COHORT_RECORDS",
     "RULE_ID",
     "RULE_VERSION",
+    "RETRY_AMPLIFICATION_RULE_ID",
+    "RetryAmplificationProfile",
     "validate_ai_savings_finding",
+    "validate_ai_savings_profile",
+    "validate_ai_savings_source_binding",
     "validate_context_growth_profile",
     "validate_context_growth_source_binding",
+    "validate_retry_amplification_profile",
+    "validate_retry_amplification_source_binding",
 ]

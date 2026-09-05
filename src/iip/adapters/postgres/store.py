@@ -32,7 +32,7 @@ from iip.adapters.ai_savings_store import (
 from iip.adapters.ai_usage_store import prepare_ai_usage_writes
 from iip.application.evaluate_ai_savings import (
     InvalidAiSavingsInputError,
-    validate_context_growth_source_binding,
+    validate_ai_savings_source_binding,
 )
 from iip.application.attribute_ai_usage import (
     InvalidAiAttributionInputError,
@@ -89,6 +89,7 @@ SCHEMA_MIGRATIONS = (
     "0019_ai_cost_ledger.sql",
     "0020_ai_savings_ledger.sql",
     "0021_ai_attribution_ledger.sql",
+    "0022_ai_retry_savings_rule.sql",
 )
 
 
@@ -1251,7 +1252,7 @@ class PostgresResourceStore:
                 if len(cost_documents) != len(item.cost_record_ids):
                     raise PersistenceError("storage.request.invalid")
                 try:
-                    validate_context_growth_source_binding(
+                    validate_ai_savings_source_binding(
                         item.document,
                         usage_documents,
                         cost_documents,

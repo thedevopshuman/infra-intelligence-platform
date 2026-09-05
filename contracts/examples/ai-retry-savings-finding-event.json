@@ -1,0 +1,20 @@
+{
+  "specversion": "1.0",
+  "id": "ai-savings-8f29a496b948730ee31157930538ff1b4f3eb335e69f3fcd9eb7cb11a1d0f122",
+  "source": "urn:iip:ai-savings:retry-amplification:1.0.0",
+  "type": "io.iip.ai.savings-finding-recorded.v1",
+  "time": "2026-09-05T11:00:00Z",
+  "subject": "aif_8f29a496b948730ee31157930538ff1b",
+  "datacontenttype": "application/json",
+  "tenantid": "local",
+  "data": {
+    "findingId": "aif_8f29a496b948730ee31157930538ff1b",
+    "ruleId": "retry-amplification",
+    "ruleVersion": "1.0.0",
+    "category": "retry-amplification",
+    "severity": "high",
+    "provider": "aws.bedrock",
+    "modelId": "example.foundation-model-v1:0",
+    "serviceName": "support-assistant"
+  }
+}

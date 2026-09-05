@@ -75,6 +75,8 @@ def trace_payload(
     scope_name: str = "opentelemetry.instrumentation.botocore",
     model: str = "example.foundation-model-v1:0",
     started_at: datetime | None = None,
+    provider_attribute: str | None = "gen_ai.provider.name",
+    legacy_provider: str | None = None,
 ) -> bytes:
     request = ExportTraceServiceRequest()
     resource_spans = request.resource_spans.add()
@@ -99,7 +101,6 @@ def trace_payload(
     span.end_time_unix_nano = span.start_time_unix_nano + 1_250_000_000
     span.status.code = Status.STATUS_CODE_OK
     string_attributes = (
-        ("gen_ai.provider.name", "aws.bedrock"),
         ("gen_ai.operation.name", "chat"),
         ("gen_ai.request.model", model),
         ("gen_ai.response.model", model),
@@ -107,6 +108,14 @@ def trace_payload(
     )
     for key, value in string_attributes:
         span.attributes.add(key=key).value.string_value = value
+    if provider_attribute is not None:
+        span.attributes.add(
+            key=provider_attribute
+        ).value.string_value = "aws.bedrock"
+    if legacy_provider is not None:
+        span.attributes.add(
+            key="gen_ai.system"
+        ).value.string_value = legacy_provider
     if input_tokens is not None:
         span.attributes.add(
             key="gen_ai.usage.input_tokens"
@@ -152,6 +161,39 @@ class AiUsageReceiverAdapterTests(unittest.TestCase):
         self.assertEqual(observed.dropped_attribute_count, 1)
         self.assertRegex(observed.request_id_hash or "", r"^sha256:[a-f0-9]{64}$")
         self.assertNotIn("provider-request-123", repr(observed))
+
+    def test_shipped_botocore_provider_alias_is_exact_and_conflict_safe(self) -> None:
+        batch = self.receiver.decode_traces(
+            self.channel,
+            trace_payload(
+                scope_name=(
+                    "opentelemetry.instrumentation.botocore.bedrock-runtime"
+                ),
+                provider_attribute="gen_ai.system",
+            ),
+            content_encoding="identity",
+        )
+        self.assertEqual(batch.spans[0].provider, "aws.bedrock")
+
+        same_value = self.receiver.decode_traces(
+            self.channel,
+            trace_payload(legacy_provider="aws.bedrock"),
+            content_encoding="identity",
+        )
+        self.assertEqual(same_value.spans[0].provider, "aws.bedrock")
+
+        for payload in (
+            trace_payload(provider_attribute=None),
+            trace_payload(legacy_provider="another.provider"),
+        ):
+            with self.subTest(payload=payload[:16]), self.assertRaises(
+                InvalidAiUsageRequestError
+            ):
+                self.receiver.decode_traces(
+                    self.channel,
+                    payload,
+                    content_encoding="identity",
+                )
 
     def test_content_events_and_unapproved_identity_fail_closed(self) -> None:
         for content_name in (

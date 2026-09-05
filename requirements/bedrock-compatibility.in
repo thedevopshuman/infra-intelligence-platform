@@ -1,0 +1,6 @@
+-r verify.in
+
+# Exact provider client and official OpenTelemetry instrumentation qualified by
+# the isolated Bedrock compatibility gate. Keep this outside the product image.
+boto3==1.43.73
+opentelemetry-instrumentation-botocore==0.65b0

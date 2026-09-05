@@ -1,0 +1,70 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "BedrockInstrumentationCompatibilityReport",
+  "metadata": {
+    "id": "bic_0123456789abcdef0123456789abcdef",
+    "generatedAt": "2026-09-05T12:00:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "compatible",
+    "qualificationLevel": "offline-sdk-interoperability",
+    "environment": {
+      "platform": "linux/arm64",
+      "containerRuntime": "docker",
+      "containerRuntimeVersion": "28.3.3",
+      "pythonVersion": "3.12.11",
+      "applicationVersion": "0.63.0",
+      "boto3Version": "1.43.73",
+      "botocoreVersion": "1.43.73",
+      "instrumentationVersion": "0.65b0",
+      "otelSdkVersion": "1.44.0"
+    },
+    "profile": {
+      "name": "otel-python-botocore-converse-v1",
+      "provider": "aws.bedrock",
+      "service": "bedrock-runtime",
+      "operation": "Converse",
+      "modelId": "example.foundation-model-v1:0",
+      "region": "us-east-1",
+      "invocationTarget": "botocore-stubber",
+      "instrumentationScope": "opentelemetry.instrumentation.botocore.bedrock-runtime",
+      "providerAttribute": "gen_ai.system",
+      "contentCapture": false,
+      "requestPath": "direct-to-provider",
+      "telemetryPath": "asynchronous-otel"
+    },
+    "result": {
+      "normalizedProvider": "aws.bedrock",
+      "operationName": "chat",
+      "usageCompleteness": "partial",
+      "missingUsageFields": [
+        "cacheReadInputTokens",
+        "cacheWriteInputTokens",
+        "reasoningOutputTokens"
+      ],
+      "contentCaptured": false,
+      "rawPayloadPersisted": false,
+      "exactCostEligible": false,
+      "liveProviderVerified": false,
+      "streamingVerified": false
+    },
+    "checks": [
+      {"id": "provider-call-completed", "status": "passed"},
+      {"id": "official-instrumentation-span", "status": "passed"},
+      {"id": "supported-instrumentation-scope", "status": "passed"},
+      {"id": "provider-alias-normalized", "status": "passed"},
+      {"id": "metadata-only-span", "status": "passed"},
+      {"id": "provider-token-totals", "status": "passed"},
+      {"id": "receiver-normalization", "status": "passed"},
+      {"id": "async-export-failure-isolated", "status": "passed"}
+    ],
+    "summary": {
+      "totalChecks": 8,
+      "passedChecks": 8,
+      "failedChecks": 0,
+      "overallStatus": "compatible"
+    }
+  }
+}

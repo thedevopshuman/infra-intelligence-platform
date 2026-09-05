@@ -145,6 +145,14 @@ is not an accounting authority. The time-relative fixture includes priced and
 unpriced scopes, idempotent replay, and a separately rejected content span.
 This proves the local contract flow, not live AWS instrumentation compatibility.
 
+The exact pinned Python botocore `Converse` profile now has a separate
+no-network interoperability gate. It exposed two upstream facts hidden by the
+synthetic flow: the shipped scope is service-specific and the provider still
+arrives as legacy `gen_ai.system`. The adapter normalizes that alias with
+conflict rejection. Missing cache/reasoning subsets remain missing, so this
+profile is not promoted to exact-cost eligibility. Live model/region and
+`ConverseStream` qualification remain separate evidence.
+
 ## Privacy and security
 
 - V0 allowlists required GenAI metadata and drops prompt, response, message,

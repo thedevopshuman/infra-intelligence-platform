@@ -35,13 +35,17 @@ content crosses the boundary; and stopping the observability path does not fail
 the model request.
 
 Implementation status: items 1, 2, 4, 5, 6, and 7 are delivered. Item 3 has an
-executable Bedrock-shaped OTLP fixture and strict metadata/content boundary;
-live `Converse`/`ConverseStream` auto-instrumentation qualification remains.
+executable Bedrock-shaped OTLP fixture, strict metadata/content boundary, and a
+no-network gate against the exact pinned official Python botocore `Converse`
+instrumentation. The gate normalizes the shipped legacy provider attribute and
+service-specific scope without guessing absent cache/reasoning usage. Live
+model/region and `ConverseStream` auto-instrumentation qualification remain.
 Item 7 includes the privacy-bounded OTLP aggregate projection, finding view,
 and a disposable Collector/Prometheus/Loki/Grafana topology. Item 8 now has a
 deterministic full-flow gate covering deduplication, visible unpriced usage,
-content rejection, exact cost, and one saving. The real-provider compatibility
-gate and inference/telemetry failure-isolation qualification remain.
+content rejection, exact cost, and one saving. A source-bound offline report
+now also proves official SDK interoperability and asynchronous exporter-failure
+isolation. The explicitly enabled real-provider call remains.
 
 ## Phase B — application and team attribution
 

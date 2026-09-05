@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:bedrock-instrumentation-compatibility-report:v1alpha1",
+  "title": "Bedrock Instrumentation Compatibility Report",
+  "description": "Source-bound evidence for one exact OpenTelemetry Python botocore Bedrock Converse profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "BedrockInstrumentationCompatibilityReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^bic_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationLevel", "environment", "profile", "result", "checks", "summary"],
+      "properties": {
+        "status": {"enum": ["compatible", "incompatible"]},
+        "qualificationLevel": {"enum": ["offline-sdk-interoperability", "live-provider-interoperability"]},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["platform", "containerRuntime", "containerRuntimeVersion", "pythonVersion", "applicationVersion", "boto3Version", "botocoreVersion", "instrumentationVersion", "otelSdkVersion"],
+          "properties": {
+            "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+            "containerRuntime": {"const": "docker"},
+            "containerRuntimeVersion": {"type": "string", "minLength": 1, "maxLength": 64},
+            "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+            "applicationVersion": {"$ref": "#/$defs/semver"},
+            "boto3Version": {"const": "1.43.73"},
+            "botocoreVersion": {"const": "1.43.73"},
+            "instrumentationVersion": {"const": "0.65b0"},
+            "otelSdkVersion": {"const": "1.44.0"}
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "provider", "service", "operation", "modelId", "region", "invocationTarget", "instrumentationScope", "providerAttribute", "contentCapture", "requestPath", "telemetryPath"],
+          "properties": {
+            "name": {"const": "otel-python-botocore-converse-v1"},
+            "provider": {"const": "aws.bedrock"},
+            "service": {"const": "bedrock-runtime"},
+            "operation": {"const": "Converse"},
+            "modelId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{1,255}$"},
+            "region": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"},
+            "invocationTarget": {"enum": ["botocore-stubber", "aws-bedrock"]},
+            "instrumentationScope": {"const": "opentelemetry.instrumentation.botocore.bedrock-runtime"},
+            "providerAttribute": {"const": "gen_ai.system"},
+            "contentCapture": {"const": false},
+            "requestPath": {"const": "direct-to-provider"},
+            "telemetryPath": {"const": "asynchronous-otel"}
+          }
+        },
+        "result": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["normalizedProvider", "operationName", "usageCompleteness", "missingUsageFields", "contentCaptured", "rawPayloadPersisted", "exactCostEligible", "liveProviderVerified", "streamingVerified"],
+          "properties": {
+            "normalizedProvider": {"const": "aws.bedrock"},
+            "operationName": {"const": "chat"},
+            "usageCompleteness": {"const": "partial"},
+            "missingUsageFields": {
+              "type": "array",
+              "prefixItems": [
+                {"const": "cacheReadInputTokens"},
+                {"const": "cacheWriteInputTokens"},
+                {"const": "reasoningOutputTokens"}
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "contentCaptured": {"const": false},
+            "rawPayloadPersisted": {"const": false},
+            "exactCostEligible": {"const": false},
+            "liveProviderVerified": {"type": "boolean"},
+            "streamingVerified": {"const": false}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "prefixItems": [
+            {"$ref": "#/$defs/providerCallCompletedCheck"},
+            {"$ref": "#/$defs/officialInstrumentationSpanCheck"},
+            {"$ref": "#/$defs/supportedInstrumentationScopeCheck"},
+            {"$ref": "#/$defs/providerAliasNormalizedCheck"},
+            {"$ref": "#/$defs/metadataOnlySpanCheck"},
+            {"$ref": "#/$defs/providerTokenTotalsCheck"},
+            {"$ref": "#/$defs/receiverNormalizationCheck"},
+            {"$ref": "#/$defs/asyncExportFailureIsolatedCheck"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 8},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 8},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 8},
+            "overallStatus": {"enum": ["compatible", "incompatible"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "providerCallCompletedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "provider-call-completed"}}}]},
+    "officialInstrumentationSpanCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "official-instrumentation-span"}}}]},
+    "supportedInstrumentationScopeCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "supported-instrumentation-scope"}}}]},
+    "providerAliasNormalizedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "provider-alias-normalized"}}}]},
+    "metadataOnlySpanCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "metadata-only-span"}}}]},
+    "providerTokenTotalsCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "provider-token-totals"}}}]},
+    "receiverNormalizationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "receiver-normalization"}}}]},
+    "asyncExportFailureIsolatedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "async-export-failure-isolated"}}}]}
+  }
+}

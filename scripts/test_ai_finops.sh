@@ -6,7 +6,18 @@ IIP_TEST_PYTHON=${IIP_TEST_PYTHON:-python3}
 IIP_COMPOSE_FILE=deploy/docker-compose.ai-finops.yml
 IIP_COMPOSE_PROJECT=iip-ai-finops-test
 IIP_AI_FINOPS_ANCHOR=$(date -u '+%Y-%m-%dT%H:%M:00Z')
-export IIP_AI_FINOPS_ANCHOR
+IIP_AI_FINOPS_POSTGRES_PORT=${IIP_AI_FINOPS_TEST_POSTGRES_PORT:-25435}
+IIP_AI_FINOPS_API_PORT=${IIP_AI_FINOPS_TEST_API_PORT:-28082}
+IIP_AI_FINOPS_RECEIVER_PORT=${IIP_AI_FINOPS_TEST_RECEIVER_PORT:-24320}
+IIP_AI_FINOPS_COLLECTOR_PORT=${IIP_AI_FINOPS_TEST_COLLECTOR_PORT:-24319}
+IIP_AI_FINOPS_COLLECTOR_HEALTH_PORT=${IIP_AI_FINOPS_TEST_COLLECTOR_HEALTH_PORT:-23134}
+IIP_AI_FINOPS_PROMETHEUS_PORT=${IIP_AI_FINOPS_TEST_PROMETHEUS_PORT:-29091}
+IIP_AI_FINOPS_LOKI_PORT=${IIP_AI_FINOPS_TEST_LOKI_PORT:-23101}
+IIP_AI_FINOPS_GRAFANA_PORT=${IIP_AI_FINOPS_TEST_GRAFANA_PORT:-23000}
+export IIP_AI_FINOPS_ANCHOR IIP_AI_FINOPS_POSTGRES_PORT IIP_AI_FINOPS_API_PORT
+export IIP_AI_FINOPS_RECEIVER_PORT IIP_AI_FINOPS_COLLECTOR_PORT
+export IIP_AI_FINOPS_COLLECTOR_HEALTH_PORT IIP_AI_FINOPS_PROMETHEUS_PORT
+export IIP_AI_FINOPS_LOKI_PORT IIP_AI_FINOPS_GRAFANA_PORT
 
 export IIP_AI_USAGE_CHANNEL_TOKEN
 IIP_AI_USAGE_CHANNEL_TOKEN=$(
@@ -61,7 +72,7 @@ IIP_AI_FINOPS_READY=false
 IIP_AI_FINOPS_READY_ATTEMPT=0
 while [ "$IIP_AI_FINOPS_READY_ATTEMPT" -lt 30 ]; do
     if "$IIP_TEST_PYTHON" -c \
-        "import urllib.request; urllib.request.urlopen('http://127.0.0.1:13134/', timeout=2)" \
+        "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['IIP_AI_FINOPS_COLLECTOR_HEALTH_PORT'] + '/', timeout=2)" \
         >/dev/null 2>&1; then
         IIP_AI_FINOPS_READY=true
         break
@@ -79,15 +90,15 @@ fi
 PYTHONPATH=src:sdks/python/src "$IIP_TEST_PYTHON" \
     scripts/ai_finops_fixture.py send \
     --anchor "$IIP_AI_FINOPS_ANCHOR" \
-    --collector http://127.0.0.1:14319 \
-    --receiver http://127.0.0.1:14320
+    --collector "http://127.0.0.1:${IIP_AI_FINOPS_COLLECTOR_PORT}" \
+    --receiver "http://127.0.0.1:${IIP_AI_FINOPS_RECEIVER_PORT}"
 
 if ! PYTHONPATH=src:sdks/python/src "$IIP_TEST_PYTHON" \
     scripts/ai_finops_fixture.py verify \
-    --database postgresql://iip@127.0.0.1:15435/iip \
-    --prometheus http://127.0.0.1:19091 \
-    --grafana http://127.0.0.1:13000 \
-    --loki http://127.0.0.1:13101 \
+    --database "postgresql://iip@127.0.0.1:${IIP_AI_FINOPS_POSTGRES_PORT}/iip" \
+    --prometheus "http://127.0.0.1:${IIP_AI_FINOPS_PROMETHEUS_PORT}" \
+    --grafana "http://127.0.0.1:${IIP_AI_FINOPS_GRAFANA_PORT}" \
+    --loki "http://127.0.0.1:${IIP_AI_FINOPS_LOKI_PORT}" \
     --timeout-seconds 60; then
     "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
         -f "$IIP_COMPOSE_FILE" logs --no-color >&2

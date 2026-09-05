@@ -67,6 +67,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0089-fail-closed-otlp-client-crl-freshness.md",
     "docs/decisions/0090-intermediate-ca-and-otlp-crl-rollout-evidence.md",
     "docs/decisions/0091-opentelemetry-native-ai-economics.md",
+    "docs/decisions/0092-bedrock-instrumentation-compatibility-profile.md",
     "docs/specifications/collector-queue-loss-contract.md",
     "docs/decisions/0026-resource-history-change-evidence.md",
     "docs/decisions/0029-investigation-context-correlation.md",
@@ -116,6 +117,7 @@ REQUIRED_PATHS = (
     "docs/specifications/oidc-issuer-compatibility-contract.md",
     "docs/specifications/policy-engine-compatibility-contract.md",
     "docs/specifications/otlp-receiver-compatibility-contract.md",
+    "docs/specifications/bedrock-instrumentation-compatibility-contract.md",
     "docs/decisions/0059-backend-neutral-query-availability-telemetry.md",
     "docs/specifications/query-availability-telemetry-contract.md",
     "docs/specifications/otlp-receiver-availability-telemetry-contract.md",
@@ -151,6 +153,7 @@ REQUIRED_PATHS = (
     "docs/operations/ai-usage-receiver.md",
     "docs/operations/ai-cost-engine.md",
     "docs/operations/ai-savings-engine.md",
+    "docs/operations/bedrock-instrumentation-qualification.md",
     "docs/specifications/ai-economics-telemetry-contract.md",
     "docs/operations/log-evidence.md",
     "docs/operations/resource-change-evidence.md",
@@ -165,6 +168,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/oidc-issuer-compatibility-report.schema.json",
     "contracts/schemas/policy-engine-compatibility-report.schema.json",
     "contracts/schemas/otlp-receiver-compatibility-report.schema.json",
+    "contracts/schemas/bedrock-instrumentation-compatibility-report.schema.json",
     "contracts/schemas/integration-config.schema.json",
     "contracts/schemas/action-proposal.schema.json",
     "contracts/schemas/action-approval.schema.json",
@@ -1177,6 +1181,100 @@ def validate_otlp_receiver_compatibility_example(
         / "otlp-receiver-compatibility-report.json"
     )
     validate_otlp_receiver_compatibility_document(documents.get(path), errors)
+
+
+BEDROCK_INSTRUMENTATION_COMPATIBILITY_CHECKS = (
+    "provider-call-completed",
+    "official-instrumentation-span",
+    "supported-instrumentation-scope",
+    "provider-alias-normalized",
+    "metadata-only-span",
+    "provider-token-totals",
+    "receiver-normalization",
+    "async-export-failure-isolated",
+)
+
+
+def validate_bedrock_instrumentation_compatibility_document(
+    report: object, errors: List[str]
+) -> None:
+    """Check qualification scope, closed checks, and derived summary."""
+
+    if not isinstance(report, dict):
+        fail(errors, "Bedrock instrumentation compatibility report must be an object")
+        return
+    spec = report.get("spec")
+    checks = spec.get("checks") if isinstance(spec, dict) else None
+    summary = spec.get("summary") if isinstance(spec, dict) else None
+    profile = spec.get("profile") if isinstance(spec, dict) else None
+    result = spec.get("result") if isinstance(spec, dict) else None
+    if not all(
+        isinstance(item, expected)
+        for item, expected in (
+            (checks, list),
+            (summary, dict),
+            (profile, dict),
+            (result, dict),
+        )
+    ):
+        fail(
+            errors,
+            "Bedrock instrumentation report must contain checks, summary, profile, and result",
+        )
+        return
+    assert isinstance(spec, dict)
+    assert isinstance(checks, list)
+    assert isinstance(summary, dict)
+    assert isinstance(profile, dict)
+    assert isinstance(result, dict)
+    check_ids = tuple(
+        check.get("id") if isinstance(check, dict) else None for check in checks
+    )
+    if check_ids != BEDROCK_INSTRUMENTATION_COMPATIBILITY_CHECKS:
+        fail(errors, "Bedrock instrumentation checks must match the closed profile")
+    passed = sum(
+        1
+        for check in checks
+        if isinstance(check, dict)
+        and check.get("status") == "passed"
+        and "errorCode" not in check
+    )
+    failed = len(checks) - passed
+    status = "compatible" if failed == 0 else "incompatible"
+    if spec.get("status") != status:
+        fail(errors, "Bedrock instrumentation status must match its checks")
+    if summary != {
+        "totalChecks": len(checks),
+        "passedChecks": passed,
+        "failedChecks": failed,
+        "overallStatus": status,
+    }:
+        fail(errors, "Bedrock instrumentation summary must match its checks")
+    live = spec.get("qualificationLevel") == "live-provider-interoperability"
+    if (
+        (profile.get("invocationTarget") == "aws-bedrock") != live
+        or (result.get("liveProviderVerified") is True) != live
+    ):
+        fail(errors, "Bedrock instrumentation qualification level must match its result")
+    if (
+        result.get("usageCompleteness") == "partial"
+        and result.get("exactCostEligible") is not False
+    ):
+        fail(errors, "partial Bedrock usage cannot claim exact-cost eligibility")
+
+
+def validate_bedrock_instrumentation_compatibility_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "bedrock-instrumentation-compatibility-report.json"
+    )
+    validate_bedrock_instrumentation_compatibility_document(
+        documents.get(path), errors
+    )
 
 
 def validate_plugin_action_mediation_examples(
@@ -3691,6 +3789,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "otlp-receiver-compatibility-report.json",
             "OtlpReceiverCompatibilityReport",
         ),
+        (
+            "bedrock-instrumentation-compatibility-report.json",
+            "BedrockInstrumentationCompatibilityReport",
+        ),
         ("plugin-invocation.json", "PluginInvocation"),
         ("plugin-invocation-result.json", "PluginInvocationResult"),
         ("plugin-invocation-result-failed.json", "PluginInvocationResult"),
@@ -3806,6 +3908,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_oidc_issuer_compatibility_example(documents, errors)
     validate_policy_engine_compatibility_example(documents, errors)
     validate_otlp_receiver_compatibility_example(documents, errors)
+    validate_bedrock_instrumentation_compatibility_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
     validate_ai_economics_examples(documents, errors)
 

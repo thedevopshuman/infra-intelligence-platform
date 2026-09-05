@@ -63,7 +63,7 @@ span:
 
 | Fact | Attribute |
 | --- | --- |
-| Provider | `gen_ai.provider.name` |
+| Provider | `gen_ai.provider.name`, or shipped botocore alias `gen_ai.system`; equal dual publication is accepted and conflicts are rejected |
 | Operation | `gen_ai.operation.name` |
 | Requested model | `gen_ai.request.model` |
 | Response model | `gen_ai.response.model` (optional) |
@@ -75,12 +75,22 @@ span:
 | Provider request | `aws.request_id` (optional and hashed) |
 | Retries | `aws.retry_count` (optional non-negative integer) |
 
+Official Python botocore `0.65b0` uses the service-specific instrumentation
+scope `opentelemetry.instrumentation.botocore.bedrock-runtime`; protected
+channel configuration must allowlist that exact scope. The generic scope in
+older fixtures remains supported only when explicitly enrolled.
+
 Only `CLIENT` spans are eligible. At least one of input/output tokens must be
 present. A complete record has both totals and all configured breakdowns; the
 example explicitly zero-fills absent cache/reasoning breakdowns because that
 instrumentation profile defines absence as zero. A profile that cannot make
 that guarantee must remove those fields from `zeroWhenAbsent`, producing
 partial usage and preventing an unsupported exact cost.
+
+The pinned official botocore profile does not currently report cache-read,
+cache-write, or reasoning subsets. Its qualification configuration therefore
+uses an empty `zeroWhenAbsent` list and produces partial, non-exact-cost-eligible
+usage. See the [Bedrock instrumentation qualification](bedrock-instrumentation-qualification.md).
 
 ## Run the isolated process
 
@@ -158,6 +168,7 @@ Helm rendering. With Docker Desktop running:
 
 ```bash
 make test-otlp-receiver PYTHON=.venv/bin/python
+make test-bedrock-instrumentation
 ```
 
 The Docker profile also starts the tenant-explicit workflow worker with the

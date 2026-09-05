@@ -39,12 +39,16 @@ evidence-backed saving plus a value-minimized event. The same bounded profile
 now exports request/token volume, pricing coverage, calculated cost, change,
 and potential saving through the existing OTLP metrics boundary. A disposable
 Collector/Prometheus/Loki/Grafana topology and deterministic Bedrock-shaped
-full-flow gate now render the five-question reference dashboard. Live Bedrock
-auto-instrumentation qualification remains. See the
+full-flow gate now render the five-question reference dashboard. A separate
+no-network gate exercises the exact pinned official botocore `Converse`
+instrumentation, its shipped legacy provider attribute and service-specific
+scope, receiver normalization, and asynchronous exporter failure isolation.
+Live model/region and streaming qualification remain. See the
 [receiver runbook](docs/operations/ai-usage-receiver.md),
 [cost-engine runbook](docs/operations/ai-cost-engine.md),
 [savings-engine runbook](docs/operations/ai-savings-engine.md),
 [local AI FinOps dashboard](docs/operations/ai-finops-local-demo.md),
+[Bedrock instrumentation qualification](docs/operations/bedrock-instrumentation-qualification.md),
 [telemetry contract](docs/specifications/ai-economics-telemetry-contract.md),
 [product direction](docs/product/ai-finops-vision.md),
 [architecture](docs/architecture/ai-economics.md), [contracts](docs/specifications/ai-economics-contracts.md),
@@ -79,6 +83,7 @@ make test-backup-restore
 make test-otel
 make test-otlp-receiver
 make test-ai-finops
+make test-bedrock-instrumentation
 make test-prometheus
 make test-loki
 make test-plugin-compatibility

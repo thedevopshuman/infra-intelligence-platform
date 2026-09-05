@@ -12,8 +12,9 @@ foundation with an OpenTelemetry-native AWS Bedrock vertical slice. Its
 contract, architecture, metadata-only trace intake, usage ledger, and
 versioned pricing runtime are delivered. The first evidence-backed
 context-growth rule and its privacy-bounded OTLP aggregate metric projection
-are also executable. Live Bedrock qualification and the reference dashboard
-topology remain.
+are also executable. The reference dashboard topology and pinned official
+botocore offline interoperability gate are executable; live Bedrock
+model/region and streaming qualification remain.
 
 ## Phase 0 — foundation (current repository)
 

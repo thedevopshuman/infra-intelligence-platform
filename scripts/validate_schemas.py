@@ -147,6 +147,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "otlp-receiver-compatibility-report.schema.json": (
         "otlp-receiver-compatibility-report.json",
     ),
+    "bedrock-instrumentation-compatibility-report.schema.json": (
+        "bedrock-instrumentation-compatibility-report.json",
+    ),
     "oidc-issuer-compatibility-report.schema.json": (
         "oidc-issuer-compatibility-report.json",
     ),

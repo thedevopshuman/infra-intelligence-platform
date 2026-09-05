@@ -285,7 +285,7 @@ class ConfiguredAiUsageReceiver:
         for attributes in all_layers:
             cls._reject_prohibited_names(attributes)
 
-        provider = cls._required_string(span_attributes, "gen_ai.provider.name")
+        provider = cls._provider(span_attributes)
         operation = cls._required_string(span_attributes, "gen_ai.operation.name")
         request_model = cls._required_string(span_attributes, "gen_ai.request.model")
         response_model = cls._optional_string(span_attributes, "gen_ai.response.model")
@@ -345,6 +345,7 @@ class ConfiguredAiUsageReceiver:
             "deployment.environment",
             "cloud.region",
             "gen_ai.provider.name",
+            "gen_ai.system",
             "gen_ai.operation.name",
             "gen_ai.request.model",
             "gen_ai.response.model",
@@ -356,6 +357,7 @@ class ConfiguredAiUsageReceiver:
         dropped_count = sum(
             1 for attributes in all_layers for key in attributes if key not in consumed
         )
+
         return AiUsageSpan(
             provider=provider,
             operation_name=operation,
@@ -390,6 +392,29 @@ class ConfiguredAiUsageReceiver:
             semantic_convention_version=channel.semantic_convention_version,
             dropped_attribute_count=dropped_count,
         )
+
+    @classmethod
+    def _provider(cls, attributes: Mapping[str, AnyValue]) -> str:
+        """Normalize the stable provider key and its shipped legacy alias.
+
+        Current OpenTelemetry Python botocore releases still emit
+        ``gen_ai.system`` while the newer GenAI conventions use
+        ``gen_ai.provider.name``. Accept either exact string, but never let a
+        conflicting pair choose the tenant channel's provider implicitly.
+        """
+
+        provider = cls._optional_string(attributes, "gen_ai.provider.name")
+        legacy_system = cls._optional_string(attributes, "gen_ai.system")
+        if provider is None and legacy_system is None:
+            raise InvalidAiUsageRequestError("otlp.attribute.required")
+        if (
+            provider is not None
+            and legacy_system is not None
+            and provider != legacy_system
+        ):
+            raise InvalidAiUsageRequestError("otlp.span.not-allowlisted")
+        assert provider is not None or legacy_system is not None
+        return provider if provider is not None else legacy_system
 
     @classmethod
     def _parse_channel(cls, entry: object) -> tuple[_ChannelProfile, str]:

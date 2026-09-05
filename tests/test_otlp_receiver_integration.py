@@ -200,7 +200,7 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
         )
         provider.add_span_processor(SimpleSpanProcessor(exporter))
         tracer = provider.get_tracer(
-            "opentelemetry.instrumentation.botocore",
+            "opentelemetry.instrumentation.botocore.bedrock-runtime",
             "0.0.0-example",
         )
         try:
@@ -208,7 +208,7 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
                 "chat example.foundation-model-v1:0",
                 kind=SpanKind.CLIENT,
                 attributes={
-                    "gen_ai.provider.name": "aws.bedrock",
+                    "gen_ai.system": "aws.bedrock",
                     "gen_ai.operation.name": "chat",
                     "gen_ai.request.model": "example.foundation-model-v1:0",
                     "gen_ai.response.model": "example.foundation-model-v1:0",

@@ -170,6 +170,24 @@ class AiFinOpsTopologyTests(unittest.TestCase):
         self.assertTrue(run.call_args.kwargs["check"])
         self.assertEqual(output, "container-id\n")
 
+    def test_disposable_gate_does_not_take_over_visible_stack_ports(self) -> None:
+        runner = (ROOT / "scripts" / "test_ai_finops.sh").read_text(
+            encoding="utf-8"
+        )
+
+        for port in (
+            "25435",
+            "28082",
+            "24320",
+            "24319",
+            "23134",
+            "29091",
+            "23101",
+            "23000",
+        ):
+            self.assertIn(port, runner)
+        self.assertIn("IIP_AI_FINOPS_TEST_COLLECTOR_PORT", runner)
+
 
 if __name__ == "__main__":
     unittest.main()

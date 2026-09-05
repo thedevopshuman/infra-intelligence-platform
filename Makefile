@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-ai-finops test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -20,6 +20,8 @@ help:
 	@echo "test-otel     Send reference metrics and traces to an OpenTelemetry Collector"
 	@echo "test-otlp-receiver Send official OTLP metrics, logs, and AI usage-to-cost traces"
 	@echo "test-ai-finops Prove the local Bedrock-to-Grafana AI economics slice"
+	@echo "test-bedrock-instrumentation Qualify pinned official Bedrock instrumentation offline"
+	@echo "test-bedrock-live Make one explicitly enabled live Bedrock compatibility call"
 	@echo "test-prometheus Query a real Prometheus server through the evidence adapter"
 	@echo "test-collector-queue-loss Drive a real Collector's own self-metrics into a queue/loss report"
 	@echo "test-loki     Query a real Loki server through the log evidence adapter"
@@ -91,6 +93,14 @@ test-otlp-receiver:
 
 test-ai-finops:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_ai_finops.sh
+
+test-bedrock-instrumentation:
+	IIP_DOCKER_BIN=$(DOCKER) IIP_BEDROCK_COMPATIBILITY_MODE=offline \
+		scripts/test_bedrock_instrumentation.sh
+
+test-bedrock-live:
+	IIP_DOCKER_BIN=$(DOCKER) IIP_BEDROCK_COMPATIBILITY_MODE=live \
+		scripts/test_bedrock_instrumentation.sh
 
 test-prometheus:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_prometheus.sh

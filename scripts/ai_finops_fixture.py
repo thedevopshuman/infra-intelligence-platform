@@ -21,6 +21,9 @@ CHANNEL_TOKEN_SHA256 = (
 KNOWN_MODEL = "example.foundation-model-v1:0"
 UNKNOWN_MODEL = "unpriced.foundation-model-v1:0"
 CATALOG_ID = "apc_11111111111111111111111111111111"
+INSTRUMENTATION_SCOPE = (
+    "opentelemetry.instrumentation.botocore.bedrock-runtime"
+)
 
 
 def _parse_anchor(value: str) -> datetime:
@@ -76,9 +79,7 @@ def channel_configuration() -> Mapping[str, object]:
                 "models": [KNOWN_MODEL, UNKNOWN_MODEL],
                 "operations": ["chat"],
                 "regions": ["us-east-1"],
-                "instrumentationScopes": [
-                    "opentelemetry.instrumentation.botocore"
-                ],
+                "instrumentationScopes": [INSTRUMENTATION_SCOPE],
                 "usageAttributes": {
                     "inputTokens": "gen_ai.usage.input_tokens",
                     "outputTokens": "gen_ai.usage.output_tokens",
@@ -225,14 +226,14 @@ def _finished_spans(
     )
     provider.add_span_processor(SimpleSpanProcessor(memory))
     tracer = provider.get_tracer(
-        "opentelemetry.instrumentation.botocore",
+        INSTRUMENTATION_SCOPE,
         "0.0.0-ai-finops-fixture",
     )
     for index, (started_at, tokens) in enumerate(
         zip(_span_times(anchor), input_tokens)
     ):
         attributes: dict[str, object] = {
-            "gen_ai.provider.name": "aws.bedrock",
+            "gen_ai.system": "aws.bedrock",
             "gen_ai.operation.name": "chat",
             "gen_ai.request.model": model_id,
             "gen_ai.response.model": model_id,

@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -37,6 +37,7 @@ help:
 	@echo "test-helm-install Build and install the chart on the explicit local kind cluster"
 	@echo "test-release-install Install a verified packaged release on the explicit local kind cluster"
 	@echo "test-release-upgrade Prove sustained availability across a packaged N-1 transition"
+	@echo "qualify-release Run both packaged profiles and require one complete report"
 	@echo "db-migrate    Apply PostgreSQL migrations using IIP_DATABASE_URL"
 	@echo "helm-lint     Lint and render the Helm chart"
 	@echo "verify        Run all local quality gates"
@@ -51,6 +52,7 @@ help:
 	@echo "package-chart Package the Helm chart under dist/"
 	@echo "release-bundle Build an unsigned multi-platform release bundle with SBOM/provenance"
 	@echo "verify-release-bundle Verify IIP_RELEASE_BUNDLE checksums and OCI attestations"
+	@echo "verify-release-qualification Verify the complete environment-scoped release report"
 
 install-verify-deps:
 	$(PYTHON) -m pip install --requirement requirements/verify.txt
@@ -150,7 +152,9 @@ test-helm-install:
 test-release-install:
 	@test -n "$(IIP_RELEASE_BUNDLE)" || \
 		(echo "IIP_RELEASE_BUNDLE is required" >&2; exit 2)
-	IIP_RELEASE_BUNDLE="$(IIP_RELEASE_BUNDLE)" IIP_DOCKER_BIN=$(DOCKER) \
+	IIP_RELEASE_BUNDLE="$(IIP_RELEASE_BUNDLE)" \
+		IIP_RELEASE_QUALIFICATION_REPORT="$(IIP_RELEASE_QUALIFICATION_REPORT)" \
+		IIP_DOCKER_BIN=$(DOCKER) \
 		IIP_HELM_BIN=$(HELM) IIP_TEST_PYTHON=$(PYTHON) scripts/test_helm_install.sh
 
 test-release-upgrade:
@@ -159,9 +163,12 @@ test-release-upgrade:
 	@test -n "$(IIP_UPGRADE_FROM_REVISION)" || \
 		(echo "IIP_UPGRADE_FROM_REVISION is required" >&2; exit 2)
 	IIP_RELEASE_BUNDLE="$(IIP_RELEASE_BUNDLE)" \
+		IIP_RELEASE_QUALIFICATION_REPORT="$(IIP_RELEASE_QUALIFICATION_REPORT)" \
 		IIP_UPGRADE_FROM_REVISION="$(IIP_UPGRADE_FROM_REVISION)" \
 		IIP_DOCKER_BIN=$(DOCKER) IIP_HELM_BIN=$(HELM) \
 		IIP_TEST_PYTHON=$(PYTHON) scripts/test_release_upgrade.sh
+
+qualify-release: test-release-install test-release-upgrade verify-release-qualification
 
 db-migrate:
 	PYTHONPATH=src $(PYTHON) -m iip.adapters.postgres
@@ -357,3 +364,13 @@ verify-release-bundle:
 	@test -n "$(IIP_RELEASE_BUNDLE)" || \
 		(echo "IIP_RELEASE_BUNDLE is required" >&2; exit 2)
 	$(PYTHON) scripts/release_bundle.py verify "$(IIP_RELEASE_BUNDLE)"
+
+verify-release-qualification:
+	@test -n "$(IIP_RELEASE_BUNDLE)" || \
+		(echo "IIP_RELEASE_BUNDLE is required" >&2; exit 2)
+	@IIP_QUALIFICATION_REPORT="$(IIP_RELEASE_QUALIFICATION_REPORT)"; \
+	if [ -z "$$IIP_QUALIFICATION_REPORT" ]; then \
+		IIP_QUALIFICATION_REPORT="$(IIP_RELEASE_BUNDLE).qualification.json"; \
+	fi; \
+	$(PYTHON) scripts/release_qualification.py verify \
+		"$(IIP_RELEASE_BUNDLE)" "$$IIP_QUALIFICATION_REPORT" --require-complete

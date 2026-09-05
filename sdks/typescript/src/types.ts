@@ -530,6 +530,121 @@ export interface RuntimeVersionReport {
   };
 }
 
+export type ReleaseQualificationInstallCheckId =
+  | "bundle-integrity"
+  | "source-identity"
+  | "immutable-deployment"
+  | "runtime-identity"
+  | "schema-migrations"
+  | "protected-operations"
+  | "tls-ingress"
+  | "backup-checksum"
+  | "isolated-restore"
+  | "helm-upgrade";
+
+export type ReleaseQualificationUpgradeCheckId =
+  | "bundle-integrity"
+  | "source-identity"
+  | "strict-ancestry"
+  | "base-runtime-identity"
+  | "target-runtime-identity"
+  | "tenant-data-preservation"
+  | "non-regressing-migration"
+  | "forward-schema-rollback"
+  | "idempotent-reupgrade"
+  | "zero-failure-service-availability"
+  | "in-flight-request-drain"
+  | "helm-history";
+
+export interface ReleaseQualificationRuntimeIdentity {
+  version: string;
+  chartVersion: string;
+  revision: string;
+  imageDigest: Sha256Digest;
+}
+
+export interface ReleaseQualificationReport {
+  apiVersion: "iip.dev/v1alpha1";
+  kind: "ReleaseQualificationReport";
+  metadata: {
+    id: `rqr_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "incomplete" | "qualified";
+    candidate: {
+      version: string;
+      chartVersion: string;
+      revision: string;
+      releaseManifestDigest: Sha256Digest;
+      controlPlaneImageDigest: Sha256Digest;
+      platforms: `linux/${string}`[];
+      signatureStatus: "unsigned" | "signed";
+    };
+    environment: {
+      profile: "local-kind";
+      platform: `linux/${string}`;
+      kubernetesVersion: string;
+      containerRuntime: { name: "docker"; version: string };
+    };
+    profiles: Array<
+      | {
+          name: "packaged-install";
+          observedAt: string;
+          result: "passed";
+          checks: Array<{
+            id: ReleaseQualificationInstallCheckId;
+            status: "passed";
+          }>;
+          measurement: {
+            runtime: ReleaseQualificationRuntimeIdentity;
+            requiredMigration: string;
+            appliedMigrationCount: number;
+            finalHelmRevision: 2;
+            backupChecksumVerified: true;
+            isolatedRestoreVerified: true;
+          };
+        }
+      | {
+          name: "n-minus-one-upgrade";
+          observedAt: string;
+          result: "passed";
+          checks: Array<{
+            id: ReleaseQualificationUpgradeCheckId;
+            status: "passed";
+          }>;
+          measurement: {
+            base: ReleaseQualificationRuntimeIdentity & { migration: string };
+            target: ReleaseQualificationRuntimeIdentity & { migration: string };
+            migrationRelation: "retained" | "advanced";
+            appliedMigrationCount: number;
+            finalHelmRevision: 4;
+            availability: {
+              attemptCount: number;
+              requestCount: number;
+              successCount: number;
+              failureCount: 0;
+              baseSuccessCount: number;
+              targetSuccessCount: number;
+            };
+            inFlightDrain: {
+              blockedReadObserved: true;
+              podTerminationRequested: true;
+              requestCompleted: true;
+            };
+          };
+        }
+    >;
+    summary: {
+      requiredProfiles: 2;
+      passedProfiles: 1 | 2;
+      overallStatus: "incomplete" | "qualified";
+    };
+  };
+}
+
 export interface ResourceRelationship {
   type: string;
   target: string;

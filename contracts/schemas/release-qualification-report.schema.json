@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.iip.dev/v1alpha1/release-qualification-report.schema.json",
+  "title": "Release qualification report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "const": "iip.dev/v1alpha1" },
+    "kind": { "const": "ReleaseQualificationReport" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^rqr_[0-9a-f]{32}$" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "sourceRevision": { "$ref": "#/$defs/revision" },
+        "sourceDirty": { "const": false }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "candidate", "environment", "profiles", "summary"],
+      "properties": {
+        "status": { "enum": ["incomplete", "qualified"] },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "environment": { "$ref": "#/$defs/environment" },
+        "profiles": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/installProfile" },
+              { "$ref": "#/$defs/upgradeProfile" }
+            ]
+          }
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requiredProfiles", "passedProfiles", "overallStatus"],
+          "properties": {
+            "requiredProfiles": { "const": 2 },
+            "passedProfiles": { "type": "integer", "minimum": 1, "maximum": 2 },
+            "overallStatus": { "enum": ["incomplete", "qualified"] }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "migration": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 255,
+      "pattern": "^[0-9]{4}_[A-Za-z0-9_]+\\.sql$"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "chartVersion",
+        "revision",
+        "releaseManifestDigest",
+        "controlPlaneImageDigest",
+        "platforms",
+        "signatureStatus"
+      ],
+      "properties": {
+        "version": { "$ref": "#/$defs/semver" },
+        "chartVersion": { "$ref": "#/$defs/semver" },
+        "revision": { "$ref": "#/$defs/revision" },
+        "releaseManifestDigest": { "$ref": "#/$defs/digest" },
+        "controlPlaneImageDigest": { "$ref": "#/$defs/digest" },
+        "platforms": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^linux/[a-z0-9_]+(?:/[a-z0-9.]+)?$"
+          }
+        },
+        "signatureStatus": { "enum": ["unsigned", "signed"] }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "platform", "kubernetesVersion", "containerRuntime"],
+      "properties": {
+        "profile": { "const": "local-kind" },
+        "platform": {
+          "type": "string",
+          "pattern": "^linux/[a-z0-9_]+(?:/[a-z0-9.]+)?$"
+        },
+        "kubernetesVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "containerRuntime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "version"],
+          "properties": {
+            "name": { "const": "docker" },
+            "version": { "type": "string", "minLength": 1, "maxLength": 64 }
+          }
+        }
+      }
+    },
+    "passedCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "status": { "const": "passed" }
+      }
+    },
+    "runtimeIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "chartVersion", "revision", "imageDigest"],
+      "properties": {
+        "version": { "$ref": "#/$defs/semver" },
+        "chartVersion": { "$ref": "#/$defs/semver" },
+        "revision": { "$ref": "#/$defs/revision" },
+        "imageDigest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "installProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "observedAt", "result", "checks", "measurement"],
+      "properties": {
+        "name": { "const": "packaged-install" },
+        "observedAt": { "type": "string", "format": "date-time" },
+        "result": { "const": "passed" },
+        "checks": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/passedCheck" }
+        },
+        "measurement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runtime",
+            "requiredMigration",
+            "appliedMigrationCount",
+            "finalHelmRevision",
+            "backupChecksumVerified",
+            "isolatedRestoreVerified"
+          ],
+          "properties": {
+            "runtime": { "$ref": "#/$defs/runtimeIdentity" },
+            "requiredMigration": { "$ref": "#/$defs/migration" },
+            "appliedMigrationCount": { "type": "integer", "minimum": 1 },
+            "finalHelmRevision": { "const": 2 },
+            "backupChecksumVerified": { "const": true },
+            "isolatedRestoreVerified": { "const": true }
+          }
+        }
+      }
+    },
+    "upgradeRevision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "chartVersion", "revision", "migration", "imageDigest"],
+      "properties": {
+        "version": { "$ref": "#/$defs/semver" },
+        "chartVersion": { "$ref": "#/$defs/semver" },
+        "revision": { "$ref": "#/$defs/revision" },
+        "migration": { "$ref": "#/$defs/migration" },
+        "imageDigest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "upgradeProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "observedAt", "result", "checks", "measurement"],
+      "properties": {
+        "name": { "const": "n-minus-one-upgrade" },
+        "observedAt": { "type": "string", "format": "date-time" },
+        "result": { "const": "passed" },
+        "checks": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/passedCheck" }
+        },
+        "measurement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "base",
+            "target",
+            "migrationRelation",
+            "appliedMigrationCount",
+            "finalHelmRevision",
+            "availability",
+            "inFlightDrain"
+          ],
+          "properties": {
+            "base": { "$ref": "#/$defs/upgradeRevision" },
+            "target": { "$ref": "#/$defs/upgradeRevision" },
+            "migrationRelation": { "enum": ["retained", "advanced"] },
+            "appliedMigrationCount": { "type": "integer", "minimum": 1 },
+            "finalHelmRevision": { "const": 4 },
+            "availability": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "attemptCount",
+                "requestCount",
+                "successCount",
+                "failureCount",
+                "baseSuccessCount",
+                "targetSuccessCount"
+              ],
+              "properties": {
+                "attemptCount": { "type": "integer", "minimum": 20 },
+                "requestCount": { "type": "integer", "minimum": 40 },
+                "successCount": { "type": "integer", "minimum": 20 },
+                "failureCount": { "const": 0 },
+                "baseSuccessCount": { "type": "integer", "minimum": 10 },
+                "targetSuccessCount": { "type": "integer", "minimum": 10 }
+              }
+            },
+            "inFlightDrain": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["blockedReadObserved", "podTerminationRequested", "requestCompleted"],
+              "properties": {
+                "blockedReadObserved": { "const": true },
+                "podTerminationRequested": { "const": true },
+                "requestCompleted": { "const": true }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

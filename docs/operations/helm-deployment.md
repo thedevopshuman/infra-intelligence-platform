@@ -215,7 +215,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.67.0
+  tag: 0.68.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -357,7 +357,7 @@ To test the actual packaged release chart and attested OCI archive instead of
 checkout artifacts, first build the release bundle and then run:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.67.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.68.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -366,10 +366,16 @@ and the explicit prior release revision. Equal latest migrations are allowed;
 a migration regression is not:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.67.0-0123456789ab \
-IIP_UPGRADE_FROM_REVISION=6b38741 \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.68.0-0123456789ab \
+IIP_UPGRADE_FROM_REVISION=22b2e66 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
+
+For promotion evidence, run both through `make qualify-release` with the same
+variables. It writes a minimized report adjacent to the bundle and requires
+both closed profiles before `make verify-release-qualification` succeeds. The
+report binds the exact release-manifest digest and measured local environment;
+it does not turn Kind results into a production-cluster claim.
 
 The source gate builds and loads the current image; the release gate verifies
 the bundle, loads its OCI image, and uses its packaged chart. Both register the
@@ -410,4 +416,4 @@ The first revision additionally proves the public local console-authentication d
 
 ## Production gaps
 
-This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance and 128-tenant PostgreSQL overload evidence; the chart declares guarded TLS ingress and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; the kind gate restores one; and the N-1 gate proves a data-preserving upgrade, application rollback against the forward schema, idempotent re-upgrade, zero-failure bounded reads through the internal Service, and completion of one deliberately blocked read during target-pod termination. Organizational image signing, external secret-controller integration, controller-specific end-to-end TLS and upgrade conformance, production request-duration and streaming profiles, production-scale latency/load and failure-injected availability, high availability, customer-environment sustained workload and failover tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.
+This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance, a manifest-bound install/N-1 qualification report, and 128-tenant PostgreSQL overload evidence; the chart declares guarded TLS ingress and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; the kind gate restores one; and the N-1 gate proves a data-preserving upgrade, application rollback against the forward schema, idempotent re-upgrade, zero-failure bounded reads through the internal Service, and completion of one deliberately blocked read during target-pod termination. Organizational image signing, external secret-controller integration, controller-specific end-to-end TLS and upgrade conformance, production request-duration and streaming profiles, production-scale latency/load and failure-injected availability, high availability, customer-environment sustained workload and failover tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.

@@ -11,3 +11,8 @@ The `image` and `pluginMediationBridgeImage` entries independently record each O
 `sourceDate` is the committed revision's timestamp rather than bundle wall-clock time. The chart `appVersion` must equal the application version before packaging, and source archives are produced from the same clean Git revision. These controls make a bundle traceable and make non-image artifacts reproducible from the revision; they do not promise byte-for-byte reproducibility of a network-resolved container build.
 
 The reference bundle is deliberately marked `unsigned`. Checksums, SBOM, and provenance describe integrity and construction but do not authenticate a publisher. A production release must publish and sign both OCI indexes using the organization's accepted release identity, verify each signature and its transparency evidence, and distribute the verified digests through a trusted channel. The neutral repository cannot select or claim that external identity before hosting and governance decisions are accepted.
+
+Executable install and upgrade observations are recorded in a separate
+[release qualification report](release-qualification-report-contract.md). That
+report binds back to this manifest by a recomputed digest but remains outside
+the finalized bundle because its claims describe one measured environment.

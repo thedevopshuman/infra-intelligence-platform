@@ -471,6 +471,30 @@ class RuntimeVersionReport:
 
 
 @dataclass(frozen=True)
+class ReleaseQualificationReport:
+    """Environment-scoped packaged install and N-1 upgrade evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ReleaseQualificationReport":
+        if payload.get("apiVersion") != "iip.dev/v1alpha1":
+            raise ValueError("unsupported release qualification report apiVersion")
+        if payload.get("kind") != "ReleaseQualificationReport":
+            raise ValueError(
+                "release qualification report kind must be ReleaseQualificationReport"
+            )
+        if not isinstance(payload.get("metadata"), Mapping):
+            raise ValueError("release qualification report metadata must be an object")
+        if not isinstance(payload.get("spec"), Mapping):
+            raise ValueError("release qualification report spec must be an object")
+        return cls(dict(payload))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class SessionContext:
     """Non-secret identity context derived from the client's credential."""
 

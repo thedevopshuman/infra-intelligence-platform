@@ -70,6 +70,7 @@ from infra_intelligence_sdk import (
     ResourceNeighborhood,
     ResourceObservation,
     ResourceTimeline,
+    ReleaseQualificationReport,
     RuntimeVersionReport,
     SessionContext,
     TelemetryEvidenceRequest,
@@ -176,6 +177,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         runtime_version = RuntimeVersionReport.from_dict(
             example("runtime-version-report.json")
+        )
+        release_qualification = ReleaseQualificationReport.from_dict(
+            example("release-qualification-report.json")
         )
         session = SessionContext.from_dict(example("session-context.json"))
         local_console_authentication = ConsoleAuthenticationConfiguration.from_dict(
@@ -422,6 +426,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         self.assertEqual(
             runtime_version.to_dict()["kind"], "RuntimeVersionReport"
+        )
+        self.assertEqual(
+            release_qualification.to_dict()["spec"]["status"], "qualified"
         )
         self.assertEqual(session.to_dict()["kind"], "SessionContext")
         self.assertEqual(

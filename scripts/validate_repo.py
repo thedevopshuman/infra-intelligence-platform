@@ -75,6 +75,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0097-packaged-n-minus-one-upgrade-conformance.md",
     "docs/decisions/0098-sustained-upgrade-availability-conformance.md",
     "docs/decisions/0099-graceful-api-termination-and-drain-conformance.md",
+    "docs/decisions/0100-environment-scoped-release-qualification-evidence.md",
     "docs/specifications/collector-queue-loss-contract.md",
     "docs/decisions/0026-resource-history-change-evidence.md",
     "docs/decisions/0029-investigation-context-correlation.md",
@@ -173,6 +174,7 @@ REQUIRED_PATHS = (
     "docs/operations/measurements/postgresql-backup-restore.json",
     "contracts/schemas/resource.schema.json",
     "contracts/schemas/release-manifest.schema.json",
+    "contracts/schemas/release-qualification-report.schema.json",
     "contracts/schemas/credential-lease-request.schema.json",
     "contracts/schemas/credential-lease.schema.json",
     "contracts/schemas/credential-broker-compatibility-report.schema.json",
@@ -334,6 +336,7 @@ REQUIRED_PATHS = (
     "contracts/examples/resource-change-evidence-result.json",
     "contracts/examples/resource-timeline.json",
     "contracts/examples/release-manifest.json",
+    "contracts/examples/release-qualification-report.json",
     "contracts/examples/page-info.json",
     "contracts/examples/error.json",
     "docs/specifications/evidence-contract.md",
@@ -358,6 +361,7 @@ REQUIRED_PATHS = (
     "docs/specifications/resource-collection-contract.md",
     "docs/specifications/resource-query-contract.md",
     "docs/specifications/release-manifest-contract.md",
+    "docs/specifications/release-qualification-report-contract.md",
     "docs/specifications/resource-change-evidence-contract.md",
     "requirements/verify.in",
     "requirements/verify.txt",
@@ -435,6 +439,7 @@ REQUIRED_PATHS = (
     "tests/test_helm_deployment.py",
     "tests/test_helm_values.py",
     "tests/test_release_bundle.py",
+    "tests/test_release_qualification.py",
     "tests/test_plugin_invocation_lifecycle.py",
     "tests/test_plugin_compatibility.py",
     "tests/test_plugin_action_mediation.py",
@@ -445,6 +450,7 @@ REQUIRED_PATHS = (
     "scripts/test_helm_install.sh",
     "scripts/build_release_bundle.sh",
     "scripts/release_bundle.py",
+    "scripts/release_qualification.py",
     "scripts/run_plugin_runner_conformance.py",
     "scripts/run_capacity_certification.py",
     "scripts/test_capacity.sh",
@@ -1386,6 +1392,127 @@ def validate_openai_instrumentation_compatibility_example(
     validate_openai_instrumentation_compatibility_document(
         documents.get(path), errors
     )
+
+
+RELEASE_QUALIFICATION_INSTALL_CHECKS = (
+    "bundle-integrity",
+    "source-identity",
+    "immutable-deployment",
+    "runtime-identity",
+    "schema-migrations",
+    "protected-operations",
+    "tls-ingress",
+    "backup-checksum",
+    "isolated-restore",
+    "helm-upgrade",
+)
+RELEASE_QUALIFICATION_UPGRADE_CHECKS = (
+    "bundle-integrity",
+    "source-identity",
+    "strict-ancestry",
+    "base-runtime-identity",
+    "target-runtime-identity",
+    "tenant-data-preservation",
+    "non-regressing-migration",
+    "forward-schema-rollback",
+    "idempotent-reupgrade",
+    "zero-failure-service-availability",
+    "in-flight-request-drain",
+    "helm-history",
+)
+
+
+def validate_release_qualification_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check the closed profiles, candidate binding, and derived result."""
+
+    path = ROOT / "contracts" / "examples" / "release-qualification-report.json"
+    report = documents.get(path)
+    if not isinstance(report, dict):
+        fail(errors, "release qualification report must be an object")
+        return
+    metadata = report.get("metadata")
+    spec = report.get("spec")
+    if not isinstance(metadata, dict) or not isinstance(spec, dict):
+        return
+    candidate = spec.get("candidate")
+    profiles = spec.get("profiles")
+    summary = spec.get("summary")
+    if (
+        not isinstance(candidate, dict)
+        or not isinstance(profiles, list)
+        or not isinstance(summary, dict)
+    ):
+        return
+    if metadata.get("sourceRevision") != candidate.get("revision"):
+        fail(errors, "release qualification source must match its candidate")
+    expected_profiles = (
+        ("packaged-install", RELEASE_QUALIFICATION_INSTALL_CHECKS),
+        ("n-minus-one-upgrade", RELEASE_QUALIFICATION_UPGRADE_CHECKS),
+    )
+    if tuple(
+        item.get("name") if isinstance(item, dict) else None for item in profiles
+    ) != tuple(item[0] for item in expected_profiles):
+        fail(errors, "release qualification profiles must match the closed set")
+        return
+    for profile, (_, expected_checks) in zip(profiles, expected_profiles):
+        if not isinstance(profile, dict):
+            continue
+        checks = profile.get("checks")
+        check_ids = tuple(
+            check.get("id") if isinstance(check, dict) else None
+            for check in checks or []
+        )
+        if check_ids != expected_checks:
+            fail(errors, "release qualification checks must match the closed profile")
+    install_measurement = profiles[0].get("measurement", {})
+    upgrade_measurement = profiles[1].get("measurement", {})
+    if isinstance(install_measurement, dict) and install_measurement.get(
+        "runtime"
+    ) != {
+        "version": candidate.get("version"),
+        "chartVersion": candidate.get("chartVersion"),
+        "revision": candidate.get("revision"),
+        "imageDigest": candidate.get("controlPlaneImageDigest"),
+    }:
+        fail(errors, "release install runtime must match its candidate")
+    target = (
+        upgrade_measurement.get("target")
+        if isinstance(upgrade_measurement, dict)
+        else None
+    )
+    if isinstance(target, dict) and any(
+        target.get(field) != candidate.get(candidate_field)
+        for field, candidate_field in (
+            ("version", "version"),
+            ("chartVersion", "chartVersion"),
+            ("revision", "revision"),
+            ("imageDigest", "controlPlaneImageDigest"),
+        )
+    ):
+        fail(errors, "release upgrade target must match its candidate")
+    availability = (
+        upgrade_measurement.get("availability")
+        if isinstance(upgrade_measurement, dict)
+        else None
+    )
+    if isinstance(availability, dict) and (
+        availability.get("failureCount") != 0
+        or availability.get("attemptCount") != availability.get("successCount")
+        or availability.get("requestCount")
+        != 2 * availability.get("successCount", -1)
+        or availability.get("successCount")
+        != availability.get("baseSuccessCount", -1)
+        + availability.get("targetSuccessCount", -1)
+    ):
+        fail(errors, "release qualification availability totals must be derived")
+    if summary != {
+        "requiredProfiles": 2,
+        "passedProfiles": 2,
+        "overallStatus": "qualified",
+    } or spec.get("status") != "qualified":
+        fail(errors, "release qualification summary must match its profiles")
 
 
 def validate_plugin_action_mediation_examples(
@@ -4067,6 +4194,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_otlp_receiver_compatibility_example(documents, errors)
     validate_bedrock_instrumentation_compatibility_example(documents, errors)
     validate_openai_instrumentation_compatibility_example(documents, errors)
+    validate_release_qualification_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
     validate_ai_economics_examples(documents, errors)
 

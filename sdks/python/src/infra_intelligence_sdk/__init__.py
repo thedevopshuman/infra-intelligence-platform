@@ -87,6 +87,7 @@ from .models import (
     ResourceObservation,
     ResourceObservationCursor,
     ResourceTimeline,
+    ReleaseQualificationReport,
     RuntimeVersionReport,
     SessionContext,
     TelemetryEvidenceRequest,
@@ -185,6 +186,7 @@ __all__ = [
     "ResourceObservation",
     "ResourceObservationCursor",
     "ResourceTimeline",
+    "ReleaseQualificationReport",
     "RuntimeVersionReport",
     "SessionContext",
     "TelemetryEvidenceRequest",
@@ -195,4 +197,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.48.0"
+__version__ = "0.49.0"

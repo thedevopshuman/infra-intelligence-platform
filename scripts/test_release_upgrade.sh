@@ -10,6 +10,7 @@ IIP_KUBE_CONTEXT=${IIP_KUBE_CONTEXT:-kind-iip-dev}
 IIP_TEST_NAMESPACE=${IIP_TEST_NAMESPACE:-iip-release-upgrade-test}
 IIP_KEEP_TEST_NAMESPACE=${IIP_KEEP_TEST_NAMESPACE:-false}
 IIP_RELEASE_BUNDLE=${IIP_RELEASE_BUNDLE:-}
+IIP_RELEASE_QUALIFICATION_REPORT=${IIP_RELEASE_QUALIFICATION_REPORT:-}
 IIP_UPGRADE_FROM_REVISION=${IIP_UPGRADE_FROM_REVISION:-}
 IIP_TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/iip-release-upgrade.XXXXXX")
 
@@ -25,6 +26,16 @@ case "$IIP_RELEASE_BUNDLE" in
     /*) ;;
     *)
         echo "IIP_RELEASE_BUNDLE must be an absolute directory" >&2
+        exit 2
+        ;;
+esac
+if [ -z "$IIP_RELEASE_QUALIFICATION_REPORT" ]; then
+    IIP_RELEASE_QUALIFICATION_REPORT="$IIP_RELEASE_BUNDLE.qualification.json"
+fi
+case "$IIP_RELEASE_QUALIFICATION_REPORT" in
+    /*) ;;
+    *)
+        echo "IIP_RELEASE_QUALIFICATION_REPORT must be an absolute path" >&2
         exit 2
         ;;
 esac
@@ -516,7 +527,7 @@ prove_in_flight_request_drain() {
     "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
         --namespace "$IIP_TEST_NAMESPACE" exec deployment/iip-postgres -- \
         psql -U iip -d iip -v ON_ERROR_STOP=1 -c \
-        'BEGIN; LOCK TABLE iip.resource_projections IN ACCESS EXCLUSIVE MODE; SELECT pg_sleep(12); COMMIT;' \
+        'BEGIN; LOCK TABLE iip.resource_projections IN ACCESS EXCLUSIVE MODE; SELECT pg_sleep(30); COMMIT;' \
         >"$IIP_TEST_TEMP_DIR/drain-lock.log" 2>&1 &
     IIP_DRAIN_LOCK_PID=$!
 
@@ -541,46 +552,125 @@ prove_in_flight_request_drain() {
     fi
 
     "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
-        --namespace "$IIP_TEST_NAMESPACE" exec iip-upgrade-probe -- \
-        python -c \
-        'import json,sys,urllib.request; from pathlib import Path; token=Path("/var/run/iip-probe/bearer-token").read_text().strip(); request=urllib.request.Request("http://"+sys.argv[1]+":8080/v1/resources", headers={"Authorization":"Bearer "+token}); document=json.load(urllib.request.urlopen(request, timeout=30)); matches=[item for item in document["items"] if item["spec"]["externalId"] == "cluster-upgrade/default/api"]; assert len(matches) == 1; print("drained-request-complete")' \
-        "$IIP_DRAIN_POD_IP" >"$IIP_TEST_TEMP_DIR/drain-client.log" 2>&1 &
-    IIP_DRAIN_CLIENT_PID=$!
+        --namespace "$IIP_TEST_NAMESPACE" apply -f - >/dev/null <<EOF
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: iip-drain-client
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 60
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: iip-drain-client
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: client
+          image: "$IIP_TARGET_REPOSITORY@$IIP_TARGET_IMAGE_DIGEST"
+          imagePullPolicy: Never
+          command: ["python", "-c"]
+          args:
+            - |
+              import json
+              import os
+              import urllib.request
+              from pathlib import Path
+
+              token = Path("/var/run/iip-probe/bearer-token").read_text().strip()
+              request = urllib.request.Request(
+                  "http://" + os.environ["IIP_DRAIN_POD_IP"] + ":8080/v1/resources",
+                  headers={"Authorization": "Bearer " + token},
+              )
+              document = json.load(urllib.request.urlopen(request, timeout=55))
+              matches = [
+                  item for item in document["items"]
+                  if item["spec"]["externalId"] == "cluster-upgrade/default/api"
+                  and item["metadata"]["tenantId"] == "upgrade-test"
+              ]
+              assert len(matches) == 1
+              print("drained-request-complete")
+          env:
+            - name: IIP_DRAIN_POD_IP
+              value: "$IIP_DRAIN_POD_IP"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: credential
+              mountPath: /var/run/iip-probe
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: credential
+          secret:
+            secretName: iip-upgrade-probe
+        - name: tmp
+          emptyDir: {}
+EOF
 
     attempt=0
     IIP_BLOCKED_READ_COUNT=0
-    while [ "$attempt" -lt 100 ]; do
+    while [ "$attempt" -lt 200 ]; do
         IIP_BLOCKED_READ_COUNT=$(
             "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
                 --namespace "$IIP_TEST_NAMESPACE" exec deployment/iip-postgres -- \
                 psql -U iip -d iip -Atc \
-                "SELECT count(*) FROM pg_stat_activity WHERE datname = 'iip' AND wait_event_type = 'Lock' AND query LIKE '%FROM iip.resource_projections%'" \
+                "SELECT count(*) FROM pg_stat_activity WHERE datname = 'iip' AND wait_event_type = 'Lock' AND query LIKE '%resource_projections%'" \
                 2>/dev/null || true
         )
-        if [ "$IIP_BLOCKED_READ_COUNT" -ge 1 ]; then
-            break
-        fi
+        case "$IIP_BLOCKED_READ_COUNT" in
+            ''|*[!0-9]*) ;;
+            *)
+                if [ "$IIP_BLOCKED_READ_COUNT" -ge 1 ]; then
+                    break
+                fi
+                ;;
+        esac
         attempt=$((attempt + 1))
         sleep 0.1
     done
-    if [ "$IIP_BLOCKED_READ_COUNT" -lt 1 ]; then
-        echo "In-flight drain test did not observe the blocked API read" >&2
-        exit 1
-    fi
+    case "$IIP_BLOCKED_READ_COUNT" in
+        ''|*[!0-9]*)
+            echo "In-flight drain test did not observe the blocked API read" >&2
+            exit 1
+            ;;
+        *)
+            if [ "$IIP_BLOCKED_READ_COUNT" -lt 1 ]; then
+                echo "In-flight drain test did not observe the blocked API read" >&2
+                exit 1
+            fi
+            ;;
+    esac
 
     "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
         --namespace "$IIP_TEST_NAMESPACE" delete pod "$IIP_DRAIN_POD" \
         --wait=false >/dev/null
-    if ! wait "$IIP_DRAIN_CLIENT_PID"; then
-        echo "In-flight API request was terminated before completion" >&2
-        exit 1
-    fi
     if ! wait "$IIP_DRAIN_LOCK_PID"; then
         echo "In-flight drain database fixture failed" >&2
         exit 1
     fi
-    if ! rg -qx 'drained-request-complete' \
-        "$IIP_TEST_TEMP_DIR/drain-client.log"; then
+    if ! "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" wait \
+        --for=condition=complete job/iip-drain-client --timeout=60s >/dev/null; then
+        echo "In-flight API request was terminated before completion" >&2
+        exit 1
+    fi
+    if ! "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" logs job/iip-drain-client | \
+        rg -qx 'drained-request-complete'; then
         echo "In-flight API request did not return the expected tenant data" >&2
         exit 1
     fi
@@ -645,6 +735,10 @@ assert_migration "$IIP_TARGET_MIGRATION"
 assert_seed_resource
 wait_for_probe_version "$IIP_TARGET_VERSION" "$((IIP_TARGET_PROBE_COUNT + 5))"
 stop_and_assert_availability_probe
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+    --namespace "$IIP_TEST_NAMESPACE" exec iip-upgrade-probe -- \
+    python -c 'print(open("/tmp/probe-state.json", encoding="utf-8").read(), end="")' \
+    >"$IIP_TEST_TEMP_DIR/availability-state.json"
 prove_in_flight_request_drain
 
 IIP_APPLIED_MIGRATION_COUNT=$(
@@ -662,4 +756,35 @@ fi
     "$IIP_TEST_PYTHON" -c \
         'import json,sys; rows=json.load(sys.stdin); assert len(rows) == 4; assert [row["status"] for row in rows] == ["superseded","superseded","superseded","deployed"]'
 
-echo "Packaged N-1 upgrade passed: sustained availability -> release identity -> preserved tenant data -> forward migration -> application rollback -> idempotent re-upgrade"
+IIP_QUALIFICATION_ARCHITECTURE=$(
+    "$IIP_DOCKER_BIN" info --format '{{.Architecture}}'
+)
+case "$IIP_QUALIFICATION_ARCHITECTURE" in
+    aarch64) IIP_QUALIFICATION_ARCHITECTURE=arm64 ;;
+    x86_64) IIP_QUALIFICATION_ARCHITECTURE=amd64 ;;
+esac
+IIP_QUALIFICATION_KUBERNETES_VERSION=$(
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" get nodes \
+        -o 'jsonpath={.items[0].status.nodeInfo.kubeletVersion}'
+)
+IIP_QUALIFICATION_DOCKER_VERSION=$(
+    "$IIP_DOCKER_BIN" version --format '{{.Server.Version}}'
+)
+"$IIP_TEST_PYTHON" scripts/release_qualification.py record-upgrade \
+    "$IIP_RELEASE_BUNDLE" "$IIP_RELEASE_QUALIFICATION_REPORT" \
+    --availability-state "$IIP_TEST_TEMP_DIR/availability-state.json" \
+    --base-version "$IIP_BASE_VERSION" \
+    --base-chart-version "$IIP_BASE_CHART_VERSION" \
+    --base-revision "$IIP_BASE_REVISION" \
+    --base-migration "$IIP_BASE_MIGRATION" \
+    --base-image-digest "$IIP_BASE_IMAGE_DIGEST" \
+    --target-migration "$IIP_TARGET_MIGRATION" \
+    --applied-migration-count "$IIP_APPLIED_MIGRATION_COUNT" \
+    --final-helm-revision 4 \
+    --platform "linux/$IIP_QUALIFICATION_ARCHITECTURE" \
+    --kubernetes-version "$IIP_QUALIFICATION_KUBERNETES_VERSION" \
+    --container-runtime-version "$IIP_QUALIFICATION_DOCKER_VERSION"
+"$IIP_TEST_PYTHON" scripts/release_qualification.py verify \
+    "$IIP_RELEASE_BUNDLE" "$IIP_RELEASE_QUALIFICATION_REPORT"
+
+echo "Packaged N-1 upgrade passed: sustained availability -> release identity -> preserved tenant data -> forward migration -> application rollback -> idempotent re-upgrade -> qualification evidence=$IIP_RELEASE_QUALIFICATION_REPORT"

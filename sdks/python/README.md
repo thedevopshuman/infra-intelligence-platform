@@ -96,3 +96,8 @@ application/team ownership.
 Version 0.48 adds the bounded `Client.get_ai_allocation_report` read and its
 generation-bound application/team report model. Tenant identity and policy/
 catalog selection remain server-owned.
+
+Version 0.49 adds `ReleaseQualificationReport` for offline promotion tooling.
+It uses the `iip.dev/v1alpha1` artifact namespace and grants no API access or
+runtime authority; the repository verifier remains responsible for its closed
+checks, derived totals, and release-manifest binding.

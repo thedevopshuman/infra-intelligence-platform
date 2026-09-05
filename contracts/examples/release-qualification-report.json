@@ -1,0 +1,119 @@
+{
+  "apiVersion": "iip.dev/v1alpha1",
+  "kind": "ReleaseQualificationReport",
+  "metadata": {
+    "id": "rqr_0123456789abcdef0123456789abcdef",
+    "generatedAt": "2026-09-05T14:30:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "candidate": {
+      "version": "0.68.0",
+      "chartVersion": "0.70.0",
+      "revision": "0123456789abcdef0123456789abcdef01234567",
+      "releaseManifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "controlPlaneImageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "signatureStatus": "unsigned"
+    },
+    "environment": {
+      "profile": "local-kind",
+      "platform": "linux/arm64",
+      "kubernetesVersion": "v1.36.1",
+      "containerRuntime": {
+        "name": "docker",
+        "version": "29.1.5"
+      }
+    },
+    "profiles": [
+      {
+        "name": "packaged-install",
+        "observedAt": "2026-09-05T14:20:00Z",
+        "result": "passed",
+        "checks": [
+          {"id": "bundle-integrity", "status": "passed"},
+          {"id": "source-identity", "status": "passed"},
+          {"id": "immutable-deployment", "status": "passed"},
+          {"id": "runtime-identity", "status": "passed"},
+          {"id": "schema-migrations", "status": "passed"},
+          {"id": "protected-operations", "status": "passed"},
+          {"id": "tls-ingress", "status": "passed"},
+          {"id": "backup-checksum", "status": "passed"},
+          {"id": "isolated-restore", "status": "passed"},
+          {"id": "helm-upgrade", "status": "passed"}
+        ],
+        "measurement": {
+          "runtime": {
+            "version": "0.68.0",
+            "chartVersion": "0.70.0",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "requiredMigration": "0022_ai_retry_attempt_attribution.sql",
+          "appliedMigrationCount": 22,
+          "finalHelmRevision": 2,
+          "backupChecksumVerified": true,
+          "isolatedRestoreVerified": true
+        }
+      },
+      {
+        "name": "n-minus-one-upgrade",
+        "observedAt": "2026-09-05T14:30:00Z",
+        "result": "passed",
+        "checks": [
+          {"id": "bundle-integrity", "status": "passed"},
+          {"id": "source-identity", "status": "passed"},
+          {"id": "strict-ancestry", "status": "passed"},
+          {"id": "base-runtime-identity", "status": "passed"},
+          {"id": "target-runtime-identity", "status": "passed"},
+          {"id": "tenant-data-preservation", "status": "passed"},
+          {"id": "non-regressing-migration", "status": "passed"},
+          {"id": "forward-schema-rollback", "status": "passed"},
+          {"id": "idempotent-reupgrade", "status": "passed"},
+          {"id": "zero-failure-service-availability", "status": "passed"},
+          {"id": "in-flight-request-drain", "status": "passed"},
+          {"id": "helm-history", "status": "passed"}
+        ],
+        "measurement": {
+          "base": {
+            "version": "0.67.0",
+            "chartVersion": "0.69.0",
+            "revision": "1111111111111111111111111111111111111111",
+            "migration": "0022_ai_retry_attempt_attribution.sql",
+            "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "target": {
+            "version": "0.68.0",
+            "chartVersion": "0.70.0",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "migration": "0022_ai_retry_attempt_attribution.sql",
+            "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "migrationRelation": "retained",
+          "appliedMigrationCount": 22,
+          "finalHelmRevision": 4,
+          "availability": {
+            "attemptCount": 989,
+            "requestCount": 1978,
+            "successCount": 989,
+            "failureCount": 0,
+            "baseSuccessCount": 475,
+            "targetSuccessCount": 514
+          },
+          "inFlightDrain": {
+            "blockedReadObserved": true,
+            "podTerminationRequested": true,
+            "requestCompleted": true
+          }
+        }
+      }
+    ],
+    "summary": {
+      "requiredProfiles": 2,
+      "passedProfiles": 2,
+      "overallStatus": "qualified"
+    }
+  }
+}

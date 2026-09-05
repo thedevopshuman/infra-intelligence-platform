@@ -44,7 +44,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.67.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.68.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 
@@ -56,7 +56,7 @@ After verification, prove that the packaged chart and OCI image—not checkout
 copies—install on the explicit local Kind cluster:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.67.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.68.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -76,8 +76,8 @@ selected supported prior revision. The target may retain the same latest
 migration or add a newer one; migration regression is rejected:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.67.0-0123456789ab \
-IIP_UPGRADE_FROM_REVISION=6b38741 \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.68.0-0123456789ab \
+IIP_UPGRADE_FROM_REVISION=22b2e66 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
 
@@ -98,6 +98,39 @@ read after Kubernetes begins terminating its exact serving pod. This checks the
 API's signal handling and active-handler join independently of the Service's
 other ready replica. It is one bounded drain case, not a claim about every
 customer request duration, streaming protocol, ingress, or load balancer.
+
+## Retain one complete qualification report
+
+Run both packaged profiles in sequence and require their machine-readable
+evidence to agree on the candidate and local environment:
+
+```bash
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.68.0-0123456789ab \
+IIP_UPGRADE_FROM_REVISION=<supported-ancestor> \
+  make qualify-release PYTHON=.venv/bin/python
+```
+
+The default report is written adjacent to the bundle as
+`<bundle>.qualification.json`. Set the absolute
+`IIP_RELEASE_QUALIFICATION_REPORT` path to retain it elsewhere. The install gate
+starts a new report and the N-1 gate adds its profile only when candidate,
+platform, Kubernetes, and Docker identity match. Verify a transported report
+and bundle with:
+
+```bash
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.68.0-0123456789ab \
+IIP_RELEASE_QUALIFICATION_REPORT=/absolute/path/to/report.json \
+  make verify-release-qualification PYTHON=.venv/bin/python
+```
+
+The verifier recomputes the release-manifest digest from the already verified
+bundle and derives the closed-profile summary. It rejects a dirty source,
+candidate substitution, invented or reordered check, inconsistent availability
+total, migration regression, failed request, or incomplete report. The report
+stays outside the bundle so recording an environment observation cannot mutate
+the finalized artifacts or `SHA256SUMS`. See the [qualification
+contract](../specifications/release-qualification-report-contract.md) and
+[ADR 0100](../decisions/0100-environment-scoped-release-qualification-evidence.md).
 
 ## Production promotion boundary
 

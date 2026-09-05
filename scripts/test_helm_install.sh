@@ -10,6 +10,7 @@ IIP_KUBE_CONTEXT=${IIP_KUBE_CONTEXT:-kind-iip-dev}
 IIP_TEST_NAMESPACE=${IIP_TEST_NAMESPACE:-iip-helm-install-test}
 IIP_KEEP_TEST_NAMESPACE=${IIP_KEEP_TEST_NAMESPACE:-false}
 IIP_RELEASE_BUNDLE=${IIP_RELEASE_BUNDLE:-}
+IIP_RELEASE_QUALIFICATION_REPORT=${IIP_RELEASE_QUALIFICATION_REPORT:-}
 IIP_TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/iip-helm-install.XXXXXX")
 
 case "$IIP_KUBE_CONTEXT" in
@@ -73,6 +74,16 @@ if [ -n "$IIP_RELEASE_BUNDLE" ]; then
         /*) ;;
         *)
             echo "IIP_RELEASE_BUNDLE must be an absolute directory" >&2
+            exit 2
+            ;;
+    esac
+    if [ -z "$IIP_RELEASE_QUALIFICATION_REPORT" ]; then
+        IIP_RELEASE_QUALIFICATION_REPORT="$IIP_RELEASE_BUNDLE.qualification.json"
+    fi
+    case "$IIP_RELEASE_QUALIFICATION_REPORT" in
+        /*) ;;
+        *)
+            echo "IIP_RELEASE_QUALIFICATION_REPORT must be an absolute path" >&2
             exit 2
             ;;
     esac
@@ -284,6 +295,8 @@ printf '%s' "$IIP_RUNTIME_VERSION_JSON" | "$IIP_TEST_PYTHON" -c \
     "$IIP_APP_VERSION" "$IIP_CHART_VERSION" "$IIP_TEST_IMAGE_DIGEST" \
     "$IIP_EXPECTED_MIGRATION" "$IIP_EXPECTED_BUILD_MODE" \
     "$IIP_EXPECTED_BUILD_REVISION"
+printf '%s\n' "$IIP_RUNTIME_VERSION_JSON" > \
+    "$IIP_TEST_TEMP_DIR/runtime-version-report.json"
 
 IIP_TELEMETRY_DEPLOYMENT_HEALTH_JSON=$(
     printf '%s' "$IIP_AUTH_BEARER_TOKEN" | \
@@ -502,7 +515,32 @@ EOF
         'import json,sys; rows=json.load(sys.stdin); assert len(rows) == 2 and str(rows[-1]["revision"]) == "2" and rows[-1]["status"] == "deployed"'
 
 if [ "$IIP_EXPECTED_BUILD_MODE" = "release" ]; then
-    echo "Packaged release install/upgrade test passed: verified bundle -> immutable image -> release identity -> migrations -> TLS ingress -> backup/restore"
+    IIP_QUALIFICATION_ARCHITECTURE=$(
+        "$IIP_DOCKER_BIN" info --format '{{.Architecture}}'
+    )
+    case "$IIP_QUALIFICATION_ARCHITECTURE" in
+        aarch64) IIP_QUALIFICATION_ARCHITECTURE=arm64 ;;
+        x86_64) IIP_QUALIFICATION_ARCHITECTURE=amd64 ;;
+    esac
+    IIP_QUALIFICATION_KUBERNETES_VERSION=$(
+        "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" get nodes \
+            -o 'jsonpath={.items[0].status.nodeInfo.kubeletVersion}'
+    )
+    IIP_QUALIFICATION_DOCKER_VERSION=$(
+        "$IIP_DOCKER_BIN" version --format '{{.Server.Version}}'
+    )
+    "$IIP_TEST_PYTHON" scripts/release_qualification.py record-install \
+        "$IIP_RELEASE_BUNDLE" "$IIP_RELEASE_QUALIFICATION_REPORT" \
+        --runtime-report "$IIP_TEST_TEMP_DIR/runtime-version-report.json" \
+        --required-migration "$IIP_EXPECTED_MIGRATION" \
+        --applied-migration-count "$IIP_APPLIED_MIGRATION_COUNT" \
+        --final-helm-revision 2 \
+        --platform "linux/$IIP_QUALIFICATION_ARCHITECTURE" \
+        --kubernetes-version "$IIP_QUALIFICATION_KUBERNETES_VERSION" \
+        --container-runtime-version "$IIP_QUALIFICATION_DOCKER_VERSION"
+    "$IIP_TEST_PYTHON" scripts/release_qualification.py verify \
+        "$IIP_RELEASE_BUNDLE" "$IIP_RELEASE_QUALIFICATION_REPORT"
+    echo "Packaged release install/upgrade test passed: verified bundle -> immutable image -> release identity -> migrations -> TLS ingress -> backup/restore -> qualification evidence=$IIP_RELEASE_QUALIFICATION_REPORT"
 else
     echo "Helm install/upgrade test passed: immutable image -> runtime identity -> delivery/SLO/retention operations -> migrations -> TLS ingress -> backup/restore"
 fi

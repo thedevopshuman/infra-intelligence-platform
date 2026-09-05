@@ -55,8 +55,12 @@ class ReleaseUpgradeGateTests(unittest.TestCase):
         )
 
         self.assertIn("LOCK TABLE iip.resource_projections", script)
-        self.assertIn("pg_sleep(12)", script)
+        self.assertIn("pg_sleep(30)", script)
         self.assertIn("wait_event_type = 'Lock'", script)
+        self.assertIn("kind: Job", script)
+        self.assertIn("name: iip-drain-client", script)
+        self.assertIn("automountServiceAccountToken: false", script)
+        self.assertIn("secretName: iip-upgrade-probe", script)
         self.assertIn('delete pod "$IIP_DRAIN_POD"', script)
         self.assertIn("--wait=false", script)
         self.assertIn("drained-request-complete", script)

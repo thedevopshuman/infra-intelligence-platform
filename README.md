@@ -10,7 +10,10 @@ The packaged Kubernetes release uses surge-first API rollouts, a bounded
 endpoint-propagation delay, and signal-aware active-request draining. Its N-1
 gate continuously reads authenticated release identity and tenant data and also
 terminates a pod while one database read is intentionally blocked; both the
-connection and the replacement Deployment must recover cleanly.
+connection and the replacement Deployment must recover cleanly. Running both
+packaged gates retains a separate manifest-bound, environment-scoped
+qualification report; incomplete or internally inconsistent evidence cannot be
+promoted by the repository verifier.
 
 The exact-host plugin matrix has separate offline observer, host-mediated read,
 and proposal-only action-provider rows. The action row runs in Docker's
@@ -117,6 +120,8 @@ make release-bundle PYTHON=.venv/bin/python
 # After building a bundle, prove its install and the selected N-1 transition:
 # IIP_RELEASE_BUNDLE=/absolute/path/to/bundle make test-release-install
 # IIP_RELEASE_BUNDLE=/absolute/path/to/bundle IIP_UPGRADE_FROM_REVISION=<revision> make test-release-upgrade
+# Or run both and require one complete manifest-bound report:
+# IIP_RELEASE_BUNDLE=/absolute/path/to/bundle IIP_UPGRADE_FROM_REVISION=<revision> make qualify-release
 # With the local kind cluster and explicit kubeconfig:
 IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-events
 IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-actions

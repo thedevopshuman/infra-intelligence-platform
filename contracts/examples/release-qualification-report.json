@@ -10,8 +10,8 @@
   "spec": {
     "status": "qualified",
     "candidate": {
-      "version": "0.68.0",
-      "chartVersion": "0.70.0",
+      "version": "0.69.0",
+      "chartVersion": "0.71.0",
       "revision": "0123456789abcdef0123456789abcdef01234567",
       "releaseManifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
       "controlPlaneImageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -46,12 +46,12 @@
         ],
         "measurement": {
           "runtime": {
-            "version": "0.68.0",
-            "chartVersion": "0.70.0",
+            "version": "0.69.0",
+            "chartVersion": "0.71.0",
             "revision": "0123456789abcdef0123456789abcdef01234567",
             "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
-          "requiredMigration": "0022_ai_retry_attempt_attribution.sql",
+          "requiredMigration": "0022_ai_retry_savings_rule.sql",
           "appliedMigrationCount": 22,
           "finalHelmRevision": 2,
           "backupChecksumVerified": true,
@@ -78,17 +78,17 @@
         ],
         "measurement": {
           "base": {
-            "version": "0.67.0",
-            "chartVersion": "0.69.0",
-            "revision": "1111111111111111111111111111111111111111",
-            "migration": "0022_ai_retry_attempt_attribution.sql",
+            "version": "0.68.0",
+            "chartVersion": "0.70.0",
+            "revision": "48f2168e534aba6761730d3537da70f2283ace13",
+            "migration": "0022_ai_retry_savings_rule.sql",
             "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
           },
           "target": {
-            "version": "0.68.0",
-            "chartVersion": "0.70.0",
+            "version": "0.69.0",
+            "chartVersion": "0.71.0",
             "revision": "0123456789abcdef0123456789abcdef01234567",
-            "migration": "0022_ai_retry_attempt_attribution.sql",
+            "migration": "0022_ai_retry_savings_rule.sql",
             "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
           "migrationRelation": "retained",

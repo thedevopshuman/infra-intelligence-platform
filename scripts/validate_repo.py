@@ -76,7 +76,9 @@ REQUIRED_PATHS = (
     "docs/decisions/0098-sustained-upgrade-availability-conformance.md",
     "docs/decisions/0099-graceful-api-termination-and-drain-conformance.md",
     "docs/decisions/0100-environment-scoped-release-qualification-evidence.md",
+    "docs/decisions/0101-source-bound-postgresql-recovery-evidence.md",
     "docs/specifications/collector-queue-loss-contract.md",
+    "docs/specifications/postgresql-recovery-qualification-contract.md",
     "docs/decisions/0026-resource-history-change-evidence.md",
     "docs/decisions/0029-investigation-context-correlation.md",
     "docs/decisions/0030-durable-investigation-lifecycle.md",
@@ -171,7 +173,6 @@ REQUIRED_PATHS = (
     "docs/operations/resource-change-evidence.md",
     "docs/operations/postgresql-backup-restore.md",
     "docs/operations/plugin-runner.md",
-    "docs/operations/measurements/postgresql-backup-restore.json",
     "contracts/schemas/resource.schema.json",
     "contracts/schemas/release-manifest.schema.json",
     "contracts/schemas/release-qualification-report.schema.json",
@@ -245,6 +246,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/ai-cost-record.schema.json",
     "contracts/schemas/ai-savings-finding.schema.json",
     "contracts/schemas/investigation-capacity-report.schema.json",
+    "contracts/schemas/postgresql-recovery-qualification-report.schema.json",
     "contracts/schemas/runtime-version-report.schema.json",
     "contracts/schemas/session-context.schema.json",
     "contracts/schemas/console-authentication.schema.json",
@@ -321,6 +323,7 @@ REQUIRED_PATHS = (
     "contracts/examples/investigation-report-telemetry-seasonal.json",
     "contracts/examples/ingestion-freshness-report.json",
     "contracts/examples/investigation-capacity-report.json",
+    "contracts/examples/postgresql-recovery-qualification-report.json",
     "contracts/examples/telemetry-export-health-report.json",
     "contracts/examples/event-delivery-health-report.json",
     "contracts/examples/runtime-version-report.json",
@@ -1420,6 +1423,17 @@ RELEASE_QUALIFICATION_UPGRADE_CHECKS = (
     "in-flight-request-drain",
     "helm-history",
 )
+POSTGRESQL_RECOVERY_QUALIFICATION_CHECKS = (
+    "representative-state",
+    "complete-schema-backup",
+    "source-quiescence",
+    "isolated-restore",
+    "row-integrity",
+    "sequence-integrity",
+    "projection-consistency",
+    "recovery-point-age-objective",
+    "recovery-ready-objective",
+)
 
 
 def validate_release_qualification_example(
@@ -1513,6 +1527,121 @@ def validate_release_qualification_example(
         "overallStatus": "qualified",
     } or spec.get("status") != "qualified":
         fail(errors, "release qualification summary must match its profiles")
+
+
+def validate_postgresql_recovery_qualification_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check source binding, closed checks, and derived recovery measurements."""
+
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "postgresql-recovery-qualification-report.json"
+    )
+    report = documents.get(path)
+    if not isinstance(report, dict):
+        fail(errors, "PostgreSQL recovery qualification report must be an object")
+        return
+    metadata = report.get("metadata")
+    spec = report.get("spec")
+    if not isinstance(metadata, dict) or not isinstance(spec, dict):
+        return
+    checks = spec.get("checks")
+    measurements = spec.get("measurements")
+    profile = spec.get("profile")
+    if (
+        not isinstance(checks, list)
+        or not isinstance(measurements, dict)
+        or not isinstance(profile, dict)
+    ):
+        return
+    check_ids = tuple(
+        item.get("id") if isinstance(item, dict) else None for item in checks
+    )
+    if check_ids != POSTGRESQL_RECOVERY_QUALIFICATION_CHECKS:
+        fail(errors, "PostgreSQL recovery checks must match the closed profile")
+        return
+    check_status = {
+        item.get("id"): item.get("status")
+        for item in checks
+        if isinstance(item, dict)
+    }
+    derived_status = (
+        "qualified"
+        if all(status == "passed" for status in check_status.values())
+        else "failed"
+    )
+    if spec.get("status") != derived_status:
+        fail(errors, "PostgreSQL recovery status must derive from its checks")
+    integrity = measurements.get("integrity")
+    backup = measurements.get("backup")
+    restore = measurements.get("restore")
+    fixture = measurements.get("fixture")
+    objectives = profile.get("objectives")
+    if not all(
+        isinstance(item, dict)
+        for item in (integrity, backup, restore, fixture, objectives)
+    ):
+        return
+    assert isinstance(integrity, dict)
+    assert isinstance(backup, dict)
+    assert isinstance(restore, dict)
+    assert isinstance(fixture, dict)
+    assert isinstance(objectives, dict)
+    tables = integrity.get("tables")
+    if not isinstance(tables, dict):
+        return
+    table_rows = [
+        item.get("rowCount")
+        for item in tables.values()
+        if isinstance(item, dict) and isinstance(item.get("rowCount"), int)
+    ]
+    if (
+        integrity.get("tableCount") != len(tables)
+        or len(table_rows) != len(tables)
+        or integrity.get("rowCount") != sum(table_rows)
+    ):
+        fail(errors, "PostgreSQL recovery integrity totals must be derived")
+    if integrity.get("databaseDigest") != canonical_digest(
+        {
+            "tables": tables,
+            "sequenceDigest": integrity.get("sequenceDigest"),
+        }
+    ):
+        fail(errors, "PostgreSQL recovery database digest must be derived")
+    projection = integrity.get("projectionVerification")
+    if isinstance(projection, dict) and (
+        fixture.get("resourceCount") != projection.get("resourceCount")
+        or fixture.get("relationshipCount") != projection.get("relationshipCount")
+    ):
+        fail(errors, "PostgreSQL recovery fixture must match projection verification")
+    expected_timing_checks = {
+        "recovery-point-age-objective": (
+            isinstance(backup.get("recoveryPointAgeMilliseconds"), int)
+            and isinstance(objectives.get("maximumRecoveryPointAgeMilliseconds"), int)
+            and backup["recoveryPointAgeMilliseconds"]
+            <= objectives["maximumRecoveryPointAgeMilliseconds"]
+        ),
+        "recovery-ready-objective": (
+            isinstance(restore.get("recoveryReadyMilliseconds"), int)
+            and isinstance(objectives.get("maximumRecoveryReadyMilliseconds"), int)
+            and restore["recoveryReadyMilliseconds"]
+            <= objectives["maximumRecoveryReadyMilliseconds"]
+        ),
+    }
+    for identifier, passed in expected_timing_checks.items():
+        if check_status.get(identifier) != ("passed" if passed else "failed"):
+            fail(errors, f"PostgreSQL recovery {identifier} status must be derived")
+    report_identity = {
+        "generatedAt": metadata.get("generatedAt"),
+        "profile": profile.get("name"),
+        "sourceRevision": metadata.get("sourceRevision"),
+    }
+    expected_id = "pgr_" + canonical_digest(report_identity).removeprefix("sha256:")[:32]
+    if metadata.get("id") != expected_id:
+        fail(errors, "PostgreSQL recovery report id must be source-bound")
 
 
 def validate_plugin_action_mediation_examples(
@@ -4132,6 +4261,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("ingestion-freshness-report.json", "IngestionFreshnessReport"),
         ("investigation-capacity-report.json", "InvestigationCapacityReport"),
         (
+            "postgresql-recovery-qualification-report.json",
+            "PostgreSQLRecoveryQualificationReport",
+        ),
+        (
             "credential-broker-compatibility-report.json",
             "CredentialBrokerCompatibilityReport",
         ),
@@ -4195,6 +4328,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_bedrock_instrumentation_compatibility_example(documents, errors)
     validate_openai_instrumentation_compatibility_example(documents, errors)
     validate_release_qualification_example(documents, errors)
+    validate_postgresql_recovery_qualification_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
     validate_ai_economics_examples(documents, errors)
 

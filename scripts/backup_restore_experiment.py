@@ -7,6 +7,7 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 import os
 import platform
 import re
@@ -24,6 +25,7 @@ import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
 
+from iip import __version__ as application_version
 from iip.application.actions import (
     DecideActionCommand,
     ExecuteActionCommand,
@@ -36,7 +38,10 @@ from iip.application.plugin_invocations import CancelPluginInvocationCommand
 from iip.application.ports import ActorContext
 from iip.application.rebuild_projections import RebuildProjectionsCommand
 from iip.adapters.postgres import PostgresOperationalStore
+from iip.adapters.postgres.store import SCHEMA_MIGRATIONS
 from iip.bootstrap import build_postgres_runtime, build_projection_maintenance
+
+import validate_schemas
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,6 +55,24 @@ DEFAULT_RPO_TARGET_SECONDS = 60.0
 DEFAULT_RTO_TARGET_SECONDS = 120.0
 BACKUP_PATH = "/tmp/iip-backup-restore.dump"
 DATABASE_NAME = re.compile(r"[a-z][a-z0-9_]{0,62}")
+POSTGRES_IMAGE = (
+    "postgres:18.4-alpine@"
+    "sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15"
+)
+REPORT_SCHEMA = (
+    ROOT / "contracts" / "schemas" / "postgresql-recovery-qualification-report.schema.json"
+)
+CHECK_IDS = (
+    "representative-state",
+    "complete-schema-backup",
+    "source-quiescence",
+    "isolated-restore",
+    "row-integrity",
+    "sequence-integrity",
+    "projection-consistency",
+    "recovery-point-age-objective",
+    "recovery-ready-objective",
+)
 
 
 def canonical_json(value: object) -> str:
@@ -76,11 +99,21 @@ def compile_manifest(
         (dict(item) for item in sequences),
         key=lambda item: canonical_json(item),
     )
-    material = {"tables": tables, "sequences": normalized_sequences}
-    database_digest = hashlib.sha256(canonical_json(material).encode("utf-8")).hexdigest()
+    sequence_digest = hashlib.sha256(
+        canonical_json(normalized_sequences).encode("utf-8")
+    ).hexdigest()
+    database_material = {
+        "tables": tables,
+        "sequenceDigest": f"sha256:{sequence_digest}",
+    }
+    database_digest = hashlib.sha256(
+        canonical_json(database_material).encode("utf-8")
+    ).hexdigest()
     return {
-        **material,
+        "tables": tables,
+        "sequences": normalized_sequences,
         "databaseDigest": f"sha256:{database_digest}",
+        "sequenceDigest": f"sha256:{sequence_digest}",
     }
 
 
@@ -163,7 +196,9 @@ def load_example(name: str) -> dict[str, Any]:
     return document
 
 
-def seed_reference_workflow(database_url_value: str) -> dict[str, object]:
+def seed_reference_workflow(
+    database_url_value: str,
+) -> tuple[dict[str, object], str]:
     """Persist one workflow through the same application and adapter boundaries."""
 
     runtime = build_postgres_runtime(database_url_value, migrate=True)
@@ -297,15 +332,28 @@ def seed_reference_workflow(database_url_value: str) -> dict[str, object]:
     plugin_status = operations.get_plugin_invocation_status(
         investigator, str(invocation["metadata"]["id"])
     )
-    return {
-        "actionOutcome": action_result["spec"]["outcome"],
-        "investigationOutcome": report["spec"]["outcome"],
-        "pluginInvocationState": claim.state,
-        "pluginInvocationTerminalState": plugin_status["spec"]["state"],
-        "pluginSessionStatus": plugin_session["status"],
-        "resourceCount": len(resources),
-        "tenantId": target.identity.tenant_id,
-    }
+    if (
+        action_result["spec"]["outcome"] != "dry-run"
+        or report["spec"]["outcome"] != "conclusive"
+        or claim.state != "claimed"
+        or plugin_status["spec"]["state"] != "cancelled"
+        or plugin_session["status"] != "ready"
+    ):
+        raise RuntimeError("backup_restore.fixture_incomplete")
+    return (
+        {
+            "tenantCount": 1,
+            "resourceCount": len(resources),
+            "relationshipCount": sum(
+                len(resource.relationships) for resource in resources
+            ),
+            "investigationCount": 1,
+            "governedActionCount": 1,
+            "pluginSessionCount": 1,
+            "pluginInvocationCount": 1,
+        },
+        target.identity.tenant_id,
+    )
 
 
 @dataclass(frozen=True)
@@ -377,10 +425,67 @@ def projection_verification(database_url_value: str, tenant_id: str) -> dict[str
     }
 
 
+def source_identity() -> tuple[str, bool]:
+    """Return the exact checkout revision and whether any tracked/untracked input differs."""
+
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=10,
+        check=True,
+    ).stdout.strip()
+    dirty = bool(
+        subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=normal"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            timeout=10,
+            check=True,
+        ).stdout.strip()
+    )
+    return revision, dirty
+
+
+def docker_server_version(docker_bin: str) -> str:
+    result = subprocess.run(
+        [docker_bin, "version", "--format", "{{.Server.Version}}"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=10,
+        check=True,
+    ).stdout.strip()
+    if not result or len(result) > 64:
+        raise RuntimeError("backup_restore.container_runtime_invalid")
+    return result
+
+
+def elapsed_milliseconds(seconds: float) -> int:
+    """Round measured durations upward so the report never understates elapsed time."""
+
+    return max(0, math.ceil(seconds * 1_000))
+
+
+def check(identifier: str, passed: bool) -> dict[str, str]:
+    if passed:
+        return {"id": identifier, "status": "passed"}
+    return {
+        "id": identifier,
+        "status": "failed",
+        "errorCode": f"postgresql.recovery.{identifier}.failed",
+    }
+
+
 def build_report(
     *,
+    source_revision: str,
+    source_dirty: bool,
+    container_runtime_version: str,
     server_version: str,
-    seed: Mapping[str, object],
+    fixture: Mapping[str, object],
     source_manifest: Mapping[str, object],
     backup_bytes: int,
     recovery_point: str,
@@ -399,61 +504,264 @@ def build_report(
         for table in tables.values()
         if isinstance(table, Mapping)
     )
-    objectives_met = (
-        recovery_point_age_seconds <= rpo_target_seconds
-        and recovery_ready_seconds <= rto_target_seconds
+    generated_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    maximum_recovery_point_age_milliseconds = elapsed_milliseconds(
+        rpo_target_seconds
+    )
+    maximum_recovery_ready_milliseconds = elapsed_milliseconds(rto_target_seconds)
+    backup_duration_milliseconds = elapsed_milliseconds(backup_duration_seconds)
+    recovery_point_age_milliseconds = elapsed_milliseconds(
+        recovery_point_age_seconds
+    )
+    restore_command_duration_milliseconds = elapsed_milliseconds(
+        restore_command_duration_seconds
+    )
+    recovery_ready_milliseconds = elapsed_milliseconds(recovery_ready_seconds)
+    checks = [
+        check(
+            "representative-state",
+            int(fixture.get("resourceCount", 0)) >= 1
+            and int(fixture.get("relationshipCount", 0)) >= 1,
+        ),
+        check("complete-schema-backup", backup_bytes > 0 and len(tables) > 0),
+        check("source-quiescence", True),
+        check("isolated-restore", True),
+        check("row-integrity", True),
+        check("sequence-integrity", True),
+        check("projection-consistency", projection.get("driftDetected") is False),
+        check(
+            "recovery-point-age-objective",
+            recovery_point_age_milliseconds
+            <= maximum_recovery_point_age_milliseconds,
+        ),
+        check(
+            "recovery-ready-objective",
+            recovery_ready_milliseconds <= maximum_recovery_ready_milliseconds,
+        ),
+    ]
+    status = (
+        "qualified" if all(item["status"] == "passed" for item in checks) else "failed"
+    )
+    identity = canonical_json(
+        {
+            "generatedAt": generated_at,
+            "profile": "quiesced-logical-restore-v1",
+            "sourceRevision": source_revision,
+        }
     )
     return {
-        "apiVersion": "iip.platform/operations/v1alpha1",
-        "kind": "PostgreSQLBackupRestoreMeasurement",
+        "apiVersion": "iip.platform/v1alpha1",
+        "kind": "PostgreSQLRecoveryQualificationReport",
         "metadata": {
-            "capturedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "environment": "docker-desktop-local",
-            "hostArchitecture": platform.machine(),
+            "id": "pgr_" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:32],
+            "generatedAt": generated_at,
+            "sourceRevision": source_revision,
+            "sourceDirty": source_dirty,
         },
         "spec": {
-            "database": {
-                "engine": "PostgreSQL",
-                "serverVersion": server_version,
-                "containerImage": "postgres:18.4-alpine",
+            "status": status,
+            "environment": {
+                "profile": "local-docker",
+                "platform": f"{platform.system().lower()}/{platform.machine().lower()}",
+                "pythonVersion": platform.python_version(),
+                "applicationVersion": application_version,
+                "containerRuntime": {
+                    "name": "docker",
+                    "version": container_runtime_version,
+                },
+                "database": {
+                    "engine": "postgresql",
+                    "version": server_version,
+                    "migration": SCHEMA_MIGRATIONS[-1],
+                    "image": POSTGRES_IMAGE,
+                },
             },
-            "method": {
+            "profile": {
+                "name": "quiesced-logical-restore-v1",
                 "backup": "pg_dump-custom-format",
                 "restore": "fresh-database-pg_restore",
-                "workload": "quiesced-reference-workflow",
+                "workload": "quiesced-representative-workflow",
                 "scope": "complete-iip-schema",
+                "objectives": {
+                    "classification": "local-regression-guardrail",
+                    "maximumRecoveryPointAgeMilliseconds": (
+                        maximum_recovery_point_age_milliseconds
+                    ),
+                    "maximumRecoveryReadyMilliseconds": (
+                        maximum_recovery_ready_milliseconds
+                    ),
+                },
             },
-            "objectives": {
-                "maximumRecoveryPointAgeSeconds": rpo_target_seconds,
-                "maximumRecoveryReadySeconds": rto_target_seconds,
-                "classification": "local-experiment-guardrail",
+            "measurements": {
+                "fixture": dict(fixture),
+                "backup": {
+                    "bytes": backup_bytes,
+                    "durationMilliseconds": backup_duration_milliseconds,
+                    "recoveryPoint": recovery_point,
+                    "recoveryPointAgeMilliseconds": recovery_point_age_milliseconds,
+                    "committedRecordLoss": 0,
+                    "sourceStable": True,
+                },
+                "restore": {
+                    "commandDurationMilliseconds": (
+                        restore_command_duration_milliseconds
+                    ),
+                    "recoveryReadyMilliseconds": recovery_ready_milliseconds,
+                    "isolatedDatabase": True,
+                },
+                "integrity": {
+                    "matched": True,
+                    "databaseDigest": source_manifest["databaseDigest"],
+                    "tableCount": len(tables),
+                    "rowCount": row_count,
+                    "tables": tables,
+                    "sequenceCount": len(source_manifest["sequences"]),
+                    "sequenceDigest": source_manifest["sequenceDigest"],
+                    "projectionVerification": dict(projection),
+                },
             },
-        },
-        "status": {
-            "backup": {
-                "bytes": backup_bytes,
-                "durationSeconds": round(backup_duration_seconds, 6),
-                "recoveryPoint": recovery_point,
-                "recoveryPointAgeSeconds": round(recovery_point_age_seconds, 6),
-                "committedRecordLoss": 0,
-            },
-            "restore": {
-                "commandDurationSeconds": round(restore_command_duration_seconds, 6),
-                "recoveryReadySeconds": round(recovery_ready_seconds, 6),
-            },
-            "integrity": {
-                "matched": True,
-                "databaseDigest": source_manifest["databaseDigest"],
-                "tableCount": len(tables),
-                "rowCount": row_count,
-                "tables": tables,
-                "sequenceCount": len(source_manifest["sequences"]),
-                "projectionVerification": dict(projection),
-            },
-            "seed": dict(seed),
-            "objectivesMet": objectives_met,
+            "checks": checks,
         },
     }
+
+
+def validate_report(
+    document: object,
+    *,
+    require_clean: bool = False,
+) -> None:
+    """Apply JSON Schema plus derived semantic checks to a recovery report."""
+
+    schema = json.loads(REPORT_SCHEMA.read_text(encoding="utf-8"))
+    errors = validate_schemas.instance_validation_errors(
+        schema,
+        document,
+        label="PostgreSQL recovery qualification report",
+    )
+    if errors:
+        raise RuntimeError("; ".join(errors))
+    assert isinstance(document, Mapping)
+    metadata = document["metadata"]
+    spec = document["spec"]
+    assert isinstance(metadata, Mapping)
+    assert isinstance(spec, Mapping)
+    measurements = spec["measurements"]
+    profile = spec["profile"]
+    checks = spec["checks"]
+    environment = spec["environment"]
+    assert isinstance(measurements, Mapping)
+    assert isinstance(profile, Mapping)
+    assert isinstance(checks, Sequence)
+    assert isinstance(environment, Mapping)
+    check_ids = tuple(
+        item.get("id") for item in checks if isinstance(item, Mapping)
+    )
+    if check_ids != CHECK_IDS:
+        raise RuntimeError("backup_restore.check_set_invalid")
+    check_status = {
+        item["id"]: item["status"]
+        for item in checks
+        if isinstance(item, Mapping)
+    }
+    derived_status = (
+        "qualified"
+        if all(status == "passed" for status in check_status.values())
+        else "failed"
+    )
+    if spec.get("status") != derived_status:
+        raise RuntimeError("backup_restore.status_invalid")
+    integrity = measurements["integrity"]
+    fixture = measurements["fixture"]
+    backup = measurements["backup"]
+    restore = measurements["restore"]
+    assert isinstance(integrity, Mapping)
+    assert isinstance(fixture, Mapping)
+    assert isinstance(backup, Mapping)
+    assert isinstance(restore, Mapping)
+    tables = integrity["tables"]
+    assert isinstance(tables, Mapping)
+    if integrity.get("tableCount") != len(tables) or integrity.get("rowCount") != sum(
+        int(table["rowCount"])
+        for table in tables.values()
+        if isinstance(table, Mapping)
+    ):
+        raise RuntimeError("backup_restore.integrity_totals_invalid")
+    expected_database_digest = "sha256:" + hashlib.sha256(
+        canonical_json(
+            {
+                "tables": tables,
+                "sequenceDigest": integrity["sequenceDigest"],
+            }
+        ).encode("utf-8")
+    ).hexdigest()
+    if integrity.get("databaseDigest") != expected_database_digest:
+        raise RuntimeError("backup_restore.database_digest_invalid")
+    projection = integrity["projectionVerification"]
+    assert isinstance(projection, Mapping)
+    structural_checks = {
+        "representative-state": int(fixture["resourceCount"]) >= 1
+        and int(fixture["relationshipCount"]) >= 1
+        and fixture["resourceCount"] == projection["resourceCount"]
+        and fixture["relationshipCount"] == projection["relationshipCount"],
+        "complete-schema-backup": int(backup["bytes"]) > 0 and len(tables) > 0,
+        "source-quiescence": backup["sourceStable"] is True
+        and backup["committedRecordLoss"] == 0,
+        "isolated-restore": restore["isolatedDatabase"] is True,
+        "row-integrity": integrity["matched"] is True,
+        "sequence-integrity": integrity["matched"] is True,
+        "projection-consistency": projection["driftDetected"] is False,
+        "recovery-point-age-objective": (
+            backup["recoveryPointAgeMilliseconds"]
+            <= profile["objectives"]["maximumRecoveryPointAgeMilliseconds"]
+        ),
+        "recovery-ready-objective": (
+            restore["recoveryReadyMilliseconds"]
+            <= profile["objectives"]["maximumRecoveryReadyMilliseconds"]
+        ),
+    }
+    for identifier, passed in structural_checks.items():
+        expected = "passed" if passed else "failed"
+        if check_status.get(identifier) != expected:
+            raise RuntimeError(f"backup_restore.{identifier}.status_invalid")
+    expected_id_material = canonical_json(
+        {
+            "generatedAt": metadata["generatedAt"],
+            "profile": profile["name"],
+            "sourceRevision": metadata["sourceRevision"],
+        }
+    )
+    expected_id = (
+        "pgr_" + hashlib.sha256(expected_id_material.encode("utf-8")).hexdigest()[:32]
+    )
+    if metadata.get("id") != expected_id:
+        raise RuntimeError("backup_restore.report_id_invalid")
+    database = environment["database"]
+    assert isinstance(database, Mapping)
+    if database.get("image") != POSTGRES_IMAGE:
+        raise RuntimeError("backup_restore.database_image_invalid")
+    if require_clean:
+        revision, dirty = source_identity()
+        if (
+            metadata.get("sourceDirty") is not False
+            or dirty
+            or metadata.get("sourceRevision") != revision
+            or environment.get("applicationVersion") != application_version
+            or database.get("migration") != SCHEMA_MIGRATIONS[-1]
+        ):
+            raise RuntimeError("backup_restore.clean_source_identity_invalid")
+
+
+def write_report(path: Path, report: Mapping[str, object]) -> None:
+    """Atomically publish a complete report without leaving a partial claim."""
+
+    path = path.resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    temporary.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    os.replace(temporary, path)
 
 
 def run_experiment(args: argparse.Namespace) -> dict[str, object]:
@@ -471,11 +779,13 @@ def run_experiment(args: argparse.Namespace) -> dict[str, object]:
     restored_url = database_url(
         args.restored_database, args.database_host, args.database_port
     )
+    revision, dirty = source_identity()
+    container_runtime_version = docker_server_version(args.docker_bin)
 
     runner.cleanup()
     try:
         runner.run("up", "--detach", "--wait")
-        seed = seed_reference_workflow(source_url)
+        fixture, fixture_tenant_id = seed_reference_workflow(source_url)
         source_manifest = database_manifest(source_url)
         server_version = database_version(source_url)
         recovery_point_started = time.perf_counter()
@@ -519,12 +829,15 @@ def run_experiment(args: argparse.Namespace) -> dict[str, object]:
         restore_duration = time.perf_counter() - restore_started
         restored_manifest = database_manifest(restored_url)
         assert_identical_manifests(source_manifest, restored_manifest)
-        projection = projection_verification(restored_url, str(seed["tenantId"]))
+        projection = projection_verification(restored_url, fixture_tenant_id)
         recovery_ready = time.perf_counter() - recovery_started
 
         report = build_report(
+            source_revision=revision,
+            source_dirty=dirty,
+            container_runtime_version=container_runtime_version,
             server_version=server_version,
-            seed=seed,
+            fixture=fixture,
             source_manifest=source_manifest,
             backup_bytes=backup_bytes,
             recovery_point=recovery_point,
@@ -536,8 +849,7 @@ def run_experiment(args: argparse.Namespace) -> dict[str, object]:
             rpo_target_seconds=args.rpo_target_seconds,
             rto_target_seconds=args.rto_target_seconds,
         )
-        if not report["status"]["objectivesMet"]:
-            raise RuntimeError("backup_restore.objective_missed")
+        validate_report(report)
         return report
     finally:
         runner.cleanup()
@@ -563,22 +875,53 @@ def parser() -> argparse.ArgumentParser:
         "--rto-target-seconds", type=float, default=DEFAULT_RTO_TARGET_SECONDS
     )
     result.add_argument("--output", type=Path)
+    result.add_argument(
+        "--verify-report",
+        type=Path,
+        help="verify an existing report without starting Docker",
+    )
+    result.add_argument(
+        "--require-clean",
+        action="store_true",
+        help="require the report to match the current clean checkout",
+    )
     return result
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
+    if args.verify_report is not None:
+        try:
+            document = json.loads(args.verify_report.read_text(encoding="utf-8"))
+            validate_report(document, require_clean=args.require_clean)
+        except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
+            print(f"backup/restore report verification failed: {error}", file=sys.stderr)
+            return 1
+        status = document["spec"]["status"]
+        if status != "qualified":
+            print("backup/restore report verification failed: profile failed", file=sys.stderr)
+            return 1
+        print(f"PostgreSQL recovery qualification verify passed: {args.verify_report}")
+        return 0
     try:
         report = run_experiment(args)
     except (OSError, RuntimeError, ValueError, psycopg.Error, subprocess.SubprocessError) as error:
         print(f"backup/restore experiment failed: {error}", file=sys.stderr)
         return 1
-    encoded = json.dumps(report, indent=2, sort_keys=True) + "\n"
     if args.output is not None:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(encoded, encoding="utf-8")
-    print(canonical_json(report))
-    return 0
+        write_report(args.output, report)
+        measurements = report["spec"]["measurements"]
+        print(
+            "PostgreSQL recovery qualification "
+            f"{report['spec']['status']}: "
+            f"{measurements['integrity']['tableCount']} tables, "
+            f"{measurements['integrity']['rowCount']} rows, "
+            f"ready in {measurements['restore']['recoveryReadyMilliseconds']} ms"
+        )
+        print(f"report: {args.output.resolve()}")
+    else:
+        print(canonical_json(report))
+    return 0 if report["spec"]["status"] == "qualified" else 1
 
 
 if __name__ == "__main__":

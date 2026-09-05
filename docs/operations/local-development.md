@@ -68,7 +68,7 @@ Run the separate end-to-end recovery measurement with:
 make test-backup-restore
 ```
 
-It seeds the durable reference workflow, backs up the complete platform schema, restores into a fresh database, verifies every table and sequence plus projection consistency, prints measured local RPO/RTO evidence, and removes its isolated Compose project and volume. See the [backup and restore procedure](postgresql-backup-restore.md) for the measurement semantics and production gaps.
+It seeds the durable reference workflow, backs up the complete platform schema, restores into a fresh database, verifies every table and sequence plus projection consistency, writes a source-bound qualification report under `dist/`, and removes its isolated Compose project and volume. See the [backup and restore procedure](postgresql-backup-restore.md) for the measurement semantics, clean-report verification command, and production gaps.
 
 Exercise the official OTLP/HTTP exporter against a real OpenTelemetry Collector with:
 

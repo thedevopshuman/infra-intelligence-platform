@@ -215,7 +215,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.68.0
+  tag: 0.69.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -331,7 +331,7 @@ The local-hashed authentication example is suitable for a controlled evaluation.
 
 Backups are disabled by default. To enable them, pre-create a protected PersistentVolumeClaim and configure `backup.enabled`, its schedule/time zone, `backup.destination.existingClaim`, and exact database egress. The digest-pinned PostgreSQL client receives the database Secret and backup volume but no identity Secret, service-account token, or general network access. It writes a custom-format dump and publishes its checksum sidecar only after the dump catalog validates.
 
-The chart does not create or prune storage. Before customer use, verify encryption, off-cluster replication, failure-domain separation, immutability, retention, capacity alerts, access review, and restore authorization. The complete configuration and operator checks are in [PostgreSQL backup and restore](postgresql-backup-restore.md).
+The chart does not create or prune storage. Before customer use, verify encryption, off-cluster replication, failure-domain separation, immutability, retention, capacity alerts, access review, and restore authorization. The complete configuration and operator checks are in [PostgreSQL backup and restore](postgresql-backup-restore.md). Retain the strict local source-bound report with `make test-backup-restore`, then run `make verify-backup-restore-report` from the clean release checkout; that report remains a logical-restore regression gate rather than production continuity evidence.
 
 ## Upgrade procedure
 
@@ -357,7 +357,7 @@ To test the actual packaged release chart and attested OCI archive instead of
 checkout artifacts, first build the release bundle and then run:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.68.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.69.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -366,8 +366,8 @@ and the explicit prior release revision. Equal latest migrations are allowed;
 a migration regression is not:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.68.0-0123456789ab \
-IIP_UPGRADE_FROM_REVISION=22b2e66 \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.69.0-0123456789ab \
+IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
 
@@ -416,4 +416,4 @@ The first revision additionally proves the public local console-authentication d
 
 ## Production gaps
 
-This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance, a manifest-bound install/N-1 qualification report, and 128-tenant PostgreSQL overload evidence; the chart declares guarded TLS ingress and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; the kind gate restores one; and the N-1 gate proves a data-preserving upgrade, application rollback against the forward schema, idempotent re-upgrade, zero-failure bounded reads through the internal Service, and completion of one deliberately blocked read during target-pod termination. Organizational image signing, external secret-controller integration, controller-specific end-to-end TLS and upgrade conformance, production request-duration and streaming profiles, production-scale latency/load and failure-injected availability, high availability, customer-environment sustained workload and failover tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.
+This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance, a manifest-bound install/N-1 qualification report, a source-bound complete-schema PostgreSQL logical recovery report, and 128-tenant PostgreSQL overload evidence; the chart declares guarded TLS ingress and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; the kind gate restores one; and the N-1 gate proves a data-preserving upgrade, application rollback against the forward schema, idempotent re-upgrade, zero-failure bounded reads through the internal Service, and completion of one deliberately blocked read during target-pod termination. Organizational image signing, external secret-controller integration, controller-specific end-to-end TLS and upgrade conformance, production request-duration and streaming profiles, production-scale latency/load and failure-injected availability, high availability, customer-environment sustained workload and failover tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.

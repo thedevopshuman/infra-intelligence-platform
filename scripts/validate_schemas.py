@@ -77,6 +77,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "investigation-capacity-report.schema.json": (
         "investigation-capacity-report.json",
     ),
+    "postgresql-recovery-qualification-report.schema.json": (
+        "postgresql-recovery-qualification-report.json",
+    ),
     "error.schema.json": ("error.json",),
     "evidence.schema.json": ("evidence.json",),
     "evidence-retention-report.schema.json": (

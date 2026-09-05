@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence OTLP Receiver API",
-    "version": "0.68.0",
+    "version": "0.69.0",
     "description": "Isolated OTLP/HTTP Protobuf intake for allowlisted metrics, logs, and metadata-only generative-AI usage spans. The production profile requires both a CA-verified SPIFFE client certificate and a tenant-bound channel Bearer credential. This listener exposes no Infrastructure Intelligence control-plane operations."
   },
   "servers": [

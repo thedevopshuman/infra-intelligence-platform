@@ -93,3 +93,7 @@ deployment configuration determines the policy and price generations.
 Version 0.49 adds the offline `ReleaseQualificationReport` and its closed
 install/upgrade check identifiers. This artifact type does not add a client
 method, credential, or production-environment claim.
+
+Version 0.50 adds the offline `PostgreSQLRecoveryQualificationReport` and its
+closed logical-restore check identifiers. It adds no database credential,
+tenant data, API method, or HA/PITR claim.

@@ -1,0 +1,101 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PostgreSQLRecoveryQualificationReport",
+  "metadata": {
+    "id": "pgr_08cf6b0a89a4b7492c1bed010f091cff",
+    "generatedAt": "2026-09-05T14:00:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "environment": {
+      "profile": "local-docker",
+      "platform": "darwin/arm64",
+      "pythonVersion": "3.12.11",
+      "applicationVersion": "0.69.0",
+      "containerRuntime": {
+        "name": "docker",
+        "version": "29.7.2"
+      },
+      "database": {
+        "engine": "postgresql",
+        "version": "18.4",
+        "migration": "0022_ai_retry_savings_rule.sql",
+        "image": "postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15"
+      }
+    },
+    "profile": {
+      "name": "quiesced-logical-restore-v1",
+      "backup": "pg_dump-custom-format",
+      "restore": "fresh-database-pg_restore",
+      "workload": "quiesced-representative-workflow",
+      "scope": "complete-iip-schema",
+      "objectives": {
+        "classification": "local-regression-guardrail",
+        "maximumRecoveryPointAgeMilliseconds": 60000,
+        "maximumRecoveryReadyMilliseconds": 120000
+      }
+    },
+    "measurements": {
+      "fixture": {
+        "tenantCount": 1,
+        "resourceCount": 1,
+        "relationshipCount": 1,
+        "investigationCount": 1,
+        "governedActionCount": 1,
+        "pluginSessionCount": 1,
+        "pluginInvocationCount": 1
+      },
+      "backup": {
+        "bytes": 65536,
+        "durationMilliseconds": 180,
+        "recoveryPoint": "2026-09-05T13:59:58Z",
+        "recoveryPointAgeMilliseconds": 184,
+        "committedRecordLoss": 0,
+        "sourceStable": true
+      },
+      "restore": {
+        "commandDurationMilliseconds": 171,
+        "recoveryReadyMilliseconds": 506,
+        "isolatedDatabase": true
+      },
+      "integrity": {
+        "matched": true,
+        "databaseDigest": "sha256:42c37fc65c1e42fb57a53de197bac23b578cef2cf264c134100bb792c3a9afc9",
+        "tableCount": 2,
+        "rowCount": 2,
+        "tables": {
+          "resource_observations": {
+            "rowCount": 1,
+            "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          "resource_projections": {
+            "rowCount": 1,
+            "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+          }
+        },
+        "sequenceCount": 4,
+        "sequenceDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "projectionVerification": {
+          "driftDetected": false,
+          "resourceCount": 1,
+          "relationshipCount": 1,
+          "latestObservationOffset": 1,
+          "projectionDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+        }
+      }
+    },
+    "checks": [
+      {"id": "representative-state", "status": "passed"},
+      {"id": "complete-schema-backup", "status": "passed"},
+      {"id": "source-quiescence", "status": "passed"},
+      {"id": "isolated-restore", "status": "passed"},
+      {"id": "row-integrity", "status": "passed"},
+      {"id": "sequence-integrity", "status": "passed"},
+      {"id": "projection-consistency", "status": "passed"},
+      {"id": "recovery-point-age-objective", "status": "passed"},
+      {"id": "recovery-ready-objective", "status": "passed"}
+    ]
+  }
+}

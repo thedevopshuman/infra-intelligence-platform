@@ -645,6 +645,101 @@ export interface ReleaseQualificationReport {
   };
 }
 
+export type PostgreSQLRecoveryQualificationCheckId =
+  | "representative-state"
+  | "complete-schema-backup"
+  | "source-quiescence"
+  | "isolated-restore"
+  | "row-integrity"
+  | "sequence-integrity"
+  | "projection-consistency"
+  | "recovery-point-age-objective"
+  | "recovery-ready-objective";
+
+export interface PostgreSQLRecoveryQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PostgreSQLRecoveryQualificationReport";
+  metadata: {
+    id: `pgr_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: boolean;
+  };
+  spec: {
+    status: "qualified" | "failed";
+    environment: {
+      profile: "local-docker";
+      platform: `${string}/${string}`;
+      pythonVersion: string;
+      applicationVersion: string;
+      containerRuntime: { name: "docker"; version: string };
+      database: {
+        engine: "postgresql";
+        version: string;
+        migration: `${number}_${string}.sql`;
+        image: `postgres:18.4-alpine@sha256:${string}`;
+      };
+    };
+    profile: {
+      name: "quiesced-logical-restore-v1";
+      backup: "pg_dump-custom-format";
+      restore: "fresh-database-pg_restore";
+      workload: "quiesced-representative-workflow";
+      scope: "complete-iip-schema";
+      objectives: {
+        classification: "local-regression-guardrail";
+        maximumRecoveryPointAgeMilliseconds: number;
+        maximumRecoveryReadyMilliseconds: number;
+      };
+    };
+    measurements: {
+      fixture: {
+        tenantCount: 1;
+        resourceCount: number;
+        relationshipCount: number;
+        investigationCount: 1;
+        governedActionCount: 1;
+        pluginSessionCount: 1;
+        pluginInvocationCount: 1;
+      };
+      backup: {
+        bytes: number;
+        durationMilliseconds: number;
+        recoveryPoint: string;
+        recoveryPointAgeMilliseconds: number;
+        committedRecordLoss: 0;
+        sourceStable: true;
+      };
+      restore: {
+        commandDurationMilliseconds: number;
+        recoveryReadyMilliseconds: number;
+        isolatedDatabase: true;
+      };
+      integrity: {
+        matched: true;
+        databaseDigest: Sha256Digest;
+        tableCount: number;
+        rowCount: number;
+        tables: Record<string, { rowCount: number; digest: Sha256Digest }>;
+        sequenceCount: number;
+        sequenceDigest: Sha256Digest;
+        projectionVerification: {
+          driftDetected: false;
+          resourceCount: number;
+          relationshipCount: number;
+          latestObservationOffset: number;
+          projectionDigest: Sha256Digest;
+        };
+      };
+    };
+    checks: Array<{
+      id: PostgreSQLRecoveryQualificationCheckId;
+      status: "passed" | "failed";
+      errorCode?: `postgresql.recovery.${string}`;
+    }>;
+  };
+}
+
 export interface ResourceRelationship {
   type: string;
   target: string;

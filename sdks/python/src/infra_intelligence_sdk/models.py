@@ -495,6 +495,28 @@ class ReleaseQualificationReport:
 
 
 @dataclass(frozen=True)
+class PostgreSQLRecoveryQualificationReport:
+    """Source-bound complete-schema logical backup and restore evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "PostgreSQLRecoveryQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="PostgreSQLRecoveryQualificationReport",
+                label="PostgreSQL recovery qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class SessionContext:
     """Non-secret identity context derived from the client's credential."""
 

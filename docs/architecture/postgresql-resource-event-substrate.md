@@ -138,7 +138,7 @@ Checkpoint age remains measurable after a complete empty reconciliation. A sourc
 
 [ADR 0010](../decisions/0010-postgresql-backup-restore-verification.md) adds a complete-schema logical backup experiment without declaring a production backup provider. The Docker Desktop target seeds authoritative and derived records through the platform boundaries, takes a quiesced custom-format backup, restores into a fresh database, and compares every `iip` table plus identity-sequence state by canonical digest. Recovery is considered ready only after the tenant projection verifier also proves that restored serving state agrees with immutable accepted observations.
 
-The [operator procedure and recorded measurement](../operations/postgresql-backup-restore.md) distinguish the local experiment's recovery-point age and verified recovery-readiness time from production RPO/RTO commitments. Scheduled encrypted backups, off-host retention, WAL-based point-in-time recovery, and restore authorization remain tied to the future production hosting decision.
+The [operator procedure and qualification contract](../operations/postgresql-backup-restore.md) distinguish the local experiment's recovery-point age and verified recovery-readiness time from production RPO/RTO commitments. ADR 0101 binds the minimized report to one exact source revision, migration, pinned PostgreSQL image, and environment, with derived closed checks and no tenant or stored document content. Scheduled encrypted backups, off-host retention, replication/failover, WAL-based point-in-time recovery, and restore authorization remain tied to the production hosting decision and require separate executable profiles.
 
 ## Verification profiles
 

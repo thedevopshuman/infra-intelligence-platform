@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:18.4-alpine
+    image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
     environment:
       POSTGRES_DB: iip
       POSTGRES_USER: iip
@@ -14,7 +14,7 @@ services:
       - "127.0.0.1:15434:5432"
 
   api:
-    image: iip-otlp-receiver-test:0.68.0
+    image: iip-otlp-receiver-test:0.69.0
     build:
       context: ..
       dockerfile: Dockerfile
@@ -43,7 +43,7 @@ services:
       - no-new-privileges:true
 
   receiver:
-    image: iip-otlp-receiver-test:0.68.0
+    image: iip-otlp-receiver-test:0.69.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.otlp_receiver"]
     environment:
@@ -94,7 +94,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-otlp-receiver-test:0.68.0
+    image: iip-otlp-receiver-test:0.69.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:

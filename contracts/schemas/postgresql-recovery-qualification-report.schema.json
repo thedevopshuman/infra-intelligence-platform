@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:postgresql-recovery-qualification-report:v1alpha1",
+  "title": "PostgreSQL Recovery Qualification Report",
+  "description": "Source-bound evidence for one isolated, complete-schema PostgreSQL logical backup and verified restore profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "PostgreSQLRecoveryQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^pgr_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "environment", "profile", "measurements", "checks"],
+      "properties": {
+        "status": {"enum": ["qualified", "failed"]},
+        "environment": {"$ref": "#/$defs/environment"},
+        "profile": {"$ref": "#/$defs/profile"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "checks": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "prefixItems": [
+            {"$ref": "#/$defs/representativeStateCheck"},
+            {"$ref": "#/$defs/completeSchemaBackupCheck"},
+            {"$ref": "#/$defs/sourceQuiescenceCheck"},
+            {"$ref": "#/$defs/isolatedRestoreCheck"},
+            {"$ref": "#/$defs/rowIntegrityCheck"},
+            {"$ref": "#/$defs/sequenceIntegrityCheck"},
+            {"$ref": "#/$defs/projectionConsistencyCheck"},
+            {"$ref": "#/$defs/recoveryPointAgeCheck"},
+            {"$ref": "#/$defs/recoveryReadyCheck"}
+          ],
+          "items": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "counter": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "milliseconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400000
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "platform", "pythonVersion", "applicationVersion", "containerRuntime", "database"],
+      "properties": {
+        "profile": {"const": "local-docker"},
+        "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+        "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "containerRuntime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "version"],
+          "properties": {
+            "name": {"const": "docker"},
+            "version": {"type": "string", "minLength": 1, "maxLength": 64}
+          }
+        },
+        "database": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["engine", "version", "migration", "image"],
+          "properties": {
+            "engine": {"const": "postgresql"},
+            "version": {"type": "string", "minLength": 1, "maxLength": 64},
+            "migration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"},
+            "image": {
+              "type": "string",
+              "pattern": "^postgres:18\\.4-alpine@sha256:[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "backup", "restore", "workload", "scope", "objectives"],
+      "properties": {
+        "name": {"const": "quiesced-logical-restore-v1"},
+        "backup": {"const": "pg_dump-custom-format"},
+        "restore": {"const": "fresh-database-pg_restore"},
+        "workload": {"const": "quiesced-representative-workflow"},
+        "scope": {"const": "complete-iip-schema"},
+        "objectives": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["classification", "maximumRecoveryPointAgeMilliseconds", "maximumRecoveryReadyMilliseconds"],
+          "properties": {
+            "classification": {"const": "local-regression-guardrail"},
+            "maximumRecoveryPointAgeMilliseconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600000
+            },
+            "maximumRecoveryReadyMilliseconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600000
+            }
+          }
+        }
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture", "backup", "restore", "integrity"],
+      "properties": {
+        "fixture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tenantCount", "resourceCount", "relationshipCount", "investigationCount", "governedActionCount", "pluginSessionCount", "pluginInvocationCount"],
+          "properties": {
+            "tenantCount": {"const": 1},
+            "resourceCount": {"type": "integer", "minimum": 1},
+            "relationshipCount": {"type": "integer", "minimum": 1},
+            "investigationCount": {"const": 1},
+            "governedActionCount": {"const": 1},
+            "pluginSessionCount": {"const": 1},
+            "pluginInvocationCount": {"const": 1}
+          }
+        },
+        "backup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bytes", "durationMilliseconds", "recoveryPoint", "recoveryPointAgeMilliseconds", "committedRecordLoss", "sourceStable"],
+          "properties": {
+            "bytes": {"type": "integer", "minimum": 1},
+            "durationMilliseconds": {"$ref": "#/$defs/milliseconds"},
+            "recoveryPoint": {"type": "string", "format": "date-time"},
+            "recoveryPointAgeMilliseconds": {"$ref": "#/$defs/milliseconds"},
+            "committedRecordLoss": {"const": 0},
+            "sourceStable": {"const": true}
+          }
+        },
+        "restore": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["commandDurationMilliseconds", "recoveryReadyMilliseconds", "isolatedDatabase"],
+          "properties": {
+            "commandDurationMilliseconds": {"$ref": "#/$defs/milliseconds"},
+            "recoveryReadyMilliseconds": {"$ref": "#/$defs/milliseconds"},
+            "isolatedDatabase": {"const": true}
+          }
+        },
+        "integrity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["matched", "databaseDigest", "tableCount", "rowCount", "tables", "sequenceCount", "sequenceDigest", "projectionVerification"],
+          "properties": {
+            "matched": {"const": true},
+            "databaseDigest": {"$ref": "#/$defs/sha256"},
+            "tableCount": {"type": "integer", "minimum": 1},
+            "rowCount": {"type": "integer", "minimum": 1},
+            "tables": {
+              "type": "object",
+              "minProperties": 1,
+              "propertyNames": {"pattern": "^[a-z][a-z0-9_]{0,62}$"},
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["rowCount", "digest"],
+                "properties": {
+                  "rowCount": {"$ref": "#/$defs/counter"},
+                  "digest": {"$ref": "#/$defs/sha256"}
+                }
+              }
+            },
+            "sequenceCount": {"$ref": "#/$defs/counter"},
+            "sequenceDigest": {"$ref": "#/$defs/sha256"},
+            "projectionVerification": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["driftDetected", "resourceCount", "relationshipCount", "latestObservationOffset", "projectionDigest"],
+              "properties": {
+                "driftDetected": {"const": false},
+                "resourceCount": {"type": "integer", "minimum": 1},
+                "relationshipCount": {"type": "integer", "minimum": 1},
+                "latestObservationOffset": {"type": "integer", "minimum": 1},
+                "projectionDigest": {"$ref": "#/$defs/sha256"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^postgresql\\.recovery\\.[a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "representativeStateCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "representative-state"}}}]},
+    "completeSchemaBackupCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "complete-schema-backup"}}}]},
+    "sourceQuiescenceCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "source-quiescence"}}}]},
+    "isolatedRestoreCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "isolated-restore"}}}]},
+    "rowIntegrityCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "row-integrity"}}}]},
+    "sequenceIntegrityCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "sequence-integrity"}}}]},
+    "projectionConsistencyCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "projection-consistency"}}}]},
+    "recoveryPointAgeCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "recovery-point-age-objective"}}}]},
+    "recoveryReadyCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "recovery-ready-objective"}}}]}
+  }
+}

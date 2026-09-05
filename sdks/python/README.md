@@ -101,3 +101,8 @@ Version 0.49 adds `ReleaseQualificationReport` for offline promotion tooling.
 It uses the `iip.dev/v1alpha1` artifact namespace and grants no API access or
 runtime authority; the repository verifier remains responsible for its closed
 checks, derived totals, and release-manifest binding.
+
+Version 0.50 adds `PostgreSQLRecoveryQualificationReport` for offline recovery
+evidence tooling. It carries aggregate, source-bound logical restore facts only;
+the executable repository verifier remains authoritative for derived checks and
+clean-current-source qualification.

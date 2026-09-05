@@ -7,6 +7,8 @@
 - `contracts/schemas/ai-attribution-policy.schema.json`
 - `contracts/schemas/ai-usage-attribution-record.schema.json`
 - `contracts/schemas/ai-price-catalog.schema.json`
+- `contracts/schemas/ai-price-catalog-qualification-policy.schema.json`
+- `contracts/schemas/ai-price-catalog-qualification-report.schema.json`
 - `contracts/schemas/ai-cost-record.schema.json`
 - `contracts/schemas/ai-savings-finding.schema.json`
 - `contracts/schemas/ai-model-suitability-report.schema.json`
@@ -59,6 +61,11 @@ A catalog is an immutable tenant-scoped version. Its source identifies whether
 the data came from a provider publication, operator-managed commercial terms,
 or an explicitly non-production test fixture. A fixture price must not be
 presented as a provider price.
+
+Pre-promotion freshness, global overlap, and exact required-scope coverage use
+the separate minimized [price-catalog qualification
+contracts](ai-price-catalog-qualification-contract.md). Qualification neither
+selects an authoritative source nor turns calculated estimates into invoices.
 
 An entry matches provider, model, region, service tier, routing mode, purchase
 mode, and invocation start time. `effectiveFrom` is inclusive;

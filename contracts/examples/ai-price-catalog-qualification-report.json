@@ -1,0 +1,55 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiPriceCatalogQualificationReport",
+  "metadata": {
+    "id": "apq_f68cff93d28d4fd2ff79ccb3419ac890",
+    "tenantId": "local",
+    "generatedAt": "2026-09-05T10:00:00Z",
+    "validUntil": "2026-09-06T10:00:00Z"
+  },
+  "spec": {
+    "status": "qualified",
+    "qualificationLevel": "offline-static",
+    "qualifierVersion": "0.1.0",
+    "catalog": {
+      "id": "apc_11111111111111111111111111111111",
+      "version": "2026-09-05.1",
+      "documentDigest": "sha256:c5e4e49a1b4cfa2cc05d35014aacfd70f977a924cc0eb59893a3ef91beac5513",
+      "sourceKind": "test-fixture",
+      "sourceHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "publishedAt": "2026-09-05T09:00:00Z",
+      "retrievedAt": "2026-09-05T08:55:00Z",
+      "currency": "USD",
+      "currencyScale": 9
+    },
+    "policy": {
+      "id": "apqp_105a7678dfd8e2ada46cf89f66971dd4",
+      "version": "2026-09-05.1",
+      "documentDigest": "sha256:08fccdb41803ced59a896c67d05068be8b81215763f4afcd973a768017f0aa14",
+      "maximumSourceAgeSeconds": 604800,
+      "reportValiditySeconds": 86400,
+      "maximumFutureSkewSeconds": 300
+    },
+    "measurements": {
+      "entryCount": 1,
+      "requiredScopeCount": 1,
+      "coveredScopeCount": 1,
+      "missingScopeCount": 0,
+      "ambiguousScopeCount": 0,
+      "overlappingEntryPairCount": 0
+    },
+    "checks": [
+      {"id": "source-profile", "status": "passed"},
+      {"id": "source-freshness", "status": "passed"},
+      {"id": "publication-order", "status": "passed"},
+      {"id": "non-overlapping-entries", "status": "passed"},
+      {"id": "required-scope-coverage", "status": "passed"}
+    ],
+    "summary": {
+      "totalChecks": 5,
+      "passedChecks": 5,
+      "failedChecks": 0,
+      "overallStatus": "qualified"
+    }
+  }
+}

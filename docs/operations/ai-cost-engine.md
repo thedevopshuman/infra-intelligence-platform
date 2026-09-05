@@ -27,6 +27,40 @@ The engine has no provider credential and makes no network request. Updating a
 catalog is a reviewed deployment/configuration operation, not automatic price
 scraping.
 
+## Pre-promotion catalog qualification
+
+Create a protected `AiPriceCatalogQualificationPolicy` containing the exact
+commercial scopes the tenant expects. Then generate minimized evidence for the
+candidate catalog:
+
+```bash
+PYTHONPATH=src:sdks/python/src .venv/bin/python \
+  scripts/qualify_ai_price_catalog.py generate \
+  --catalog /protected/candidate-catalog.json \
+  --policy /protected/catalog-policy.json \
+  --qualification-level production-catalog \
+  --output dist/ai-price-catalog-qualification-report.json
+```
+
+The production level rejects fixture sources, stale material, invalid
+publication ordering, overlapping entries, and any required scope with zero or
+multiple matches. Verify a retained report against the exact inputs and its
+validity window before review or promotion:
+
+```bash
+PYTHONPATH=src:sdks/python/src .venv/bin/python \
+  scripts/qualify_ai_price_catalog.py verify \
+  --report dist/ai-price-catalog-qualification-report.json \
+  --catalog /protected/candidate-catalog.json \
+  --policy /protected/catalog-policy.json
+```
+
+The report omits rates, model names, source locators, and required-scope
+details. It proves deterministic static qualification only; it does not prove
+that the upstream source is authoritative, that negotiated prices are correct,
+or that an organization approved promotion. Runtime enforcement of a current
+production report remains a separate explicit boundary.
+
 ## Configuration shape
 
 `IIP_AI_PRICE_CATALOGS_JSON` is a closed wrapper containing exactly one catalog

@@ -33,8 +33,8 @@ def rendered_profile() -> dict[str, object]:
         "schemaVersion": "1",
         "chart": {
             "name": "infra-intelligence",
-            "version": "0.81.0",
-            "applicationVersion": "0.78.0",
+            "version": "0.82.0",
+            "applicationVersion": "0.79.0",
         },
         "image": {
             "repository": "registry.example.test/iip/control-plane",

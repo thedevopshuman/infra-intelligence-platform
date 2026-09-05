@@ -24,6 +24,9 @@ flowchart LR
     Attribution --> AttributionFacts["Immutable attribution facts"]
     Ledger --> Cost["Versioned cost engine"]
     Catalog["Protected price catalog"] --> Cost
+    PricePolicy["Protected qualification policy"] --> Qualification["Catalog qualification"]
+    Catalog --> Qualification
+    Qualification --> PriceEvidence["Minimized qualification evidence"]
     Cost --> Facts["Calculated cost facts"]
     Facts --> Rules["Deterministic savings rules"]
     Rules --> Findings["Evidence-backed findings"]
@@ -94,6 +97,14 @@ catalog entry, and resulting amount.
 data, does not include discounts or commitments unless represented by an exact
 catalog entry, and can be recomputed without altering the source usage record.
 Future reconciliation with provider billing creates separate variance facts.
+
+Before production promotion, the offline catalog qualifier can bind one exact
+catalog to a protected required-scope policy and prove source freshness,
+publication order, non-overlapping effective prices, and unique required
+coverage. Its immutable report carries only digests, timestamps, currency, and
+aggregate counts—not prices, model names, source locators, or scope details.
+This evidence does not choose an authoritative source or grant runtime
+promotion authority; those remain explicit customer decisions.
 
 ## Application and team attribution
 

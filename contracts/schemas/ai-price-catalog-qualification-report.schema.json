@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-price-catalog-qualification-report:v1alpha1",
+  "title": "AI Price Catalog Qualification Report",
+  "description": "Immutable minimized evidence that an exact AI price catalog satisfies a protected qualification policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "AiPriceCatalogQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "generatedAt", "validUntil"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^apq_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "validUntil": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationLevel", "qualifierVersion", "catalog", "policy", "measurements", "checks", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "unqualified"]},
+        "qualificationLevel": {"enum": ["offline-static", "production-catalog"]},
+        "qualifierVersion": {"const": "0.1.0"},
+        "catalog": {"$ref": "#/$defs/catalog"},
+        "policy": {"$ref": "#/$defs/policy"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "checks": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "prefixItems": [
+            {"$ref": "#/$defs/sourceProfileCheck"},
+            {"$ref": "#/$defs/sourceFreshnessCheck"},
+            {"$ref": "#/$defs/publicationOrderCheck"},
+            {"$ref": "#/$defs/nonOverlappingEntriesCheck"},
+            {"$ref": "#/$defs/requiredScopeCoverageCheck"}
+          ],
+          "items": false
+        },
+        "summary": {"$ref": "#/$defs/summary"}
+      }
+    }
+  },
+  "$defs": {
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "documentDigest", "sourceKind", "sourceHash", "publishedAt", "retrievedAt", "currency", "currencyScale"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^apc_[a-f0-9]{32}$"},
+        "version": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][0-9]+$"},
+        "documentDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "sourceKind": {"enum": ["provider-published", "operator-managed", "test-fixture"]},
+        "sourceHash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "publishedAt": {"type": "string", "format": "date-time"},
+        "retrievedAt": {"type": "string", "format": "date-time"},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "currencyScale": {"type": "integer", "enum": [6, 9, 12]}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "documentDigest", "maximumSourceAgeSeconds", "reportValiditySeconds", "maximumFutureSkewSeconds"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^apqp_[a-f0-9]{32}$"},
+        "version": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][0-9]+$"},
+        "documentDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "maximumSourceAgeSeconds": {"type": "integer", "minimum": 300, "maximum": 31536000},
+        "reportValiditySeconds": {"type": "integer", "minimum": 60, "maximum": 2592000},
+        "maximumFutureSkewSeconds": {"type": "integer", "minimum": 0, "maximum": 300}
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entryCount", "requiredScopeCount", "coveredScopeCount", "missingScopeCount", "ambiguousScopeCount", "overlappingEntryPairCount"],
+      "properties": {
+        "entryCount": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "requiredScopeCount": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "coveredScopeCount": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "missingScopeCount": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "ambiguousScopeCount": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "overlappingEntryPairCount": {"type": "integer", "minimum": 0, "maximum": 49995000}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "sourceProfileCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "source-profile"}}}]},
+    "sourceFreshnessCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "source-freshness"}}}]},
+    "publicationOrderCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "publication-order"}}}]},
+    "nonOverlappingEntriesCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "non-overlapping-entries"}}}]},
+    "requiredScopeCoverageCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "required-scope-coverage"}}}]},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+      "properties": {
+        "totalChecks": {"const": 5},
+        "passedChecks": {"type": "integer", "minimum": 0, "maximum": 5},
+        "failedChecks": {"type": "integer", "minimum": 0, "maximum": 5},
+        "overallStatus": {"enum": ["qualified", "unqualified"]}
+      }
+    }
+  }
+}

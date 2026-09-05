@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -30,6 +30,9 @@ IIP_RELEASE_SIGNATURE_POLICY ?=
 IIP_RELEASE_SIGNATURE_REPORT ?= dist/release-signature-verification-report.json
 IIP_RELEASE_VULNERABILITY_POLICY ?= contracts/examples/release-vulnerability-policy.json
 IIP_RELEASE_VULNERABILITY_REPORT ?= dist/release-vulnerability-qualification-report.json
+IIP_AI_PRICE_CATALOG_FILE ?=
+IIP_AI_PRICE_QUALIFICATION_POLICY ?=
+IIP_AI_PRICE_QUALIFICATION_REPORT ?= dist/ai-price-catalog-qualification-report.json
 
 help:
 	@echo "install-verify-deps Install pinned verification-only Python dependencies"
@@ -62,6 +65,9 @@ help:
 	@echo "test-otel     Send reference metrics and traces to an OpenTelemetry Collector"
 	@echo "test-otlp-receiver Send official OTLP metrics, logs, and AI usage-to-cost traces"
 	@echo "test-ai-finops Prove the local multi-provider AI economics slice"
+	@echo "test-ai-price-catalog-qualification Validate deterministic minimized catalog evidence"
+	@echo "qualify-ai-price-catalog Qualify an exact production catalog against protected scopes"
+	@echo "verify-ai-price-catalog-report Verify a retained current catalog qualification report"
 	@echo "test-bedrock-instrumentation Qualify pinned Bedrock Converse and ConverseStream instrumentation offline"
 	@echo "test-bedrock-live Make one explicitly enabled live Bedrock compatibility call"
 	@echo "test-openai-instrumentation Qualify pinned official OpenAI instrumentation offline"
@@ -267,6 +273,31 @@ test-otlp-receiver:
 
 test-ai-finops:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_ai_finops.sh
+
+test-ai-price-catalog-qualification:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_ai_price_catalog_qualification -v
+
+qualify-ai-price-catalog:
+	@test -n "$(IIP_AI_PRICE_CATALOG_FILE)" || \
+		(echo "IIP_AI_PRICE_CATALOG_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_AI_PRICE_QUALIFICATION_POLICY)" || \
+		(echo "IIP_AI_PRICE_QUALIFICATION_POLICY is required" >&2; exit 2)
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/qualify_ai_price_catalog.py generate \
+		--catalog "$(IIP_AI_PRICE_CATALOG_FILE)" \
+		--policy "$(IIP_AI_PRICE_QUALIFICATION_POLICY)" \
+		--qualification-level production-catalog \
+		--output "$(IIP_AI_PRICE_QUALIFICATION_REPORT)"
+
+verify-ai-price-catalog-report:
+	@test -n "$(IIP_AI_PRICE_CATALOG_FILE)" || \
+		(echo "IIP_AI_PRICE_CATALOG_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_AI_PRICE_QUALIFICATION_POLICY)" || \
+		(echo "IIP_AI_PRICE_QUALIFICATION_POLICY is required" >&2; exit 2)
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/qualify_ai_price_catalog.py verify \
+		--report "$(IIP_AI_PRICE_QUALIFICATION_REPORT)" \
+		--catalog "$(IIP_AI_PRICE_CATALOG_FILE)" \
+		--policy "$(IIP_AI_PRICE_QUALIFICATION_POLICY)"
 
 test-bedrock-instrumentation:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_BEDROCK_COMPATIBILITY_MODE=offline \

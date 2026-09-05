@@ -18,6 +18,8 @@ export type AiUsageRecordId = `aiu_${string}`;
 export type AiAttributionPolicyId = `aap_${string}`;
 export type AiUsageAttributionRecordId = `aia_${string}`;
 export type AiPriceCatalogId = `apc_${string}`;
+export type AiPriceCatalogQualificationPolicyId = `apqp_${string}`;
+export type AiPriceCatalogQualificationReportId = `apq_${string}`;
 export type AiCostRecordId = `aic_${string}`;
 export type AiSavingsFindingId = `aif_${string}`;
 export type AiModelSuitabilityReportId = `ams_${string}`;
@@ -320,6 +322,93 @@ export interface AiPriceCatalog {
       contentHash: Sha256Digest;
     };
     entries: AiPriceCatalogEntry[];
+  };
+}
+
+export interface AiPriceCatalogQualificationScope {
+  provider: string;
+  modelId: string;
+  region: string;
+  serviceTier: AiServiceTier;
+  routingMode: AiRoutingMode;
+  purchaseMode: AiPurchaseMode;
+  effectiveAt: string;
+}
+
+export interface AiPriceCatalogQualificationPolicy {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiPriceCatalogQualificationPolicy";
+  metadata: {
+    id: AiPriceCatalogQualificationPolicyId;
+    tenantId: string;
+    version: string;
+  };
+  spec: {
+    maximumSourceAgeSeconds: number;
+    reportValiditySeconds: number;
+    maximumFutureSkewSeconds: number;
+    requiredScopes: AiPriceCatalogQualificationScope[];
+  };
+}
+
+export type AiPriceCatalogQualificationCheckId =
+  | "source-profile"
+  | "source-freshness"
+  | "publication-order"
+  | "non-overlapping-entries"
+  | "required-scope-coverage";
+
+export interface AiPriceCatalogQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiPriceCatalogQualificationReport";
+  metadata: {
+    id: AiPriceCatalogQualificationReportId;
+    tenantId: string;
+    generatedAt: string;
+    validUntil: string;
+  };
+  spec: {
+    status: "qualified" | "unqualified";
+    qualificationLevel: "offline-static" | "production-catalog";
+    qualifierVersion: "0.1.0";
+    catalog: {
+      id: AiPriceCatalogId;
+      version: string;
+      documentDigest: Sha256Digest;
+      sourceKind: "provider-published" | "operator-managed" | "test-fixture";
+      sourceHash: Sha256Digest;
+      publishedAt: string;
+      retrievedAt: string;
+      currency: string;
+      currencyScale: AiCurrencyScale;
+    };
+    policy: {
+      id: AiPriceCatalogQualificationPolicyId;
+      version: string;
+      documentDigest: Sha256Digest;
+      maximumSourceAgeSeconds: number;
+      reportValiditySeconds: number;
+      maximumFutureSkewSeconds: number;
+    };
+    measurements: {
+      entryCount: number;
+      requiredScopeCount: number;
+      coveredScopeCount: number;
+      missingScopeCount: number;
+      ambiguousScopeCount: number;
+      overlappingEntryPairCount: number;
+    };
+    checks: Array<{
+      id: AiPriceCatalogQualificationCheckId;
+      status: "passed" | "failed";
+      errorCode?: string;
+    }>;
+    summary: {
+      totalChecks: 5;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "qualified" | "unqualified";
+    };
   };
 }
 

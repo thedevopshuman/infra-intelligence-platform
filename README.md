@@ -106,7 +106,12 @@ retry monetary savings remain explicitly unresolved until billed-attempt
 evidence exists. Lower-cost model findings require a protected, immutable,
 time-bounded suitability report proving workload-specific quality, latency,
 safety, and compliance gates; price difference alone cannot create a
-recommendation. Separate bounded projections export request/token volume,
+recommendation. An offline provider-neutral catalog qualifier now binds an
+exact catalog to a protected required-scope policy and proves source freshness,
+publication order, non-overlapping effective prices, and unique coverage. Its
+tamper-evident report contains digests and aggregate counts—not negotiated
+rates, model names, source locators, or credentials—and does not choose an
+authoritative source or grant promotion authority. Separate bounded projections export request/token volume,
 pricing coverage, calculated cost, context change, retry change, qualified
 model-cost difference, and potential saving through the existing OTLP metrics
 boundary. A disposable

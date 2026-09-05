@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "IngressAvailabilityQualificationReport",
   "metadata": {
-    "id": "iaq_fe97096a8227cc8e1d49aee674ca7844",
+    "id": "iaq_c693a23149f518c4d9a2d78f4c9bcaaf",
     "generatedAt": "2026-09-06T12:00:05Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
@@ -12,12 +12,12 @@
     "qualificationLevel": "customer-ingress",
     "targetBindingDigest": "sha256:67f7aaa3a40b5a2a295d84c806d41b6a1f226a432f8ebe6742019f464f6f4c1f",
     "targetIdentity": {
-      "applicationVersion": "0.78.0",
+      "applicationVersion": "0.79.0",
       "contractsApiVersion": "iip.platform/v1alpha1",
       "requiredMigration": "0023_ai_model_suitability.sql",
       "buildMode": "release",
       "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
-      "chartVersion": "0.81.0",
+      "chartVersion": "0.82.0",
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "objective": {

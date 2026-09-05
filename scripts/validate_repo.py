@@ -425,7 +425,12 @@ REQUIRED_PATHS = (
     "docs/specifications/release-vulnerability-qualification-report-contract.md",
     "docs/specifications/resource-change-evidence-contract.md",
     "docs/specifications/ai-model-suitability-report-contract.md",
+    "docs/specifications/ai-price-catalog-qualification-contract.md",
     "docs/decisions/0111-qualified-expensive-model-anomaly.md",
+    "docs/decisions/0112-minimized-ai-price-catalog-qualification.md",
+    "scripts/qualify_ai_price_catalog.py",
+    "src/iip/application/qualify_ai_price_catalog.py",
+    "tests/test_ai_price_catalog_qualification.py",
     "requirements/verify.in",
     "requirements/verify.txt",
     "scripts/validate_schemas.py",
@@ -4099,6 +4104,12 @@ def validate_ai_economics_examples(
         example_dir / "ai-usage-attribution-record.json"
     )
     attribution_event = documents.get(example_dir / "ai-usage-attributed-event.json")
+    price_qualification_policy = documents.get(
+        example_dir / "ai-price-catalog-qualification-policy.json"
+    )
+    price_qualification_report = documents.get(
+        example_dir / "ai-price-catalog-qualification-report.json"
+    )
     named = {
         "AI usage": usage,
         "AI price catalog": catalog,
@@ -4110,6 +4121,8 @@ def validate_ai_economics_examples(
         "AI attribution policy": attribution_policy,
         "AI usage attribution": attribution_record,
         "AI attribution event": attribution_event,
+        "AI price qualification policy": price_qualification_policy,
+        "AI price qualification report": price_qualification_report,
     }
     for label, document in named.items():
         if not isinstance(document, dict):
@@ -4127,6 +4140,23 @@ def validate_ai_economics_examples(
     assert isinstance(attribution_policy, dict)
     assert isinstance(attribution_record, dict)
     assert isinstance(attribution_event, dict)
+    assert isinstance(price_qualification_policy, dict)
+    assert isinstance(price_qualification_report, dict)
+
+    from iip.application.qualify_ai_price_catalog import (
+        AiPriceCatalogQualificationError,
+        verify_ai_price_catalog_qualification_report,
+    )
+
+    try:
+        verify_ai_price_catalog_qualification_report(
+            price_qualification_report,
+            catalog,
+            price_qualification_policy,
+            evaluated_at="2026-09-05T12:00:00Z",
+        )
+    except AiPriceCatalogQualificationError:
+        fail(errors, "AI price qualification examples must recalculate exactly")
 
     tenant_ids = {
         document.get("metadata", {}).get("tenantId")
@@ -4477,6 +4507,14 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("ai-attribution-policy.json", "AiAttributionPolicy"),
         ("ai-usage-attribution-record.json", "AiUsageAttributionRecord"),
         ("ai-price-catalog.json", "AiPriceCatalog"),
+        (
+            "ai-price-catalog-qualification-policy.json",
+            "AiPriceCatalogQualificationPolicy",
+        ),
+        (
+            "ai-price-catalog-qualification-report.json",
+            "AiPriceCatalogQualificationReport",
+        ),
         ("ai-cost-record.json", "AiCostRecord"),
         ("ai-savings-finding.json", "AiSavingsFinding"),
         ("ai-retry-savings-finding.json", "AiSavingsFinding"),

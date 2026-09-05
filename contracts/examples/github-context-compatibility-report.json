@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "GithubContextCompatibilityReport",
   "metadata": {
-    "id": "gcr_8e9a3a8c9be267944960e9cfcbd8d43d",
+    "id": "gcr_80cb5306566152901c12f0d6d5ac619c",
     "generatedAt": "2026-09-06T12:00:00Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
@@ -12,7 +12,7 @@
     "environment": {
       "platform": "darwin/arm64",
       "pythonVersion": "3.14.3",
-      "applicationVersion": "0.78.0"
+      "applicationVersion": "0.79.0"
     },
     "profile": {
       "name": "local-github-rest-contents-v1",

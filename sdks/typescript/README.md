@@ -46,7 +46,8 @@ TypeScript package intentionally provides types only because Unix-domain socket
 transport is runtime-specific.
 
 `AiUsageRecord`, `AiAttributionPolicy`, `AiUsageAttributionRecord`,
-`AiPriceCatalog`, `AiCostRecord`, `AiSavingsFinding`, `AiModelSuitabilityReport`,
+`AiPriceCatalog`, `AiPriceCatalogQualificationPolicy`,
+`AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`, `AiModelSuitabilityReport`,
 and `AiAllocationReport`
 describe the
 metadata-only AI economics ledger. The SDK does not instrument or
@@ -82,6 +83,10 @@ Version 0.40 adds `InvestigationSignalPlan` and `InvestigationSignalPromotion` f
 Version 0.46 adds vendor-neutral AI usage, price catalog, calculated-cost, and
 evidence-backed savings record types without adding a provider or
 instrumentation dependency.
+
+Version 0.56 adds protected price-catalog qualification policy and minimized
+report types without a provider pricing client, promotion method, or negotiated
+rate exposure.
 
 Version 0.47 adds protected attribution-policy and immutable usage-attribution
 record types without exposing policy installation or workload-controlled

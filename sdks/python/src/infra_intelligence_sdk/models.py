@@ -3677,6 +3677,58 @@ class AiPriceCatalog:
 
 
 @dataclass(frozen=True)
+class AiPriceCatalogQualificationPolicy:
+    """Protected freshness and exact-scope requirements for a price catalog."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "AiPriceCatalogQualificationPolicy":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiPriceCatalogQualificationPolicy",
+                label="AI price catalog qualification policy",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class AiPriceCatalogQualificationReport:
+    """Minimized reproducible evidence for one exact price catalog and policy."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "AiPriceCatalogQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiPriceCatalogQualificationReport",
+                label="AI price catalog qualification report",
+            )
+        )
+
+    @property
+    def status(self) -> Optional[str]:
+        spec = self.payload.get("spec")
+        value = spec.get("status") if isinstance(spec, Mapping) else None
+        return value if isinstance(value, str) else None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class AiCostRecord:
     """Explainable calculated-cost result for one AI usage record."""
 

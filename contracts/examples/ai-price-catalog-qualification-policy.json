@@ -1,0 +1,25 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiPriceCatalogQualificationPolicy",
+  "metadata": {
+    "id": "apqp_105a7678dfd8e2ada46cf89f66971dd4",
+    "tenantId": "local",
+    "version": "2026-09-05.1"
+  },
+  "spec": {
+    "maximumSourceAgeSeconds": 604800,
+    "reportValiditySeconds": 86400,
+    "maximumFutureSkewSeconds": 300,
+    "requiredScopes": [
+      {
+        "provider": "aws.bedrock",
+        "modelId": "example.foundation-model-v1:0",
+        "region": "us-east-1",
+        "serviceTier": "standard",
+        "routingMode": "in-region",
+        "purchaseMode": "on-demand",
+        "effectiveAt": "2026-09-05T10:00:00Z"
+      }
+    ]
+  }
+}

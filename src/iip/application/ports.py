@@ -634,6 +634,22 @@ class AiUsageLedger(Protocol):
         """Atomically persist normalized usage and events with exact deduplication."""
 
 
+@dataclass(frozen=True)
+class AiSavingsCohortQuery:
+    """Exact bounded scope used by deterministic AI savings rules."""
+
+    provider: str
+    model_id: str
+    region: str
+    service_name: str
+    deployment_environment: str
+    start: str
+    end: str
+    catalog_id: str
+    engine_version: str
+    limit: int
+
+
 class AiEconomicsLedger(AiUsageLedger, Protocol):
     def register_price_catalog(
         self,
@@ -659,6 +675,21 @@ class AiEconomicsLedger(AiUsageLedger, Protocol):
         events: tuple[PlatformEvent, ...],
     ) -> tuple[Mapping[str, object], ...]:
         """Atomically persist cost records and their event/outbox side effects."""
+
+    def list_ai_savings_cohort(
+        self,
+        actor: ActorContext,
+        query: AiSavingsCohortQuery,
+    ) -> tuple[tuple[Mapping[str, object], Mapping[str, object] | None], ...]:
+        """List scoped usage with the exact requested cost result when present."""
+
+    def commit_ai_savings_batch(
+        self,
+        actor: ActorContext,
+        findings: tuple[Mapping[str, object], ...],
+        events: tuple[PlatformEvent, ...],
+    ) -> tuple[Mapping[str, object], ...]:
+        """Atomically persist savings findings and their event/outbox side effects."""
 
 
 class EventOutbox(Protocol):

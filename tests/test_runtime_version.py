@@ -43,7 +43,7 @@ def identity(**overrides: object) -> RuntimeVersionIdentity:
     values: dict[str, object] = {
         "application_version": "0.63.0",
         "contract_api_version": "iip.platform/v1alpha1",
-        "required_storage_migration": "0019_ai_cost_ledger.sql",
+        "required_storage_migration": "0020_ai_savings_ledger.sql",
         "build_revision": REVISION,
         "helm_chart_version": "0.63.0",
         "image_digest": DIGEST,

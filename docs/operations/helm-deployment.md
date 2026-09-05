@@ -13,6 +13,12 @@ an exact tenant enrollment, and `aiCostEngine.catalogsExistingSecret`; fixture
 pricing remains separately prohibited by default. Follow the
 [AI cost-engine runbook](ai-cost-engine.md) before enabling it.
 
+The optional AI savings engine is also worker-owned and disabled by default.
+It requires the cost engine, exact worker tenant enrollment, and a protected
+profile wrapper from an existing Secret. `aiSavingsEngine` configuration is
+never projected into the API or OTLP receiver. Follow the
+[AI savings-engine runbook](ai-savings-engine.md) before enabling it.
+
 ## Required inputs
 
 Before installation, provide:

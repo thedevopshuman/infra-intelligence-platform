@@ -106,10 +106,36 @@ A finding is a deterministic rule result. It freezes rule ID/version,
 attribution, baseline and current windows, observations, confidence, potential
 saving calculation, recommendation, and evidence references.
 
-The initial categories are `context-growth`, `retry-amplification`, and
-`expensive-model-anomaly`. Only a rule with complete source facts and a
-declared minimum cohort may emit a finding. Potential savings can be
-`calculated` or `unpriced`; a missing price is never zero savings.
+The contract reserves `context-growth`, `retry-amplification`, and
+`expensive-model-anomaly`. The executable V0 runtime supports only
+`context-growth` version `1.0.0`; accepting another category in the public
+schema does not claim that its evaluator exists. Only a rule with complete
+source facts and a declared minimum cohort may emit a finding. Potential
+savings can be `calculated` or `unpriced`; a missing price is never zero
+savings. The V0 runtime emits only a calculated finding and emits no finding
+when exact pricing is unavailable.
+
+The V0 profile fixes adjacent, equal-duration baseline and current windows and
+the exact tenant, provider, model, region, service, deployment environment,
+catalog, cost-engine version, request minimum, record ceiling, growth
+threshold, and grace period. Only successful, complete records with zero
+cache-read and cache-write input qualify. Both cohorts must use one currency
+and scale; the current cohort must use one uncached-input rate.
+
+V0 uses integer half-up arithmetic:
+
+```text
+mean = roundHalfUp(sum(inputTokens) / sampleCount)
+changeBasisPoints = roundHalfUp((currentMean - baselineMean) * 10000 / baselineMean)
+excessQuantity = (currentMean - baselineMean) * currentSampleCount
+amountSubunits = roundHalfUp(excessQuantity * currentRate / 1000000)
+```
+
+Every qualifying finding cites all usage and cost records used by the formula.
+Its identifier is the first 32 hexadecimal characters of the canonical
+specification SHA-256 digest with the `aif_` prefix. Evaluation time is not an
+identity input. Persistence must revalidate the exact source cohort and
+calculation before commit.
 
 Recommendations are advisory and always set `requiresValidation: true`. A
 lower-cost model suggestion requires separate workload-specific quality,
@@ -126,6 +152,12 @@ content or pricing.
 contains usage, catalog, status, provider, model, and service routing identity,
 but never contains quantities, rates, monetary totals, or catalog contents.
 An exact retry creates no second cost event.
+
+`io.iip.ai.savings-finding-recorded.v1` commits atomically with a new savings
+finding. Its data contains the finding and rule identities plus bounded
+category, severity, provider, model, and service routing dimensions. It omits
+windows, samples, quantities, rates, currency, monetary values, and evidence
+record IDs. An exact deterministic retry creates no second finding or event.
 
 ## Compatibility
 

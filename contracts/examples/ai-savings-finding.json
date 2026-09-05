@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "AiSavingsFinding",
   "metadata": {
-    "id": "aif_33333333333333333333333333333333",
+    "id": "aif_a80f20ce53c6833a008c552e0e562f98",
     "tenantId": "local",
     "evaluatedAt": "2026-09-05T11:00:00Z"
   },

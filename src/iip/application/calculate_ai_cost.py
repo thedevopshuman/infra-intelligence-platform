@@ -386,6 +386,16 @@ def validate_ai_cost_record(document: object) -> Mapping[str, object]:
     return root
 
 
+def validate_ai_usage_for_economics(
+    document: object,
+    *,
+    expected_tenant: str,
+) -> Mapping[str, object]:
+    """Validate one stored usage fact for a downstream economics use case."""
+
+    return _usage_input(document, expected_tenant=expected_tenant)
+
+
 def _price_entry(value: object) -> AiPriceEntry:
     entry = _closed(
         value,
@@ -546,6 +556,8 @@ def _usage_input(value: object, *, expected_tenant: str) -> Mapping[str, object]
         "started_at": started_at,
         "trace_id": trace_id,
         "service_name": service_name,
+        "deployment_environment": attribution.get("deploymentEnvironment"),
+        "outcome": invocation["outcome"],
         "completeness": usage["completeness"],
         "missing_fields": tuple(missing),
         **quantities,
@@ -841,5 +853,6 @@ __all__ = [
     "ValidatedAiPriceCatalog",
     "calculate_ai_cost_record",
     "validate_ai_cost_record",
+    "validate_ai_usage_for_economics",
     "validate_ai_price_catalog",
 ]

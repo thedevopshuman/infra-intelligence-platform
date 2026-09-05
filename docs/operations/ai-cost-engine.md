@@ -103,9 +103,11 @@ application parser's defensive maximum. Split larger tenant fleets across
 separately enrolled worker releases until a protected catalog service is
 accepted. Never place catalog bodies directly in a committed values file.
 
-Apply packaged migrations through `0019_ai_cost_ledger.sql` before enabling the
-worker. The migration hook remains database-only; serving workloads never
-apply schema changes.
+Apply packaged migrations through `0020_ai_savings_ledger.sql` before enabling
+the worker. The cost ledger itself is introduced by
+`0019_ai_cost_ledger.sql`; the later migration adds the separately operated
+savings ledger. The migration hook remains database-only; serving workloads
+never apply schema changes.
 
 ## Calculation and unresolved coverage
 
@@ -166,5 +168,7 @@ and verifies the linked priced cost fact and cost event/outbox row:
 make test-otlp-receiver PYTHON=.venv/bin/python
 ```
 
-The context-growth saving rule, bounded aggregate export, dashboard, and real
-Bedrock instrumentation qualification are separate Phase A exit work.
+The context-growth rule is executable and documented in the
+[AI savings-engine runbook](ai-savings-engine.md). Bounded aggregate export,
+the dashboard, and real Bedrock instrumentation qualification remain separate
+Phase A exit work.

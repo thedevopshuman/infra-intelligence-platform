@@ -84,10 +84,10 @@ partial usage and preventing an unsupported exact cost.
 
 ## Run the isolated process
 
-Apply all packaged migrations through `0019_ai_cost_ledger.sql`, then configure
-the receiver. The usage ledger itself is introduced by
-`0018_ai_usage_ledger.sql`; the later migration adds the separately operated
-price and cost ledgers:
+Apply all packaged migrations through `0020_ai_savings_ledger.sql`, then
+configure the receiver. The usage ledger itself is introduced by
+`0018_ai_usage_ledger.sql`; migrations `0019` and `0020` add the separately
+operated price/cost and savings ledgers:
 
 ```bash
 export IIP_DATABASE_URL=postgresql://...

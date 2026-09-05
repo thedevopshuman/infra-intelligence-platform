@@ -149,6 +149,7 @@ REQUIRED_PATHS = (
     "docs/operations/otlp-metrics-receiver.md",
     "docs/operations/ai-usage-receiver.md",
     "docs/operations/ai-cost-engine.md",
+    "docs/operations/ai-savings-engine.md",
     "docs/operations/log-evidence.md",
     "docs/operations/resource-change-evidence.md",
     "docs/operations/postgresql-backup-restore.md",
@@ -233,6 +234,7 @@ REQUIRED_PATHS = (
     "contracts/examples/ai-savings-finding.json",
     "contracts/examples/ai-usage-recorded-event.json",
     "contracts/examples/ai-cost-calculated-event.json",
+    "contracts/examples/ai-savings-finding-event.json",
     "contracts/examples/evidence-retention-report.json",
     "contracts/examples/credential-lease-request.json",
     "contracts/examples/credential-lease.json",
@@ -375,8 +377,11 @@ REQUIRED_PATHS = (
     "src/iip/adapters/otlp_ai_usage_receiver.py",
     "src/iip/adapters/ai_usage_store.py",
     "src/iip/application/calculate_ai_cost.py",
+    "src/iip/application/evaluate_ai_savings.py",
     "src/iip/adapters/ai_cost_store.py",
     "src/iip/adapters/ai_price_catalogs.py",
+    "src/iip/adapters/ai_savings_store.py",
+    "src/iip/adapters/ai_savings_profiles.py",
     "src/iip/adapters/postgres/migrations/0006_source_checkpoint_provider_cursors.sql",
     "src/iip/adapters/postgres/migrations/0007_investigation_lifecycle.sql",
     "src/iip/adapters/postgres/migrations/0008_action_execution_lifecycle.sql",
@@ -389,10 +394,12 @@ REQUIRED_PATHS = (
     "src/iip/adapters/postgres/migrations/0017_telemetry_export_slo_samples.sql",
     "src/iip/adapters/postgres/migrations/0018_ai_usage_ledger.sql",
     "src/iip/adapters/postgres/migrations/0019_ai_cost_ledger.sql",
+    "src/iip/adapters/postgres/migrations/0020_ai_savings_ledger.sql",
     "src/iip/adapters/postgres/health.py",
     "tests/test_evidence_collection.py",
     "tests/test_ai_usage_receiver.py",
     "tests/test_ai_cost_engine.py",
+    "tests/test_ai_savings_engine.py",
     "tests/test_telemetry_export_health.py",
     "tests/test_kubernetes_event_evidence.py",
     "tests/test_telemetry_evidence.py",
@@ -3328,6 +3335,7 @@ def validate_ai_economics_examples(
     finding = documents.get(example_dir / "ai-savings-finding.json")
     event = documents.get(example_dir / "ai-usage-recorded-event.json")
     cost_event = documents.get(example_dir / "ai-cost-calculated-event.json")
+    savings_event = documents.get(example_dir / "ai-savings-finding-event.json")
     named = {
         "AI usage": usage,
         "AI price catalog": catalog,
@@ -3335,6 +3343,7 @@ def validate_ai_economics_examples(
         "AI savings finding": finding,
         "AI usage event": event,
         "AI cost event": cost_event,
+        "AI savings event": savings_event,
     }
     for label, document in named.items():
         if not isinstance(document, dict):
@@ -3348,6 +3357,7 @@ def validate_ai_economics_examples(
     assert isinstance(finding, dict)
     assert isinstance(event, dict)
     assert isinstance(cost_event, dict)
+    assert isinstance(savings_event, dict)
 
     tenant_ids = {
         document.get("metadata", {}).get("tenantId")
@@ -3489,6 +3499,17 @@ def validate_ai_economics_examples(
                     fail(errors, f"AI cost line {category} amount is not half-up rounded")
 
     finding_spec = finding.get("spec", {})
+    expected_finding_digest = hashlib.sha256(
+        json.dumps(
+            finding_spec,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    if finding.get("metadata", {}).get("id") != "aif_" + expected_finding_digest[:32]:
+        fail(errors, "AI savings finding ID must bind its canonical specification")
     rule = finding_spec.get("rule", {}) if isinstance(finding_spec, dict) else {}
     finding_value = finding_spec.get("finding", {}) if isinstance(finding_spec, dict) else {}
     if rule.get("id") != finding_value.get("category"):
@@ -3563,6 +3584,30 @@ def validate_ai_economics_examples(
         or cost_event_data.get("serviceName") != attribution.get("serviceName")
     ):
         fail(errors, "AI cost CloudEvent must match usage, catalog, and cost examples")
+
+    savings_event_data = savings_event.get("data", {})
+    finding_metadata = finding.get("metadata", {})
+    if (
+        savings_event.get("id") != "ai-savings-" + expected_finding_digest
+        or savings_event.get("tenantid") not in tenant_ids
+        or savings_event.get("subject") != finding_metadata.get("id")
+        or savings_event.get("type")
+        != "io.iip.ai.savings-finding-recorded.v1"
+        or savings_event_data.get("findingId") != finding_metadata.get("id")
+        or savings_event_data.get("ruleId") != rule.get("id")
+        or savings_event_data.get("ruleVersion") != rule.get("version")
+        or savings_event_data.get("category") != finding_value.get("category")
+        or savings_event_data.get("severity") != finding_value.get("severity")
+        or savings_event_data.get("provider") != scope.get("provider")
+        or savings_event_data.get("modelId") != scope.get("modelId")
+        or savings_event_data.get("serviceName") != scope.get("serviceName")
+    ):
+        fail(errors, "AI savings CloudEvent must match the finding example")
+    if any(
+        key in json.dumps(savings_event_data).lower()
+        for key in ("token", "amount", "price", "currency")
+    ):
+        fail(errors, "AI savings CloudEvent must omit quantities and monetary values")
 
 
 def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> None:

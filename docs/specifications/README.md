@@ -42,7 +42,7 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | Console authentication | [console-authentication-contract.md](console-authentication-contract.md) | `contracts/schemas/console-authentication.schema.json` | `contracts/examples/console-authentication-local.json`, `contracts/examples/console-authentication-oidc.json` |
 | Page information | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/page-info.schema.json` | `contracts/examples/page-info.json` |
 | Error | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/error.schema.json` | `contracts/examples/error.json` |
-| Event | [event-contract.md](event-contract.md) | `contracts/schemas/event.schema.json` | `contracts/examples/event.json`, `contracts/examples/ai-usage-recorded-event.json`, `contracts/examples/ai-cost-calculated-event.json` |
+| Event | [event-contract.md](event-contract.md) | `contracts/schemas/event.schema.json` | `contracts/examples/event.json`, `contracts/examples/ai-usage-recorded-event.json`, `contracts/examples/ai-cost-calculated-event.json`, `contracts/examples/ai-savings-finding-event.json` |
 | Evidence | [evidence-contract.md](evidence-contract.md) | `contracts/schemas/evidence.schema.json` | `contracts/examples/evidence.json` |
 | AI usage record | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-usage-record.schema.json` | `contracts/examples/ai-usage-record.json` |
 | AI price catalog | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-price-catalog.schema.json` | `contracts/examples/ai-price-catalog.json` |

@@ -20,9 +20,18 @@ from iip.adapters.ai_cost_store import (
     validate_ai_cost_actor,
     validate_ai_cost_usage_binding,
 )
+from iip.adapters.ai_savings_store import (
+    prepare_ai_savings_writes,
+    validate_ai_savings_query,
+)
 from iip.adapters.ai_usage_store import prepare_ai_usage_writes
+from iip.application.evaluate_ai_savings import (
+    InvalidAiSavingsInputError,
+    validate_context_growth_source_binding,
+)
 from iip.application.ports import (
     ActorContext,
+    AiSavingsCohortQuery,
     EventDeliverySloState,
     EventDeliveryState,
     OutboxMessage,
@@ -67,6 +76,7 @@ SCHEMA_MIGRATIONS = (
     "0017_telemetry_export_slo_samples.sql",
     "0018_ai_usage_ledger.sql",
     "0019_ai_cost_ledger.sql",
+    "0020_ai_savings_ledger.sql",
 )
 
 
@@ -801,6 +811,198 @@ class PostgresResourceStore:
 
             return tuple(
                 stored[(item.tenant_id, item.cost_record_id)]
+                for item in prepared
+            )
+
+    @_translate_database_errors
+    def list_ai_savings_cohort(
+        self,
+        actor: ActorContext,
+        query: AiSavingsCohortQuery,
+    ) -> tuple[tuple[Mapping[str, object], Mapping[str, object] | None], ...]:
+        """Read exact-scope successful usage with one requested calculation."""
+
+        validate_ai_savings_query(actor, query)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT usage.document AS usage_document,
+                       cost.document AS cost_document
+                FROM iip.ai_usage_records AS usage
+                LEFT JOIN iip.ai_cost_records AS cost
+                  ON cost.tenant_id = usage.tenant_id
+                 AND cost.usage_record_id = usage.usage_record_id
+                 AND cost.catalog_id = %s
+                 AND cost.engine_version = %s
+                WHERE usage.tenant_id = %s
+                  AND usage.provider = %s
+                  AND usage.model_id = %s
+                  AND usage.service_name = %s
+                  AND usage.document->'spec'->'invocation'->>'region' = %s
+                  AND usage.document->'spec'->'invocation'->>'outcome' = 'success'
+                  AND usage.document->'spec'->'attribution'
+                        ->>'deploymentEnvironment' = %s
+                  AND usage.invocation_started_at >= %s
+                  AND usage.invocation_started_at < %s
+                ORDER BY usage.invocation_started_at, usage.usage_record_id
+                LIMIT %s
+                """,
+                (
+                    query.catalog_id,
+                    query.engine_version,
+                    actor.tenant_id,
+                    query.provider,
+                    query.model_id,
+                    query.service_name,
+                    query.region,
+                    query.deployment_environment,
+                    query.start,
+                    query.end,
+                    query.limit,
+                ),
+            ).fetchall()
+        return tuple(
+            (row["usage_document"], row["cost_document"])
+            for row in rows
+        )
+
+    @_translate_database_errors
+    def commit_ai_savings_batch(
+        self,
+        actor: ActorContext,
+        findings: tuple[Mapping[str, object], ...],
+        events: tuple[PlatformEvent, ...],
+    ) -> tuple[Mapping[str, object], ...]:
+        """Commit source-bound savings findings, events, and outbox atomically."""
+
+        prepared = prepare_ai_savings_writes(actor, findings, events)
+        with self._connect() as connection:
+            for item in prepared:
+                connection.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (f"iip.ai-savings\x1f{item.tenant_id}\x1f{item.finding_id}",),
+                )
+            stored: dict[tuple[str, str], Mapping[str, object]] = {}
+            new_items = []
+            for item in prepared:
+                usage_rows = connection.execute(
+                    """
+                    SELECT document
+                    FROM iip.ai_usage_records
+                    WHERE tenant_id = %s
+                      AND provider = %s
+                      AND model_id = %s
+                      AND service_name = %s
+                      AND document->'spec'->'invocation'->>'region' = %s
+                      AND document->'spec'->'invocation'->>'outcome' = 'success'
+                      AND document->'spec'->'attribution'
+                            ->>'deploymentEnvironment' = %s
+                      AND invocation_started_at >= %s
+                      AND invocation_started_at < %s
+                    ORDER BY invocation_started_at, usage_record_id
+                    FOR SHARE
+                    """,
+                    (
+                        item.tenant_id,
+                        item.provider,
+                        item.model_id,
+                        item.service_name,
+                        item.region,
+                        item.deployment_environment,
+                        item.baseline_start,
+                        item.current_end,
+                    ),
+                ).fetchall()
+                usage_documents = tuple(row["document"] for row in usage_rows)
+                usage_ids = {
+                    document["metadata"]["id"]
+                    for document in usage_documents
+                }
+                if usage_ids != set(item.usage_record_ids):
+                    raise PersistenceError("storage.request.invalid")
+                cost_rows = connection.execute(
+                    """
+                    SELECT document
+                    FROM iip.ai_cost_records
+                    WHERE tenant_id = %s
+                      AND cost_record_id = ANY(%s)
+                    ORDER BY cost_record_id
+                    FOR SHARE
+                    """,
+                    (item.tenant_id, list(item.cost_record_ids)),
+                ).fetchall()
+                cost_documents = tuple(row["document"] for row in cost_rows)
+                if len(cost_documents) != len(item.cost_record_ids):
+                    raise PersistenceError("storage.request.invalid")
+                try:
+                    validate_context_growth_source_binding(
+                        item.document,
+                        usage_documents,
+                        cost_documents,
+                    )
+                except InvalidAiSavingsInputError:
+                    raise PersistenceError("storage.request.invalid") from None
+                row = connection.execute(
+                    """
+                    SELECT document_hash, document
+                    FROM iip.ai_savings_findings
+                    WHERE tenant_id = %s AND finding_id = %s
+                    FOR UPDATE
+                    """,
+                    (item.tenant_id, item.finding_id),
+                ).fetchone()
+                if row is not None:
+                    if row["document_hash"] != item.document_hash:
+                        raise PersistenceError("storage.conflict")
+                    stored[(item.tenant_id, item.finding_id)] = row["document"]
+                    continue
+                new_items.append(item)
+
+            for item in new_items:
+                connection.execute(
+                    """
+                    INSERT INTO iip.ai_savings_findings (
+                        tenant_id, finding_id, document_hash, rule_id,
+                        rule_version, severity, provider, model_id, region,
+                        service_name, deployment_environment, baseline_start,
+                        baseline_end, current_start, current_end, evaluated_at,
+                        document
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s
+                    )
+                    """,
+                    (
+                        item.tenant_id,
+                        item.finding_id,
+                        item.document_hash,
+                        item.rule_id,
+                        item.rule_version,
+                        item.severity,
+                        item.provider,
+                        item.model_id,
+                        item.region,
+                        item.service_name,
+                        item.deployment_environment,
+                        item.baseline_start,
+                        item.baseline_end,
+                        item.current_start,
+                        item.current_end,
+                        item.evaluated_at,
+                        Jsonb(dict(item.document)),
+                    ),
+                )
+                event_offset = self._append_event(connection, item.event)
+                connection.execute(
+                    """
+                    INSERT INTO iip.event_outbox (tenant_id, event_offset)
+                    VALUES (%s, %s)
+                    """,
+                    (item.tenant_id, event_offset),
+                )
+                stored[(item.tenant_id, item.finding_id)] = item.document
+            return tuple(
+                stored[(item.tenant_id, item.finding_id)]
                 for item in prepared
             )
 

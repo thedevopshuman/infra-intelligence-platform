@@ -1,0 +1,20 @@
+{
+  "specversion": "1.0",
+  "id": "ai-savings-a80f20ce53c6833a008c552e0e562f98eb3b8629da32cb7eeab676c4c41f000e",
+  "source": "urn:iip:ai-savings:context-growth:1.0.0",
+  "type": "io.iip.ai.savings-finding-recorded.v1",
+  "time": "2026-09-05T11:00:00Z",
+  "subject": "aif_a80f20ce53c6833a008c552e0e562f98",
+  "datacontenttype": "application/json",
+  "tenantid": "local",
+  "data": {
+    "findingId": "aif_a80f20ce53c6833a008c552e0e562f98",
+    "ruleId": "context-growth",
+    "ruleVersion": "1.0.0",
+    "category": "context-growth",
+    "severity": "medium",
+    "provider": "aws.bedrock",
+    "modelId": "example.foundation-model-v1:0",
+    "serviceName": "support-assistant"
+  }
+}

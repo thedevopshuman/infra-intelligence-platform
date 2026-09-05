@@ -34,11 +34,11 @@ duplicate delivery does not duplicate cost; unknown pricing is visible; no
 content crosses the boundary; and stopping the observability path does not fail
 the model request.
 
-Implementation status: items 1, 2, 4, and 5 are delivered. Item 3 has an
+Implementation status: items 1, 2, 4, 5, and 6 are delivered. Item 3 has an
 executable Bedrock-shaped OTLP fixture and strict metadata/content boundary;
 live `Converse`/`ConverseStream` auto-instrumentation qualification remains.
-Items 6–8 remain: the context-growth rule, bounded aggregate export, Grafana
-topology, deterministic full-flow gate, and real-provider compatibility gate.
+Items 7–8 remain: bounded aggregate export, Grafana topology, deterministic
+full-flow gate, and real-provider compatibility gate.
 
 ## Phase B — application and team attribution
 

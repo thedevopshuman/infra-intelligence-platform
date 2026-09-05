@@ -130,7 +130,10 @@ atomically; pricing and recommendations remain separate downstream use cases.
 The tenant-explicit workflow worker now implements the separate pricing use
 case: protected immutable catalogs drive bounded integer cost calculation, and
 each new cost fact, minimized event, and outbox row commit atomically. Saving
-rules and dashboard aggregates remain separate downstream work.
+evaluation remains a separate downstream use case: the first executable
+context-growth rule compares protected fixed windows, revalidates exact usage
+and cost evidence in storage, and atomically records a deterministic finding,
+minimized event, and outbox row. Dashboard aggregates remain downstream work.
 
 Evidence providers cross a separate application-owned boundary. The [reference collection pipeline](evidence-collection-pipeline.md) authorizes an exact tenant, integration, evidence type, and resource scope before a provider runs, then validates and redacts provider output before hashing and atomic persistence. Providers do not receive ambient credentials through the application contract.
 

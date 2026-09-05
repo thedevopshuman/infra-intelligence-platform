@@ -90,6 +90,9 @@ class HelmValuesContractTests(unittest.TestCase):
             "worker.enabled must be true when aiCostEngine.enabled=true",
             "aiCostEngine.catalogsExistingSecret is required",
             "aiCostEngine.enabled must be true when test fixtures are allowed",
+            "worker.enabled must be true when aiSavingsEngine.enabled=true",
+            "aiCostEngine.enabled must be true when aiSavingsEngine.enabled=true",
+            "aiSavingsEngine.profilesExistingSecret is required",
             "telemetry.traceMaxExportBatchSize must not exceed",
             "telemetry.otlpEndpoint is required",
             "auth.existingSecret is required",
@@ -119,6 +122,11 @@ class HelmValuesContractTests(unittest.TestCase):
         ai_cost = self.schema["properties"]["aiCostEngine"]
         self.assertFalse(ai_cost["additionalProperties"])
         self.assertEqual(ai_cost["properties"]["batchSize"]["maximum"], 1000)
+        ai_savings = self.schema["properties"]["aiSavingsEngine"]
+        self.assertFalse(ai_savings["additionalProperties"])
+        self.assertEqual(
+            ai_savings["properties"]["intervalSeconds"]["maximum"], 3600
+        )
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from typing import Dict, Iterable, Mapping, Optional
 
 from iip.application.ports import (
     ActorContext,
+    AiSavingsCohortQuery,
     EventDeliverySloState,
     EventDeliveryState,
     OutboxMessage,
@@ -30,7 +31,16 @@ from iip.adapters.ai_cost_store import (
     validate_ai_cost_actor,
     validate_ai_cost_usage_binding,
 )
+from iip.adapters.ai_savings_store import (
+    PreparedAiSavingsWrite,
+    prepare_ai_savings_writes,
+    validate_ai_savings_query,
+)
 from iip.adapters.ai_usage_store import prepare_ai_usage_writes
+from iip.application.evaluate_ai_savings import (
+    InvalidAiSavingsInputError,
+    validate_context_growth_source_binding,
+)
 from iip.domain.models import (
     ObservationDisposition,
     PlatformEvent,
@@ -77,6 +87,9 @@ class InMemoryResourceStore:
             tuple[str, str], tuple[str, Mapping[str, object]]
         ] = {}
         self._ai_cost_identities: Dict[tuple[str, str, str, str], str] = {}
+        self._ai_savings: Dict[
+            tuple[str, str], tuple[str, Mapping[str, object]]
+        ] = {}
         self._lock = RLock()
 
     @property
@@ -85,6 +98,16 @@ class InMemoryResourceStore:
 
         with self._lock:
             return tuple(item.event for item in self._event_log)
+
+    @property
+    def ai_savings_findings(self) -> tuple[Mapping[str, object], ...]:
+        """Expose immutable savings findings for local diagnostics and tests."""
+
+        with self._lock:
+            return tuple(
+                self._json_copy(document)
+                for (_digest, document) in self._ai_savings.values()
+            )
 
     def apply(
         self,
@@ -399,10 +422,12 @@ class InMemoryResourceStore:
                     or (
                         "test-fixture-pricing" in item.warnings
                     ) != (catalog_source["kind"] == "test-fixture")
-                    or item.cost_status == "priced"
-                    and (
-                        item.currency != catalog_spec["currency"]
-                        or item.currency_scale != catalog_spec["currencyScale"]
+                    or (
+                        item.cost_status == "priced"
+                        and (
+                            item.currency != catalog_spec["currency"]
+                            or item.currency_scale != catalog_spec["currencyScale"]
+                        )
                     )
                 ):
                     raise PersistenceError("storage.request.invalid")
@@ -446,6 +471,179 @@ class InMemoryResourceStore:
                 )
                 results.append(self._json_copy(copied))
             return tuple(results)
+
+    def list_ai_savings_cohort(
+        self,
+        actor: ActorContext,
+        query: AiSavingsCohortQuery,
+    ) -> tuple[tuple[Mapping[str, object], Mapping[str, object] | None], ...]:
+        """Read a bounded exact-scope usage/cost cohort."""
+
+        validate_ai_savings_query(actor, query)
+        with self._lock:
+            candidates: list[
+                tuple[str, str, Mapping[str, object], Mapping[str, object] | None]
+            ] = []
+            for (tenant_id, _deduplication_key), (_digest, usage) in self._ai_usage.items():
+                if tenant_id != actor.tenant_id or not self._ai_savings_usage_matches(
+                    usage, query
+                ):
+                    continue
+                metadata = usage["metadata"]
+                invocation = usage["spec"]["invocation"]  # type: ignore[index]
+                assert isinstance(metadata, Mapping) and isinstance(invocation, Mapping)
+                usage_id = metadata["id"]
+                started_at = invocation["startedAt"]
+                if not isinstance(usage_id, str) or not isinstance(started_at, str):
+                    raise PersistenceError("storage.state.invalid")
+                cost_id = self._ai_cost_identities.get(
+                    (
+                        tenant_id,
+                        usage_id,
+                        query.catalog_id,
+                        query.engine_version,
+                    )
+                )
+                cost = (
+                    self._ai_costs.get((tenant_id, cost_id))[1]
+                    if cost_id is not None
+                    and (tenant_id, cost_id) in self._ai_costs
+                    else None
+                )
+                candidates.append((started_at, usage_id, usage, cost))
+            candidates.sort(key=lambda item: (item[0], item[1]))
+            return tuple(
+                (
+                    self._json_copy(usage),
+                    self._json_copy(cost) if cost is not None else None,
+                )
+                for _started_at, _usage_id, usage, cost in candidates[: query.limit]
+            )
+
+    def commit_ai_savings_batch(
+        self,
+        actor: ActorContext,
+        findings: tuple[Mapping[str, object], ...],
+        events: tuple[PlatformEvent, ...],
+    ) -> tuple[Mapping[str, object], ...]:
+        """Atomically retain source-bound savings findings and enqueue events."""
+
+        prepared = prepare_ai_savings_writes(actor, findings, events)
+        with self._lock:
+            event_identities = {
+                (item.event.tenant_id, item.event.source, item.event.event_id)
+                for item in self._event_log
+            }
+            for item in prepared:
+                usage_documents = tuple(
+                    document
+                    for (
+                        tenant_id,
+                        _deduplication_key,
+                    ), (_digest, document) in self._ai_usage.items()
+                    if tenant_id == item.tenant_id
+                    and self._ai_savings_finding_scope_matches(document, item)
+                )
+                if {
+                    document["metadata"]["id"]  # type: ignore[index]
+                    for document in usage_documents
+                } != set(item.usage_record_ids):
+                    raise PersistenceError("storage.request.invalid")
+                cost_documents: list[Mapping[str, object]] = []
+                for cost_id in item.cost_record_ids:
+                    stored_cost = self._ai_costs.get((item.tenant_id, cost_id))
+                    if stored_cost is None:
+                        raise PersistenceError("storage.request.invalid")
+                    cost_documents.append(stored_cost[1])
+                try:
+                    validate_context_growth_source_binding(
+                        item.document,
+                        usage_documents,
+                        tuple(cost_documents),
+                    )
+                except InvalidAiSavingsInputError:
+                    raise PersistenceError("storage.request.invalid") from None
+                existing = self._ai_savings.get(
+                    (item.tenant_id, item.finding_id)
+                )
+                if (
+                    (existing is not None and existing[0] != item.document_hash)
+                    or (
+                        existing is None
+                        and (item.tenant_id, item.event.source, item.event.event_id)
+                        in event_identities
+                    )
+                ):
+                    raise PersistenceError("storage.conflict")
+
+            results: list[Mapping[str, object]] = []
+            for item in prepared:
+                key = (item.tenant_id, item.finding_id)
+                existing = self._ai_savings.get(key)
+                if existing is not None:
+                    results.append(self._json_copy(existing[1]))
+                    continue
+                copied = self._json_copy(item.document)
+                self._ai_savings[key] = (item.document_hash, copied)
+                event_offset = len(self._event_log) + 1
+                self._event_log.append(StoredEvent(event_offset, item.event))
+                self._outbox[event_offset] = _MemoryOutboxEntry(
+                    event_offset,
+                    item.event,
+                    item.evaluated_at,
+                )
+                results.append(self._json_copy(copied))
+            return tuple(results)
+
+    @staticmethod
+    def _ai_savings_usage_matches(
+        usage: Mapping[str, object],
+        query: AiSavingsCohortQuery,
+    ) -> bool:
+        try:
+            spec = usage["spec"]
+            assert isinstance(spec, Mapping)
+            invocation = spec["invocation"]
+            attribution = spec["attribution"]
+            assert isinstance(invocation, Mapping) and isinstance(attribution, Mapping)
+            model_id = invocation.get("responseModel", invocation["requestModel"])
+            started_at = datetime.fromisoformat(
+                str(invocation["startedAt"]).replace("Z", "+00:00")
+            )
+            start = datetime.fromisoformat(query.start.replace("Z", "+00:00"))
+            end = datetime.fromisoformat(query.end.replace("Z", "+00:00"))
+            return (
+                invocation["provider"] == query.provider
+                and model_id == query.model_id
+                and invocation["region"] == query.region
+                and invocation["outcome"] == "success"
+                and attribution["serviceName"] == query.service_name
+                and attribution.get("deploymentEnvironment")
+                == query.deployment_environment
+                and start <= started_at < end
+            )
+        except (AssertionError, KeyError, TypeError, ValueError):
+            raise PersistenceError("storage.state.invalid") from None
+
+    @classmethod
+    def _ai_savings_finding_scope_matches(
+        cls,
+        usage: Mapping[str, object],
+        finding: PreparedAiSavingsWrite,
+    ) -> bool:
+        baseline_query = AiSavingsCohortQuery(
+            provider=finding.provider,
+            model_id=finding.model_id,
+            region=finding.region,
+            service_name=finding.service_name,
+            deployment_environment=finding.deployment_environment,
+            start=finding.baseline_start,
+            end=finding.current_end,
+            catalog_id="apc_00000000000000000000000000000000",
+            engine_version="0.1.0",
+            limit=1,
+        )
+        return cls._ai_savings_usage_matches(usage, baseline_query)
 
     def claim_outbox(
         self,

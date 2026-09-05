@@ -35,6 +35,12 @@ aiCostEngine:
   batchSize: 100
   intervalSeconds: 10
 
+aiSavingsEngine:
+  enabled: false
+  profilesExistingSecret: ""
+  profilesSecretKey: ai-savings-profiles-json
+  intervalSeconds: 60
+
 eventPublisher:
   mode: disabled
   batchSize: 100

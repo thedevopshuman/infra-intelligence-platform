@@ -205,6 +205,18 @@ def ai_cost_interval_seconds() -> int:
     return interval
 
 
+def ai_savings_interval_seconds() -> int:
+    try:
+        interval = int(
+            os.environ.get("IIP_AI_SAVINGS_INTERVAL_SECONDS", "60")
+        )
+    except ValueError:
+        raise ValueError("ai.savings.configuration.invalid") from None
+    if interval < 1 or interval > 3600:
+        raise ValueError("ai.savings.configuration.invalid")
+    return interval
+
+
 def run_ai_cost_pass(
     service: Any,
     tenants: tuple[str, ...],
@@ -306,6 +318,11 @@ def main() -> None:
         ai_cost_interval_seconds() if ai_cost_service is not None else 10
     )
     next_ai_cost_at = time.monotonic()
+    ai_savings_service = runtime.ai_savings_evaluation
+    ai_savings_interval = (
+        ai_savings_interval_seconds() if ai_savings_service is not None else 60
+    )
+    next_ai_savings_at = time.monotonic()
     stopped = Event()
 
     def stop(_signum: int, _frame: object) -> None:
@@ -353,6 +370,36 @@ def main() -> None:
                     )
                 next_ai_cost_at = time.monotonic() + ai_cost_interval
                 worked = worked or cost_pass.processed > 0
+            if (
+                ai_savings_service is not None
+                and time.monotonic() >= next_ai_savings_at
+            ):
+                savings_passes = tuple(
+                    ai_savings_service.run_once(tenant_id, worker_id)
+                    for tenant_id in tenants
+                )
+                summary = {
+                    "profiles": sum(item.profiles for item in savings_passes),
+                    "qualified": sum(item.qualified for item in savings_passes),
+                    "pending": sum(item.pending for item in savings_passes),
+                    "insufficient": sum(item.insufficient for item in savings_passes),
+                    "unresolved": sum(item.unresolved for item in savings_passes),
+                    "unsupported": sum(item.unsupported for item in savings_passes),
+                    "belowThreshold": sum(
+                        item.below_threshold for item in savings_passes
+                    ),
+                    "failures": sum(item.failures for item in savings_passes),
+                }
+                if summary["qualified"] or summary["failures"] or arguments.once:
+                    print(
+                        json.dumps(
+                            {"event": "ai-savings.evaluation.pass", **summary},
+                            separators=(",", ":"),
+                            sort_keys=True,
+                        )
+                    )
+                next_ai_savings_at = time.monotonic() + ai_savings_interval
+                worked = worked or summary["qualified"] > 0
             for tenant_id in tenants:
                 if stopped.is_set():
                     break

@@ -40,6 +40,7 @@ Events are immutable. A correction creates a new event that references the prior
 - `io.iip.plugin.failed.v1`
 - `io.iip.ai.usage-recorded.v1`
 - `io.iip.ai.cost-calculated.v1`
+- `io.iip.ai.savings-finding-recorded.v1`
 
 `io.iip.ai.usage-recorded.v1` is emitted only after the tenant-scoped usage
 record is durable. Its data contains bounded routing identity and the canonical
@@ -50,5 +51,10 @@ price configuration. See the [AI economics contracts](ai-economics-contracts.md)
 record. It binds the usage, catalog version, engine version through its source,
 and resolved status. Its routing data deliberately omits rates, quantities,
 totals, and protected catalog contents.
+
+`io.iip.ai.savings-finding-recorded.v1` is emitted atomically with an immutable
+evidence-backed finding. Its data is limited to finding/rule identity and
+bounded routing dimensions; windows, samples, quantities, prices, monetary
+values, and source-record identities remain in the protected ledger.
 
 Event type versions change only for incompatible `data` semantics. Additive optional data fields remain within the major version.

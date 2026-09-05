@@ -132,6 +132,12 @@ class LocalStackConfigurationTests(unittest.TestCase):
         )
         self.assertIn("IIP_AI_PRICE_CATALOGS_JSON", worker)
         self.assertIn("IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES", worker)
+        self.assertNotIn("IIP_AI_SAVINGS_PROFILES_JSON", api)
+        self.assertIn(
+            "IIP_AI_SAVINGS_ENGINE_ENABLED: ${IIP_AI_SAVINGS_ENGINE_ENABLED:-false}",
+            worker,
+        )
+        self.assertIn("IIP_AI_SAVINGS_PROFILES_JSON", worker)
 
 
 if __name__ == "__main__":

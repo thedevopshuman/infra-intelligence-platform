@@ -1,6 +1,6 @@
 # AI economics architecture
 
-**Status:** Accepted V0 boundary; usage intake and cost engine executable
+**Status:** Accepted V0 boundary; usage, cost, and context-growth rule executable
 **Date:** 2026-09-05
 
 ## Context
@@ -110,6 +110,23 @@ requirements are not met.
 The first rule is `context-growth`. Retry and expensive-model rules remain
 disabled until their source facts and evaluation profiles have executable
 coverage.
+
+The executable rule runs only in the tenant-explicit workflow worker. A
+protected profile fixes the exact provider, model, region, service,
+environment, catalog, engine version, threshold, and two adjacent
+equal-duration windows. V0 accepts only successful complete records with no
+cache-read or cache-write input and exact priced costs. This conservative
+subset prevents a calculated uncached-input saving from silently including
+cached tokens.
+
+For qualifying cohorts, the rule compares half-up-rounded mean input tokens
+per request. It prices only the excess current-window input above the baseline
+mean at the uniform current uncached-input rate. The finding cites every source
+usage and cost record, freezes the arithmetic, carries a deterministic ID, and
+requires validation before context retention changes. The PostgreSQL adapter
+reloads and recalculates the complete cohort before atomically committing the
+finding, value-minimized event, and outbox row. Pending, insufficient,
+unpriced, unsupported, and below-threshold profiles create no finding.
 
 ## Privacy and security
 

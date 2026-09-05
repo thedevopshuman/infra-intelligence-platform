@@ -170,6 +170,14 @@ helm-lint:
 		--set database.existingSecret=iip-database \
 		--set worker.enabled=true \
 		--set 'worker.tenants[0]=tenant-a' \
+		--set aiCostEngine.enabled=true \
+		--set aiCostEngine.catalogsExistingSecret=iip-ai-prices \
+		--set aiSavingsEngine.enabled=true \
+		--set aiSavingsEngine.profilesExistingSecret=iip-ai-savings >/dev/null
+	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set database.existingSecret=iip-database \
+		--set worker.enabled=true \
+		--set 'worker.tenants[0]=tenant-a' \
 		--set eventPublisher.mode=https-webhook \
 		--set eventPublisher.httpsWebhook.endpoint=https://events.example.test/v1/cloudevents \
 		--set eventPublisher.httpsWebhook.tokenExistingSecret=iip-event-token \

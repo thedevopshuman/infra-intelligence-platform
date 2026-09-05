@@ -13,6 +13,7 @@ from infra_intelligence_sdk import (
     AiSavingsFinding,
     AiUsageRecord,
 )
+from iip.application.evaluate_ai_savings import validate_ai_savings_finding
 from scripts.validate_repo import ROOT, validate_ai_economics_examples
 
 
@@ -38,6 +39,7 @@ def example_documents() -> dict[Path, object]:
         "ai-savings-finding.json",
         "ai-usage-recorded-event.json",
         "ai-cost-calculated-event.json",
+        "ai-savings-finding-event.json",
     )
     return {EXAMPLES / name: load(EXAMPLES / name) for name in names}
 
@@ -61,6 +63,7 @@ class AiEconomicsContractTests(unittest.TestCase):
         errors: list[str] = []
         validate_ai_economics_examples(example_documents(), errors)
         self.assertEqual([], errors)
+        validate_ai_savings_finding(load(EXAMPLES / "ai-savings-finding.json"))
 
     def test_usage_contract_prohibits_content_and_raw_payload_capture(self) -> None:
         schema = load(SCHEMAS / "ai-usage-record.schema.json")

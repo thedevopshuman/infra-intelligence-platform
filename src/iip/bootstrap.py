@@ -50,6 +50,11 @@ from iip.application.calculate_ai_cost import (
     AiCostCalculationService,
     AiCostConfigurationError,
 )
+from iip.application.evaluate_ai_savings import (
+    AiSavingsConfigurationError,
+    AiSavingsEvaluationService,
+    validate_context_growth_profile,
+)
 from iip.application.collect_evidence import EvidenceCollectionService
 from iip.application.context_evidence import ContextEvidenceProvider, ContextEvidenceService
 from iip.application.deliver_events import EventDeliveryService
@@ -214,6 +219,7 @@ class Runtime:
     otlp_logs_ingestion: OtlpLogsIngestionService | None
     ai_usage_ingestion: AiUsageIngestionService | None
     ai_cost_calculation: AiCostCalculationService | None
+    ai_savings_evaluation: AiSavingsEvaluationService | None
     investigations: DeterministicInvestigationService
     investigation_lifecycle: InvestigationLifecycleService
     investigation_dispatch: InvestigationDispatchService
@@ -278,6 +284,7 @@ def build_local_runtime(
     ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
+    ai_savings_profiles: tuple[Mapping[str, object], ...] | None = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -320,6 +327,7 @@ def build_local_runtime(
         ai_cost_catalogs,
         ai_cost_allow_test_fixtures,
         ai_cost_batch_size,
+        ai_savings_profiles,
     )
 
 
@@ -363,6 +371,7 @@ def _compose_runtime(
     ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
+    ai_savings_profiles: tuple[Mapping[str, object], ...] | None = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -593,6 +602,11 @@ def _compose_runtime(
             if ai_cost_catalogs is not None
             else None
         ),
+        ai_savings_evaluation=(
+            AiSavingsEvaluationService(store, clock, ai_savings_profiles)
+            if ai_savings_profiles is not None
+            else None
+        ),
         investigations=investigations,
         investigation_lifecycle=investigation_lifecycle,
         investigation_dispatch=InvestigationDispatchService(
@@ -691,6 +705,7 @@ def build_postgres_runtime(
     ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
+    ai_savings_profiles: tuple[Mapping[str, object], ...] | None = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -740,6 +755,7 @@ def build_postgres_runtime(
         ai_cost_catalogs,
         ai_cost_allow_test_fixtures,
         ai_cost_batch_size,
+        ai_savings_profiles,
     )
 
 
@@ -894,6 +910,11 @@ def _build_runtime_from_env(
             if include_ai_cost_engine
             else (None, False, 100)
         )
+        ai_savings_profiles = (
+            _ai_savings_engine_configuration_from_env(ai_cost_catalogs)
+            if include_ai_cost_engine
+            else None
+        )
         if not database_url:
             return build_local_runtime(
                 authenticator,
@@ -945,6 +966,7 @@ def _build_runtime_from_env(
                 ai_cost_catalogs=ai_cost_catalogs,
                 ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
                 ai_cost_batch_size=ai_cost_batch_size,
+                ai_savings_profiles=ai_savings_profiles,
             )
         auto_migrate = (
             os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
@@ -1001,6 +1023,7 @@ def _build_runtime_from_env(
             ai_cost_catalogs=ai_cost_catalogs,
             ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
             ai_cost_batch_size=ai_cost_batch_size,
+            ai_savings_profiles=ai_savings_profiles,
         )
     except Exception:
         if telemetry_runtime is not None:
@@ -1896,3 +1919,46 @@ def _ai_cost_engine_configuration_from_env() -> tuple[
     if not worker_tenants or catalog_tenants != worker_tenants:
         raise AiCostConfigurationError("ai.cost.tenants.invalid")
     return catalogs, allow_raw == "true", batch_size
+
+
+def _ai_savings_engine_configuration_from_env(
+    catalogs: tuple[Mapping[str, object], ...] | None,
+) -> tuple[Mapping[str, object], ...] | None:
+    enabled = os.environ.get("IIP_AI_SAVINGS_ENGINE_ENABLED", "false").lower()
+    if enabled not in ("false", "true"):
+        raise AiSavingsConfigurationError("ai.savings.configuration.invalid")
+    if enabled == "false":
+        return None
+    raw_profiles = os.environ.get("IIP_AI_SAVINGS_PROFILES_JSON")
+    if raw_profiles is None or catalogs is None:
+        raise AiSavingsConfigurationError("ai.savings.configuration.required")
+
+    from iip.adapters.ai_savings_profiles import ai_savings_profiles_from_json
+
+    profiles = ai_savings_profiles_from_json(raw_profiles)
+    validated = tuple(validate_context_growth_profile(item) for item in profiles)
+    worker_tenants = {
+        item.strip()
+        for item in os.environ.get("IIP_WORKER_TENANTS", "").split(",")
+        if item.strip()
+    }
+    profile_tenants = {item.tenant_id for item in validated}
+    try:
+        catalog_by_tenant = {
+            item["metadata"]["tenantId"]: item["metadata"]["id"]  # type: ignore[index]
+            for item in catalogs
+        }
+    except (KeyError, TypeError):
+        raise AiSavingsConfigurationError(
+            "ai.savings.configuration.invalid"
+        ) from None
+    if (
+        not worker_tenants
+        or profile_tenants != worker_tenants
+        or any(
+            catalog_by_tenant.get(profile.tenant_id) != profile.catalog_id
+            for profile in validated
+        )
+    ):
+        raise AiSavingsConfigurationError("ai.savings.tenants.invalid")
+    return profiles

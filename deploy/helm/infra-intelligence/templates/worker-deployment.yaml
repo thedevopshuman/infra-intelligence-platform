@@ -78,6 +78,17 @@ spec:
             - name: IIP_AI_COST_INTERVAL_SECONDS
               value: {{ .Values.aiCostEngine.intervalSeconds | quote }}
             {{- end }}
+            - name: IIP_AI_SAVINGS_ENGINE_ENABLED
+              value: {{ .Values.aiSavingsEngine.enabled | quote }}
+            {{- if .Values.aiSavingsEngine.enabled }}
+            - name: IIP_AI_SAVINGS_PROFILES_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aiSavingsEngine.profilesExistingSecret | quote }}
+                  key: {{ .Values.aiSavingsEngine.profilesSecretKey | quote }}
+            - name: IIP_AI_SAVINGS_INTERVAL_SECONDS
+              value: {{ .Values.aiSavingsEngine.intervalSeconds | quote }}
+            {{- end }}
             - name: IIP_WORKER_LEASE_SECONDS
               value: {{ .Values.worker.leaseSeconds | quote }}
             - name: IIP_WORKER_HEARTBEAT_SECONDS

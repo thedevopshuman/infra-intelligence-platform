@@ -32,10 +32,14 @@ and does not collect prompts or responses by default. An isolated, tenant-bound
 `/v1/traces` route now normalizes approved Bedrock-shaped GenAI client metadata
 and atomically stores usage plus its event. A tenant-explicit background cost
 service now loads protected versioned catalogs and atomically records
-explainable calculated estimates plus value-minimized events. Live Bedrock
-qualification, the rule runtime, aggregate export, and dashboard remain. See the
+explainable calculated estimates plus value-minimized events. A separate
+tenant-explicit deterministic service evaluates fixed context-growth windows,
+revalidates every cited usage and cost fact, and atomically records one
+evidence-backed saving plus a value-minimized event. Live Bedrock
+qualification, aggregate export, and the dashboard remain. See the
 [receiver runbook](docs/operations/ai-usage-receiver.md),
 [cost-engine runbook](docs/operations/ai-cost-engine.md),
+[savings-engine runbook](docs/operations/ai-savings-engine.md),
 [product direction](docs/product/ai-finops-vision.md),
 [architecture](docs/architecture/ai-economics.md), [contracts](docs/specifications/ai-economics-contracts.md),
 and [roadmap](docs/roadmap/ai-finops-roadmap.md).

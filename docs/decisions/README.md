@@ -113,3 +113,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0107](0107-exact-release-signature-verification.md) | Accepted | Verify both published OCI indexes at manifest digests against exact organizational signer identity and transparency evidence |
 | [0108](0108-sbom-vulnerability-policy-and-qualification.md) | Accepted | Scan every exact release SPDX attestation with a pinned tool and fresh database under closed thresholds and expiring exceptions |
 | [0109](0109-component-aware-kubernetes-availability.md) | Accepted | Protect API, worker, and receiver rollouts with component budgets, hard topology spread, and bounded process draining |
+| [0110](0110-source-bound-multi-node-kubernetes-availability.md) | Accepted | Prove zero-failure API and OTLP Service access during a planned worker drain in an owned three-node Kind cluster |

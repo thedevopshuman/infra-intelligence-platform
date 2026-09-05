@@ -517,6 +517,28 @@ class CustomerDeploymentPreflightReport:
 
 
 @dataclass(frozen=True)
+class KubernetesAvailabilityQualificationReport:
+    """Source-bound planned worker-drain availability evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "KubernetesAvailabilityQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="KubernetesAvailabilityQualificationReport",
+                label="Kubernetes availability qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class PostgreSQLRecoveryQualificationReport:
     """Source-bound complete-schema logical backup and restore evidence."""
 

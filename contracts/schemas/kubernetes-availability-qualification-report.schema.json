@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:kubernetes-availability-qualification-report:v1alpha1",
+  "title": "Kubernetes Availability Qualification Report",
+  "description": "Minimized, source-bound evidence that redundant IIP workloads preserve API and OTLP service during one planned worker-node drain.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "KubernetesAvailabilityQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^kaq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationLevel", "subject", "environment", "policy", "components", "intakeSeed", "disruption", "probes", "summary", "checks", "limitations"],
+      "properties": {
+        "status": {"const": "qualified"},
+        "qualificationLevel": {"const": "local-multi-node-kind-v1"},
+        "subject": {"$ref": "#/$defs/subject"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "policy": {"$ref": "#/$defs/policy"},
+        "components": {"$ref": "#/$defs/components"},
+        "intakeSeed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["resourceAccepted", "metricAccepted"],
+          "properties": {
+            "resourceAccepted": {"const": true},
+            "metricAccepted": {"const": true}
+          }
+        },
+        "disruption": {"$ref": "#/$defs/disruption"},
+        "probes": {"$ref": "#/$defs/probes"},
+        "summary": {"$ref": "#/$defs/summary"},
+        "checks": {"$ref": "#/$defs/checks"},
+        "limitations": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {"const": "planned-disruption-only"},
+            {"const": "local-single-region"},
+            {"const": "shared-dependencies-not-qualified"},
+            {"const": "involuntary-failure-not-qualified"}
+          ],
+          "items": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "toolVersion": {"type": "string", "pattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$", "maxLength": 64},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "chartVersion", "requiredMigration", "sourceRevision", "imageDigest"],
+      "properties": {
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "kubernetesVersion", "kindVersion", "dockerVersion", "containerdVersion", "nodeCount", "workerNodeCount", "clusterBindingDigest"],
+      "properties": {
+        "platform": {"type": "string", "pattern": "^linux/[a-z0-9_.-]+$", "maxLength": 64},
+        "kubernetesVersion": {"$ref": "#/$defs/toolVersion"},
+        "kindVersion": {"$ref": "#/$defs/toolVersion"},
+        "dockerVersion": {"$ref": "#/$defs/toolVersion"},
+        "containerdVersion": {"$ref": "#/$defs/toolVersion"},
+        "nodeCount": {"const": 3},
+        "workerNodeCount": {"const": 2},
+        "clusterBindingDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rollout", "podDisruptionBudget", "topologySpread"],
+      "properties": {
+        "rollout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxUnavailable", "maxSurge"],
+          "properties": {"maxUnavailable": {"const": 0}, "maxSurge": {"const": 1}}
+        },
+        "podDisruptionBudget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["minAvailable"],
+          "properties": {"minAvailable": {"const": 1}}
+        },
+        "topologySpread": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["topologyKey", "maxSkew", "minDomains", "whenUnsatisfiable"],
+          "properties": {
+            "topologyKey": {"const": "kubernetes.io/hostname"},
+            "maxSkew": {"const": 1},
+            "minDomains": {"const": 2},
+            "whenUnsatisfiable": {"const": "DoNotSchedule"}
+          }
+        }
+      }
+    },
+    "componentState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["readyReplicas", "unavailableReplicas", "domainCount", "pdbDisruptionsAllowed"],
+      "properties": {
+        "readyReplicas": {"type": "integer", "minimum": 0, "maximum": 2},
+        "unavailableReplicas": {"type": "integer", "minimum": 0, "maximum": 2},
+        "domainCount": {"type": "integer", "minimum": 0, "maximum": 2},
+        "pdbDisruptionsAllowed": {"type": "integer", "minimum": 0, "maximum": 1}
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "desiredReplicas", "baseline", "disruption", "recovery"],
+      "properties": {
+        "id": {"enum": ["control-plane-api", "workflow-worker", "otlp-receiver"]},
+        "desiredReplicas": {"const": 2},
+        "baseline": {"$ref": "#/$defs/componentState"},
+        "disruption": {"$ref": "#/$defs/componentState"},
+        "recovery": {"$ref": "#/$defs/componentState"}
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {"$ref": "#/$defs/component", "properties": {"id": {"const": "control-plane-api"}}},
+        {"$ref": "#/$defs/component", "properties": {"id": {"const": "workflow-worker"}}},
+        {"$ref": "#/$defs/component", "properties": {"id": {"const": "otlp-receiver"}}}
+      ],
+      "items": false
+    },
+    "disruption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "targetNodeDigest", "nodeCordoned", "nodeDrained", "nodeUncordoned", "evictedComponentCount"],
+      "properties": {
+        "method": {"const": "kubectl-drain"},
+        "targetNodeDigest": {"$ref": "#/$defs/digest"},
+        "nodeCordoned": {"const": true},
+        "nodeDrained": {"const": true},
+        "nodeUncordoned": {"const": true},
+        "evictedComponentCount": {"const": 3}
+      }
+    },
+    "probePhase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "attempts", "successes", "failures"],
+      "properties": {
+        "id": {"enum": ["baseline", "disruption", "recovery"]},
+        "attempts": {"type": "integer", "minimum": 20, "maximum": 10000},
+        "successes": {"type": "integer", "minimum": 20, "maximum": 10000},
+        "failures": {"const": 0}
+      }
+    },
+    "phaseSequence": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {"$ref": "#/$defs/probePhase", "properties": {"id": {"const": "baseline"}}},
+        {"$ref": "#/$defs/probePhase", "properties": {"id": {"const": "disruption"}}},
+        {"$ref": "#/$defs/probePhase", "properties": {"id": {"const": "recovery"}}}
+      ],
+      "items": false
+    },
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "protocol", "path", "phases"],
+      "properties": {
+        "id": {"enum": ["control-plane-api", "otlp-metrics"]},
+        "protocol": {"enum": ["http-json", "otlp-http-protobuf"]},
+        "path": {"enum": ["/v1/system/version", "/v1/metrics"]},
+        "phases": {"$ref": "#/$defs/phaseSequence"}
+      }
+    },
+    "probes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {"$ref": "#/$defs/probe", "properties": {"id": {"const": "control-plane-api"}, "protocol": {"const": "http-json"}, "path": {"const": "/v1/system/version"}}},
+        {"$ref": "#/$defs/probe", "properties": {"id": {"const": "otlp-metrics"}, "protocol": {"const": "otlp-http-protobuf"}, "path": {"const": "/v1/metrics"}}}
+      ],
+      "items": false
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalChecks", "passedChecks", "failedChecks", "totalProbeAttempts", "failedProbeAttempts", "overallStatus"],
+      "properties": {
+        "totalChecks": {"const": 14},
+        "passedChecks": {"const": 14},
+        "failedChecks": {"const": 0},
+        "totalProbeAttempts": {"type": "integer", "minimum": 120, "maximum": 60000},
+        "failedProbeAttempts": {"const": 0},
+        "overallStatus": {"const": "qualified"}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {"id": {"type": "string"}, "status": {"const": "passed"}}
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 14,
+      "maxItems": 14,
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "isolated-cluster"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "immutable-image"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "zero-unavailable-rollout"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "component-pdbs"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "hard-topology-spread"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "durable-intake-seed"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "component-baseline"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "voluntary-drain"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "disruption-capacity"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-zero-failure"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-zero-failure"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "component-recovery"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "output-minimization"}}}
+      ],
+      "items": false
+    }
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "KubernetesAvailabilityQualificationReport",
+  "metadata": {
+    "id": "kaq_222cbaaf15322da4949777146f2ed5c4",
+    "generatedAt": "2026-09-06T12:30:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualificationLevel": "local-multi-node-kind-v1",
+    "subject": {
+      "applicationVersion": "0.77.0",
+      "chartVersion": "0.80.0",
+      "requiredMigration": "0022_ai_retry_savings_rule.sql",
+      "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "environment": {
+      "platform": "linux/arm64",
+      "kubernetesVersion": "v1.36.1",
+      "kindVersion": "v0.32.0",
+      "dockerVersion": "29.7.2",
+      "containerdVersion": "v2.2.1",
+      "nodeCount": 3,
+      "workerNodeCount": 2,
+      "clusterBindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "policy": {
+      "rollout": {"maxUnavailable": 0, "maxSurge": 1},
+      "podDisruptionBudget": {"minAvailable": 1},
+      "topologySpread": {
+        "topologyKey": "kubernetes.io/hostname",
+        "maxSkew": 1,
+        "minDomains": 2,
+        "whenUnsatisfiable": "DoNotSchedule"
+      }
+    },
+    "components": [
+      {
+        "id": "control-plane-api",
+        "desiredReplicas": 2,
+        "baseline": {"readyReplicas": 2, "unavailableReplicas": 0, "domainCount": 2, "pdbDisruptionsAllowed": 1},
+        "disruption": {"readyReplicas": 1, "unavailableReplicas": 1, "domainCount": 1, "pdbDisruptionsAllowed": 0},
+        "recovery": {"readyReplicas": 2, "unavailableReplicas": 0, "domainCount": 2, "pdbDisruptionsAllowed": 1}
+      },
+      {
+        "id": "workflow-worker",
+        "desiredReplicas": 2,
+        "baseline": {"readyReplicas": 2, "unavailableReplicas": 0, "domainCount": 2, "pdbDisruptionsAllowed": 1},
+        "disruption": {"readyReplicas": 1, "unavailableReplicas": 1, "domainCount": 1, "pdbDisruptionsAllowed": 0},
+        "recovery": {"readyReplicas": 2, "unavailableReplicas": 0, "domainCount": 2, "pdbDisruptionsAllowed": 1}
+      },
+      {
+        "id": "otlp-receiver",
+        "desiredReplicas": 2,
+        "baseline": {"readyReplicas": 2, "unavailableReplicas": 0, "domainCount": 2, "pdbDisruptionsAllowed": 1},
+        "disruption": {"readyReplicas": 1, "unavailableReplicas": 1, "domainCount": 1, "pdbDisruptionsAllowed": 0},
+        "recovery": {"readyReplicas": 2, "unavailableReplicas": 0, "domainCount": 2, "pdbDisruptionsAllowed": 1}
+      }
+    ],
+    "intakeSeed": {"resourceAccepted": true, "metricAccepted": true},
+    "disruption": {
+      "method": "kubectl-drain",
+      "targetNodeDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "nodeCordoned": true,
+      "nodeDrained": true,
+      "nodeUncordoned": true,
+      "evictedComponentCount": 3
+    },
+    "probes": [
+      {
+        "id": "control-plane-api",
+        "protocol": "http-json",
+        "path": "/v1/system/version",
+        "phases": [
+          {"id": "baseline", "attempts": 20, "successes": 20, "failures": 0},
+          {"id": "disruption", "attempts": 24, "successes": 24, "failures": 0},
+          {"id": "recovery", "attempts": 20, "successes": 20, "failures": 0}
+        ]
+      },
+      {
+        "id": "otlp-metrics",
+        "protocol": "otlp-http-protobuf",
+        "path": "/v1/metrics",
+        "phases": [
+          {"id": "baseline", "attempts": 20, "successes": 20, "failures": 0},
+          {"id": "disruption", "attempts": 24, "successes": 24, "failures": 0},
+          {"id": "recovery", "attempts": 20, "successes": 20, "failures": 0}
+        ]
+      }
+    ],
+    "summary": {
+      "totalChecks": 14,
+      "passedChecks": 14,
+      "failedChecks": 0,
+      "totalProbeAttempts": 128,
+      "failedProbeAttempts": 0,
+      "overallStatus": "qualified"
+    },
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "isolated-cluster", "status": "passed"},
+      {"id": "immutable-image", "status": "passed"},
+      {"id": "zero-unavailable-rollout", "status": "passed"},
+      {"id": "component-pdbs", "status": "passed"},
+      {"id": "hard-topology-spread", "status": "passed"},
+      {"id": "durable-intake-seed", "status": "passed"},
+      {"id": "component-baseline", "status": "passed"},
+      {"id": "voluntary-drain", "status": "passed"},
+      {"id": "disruption-capacity", "status": "passed"},
+      {"id": "api-zero-failure", "status": "passed"},
+      {"id": "receiver-zero-failure", "status": "passed"},
+      {"id": "component-recovery", "status": "passed"},
+      {"id": "output-minimization", "status": "passed"}
+    ],
+    "limitations": [
+      "planned-disruption-only",
+      "local-single-region",
+      "shared-dependencies-not-qualified",
+      "involuntary-failure-not-qualified"
+    ]
+  }
+}

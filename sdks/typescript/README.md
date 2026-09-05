@@ -111,3 +111,8 @@ Version 0.53 adds the hard topology-spread check and the previously omitted
 vulnerability-qualified-release requirement to the closed preflight unions.
 It does not turn Kubernetes placement configuration into live availability
 evidence.
+
+Version 0.54 adds the offline
+`KubernetesAvailabilityQualificationReport`, component/phase state, and closed
+check identifiers. It adds no API method, Kubernetes credential, mutation
+authority, or production availability claim.

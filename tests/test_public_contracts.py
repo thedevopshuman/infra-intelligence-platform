@@ -50,6 +50,7 @@ from infra_intelligence_sdk import (
     IntegrationConfig,
     KubernetesEventEvidenceRequest,
     KubernetesEventEvidenceResult,
+    KubernetesAvailabilityQualificationReport,
     LogEvidenceRequest,
     LogEvidenceResult,
     OtlpLogsEvidence,
@@ -186,6 +187,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         deployment_preflight = CustomerDeploymentPreflightReport.from_dict(
             example("customer-deployment-preflight-report.json")
+        )
+        kubernetes_availability = KubernetesAvailabilityQualificationReport.from_dict(
+            example("kubernetes-availability-qualification-report.json")
         )
         postgresql_recovery = PostgreSQLRecoveryQualificationReport.from_dict(
             example("postgresql-recovery-qualification-report.json")
@@ -445,6 +449,10 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             deployment_preflight.to_dict()["spec"]["status"],
             "configuration-ready",
+        )
+        self.assertEqual(
+            kubernetes_availability.to_dict()["spec"]["qualificationLevel"],
+            "local-multi-node-kind-v1",
         )
         self.assertEqual(
             postgresql_recovery.to_dict()["spec"]["profile"]["name"],

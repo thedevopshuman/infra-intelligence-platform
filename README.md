@@ -17,6 +17,15 @@ retains a separate manifest-bound, environment-scoped qualification report;
 incomplete or internally inconsistent evidence cannot be promoted by the
 repository verifier.
 
+A separate owned three-node Kind gate now turns those availability declarations
+into live evidence. It spreads two replicas of the API, worker, and receiver
+across two workers, commits one real OTLP metric, continuously probes exact
+release identity and OTLP intake through their Services, drains one worker
+through the Eviction API, and requires zero probe failures before, during, and
+after recovery. The retained report contains aggregate states and digests only;
+it does not claim involuntary-node, database, regional, or customer-cluster
+availability. See the [Kubernetes availability qualification runbook](docs/operations/kubernetes-availability-qualification.md).
+
 After registry publication, a separate promotion verifier derives both OCI
 index digests from that verified manifest and checks exact Cosign signer
 identity, issuer, version, and transparency evidence under a reviewed policy.
@@ -159,6 +168,7 @@ make test-prometheus
 make test-loki
 make test-plugin-compatibility
 make test-helm-install
+make qualify-kubernetes-availability PYTHON=.venv/bin/python
 make release-bundle PYTHON=.venv/bin/python
 # Exercise the digest-pinned SBOM scanner and its no-network scan path:
 make test-release-vulnerabilities PYTHON=.venv/bin/python

@@ -92,6 +92,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "ingress-availability-qualification-report.schema.json": (
         "ingress-availability-qualification-report.json",
     ),
+    "kubernetes-availability-qualification-report.schema.json": (
+        "kubernetes-availability-qualification-report.json",
+    ),
     "error.schema.json": ("error.json",),
     "evidence.schema.json": ("evidence.json",),
     "evidence-retention-report.schema.json": (

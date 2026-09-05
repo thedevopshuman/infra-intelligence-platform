@@ -116,6 +116,13 @@ placement and planned-disruption gaps; involuntary node loss, customer ingress,
 database, storage, sustained-load, and regional availability remain external
 qualification work.
 
+Qualification update: ADR 0110 adds an owned three-node Kind gate that commits
+one real OTLP metric, drains one worker through the Eviction API, requires the
+exact expected capacity/PDB/domain state for every application component, and
+observes zero failed API or OTLP Service probes through recovery. This closes
+the local planned-disruption evidence gap; involuntary loss, shared database,
+customer-cluster, sustained-load, and regional availability remain external.
+
 Update: ADR 0058 adds a deployment-configured rolling useful-completion SLO over durable asynchronous jobs, including explicit late, failed, cancelled, and unfinished misses. ADR 0059 adds a privacy-bounded query availability counter and duration histogram with explicit objective values over the replaceable OTLP metrics boundary. Bounded external ingress qualification is delivered by ADR 0105; continuous regional coverage and notification routing remain open.
 
 ## Phase 4 — governed actions and workflows

@@ -644,6 +644,118 @@ export interface CustomerDeploymentPreflightReport {
   };
 }
 
+export type KubernetesAvailabilityComponentId =
+  | "control-plane-api"
+  | "workflow-worker"
+  | "otlp-receiver";
+
+export type KubernetesAvailabilityCheckId =
+  | "source-binding"
+  | "isolated-cluster"
+  | "immutable-image"
+  | "zero-unavailable-rollout"
+  | "component-pdbs"
+  | "hard-topology-spread"
+  | "durable-intake-seed"
+  | "component-baseline"
+  | "voluntary-drain"
+  | "disruption-capacity"
+  | "api-zero-failure"
+  | "receiver-zero-failure"
+  | "component-recovery"
+  | "output-minimization";
+
+export interface KubernetesAvailabilityComponentState {
+  readyReplicas: number;
+  unavailableReplicas: number;
+  domainCount: number;
+  pdbDisruptionsAllowed: number;
+}
+
+export interface KubernetesAvailabilityQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "KubernetesAvailabilityQualificationReport";
+  metadata: {
+    id: `kaq_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: boolean;
+  };
+  spec: {
+    status: "qualified";
+    qualificationLevel: "local-multi-node-kind-v1";
+    subject: {
+      applicationVersion: string;
+      chartVersion: string;
+      requiredMigration: `${number}_${string}.sql`;
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    environment: {
+      platform: `linux/${string}`;
+      kubernetesVersion: string;
+      kindVersion: string;
+      dockerVersion: string;
+      containerdVersion: string;
+      nodeCount: 3;
+      workerNodeCount: 2;
+      clusterBindingDigest: Sha256Digest;
+    };
+    policy: {
+      rollout: { maxUnavailable: 0; maxSurge: 1 };
+      podDisruptionBudget: { minAvailable: 1 };
+      topologySpread: {
+        topologyKey: "kubernetes.io/hostname";
+        maxSkew: 1;
+        minDomains: 2;
+        whenUnsatisfiable: "DoNotSchedule";
+      };
+    };
+    components: Array<{
+      id: KubernetesAvailabilityComponentId;
+      desiredReplicas: 2;
+      baseline: KubernetesAvailabilityComponentState;
+      disruption: KubernetesAvailabilityComponentState;
+      recovery: KubernetesAvailabilityComponentState;
+    }>;
+    intakeSeed: { resourceAccepted: true; metricAccepted: true };
+    disruption: {
+      method: "kubectl-drain";
+      targetNodeDigest: Sha256Digest;
+      nodeCordoned: true;
+      nodeDrained: true;
+      nodeUncordoned: true;
+      evictedComponentCount: 3;
+    };
+    probes: Array<{
+      id: "control-plane-api" | "otlp-metrics";
+      protocol: "http-json" | "otlp-http-protobuf";
+      path: "/v1/system/version" | "/v1/metrics";
+      phases: Array<{
+        id: "baseline" | "disruption" | "recovery";
+        attempts: number;
+        successes: number;
+        failures: 0;
+      }>;
+    }>;
+    summary: {
+      totalChecks: 14;
+      passedChecks: 14;
+      failedChecks: 0;
+      totalProbeAttempts: number;
+      failedProbeAttempts: 0;
+      overallStatus: "qualified";
+    };
+    checks: Array<{ id: KubernetesAvailabilityCheckId; status: "passed" }>;
+    limitations: [
+      "planned-disruption-only",
+      "local-single-region",
+      "shared-dependencies-not-qualified",
+      "involuntary-failure-not-qualified",
+    ];
+  };
+}
+
 export type ReleaseQualificationInstallCheckId =
   | "bundle-integrity"
   | "source-identity"

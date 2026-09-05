@@ -1,9 +1,10 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
 KUBECTL ?= kubectl
 DOCKER ?= docker
+KIND ?= kind
 NPM ?= npm
 COSIGN ?= cosign
 IIP_DATABASE_RECOVERY_REPORT ?= dist/postgresql-recovery-qualification-report.json
@@ -23,6 +24,7 @@ IIP_INGRESS_MINIMUM_AVAILABILITY_BASIS_POINTS ?= 9990
 IIP_INGRESS_MAXIMUM_P95_LATENCY_MILLISECONDS ?= 2000
 IIP_INGRESS_REQUEST_TIMEOUT_MILLISECONDS ?= 2000
 IIP_INGRESS_INTERVAL_MILLISECONDS ?= 1000
+IIP_KUBERNETES_AVAILABILITY_REPORT ?= dist/kubernetes-availability-qualification-report.json
 IIP_GITHUB_CONTEXT_COMPATIBILITY_REPORT ?= dist/github-context-compatibility-report.json
 IIP_RELEASE_SIGNATURE_POLICY ?=
 IIP_RELEASE_SIGNATURE_REPORT ?= dist/release-signature-verification-report.json
@@ -41,6 +43,9 @@ help:
 	@echo "test-ingress-availability Exercise the minimized external probe against real local routes"
 	@echo "qualify-ingress-availability Qualify one HTTPS customer ingress and exact release identity"
 	@echo "verify-ingress-availability-report Verify clean current ingress qualification evidence"
+	@echo "test-kubernetes-availability Validate the planned-disruption report and harness"
+	@echo "qualify-kubernetes-availability Prove API/OTLP availability during an owned Kind worker drain"
+	@echo "verify-kubernetes-availability-report Verify clean current planned-disruption evidence"
 	@echo "test-postgres Run PostgreSQL integration tests with Docker Desktop"
 	@echo "test-capacity Certify large-tenant investigation dispatch capacity with PostgreSQL"
 	@echo "test-credential-broker Certify the external broker client over local TLS"
@@ -181,6 +186,22 @@ qualify-ingress-availability:
 verify-ingress-availability-report:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/qualify_ingress_availability.py verify \
 		--report "$(IIP_INGRESS_QUALIFICATION_REPORT)" \
+		--require-clean --require-qualified
+
+test-kubernetes-availability:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_kubernetes_availability_qualification -v
+
+qualify-kubernetes-availability:
+	IIP_AVAILABILITY_REPORT="$(IIP_KUBERNETES_AVAILABILITY_REPORT)" \
+		IIP_DOCKER_BIN=$(DOCKER) IIP_KIND_BIN=$(KIND) \
+		IIP_KUBECTL_BIN=$(KUBECTL) IIP_HELM_BIN=$(HELM) \
+		IIP_TEST_PYTHON=$(PYTHON) scripts/test_kubernetes_availability.sh
+
+verify-kubernetes-availability-report:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) \
+		scripts/kubernetes_availability_qualification.py verify \
+		--report "$(IIP_KUBERNETES_AVAILABILITY_REPORT)" \
 		--require-clean --require-qualified
 
 test-postgres:

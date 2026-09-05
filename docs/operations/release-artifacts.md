@@ -44,7 +44,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.66.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.67.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 
@@ -56,7 +56,7 @@ After verification, prove that the packaged chart and OCI image—not checkout
 copies—install on the explicit local Kind cluster:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.66.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.67.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -71,12 +71,13 @@ namespace unless explicitly retained for debugging.
 
 ## Prove the supported N-1 upgrade locally
 
-For a target release that adds a schema migration, run the packaged target
-against the explicitly selected prior revision:
+For every target release, run the packaged target against the explicitly
+selected supported prior revision. The target may retain the same latest
+migration or add a newer one; migration regression is rejected:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.66.0-0123456789ab \
-IIP_UPGRADE_FROM_REVISION=a36c79a \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.67.0-0123456789ab \
+IIP_UPGRADE_FROM_REVISION=6b38741 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
 
@@ -91,6 +92,12 @@ seeded Resource through the Kubernetes Service; any failed request or unknown
 revision fails the gate. This proves bounded in-cluster availability for the
 selected N-1 pair, not arbitrary-version compatibility, customer-ingress
 behavior, production load, or failure-injected availability.
+
+The target must also complete a deliberately blocked authenticated Resource
+read after Kubernetes begins terminating its exact serving pod. This checks the
+API's signal handling and active-handler join independently of the Service's
+other ready replica. It is one bounded drain case, not a claim about every
+customer request duration, streaming protocol, ingress, or load balancer.
 
 ## Production promotion boundary
 

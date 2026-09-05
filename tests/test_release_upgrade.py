@@ -18,6 +18,8 @@ class ReleaseUpgradeGateTests(unittest.TestCase):
         self.assertIn('scripts/release_bundle.py verify "$IIP_RELEASE_BUNDLE"', script)
         self.assertIn("git merge-base --is-ancestor", script)
         self.assertIn("Release bundle revision does not match", script)
+        self.assertIn("must not precede the source migration", script)
+        self.assertNotIn("requires a target with a newer schema migration", script)
         self.assertIn('git archive "$IIP_BASE_REVISION"', script)
         self.assertIn('IIP_IMAGE_REVISION=$IIP_BASE_REVISION', script)
         self.assertIn('"$IIP_DOCKER_BIN" load --input', script)
@@ -46,6 +48,23 @@ class ReleaseUpgradeGateTests(unittest.TestCase):
         self.assertIn('state["failureCount"] == 0', script)
         self.assertIn('state["requestCount"] >= 40', script)
         self.assertIn("stop_and_assert_availability_probe", script)
+
+    def test_gate_proves_a_terminating_api_finishes_an_active_read(self) -> None:
+        script = (ROOT / "scripts" / "test_release_upgrade.sh").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("LOCK TABLE iip.resource_projections", script)
+        self.assertIn("pg_sleep(12)", script)
+        self.assertIn("wait_event_type = 'Lock'", script)
+        self.assertIn('delete pod "$IIP_DRAIN_POD"', script)
+        self.assertIn("--wait=false", script)
+        self.assertIn("drained-request-complete", script)
+        self.assertIn("In-flight API request was terminated", script)
+        self.assertLess(
+            script.index("stop_and_assert_availability_probe\n"),
+            script.rindex("prove_in_flight_request_drain\n"),
+        )
 
 
 if __name__ == "__main__":

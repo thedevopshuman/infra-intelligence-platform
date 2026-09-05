@@ -133,8 +133,10 @@ IIP_TARGET_MIGRATION=$(rg --files src/iip/adapters/postgres/migrations -g '*.sql
 IIP_TARGET_MIGRATION=$(basename "$IIP_TARGET_MIGRATION")
 IIP_TARGET_MIGRATION_COUNT=$(rg --files src/iip/adapters/postgres/migrations \
     -g '*.sql' | wc -l | tr -d ' ')
-if [ "$IIP_BASE_MIGRATION" = "$IIP_TARGET_MIGRATION" ]; then
-    echo "Upgrade gate requires a target with a newer schema migration" >&2
+IIP_NEWEST_PAIR_MIGRATION=$(printf '%s\n%s\n' \
+    "$IIP_BASE_MIGRATION" "$IIP_TARGET_MIGRATION" | sort | tail -n 1)
+if [ "$IIP_TARGET_MIGRATION" != "$IIP_NEWEST_PAIR_MIGRATION" ]; then
+    echo "Upgrade target migration must not precede the source migration" >&2
     exit 2
 fi
 
@@ -493,6 +495,101 @@ stop_and_assert_availability_probe() {
         "$IIP_BASE_VERSION" "$IIP_TARGET_VERSION"
 }
 
+prove_in_flight_request_drain() {
+    IIP_DRAIN_POD=$(
+        "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+            --namespace "$IIP_TEST_NAMESPACE" get pods \
+            --selector='app.kubernetes.io/instance=iip,app.kubernetes.io/component=control-plane-api' \
+            --field-selector=status.phase=Running \
+            --output jsonpath='{.items[0].metadata.name}'
+    )
+    IIP_DRAIN_POD_IP=$(
+        "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+            --namespace "$IIP_TEST_NAMESPACE" get pod "$IIP_DRAIN_POD" \
+            --output jsonpath='{.status.podIP}'
+    )
+    if [ -z "$IIP_DRAIN_POD" ] || [ -z "$IIP_DRAIN_POD_IP" ]; then
+        echo "In-flight drain test could not resolve a target pod" >&2
+        exit 1
+    fi
+
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" exec deployment/iip-postgres -- \
+        psql -U iip -d iip -v ON_ERROR_STOP=1 -c \
+        'BEGIN; LOCK TABLE iip.resource_projections IN ACCESS EXCLUSIVE MODE; SELECT pg_sleep(12); COMMIT;' \
+        >"$IIP_TEST_TEMP_DIR/drain-lock.log" 2>&1 &
+    IIP_DRAIN_LOCK_PID=$!
+
+    attempt=0
+    while [ "$attempt" -lt 100 ]; do
+        IIP_DRAIN_LOCK_COUNT=$(
+            "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+                --namespace "$IIP_TEST_NAMESPACE" exec deployment/iip-postgres -- \
+                psql -U iip -d iip -Atc \
+                "SELECT count(*) FROM pg_locks WHERE relation = 'iip.resource_projections'::regclass AND mode = 'AccessExclusiveLock' AND granted" \
+                2>/dev/null || true
+        )
+        if [ "$IIP_DRAIN_LOCK_COUNT" = "1" ]; then
+            break
+        fi
+        attempt=$((attempt + 1))
+        sleep 0.1
+    done
+    if [ "$IIP_DRAIN_LOCK_COUNT" != "1" ]; then
+        echo "In-flight drain test could not acquire its bounded database lock" >&2
+        exit 1
+    fi
+
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" exec iip-upgrade-probe -- \
+        python -c \
+        'import json,sys,urllib.request; from pathlib import Path; token=Path("/var/run/iip-probe/bearer-token").read_text().strip(); request=urllib.request.Request("http://"+sys.argv[1]+":8080/v1/resources", headers={"Authorization":"Bearer "+token}); document=json.load(urllib.request.urlopen(request, timeout=30)); matches=[item for item in document["items"] if item["spec"]["externalId"] == "cluster-upgrade/default/api"]; assert len(matches) == 1; print("drained-request-complete")' \
+        "$IIP_DRAIN_POD_IP" >"$IIP_TEST_TEMP_DIR/drain-client.log" 2>&1 &
+    IIP_DRAIN_CLIENT_PID=$!
+
+    attempt=0
+    IIP_BLOCKED_READ_COUNT=0
+    while [ "$attempt" -lt 100 ]; do
+        IIP_BLOCKED_READ_COUNT=$(
+            "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+                --namespace "$IIP_TEST_NAMESPACE" exec deployment/iip-postgres -- \
+                psql -U iip -d iip -Atc \
+                "SELECT count(*) FROM pg_stat_activity WHERE datname = 'iip' AND wait_event_type = 'Lock' AND query LIKE '%FROM iip.resource_projections%'" \
+                2>/dev/null || true
+        )
+        if [ "$IIP_BLOCKED_READ_COUNT" -ge 1 ]; then
+            break
+        fi
+        attempt=$((attempt + 1))
+        sleep 0.1
+    done
+    if [ "$IIP_BLOCKED_READ_COUNT" -lt 1 ]; then
+        echo "In-flight drain test did not observe the blocked API read" >&2
+        exit 1
+    fi
+
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" delete pod "$IIP_DRAIN_POD" \
+        --wait=false >/dev/null
+    if ! wait "$IIP_DRAIN_CLIENT_PID"; then
+        echo "In-flight API request was terminated before completion" >&2
+        exit 1
+    fi
+    if ! wait "$IIP_DRAIN_LOCK_PID"; then
+        echo "In-flight drain database fixture failed" >&2
+        exit 1
+    fi
+    if ! rg -qx 'drained-request-complete' \
+        "$IIP_TEST_TEMP_DIR/drain-client.log"; then
+        echo "In-flight API request did not return the expected tenant data" >&2
+        exit 1
+    fi
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_TEST_NAMESPACE" rollout status \
+        deployment/iip-infra-intelligence --timeout=120s >/dev/null
+    echo "in-flight drain passed: terminating API completed a blocked authenticated tenant read"
+}
+
 IIP_BASE_CHART="$IIP_BASE_ROOT/deploy/helm/infra-intelligence"
 IIP_TARGET_CHART="$IIP_RELEASE_BUNDLE/infra-intelligence-$IIP_TARGET_CHART_VERSION.tgz"
 install_revision "$IIP_BASE_CHART" "$IIP_BASE_REPOSITORY" \
@@ -548,6 +645,7 @@ assert_migration "$IIP_TARGET_MIGRATION"
 assert_seed_resource
 wait_for_probe_version "$IIP_TARGET_VERSION" "$((IIP_TARGET_PROBE_COUNT + 5))"
 stop_and_assert_availability_probe
+prove_in_flight_request_drain
 
 IIP_APPLIED_MIGRATION_COUNT=$(
     "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \

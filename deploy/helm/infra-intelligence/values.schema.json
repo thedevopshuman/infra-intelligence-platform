@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": [
     "replicaCount",
+    "apiTermination",
     "image",
     "worker",
     "aiAttribution",
@@ -48,6 +49,23 @@
   ],
   "properties": {
     "replicaCount": { "$ref": "#/definitions/replicas" },
+    "apiTermination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gracePeriodSeconds", "endpointDrainSeconds"],
+      "properties": {
+        "gracePeriodSeconds": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 600
+        },
+        "endpointDrainSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        }
+      }
+    },
     "image": {
       "type": "object",
       "additionalProperties": false,

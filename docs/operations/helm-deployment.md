@@ -215,7 +215,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.66.0
+  tag: 0.67.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -299,6 +299,24 @@ helm upgrade --install iip deploy/helm/infra-intelligence \
 
 The migration NetworkPolicy hook is created first, then the migration Job. The Job receives only the database Secret and runs every packaged migration under an advisory lock. The serving Deployment rolls out only after the hook succeeds. `/readyz` independently opens a bounded database connection and verifies the latest migration recorded by the new image. After rollout, compare the authenticated runtime report's application, required migration, source revision, chart version, and image digest with the promoted release evidence.
 
+The API rollout always creates one surge replica and permits zero unavailable
+replicas. It keeps each new pod ready for two seconds before advancing. The
+termination budget is a closed values contract:
+
+```yaml
+apiTermination:
+  gracePeriodSeconds: 60
+  endpointDrainSeconds: 5
+```
+
+Kubernetes first marks a terminating endpoint and runs the bounded pre-stop
+delay so Service and ingress routing can converge. `SIGTERM` then stops new API
+acceptance while the process joins active request handlers before closing its
+shared runtime. The endpoint delay must be smaller than the total grace period;
+Helm rejects an invalid relationship. Size the remaining budget above the
+customer's qualified longest request. Kubernetes still force-kills work that
+outlives the total budget.
+
 `worker.investigationConcurrency` bounds simultaneous investigation tasks in each worker pod. `worker.maxTenantInvestigationConcurrency` is enforced from durable unexpired leases across all replicas; keep its default of one until measured tenant workloads justify a larger share. The process scheduler gives each enrolled tenant at most one local task and rotates polling order. These controls do not replace resource requests/limits, completion-SLO monitoring, or deliberate tenant sharding when the enrolled tenant count is much larger than available process slots.
 
 `investigationQueue.maxOutstandingJobsPerTenant` bounds each tenant's durable non-terminal backlog across API replicas. Size it from measured arrival rate, completion capacity, and acceptable queue delay; do not raise it merely to hide sustained completion-SLO misses. A full tenant receives `429 investigation.queue.capacity-exceeded`; an exact idempotent resubmission still returns its existing job. Alert on sustained rejection at the ingress/API telemetry layer and investigate worker capacity or a faulty submitter.
@@ -323,7 +341,7 @@ Before upgrading:
 2. Complete and verify the database backup procedure for the deployment's RPO/RTO policy.
 3. Put the target OCI index digest in `image.digest` and render the exact values with `helm template`.
 4. Run `helm upgrade --install ... --wait`; do not bypass a failed hook.
-5. Verify the migration Job log, Deployment rollout, `/readyz`, and the customer workflow appropriate to the environment.
+5. Verify the migration Job log, Deployment rollout, `/readyz`, graceful-drain log, and the customer workflow appropriate to the environment.
 
 The migration hook is forward-only. Helm application rollback does not reverse database changes. A schema rollback needs an explicit reviewed recovery procedure.
 
@@ -339,16 +357,17 @@ To test the actual packaged release chart and attested OCI archive instead of
 checkout artifacts, first build the release bundle and then run:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.66.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.67.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
-When the target adds a database migration, prove the supported N-1 transition
-using the packaged target and an explicit ancestor revision:
+For every target, prove the supported N-1 transition using the packaged target
+and the explicit prior release revision. Equal latest migrations are allowed;
+a migration regression is not:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.66.0-0123456789ab \
-IIP_UPGRADE_FROM_REVISION=a36c79a \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.67.0-0123456789ab \
+IIP_UPGRADE_FROM_REVISION=6b38741 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
 
@@ -379,8 +398,16 @@ sends authenticated release-identity and Resource reads through the Service for
 the full transition. It accepts only the two exact source revisions and requires
 zero request or data failures.
 
+After the target stabilizes, the same gate takes an exclusive bounded lock on
+the Resource projection, starts a direct authenticated read against one API
+pod, verifies that the read is blocked in PostgreSQL, and terminates that exact
+pod. The connection must return the original tenant data after the lock clears,
+and the replacement Deployment must become ready. This distinguishes Service
+availability from preservation of work already accepted by a terminating
+process.
+
 The first revision additionally proves the public local console-authentication discovery document, the investigation-completion objective, and the disabled-by-default Evidence retention report from inside the installed pod.
 
 ## Production gaps
 
-This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance and 128-tenant PostgreSQL overload evidence; the chart declares guarded TLS ingress and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; the kind gate restores one; and the N-1 gate proves a data-preserving upgrade, application rollback against the forward schema, idempotent re-upgrade, and zero-failure bounded reads through the internal Service. Organizational image signing, external secret-controller integration, controller-specific end-to-end TLS and upgrade conformance, production-scale latency/load and failure-injected availability, high availability, customer-environment sustained workload and failover tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.
+This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance and 128-tenant PostgreSQL overload evidence; the chart declares guarded TLS ingress and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; the kind gate restores one; and the N-1 gate proves a data-preserving upgrade, application rollback against the forward schema, idempotent re-upgrade, zero-failure bounded reads through the internal Service, and completion of one deliberately blocked read during target-pod termination. Organizational image signing, external secret-controller integration, controller-specific end-to-end TLS and upgrade conformance, production request-duration and streaming profiles, production-scale latency/load and failure-injected availability, high availability, customer-environment sustained workload and failover tests, database failover, storage durability/encryption/retention, point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.

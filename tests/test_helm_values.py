@@ -81,6 +81,7 @@ class HelmValuesContractTests(unittest.TestCase):
 
         for expected in (
             "worker.heartbeatSeconds must be less than worker.leaseSeconds",
+            "apiTermination.endpointDrainSeconds must be less than",
             "eventPublisher.retryBaseSeconds must not exceed",
             "eventDeliverySlo.maximumDeliveryLatencySeconds must be less than",
             "investigationCompletionSlo.maximumCompletionSeconds must be less than",
@@ -155,6 +156,21 @@ class HelmValuesContractTests(unittest.TestCase):
             ["scope", "tenant-scope"],
         )
         self.assertIn("aiEconomicsAttributeMode: tenant-scope", self.values)
+
+        termination = self.schema["properties"]["apiTermination"]
+        self.assertFalse(termination["additionalProperties"])
+        self.assertEqual(
+            set(termination["required"]),
+            {"gracePeriodSeconds", "endpointDrainSeconds"},
+        )
+        self.assertEqual(
+            termination["properties"]["gracePeriodSeconds"]["maximum"],
+            600,
+        )
+        self.assertEqual(
+            termination["properties"]["endpointDrainSeconds"]["maximum"],
+            60,
+        )
 
 
 if __name__ == "__main__":

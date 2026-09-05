@@ -1,6 +1,9 @@
 {{- if and .Values.worker.enabled (ge (int .Values.worker.heartbeatSeconds) (int .Values.worker.leaseSeconds)) }}
 {{- fail "worker.heartbeatSeconds must be less than worker.leaseSeconds" }}
 {{- end }}
+{{- if ge (int .Values.apiTermination.endpointDrainSeconds) (int .Values.apiTermination.gracePeriodSeconds) }}
+{{- fail "apiTermination.endpointDrainSeconds must be less than apiTermination.gracePeriodSeconds" }}
+{{- end }}
 {{- if gt (int .Values.eventPublisher.retryBaseSeconds) (int .Values.eventPublisher.retryMaxSeconds) }}
 {{- fail "eventPublisher.retryBaseSeconds must not exceed eventPublisher.retryMaxSeconds" }}
 {{- end }}

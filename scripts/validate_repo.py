@@ -74,6 +74,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0096-source-bound-retry-amplification.md",
     "docs/decisions/0097-packaged-n-minus-one-upgrade-conformance.md",
     "docs/decisions/0098-sustained-upgrade-availability-conformance.md",
+    "docs/decisions/0099-graceful-api-termination-and-drain-conformance.md",
     "docs/specifications/collector-queue-loss-contract.md",
     "docs/decisions/0026-resource-history-change-evidence.md",
     "docs/decisions/0029-investigation-context-correlation.md",

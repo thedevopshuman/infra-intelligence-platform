@@ -102,3 +102,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0096](0096-source-bound-retry-amplification.md) | Accepted | Detect mapped retry amplification while leaving monetary savings unresolved until billing evidence exists |
 | [0097](0097-packaged-n-minus-one-upgrade-conformance.md) | Accepted | Prove packaged N-1 upgrade, application rollback, data preservation, and idempotent re-upgrade compatibility |
 | [0098](0098-sustained-upgrade-availability-conformance.md) | Accepted | Require zero-failure authenticated Service reads throughout the packaged N-1 transition |
+| [0099](0099-graceful-api-termination-and-drain-conformance.md) | Accepted | Drain endpoints and active API handlers, then prove a blocked tenant read survives pod termination |

@@ -9,6 +9,34 @@ CHART = ROOT / "deploy" / "helm" / "infra-intelligence"
 
 
 class HelmMigrationBoundaryTests(unittest.TestCase):
+    def test_api_rollout_drains_endpoints_and_active_requests(self) -> None:
+        deployment = (CHART / "templates" / "deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+        validation = (CHART / "templates" / "validation.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+
+        for expected in (
+            "maxUnavailable: 0",
+            "maxSurge: 1",
+            "minReadySeconds: 2",
+            "terminationGracePeriodSeconds:",
+            "lifecycle:",
+            "preStop:",
+            "apiTermination.endpointDrainSeconds",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, deployment)
+        self.assertIn("apiTermination:", values)
+        self.assertIn("gracePeriodSeconds: 60", values)
+        self.assertIn("endpointDrainSeconds: 5", values)
+        self.assertIn(
+            "apiTermination.endpointDrainSeconds must be less than",
+            validation,
+        )
+
     def test_otlp_receiver_mutual_tls_is_secret_backed_and_probe_safe(self) -> None:
         deployment = (
             CHART / "templates" / "otlp-receiver-deployment.yaml"

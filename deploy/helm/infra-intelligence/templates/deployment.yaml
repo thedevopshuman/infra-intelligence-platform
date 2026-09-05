@@ -6,6 +6,12 @@ metadata:
     {{- include "infra-intelligence.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  minReadySeconds: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       {{- include "infra-intelligence.selectorLabels" . | nindent 6 }}
@@ -24,6 +30,7 @@ spec:
     spec:
       serviceAccountName: {{ include "infra-intelligence.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      terminationGracePeriodSeconds: {{ .Values.apiTermination.gracePeriodSeconds }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       {{- with .Values.imagePullSecrets }}
@@ -34,6 +41,13 @@ spec:
         - name: api
           image: {{ include "infra-intelligence.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - python
+                  - -c
+                  - {{ printf "import time; time.sleep(%d)" (int .Values.apiTermination.endpointDrainSeconds) | quote }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           envFrom:

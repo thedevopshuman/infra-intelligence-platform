@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
+from threading import Event, Thread
 from typing import Any, Callable, Dict, Mapping, Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -190,11 +192,38 @@ from iip.application.telemetry_evidence import (
 from iip.bootstrap import Runtime, build_runtime_from_env
 
 
+class DrainingThreadingHTTPServer(ThreadingHTTPServer):
+    """Stop accepting new requests and wait for active handlers on shutdown."""
+
+    daemon_threads = False
+    block_on_close = True
+
+
+def _shutdown_handler(
+    server: ThreadingHTTPServer,
+    shutdown_requested: Event,
+) -> Callable[[int, object], None]:
+    """Build an idempotent signal handler without blocking the main server thread."""
+
+    def stop(_signum: int, _frame: object) -> None:
+        if shutdown_requested.is_set():
+            return
+        shutdown_requested.set()
+        print("IIP reference API draining active requests", flush=True)
+        Thread(
+            target=server.shutdown,
+            name="iip-http-shutdown",
+            daemon=True,
+        ).start()
+
+    return stop
+
+
 class ApiHandler(BaseHTTPRequestHandler):
     """Small HTTP adapter with credential-derived request identity."""
 
     runtime: Runtime
-    server_version = "IIPReference/0.66.0"
+    server_version = "IIPReference/0.67.0"
 
     _console_assets = {
         "/": ("index.html", "text/html; charset=utf-8"),
@@ -1913,13 +1942,21 @@ def main() -> None:
     runtime = build_runtime_from_env()
     try:
         ApiHandler.runtime = runtime
-        server = ThreadingHTTPServer((host, port), ApiHandler)
-        print(f"IIP reference API listening on http://{host}:{port}")
+        server = DrainingThreadingHTTPServer((host, port), ApiHandler)
+        shutdown_requested = Event()
+        stop = _shutdown_handler(server, shutdown_requested)
+        previous_handlers = {
+            shutdown_signal: signal.signal(shutdown_signal, stop)
+            for shutdown_signal in (signal.SIGTERM, signal.SIGINT)
+        }
+        print(f"IIP reference API listening on http://{host}:{port}", flush=True)
         try:
             server.serve_forever()
         except KeyboardInterrupt:
-            print("IIP reference API stopped")
+            print("IIP reference API stopped", flush=True)
         finally:
+            for shutdown_signal, previous_handler in previous_handlers.items():
+                signal.signal(shutdown_signal, previous_handler)
             server.server_close()
     finally:
         runtime.close()

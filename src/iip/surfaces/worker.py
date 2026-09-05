@@ -55,6 +55,17 @@ class AiCostWorkerPass:
     failures: int
 
 
+@dataclass(frozen=True)
+class AiAttributionWorkerPass:
+    """Value-minimized result across explicitly enrolled tenant policies."""
+
+    tenants: int
+    processed: int
+    allocated: int
+    unallocated: int
+    failures: int
+
+
 class TenantFairInvestigationScheduler:
     """Keep at most one process-local task in flight for each tenant."""
 
@@ -205,6 +216,18 @@ def ai_cost_interval_seconds() -> int:
     return interval
 
 
+def ai_attribution_interval_seconds() -> int:
+    try:
+        interval = int(
+            os.environ.get("IIP_AI_ATTRIBUTION_INTERVAL_SECONDS", "10")
+        )
+    except ValueError:
+        raise ValueError("ai.attribution.configuration.invalid") from None
+    if interval < 1 or interval > 3600:
+        raise ValueError("ai.attribution.configuration.invalid")
+    return interval
+
+
 def ai_savings_interval_seconds() -> int:
     try:
         interval = int(
@@ -243,6 +266,33 @@ def run_ai_cost_pass(
         priced,
         unpriced,
         ambiguous,
+        failures,
+    )
+
+
+def run_ai_attribution_pass(
+    service: Any,
+    tenants: tuple[str, ...],
+    worker_id: str,
+) -> AiAttributionWorkerPass:
+    processed = 0
+    allocated = 0
+    unallocated = 0
+    failures = 0
+    for tenant_id in tenants:
+        try:
+            result = service.run_once(tenant_id, worker_id)
+            processed += result.processed
+            allocated += result.allocated
+            unallocated += result.unallocated
+        except Exception:
+            # Tenant, application, team, rule, and usage identities stay out of logs.
+            failures += 1
+    return AiAttributionWorkerPass(
+        len(tenants),
+        processed,
+        allocated,
+        unallocated,
         failures,
     )
 
@@ -313,6 +363,13 @@ def main() -> None:
         evidence_retention_interval_seconds() if retention_enabled else 3600
     )
     next_retention_at = time.monotonic()
+    ai_attribution_service = runtime.ai_attribution_resolution
+    ai_attribution_interval = (
+        ai_attribution_interval_seconds()
+        if ai_attribution_service is not None
+        else 10
+    )
+    next_ai_attribution_at = time.monotonic()
     ai_cost_service = runtime.ai_cost_calculation
     ai_cost_interval = (
         ai_cost_interval_seconds() if ai_cost_service is not None else 10
@@ -350,6 +407,38 @@ def main() -> None:
                         sort_keys=True,
                     )
                 )
+            if (
+                ai_attribution_service is not None
+                and time.monotonic() >= next_ai_attribution_at
+            ):
+                attribution_pass = run_ai_attribution_pass(
+                    ai_attribution_service,
+                    tenants,
+                    worker_id,
+                )
+                if (
+                    attribution_pass.processed
+                    or attribution_pass.failures
+                    or arguments.once
+                ):
+                    print(
+                        json.dumps(
+                            {
+                                "event": "ai-attribution.resolution.pass",
+                                "tenants": attribution_pass.tenants,
+                                "processed": attribution_pass.processed,
+                                "allocated": attribution_pass.allocated,
+                                "unallocated": attribution_pass.unallocated,
+                                "failures": attribution_pass.failures,
+                            },
+                            separators=(",", ":"),
+                            sort_keys=True,
+                        )
+                    )
+                next_ai_attribution_at = (
+                    time.monotonic() + ai_attribution_interval
+                )
+                worked = worked or attribution_pass.processed > 0
             if ai_cost_service is not None and time.monotonic() >= next_ai_cost_at:
                 cost_pass = run_ai_cost_pass(ai_cost_service, tenants, worker_id)
                 if cost_pass.processed or cost_pass.failures or arguments.once:

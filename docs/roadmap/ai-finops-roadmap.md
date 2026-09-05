@@ -60,6 +60,15 @@ reviewed organizational ownership without arbitrary user-controlled labels.
   standard OTel attributes before creating any IIP SDK;
 - prove cardinality, tenant isolation, renames, and historical ownership.
 
+Implementation status: the protected policy and immutable attribution-result
+contracts, deterministic effective-time resolver, explicit unallocated state,
+tenant-bound in-memory/PostgreSQL persistence, worker authority, CloudEvent,
+SDK types, Docker/Helm configuration, and executable isolation/rename/replay
+tests are delivered. Bounded allocation queries, cost joins, export dimensions,
+and application/team dashboard views are the next unit. Optional business
+attributes remain deferred pending evidence that standard service/resource
+identity is insufficient.
+
 Exit gate: every allocation is traceable to an effective-time mapping, and
 unallocated usage remains visible rather than guessed.
 

@@ -50,6 +50,11 @@ from iip.application.calculate_ai_cost import (
     AiCostCalculationService,
     AiCostConfigurationError,
 )
+from iip.application.attribute_ai_usage import (
+    AiAttributionConfigurationError,
+    AiAttributionService,
+    validate_ai_attribution_policy,
+)
 from iip.application.evaluate_ai_savings import (
     AiSavingsConfigurationError,
     AiSavingsEvaluationService,
@@ -219,6 +224,7 @@ class Runtime:
     otlp_metrics_ingestion: OtlpMetricsIngestionService | None
     otlp_logs_ingestion: OtlpLogsIngestionService | None
     ai_usage_ingestion: AiUsageIngestionService | None
+    ai_attribution_resolution: AiAttributionService | None
     ai_cost_calculation: AiCostCalculationService | None
     ai_savings_evaluation: AiSavingsEvaluationService | None
     investigations: DeterministicInvestigationService
@@ -283,6 +289,9 @@ def build_local_runtime(
     otlp_receiver_objectives: OtlpReceiverObjectives | None = None,
     otlp_receiver_telemetry_sink: OtlpReceiverTelemetrySink | None = None,
     ai_economics_telemetry_sink: AiEconomicsTelemetrySink | None = None,
+    ai_attribution_policies: tuple[Mapping[str, object], ...] | None = None,
+    ai_attribution_allow_test_fixtures: bool = False,
+    ai_attribution_batch_size: int = 100,
     ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
@@ -327,6 +336,9 @@ def build_local_runtime(
         ai_economics_telemetry_sink,
         collector_queue_loss_binding,
         collector_queue_loss_objectives,
+        ai_attribution_policies,
+        ai_attribution_allow_test_fixtures,
+        ai_attribution_batch_size,
         ai_cost_catalogs,
         ai_cost_allow_test_fixtures,
         ai_cost_batch_size,
@@ -372,6 +384,9 @@ def _compose_runtime(
     ai_economics_telemetry_sink: AiEconomicsTelemetrySink | None = None,
     collector_queue_loss_binding: CollectorQueueLossBinding | None = None,
     collector_queue_loss_objectives: CollectorQueueLossObjectives | None = None,
+    ai_attribution_policies: tuple[Mapping[str, object], ...] | None = None,
+    ai_attribution_allow_test_fixtures: bool = False,
+    ai_attribution_batch_size: int = 100,
     ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
@@ -595,6 +610,17 @@ def _compose_runtime(
             if ai_usage_receiver is not None
             else None
         ),
+        ai_attribution_resolution=(
+            AiAttributionService(
+                store,
+                clock,
+                ai_attribution_policies,
+                allow_test_fixtures=ai_attribution_allow_test_fixtures,
+                batch_size=ai_attribution_batch_size,
+            )
+            if ai_attribution_policies is not None
+            else None
+        ),
         ai_cost_calculation=(
             AiCostCalculationService(
                 store,
@@ -712,6 +738,9 @@ def build_postgres_runtime(
     otlp_receiver_objectives: OtlpReceiverObjectives | None = None,
     otlp_receiver_telemetry_sink: OtlpReceiverTelemetrySink | None = None,
     ai_economics_telemetry_sink: AiEconomicsTelemetrySink | None = None,
+    ai_attribution_policies: tuple[Mapping[str, object], ...] | None = None,
+    ai_attribution_allow_test_fixtures: bool = False,
+    ai_attribution_batch_size: int = 100,
     ai_cost_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
@@ -763,6 +792,9 @@ def build_postgres_runtime(
         ai_economics_telemetry_sink,
         collector_queue_loss_binding,
         collector_queue_loss_objectives,
+        ai_attribution_policies,
+        ai_attribution_allow_test_fixtures,
+        ai_attribution_batch_size,
         ai_cost_catalogs,
         ai_cost_allow_test_fixtures,
         ai_cost_batch_size,
@@ -809,7 +841,7 @@ def build_runtime_from_env(*, include_action_executor: bool = True) -> Runtime:
     return _build_runtime_from_env(
         _authenticator_from_env(),
         include_action_executor=include_action_executor,
-        include_ai_cost_engine=False,
+        include_ai_economics_engine=False,
     )
 
 
@@ -819,7 +851,7 @@ def build_workflow_worker_runtime_from_env() -> Runtime:
     return _build_runtime_from_env(
         DenyAllAuthenticator(),
         include_action_executor=False,
-        include_ai_cost_engine=True,
+        include_ai_economics_engine=True,
     )
 
 
@@ -827,7 +859,7 @@ def _build_runtime_from_env(
     authenticator: Authenticator,
     *,
     include_action_executor: bool,
-    include_ai_cost_engine: bool,
+    include_ai_economics_engine: bool,
 ) -> Runtime:
     policy = _policy_from_env()
     objectives = _ingestion_objectives_from_env()
@@ -913,17 +945,26 @@ def _build_runtime_from_env(
         context_documents_backend = _context_documents_backend_from_env()
         signal_catalog = build_investigation_signal_catalog(os.environ)
         (
+            ai_attribution_policies,
+            ai_attribution_allow_test_fixtures,
+            ai_attribution_batch_size,
+        ) = (
+            _ai_attribution_engine_configuration_from_env()
+            if include_ai_economics_engine
+            else (None, False, 100)
+        )
+        (
             ai_cost_catalogs,
             ai_cost_allow_test_fixtures,
             ai_cost_batch_size,
         ) = (
             _ai_cost_engine_configuration_from_env()
-            if include_ai_cost_engine
+            if include_ai_economics_engine
             else (None, False, 100)
         )
         ai_savings_profiles = (
             _ai_savings_engine_configuration_from_env(ai_cost_catalogs)
-            if include_ai_cost_engine
+            if include_ai_economics_engine
             else None
         )
         if not database_url:
@@ -979,6 +1020,11 @@ def _build_runtime_from_env(
                     if metrics_runtime is not None
                     else None
                 ),
+                ai_attribution_policies=ai_attribution_policies,
+                ai_attribution_allow_test_fixtures=(
+                    ai_attribution_allow_test_fixtures
+                ),
+                ai_attribution_batch_size=ai_attribution_batch_size,
                 ai_cost_catalogs=ai_cost_catalogs,
                 ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
                 ai_cost_batch_size=ai_cost_batch_size,
@@ -1041,6 +1087,11 @@ def _build_runtime_from_env(
                 else None
             ),
             readiness_timeout_seconds=_readiness_timeout_from_env(),
+            ai_attribution_policies=ai_attribution_policies,
+            ai_attribution_allow_test_fixtures=(
+                ai_attribution_allow_test_fixtures
+            ),
+            ai_attribution_batch_size=ai_attribution_batch_size,
             ai_cost_catalogs=ai_cost_catalogs,
             ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
             ai_cost_batch_size=ai_cost_batch_size,
@@ -1894,6 +1945,59 @@ def _ai_usage_receiver_from_env() -> AiUsageReceiverAdapter | None:
     from iip.adapters.otlp_ai_usage_receiver import ConfiguredAiUsageReceiver
 
     return ConfiguredAiUsageReceiver.from_json(configuration)
+
+
+def _ai_attribution_engine_configuration_from_env() -> tuple[
+    tuple[Mapping[str, object], ...] | None,
+    bool,
+    int,
+]:
+    enabled = os.environ.get("IIP_AI_ATTRIBUTION_ENABLED", "false").lower()
+    if enabled not in ("false", "true"):
+        raise AiAttributionConfigurationError(
+            "ai.attribution.configuration.invalid"
+        )
+    if enabled == "false":
+        return None, False, 100
+    raw_policies = os.environ.get("IIP_AI_ATTRIBUTION_POLICIES_JSON")
+    if raw_policies is None:
+        raise AiAttributionConfigurationError(
+            "ai.attribution.configuration.required"
+        )
+    allow_raw = os.environ.get(
+        "IIP_AI_ATTRIBUTION_ALLOW_TEST_FIXTURES",
+        "false",
+    ).lower()
+    if allow_raw not in ("false", "true"):
+        raise AiAttributionConfigurationError(
+            "ai.attribution.configuration.invalid"
+        )
+    try:
+        batch_size = int(os.environ.get("IIP_AI_ATTRIBUTION_BATCH_SIZE", "100"))
+    except ValueError:
+        raise AiAttributionConfigurationError(
+            "ai.attribution.configuration.invalid"
+        ) from None
+    if not 1 <= batch_size <= 1000:
+        raise AiAttributionConfigurationError(
+            "ai.attribution.configuration.invalid"
+        )
+
+    from iip.adapters.ai_attribution_policies import (
+        ai_attribution_policies_from_json,
+    )
+
+    policies = ai_attribution_policies_from_json(raw_policies)
+    validated = tuple(validate_ai_attribution_policy(item) for item in policies)
+    worker_tenants = {
+        item.strip()
+        for item in os.environ.get("IIP_WORKER_TENANTS", "").split(",")
+        if item.strip()
+    }
+    policy_tenants = {item.tenant_id for item in validated}
+    if not worker_tenants or policy_tenants != worker_tenants:
+        raise AiAttributionConfigurationError("ai.attribution.tenants.invalid")
+    return policies, allow_raw == "true", batch_size
 
 
 def _ai_cost_engine_configuration_from_env() -> tuple[

@@ -96,3 +96,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0090](0090-intermediate-ca-and-otlp-crl-rollout-evidence.md) | Accepted | Prove an intermediate-issued OTLP client chain and activate a newer CRL through receiver rollout |
 | [0091](0091-opentelemetry-native-ai-economics.md) | Accepted | Keep AI economics asynchronous, metadata-only, OTel-native, and separate usage collection from calculated cost |
 | [0092](0092-bedrock-instrumentation-compatibility-profile.md) | Accepted | Qualify exact official botocore Bedrock profiles without overstating offline or incomplete-usage evidence |
+| [0093](0093-protected-effective-time-ai-attribution.md) | Accepted | Resolve observed AI service identity to immutable application/team facts under protected effective-time policy |

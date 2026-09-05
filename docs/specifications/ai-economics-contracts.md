@@ -4,6 +4,8 @@
 **Machine contracts:**
 
 - `contracts/schemas/ai-usage-record.schema.json`
+- `contracts/schemas/ai-attribution-policy.schema.json`
+- `contracts/schemas/ai-usage-attribution-record.schema.json`
 - `contracts/schemas/ai-price-catalog.schema.json`
 - `contracts/schemas/ai-cost-record.schema.json`
 - `contracts/schemas/ai-savings-finding.schema.json`
@@ -11,6 +13,11 @@
 These contracts separate observed model usage, price configuration, calculated
 cost, and potential savings. An implementation must not mutate one record to
 stand in for another stage.
+
+Protected application/team allocation is specified separately in
+[`ai-attribution-contracts.md`](ai-attribution-contracts.md). Its policy and
+result schemas are listed here because attribution is a peer stage in the same
+AI economics flow, not a mutation of usage or cost.
 
 ## `AiUsageRecord`
 

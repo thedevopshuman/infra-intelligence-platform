@@ -45,6 +45,11 @@ def create_configuration(anchor: datetime | None = None) -> Path:
             separators=(",", ":"),
             sort_keys=True,
         ),
+        "IIP_AI_ATTRIBUTION_POLICIES_JSON": json.dumps(
+            ai_finops_fixture.attribution_policy_configuration(selected),
+            separators=(",", ":"),
+            sort_keys=True,
+        ),
         "IIP_AI_SAVINGS_PROFILES_JSON": json.dumps(
             ai_finops_fixture.savings_profile_configuration(selected),
             separators=(",", ":"),

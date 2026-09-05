@@ -1,0 +1,21 @@
+{
+  "specversion": "1.0",
+  "id": "ai-attribution-da1365aa71c7ced0a9f833e58dcdeec60f25dc706cdc562195208be9aade0e0a",
+  "type": "io.iip.ai.usage-attributed.v1",
+  "source": "urn:iip:ai-attribution:0.1.0",
+  "time": "2026-09-05T10:00:04Z",
+  "subject": "aia_da1365aa71c7ced0a9f833e58dcdeec6",
+  "datacontenttype": "application/json",
+  "tenantid": "local",
+  "data": {
+    "attributionRecordId": "aia_da1365aa71c7ced0a9f833e58dcdeec6",
+    "usageRecordId": "aiu_0123456789abcdef0123456789abcdef",
+    "policyId": "aap_22222222222222222222222222222222",
+    "policyVersion": "2026-09-05.1",
+    "status": "allocated",
+    "applicationId": "support-experience",
+    "teamId": "customer-experience"
+  },
+  "correlationid": "0123456789abcdef0123456789abcdef",
+  "causationid": "aiu_0123456789abcdef0123456789abcdef"
+}

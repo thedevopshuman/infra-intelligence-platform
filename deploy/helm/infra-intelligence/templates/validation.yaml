@@ -19,6 +19,15 @@
 {{- if and .Values.evidenceRetention.enabled (not .Values.worker.enabled) }}
 {{- fail "worker.enabled must be true when evidenceRetention.enabled=true" }}
 {{- end }}
+{{- if and .Values.aiAttribution.enabled (not .Values.worker.enabled) }}
+{{- fail "worker.enabled must be true when aiAttribution.enabled=true" }}
+{{- end }}
+{{- if and .Values.aiAttribution.enabled (not .Values.aiAttribution.policiesExistingSecret) }}
+{{- fail "aiAttribution.policiesExistingSecret is required when aiAttribution.enabled=true" }}
+{{- end }}
+{{- if and .Values.aiAttribution.allowTestFixtures (not .Values.aiAttribution.enabled) }}
+{{- fail "aiAttribution.enabled must be true when attribution test fixtures are allowed" }}
+{{- end }}
 {{- if and .Values.aiCostEngine.enabled (not .Values.worker.enabled) }}
 {{- fail "worker.enabled must be true when aiCostEngine.enabled=true" }}
 {{- end }}

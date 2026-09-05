@@ -133,6 +133,27 @@ def price_catalog_configuration(anchor: datetime) -> Mapping[str, object]:
     return {"catalogs": [catalog]}
 
 
+def attribution_policy_configuration(anchor: datetime) -> Mapping[str, object]:
+    policy = json.loads(
+        (ROOT / "contracts" / "examples" / "ai-attribution-policy.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    policy["metadata"]["publishedAt"] = format_timestamp(
+        anchor - timedelta(minutes=10)
+    )
+    policy["spec"]["source"]["retrievedAt"] = format_timestamp(
+        anchor - timedelta(minutes=11)
+    )
+    policy["spec"]["rules"][0]["match"][
+        "deploymentEnvironment"
+    ] = "ai-finops-demo"
+    policy["spec"]["rules"][0]["effectiveFrom"] = format_timestamp(
+        anchor - timedelta(days=1)
+    )
+    return {"policies": [policy]}
+
+
 def savings_profile_configuration(anchor: datetime) -> Mapping[str, object]:
     baseline_start, current_start, current_end = _windows(anchor)
 
@@ -371,6 +392,17 @@ def _database_snapshot(database_url: str) -> Mapping[str, object]:
                 """
             ).fetchall()
         )
+        attributions = tuple(
+            row[0]
+            for row in connection.execute(
+                """
+                SELECT document
+                FROM iip.ai_usage_attributions
+                WHERE tenant_id = 'local'
+                ORDER BY attribution_record_id
+                """
+            ).fetchall()
+        )
         findings = tuple(
             row[0]
             for row in connection.execute(
@@ -382,7 +414,12 @@ def _database_snapshot(database_url: str) -> Mapping[str, object]:
                 """
             ).fetchall()
         )
-    return {"usage": usage, "costs": costs, "findings": findings}
+    return {
+        "usage": usage,
+        "attributions": attributions,
+        "costs": costs,
+        "findings": findings,
+    }
 
 
 def _assert_equal(actual: object, expected: object, name: str) -> None:
@@ -404,12 +441,34 @@ def verify_fixture(
         try:
             snapshot = _database_snapshot(database_url)
             _assert_equal(len(snapshot["usage"]), 8, "usage ledger count")
+            _assert_equal(
+                len(snapshot["attributions"]),
+                8,
+                "attribution ledger count",
+            )
             _assert_equal(len(snapshot["costs"]), 8, "cost ledger count")
             _assert_equal(len(snapshot["findings"]), 1, "finding ledger count")
 
             serialized = json.dumps(snapshot, sort_keys=True)
             if "must-never-cross-iip-boundary" in serialized:
                 raise AssertionError("content crossed the metadata-only boundary")
+
+            attributions = snapshot["attributions"]
+            assert isinstance(attributions, tuple)
+            allocation_statuses = [
+                item["spec"]["resolution"]["status"]
+                for item in attributions
+            ]
+            _assert_equal(
+                allocation_statuses.count("allocated"),
+                4,
+                "allocated usage records",
+            )
+            _assert_equal(
+                allocation_statuses.count("unallocated"),
+                4,
+                "visible unallocated usage records",
+            )
 
             costs = snapshot["costs"]
             assert isinstance(costs, tuple)
@@ -510,7 +569,7 @@ def main() -> None:
     configuration = subparsers.add_parser("configuration")
     configuration.add_argument(
         "name",
-        choices=("channel", "catalog", "profiles", "token"),
+        choices=("channel", "attribution", "catalog", "profiles", "token"),
     )
     configuration.add_argument("--anchor", required=True)
 
@@ -531,6 +590,7 @@ def main() -> None:
         anchor = _parse_anchor(arguments.anchor)
         documents = {
             "channel": channel_configuration(),
+            "attribution": attribution_policy_configuration(anchor),
             "catalog": price_catalog_configuration(anchor),
             "profiles": savings_profile_configuration(anchor),
         }

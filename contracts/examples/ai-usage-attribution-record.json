@@ -1,0 +1,37 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiUsageAttributionRecord",
+  "metadata": {
+    "id": "aia_da1365aa71c7ced0a9f833e58dcdeec6",
+    "tenantId": "local",
+    "resolvedAt": "2026-09-05T10:00:04Z"
+  },
+  "spec": {
+    "usageRecordId": "aiu_0123456789abcdef0123456789abcdef",
+    "effectiveAt": "2026-09-05T10:00:00Z",
+    "engineVersion": "0.1.0",
+    "policy": {
+      "id": "aap_22222222222222222222222222222222",
+      "version": "2026-09-05.1",
+      "sourceHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "observedIdentity": {
+      "serviceName": "support-assistant",
+      "serviceNamespace": "customer-experience",
+      "deploymentEnvironment": "production",
+      "resourceRefs": []
+    },
+    "resolution": {
+      "status": "allocated",
+      "ruleId": "support-production",
+      "application": {
+        "id": "support-experience",
+        "name": "Support Experience"
+      },
+      "team": {
+        "id": "customer-experience",
+        "name": "Customer Experience"
+      }
+    }
+  }
+}

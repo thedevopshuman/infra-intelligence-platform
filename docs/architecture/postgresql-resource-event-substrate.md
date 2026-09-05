@@ -17,8 +17,11 @@ This page describes the executable Phase 1 persistence slice. Public contracts r
 | `iip.event_outbox` | At-least-once delivery state for event-log rows | Unique event offset and tenant-scoped lease |
 | `iip.source_checkpoints` | Last explicitly committed aggregate checkpoint and opaque provider cursor map | `(tenant_id, source_id)` |
 | `iip.ai_usage_records` | Immutable metadata-only GenAI invocation usage | Tenant-scoped usage ID and deduplication key |
+| `iip.ai_attribution_policies` | Immutable protected application/team mapping snapshots | Tenant-scoped policy ID and unique version |
+| `iip.ai_usage_attributions` | Reproducible effective-time allocation facts | Tenant, usage, policy, and engine identity |
 | `iip.ai_price_catalogs` | Immutable protected AI price snapshots | Tenant-scoped catalog ID and unique version |
 | `iip.ai_cost_records` | Reproducible per-usage calculated-cost facts | Tenant, usage, catalog, and engine identity |
+| `iip.ai_savings_findings` | Immutable deterministic evidence-backed savings facts | Tenant-scoped finding ID |
 
 Canonical documents are stored as `jsonb`, but frequently enforced identity, tenancy, ordering, lifecycle, and delivery fields are relational columns. The relational columns are not a second public contract; migrations and adapter tests keep them aligned with the canonical document.
 
@@ -57,6 +60,15 @@ resource projection. An accepted normalized span commits the immutable
 tenant, AI channel actor, stable span-derived identity, and document hash are
 checked again at the storage port. An exact retry returns the first document;
 reuse of the identity with different usage fails closed.
+
+AI attribution is an independent worker transaction after intake. The worker
+registers one protected immutable mapping snapshot per enrolled tenant, reads a
+bounded invocation-time-ordered page, and resolves observed service/resource
+identity to application/team ownership or an explicit unallocated result.
+Storage reloads the exact policy and usage documents and re-resolves the
+decision before atomically inserting `ai_usage_attributions`, its
+value-minimized CloudEvent, and outbox row. The source usage row is never
+updated, and exact retries emit no second event.
 
 AI cost calculation remains a separate transaction after intake. The
 tenant-explicit worker idempotently registers a protected catalog, selects a

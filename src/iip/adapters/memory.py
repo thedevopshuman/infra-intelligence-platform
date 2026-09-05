@@ -25,6 +25,11 @@ from iip.application.ports import (
     SourceIngestionState,
     StoredEvent,
 )
+from iip.adapters.ai_attribution_store import (
+    prepare_ai_attribution_policy,
+    prepare_ai_attribution_writes,
+    validate_ai_attribution_actor,
+)
 from iip.adapters.ai_cost_store import (
     prepare_ai_cost_writes,
     prepare_ai_price_catalog,
@@ -40,6 +45,10 @@ from iip.adapters.ai_usage_store import prepare_ai_usage_writes
 from iip.application.evaluate_ai_savings import (
     InvalidAiSavingsInputError,
     validate_context_growth_source_binding,
+)
+from iip.application.attribute_ai_usage import (
+    InvalidAiAttributionInputError,
+    validate_ai_attribution_source_binding,
 )
 from iip.domain.models import (
     ObservationDisposition,
@@ -79,6 +88,16 @@ class InMemoryResourceStore:
             tuple[str, str], tuple[str, Mapping[str, object]]
         ] = {}
         self._ai_usage_ids: Dict[tuple[str, str], str] = {}
+        self._ai_attribution_policies: Dict[
+            tuple[str, str], tuple[str, Mapping[str, object]]
+        ] = {}
+        self._ai_attribution_policy_versions: Dict[tuple[str, str], str] = {}
+        self._ai_attributions: Dict[
+            tuple[str, str], tuple[str, Mapping[str, object]]
+        ] = {}
+        self._ai_attribution_identities: Dict[
+            tuple[str, str, str, str], str
+        ] = {}
         self._ai_price_catalogs: Dict[
             tuple[str, str], tuple[str, Mapping[str, object]]
         ] = {}
@@ -107,6 +126,16 @@ class InMemoryResourceStore:
             return tuple(
                 self._json_copy(document)
                 for (_digest, document) in self._ai_savings.values()
+            )
+
+    @property
+    def ai_usage_attributions(self) -> tuple[Mapping[str, object], ...]:
+        """Expose immutable attribution facts for local diagnostics and tests."""
+
+        with self._lock:
+            return tuple(
+                self._json_copy(document)
+                for (_digest, document) in self._ai_attributions.values()
             )
 
     def apply(
@@ -304,6 +333,173 @@ class InMemoryResourceStore:
                     item.recorded_at,
                 )
                 results.append(self._json_copy(document))
+            return tuple(results)
+
+    def register_attribution_policy(
+        self,
+        actor: ActorContext,
+        policy: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        """Register one immutable exact-tenant attribution snapshot."""
+
+        prepared = prepare_ai_attribution_policy(actor, policy)
+        key = (prepared.tenant_id, prepared.policy_id)
+        version_key = (prepared.tenant_id, prepared.policy_version)
+        with self._lock:
+            existing = self._ai_attribution_policies.get(key)
+            version_policy = self._ai_attribution_policy_versions.get(version_key)
+            if existing is not None:
+                if existing[0] != prepared.document_hash:
+                    raise PersistenceError("storage.conflict")
+                return self._json_copy(existing[1])
+            if version_policy is not None and version_policy != prepared.policy_id:
+                raise PersistenceError("storage.conflict")
+            copied = self._json_copy(prepared.document)
+            self._ai_attribution_policies[key] = (prepared.document_hash, copied)
+            self._ai_attribution_policy_versions[version_key] = prepared.policy_id
+            return self._json_copy(copied)
+
+    def list_usage_without_attribution(
+        self,
+        actor: ActorContext,
+        policy_id: str,
+        engine_version: str,
+        *,
+        limit: int = 100,
+    ) -> tuple[Mapping[str, object], ...]:
+        """List a bounded exact-tenant page not resolved by this generation."""
+
+        validate_ai_attribution_actor(
+            actor,
+            policy_id=policy_id,
+            engine_version=engine_version,
+            limit=limit,
+        )
+        with self._lock:
+            if (actor.tenant_id, policy_id) not in self._ai_attribution_policies:
+                raise PersistenceError("storage.request.invalid")
+            candidates: list[tuple[str, str, Mapping[str, object]]] = []
+            for (tenant_id, _deduplication), (_digest, usage) in self._ai_usage.items():
+                if tenant_id != actor.tenant_id:
+                    continue
+                metadata = usage.get("metadata")
+                spec = usage.get("spec")
+                invocation = spec.get("invocation") if isinstance(spec, Mapping) else None
+                if not isinstance(metadata, Mapping) or not isinstance(invocation, Mapping):
+                    raise PersistenceError("storage.state.invalid")
+                usage_id = metadata.get("id")
+                started_at = invocation.get("startedAt")
+                if not isinstance(usage_id, str) or not isinstance(started_at, str):
+                    raise PersistenceError("storage.state.invalid")
+                identity = (tenant_id, usage_id, policy_id, engine_version)
+                if identity in self._ai_attribution_identities:
+                    continue
+                candidates.append((started_at, usage_id, usage))
+            candidates.sort(key=lambda item: (item[0], item[1]))
+            return tuple(
+                self._json_copy(usage)
+                for _started_at, _usage_id, usage in candidates[:limit]
+            )
+
+    def commit_usage_attribution_batch(
+        self,
+        actor: ActorContext,
+        records: tuple[Mapping[str, object], ...],
+        events: tuple[PlatformEvent, ...],
+    ) -> tuple[Mapping[str, object], ...]:
+        """Atomically retain source-bound attribution and enqueue events."""
+
+        prepared = prepare_ai_attribution_writes(actor, records, events)
+        with self._lock:
+            event_identities = {
+                (item.event.tenant_id, item.event.source, item.event.event_id)
+                for item in self._event_log
+            }
+            for item in prepared:
+                policy = self._ai_attribution_policies.get(
+                    (item.tenant_id, item.policy_id)
+                )
+                usage_key = self._ai_usage_ids.get(
+                    (item.tenant_id, item.usage_record_id)
+                )
+                usage = (
+                    self._ai_usage.get((item.tenant_id, usage_key))
+                    if usage_key is not None
+                    else None
+                )
+                if policy is None or usage is None:
+                    raise PersistenceError("storage.request.invalid")
+                policy_document = policy[1]
+                policy_metadata = policy_document.get("metadata")
+                policy_spec = policy_document.get("spec")
+                policy_source = (
+                    policy_spec.get("source")
+                    if isinstance(policy_spec, Mapping)
+                    else None
+                )
+                if (
+                    not isinstance(policy_metadata, Mapping)
+                    or not isinstance(policy_source, Mapping)
+                    or policy_metadata.get("version") != item.policy_version
+                    or policy_source.get("contentHash") != item.policy_source_hash
+                ):
+                    raise PersistenceError("storage.request.invalid")
+                try:
+                    validate_ai_attribution_source_binding(
+                        item.document,
+                        policy_document,
+                        usage[1],
+                    )
+                except InvalidAiAttributionInputError:
+                    raise PersistenceError("storage.request.invalid") from None
+                key = (item.tenant_id, item.attribution_record_id)
+                existing = self._ai_attributions.get(key)
+                identity = (
+                    item.tenant_id,
+                    item.usage_record_id,
+                    item.policy_id,
+                    item.engine_version,
+                )
+                existing_id = self._ai_attribution_identities.get(identity)
+                if (
+                    (existing is not None and existing[0] != item.document_hash)
+                    or (
+                        existing_id is not None
+                        and existing_id != item.attribution_record_id
+                    )
+                    or (
+                        existing is None
+                        and (item.tenant_id, item.event.source, item.event.event_id)
+                        in event_identities
+                    )
+                ):
+                    raise PersistenceError("storage.conflict")
+
+            results: list[Mapping[str, object]] = []
+            for item in prepared:
+                key = (item.tenant_id, item.attribution_record_id)
+                existing = self._ai_attributions.get(key)
+                if existing is not None:
+                    results.append(self._json_copy(existing[1]))
+                    continue
+                copied = self._json_copy(item.document)
+                self._ai_attributions[key] = (item.document_hash, copied)
+                self._ai_attribution_identities[
+                    (
+                        item.tenant_id,
+                        item.usage_record_id,
+                        item.policy_id,
+                        item.engine_version,
+                    )
+                ] = item.attribution_record_id
+                event_offset = len(self._event_log) + 1
+                self._event_log.append(StoredEvent(event_offset, item.event))
+                self._outbox[event_offset] = _MemoryOutboxEntry(
+                    event_offset,
+                    item.event,
+                    item.resolved_at,
+                )
+                results.append(self._json_copy(copied))
             return tuple(results)
 
     def register_price_catalog(

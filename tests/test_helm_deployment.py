@@ -235,6 +235,29 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
                 self.assertIn(expected, worker)
         self.assertNotIn("IIP_AI_PRICE_CATALOGS_JSON", api)
 
+    def test_ai_attribution_is_disabled_secret_backed_and_worker_owned(self) -> None:
+        worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+        api = (CHART / "templates" / "deployment.yaml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("aiAttribution:", values)
+        for expected in (
+            "IIP_AI_ATTRIBUTION_ENABLED",
+            "IIP_AI_ATTRIBUTION_POLICIES_JSON",
+            "aiAttribution.policiesExistingSecret",
+            "aiAttribution.policiesSecretKey",
+            "IIP_AI_ATTRIBUTION_ALLOW_TEST_FIXTURES",
+            "IIP_AI_ATTRIBUTION_BATCH_SIZE",
+            "IIP_AI_ATTRIBUTION_INTERVAL_SECONDS",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, worker)
+        self.assertNotIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", api)
+
     def test_ai_savings_engine_is_disabled_secret_backed_and_worker_owned(self) -> None:
         worker = (CHART / "templates" / "worker-deployment.yaml").read_text(
             encoding="utf-8"

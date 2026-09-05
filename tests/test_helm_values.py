@@ -87,6 +87,9 @@ class HelmValuesContractTests(unittest.TestCase):
             "evidenceRetention.ephemeralSeconds must not exceed",
             "evidenceRetention.standardSeconds must not exceed",
             "worker.enabled must be true when evidenceRetention.enabled=true",
+            "worker.enabled must be true when aiAttribution.enabled=true",
+            "aiAttribution.policiesExistingSecret is required",
+            "aiAttribution.enabled must be true when attribution test fixtures are allowed",
             "worker.enabled must be true when aiCostEngine.enabled=true",
             "aiCostEngine.catalogsExistingSecret is required",
             "aiCostEngine.enabled must be true when test fixtures are allowed",
@@ -122,6 +125,12 @@ class HelmValuesContractTests(unittest.TestCase):
         ai_cost = self.schema["properties"]["aiCostEngine"]
         self.assertFalse(ai_cost["additionalProperties"])
         self.assertEqual(ai_cost["properties"]["batchSize"]["maximum"], 1000)
+        ai_attribution = self.schema["properties"]["aiAttribution"]
+        self.assertFalse(ai_attribution["additionalProperties"])
+        self.assertEqual(
+            ai_attribution["properties"]["batchSize"]["maximum"],
+            1000,
+        )
         ai_savings = self.schema["properties"]["aiSavingsEngine"]
         self.assertFalse(ai_savings["additionalProperties"])
         self.assertEqual(

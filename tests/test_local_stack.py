@@ -119,12 +119,19 @@ class LocalStackConfigurationTests(unittest.TestCase):
         self.assertEqual(command[-1], "ps")
         self.assertTrue(run.call_args.kwargs["check"])
 
-    def test_local_compose_keeps_ai_catalog_worker_only_and_disabled_by_default(
+    def test_local_compose_keeps_ai_policies_worker_only_and_disabled_by_default(
         self,
     ) -> None:
         compose = local_stack.COMPOSE_PATH.read_text(encoding="utf-8")
         api, worker = compose.split("  workflow-worker:", maxsplit=1)
 
+        self.assertNotIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", api)
+        self.assertIn(
+            "IIP_AI_ATTRIBUTION_ENABLED: ${IIP_AI_ATTRIBUTION_ENABLED:-false}",
+            worker,
+        )
+        self.assertIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", worker)
+        self.assertIn("IIP_AI_ATTRIBUTION_ALLOW_TEST_FIXTURES", worker)
         self.assertNotIn("IIP_AI_PRICE_CATALOGS_JSON", api)
         self.assertIn(
             "IIP_AI_COST_ENGINE_ENABLED: ${IIP_AI_COST_ENGINE_ENABLED:-false}",

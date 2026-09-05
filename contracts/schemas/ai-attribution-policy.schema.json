@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-attribution-policy:v1alpha1",
+  "title": "AI Attribution Policy",
+  "description": "A protected, versioned, tenant-scoped mapping from observed OpenTelemetry service identity to stable application and team ownership.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "AiAttributionPolicy"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "version", "publishedAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^aap_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "version": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][0-9]+$"},
+        "publishedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "rules"],
+      "properties": {
+        "source": {"$ref": "#/$defs/source"},
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/rule"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "safeId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+    "safeText": {"type": "string", "minLength": 1, "maxLength": 256},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator", "retrievedAt", "contentHash"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["operator-managed", "test-fixture"]},
+        "locator": {"type": "string", "format": "uri-reference", "minLength": 1, "maxLength": 2048},
+        "retrievedAt": {"type": "string", "format": "date-time"},
+        "contentHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "organizationalUnit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {"$ref": "#/$defs/safeId"},
+        "name": {"$ref": "#/$defs/safeText"}
+      }
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["serviceName"],
+      "properties": {
+        "serviceName": {"$ref": "#/$defs/safeText"},
+        "serviceNamespace": {"$ref": "#/$defs/safeText"},
+        "deploymentEnvironment": {"type": "string", "minLength": 1, "maxLength": 128},
+        "resourceRef": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "priority", "match", "allocation", "effectiveFrom"],
+      "properties": {
+        "id": {"$ref": "#/$defs/safeId"},
+        "priority": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "match": {"$ref": "#/$defs/match"},
+        "allocation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["application", "team"],
+          "properties": {
+            "application": {"$ref": "#/$defs/organizationalUnit"},
+            "team": {"$ref": "#/$defs/organizationalUnit"}
+          }
+        },
+        "effectiveFrom": {"type": "string", "format": "date-time"},
+        "effectiveUntil": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

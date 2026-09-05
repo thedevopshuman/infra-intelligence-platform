@@ -68,6 +68,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0090-intermediate-ca-and-otlp-crl-rollout-evidence.md",
     "docs/decisions/0091-opentelemetry-native-ai-economics.md",
     "docs/decisions/0092-bedrock-instrumentation-compatibility-profile.md",
+    "docs/decisions/0093-protected-effective-time-ai-attribution.md",
     "docs/specifications/collector-queue-loss-contract.md",
     "docs/decisions/0026-resource-history-change-evidence.md",
     "docs/decisions/0029-investigation-context-correlation.md",
@@ -151,6 +152,8 @@ REQUIRED_PATHS = (
     "docs/operations/policy-engine.md",
     "docs/operations/otlp-metrics-receiver.md",
     "docs/operations/ai-usage-receiver.md",
+    "docs/operations/ai-attribution.md",
+    "docs/specifications/ai-attribution-contracts.md",
     "docs/operations/ai-cost-engine.md",
     "docs/operations/ai-savings-engine.md",
     "docs/operations/bedrock-instrumentation-qualification.md",
@@ -225,6 +228,8 @@ REQUIRED_PATHS = (
     "contracts/schemas/telemetry-export-burn-rate-report.schema.json",
     "contracts/schemas/collector-queue-loss-report.schema.json",
     "contracts/schemas/ai-usage-record.schema.json",
+    "contracts/schemas/ai-attribution-policy.schema.json",
+    "contracts/schemas/ai-usage-attribution-record.schema.json",
     "contracts/schemas/ai-price-catalog.schema.json",
     "contracts/schemas/ai-cost-record.schema.json",
     "contracts/schemas/ai-savings-finding.schema.json",
@@ -235,6 +240,9 @@ REQUIRED_PATHS = (
     "contracts/schemas/evaluation-scenario.schema.json",
     "contracts/examples/evidence.json",
     "contracts/examples/ai-usage-record.json",
+    "contracts/examples/ai-attribution-policy.json",
+    "contracts/examples/ai-usage-attribution-record.json",
+    "contracts/examples/ai-usage-attributed-event.json",
     "contracts/examples/ai-price-catalog.json",
     "contracts/examples/ai-cost-record.json",
     "contracts/examples/ai-savings-finding.json",
@@ -3436,6 +3444,11 @@ def validate_ai_economics_examples(
     event = documents.get(example_dir / "ai-usage-recorded-event.json")
     cost_event = documents.get(example_dir / "ai-cost-calculated-event.json")
     savings_event = documents.get(example_dir / "ai-savings-finding-event.json")
+    attribution_policy = documents.get(example_dir / "ai-attribution-policy.json")
+    attribution_record = documents.get(
+        example_dir / "ai-usage-attribution-record.json"
+    )
+    attribution_event = documents.get(example_dir / "ai-usage-attributed-event.json")
     named = {
         "AI usage": usage,
         "AI price catalog": catalog,
@@ -3444,6 +3457,9 @@ def validate_ai_economics_examples(
         "AI usage event": event,
         "AI cost event": cost_event,
         "AI savings event": savings_event,
+        "AI attribution policy": attribution_policy,
+        "AI usage attribution": attribution_record,
+        "AI attribution event": attribution_event,
     }
     for label, document in named.items():
         if not isinstance(document, dict):
@@ -3458,6 +3474,9 @@ def validate_ai_economics_examples(
     assert isinstance(event, dict)
     assert isinstance(cost_event, dict)
     assert isinstance(savings_event, dict)
+    assert isinstance(attribution_policy, dict)
+    assert isinstance(attribution_record, dict)
+    assert isinstance(attribution_event, dict)
 
     tenant_ids = {
         document.get("metadata", {}).get("tenantId")
@@ -3709,6 +3728,34 @@ def validate_ai_economics_examples(
     ):
         fail(errors, "AI savings CloudEvent must omit quantities and monetary values")
 
+    try:
+        from iip.application.attribute_ai_usage import (
+            resolve_ai_usage_attribution,
+            validate_ai_attribution_policy,
+        )
+
+        validated_policy = validate_ai_attribution_policy(attribution_policy)
+        resolved_record, resolved_event = resolve_ai_usage_attribution(
+            validated_policy,
+            usage,
+            resolved_at=str(attribution_record.get("metadata", {}).get("resolvedAt")),
+        )
+        if resolved_record != attribution_record:
+            fail(
+                errors,
+                "AI attribution record must resolve from the usage and policy examples",
+            )
+        if resolved_event.to_dict() != attribution_event:
+            fail(errors, "AI attribution CloudEvent must match its resolved record")
+    except (KeyError, TypeError, ValueError) as exc:
+        fail(errors, f"AI attribution examples violate domain semantics: {exc}")
+
+    if any(
+        key in json.dumps(attribution_event.get("data", {})).lower()
+        for key in ("token", "amount", "price", "currency", "prompt", "response")
+    ):
+        fail(errors, "AI attribution CloudEvent must omit usage, cost, and content data")
+
 
 def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> None:
     from iip.domain.models import ContractError, Resource
@@ -3777,6 +3824,8 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("action-proposal.json", "ActionProposal"),
         ("action-result.json", "ActionResult"),
         ("ai-usage-record.json", "AiUsageRecord"),
+        ("ai-attribution-policy.json", "AiAttributionPolicy"),
+        ("ai-usage-attribution-record.json", "AiUsageAttributionRecord"),
         ("ai-price-catalog.json", "AiPriceCatalog"),
         ("ai-cost-record.json", "AiCostRecord"),
         ("ai-savings-finding.json", "AiSavingsFinding"),

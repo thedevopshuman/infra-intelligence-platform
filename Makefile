@@ -187,6 +187,8 @@ helm-lint:
 		--set database.existingSecret=iip-database \
 		--set worker.enabled=true \
 		--set 'worker.tenants[0]=tenant-a' \
+		--set aiAttribution.enabled=true \
+		--set aiAttribution.policiesExistingSecret=iip-ai-attribution \
 		--set aiCostEngine.enabled=true \
 		--set aiCostEngine.catalogsExistingSecret=iip-ai-prices \
 		--set aiSavingsEngine.enabled=true \

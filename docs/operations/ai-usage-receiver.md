@@ -94,10 +94,10 @@ usage. See the [Bedrock instrumentation qualification](bedrock-instrumentation-q
 
 ## Run the isolated process
 
-Apply all packaged migrations through `0020_ai_savings_ledger.sql`, then
+Apply all packaged migrations through `0021_ai_attribution_ledger.sql`, then
 configure the receiver. The usage ledger itself is introduced by
-`0018_ai_usage_ledger.sql`; migrations `0019` and `0020` add the separately
-operated price/cost and savings ledgers:
+`0018_ai_usage_ledger.sql`; migrations `0019` through `0021` add the separately
+operated price/cost, savings, and attribution ledgers:
 
 ```bash
 export IIP_DATABASE_URL=postgresql://...

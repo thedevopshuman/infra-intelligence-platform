@@ -37,6 +37,9 @@ product kernel.
 - **Evidence before recommendation:** a potential saving cites the usage and
   cost facts, comparison windows, rule version, observed change, and formula
   that produced it.
+- **Ownership is protected:** workload telemetry supplies observed service
+  identity, while reviewed tenant policy supplies effective-time application
+  and team ownership in a separate immutable fact.
 
 Fail open applies only to customer application telemetry emission. Receiver
 authentication, tenant binding, schema validation, pricing consistency, and
@@ -66,9 +69,12 @@ support must be claimed only after executable compatibility evidence exists.
 ## Attribution
 
 V0 uses standard OpenTelemetry resource identity: `service.name`, optional
-`service.namespace`, deployment environment, provider region, and model. Phase
-2 adds reviewed application and team mappings. A future optional helper may add
-business dimensions, but a new IIP instrumentation SDK is not part of V0.
+`service.namespace`, deployment environment, provider region, and model. The
+first Phase B unit maps that observed identity to reviewed application and team
+ownership under protected effective-time policy and leaves unmatched usage
+explicitly unallocated. Allocation queries, cost joins, export dimensions, and
+dashboard views remain. A future optional helper may add business dimensions,
+but a new IIP instrumentation SDK is not part of V0.
 
 ## Initial intelligence
 
@@ -106,4 +112,3 @@ model is a safe replacement from price evidence alone.
   exported labels, or dashboard queries.
 - Stopping IIP or its backend does not change the outcome of a model request.
 - Every displayed saving links to a rule version and stored evidence.
-

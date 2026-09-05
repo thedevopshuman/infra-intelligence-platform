@@ -667,6 +667,33 @@ class AiUsageLedger(Protocol):
         """Atomically persist normalized usage and events with exact deduplication."""
 
 
+class AiAttributionLedger(AiUsageLedger, Protocol):
+    def register_attribution_policy(
+        self,
+        actor: ActorContext,
+        policy: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        """Idempotently register one immutable protected mapping snapshot."""
+
+    def list_usage_without_attribution(
+        self,
+        actor: ActorContext,
+        policy_id: str,
+        engine_version: str,
+        *,
+        limit: int = 100,
+    ) -> tuple[Mapping[str, object], ...]:
+        """List bounded exact-tenant usage not resolved by this policy and engine."""
+
+    def commit_usage_attribution_batch(
+        self,
+        actor: ActorContext,
+        records: tuple[Mapping[str, object], ...],
+        events: tuple[PlatformEvent, ...],
+    ) -> tuple[Mapping[str, object], ...]:
+        """Atomically persist source-bound attribution records and their events."""
+
+
 @dataclass(frozen=True)
 class AiSavingsCohortQuery:
     """Exact bounded scope used by deterministic AI savings rules."""
@@ -683,7 +710,7 @@ class AiSavingsCohortQuery:
     limit: int
 
 
-class AiEconomicsLedger(AiUsageLedger, Protocol):
+class AiEconomicsLedger(AiAttributionLedger, Protocol):
     def register_price_catalog(
         self,
         actor: ActorContext,

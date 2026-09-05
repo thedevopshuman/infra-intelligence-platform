@@ -3466,6 +3466,55 @@ class AiUsageRecord:
 
 
 @dataclass(frozen=True)
+class AiAttributionPolicy:
+    """Protected versioned mapping from service identity to application/team."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "AiAttributionPolicy":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiAttributionPolicy",
+                label="AI attribution policy",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class AiUsageAttributionRecord:
+    """Immutable application/team resolution for one AI usage record."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "AiUsageAttributionRecord":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiUsageAttributionRecord",
+                label="AI usage attribution record",
+            )
+        )
+
+    @property
+    def status(self) -> Optional[str]:
+        spec = self.payload.get("spec")
+        resolution = spec.get("resolution") if isinstance(spec, Mapping) else None
+        value = resolution.get("status") if isinstance(resolution, Mapping) else None
+        return value if isinstance(value, str) else None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class AiPriceCatalog:
     """Versioned data-driven token prices used for calculated cost."""
 

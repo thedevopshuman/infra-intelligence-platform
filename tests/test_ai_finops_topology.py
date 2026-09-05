@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from iip.adapters.otlp_ai_usage_receiver import ConfiguredAiUsageReceiver
+from iip.application.attribute_ai_usage import validate_ai_attribution_policy
 from iip.application.calculate_ai_cost import validate_ai_price_catalog
 from iip.application.evaluate_ai_savings import validate_context_growth_profile
 
@@ -37,6 +38,14 @@ class AiFinOpsTopologyTests(unittest.TestCase):
                 ai_finops_fixture.KNOWN_MODEL,
                 ai_finops_fixture.UNKNOWN_MODEL,
             ),
+        )
+
+        policies = ai_finops_fixture.attribution_policy_configuration(anchor)
+        attribution = validate_ai_attribution_policy(policies["policies"][0])
+        self.assertEqual(attribution.tenant_id, "local")
+        self.assertEqual(
+            attribution.rules[0].deployment_environment,
+            "ai-finops-demo",
         )
 
         catalogs = ai_finops_fixture.price_catalog_configuration(anchor)
@@ -106,6 +115,9 @@ class AiFinOpsTopologyTests(unittest.TestCase):
         self.assertNotIn("IIP_AI_PRICE_CATALOGS_JSON", api)
         self.assertNotIn("IIP_AI_PRICE_CATALOGS_JSON", receiver)
         self.assertIn("IIP_AI_PRICE_CATALOGS_JSON", worker_and_backends)
+        self.assertNotIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", api)
+        self.assertNotIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", receiver)
+        self.assertIn("IIP_AI_ATTRIBUTION_POLICIES_JSON", worker_and_backends)
         self.assertIn("IIP_AI_USAGE_RECEIVER_ENABLED: \"true\"", receiver)
         self.assertIn('IIP_OTLP_RECEIVER_ENABLED: "false"', receiver)
         self.assertIn('IIP_OTLP_LOGS_RECEIVER_ENABLED: "false"', receiver)
@@ -152,6 +164,8 @@ class AiFinOpsTopologyTests(unittest.TestCase):
             )
             profiles = json.loads(values["IIP_AI_SAVINGS_PROFILES_JSON"])
             self.assertEqual(len(profiles["profiles"]), 2)
+            policies = json.loads(values["IIP_AI_ATTRIBUTION_POLICIES_JSON"])
+            self.assertEqual(len(policies["policies"]), 1)
 
     def test_visible_stack_compose_does_not_use_a_shell(self) -> None:
         with patch.object(ai_finops_stack, "ENV_PATH", Path("/tmp/iip.env")):

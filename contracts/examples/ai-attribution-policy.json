@@ -1,0 +1,40 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiAttributionPolicy",
+  "metadata": {
+    "id": "aap_22222222222222222222222222222222",
+    "tenantId": "local",
+    "version": "2026-09-05.1",
+    "publishedAt": "2026-09-05T09:00:00Z"
+  },
+  "spec": {
+    "source": {
+      "kind": "test-fixture",
+      "locator": "urn:iip:test-fixture:ai-attribution-policy",
+      "retrievedAt": "2026-09-05T09:00:00Z",
+      "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "rules": [
+      {
+        "id": "support-production",
+        "priority": 100,
+        "match": {
+          "serviceName": "support-assistant",
+          "serviceNamespace": "customer-experience",
+          "deploymentEnvironment": "production"
+        },
+        "allocation": {
+          "application": {
+            "id": "support-experience",
+            "name": "Support Experience"
+          },
+          "team": {
+            "id": "customer-experience",
+            "name": "Customer Experience"
+          }
+        },
+        "effectiveFrom": "2026-01-01T00:00:00Z"
+      }
+    ]
+  }
+}

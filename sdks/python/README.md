@@ -49,8 +49,9 @@ bounded Unix-socket protocol from an isolated plugin without importing server
 code, selecting a destination, or receiving a credential. It returns stable
 host-created failures for plugin handling; it is not a control-plane HTTP client.
 
-`AiUsageRecord`, `AiPriceCatalog`, `AiCostRecord`, and `AiSavingsFinding`
-expose the AI economics records as public metadata-only envelopes. They do not
+`AiUsageRecord`, `AiAttributionPolicy`, `AiUsageAttributionRecord`,
+`AiPriceCatalog`, `AiCostRecord`, and `AiSavingsFinding` expose the AI economics
+records as public metadata-only envelopes. They do not
 instrument provider calls, send OTLP, or import an AWS SDK. Standard
 OpenTelemetry instrumentation remains the collection boundary.
 
@@ -86,3 +87,7 @@ Version 0.40 adds typed bounded adaptive investigation promotions. The SDK expos
 Version 0.46 adds the vendor-neutral AI usage, price catalog, calculated-cost,
 and evidence-backed savings record models. It intentionally adds no inference
 instrumentation SDK.
+
+Version 0.47 adds protected attribution-policy and immutable usage-attribution
+record models. It does not let clients install policies or self-assign
+application/team ownership.

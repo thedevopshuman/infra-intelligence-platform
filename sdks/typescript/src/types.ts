@@ -15,6 +15,8 @@ export type PluginMediationRequestId = `pmr_${string}`;
 export type PluginActionMediationGrantId = `pag_${string}`;
 export type PluginActionMediationRequestId = `par_${string}`;
 export type AiUsageRecordId = `aiu_${string}`;
+export type AiAttributionPolicyId = `aap_${string}`;
+export type AiUsageAttributionRecordId = `aia_${string}`;
 export type AiPriceCatalogId = `apc_${string}`;
 export type AiCostRecordId = `aic_${string}`;
 export type AiSavingsFindingId = `aif_${string}`;
@@ -110,6 +112,87 @@ export interface AiUsageRecord {
       droppedAttributeCount: number;
     };
     deduplicationKey: Sha256Digest;
+  };
+}
+
+export interface AiOrganizationalUnit {
+  id: string;
+  name: string;
+}
+
+export interface AiAttributionPolicyRule {
+  id: string;
+  priority: number;
+  match: {
+    serviceName: string;
+    serviceNamespace?: string;
+    deploymentEnvironment?: string;
+    resourceRef?: ResourceUid;
+  };
+  allocation: {
+    application: AiOrganizationalUnit;
+    team: AiOrganizationalUnit;
+  };
+  effectiveFrom: string;
+  effectiveUntil?: string;
+}
+
+export interface AiAttributionPolicy {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiAttributionPolicy";
+  metadata: {
+    id: AiAttributionPolicyId;
+    tenantId: string;
+    version: string;
+    publishedAt: string;
+  };
+  spec: {
+    source: {
+      kind: "operator-managed" | "test-fixture";
+      locator: string;
+      retrievedAt: string;
+      contentHash: Sha256Digest;
+    };
+    rules: AiAttributionPolicyRule[];
+  };
+}
+
+export type AiUsageAttributionResolution =
+  | {
+      status: "allocated";
+      ruleId: string;
+      application: AiOrganizationalUnit;
+      team: AiOrganizationalUnit;
+    }
+  | {
+      status: "unallocated";
+      reasonCode: "no-matching-rule";
+    };
+
+export interface AiUsageAttributionRecord {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiUsageAttributionRecord";
+  metadata: {
+    id: AiUsageAttributionRecordId;
+    tenantId: string;
+    resolvedAt: string;
+  };
+  spec: {
+    usageRecordId: AiUsageRecordId;
+    effectiveAt: string;
+    engineVersion: string;
+    policy: {
+      id: AiAttributionPolicyId;
+      version: string;
+      sourceHash: Sha256Digest;
+    };
+    observedIdentity: {
+      serviceName: string;
+      serviceNamespace?: string;
+      deploymentEnvironment?: string;
+      resourceRefs: ResourceUid[];
+    };
+    resolution: AiUsageAttributionResolution;
   };
 }
 

@@ -29,6 +29,11 @@ IIP_AI_USAGE_RECEIVER_CHANNELS_JSON=$(
     "$IIP_TEST_PYTHON" scripts/ai_finops_fixture.py configuration channel \
         --anchor "$IIP_AI_FINOPS_ANCHOR"
 )
+export IIP_AI_ATTRIBUTION_POLICIES_JSON
+IIP_AI_ATTRIBUTION_POLICIES_JSON=$(
+    "$IIP_TEST_PYTHON" scripts/ai_finops_fixture.py configuration attribution \
+        --anchor "$IIP_AI_FINOPS_ANCHOR"
+)
 export IIP_AI_PRICE_CATALOGS_JSON
 IIP_AI_PRICE_CATALOGS_JSON=$(
     "$IIP_TEST_PYTHON" scripts/ai_finops_fixture.py configuration catalog \
@@ -105,4 +110,4 @@ if ! PYTHONPATH=src:sdks/python/src "$IIP_TEST_PYTHON" \
     exit 1
 fi
 
-echo "Bedrock-shaped OTLP usage, exact cost, visible unpriced coverage, evidence-backed saving, and Grafana dashboard passed"
+echo "Bedrock-shaped OTLP usage, protected attribution, exact cost, visible unpriced/unallocated coverage, evidence-backed saving, and Grafana dashboard passed"

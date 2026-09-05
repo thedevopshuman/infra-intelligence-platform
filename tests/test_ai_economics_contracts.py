@@ -8,10 +8,12 @@ from pathlib import Path
 from jsonschema import Draft202012Validator, FormatChecker
 
 from infra_intelligence_sdk import (
+    AiAttributionPolicy,
     AiCostRecord,
     AiPriceCatalog,
     AiSavingsFinding,
     AiUsageRecord,
+    AiUsageAttributionRecord,
 )
 from iip.application.evaluate_ai_savings import validate_ai_savings_finding
 from scripts.validate_repo import ROOT, validate_ai_economics_examples
@@ -21,6 +23,8 @@ EXAMPLES = ROOT / "contracts" / "examples"
 SCHEMAS = ROOT / "contracts" / "schemas"
 CONTRACTS = (
     ("ai-usage-record", AiUsageRecord),
+    ("ai-attribution-policy", AiAttributionPolicy),
+    ("ai-usage-attribution-record", AiUsageAttributionRecord),
     ("ai-price-catalog", AiPriceCatalog),
     ("ai-cost-record", AiCostRecord),
     ("ai-savings-finding", AiSavingsFinding),
@@ -38,6 +42,9 @@ def example_documents() -> dict[Path, object]:
         "ai-cost-record.json",
         "ai-savings-finding.json",
         "ai-usage-recorded-event.json",
+        "ai-attribution-policy.json",
+        "ai-usage-attribution-record.json",
+        "ai-usage-attributed-event.json",
         "ai-cost-calculated-event.json",
         "ai-savings-finding-event.json",
     )

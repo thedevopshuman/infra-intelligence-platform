@@ -167,6 +167,7 @@ class PostgresResourceStoreTests(unittest.TestCase):
                 """
                 TRUNCATE iip.resource_relationships,
                          iip.source_reconciliations, iip.source_checkpoints,
+                         iip.ai_usage_attributions, iip.ai_attribution_policies,
                          iip.ai_cost_records, iip.ai_price_catalogs,
                          iip.ai_usage_records,
                          iip.event_outbox,

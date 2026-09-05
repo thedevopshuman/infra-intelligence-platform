@@ -39,6 +39,7 @@ Events are immutable. A correction creates a new event that references the prior
 - `io.iip.policy.decided.v1`
 - `io.iip.plugin.failed.v1`
 - `io.iip.ai.usage-recorded.v1`
+- `io.iip.ai.usage-attributed.v1`
 - `io.iip.ai.cost-calculated.v1`
 - `io.iip.ai.savings-finding-recorded.v1`
 
@@ -46,6 +47,12 @@ Events are immutable. A correction creates a new event that references the prior
 record is durable. Its data contains bounded routing identity and the canonical
 deduplication digest; it never contains prompts, responses, token content, or
 price configuration. See the [AI economics contracts](ai-economics-contracts.md).
+
+`io.iip.ai.usage-attributed.v1` is emitted atomically with a separate immutable
+attribution fact. It identifies the usage and protected policy generation and
+contains application/team IDs only for an allocated result. It omits token
+quantities, price, money, display names, resource references, and content. See
+the [AI attribution contracts](ai-attribution-contracts.md).
 
 `io.iip.ai.cost-calculated.v1` is emitted atomically with an immutable cost
 record. It binds the usage, catalog version, engine version through its source,

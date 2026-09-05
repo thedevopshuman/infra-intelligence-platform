@@ -266,6 +266,11 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_WORKER_TENANTS` | unset | Required comma-separated exact tenant enrollment for the workflow worker; wildcard is invalid |
 | `IIP_WORKER_ID` | pod/host name | Stable workflow-worker identity |
 | `IIP_AI_COST_ENGINE_ENABLED` | `false` | Enable bounded asynchronous AI cost calculation in the workflow worker only. |
+| `IIP_AI_ATTRIBUTION_ENABLED` | `false` | Enable protected effective-time application/team attribution in the workflow worker only. |
+| `IIP_AI_ATTRIBUTION_POLICIES_JSON` | required when attribution is enabled | Protected closed policy wrapper for the exact enrolled tenants. |
+| `IIP_AI_ATTRIBUTION_ALLOW_TEST_FIXTURES` | `false` | Permit fixture policies only in an explicit non-production profile. |
+| `IIP_AI_ATTRIBUTION_BATCH_SIZE` | `100` | Maximum usage records attributed per tenant/pass; range 1–1000. |
+| `IIP_AI_ATTRIBUTION_INTERVAL_SECONDS` | `10` | Attribution worker pass interval; range 1–3600 seconds. |
 | `IIP_AI_PRICE_CATALOGS_JSON` | required when cost is enabled | Protected closed price-catalog wrapper with one exact catalog per enrolled tenant. |
 | `IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES` | `false` | Explicitly permit non-production fixture pricing. |
 | `IIP_AI_COST_BATCH_SIZE` | `100` | Maximum usage records calculated per tenant/pass; range 1–1000. |

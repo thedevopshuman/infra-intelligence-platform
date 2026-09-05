@@ -15,6 +15,10 @@ context-growth rule and its privacy-bounded OTLP aggregate metric projection
 are also executable. The reference dashboard topology and pinned official
 botocore offline interoperability gate are executable; live Bedrock
 model/region and streaming qualification remain.
+The first Phase B unit is also executable: protected effective-time policies
+map observed service/resource identity to separate immutable application/team
+attribution facts, including explicit unallocated coverage. Allocation queries,
+cost joins, export dimensions, and dashboard views remain.
 
 ## Phase 0 — foundation (current repository)
 

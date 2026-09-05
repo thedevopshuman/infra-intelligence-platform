@@ -18,6 +18,9 @@ flowchart LR
     Collector -->|"OTLP/HTTP traces with channel identity"| Receiver["Isolated IIP trace receiver"]
     Receiver --> Normalizer["GenAI usage normalizer"]
     Normalizer --> Ledger["Append-only usage ledger"]
+    Ledger --> Attribution["Effective-time attribution"]
+    Ownership["Protected application/team policy"] --> Attribution
+    Attribution --> AttributionFacts["Immutable attribution facts"]
     Ledger --> Cost["Versioned cost engine"]
     Catalog["Protected price catalog"] --> Cost
     Cost --> Facts["Calculated cost facts"]
@@ -40,8 +43,8 @@ wait for IIP, the Collector, or Grafana.
 | Customer Collector | Batch, buffer, retry, authenticate, redact, and route telemetry according to customer policy. |
 | Trace receiver surface | Authenticate the channel, bind tenant and integration, enforce bounds, decode OTLP, and reject content attributes. |
 | Provider adapter | Translate accepted provider attributes into the canonical usage input without granting authority. |
-| Application service | Enforce deduplication, usage invariants, tenant scope, pricing selection, and deterministic rule evaluation. |
-| PostgreSQL adapter | Atomically persist immutable usage/cost/finding records and their outbox events. |
+| Application service | Enforce deduplication, usage invariants, tenant scope, protected effective-time attribution, pricing selection, and deterministic rule evaluation. |
+| PostgreSQL adapter | Atomically persist immutable usage/attribution/cost/finding records and their outbox events. |
 | OTLP exporter | Publish bounded aggregates and finding summaries without making serving readiness depend on delivery. |
 | Grafana | Query a configured telemetry backend; it is not an accounting store or query authority. |
 
@@ -90,6 +93,25 @@ catalog entry, and resulting amount.
 data, does not include discounts or commitments unless represented by an exact
 catalog entry, and can be recomputed without altering the source usage record.
 Future reconciliation with provider billing creates separate variance facts.
+
+## Application and team attribution
+
+The service identity on `AiUsageRecord` is observed telemetry, not permission
+to charge an application or team. The workflow worker loads one protected,
+tenant-scoped mapping snapshot and resolves each invocation at its `startedAt`
+time. It creates a separate immutable `AiUsageAttributionRecord` bound to the
+usage record, policy ID/version/source digest, and attribution-engine version.
+The usage record is never rewritten.
+
+Rules use deterministic unique priority and may narrow service identity by
+namespace, deployment environment, resource reference, and effective interval.
+No match becomes an explicit unallocated fact. Persistence re-resolves each
+decision from the stored sources before atomically committing the fact, its
+value-minimized CloudEvent, and outbox row. Only the tenant-enrolled worker has
+that authority; neither telemetry nor an API caller can select ownership.
+
+Queries that join attribution to calculated cost, allocation metric dimensions,
+and application/team dashboard panels are intentionally the next Phase B unit.
 
 The executable cost service lives in the tenant-explicit workflow worker, not
 the API or OTLP receiver. It reads one protected immutable catalog per enrolled

@@ -20,6 +20,11 @@ from iip.adapters.ai_cost_store import (
     validate_ai_cost_actor,
     validate_ai_cost_usage_binding,
 )
+from iip.adapters.ai_attribution_store import (
+    prepare_ai_attribution_policy,
+    prepare_ai_attribution_writes,
+    validate_ai_attribution_actor,
+)
 from iip.adapters.ai_savings_store import (
     prepare_ai_savings_writes,
     validate_ai_savings_query,
@@ -28,6 +33,10 @@ from iip.adapters.ai_usage_store import prepare_ai_usage_writes
 from iip.application.evaluate_ai_savings import (
     InvalidAiSavingsInputError,
     validate_context_growth_source_binding,
+)
+from iip.application.attribute_ai_usage import (
+    InvalidAiAttributionInputError,
+    validate_ai_attribution_source_binding,
 )
 from iip.application.ports import (
     ActorContext,
@@ -77,6 +86,7 @@ SCHEMA_MIGRATIONS = (
     "0018_ai_usage_ledger.sql",
     "0019_ai_cost_ledger.sql",
     "0020_ai_savings_ledger.sql",
+    "0021_ai_attribution_ledger.sql",
 )
 
 
@@ -557,6 +567,251 @@ class PostgresResourceStore:
 
             return tuple(
                 stored[(item.tenant_id, item.deduplication_key)]
+                for item in prepared
+            )
+
+    @_translate_database_errors
+    def register_attribution_policy(
+        self,
+        actor: ActorContext,
+        policy: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        """Idempotently register one immutable tenant attribution snapshot."""
+
+        prepared = prepare_ai_attribution_policy(actor, policy)
+        with self._connect() as connection:
+            for name in sorted(
+                (
+                    "iip.ai-attribution-policy-id\x1f"
+                    f"{prepared.tenant_id}\x1f{prepared.policy_id}",
+                    "iip.ai-attribution-policy-version\x1f"
+                    f"{prepared.tenant_id}\x1f{prepared.policy_version}",
+                )
+            ):
+                connection.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (name,),
+                )
+            row = connection.execute(
+                """
+                SELECT policy_id, policy_version, document_hash, document
+                FROM iip.ai_attribution_policies
+                WHERE tenant_id = %s
+                  AND (policy_id = %s OR policy_version = %s)
+                FOR UPDATE
+                """,
+                (
+                    prepared.tenant_id,
+                    prepared.policy_id,
+                    prepared.policy_version,
+                ),
+            ).fetchone()
+            if row is not None:
+                if (
+                    row["policy_id"] != prepared.policy_id
+                    or row["policy_version"] != prepared.policy_version
+                    or row["document_hash"] != prepared.document_hash
+                ):
+                    raise PersistenceError("storage.conflict")
+                return row["document"]
+            connection.execute(
+                """
+                INSERT INTO iip.ai_attribution_policies (
+                    tenant_id, policy_id, policy_version, document_hash,
+                    source_hash, published_at, document
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    prepared.tenant_id,
+                    prepared.policy_id,
+                    prepared.policy_version,
+                    prepared.document_hash,
+                    prepared.source_hash,
+                    prepared.published_at,
+                    Jsonb(dict(prepared.document)),
+                ),
+            )
+            return prepared.document
+
+    @_translate_database_errors
+    def list_usage_without_attribution(
+        self,
+        actor: ActorContext,
+        policy_id: str,
+        engine_version: str,
+        *,
+        limit: int = 100,
+    ) -> tuple[Mapping[str, object], ...]:
+        """List bounded exact-tenant usage not resolved by this generation."""
+
+        validate_ai_attribution_actor(
+            actor,
+            policy_id=policy_id,
+            engine_version=engine_version,
+            limit=limit,
+        )
+        with self._connect() as connection:
+            policy_exists = connection.execute(
+                """
+                SELECT 1 FROM iip.ai_attribution_policies
+                WHERE tenant_id = %s AND policy_id = %s
+                """,
+                (actor.tenant_id, policy_id),
+            ).fetchone()
+            if policy_exists is None:
+                raise PersistenceError("storage.request.invalid")
+            rows = connection.execute(
+                """
+                SELECT usage.document
+                FROM iip.ai_usage_records AS usage
+                WHERE usage.tenant_id = %s
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM iip.ai_usage_attributions AS attribution
+                      WHERE attribution.tenant_id = usage.tenant_id
+                        AND attribution.usage_record_id = usage.usage_record_id
+                        AND attribution.policy_id = %s
+                        AND attribution.engine_version = %s
+                  )
+                ORDER BY usage.invocation_started_at, usage.usage_record_id
+                LIMIT %s
+                """,
+                (actor.tenant_id, policy_id, engine_version, limit),
+            ).fetchall()
+        return tuple(row["document"] for row in rows)
+
+    @_translate_database_errors
+    def commit_usage_attribution_batch(
+        self,
+        actor: ActorContext,
+        records: tuple[Mapping[str, object], ...],
+        events: tuple[PlatformEvent, ...],
+    ) -> tuple[Mapping[str, object], ...]:
+        """Commit attribution facts, CloudEvents, and outbox rows atomically."""
+
+        prepared = prepare_ai_attribution_writes(actor, records, events)
+        with self._connect() as connection:
+            for name in sorted(
+                {
+                    "iip.ai-attribution\x1f"
+                    f"{item.tenant_id}\x1f{item.usage_record_id}\x1f"
+                    f"{item.policy_id}\x1f{item.engine_version}"
+                    for item in prepared
+                }
+            ):
+                connection.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (name,),
+                )
+            stored: dict[tuple[str, str], Mapping[str, object]] = {}
+            new_items = []
+            for item in prepared:
+                policy = connection.execute(
+                    """
+                    SELECT policy_version, source_hash, document
+                    FROM iip.ai_attribution_policies
+                    WHERE tenant_id = %s AND policy_id = %s
+                    """,
+                    (item.tenant_id, item.policy_id),
+                ).fetchone()
+                usage = connection.execute(
+                    """
+                    SELECT document FROM iip.ai_usage_records
+                    WHERE tenant_id = %s AND usage_record_id = %s
+                    """,
+                    (item.tenant_id, item.usage_record_id),
+                ).fetchone()
+                if (
+                    policy is None
+                    or usage is None
+                    or policy["policy_version"] != item.policy_version
+                    or policy["source_hash"] != item.policy_source_hash
+                ):
+                    raise PersistenceError("storage.request.invalid")
+                try:
+                    validate_ai_attribution_source_binding(
+                        item.document,
+                        policy["document"],
+                        usage["document"],
+                    )
+                except InvalidAiAttributionInputError:
+                    raise PersistenceError("storage.request.invalid") from None
+                row = connection.execute(
+                    """
+                    SELECT attribution_record_id, document_hash, document
+                    FROM iip.ai_usage_attributions
+                    WHERE tenant_id = %s
+                      AND (
+                          attribution_record_id = %s
+                          OR (
+                              usage_record_id = %s
+                              AND policy_id = %s
+                              AND engine_version = %s
+                          )
+                      )
+                    FOR UPDATE
+                    """,
+                    (
+                        item.tenant_id,
+                        item.attribution_record_id,
+                        item.usage_record_id,
+                        item.policy_id,
+                        item.engine_version,
+                    ),
+                ).fetchone()
+                if row is None:
+                    new_items.append(item)
+                    continue
+                if (
+                    row["attribution_record_id"] != item.attribution_record_id
+                    or row["document_hash"] != item.document_hash
+                ):
+                    raise PersistenceError("storage.conflict")
+                stored[(item.tenant_id, item.attribution_record_id)] = row["document"]
+
+            for item in new_items:
+                connection.execute(
+                    """
+                    INSERT INTO iip.ai_usage_attributions (
+                        tenant_id, attribution_record_id, usage_record_id,
+                        policy_id, policy_version, policy_source_hash,
+                        engine_version, document_hash, status,
+                        application_id, team_id, effective_at, resolved_at,
+                        document
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s
+                    )
+                    """,
+                    (
+                        item.tenant_id,
+                        item.attribution_record_id,
+                        item.usage_record_id,
+                        item.policy_id,
+                        item.policy_version,
+                        item.policy_source_hash,
+                        item.engine_version,
+                        item.document_hash,
+                        item.status,
+                        item.application_id,
+                        item.team_id,
+                        item.effective_at,
+                        item.resolved_at,
+                        Jsonb(dict(item.document)),
+                    ),
+                )
+                event_offset = self._append_event(connection, item.event)
+                connection.execute(
+                    """
+                    INSERT INTO iip.event_outbox (tenant_id, event_offset)
+                    VALUES (%s, %s)
+                    """,
+                    (item.tenant_id, event_offset),
+                )
+                stored[(item.tenant_id, item.attribution_record_id)] = item.document
+
+            return tuple(
+                stored[(item.tenant_id, item.attribution_record_id)]
                 for item in prepared
             )
 

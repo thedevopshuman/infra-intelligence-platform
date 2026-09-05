@@ -45,8 +45,9 @@ internals, provider endpoints, credential references, or secrets. The
 TypeScript package intentionally provides types only because Unix-domain socket
 transport is runtime-specific.
 
-`AiUsageRecord`, `AiPriceCatalog`, `AiCostRecord`, and `AiSavingsFinding`
-describe the metadata-only AI economics ledger. The SDK does not instrument or
+`AiUsageRecord`, `AiAttributionPolicy`, `AiUsageAttributionRecord`,
+`AiPriceCatalog`, `AiCostRecord`, and `AiSavingsFinding` describe the
+metadata-only AI economics ledger. The SDK does not instrument or
 proxy model calls; applications continue using standard OpenTelemetry
 instrumentation and a customer-controlled Collector.
 
@@ -79,3 +80,7 @@ Version 0.40 adds `InvestigationSignalPlan` and `InvestigationSignalPromotion` f
 Version 0.46 adds vendor-neutral AI usage, price catalog, calculated-cost, and
 evidence-backed savings record types without adding a provider or
 instrumentation dependency.
+
+Version 0.47 adds protected attribution-policy and immutable usage-attribution
+record types without exposing policy installation or workload-controlled
+ownership authority.

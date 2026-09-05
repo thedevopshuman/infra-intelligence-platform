@@ -133,7 +133,10 @@ each new cost fact, minimized event, and outbox row commit atomically. Saving
 evaluation remains a separate downstream use case: the first executable
 context-growth rule compares protected fixed windows, revalidates exact usage
 and cost evidence in storage, and atomically records a deterministic finding,
-minimized event, and outbox row. Dashboard aggregates remain downstream work.
+minimized event, and outbox row. Protected effective-time mappings separately
+resolve observed service/resource identity into immutable application/team or
+explicit unallocated facts; telemetry cannot assign its own ownership. The
+local OTLP aggregate projection and Grafana V0 dashboard are executable.
 
 Evidence providers cross a separate application-owned boundary. The [reference collection pipeline](evidence-collection-pipeline.md) authorizes an exact tenant, integration, evidence type, and resource scope before a provider runs, then validates and redacts provider output before hashing and atomic persistence. Providers do not receive ambient credentials through the application contract.
 

@@ -8,6 +8,7 @@
     "replicaCount",
     "image",
     "worker",
+    "aiAttribution",
     "aiCostEngine",
     "aiSavingsEngine",
     "eventPublisher",
@@ -138,6 +139,26 @@
           "maximum": 3600
         },
         "resources": { "$ref": "#/definitions/resources" }
+      }
+    },
+    "aiAttribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "policiesExistingSecret",
+        "policiesSecretKey",
+        "allowTestFixtures",
+        "batchSize",
+        "intervalSeconds"
+      ],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "policiesExistingSecret": {"$ref": "#/definitions/optionalName"},
+        "policiesSecretKey": {"$ref": "#/definitions/nonEmptyString"},
+        "allowTestFixtures": {"type": "boolean"},
+        "batchSize": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "intervalSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}
       }
     },
     "aiCostEngine": {

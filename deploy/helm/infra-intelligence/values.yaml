@@ -27,6 +27,14 @@ worker:
       cpu: 500m
       memory: 256Mi
 
+aiAttribution:
+  enabled: false
+  policiesExistingSecret: ""
+  policiesSecretKey: ai-attribution-policies-json
+  allowTestFixtures: false
+  batchSize: 100
+  intervalSeconds: 10
+
 aiCostEngine:
   enabled: false
   catalogsExistingSecret: ""

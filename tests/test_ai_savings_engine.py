@@ -471,6 +471,7 @@ class AiSavingsPostgresTests(unittest.TestCase):
             connection.execute(
                 """
                 TRUNCATE iip.event_outbox, iip.ai_savings_findings,
+                    iip.ai_usage_attributions, iip.ai_attribution_policies,
                     iip.ai_cost_records, iip.ai_price_catalogs,
                     iip.ai_usage_records, iip.event_log
                 RESTART IDENTITY CASCADE

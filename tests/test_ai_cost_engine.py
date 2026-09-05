@@ -439,7 +439,8 @@ class AiCostPostgresTests(unittest.TestCase):
         with psycopg.connect(DATABASE_URL) as connection:
             connection.execute(
                 """
-                TRUNCATE iip.ai_cost_records, iip.ai_price_catalogs,
+                TRUNCATE iip.ai_usage_attributions, iip.ai_attribution_policies,
+                         iip.ai_cost_records, iip.ai_price_catalogs,
                          iip.ai_usage_records, iip.event_outbox, iip.event_log
                 RESTART IDENTITY CASCADE
                 """

@@ -33,6 +33,9 @@ and does not collect prompts or responses by default. An isolated, tenant-bound
 and atomically stores usage plus its event. A tenant-explicit background cost
 service now loads protected versioned catalogs and atomically records
 explainable calculated estimates plus value-minimized events. A separate
+protected effective-time attribution service now maps observed service/resource
+identity to immutable application/team facts, records unmatched usage explicitly,
+and revalidates each decision against its exact usage and policy sources. A separate
 tenant-explicit deterministic service evaluates fixed context-growth windows,
 revalidates every cited usage and cost fact, and atomically records one
 evidence-backed saving plus a value-minimized event. The same bounded profile
@@ -45,6 +48,7 @@ instrumentation, its shipped legacy provider attribute and service-specific
 scope, receiver normalization, and asynchronous exporter failure isolation.
 Live model/region and streaming qualification remain. See the
 [receiver runbook](docs/operations/ai-usage-receiver.md),
+[attribution runbook](docs/operations/ai-attribution.md),
 [cost-engine runbook](docs/operations/ai-cost-engine.md),
 [savings-engine runbook](docs/operations/ai-savings-engine.md),
 [local AI FinOps dashboard](docs/operations/ai-finops-local-demo.md),
@@ -52,6 +56,7 @@ Live model/region and streaming qualification remain. See the
 [telemetry contract](docs/specifications/ai-economics-telemetry-contract.md),
 [product direction](docs/product/ai-finops-vision.md),
 [architecture](docs/architecture/ai-economics.md), [contracts](docs/specifications/ai-economics-contracts.md),
+[attribution contracts](docs/specifications/ai-attribution-contracts.md),
 and [roadmap](docs/roadmap/ai-finops-roadmap.md).
 
 ## Local quick start

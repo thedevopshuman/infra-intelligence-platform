@@ -91,6 +91,11 @@ services:
         {"identities":[{"tokenSha256":"sha256:d52e86d5eeda090d11d9c961632390e6da1356df217d662abde728312befb25d","actorId":"ai-finops-local-operator","tenantId":"local","roles":["developer","platform-admin"]}]}
       IIP_WORKER_ID: ai-finops-worker
       IIP_WORKER_TENANTS: local
+      IIP_AI_ATTRIBUTION_ENABLED: "true"
+      IIP_AI_ATTRIBUTION_POLICIES_JSON: ${IIP_AI_ATTRIBUTION_POLICIES_JSON:?set IIP_AI_ATTRIBUTION_POLICIES_JSON}
+      IIP_AI_ATTRIBUTION_ALLOW_TEST_FIXTURES: "true"
+      IIP_AI_ATTRIBUTION_BATCH_SIZE: "100"
+      IIP_AI_ATTRIBUTION_INTERVAL_SECONDS: "1"
       IIP_AI_COST_ENGINE_ENABLED: "true"
       IIP_AI_PRICE_CATALOGS_JSON: ${IIP_AI_PRICE_CATALOGS_JSON:?set IIP_AI_PRICE_CATALOGS_JSON}
       IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES: "true"

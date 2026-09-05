@@ -341,6 +341,7 @@ REQUIRED_PATHS = (
     "src/iip/application/ingest_otlp_metrics.py",
     "src/iip/application/log_evidence.py",
     "src/iip/application/ingest_otlp_logs.py",
+    "src/iip/application/ingest_ai_usage.py",
     "src/iip/application/observe_ingestion.py",
     "src/iip/application/query_telemetry_export_health.py",
     "src/iip/application/query_runtime_version.py",
@@ -368,6 +369,8 @@ REQUIRED_PATHS = (
     "src/iip/application/query_actions.py",
     "src/iip/adapters/otlp_receiver.py",
     "src/iip/adapters/otlp_logs_receiver.py",
+    "src/iip/adapters/otlp_ai_usage_receiver.py",
+    "src/iip/adapters/ai_usage_store.py",
     "src/iip/adapters/postgres/migrations/0006_source_checkpoint_provider_cursors.sql",
     "src/iip/adapters/postgres/migrations/0007_investigation_lifecycle.sql",
     "src/iip/adapters/postgres/migrations/0008_action_execution_lifecycle.sql",
@@ -378,8 +381,10 @@ REQUIRED_PATHS = (
     "src/iip/adapters/postgres/migrations/0015_plugin_invocation_lifecycle.sql",
     "src/iip/adapters/postgres/migrations/0016_telemetry_export_health.sql",
     "src/iip/adapters/postgres/migrations/0017_telemetry_export_slo_samples.sql",
+    "src/iip/adapters/postgres/migrations/0018_ai_usage_ledger.sql",
     "src/iip/adapters/postgres/health.py",
     "tests/test_evidence_collection.py",
+    "tests/test_ai_usage_receiver.py",
     "tests/test_telemetry_export_health.py",
     "tests/test_kubernetes_event_evidence.py",
     "tests/test_telemetry_evidence.py",
@@ -479,6 +484,7 @@ REQUIRED_PATHS = (
     "deploy/plugin-mediation-bridge/bridge.py",
     "deploy/otlp/receiver-channels.example.json",
     "deploy/otlp/log-receiver-channels.example.json",
+    "deploy/otlp/ai-usage-receiver-channels.example.json",
     "deploy/otlp/client-identities.example.json",
     "deploy/otel/collector-to-iip.example.yaml",
     "src/iip/surfaces/otlp_tls.py",
@@ -585,7 +591,7 @@ def validate_authentication_boundary(
         operation = item.get("get") if isinstance(item, dict) else None
         if not isinstance(operation, dict) or operation.get("security") != []:
             fail(errors, f"{public_path} must explicitly remain unauthenticated")
-    for receiver_path in ("/v1/metrics", "/v1/logs"):
+    for receiver_path in ("/v1/metrics", "/v1/logs", "/v1/traces"):
         if receiver_path in paths:
             fail(errors, f"control-plane OpenAPI must not expose {receiver_path}")
     for path, item in paths.items():
@@ -620,7 +626,13 @@ def validate_authentication_boundary(
         fail(errors, "OTLP receiver OpenAPI document must be an object")
         return
     receiver_paths = receiver.get("paths")
-    allowed_receiver_paths = {"/healthz", "/readyz", "/v1/metrics", "/v1/logs"}
+    allowed_receiver_paths = {
+        "/healthz",
+        "/readyz",
+        "/v1/metrics",
+        "/v1/logs",
+        "/v1/traces",
+    }
     if not isinstance(receiver_paths, dict) or set(receiver_paths) != allowed_receiver_paths:
         fail(errors, "OTLP receiver OpenAPI must expose only health and OTLP routes")
     if receiver.get("security") != [

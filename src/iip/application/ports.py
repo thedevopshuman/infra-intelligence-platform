@@ -624,6 +624,16 @@ class EventLog(Protocol):
         """Replay tenant-scoped events after an exclusive storage offset."""
 
 
+class AiUsageLedger(Protocol):
+    def commit_usage_batch(
+        self,
+        actor: ActorContext,
+        records: tuple[Mapping[str, object], ...],
+        events: tuple[PlatformEvent, ...],
+    ) -> tuple[Mapping[str, object], ...]:
+        """Atomically persist normalized usage and events with exact deduplication."""
+
+
 class EventOutbox(Protocol):
     def claim_outbox(
         self,

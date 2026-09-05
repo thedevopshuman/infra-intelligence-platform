@@ -132,6 +132,8 @@ helm-lint:
 		--set otlpReceiver.channelsExistingSecret=iip-otlp-metrics \
 		--set otlpLogsReceiver.enabled=true \
 		--set otlpLogsReceiver.channelsExistingSecret=iip-otlp-logs \
+		--set aiUsageReceiver.enabled=true \
+		--set aiUsageReceiver.channelsExistingSecret=iip-ai-usage \
 		--set networkPolicy.enabled=true \
 		--set networkPolicy.databaseEgress.enabled=true \
 		--set networkPolicy.otlpReceiverIngress.enabled=true >/dev/null

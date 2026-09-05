@@ -50,6 +50,10 @@ from iip.application.collect_evidence import EvidenceCollectionService
 from iip.application.context_evidence import ContextEvidenceProvider, ContextEvidenceService
 from iip.application.deliver_events import EventDeliveryService
 from iip.application.ingest_collection import ResourceCollectionIngestionService
+from iip.application.ingest_ai_usage import (
+    AiUsageIngestionService,
+    AiUsageReceiverAdapter,
+)
 from iip.application.ingest_otlp_metrics import (
     OtlpMetricsIngestionService,
     OtlpMetricsReceiverAdapter,
@@ -204,6 +208,7 @@ class Runtime:
     log_evidence: LogEvidenceService
     otlp_metrics_ingestion: OtlpMetricsIngestionService | None
     otlp_logs_ingestion: OtlpLogsIngestionService | None
+    ai_usage_ingestion: AiUsageIngestionService | None
     investigations: DeterministicInvestigationService
     investigation_lifecycle: InvestigationLifecycleService
     investigation_dispatch: InvestigationDispatchService
@@ -252,6 +257,7 @@ def build_local_runtime(
     context_documents_backend: ContextDocumentsBackend | None = None,
     otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     otlp_logs_receiver: OtlpLogsReceiverAdapter | None = None,
+    ai_usage_receiver: AiUsageReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
     action_executor: ActionExecutor | None = None,
     policy: PolicyDecisionPoint | None = None,
@@ -290,6 +296,7 @@ def build_local_runtime(
         context_documents_backend,
         otlp_metrics_receiver,
         otlp_logs_receiver,
+        ai_usage_receiver,
         telemetry_runtime,
         action_executor,
         policy,
@@ -327,6 +334,7 @@ def _compose_runtime(
     context_documents_backend: ContextDocumentsBackend | None = None,
     otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     otlp_logs_receiver: OtlpLogsReceiverAdapter | None = None,
+    ai_usage_receiver: AiUsageReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
     action_executor: ActionExecutor | None = None,
     configured_policy: PolicyDecisionPoint | None = None,
@@ -555,6 +563,11 @@ def _compose_runtime(
             if otlp_logs_receiver is not None
             else None
         ),
+        ai_usage_ingestion=(
+            AiUsageIngestionService(ai_usage_receiver, store, clock)
+            if ai_usage_receiver is not None
+            else None
+        ),
         investigations=investigations,
         investigation_lifecycle=investigation_lifecycle,
         investigation_dispatch=InvestigationDispatchService(
@@ -637,6 +650,7 @@ def build_postgres_runtime(
     context_documents_backend: ContextDocumentsBackend | None = None,
     otlp_metrics_receiver: OtlpMetricsReceiverAdapter | None = None,
     otlp_logs_receiver: OtlpLogsReceiverAdapter | None = None,
+    ai_usage_receiver: AiUsageReceiverAdapter | None = None,
     telemetry_runtime: Any = None,
     action_executor: ActionExecutor | None = None,
     policy: PolicyDecisionPoint | None = None,
@@ -682,6 +696,7 @@ def build_postgres_runtime(
         context_documents_backend,
         otlp_metrics_receiver,
         otlp_logs_receiver,
+        ai_usage_receiver,
         telemetry_runtime,
         action_executor,
         policy,
@@ -814,6 +829,11 @@ def _build_runtime_from_env(
             if receiver_mode == "shared"
             else None
         )
+        ai_usage_receiver = (
+            _ai_usage_receiver_from_env()
+            if receiver_mode == "shared"
+            else None
+        )
         credential_broker = _credential_broker_from_env()
         action_executor = (
             _kubernetes_action_executor_from_env(credential_broker)
@@ -865,6 +885,7 @@ def _build_runtime_from_env(
                 context_documents_backend=context_documents_backend,
                 otlp_metrics_receiver=otlp_metrics_receiver,
                 otlp_logs_receiver=otlp_logs_receiver,
+                ai_usage_receiver=ai_usage_receiver,
                 telemetry_runtime=telemetry_runtime,
                 action_executor=action_executor,
                 policy=policy,
@@ -916,6 +937,7 @@ def _build_runtime_from_env(
             context_documents_backend=context_documents_backend,
             otlp_metrics_receiver=otlp_metrics_receiver,
             otlp_logs_receiver=otlp_logs_receiver,
+            ai_usage_receiver=ai_usage_receiver,
             telemetry_runtime=telemetry_runtime,
             action_executor=action_executor,
             policy=policy,
@@ -945,7 +967,12 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
         raise OtlpReceiverConfigurationError("otlp.database.configuration.required")
     metrics_receiver = _otlp_metrics_receiver_from_env()
     logs_receiver = _otlp_logs_receiver_from_env()
-    if metrics_receiver is None and logs_receiver is None:
+    ai_usage_receiver = _ai_usage_receiver_from_env()
+    if (
+        metrics_receiver is None
+        and logs_receiver is None
+        and ai_usage_receiver is None
+    ):
         raise OtlpReceiverConfigurationError("otlp.configuration.required")
     auto_migrate = (
         os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower() == "true"
@@ -983,6 +1010,7 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
             collector_queue_loss_objectives=collector_queue_loss_objectives,
             otlp_metrics_receiver=metrics_receiver,
             otlp_logs_receiver=logs_receiver,
+            ai_usage_receiver=ai_usage_receiver,
             telemetry_runtime=metrics_runtime,
             telemetry_health_reporting=telemetry_health_reporting,
             otlp_receiver_objectives=_otlp_receiver_objectives_from_env(),
@@ -1758,3 +1786,18 @@ def _otlp_logs_receiver_from_env() -> OtlpLogsReceiverAdapter | None:
     from iip.adapters.otlp_logs_receiver import ConfiguredOtlpLogsReceiver
 
     return ConfiguredOtlpLogsReceiver.from_json(configuration)
+
+
+def _ai_usage_receiver_from_env() -> AiUsageReceiverAdapter | None:
+    enabled = os.environ.get("IIP_AI_USAGE_RECEIVER_ENABLED", "false").lower()
+    if enabled not in ("false", "true"):
+        raise OtlpReceiverConfigurationError("otlp.configuration.invalid")
+    if enabled == "false":
+        return None
+    configuration = os.environ.get("IIP_AI_USAGE_RECEIVER_CHANNELS_JSON")
+    if configuration is None:
+        raise OtlpReceiverConfigurationError("otlp.configuration.required")
+
+    from iip.adapters.otlp_ai_usage_receiver import ConfiguredAiUsageReceiver
+
+    return ConfiguredAiUsageReceiver.from_json(configuration)

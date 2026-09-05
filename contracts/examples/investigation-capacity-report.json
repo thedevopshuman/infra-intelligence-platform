@@ -16,7 +16,7 @@
       "database": {
         "engine": "postgresql",
         "version": "18.4",
-        "migration": "0017_telemetry_export_slo_samples.sql"
+        "migration": "0018_ai_usage_ledger.sql"
       }
     },
     "profile": {

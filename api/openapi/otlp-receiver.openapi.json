@@ -3,7 +3,7 @@
   "info": {
     "title": "Infrastructure Intelligence OTLP Receiver API",
     "version": "0.63.0",
-    "description": "Isolated OTLP/HTTP Protobuf intake for allowlisted metrics and logs. The production profile requires both a CA-verified SPIFFE client certificate and a tenant-bound channel Bearer credential. This listener exposes no Infrastructure Intelligence control-plane operations."
+    "description": "Isolated OTLP/HTTP Protobuf intake for allowlisted metrics, logs, and metadata-only generative-AI usage spans. The production profile requires both a CA-verified SPIFFE client certificate and a tenant-bound channel Bearer credential. This listener exposes no Infrastructure Intelligence control-plane operations."
   },
   "servers": [
     {"url": "https://localhost:4318", "description": "Production mutual-TLS profile"},
@@ -63,6 +63,24 @@
           "503": {"$ref": "#/components/responses/OtlpUnavailable"}
         }
       }
+    },
+    "/v1/traces": {
+      "post": {
+        "operationId": "ingestOtlpAiUsageTraces",
+        "description": "Accept one bounded OTLP trace export, normalize only approved generative-AI invocation metadata, and durably commit usage plus its event before success. Prompt, response, message, tool, embedding, retrieval-document, span-event, span-link, and raw payload content is prohibited.",
+        "requestBody": {"$ref": "#/components/requestBodies/OtlpExport"},
+        "responses": {
+          "200": {"$ref": "#/components/responses/OtlpSuccess"},
+          "400": {"$ref": "#/components/responses/OtlpInvalidRequest"},
+          "401": {"$ref": "#/components/responses/OtlpUnauthorized"},
+          "404": {"$ref": "#/components/responses/OtlpReceiverDisabled"},
+          "409": {"$ref": "#/components/responses/OtlpUsageConflict"},
+          "413": {"$ref": "#/components/responses/OtlpRequestTooLarge"},
+          "415": {"$ref": "#/components/responses/OtlpUnsupportedMedia"},
+          "429": {"$ref": "#/components/responses/OtlpRateLimited"},
+          "503": {"$ref": "#/components/responses/OtlpUnavailable"}
+        }
+      }
     }
   },
   "components": {
@@ -70,7 +88,7 @@
       "otlpChannelBearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Independent receiver credential. Protected configuration fixes tenant, integration, resource scope, catalogs, limits, sensitivity, and retention."
+        "description": "Independent receiver credential. Protected configuration fixes tenant, integration, resource/service/model scope, signal catalogs, commercial dimensions, limits, sensitivity, and retention."
       },
       "otlpMutualTLS": {
         "type": "mutualTLS",
@@ -107,6 +125,10 @@
       },
       "OtlpRequestTooLarge": {
         "description": "The encoded, decompressed, or normalized payload exceeded a channel bound",
+        "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
+      },
+      "OtlpUsageConflict": {
+        "description": "The same tenant/channel/span identity was previously committed with different usage metadata",
         "content": {"application/x-protobuf": {"schema": {"type": "string", "format": "binary"}}}
       },
       "OtlpUnsupportedMedia": {

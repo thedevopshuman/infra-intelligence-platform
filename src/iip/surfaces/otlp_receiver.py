@@ -82,6 +82,9 @@ class OtlpReceiverHandler(ApiHandler):
         if path == "/v1/logs":
             self._receive_otlp_logs()
             return
+        if path == "/v1/traces":
+            self._receive_ai_usage_traces()
+            return
         self._json(HTTPStatus.NOT_FOUND, {"error": {"code": "route.not_found"}})
 
     def _admit_otlp_channel(self, channel_id: str) -> bool:

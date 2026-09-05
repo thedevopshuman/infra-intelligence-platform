@@ -1,4 +1,4 @@
-{{- if or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled }}
+{{- if or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled .Values.aiUsageReceiver.enabled }}
 apiVersion: v1
 kind: Service
 metadata:

@@ -1,0 +1,51 @@
+{
+  "channels": [
+    {
+      "channelId": "bedrock-traces-local",
+      "tokenSha256": "sha256:03bb237c9945cb8e1a0e24ea38d2680f002ec49633b9449d4d224dd081bcd28a",
+      "tenantId": "local",
+      "integrationId": "aws-bedrock-local",
+      "provider": "aws.bedrock",
+      "semanticConventionVersion": "1.37.0-development",
+      "services": [
+        {
+          "otlpName": "support-assistant",
+          "serviceName": "support-assistant",
+          "serviceNamespace": "customer-experience",
+          "deploymentEnvironment": "production",
+          "resourceRefs": []
+        }
+      ],
+      "models": ["example.foundation-model-v1:0"],
+      "operations": ["chat"],
+      "regions": ["us-east-1"],
+      "instrumentationScopes": ["opentelemetry.instrumentation.botocore"],
+      "usageAttributes": {
+        "inputTokens": "gen_ai.usage.input_tokens",
+        "outputTokens": "gen_ai.usage.output_tokens",
+        "cacheReadInputTokens": "gen_ai.usage.cache_read.input_tokens",
+        "cacheWriteInputTokens": "gen_ai.usage.cache_write.input_tokens",
+        "reasoningOutputTokens": "gen_ai.usage.reasoning_tokens",
+        "zeroWhenAbsent": [
+          "cacheReadInputTokens",
+          "cacheWriteInputTokens",
+          "reasoningOutputTokens"
+        ],
+        "reportedBy": "provider"
+      },
+      "commercial": {
+        "serviceTier": "standard",
+        "routingMode": "in-region",
+        "purchaseMode": "on-demand"
+      },
+      "limits": {
+        "maxRequestBytes": 1048576,
+        "maxSpans": 100,
+        "maxAttributesPerSpan": 64,
+        "maxAgeSeconds": 3600,
+        "maxClockSkewSeconds": 30,
+        "maxProcessingSeconds": 10
+      }
+    }
+  ]
+}

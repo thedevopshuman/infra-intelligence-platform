@@ -34,6 +34,12 @@ duplicate delivery does not duplicate cost; unknown pricing is visible; no
 content crosses the boundary; and stopping the observability path does not fail
 the model request.
 
+Implementation status: items 1, 2, and 4 are delivered. Item 3 has an
+executable Bedrock-shaped OTLP fixture and strict metadata/content boundary;
+live `Converse`/`ConverseStream` auto-instrumentation qualification remains.
+Items 5–8 remain, including the price/cost engine, context-growth rule,
+aggregate export, Grafana topology, and full real-provider compatibility gate.
+
 ## Phase B — application and team attribution
 
 **Outcome:** Operators can allocate observed usage and calculated cost to
@@ -86,4 +92,3 @@ kernel contains no provider SDK import or vendor pricing branch.
 - long-term analytics backend and retention objectives;
 - optional business-attribution helper;
 - provider billing reconciliation and private-rate encryption.
-

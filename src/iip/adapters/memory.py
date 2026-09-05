@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -13,6 +14,7 @@ from iip.application.ports import (
     EventDeliverySloState,
     EventDeliveryState,
     OutboxMessage,
+    PersistenceError,
     PolicyDecision,
     QuarantinedOutboxMessage,
     ReconciliationSnapshot,
@@ -22,6 +24,7 @@ from iip.application.ports import (
     SourceIngestionState,
     StoredEvent,
 )
+from iip.adapters.ai_usage_store import prepare_ai_usage_writes
 from iip.domain.models import (
     ObservationDisposition,
     PlatformEvent,
@@ -56,6 +59,10 @@ class InMemoryResourceStore:
         self._outbox: Dict[int, _MemoryOutboxEntry] = {}
         self._checkpoints: Dict[tuple[str, str], SourceCheckpoint] = {}
         self._reconciliations: Dict[tuple[str, str], ReconciliationSnapshot] = {}
+        self._ai_usage: Dict[
+            tuple[str, str], tuple[str, Mapping[str, object]]
+        ] = {}
+        self._ai_usage_ids: Dict[tuple[str, str], str] = {}
         self._lock = RLock()
 
     @property
@@ -204,6 +211,63 @@ class InMemoryResourceStore:
                 for item in self._event_log
                 if item.offset > after_offset and item.event.tenant_id == tenant_id
             )[:limit]
+
+    def commit_usage_batch(
+        self,
+        actor: ActorContext,
+        records: tuple[Mapping[str, object], ...],
+        events: tuple[PlatformEvent, ...],
+    ) -> tuple[Mapping[str, object], ...]:
+        """Atomically retain exact AI usage and enqueue each new usage event."""
+
+        prepared = prepare_ai_usage_writes(actor, records, events)
+        with self._lock:
+            event_identities = {
+                (item.event.tenant_id, item.event.source, item.event.event_id)
+                for item in self._event_log
+            }
+            for item in prepared:
+                existing = self._ai_usage.get(
+                    (item.tenant_id, item.deduplication_key)
+                )
+                existing_deduplication_key = self._ai_usage_ids.get(
+                    (item.tenant_id, item.usage_record_id)
+                )
+                if existing is not None and existing[0] != item.document_hash:
+                    raise PersistenceError("storage.conflict")
+                if (
+                    existing_deduplication_key is not None
+                    and existing_deduplication_key != item.deduplication_key
+                ):
+                    raise PersistenceError("storage.conflict")
+                if existing is None and (
+                    item.tenant_id,
+                    item.event.source,
+                    item.event.event_id,
+                ) in event_identities:
+                    raise PersistenceError("storage.conflict")
+
+            results: list[Mapping[str, object]] = []
+            for item in prepared:
+                key = (item.tenant_id, item.deduplication_key)
+                existing = self._ai_usage.get(key)
+                if existing is not None:
+                    results.append(self._json_copy(existing[1]))
+                    continue
+                document = self._json_copy(item.document)
+                self._ai_usage[key] = (item.document_hash, document)
+                self._ai_usage_ids[
+                    (item.tenant_id, item.usage_record_id)
+                ] = item.deduplication_key
+                event_offset = len(self._event_log) + 1
+                self._event_log.append(StoredEvent(event_offset, item.event))
+                self._outbox[event_offset] = _MemoryOutboxEntry(
+                    event_offset,
+                    item.event,
+                    item.recorded_at,
+                )
+                results.append(self._json_copy(document))
+            return tuple(results)
 
     def claim_outbox(
         self,
@@ -762,6 +826,12 @@ class InMemoryResourceStore:
             r"[a-z][a-z0-9_.-]{2,127}", error_code
         ):
             raise ValueError("error_code must be stable and non-sensitive")
+
+    @staticmethod
+    def _json_copy(value: Mapping[str, object]) -> Mapping[str, object]:
+        return json.loads(
+            json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+        )
 
 
 class InMemoryEventPublisher:

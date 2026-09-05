@@ -11,7 +11,7 @@ from iip.application.ports import (
 )
 
 
-OTLP_RECEIVER_SIGNALS = frozenset({"metrics", "logs"})
+OTLP_RECEIVER_SIGNALS = frozenset({"metrics", "logs", "traces"})
 _MAX_DURATION_SECONDS = 86_400.0
 
 

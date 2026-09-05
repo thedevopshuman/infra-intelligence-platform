@@ -281,6 +281,8 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_TELEMETRY_LOGS_BACKEND` | `no-data` | Historical log evidence backend; `no-data`, `loki`, or `opensearch` |
 | `IIP_OTLP_LOGS_RECEIVER_ENABLED` | `false` | Enable the optional tenant-bound OTLP/HTTP logs Evidence receiver |
 | `IIP_OTLP_LOGS_RECEIVER_CHANNELS_JSON` | required when logs receiver is enabled | Protected hashed logs-channel credentials, fixed resource/service scope, mappings, limits, and handling policy |
+| `IIP_AI_USAGE_RECEIVER_ENABLED` | `false` | Enable metadata-only GenAI client-span normalization on the isolated OTLP `/v1/traces` route |
+| `IIP_AI_USAGE_RECEIVER_CHANNELS_JSON` | required when AI usage receiver is enabled | Protected hashed channel credential plus fixed tenant, service, provider, model, region, commercial, meter, and admission scope |
 | `IIP_PROMETHEUS_INTEGRATIONS_JSON` | unset | Protected non-secret tenant/integration endpoint and allowlisted metric catalog required by the Prometheus backend |
 | `IIP_PROMETHEUS_CREDENTIALS_JSON` | empty credential set | Secret-bearing local reference broker configuration; supply only through a protected runtime channel |
 | `IIP_LOKI_INTEGRATIONS_JSON` | unset | Protected non-secret tenant/integration endpoint, organization, label, service, and severity catalog required by the Loki backend |

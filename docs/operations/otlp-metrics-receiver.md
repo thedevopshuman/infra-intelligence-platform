@@ -7,6 +7,10 @@ streams through standard OTLP/HTTP binary Protobuf and records each non-empty
 export as immutable, normalized Evidence. It is independent of both outbound
 platform telemetry and historical-query adapters.
 
+The same isolated process can expose metadata-only GenAI trace intake. That
+signal has a different protected channel catalog and persistence contract; see
+the [AI usage receiver runbook](ai-usage-receiver.md).
+
 ## Enable locally
 
 Generate a channel token with at least 32 random characters and put only its SHA-256 digest in a protected channel document. `deploy/otlp/receiver-channels.example.json` shows the full shape, but its illustrative verifier is not a usable deployment secret.
@@ -80,8 +84,9 @@ certificate's `notAfter` or updating the SPIFFE identity registry. The
 receiver accepts exactly one PEM CRL up to 1 MiB. Its `lastUpdate` may be at
 most equal to the receiver clock and its `nextUpdate` must be in the future. An
 invalid issuer/signature or already expired CRL rejects startup; reaching
-`nextUpdate` later removes the receiver from readiness and rejects metrics/logs
-intake before body read. Project a current CRL and roll the receiver before
+`nextUpdate` later removes the receiver from readiness and rejects all enabled
+metrics, logs, and AI usage trace intake before body read. Project a current
+CRL and roll the receiver before
 expiry because OpenSSL and the application intentionally load the same bytes
 once at startup. The client CA bundle must include the CRL issuer certificate
 as well as the intended trust anchor so startup can validate the CRL signature
@@ -188,8 +193,9 @@ For one-process development compatibility only, set `IIP_OTLP_RECEIVER_MODE=shar
 `make verify` covers Protobuf normalization, channel/control-plane credential
 separation, TLS/SPIFFE policy, gzip and post-decompression limits,
 tenant/resource binding, redaction, immutable persistence, separate OpenAPI
-documents, SDK types, and Helm rendering. The Docker gate sends real exports
-from the official Python exporters through an intermediate-issued client chain,
+documents, SDK types, and Helm rendering. The Docker gate sends real metrics,
+logs, and GenAI trace exports from the official Python exporters through an
+intermediate-issued client chain,
 tests certificate and credential denial, atomically rotates the CRL and
 recreates the receiver, proves newly revoked and unaffected identities, queries
 PostgreSQL, validates the persistent Collector queue configuration, and writes

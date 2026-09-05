@@ -295,6 +295,11 @@ otlpLogsReceiver:
   channelsExistingSecret: ""
   channelsSecretKey: otlp-logs-receiver-channels-json
 
+aiUsageReceiver:
+  enabled: false
+  channelsExistingSecret: ""
+  channelsSecretKey: ai-usage-receiver-channels-json
+
 otlpIngest:
   replicaCount: 1
   httpHost: 0.0.0.0

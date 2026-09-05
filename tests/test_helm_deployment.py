@@ -59,6 +59,8 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             "IIP_OTLP_RECEIVER_SLO_WINDOW_SECONDS",
             "IIP_OTLP_RECEIVER_SLO_MINIMUM_BASIS_POINTS",
             "IIP_OTLP_RECEIVER_SLO_MINIMUM_ELIGIBLE_REQUESTS",
+            "IIP_AI_USAGE_RECEIVER_ENABLED",
+            "IIP_AI_USAGE_RECEIVER_CHANNELS_JSON",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, deployment)

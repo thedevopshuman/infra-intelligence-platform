@@ -40,6 +40,11 @@ from iip.application.ingest_collection import (
     IngestCollectionCommand,
     InvalidCollectionError,
 )
+from iip.application.ingest_ai_usage import (
+    AiUsagePayloadTooLargeError,
+    InvalidAiUsageRequestError,
+    validate_ai_usage_channel,
+)
 from iip.application.ingest_resource import (
     AuthorizationError,
     IngestResourceCommand,
@@ -765,6 +770,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path == "/v1/logs":
             self._receive_otlp_logs()
             return
+        if path == "/v1/traces":
+            self._receive_ai_usage_traces()
+            return
         segments = path.strip("/").split("/")
         known = (
             path
@@ -1332,6 +1340,77 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
             raise
 
+    def _receive_ai_usage_traces(self) -> None:
+        self._otlp_receiver_context = ("traces", time.monotonic())
+        service = self.runtime.ai_usage_ingestion
+        if service is None:
+            self._otlp_failure(HTTPStatus.NOT_FOUND, "otlp.receiver.disabled")
+            return
+        try:
+            try:
+                token = self._bearer_token()
+            except AuthenticationError as exc:
+                code = (
+                    "otlp.authentication.required"
+                    if str(exc) == "authentication.required"
+                    else "otlp.authentication.invalid"
+                )
+                raise OtlpReceiverAuthenticationError(code) from None
+            channel = service.authenticate_bearer(token)
+            validate_ai_usage_channel(channel)
+            self._authorize_otlp_transport(channel.channel_id)
+            if not self._admit_otlp_channel(channel.channel_id):
+                self._otlp_failure(
+                    HTTPStatus.TOO_MANY_REQUESTS,
+                    "otlp.rate-limit.exceeded",
+                )
+                return
+            content_type = self.headers.get("content-type", "")
+            media_type = content_type.partition(";")[0].strip().lower()
+            if media_type != "application/x-protobuf":
+                self._otlp_failure(
+                    HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
+                    "otlp.content-type.unsupported",
+                )
+                return
+            encoding = self.headers.get("content-encoding", "identity").strip().lower()
+            payload = self._read_binary(channel.limits.max_request_bytes)
+            service.ingest(channel, payload, content_encoding=encoding)
+            self._otlp_response(HTTPStatus.OK, b"")
+        except OtlpReceiverAuthenticationError as exc:
+            self._otlp_failure(HTTPStatus.UNAUTHORIZED, str(exc))
+        except (AiUsagePayloadTooLargeError, OtlpPayloadTooLargeError):
+            self._otlp_failure(
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                "otlp.request.too-large",
+            )
+        except (InvalidAiUsageRequestError, InvalidOtlpMetricsRequestError) as exc:
+            status = (
+                HTTPStatus.UNSUPPORTED_MEDIA_TYPE
+                if str(exc) == "otlp.compression.unsupported"
+                else HTTPStatus.BAD_REQUEST
+            )
+            self._otlp_failure(status, str(exc))
+        except OtlpReceiverConfigurationError:
+            self._otlp_failure(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "otlp.receiver.unavailable",
+            )
+        except PersistenceError as exc:
+            if str(exc) == "storage.conflict":
+                self._otlp_failure(HTTPStatus.CONFLICT, "otlp.usage.conflict")
+            else:
+                self._otlp_failure(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    "otlp.receiver.unavailable",
+                )
+        except Exception:
+            self._finish_otlp_receiver_telemetry(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                uncaught_failure=True,
+            )
+            raise
+
     def _authentication_failed(self, error: AuthenticationError) -> None:
         code = str(error)
         if code not in ("authentication.required", "authentication.invalid"):
@@ -1552,6 +1631,19 @@ class ApiHandler(BaseHTTPRequestHandler):
             "otlp.log-body.type.unsupported",
             "otlp.log-severity.invalid",
             "otlp.trace-context.invalid",
+            "otlp.span.kind.unsupported",
+            "otlp.span.content-prohibited",
+            "otlp.span.not-allowlisted",
+            "otlp.span.status.invalid",
+            "otlp.span.time.invalid",
+            "otlp.span.limit",
+            "otlp.span.duplicate",
+            "otlp.scope.not-allowlisted",
+            "otlp.usage.missing",
+            "otlp.usage.breakdown.invalid",
+            "otlp.usage.completeness.invalid",
+            "otlp.usage.conflict",
+            "otlp.attribute.required",
             "otlp.artifact.too-large",
             "otlp.clock.invalid",
             "otlp.request.invalid",

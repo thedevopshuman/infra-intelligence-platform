@@ -1,4 +1,4 @@
-{{- if or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled }}
+{{- if or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled .Values.aiUsageReceiver.enabled }}
 {{- if not .Values.database.existingSecret }}
 {{- fail "database.existingSecret is required when an OTLP receiver is enabled" }}
 {{- end }}
@@ -7,6 +7,9 @@
 {{- end }}
 {{- if and .Values.otlpLogsReceiver.enabled (not .Values.otlpLogsReceiver.channelsExistingSecret) }}
 {{- fail "otlpLogsReceiver.channelsExistingSecret is required when the logs receiver is enabled" }}
+{{- end }}
+{{- if and .Values.aiUsageReceiver.enabled (not .Values.aiUsageReceiver.channelsExistingSecret) }}
+{{- fail "aiUsageReceiver.channelsExistingSecret is required when the AI usage receiver is enabled" }}
 {{- end }}
 {{- if and (ne .Values.otlpIngest.tls.mode "disabled") (not .Values.otlpIngest.tls.serverExistingSecret) }}
 {{- fail "otlpIngest.tls.serverExistingSecret is required when receiver TLS is enabled" }}
@@ -156,6 +159,8 @@ spec:
               value: {{ .Values.otlpReceiver.enabled | quote }}
             - name: IIP_OTLP_LOGS_RECEIVER_ENABLED
               value: {{ .Values.otlpLogsReceiver.enabled | quote }}
+            - name: IIP_AI_USAGE_RECEIVER_ENABLED
+              value: {{ .Values.aiUsageReceiver.enabled | quote }}
             {{- if .Values.otlpReceiver.enabled }}
             - name: IIP_OTLP_RECEIVER_CHANNELS_JSON
               valueFrom:
@@ -169,6 +174,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.otlpLogsReceiver.channelsExistingSecret | quote }}
                   key: {{ .Values.otlpLogsReceiver.channelsSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.aiUsageReceiver.enabled }}
+            - name: IIP_AI_USAGE_RECEIVER_CHANNELS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aiUsageReceiver.channelsExistingSecret | quote }}
+                  key: {{ .Values.aiUsageReceiver.channelsSecretKey | quote }}
             {{- end }}
           ports:
             - name: otlp-http

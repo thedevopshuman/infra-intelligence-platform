@@ -40,7 +40,7 @@
 {{- if and (or .Values.telemetry.metricsEnabled .Values.telemetry.tracesEnabled) (not .Values.telemetry.otlpEndpoint) }}
 {{- fail "telemetry.otlpEndpoint is required when telemetry export is enabled" }}
 {{- end }}
-{{- if and (or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled) .Values.telemetry.metricsEnabled .Values.networkPolicy.enabled (not .Values.networkPolicy.otlpEgress.enabled) }}
+{{- if and (or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled .Values.aiUsageReceiver.enabled) .Values.telemetry.metricsEnabled .Values.networkPolicy.enabled (not .Values.networkPolicy.otlpEgress.enabled) }}
 {{- fail "networkPolicy.otlpEgress.enabled is required for OTLP receiver telemetry export" }}
 {{- end }}
 {{- if eq .Values.auth.mode "local-hashed" }}
@@ -61,6 +61,9 @@
 {{- end }}
 {{- if and .Values.otlpLogsReceiver.enabled (not .Values.otlpLogsReceiver.channelsExistingSecret) }}
 {{- fail "otlpLogsReceiver.channelsExistingSecret is required when the logs receiver is enabled" }}
+{{- end }}
+{{- if and .Values.aiUsageReceiver.enabled (not .Values.aiUsageReceiver.channelsExistingSecret) }}
+{{- fail "aiUsageReceiver.channelsExistingSecret is required when the AI usage receiver is enabled" }}
 {{- end }}
 {{- if and (ne .Values.otlpIngest.tls.mode "disabled") (not .Values.otlpIngest.tls.serverExistingSecret) }}
 {{- fail "otlpIngest.tls.serverExistingSecret is required when receiver TLS is enabled" }}

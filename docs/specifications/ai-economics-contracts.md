@@ -118,3 +118,17 @@ pricing lookup, monetary scale, privacy, or authority semantics require a new
 contract version and migration notes. SDK types represent the public records
 only; they do not instrument provider calls or import server internals.
 
+## OTLP trace binding
+
+The executable intake binding is `POST /v1/traces` on the isolated OTLP
+listener described by `api/openapi/otlp-receiver.openapi.json`. It accepts
+binary OTLP Protobuf with identity or gzip encoding. The authenticated channel,
+not span attributes, supplies tenant and protected commercial scope. Only
+allowlisted GenAI client metadata becomes a usage record; content-bearing
+attributes, span events, span links, raw payload persistence, and ambiguous
+or dropped input fail the entire export before commit.
+
+The usage row, its CloudEvent, and its outbox row commit atomically. Exact
+retries return the original record without a second event. Reusing a canonical
+span identity with changed normalized facts is a conflict. See the
+[AI usage receiver runbook](../operations/ai-usage-receiver.md).

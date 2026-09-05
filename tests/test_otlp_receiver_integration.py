@@ -13,11 +13,15 @@ from pathlib import Path
 import psycopg
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.trace import SpanKind
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader, MetricExportResult
 from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 from iip.application.ingest_otlp_metrics import OtlpReceiverConfigurationError
 from iip.surfaces.otlp_tls import OtlpTlsConfiguration
@@ -167,6 +171,79 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
             logger.removeHandler(handler)
             handler.close()
             provider.shutdown()
+
+    def test_official_trace_exporter_commits_metadata_only_ai_usage(self) -> None:
+        receiver_url = os.environ["IIP_TEST_OTLP_RECEIVER_ENDPOINT"].rstrip("/")
+        channel_token = os.environ["IIP_TEST_OTLP_CHANNEL_TOKEN"]
+        exporter = OTLPSpanExporter(
+            endpoint=f"{receiver_url}/v1/traces",
+            certificate_file=os.environ["IIP_TEST_OTLP_CA_FILE"],
+            client_certificate_file=os.environ[
+                "IIP_TEST_OTLP_CLIENT_CERT_FILE"
+            ],
+            client_key_file=os.environ["IIP_TEST_OTLP_CLIENT_KEY_FILE"],
+            headers={"Authorization": f"Bearer {channel_token}"},
+            timeout=5,
+        )
+        provider = TracerProvider(
+            resource=Resource.create(
+                {
+                    "service.name": "support-assistant",
+                    "service.namespace": "customer-experience",
+                    "deployment.environment.name": "docker-test",
+                    "cloud.region": "us-east-1",
+                }
+            )
+        )
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        tracer = provider.get_tracer(
+            "opentelemetry.instrumentation.botocore",
+            "0.0.0-example",
+        )
+        try:
+            with tracer.start_as_current_span(
+                "chat example.foundation-model-v1:0",
+                kind=SpanKind.CLIENT,
+                attributes={
+                    "gen_ai.provider.name": "aws.bedrock",
+                    "gen_ai.operation.name": "chat",
+                    "gen_ai.request.model": "example.foundation-model-v1:0",
+                    "gen_ai.response.model": "example.foundation-model-v1:0",
+                    "gen_ai.usage.input_tokens": 2400,
+                    "gen_ai.usage.output_tokens": 600,
+                    "aws.request_id": "docker-provider-request",
+                    "aws.retry_count": 0,
+                },
+            ):
+                pass
+            self.assertTrue(provider.force_flush(timeout_millis=5000))
+        finally:
+            provider.shutdown()
+
+        with psycopg.connect(os.environ["IIP_TEST_OTLP_DATABASE_URL"]) as connection:
+            row = connection.execute(
+                """
+                SELECT document, count(*) OVER () AS record_count
+                FROM iip.ai_usage_records
+                WHERE tenant_id = 'local'
+                """
+            ).fetchone()
+            event_count = connection.execute(
+                """
+                SELECT count(*)
+                FROM iip.event_log
+                WHERE tenant_id = 'local'
+                  AND event_type = 'io.iip.ai.usage-recorded.v1'
+                """
+            ).fetchone()[0]
+
+        self.assertIsNotNone(row)
+        self.assertEqual(row[1], 1)
+        document = row[0]
+        self.assertEqual(document["spec"]["usage"]["inputTokens"], 2400)
+        self.assertFalse(document["spec"]["privacy"]["contentCaptured"])
+        self.assertNotIn("docker-provider-request", json.dumps(document))
+        self.assertEqual(event_count, 1)
 
     def test_control_and_receiver_routes_are_process_isolated(self) -> None:
         control_url = os.environ["IIP_TEST_CONTROL_ENDPOINT"].rstrip("/")
@@ -365,6 +442,11 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
         counts = {str(row[0]): int(row[1]) for row in rows}
         self.assertGreaterEqual(counts.get("telemetry.metrics.push", 0), 1)
         self.assertGreaterEqual(counts.get("telemetry.logs.push", 0), 1)
+        with psycopg.connect(os.environ["IIP_TEST_OTLP_DATABASE_URL"]) as connection:
+            usage_count = connection.execute(
+                "SELECT count(*) FROM iip.ai_usage_records WHERE tenant_id = 'local'"
+            ).fetchone()[0]
+        self.assertGreaterEqual(usage_count, 1)
 
 
 @unittest.skipUnless(

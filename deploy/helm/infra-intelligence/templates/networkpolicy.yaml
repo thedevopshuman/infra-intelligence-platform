@@ -251,7 +251,7 @@ spec:
           protocol: TCP
     {{- end }}
 {{- end }}
-{{- if or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled }}
+{{- if or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled .Values.aiUsageReceiver.enabled }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

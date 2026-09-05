@@ -50,3 +50,7 @@ service:
       receivers: [otlp]
       processors: [batch]
       exporters: [otlphttp/iip]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/iip]

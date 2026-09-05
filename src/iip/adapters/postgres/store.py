@@ -14,7 +14,9 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from iip.adapters.ai_usage_store import prepare_ai_usage_writes
 from iip.application.ports import (
+    ActorContext,
     EventDeliverySloState,
     EventDeliveryState,
     OutboxMessage,
@@ -57,6 +59,7 @@ SCHEMA_MIGRATIONS = (
     "0015_plugin_invocation_lifecycle.sql",
     "0016_telemetry_export_health.sql",
     "0017_telemetry_export_slo_samples.sql",
+    "0018_ai_usage_ledger.sql",
 )
 
 
@@ -446,6 +449,99 @@ class PostgresResourceStore:
             StoredEvent(row["event_offset"], PlatformEvent.from_dict(row["document"]))
             for row in rows
         )
+
+    @_translate_database_errors
+    def commit_usage_batch(
+        self,
+        actor: ActorContext,
+        records: tuple[Mapping[str, object], ...],
+        events: tuple[PlatformEvent, ...],
+    ) -> tuple[Mapping[str, object], ...]:
+        """Commit new AI usage, CloudEvents, and outbox rows in one transaction."""
+
+        prepared = prepare_ai_usage_writes(actor, records, events)
+        with self._connect() as connection:
+            lock_names = sorted(
+                {
+                    name
+                    for item in prepared
+                    for name in (
+                        f"iip.ai-usage\x1f{item.tenant_id}\x1f{item.deduplication_key}",
+                        f"iip.ai-usage-id\x1f{item.tenant_id}\x1f{item.usage_record_id}",
+                    )
+                }
+            )
+            for name in lock_names:
+                connection.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (name,),
+                )
+
+            stored: dict[tuple[str, str], Mapping[str, object]] = {}
+            new_items = []
+            for item in prepared:
+                row = connection.execute(
+                    """
+                    SELECT usage_record_id, deduplication_key,
+                           document_hash, document
+                    FROM iip.ai_usage_records
+                    WHERE tenant_id = %s
+                      AND (deduplication_key = %s OR usage_record_id = %s)
+                    FOR UPDATE
+                    """,
+                    (
+                        item.tenant_id,
+                        item.deduplication_key,
+                        item.usage_record_id,
+                    ),
+                ).fetchone()
+                if row is None:
+                    new_items.append(item)
+                    continue
+                if (
+                    row["usage_record_id"] != item.usage_record_id
+                    or row["deduplication_key"] != item.deduplication_key
+                    or row["document_hash"] != item.document_hash
+                ):
+                    raise PersistenceError("storage.conflict")
+                stored[(item.tenant_id, item.deduplication_key)] = row["document"]
+
+            for item in new_items:
+                connection.execute(
+                    """
+                    INSERT INTO iip.ai_usage_records (
+                        tenant_id, usage_record_id, deduplication_key,
+                        document_hash, provider, model_id, service_name,
+                        invocation_started_at, recorded_at, document
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        item.tenant_id,
+                        item.usage_record_id,
+                        item.deduplication_key,
+                        item.document_hash,
+                        item.provider,
+                        item.model_id,
+                        item.service_name,
+                        item.invocation_started_at,
+                        item.recorded_at,
+                        Jsonb(dict(item.document)),
+                    ),
+                )
+                event_offset = self._append_event(connection, item.event)
+                connection.execute(
+                    """
+                    INSERT INTO iip.event_outbox (tenant_id, event_offset)
+                    VALUES (%s, %s)
+                    """,
+                    (item.tenant_id, event_offset),
+                )
+                stored[(item.tenant_id, item.deduplication_key)] = item.document
+
+            return tuple(
+                stored[(item.tenant_id, item.deduplication_key)]
+                for item in prepared
+            )
 
     @_translate_database_errors
     def claim_outbox(

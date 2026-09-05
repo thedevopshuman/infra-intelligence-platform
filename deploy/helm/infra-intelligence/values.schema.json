@@ -35,6 +35,7 @@
     "investigationSignalCatalog",
     "otlpReceiver",
     "otlpLogsReceiver",
+    "aiUsageReceiver",
     "otlpIngest",
     "resources",
     "probes",
@@ -730,6 +731,7 @@
     },
     "otlpReceiver": { "$ref": "#/definitions/receiver" },
     "otlpLogsReceiver": { "$ref": "#/definitions/receiver" },
+    "aiUsageReceiver": { "$ref": "#/definitions/receiver" },
     "otlpIngest": {
       "type": "object",
       "additionalProperties": false,

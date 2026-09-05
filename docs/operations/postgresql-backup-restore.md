@@ -43,7 +43,7 @@ The output path must be protected like other operational evidence even though th
 - `projectionVerification.driftDetected` must be false, proving that restored serving projections agree with immutable accepted observations.
 - `objectivesMet` applies only to the 60-second recovery-point-age and 120-second recovery-readiness local guardrails recorded in ADR 0010.
 
-The current measured baseline is stored in [the measurement report](measurements/postgresql-backup-restore.json). It covers every `iip` table and sequence, including the durable plugin claim, cancellation intent, terminal result, and audit record. The values are local Docker Desktop guardrails, not production SLO claims.
+The latest retained clean-revision baseline is stored in [the measurement report](measurements/postgresql-backup-restore.json). It records the exact tables present at its capture time; later migrations, including the AI usage ledger, are automatically included by the experiment but require a new clean-revision run before release promotion. The values are local Docker Desktop guardrails, not production SLO claims.
 
 ## Scheduled Helm backup baseline
 

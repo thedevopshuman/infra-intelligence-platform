@@ -94,6 +94,7 @@ class HelmValuesContractTests(unittest.TestCase):
             "credentialBroker.externalHttp.configJson is required",
             "otlpReceiver.channelsExistingSecret is required",
             "otlpLogsReceiver.channelsExistingSecret is required",
+            "aiUsageReceiver.channelsExistingSecret is required",
             "otlpIngest.tls.serverExistingSecret is required",
             "otlpIngest.tls.clientCaExistingSecret is required",
             "otlpIngest.tls.identitiesExistingSecret is required",

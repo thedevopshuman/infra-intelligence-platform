@@ -88,6 +88,24 @@ providers.
 Exit gate: a second provider reaches the same normalized dashboard and the
 kernel contains no provider SDK import or vendor pricing branch.
 
+Implementation status: the local Phase C exit gate is executable. A second
+protected Collector trace route accepts complete synthetic OpenAI-shaped GenAI
+usage through an independent channel credential, persists it in the common
+ledger, selects an effective-time OpenAI fixture rate from the common catalog,
+maps it to protected application/team ownership, and displays it beside
+Bedrock through the same provider-neutral metrics and Grafana queries. Exact
+replay remains idempotent and both provider channels reject content-bearing
+spans. Neither the OpenAI SDK nor its instrumentation enters the kernel, and
+pricing contains no provider branch.
+
+The separate pinned official OpenAI Python compatibility gate calls the real
+SDK against a loopback fixture in a no-network container and normalizes the
+actual instrumented span. Its missing cache-write and reasoning meters remain
+partial and ineligible for exact cost. Live OpenAI service, streaming,
+Responses API, private endpoints, authoritative prices, and customer Collector
+qualification remain open; the synthetic complete profile does not claim
+those outcomes.
+
 ## Later — unified infrastructure and AI economics
 
 - correlate AI economic changes with deployments, resource ownership, and
@@ -104,7 +122,7 @@ kernel contains no provider SDK import or vendor pricing branch.
 - stable public product/company name and package migration;
 - open-source license and commercial boundary;
 - authoritative provider price ingestion/approval workflow;
-- first real Bedrock model/region qualification target;
+- first real Bedrock model/region and OpenAI API/model qualification targets;
 - long-term analytics backend and retention objectives;
 - optional business-attribution helper;
 - provider billing reconciliation and private-rate encryption.

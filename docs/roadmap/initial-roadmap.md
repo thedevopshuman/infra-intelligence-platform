@@ -20,6 +20,12 @@ map observed service/resource identity to separate immutable application/team
 attribution facts, including explicit unallocated coverage. Bounded
 generation-bound allocation queries, cost joins, privacy-safe export
 dimensions, and application/team dashboard views are executable.
+The local Phase C gate is also executable: a separately authenticated
+OpenAI-shaped trace reaches the same normalized ledger, data-driven price
+engine, protected allocation views, and provider-neutral Grafana dashboard.
+An isolated pinned official OpenAI Python profile proves offline SDK and
+instrumentation interoperability while conservatively leaving missing usage
+meters unresolved; live-provider and streaming qualification remain.
 
 ## Phase 0 — foundation (current repository)
 

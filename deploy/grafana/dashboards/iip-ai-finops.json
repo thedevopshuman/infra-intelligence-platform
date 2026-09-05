@@ -141,9 +141,9 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (service_name,gen_ai_response_model,cloud_region,deployment_environment_name) (iip_ai_cost_amount{job=\"iip-ai-economics\"}) / 1e9",
+          "expr": "sum by (gen_ai_provider_name,service_name,gen_ai_response_model,cloud_region,deployment_environment_name) (iip_ai_cost_amount{job=\"iip-ai-economics\"}) / 1e9",
           "instant": true,
-          "legendFormat": "{{service_name}} · {{gen_ai_response_model}} · {{cloud_region}} · {{deployment_environment_name}}",
+          "legendFormat": "{{gen_ai_provider_name}} · {{service_name}} · {{gen_ai_response_model}} · {{cloud_region}} · {{deployment_environment_name}}",
           "range": false,
           "refId": "A"
         }
@@ -288,9 +288,9 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (iip_ai_cost_status) (iip_ai_cost_requests{job=\"iip-ai-economics\"})",
+          "expr": "sum by (gen_ai_provider_name,iip_ai_cost_status) (iip_ai_cost_requests{job=\"iip-ai-economics\"})",
           "instant": true,
-          "legendFormat": "{{iip_ai_cost_status}}",
+          "legendFormat": "{{gen_ai_provider_name}} · {{iip_ai_cost_status}}",
           "range": false,
           "refId": "A"
         },
@@ -417,7 +417,7 @@
   },
   "timepicker": {},
   "timezone": "utc",
-  "title": "IIP AI FinOps — Bedrock V0",
+  "title": "IIP AI FinOps — Multi-provider V0",
   "uid": "iip-ai-finops",
   "version": 1,
   "weekStart": ""

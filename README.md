@@ -24,12 +24,13 @@ The operational console and SDKs expose public non-secret authentication discove
 
 ## AI economics extension
 
-The repository now includes the contract boundary and first executable intake
-for a metadata-only, OpenTelemetry-native AI FinOps flow. The first target is
-AWS Bedrock → OTLP traces → normalized usage → data-driven calculated cost →
-one evidence-backed saving → Grafana. IIP remains outside the inference path
+The repository now includes a metadata-only, OpenTelemetry-native AI FinOps
+flow. Bedrock- and OpenAI-shaped traces reach the same normalized usage ledger,
+data-driven calculated-cost engine, protected application/team allocation,
+one evidence-backed saving rule, and provider-neutral Grafana dashboard. IIP
+remains outside the inference path
 and does not collect prompts or responses by default. An isolated, tenant-bound
-`/v1/traces` route now normalizes approved Bedrock-shaped GenAI client metadata
+`/v1/traces` route now normalizes approved GenAI client metadata
 and atomically stores usage plus its event. A tenant-explicit background cost
 service now loads protected versioned catalogs and atomically records
 explainable calculated estimates plus value-minimized events. A separate
@@ -44,19 +45,24 @@ revalidates every cited usage and cost fact, and atomically records one
 evidence-backed saving plus a value-minimized event. The same bounded profile
 now exports request/token volume, pricing coverage, calculated cost, change,
 and potential saving through the existing OTLP metrics boundary. A disposable
-Collector/Prometheus/Loki/Grafana topology and deterministic Bedrock-shaped
+Collector/Prometheus/Loki/Grafana topology and deterministic multi-provider
 full-flow gate now renders the usage, cost, change, saving, coverage, and protected
-application/team allocation dashboard. A separate
+application/team allocation dashboard. Separate
 no-network gate exercises the exact pinned official botocore `Converse`
 instrumentation, its shipped legacy provider attribute and service-specific
-scope, receiver normalization, and asynchronous exporter failure isolation.
-Live model/region and streaming qualification remain. See the
+scope; another exercises the real OpenAI Python client and official
+chat-completions instrumentation. Both prove receiver normalization and
+asynchronous exporter failure isolation without importing provider SDKs into
+the product image. Missing upstream token breakdowns remain unresolved rather
+than becoming zero. Live model/region, streaming, private endpoint, and invoice
+qualification remain. See the
 [receiver runbook](docs/operations/ai-usage-receiver.md),
 [attribution runbook](docs/operations/ai-attribution.md),
 [cost-engine runbook](docs/operations/ai-cost-engine.md),
 [savings-engine runbook](docs/operations/ai-savings-engine.md),
 [local AI FinOps dashboard](docs/operations/ai-finops-local-demo.md),
 [Bedrock instrumentation qualification](docs/operations/bedrock-instrumentation-qualification.md),
+[OpenAI instrumentation qualification](docs/operations/openai-instrumentation-qualification.md),
 [telemetry contract](docs/specifications/ai-economics-telemetry-contract.md),
 [product direction](docs/product/ai-finops-vision.md),
 [architecture](docs/architecture/ai-economics.md), [contracts](docs/specifications/ai-economics-contracts.md),
@@ -93,6 +99,7 @@ make test-otel
 make test-otlp-receiver
 make test-ai-finops
 make test-bedrock-instrumentation
+make test-openai-instrumentation
 make test-prometheus
 make test-loki
 make test-plugin-compatibility
@@ -144,7 +151,7 @@ The API authenticates a Bearer credential into actor, tenant, and role context, 
 
 ## Current decisions and open questions
 
-Accepted foundations live in [`docs/decisions`](docs/decisions/README.md). PostgreSQL is accepted as the initial resource/event and operational record substrate, the deterministic investigator/non-mutating action boundary is accepted as the safety baseline, and OTLP through an OpenTelemetry Collector is the accepted telemetry-portability direction. Tenant-scoped outbox dispatch with local structured-log and authenticated HTTPS publishers, finite failure quarantine, value-minimized delivery-health reporting, transport-neutral rolling publication objectives, exact-generation governed replay, optional outbound ingestion-metrics and terminal-investigation trace export, automatic exact-source freshness sampling, privileged process-local plus shared-store API/worker exporter-delivery health, rolling sampled export objectives, a two-window sampled export burn-rate report, and a customer-Collector-observed sending-queue depth and send-loss objective, authenticated runtime/release identity, replaceable historical metric/log/Kubernetes Event/context evidence ports, the first Prometheus-compatible metric and Loki and OpenSearch log adapters, isolated tenant-bound inbound OTLP metrics/logs receivers plus metadata-only GenAI usage trace intake with CA-verified SPIFFE mTLS, separate channel credentials, intermediate client-chain and fail-closed CRL freshness/rollout, PostgreSQL-before-success durability, and a persistent customer-Collector queue profile, a live exact-scope Kubernetes Event API adapter, a protected file-context adapter, OIDC/JWKS API authentication, public console discovery with Authorization Code + `S256` PKCE, an external HTTPS policy-decision adapter with executable local real-TLS compatibility evidence, an external HTTPS credential-broker client with explicitly projected workload identity and executable local real-TLS compatibility evidence, auditable cross-signal request and protected-catalog planning, tenant-scoped workflow workers, one-shot governed execution and non-replaying action reconciliation, the opt-in verified Kubernetes restart adapter, a signed no-network plugin runner with durable invocation ownership, cancellation, post-deadline reconciliation, invocation-local host-mediated read connectivity, proposal-only action mediation, and executable exact-host compatibility evidence, unit-aware threshold assessment, ordered two-window and fixed-period or calendar-day-aligned seasonal baseline comparison, event-condition correlation, conservative document/log/change-count correlation, and generation-bound AI cost allocation with application/team dashboard views are executable; a production credential issuer and customer-specific issuer/broker/policy/PKI/Collector qualification, production receiver interoperability, remote repository adapters, additional production backends/signals, regional exporter aggregation, live Bedrock qualification, model-provider selection, customer action-provider interoperability, licensing, company, and brand decisions remain explicit roadmap work.
+Accepted foundations live in [`docs/decisions`](docs/decisions/README.md). PostgreSQL is accepted as the initial resource/event and operational record substrate, the deterministic investigator/non-mutating action boundary is accepted as the safety baseline, and OTLP through an OpenTelemetry Collector is the accepted telemetry-portability direction. Tenant-scoped outbox dispatch with local structured-log and authenticated HTTPS publishers, finite failure quarantine, value-minimized delivery-health reporting, transport-neutral rolling publication objectives, exact-generation governed replay, optional outbound ingestion-metrics and terminal-investigation trace export, automatic exact-source freshness sampling, privileged process-local plus shared-store API/worker exporter-delivery health, rolling sampled export objectives, a two-window sampled export burn-rate report, and a customer-Collector-observed sending-queue depth and send-loss objective, authenticated runtime/release identity, replaceable historical metric/log/Kubernetes Event/context evidence ports, the first Prometheus-compatible metric and Loki and OpenSearch log adapters, isolated tenant-bound inbound OTLP metrics/logs receivers plus metadata-only GenAI usage trace intake with CA-verified SPIFFE mTLS, separate channel credentials, intermediate client-chain and fail-closed CRL freshness/rollout, PostgreSQL-before-success durability, and a persistent customer-Collector queue profile, a live exact-scope Kubernetes Event API adapter, a protected file-context adapter, OIDC/JWKS API authentication, public console discovery with Authorization Code + `S256` PKCE, an external HTTPS policy-decision adapter with executable local real-TLS compatibility evidence, an external HTTPS credential-broker client with explicitly projected workload identity and executable local real-TLS compatibility evidence, auditable cross-signal request and protected-catalog planning, tenant-scoped workflow workers, one-shot governed execution and non-replaying action reconciliation, the opt-in verified Kubernetes restart adapter, a signed no-network plugin runner with durable invocation ownership, cancellation, post-deadline reconciliation, invocation-local host-mediated read connectivity, proposal-only action mediation, and executable exact-host compatibility evidence, unit-aware threshold assessment, ordered two-window and fixed-period or calendar-day-aligned seasonal baseline comparison, event-condition correlation, conservative document/log/change-count correlation, and generation-bound AI cost allocation plus provider-neutral Bedrock/OpenAI-shaped dashboard views are executable; a production credential issuer and customer-specific issuer/broker/policy/PKI/Collector qualification, production receiver interoperability, remote repository adapters, additional production backends/signals, regional exporter aggregation, live Bedrock/OpenAI qualification, model-provider selection, customer action-provider interoperability, licensing, company, and brand decisions remain explicit roadmap work.
 
 Evidence artifact retention is also accepted as a disabled-by-default, tenant-scoped lifecycle that preserves immutable metadata and citations while expiring only bounded artifact bodies under policy and audit.
 

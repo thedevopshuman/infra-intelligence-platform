@@ -8,12 +8,13 @@
 AI economics is a new knowledge flow inside IIP, not a provider-specific
 subsystem. It reuses the existing isolated OTLP intake, tenant channel,
 PostgreSQL durability, CloudEvents, evidence, export-health, SDK, and deployment
-patterns. The first adapter recognizes AWS Bedrock attributes; normalized
-records and cost calculation remain provider neutral.
+patterns. The receiver recognizes the standard OpenTelemetry provider
+attribute plus the exact legacy alias emitted by the pinned Bedrock profile;
+normalized records and cost calculation remain provider neutral.
 
 ```mermaid
 flowchart LR
-    App["Customer application"] -->|direct model request| Bedrock["AWS Bedrock"]
+    App["Customer application"] -->|direct model request| Provider["Bedrock, OpenAI, or another provider"]
     App -. "metadata-only GenAI span" .-> Collector["Customer OpenTelemetry Collector"]
     Collector -->|"OTLP/HTTP traces with channel identity"| Receiver["Isolated IIP trace receiver"]
     Receiver --> Normalizer["GenAI usage normalizer"]
@@ -165,13 +166,16 @@ identities never become labels. More than the configured cohort maximum
 suppresses the aggregate rather than presenting a truncated total. Recording
 or export failure is isolated from ledger and rule outcomes.
 
-The reference Compose topology routes Bedrock-shaped spans through an upstream
-Collector into the isolated receiver, exports the worker's bounded aggregates
-back through OTLP, and renders them through Prometheus and a provisioned
-Grafana dashboard. Loki is provisioned as the replaceable log destination but
-is not an accounting authority. The time-relative fixture includes priced and
-unpriced scopes, idempotent replay, and a separately rejected content span.
-This proves the local contract flow, not live AWS instrumentation compatibility.
+The reference Compose topology routes independently authenticated Bedrock- and
+OpenAI-shaped spans through an upstream Collector into the same isolated
+receiver, exports the worker's bounded aggregates back through OTLP, and
+renders them through Prometheus and one provisioned provider-neutral Grafana
+dashboard. Loki is provisioned as the replaceable log destination but is not
+an accounting authority. The time-relative fixture includes two protected
+ownership mappings, priced and unpriced scopes, idempotent replay, and rejected
+content spans for both channels. Pricing selection is solely catalog-driven;
+the kernel contains no provider pricing branch. This proves the local contract
+flow, not live provider instrumentation or invoice compatibility.
 
 The exact pinned Python botocore `Converse` profile now has a separate
 no-network interoperability gate. It exposed two upstream facts hidden by the
@@ -180,6 +184,15 @@ arrives as legacy `gen_ai.system`. The adapter normalizes that alias with
 conflict rejection. Missing cache/reasoning subsets remain missing, so this
 profile is not promoted to exact-cost eligibility. Live model/region and
 `ConverseStream` qualification remain separate evidence.
+
+The pinned official OpenAI Python chat-completions profile also has a separate
+no-network SDK interoperability gate. It emits the standard provider identity
+and input/output totals but not every cache-write and reasoning breakdown
+needed by the exact cost engine. Those fields remain missing and the official
+profile remains partial. The complete OpenAI-shaped pricing fixture is separate
+synthetic evidence and cannot upgrade that upstream compatibility claim. Live
+OpenAI, streaming, Responses API, and private-endpoint qualification remain
+separate evidence.
 
 ## Privacy and security
 

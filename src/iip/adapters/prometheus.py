@@ -387,7 +387,7 @@ class PrometheusTelemetryMetricsBackend:
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "iip-prometheus-adapter/0.64.0",
+            "User-Agent": "iip-prometheus-adapter/0.65.0",
         }
         if integration.credential_ref is not None:
             try:

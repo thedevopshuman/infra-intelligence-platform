@@ -1,19 +1,20 @@
 # Local AI FinOps reference dashboard
 
-**Status:** Executable disposable Phase A reference topology
+**Status:** Executable disposable Phase A–C reference topology
 
 This Docker Desktop profile demonstrates the complete local metadata path:
 
 ```text
-Bedrock-shaped OTel spans -> Collector -> isolated IIP receiver -> PostgreSQL
+Bedrock/OpenAI-shaped OTel spans -> protected Collector routes -> isolated IIP receiver -> PostgreSQL
 -> attribution and cost workers -> context-growth rule -> allocation reports
 -> OTLP metrics -> Collector
 -> Prometheus -> Grafana
 ```
 
-It uses synthetic Bedrock-shaped spans and the repository's explicitly gated
-test price catalog. It does not call AWS, represent current public pricing, or
-claim live Bedrock auto-instrumentation compatibility.
+It uses synthetic Bedrock- and OpenAI-shaped spans and the repository's
+explicitly gated multi-provider test price catalog. It does not call either
+provider, represent current public pricing, or claim live auto-instrumentation
+compatibility.
 
 ## Start the visible demo
 
@@ -72,10 +73,11 @@ make test-ai-finops PYTHON=.venv/bin/python
 ```
 
 It validates Collector and Prometheus configuration before startup, then
-asserts eight unique usage facts, four priced and four unpriced cost facts,
-immutable application/team attribution, one committed finding, exact
-current-window and allocation aggregates, visible unpriced/unallocated
-coverage, dashboard provisioning, Loki readiness, and privacy-safe labels.
+asserts twelve unique usage facts, eight priced and four unpriced cost facts,
+two immutable application/team mappings, one committed finding, exact
+current-window and allocation aggregates, Bedrock/OpenAI provider coverage,
+visible unpriced/unallocated coverage, dashboard provisioning, Loki readiness,
+and privacy-safe labels.
 
 ## Components and replacement boundaries
 

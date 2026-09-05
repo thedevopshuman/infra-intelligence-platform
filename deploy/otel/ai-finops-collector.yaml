@@ -7,6 +7,10 @@ receivers:
     protocols:
       http:
         endpoint: 0.0.0.0:4318
+  otlp/openai:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4320
 
 processors:
   memory_limiter:
@@ -22,6 +26,16 @@ exporters:
     endpoint: http://ai-usage-receiver:4318
     headers:
       Authorization: Bearer ${env:IIP_AI_USAGE_CHANNEL_TOKEN}
+    timeout: 5s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 5s
+      max_elapsed_time: 30s
+  otlp_http/iip_openai:
+    endpoint: http://ai-usage-receiver:4318
+    headers:
+      Authorization: Bearer ${env:IIP_OPENAI_USAGE_CHANNEL_TOKEN}
     timeout: 5s
     retry_on_failure:
       enabled: true
@@ -47,10 +61,14 @@ service:
     logs:
       level: info
   pipelines:
-    traces:
+    traces/bedrock:
       receivers: [otlp]
       processors: [memory_limiter, batch]
       exporters: [otlp_http/iip]
+    traces/openai:
+      receivers: [otlp/openai]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/iip_openai]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]

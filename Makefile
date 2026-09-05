@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -19,9 +19,11 @@ help:
 	@echo "test-backup-restore Measure and verify PostgreSQL recovery with Docker Desktop"
 	@echo "test-otel     Send reference metrics and traces to an OpenTelemetry Collector"
 	@echo "test-otlp-receiver Send official OTLP metrics, logs, and AI usage-to-cost traces"
-	@echo "test-ai-finops Prove the local Bedrock-to-Grafana AI economics slice"
+	@echo "test-ai-finops Prove the local multi-provider AI economics slice"
 	@echo "test-bedrock-instrumentation Qualify pinned official Bedrock instrumentation offline"
 	@echo "test-bedrock-live Make one explicitly enabled live Bedrock compatibility call"
+	@echo "test-openai-instrumentation Qualify pinned official OpenAI instrumentation offline"
+	@echo "test-openai-live Make one explicitly enabled live OpenAI compatibility call"
 	@echo "test-prometheus Query a real Prometheus server through the evidence adapter"
 	@echo "test-collector-queue-loss Drive a real Collector's own self-metrics into a queue/loss report"
 	@echo "test-loki     Query a real Loki server through the log evidence adapter"
@@ -41,7 +43,7 @@ help:
 	@echo "dev-status    Show the durable local stack status"
 	@echo "dev-credentials Show the local console URL and operator token"
 	@echo "dev-down      Stop the local stack while preserving its database"
-	@echo "ai-finops-up  Start and seed the disposable Bedrock-to-Grafana slice"
+	@echo "ai-finops-up  Start and seed the disposable multi-provider AI economics slice"
 	@echo "ai-finops-status Show the local AI FinOps containers"
 	@echo "ai-finops-down Stop and remove the disposable AI FinOps slice"
 	@echo "package-chart Package the Helm chart under dist/"
@@ -101,6 +103,14 @@ test-bedrock-instrumentation:
 test-bedrock-live:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_BEDROCK_COMPATIBILITY_MODE=live \
 		scripts/test_bedrock_instrumentation.sh
+
+test-openai-instrumentation:
+	IIP_DOCKER_BIN=$(DOCKER) IIP_OPENAI_COMPATIBILITY_MODE=offline \
+		scripts/test_openai_instrumentation.sh
+
+test-openai-live:
+	IIP_DOCKER_BIN=$(DOCKER) IIP_OPENAI_COMPATIBILITY_MODE=live \
+		scripts/test_openai_instrumentation.sh
 
 test-prometheus:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_prometheus.sh

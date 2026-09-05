@@ -10,18 +10,25 @@ IIP_AI_FINOPS_POSTGRES_PORT=${IIP_AI_FINOPS_TEST_POSTGRES_PORT:-25435}
 IIP_AI_FINOPS_API_PORT=${IIP_AI_FINOPS_TEST_API_PORT:-28082}
 IIP_AI_FINOPS_RECEIVER_PORT=${IIP_AI_FINOPS_TEST_RECEIVER_PORT:-24320}
 IIP_AI_FINOPS_COLLECTOR_PORT=${IIP_AI_FINOPS_TEST_COLLECTOR_PORT:-24319}
+IIP_AI_FINOPS_OPENAI_COLLECTOR_PORT=${IIP_AI_FINOPS_TEST_OPENAI_COLLECTOR_PORT:-24321}
 IIP_AI_FINOPS_COLLECTOR_HEALTH_PORT=${IIP_AI_FINOPS_TEST_COLLECTOR_HEALTH_PORT:-23134}
 IIP_AI_FINOPS_PROMETHEUS_PORT=${IIP_AI_FINOPS_TEST_PROMETHEUS_PORT:-29091}
 IIP_AI_FINOPS_LOKI_PORT=${IIP_AI_FINOPS_TEST_LOKI_PORT:-23101}
 IIP_AI_FINOPS_GRAFANA_PORT=${IIP_AI_FINOPS_TEST_GRAFANA_PORT:-23000}
 export IIP_AI_FINOPS_ANCHOR IIP_AI_FINOPS_POSTGRES_PORT IIP_AI_FINOPS_API_PORT
 export IIP_AI_FINOPS_RECEIVER_PORT IIP_AI_FINOPS_COLLECTOR_PORT
+export IIP_AI_FINOPS_OPENAI_COLLECTOR_PORT
 export IIP_AI_FINOPS_COLLECTOR_HEALTH_PORT IIP_AI_FINOPS_PROMETHEUS_PORT
 export IIP_AI_FINOPS_LOKI_PORT IIP_AI_FINOPS_GRAFANA_PORT
 
 export IIP_AI_USAGE_CHANNEL_TOKEN
 IIP_AI_USAGE_CHANNEL_TOKEN=$(
     "$IIP_TEST_PYTHON" scripts/ai_finops_fixture.py configuration token \
+        --anchor "$IIP_AI_FINOPS_ANCHOR"
+)
+export IIP_OPENAI_USAGE_CHANNEL_TOKEN
+IIP_OPENAI_USAGE_CHANNEL_TOKEN=$(
+    "$IIP_TEST_PYTHON" scripts/ai_finops_fixture.py configuration openai-token \
         --anchor "$IIP_AI_FINOPS_ANCHOR"
 )
 export IIP_AI_USAGE_RECEIVER_CHANNELS_JSON
@@ -61,6 +68,7 @@ cleanup
     -f "$IIP_COMPOSE_FILE" config --quiet
 "$IIP_DOCKER_BIN" run --rm --network none --read-only \
     -e IIP_AI_USAGE_CHANNEL_TOKEN="$IIP_AI_USAGE_CHANNEL_TOKEN" \
+    -e IIP_OPENAI_USAGE_CHANNEL_TOKEN="$IIP_OPENAI_USAGE_CHANNEL_TOKEN" \
     -v "$PWD/deploy/otel/ai-finops-collector.yaml:/etc/otelcol-contrib/config.yaml:ro" \
     otel/opentelemetry-collector-contrib@sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5 \
     validate --config=/etc/otelcol-contrib/config.yaml
@@ -96,6 +104,7 @@ PYTHONPATH=src:sdks/python/src "$IIP_TEST_PYTHON" \
     scripts/ai_finops_fixture.py send \
     --anchor "$IIP_AI_FINOPS_ANCHOR" \
     --collector "http://127.0.0.1:${IIP_AI_FINOPS_COLLECTOR_PORT}" \
+    --openai-collector "http://127.0.0.1:${IIP_AI_FINOPS_OPENAI_COLLECTOR_PORT}" \
     --receiver "http://127.0.0.1:${IIP_AI_FINOPS_RECEIVER_PORT}"
 
 if ! PYTHONPATH=src:sdks/python/src "$IIP_TEST_PYTHON" \
@@ -112,4 +121,4 @@ if ! PYTHONPATH=src:sdks/python/src "$IIP_TEST_PYTHON" \
     exit 1
 fi
 
-echo "Bedrock-shaped OTLP usage, protected attribution, exact cost, visible unpriced/unallocated coverage, evidence-backed saving, and Grafana dashboard passed"
+echo "Bedrock- and OpenAI-shaped OTLP usage, protected attribution, data-driven cost, visible unpriced/unallocated coverage, evidence-backed saving, and one provider-neutral Grafana dashboard passed"

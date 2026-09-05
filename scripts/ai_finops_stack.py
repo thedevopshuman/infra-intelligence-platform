@@ -35,6 +35,9 @@ def create_configuration(anchor: datetime | None = None) -> Path:
         "COMPOSE_PROJECT_NAME": PROJECT,
         "IIP_AI_FINOPS_ANCHOR": ai_finops_fixture.format_timestamp(selected),
         "IIP_AI_USAGE_CHANNEL_TOKEN": ai_finops_fixture.CHANNEL_TOKEN,
+        "IIP_OPENAI_USAGE_CHANNEL_TOKEN": (
+            ai_finops_fixture.OPENAI_CHANNEL_TOKEN
+        ),
         "IIP_AI_USAGE_RECEIVER_CHANNELS_JSON": json.dumps(
             ai_finops_fixture.channel_configuration(),
             separators=(",", ":"),
@@ -137,6 +140,7 @@ def start() -> None:
     ai_finops_fixture.send_fixture(
         anchor,
         "http://127.0.0.1:14319",
+        "http://127.0.0.1:14321",
         "http://127.0.0.1:14320",
     )
     ai_finops_fixture.verify_fixture(

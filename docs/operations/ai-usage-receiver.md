@@ -1,7 +1,7 @@
 # AI usage OTLP trace receiver
 
 **Status:** Executable metadata-only reference intake; disabled by default
-**Provider qualification:** Bedrock-shaped deterministic fixture; live AWS qualification pending
+**Provider qualification:** Bedrock/OpenAI deterministic fixture and pinned offline SDK profiles; live-provider qualification pending
 
 The AI usage receiver accepts selected OpenTelemetry GenAI client spans at
 `POST /v1/traces` and commits one immutable `AiUsageRecord` plus one
@@ -12,7 +12,7 @@ PostgreSQL readiness gate used by metrics and logs.
 
 IIP is not an inference proxy. Customer applications send telemetry
 asynchronously to their Collector. A stopped or rejecting IIP receiver must
-not make a Bedrock request fail; that property belongs to the application's
+not make a provider request fail; that property belongs to the application's
 non-blocking telemetry setup and the Collector's bounded retry/queue policy.
 
 ## Privacy boundary
@@ -92,6 +92,11 @@ cache-write, or reasoning subsets. Its qualification configuration therefore
 uses an empty `zeroWhenAbsent` list and produces partial, non-exact-cost-eligible
 usage. See the [Bedrock instrumentation qualification](bedrock-instrumentation-qualification.md).
 
+The pinned official OpenAI chat-completions profile also leaves unreported
+cache-write and reasoning meters missing and remains partial. Its deployment
+supplies `cloud.region=global` rather than inferring geography from an endpoint.
+See the [OpenAI instrumentation qualification](openai-instrumentation-qualification.md).
+
 ## Run the isolated process
 
 Apply all packaged migrations through `0021_ai_attribution_ledger.sql`, then
@@ -169,6 +174,7 @@ Helm rendering. With Docker Desktop running:
 ```bash
 make test-otlp-receiver PYTHON=.venv/bin/python
 make test-bedrock-instrumentation
+make test-openai-instrumentation
 ```
 
 The Docker profile also starts the tenant-explicit workflow worker with the
@@ -179,6 +185,7 @@ waits on cost calculation.
 
 The Docker gate sends metrics, logs, and a GenAI trace through official Python
 OTLP exporters over the existing intermediate-CA and CRL-tested receiver, then
-queries PostgreSQL for the committed metadata-only usage record. A real
-Bedrock `Converse`/`ConverseStream` auto-instrumentation qualification remains
-an explicit Phase A exit item.
+queries PostgreSQL for the committed metadata-only usage record. Offline
+exact-profile qualification covers botocore `Converse` and OpenAI Python
+`chat.completions.create`. Live Bedrock/OpenAI behavior and streaming remain
+explicit provider qualification work.

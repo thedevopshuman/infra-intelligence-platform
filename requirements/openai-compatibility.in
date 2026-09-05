@@ -1,0 +1,6 @@
+-r verify.in
+
+# Exact provider client and official OpenTelemetry instrumentation qualified by
+# the isolated OpenAI compatibility gate. Keep this outside the product image.
+openai==3.8.0
+opentelemetry-instrumentation-genai-openai==1.1b0

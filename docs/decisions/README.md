@@ -98,3 +98,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0092](0092-bedrock-instrumentation-compatibility-profile.md) | Accepted | Qualify exact official botocore Bedrock profiles without overstating offline or incomplete-usage evidence |
 | [0093](0093-protected-effective-time-ai-attribution.md) | Accepted | Resolve observed AI service identity to immutable application/team facts under protected effective-time policy |
 | [0094](0094-ledger-backed-ai-allocation-reporting.md) | Accepted | Build bounded application/team reports from tenant-scoped immutable AI economics ledgers |
+| [0095](0095-openai-instrumentation-compatibility-profile.md) | Accepted | Qualify one exact official OpenAI instrumentation profile without importing its SDK or guessing missing usage meters |

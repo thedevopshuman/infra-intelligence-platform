@@ -39,29 +39,45 @@ class AiFinOpsTopologyTests(unittest.TestCase):
                 ai_finops_fixture.UNKNOWN_MODEL,
             ),
         )
+        openai = receiver.authenticate_bearer(
+            ai_finops_fixture.OPENAI_CHANNEL_TOKEN
+        )
+        self.assertEqual(openai.actor.tenant_id, "local")
+        self.assertEqual(openai.provider, "openai")
+        self.assertEqual(openai.model_ids, (ai_finops_fixture.OPENAI_MODEL,))
 
         policies = ai_finops_fixture.attribution_policy_configuration(anchor)
         attribution = validate_ai_attribution_policy(policies["policies"][0])
         self.assertEqual(attribution.tenant_id, "local")
+        self.assertEqual(len(attribution.rules), 2)
         self.assertEqual(
             attribution.rules[0].deployment_environment,
             "ai-finops-demo",
+        )
+        self.assertEqual(
+            {rule.service_name for rule in attribution.rules},
+            {"support-assistant", "order-copilot"},
         )
 
         catalogs = ai_finops_fixture.price_catalog_configuration(anchor)
         catalog = validate_ai_price_catalog(catalogs["catalogs"][0])
         self.assertEqual(catalog.tenant_id, "local")
+        self.assertEqual(
+            {entry.provider for entry in catalog.entries},
+            {"aws.bedrock", "openai"},
+        )
         profiles = ai_finops_fixture.savings_profile_configuration(anchor)
         validated = tuple(
             validate_context_growth_profile(item)
             for item in profiles["profiles"]
         )
-        self.assertEqual(len(validated), 2)
+        self.assertEqual(len(validated), 3)
         self.assertEqual(
             {item.profile_id for item in validated},
             {
                 "support-assistant-context",
                 "research-assistant-coverage",
+                "order-copilot-coverage",
             },
         )
 
@@ -102,6 +118,9 @@ class AiFinOpsTopologyTests(unittest.TestCase):
             "iip_ai_allocation_cost_amount",
         ):
             self.assertTrue(any(metric in expression for expression in expressions))
+        self.assertTrue(
+            any("gen_ai_provider_name" in expression for expression in expressions)
+        )
         serialized = json.dumps(dashboard).lower()
         for prohibited in ("trace_id", "span_id", "request_id", "gen_ai.prompt"):
             self.assertNotIn(prohibited, serialized)
@@ -141,8 +160,12 @@ class AiFinOpsTopologyTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("${env:IIP_AI_USAGE_CHANNEL_TOKEN}", collector)
+        self.assertIn("${env:IIP_OPENAI_USAGE_CHANNEL_TOKEN}", collector)
         self.assertNotIn(ai_finops_fixture.CHANNEL_TOKEN, collector)
+        self.assertNotIn(ai_finops_fixture.OPENAI_CHANNEL_TOKEN, collector)
         self.assertIn("exporters: [otlp_http/iip]", collector)
+        self.assertIn("exporters: [otlp_http/iip_openai]", collector)
+        self.assertIn("receivers: [otlp/openai]", collector)
         self.assertIn("exporters: [prometheus]", collector)
         self.assertIn("exporters: [otlp_http/loki]", collector)
 
@@ -172,8 +195,12 @@ class AiFinOpsTopologyTests(unittest.TestCase):
                 values["IIP_AI_USAGE_CHANNEL_TOKEN"],
                 ai_finops_fixture.CHANNEL_TOKEN,
             )
+            self.assertEqual(
+                values["IIP_OPENAI_USAGE_CHANNEL_TOKEN"],
+                ai_finops_fixture.OPENAI_CHANNEL_TOKEN,
+            )
             profiles = json.loads(values["IIP_AI_SAVINGS_PROFILES_JSON"])
-            self.assertEqual(len(profiles["profiles"]), 2)
+            self.assertEqual(len(profiles["profiles"]), 3)
             policies = json.loads(values["IIP_AI_ATTRIBUTION_POLICIES_JSON"])
             self.assertEqual(len(policies["policies"]), 1)
 
@@ -204,6 +231,7 @@ class AiFinOpsTopologyTests(unittest.TestCase):
             "28082",
             "24320",
             "24319",
+            "24321",
             "23134",
             "29091",
             "23101",
@@ -211,6 +239,7 @@ class AiFinOpsTopologyTests(unittest.TestCase):
         ):
             self.assertIn(port, runner)
         self.assertIn("IIP_AI_FINOPS_TEST_COLLECTOR_PORT", runner)
+        self.assertIn("IIP_AI_FINOPS_TEST_OPENAI_COLLECTOR_PORT", runner)
 
 
 if __name__ == "__main__":

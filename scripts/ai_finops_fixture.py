@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate and exercise the deterministic Bedrock-shaped AI FinOps slice."""
+"""Generate and exercise the deterministic multi-provider AI FinOps slice."""
 
 from __future__ import annotations
 
@@ -18,16 +18,22 @@ CHANNEL_TOKEN = "ai-finops-channel-token-0123456789abcdef"
 CHANNEL_TOKEN_SHA256 = (
     "sha256:dcc4a1c70125fb81b9ba226ac4b3bb9d709b3c84c7d60eeffd87d8688d5f806a"
 )
+OPENAI_CHANNEL_TOKEN = "openai-ai-finops-channel-token-0123456789abcdef"
+OPENAI_CHANNEL_TOKEN_SHA256 = (
+    "sha256:b329187f7d36b57b5da0efe454a1229980d2718431070dde94050d4429af454a"
+)
 CONTROL_TOKEN = "ai-finops-local-operator-token-0123456789abcdef"
 CONTROL_TOKEN_SHA256 = (
     "sha256:d52e86d5eeda090d11d9c961632390e6da1356df217d662abde728312befb25d"
 )
 KNOWN_MODEL = "example.foundation-model-v1:0"
 UNKNOWN_MODEL = "unpriced.foundation-model-v1:0"
+OPENAI_MODEL = "example-openai-model"
 CATALOG_ID = "apc_11111111111111111111111111111111"
 INSTRUMENTATION_SCOPE = (
     "opentelemetry.instrumentation.botocore.bedrock-runtime"
 )
+OPENAI_INSTRUMENTATION_SCOPE = "opentelemetry.util.genai.handler"
 
 
 def _parse_anchor(value: str) -> datetime:
@@ -114,7 +120,54 @@ def channel_configuration() -> Mapping[str, object]:
                     "maxClockSkewSeconds": 30,
                     "maxProcessingSeconds": 10,
                 },
-            }
+            },
+            {
+                "channelId": "openai-ai-finops-local",
+                "tokenSha256": OPENAI_CHANNEL_TOKEN_SHA256,
+                "tenantId": "local",
+                "integrationId": "openai-ai-finops-local",
+                "provider": "openai",
+                "semanticConventionVersion": "1.37.0-development",
+                "services": [
+                    {
+                        "otlpName": "order-copilot",
+                        "serviceName": "order-copilot",
+                        "serviceNamespace": "commerce",
+                        "deploymentEnvironment": "ai-finops-demo",
+                        "resourceRefs": [],
+                    }
+                ],
+                "models": [OPENAI_MODEL],
+                "operations": ["chat"],
+                "regions": ["global"],
+                "instrumentationScopes": [OPENAI_INSTRUMENTATION_SCOPE],
+                "usageAttributes": {
+                    "inputTokens": "gen_ai.usage.input_tokens",
+                    "outputTokens": "gen_ai.usage.output_tokens",
+                    "cacheReadInputTokens": (
+                        "gen_ai.usage.cache_read.input_tokens"
+                    ),
+                    "cacheWriteInputTokens": (
+                        "gen_ai.usage.cache_creation.input_tokens"
+                    ),
+                    "reasoningOutputTokens": "gen_ai.usage.reasoning_tokens",
+                    "zeroWhenAbsent": [],
+                    "reportedBy": "provider",
+                },
+                "commercial": {
+                    "serviceTier": "default",
+                    "routingMode": "global",
+                    "purchaseMode": "on-demand",
+                },
+                "limits": {
+                    "maxRequestBytes": 1_048_576,
+                    "maxSpans": 100,
+                    "maxAttributesPerSpan": 64,
+                    "maxAgeSeconds": 900,
+                    "maxClockSkewSeconds": 30,
+                    "maxProcessingSeconds": 10,
+                },
+            },
         ]
     }
 
@@ -131,8 +184,41 @@ def price_catalog_configuration(anchor: datetime) -> Mapping[str, object]:
     catalog["spec"]["source"]["retrievedAt"] = format_timestamp(
         anchor - timedelta(minutes=11)
     )
+    catalog["spec"]["source"][
+        "locator"
+    ] = "urn:iip:pricing-fixture:multi-provider:v1"
+    catalog["spec"]["source"]["contentHash"] = "sha256:" + ("3" * 64)
     catalog["spec"]["entries"][0]["effectiveFrom"] = format_timestamp(
         anchor - timedelta(days=1)
+    )
+    catalog["spec"]["entries"].append(
+        {
+            "id": "openai.example-openai-model.global.on-demand",
+            "provider": "openai",
+            "modelId": OPENAI_MODEL,
+            "regions": ["global"],
+            "serviceTiers": ["default"],
+            "routingModes": ["global"],
+            "purchaseModes": ["on-demand"],
+            "effectiveFrom": format_timestamp(anchor - timedelta(days=1)),
+            "rates": {
+                "uncachedInputTokens": {
+                    "priceSubunitsPerMillionTokens": 1_000_000_000
+                },
+                "cacheReadInputTokens": {
+                    "priceSubunitsPerMillionTokens": 100_000_000
+                },
+                "cacheWriteInputTokens": {
+                    "priceSubunitsPerMillionTokens": 1_000_000_000
+                },
+                "nonReasoningOutputTokens": {
+                    "priceSubunitsPerMillionTokens": 4_000_000_000
+                },
+                "reasoningOutputTokens": {
+                    "priceSubunitsPerMillionTokens": 4_000_000_000
+                },
+            },
+        }
     )
     return {"catalogs": [catalog]}
 
@@ -149,11 +235,37 @@ def attribution_policy_configuration(anchor: datetime) -> Mapping[str, object]:
     policy["spec"]["source"]["retrievedAt"] = format_timestamp(
         anchor - timedelta(minutes=11)
     )
+    policy["spec"]["source"][
+        "locator"
+    ] = "urn:iip:test-fixture:ai-attribution-policy:multi-provider"
+    policy["spec"]["source"]["contentHash"] = "sha256:" + ("4" * 64)
     policy["spec"]["rules"][0]["match"][
         "deploymentEnvironment"
     ] = "ai-finops-demo"
     policy["spec"]["rules"][0]["effectiveFrom"] = format_timestamp(
         anchor - timedelta(days=1)
+    )
+    policy["spec"]["rules"].append(
+        {
+            "id": "order-copilot-demo",
+            "priority": 90,
+            "match": {
+                "serviceName": "order-copilot",
+                "serviceNamespace": "commerce",
+                "deploymentEnvironment": "ai-finops-demo",
+            },
+            "allocation": {
+                "application": {
+                    "id": "commerce-ai",
+                    "name": "Commerce AI",
+                },
+                "team": {
+                    "id": "commerce-platform",
+                    "name": "Commerce Platform",
+                },
+            },
+            "effectiveFrom": format_timestamp(anchor - timedelta(days=1)),
+        }
     )
     return {"policies": [policy]}
 
@@ -163,7 +275,9 @@ def savings_profile_configuration(anchor: datetime) -> Mapping[str, object]:
 
     def profile(
         profile_id: str,
+        provider: str,
         model_id: str,
+        region: str,
         service_name: str,
     ) -> Mapping[str, object]:
         return {
@@ -172,9 +286,9 @@ def savings_profile_configuration(anchor: datetime) -> Mapping[str, object]:
             "catalogId": CATALOG_ID,
             "costEngineVersion": "0.1.0",
             "scope": {
-                "provider": "aws.bedrock",
+                "provider": provider,
                 "modelId": model_id,
-                "region": "us-east-1",
+                "region": region,
                 "serviceName": service_name,
                 "deploymentEnvironment": "ai-finops-demo",
             },
@@ -196,13 +310,24 @@ def savings_profile_configuration(anchor: datetime) -> Mapping[str, object]:
         "profiles": [
             profile(
                 "support-assistant-context",
+                "aws.bedrock",
                 KNOWN_MODEL,
+                "us-east-1",
                 "support-assistant",
             ),
             profile(
                 "research-assistant-coverage",
+                "aws.bedrock",
                 UNKNOWN_MODEL,
+                "us-east-1",
                 "research-assistant",
+            ),
+            profile(
+                "order-copilot-coverage",
+                "openai",
+                OPENAI_MODEL,
+                "global",
+                "order-copilot",
             ),
         ]
     }
@@ -224,6 +349,11 @@ def _finished_spans(
     model_id: str,
     service_name: str,
     input_tokens: tuple[int, int, int, int],
+    provider_name: str = "aws.bedrock",
+    service_namespace: str | None = None,
+    region: str = "us-east-1",
+    instrumentation_scope: str = INSTRUMENTATION_SCOPE,
+    explicit_usage_breakdowns: bool = False,
     content_attribute: bool = False,
 ) -> tuple[object, ...]:
     from opentelemetry.sdk.resources import Resource
@@ -240,33 +370,55 @@ def _finished_spans(
             {
                 "service.name": service_name,
                 "service.namespace": (
-                    "customer-experience"
-                    if service_name == "support-assistant"
-                    else "research"
+                    service_namespace
+                    or (
+                        "customer-experience"
+                        if service_name == "support-assistant"
+                        else "research"
+                    )
                 ),
                 "deployment.environment.name": "ai-finops-demo",
-                "cloud.region": "us-east-1",
+                "cloud.region": region,
             }
         )
     )
     provider.add_span_processor(SimpleSpanProcessor(memory))
     tracer = provider.get_tracer(
-        INSTRUMENTATION_SCOPE,
+        instrumentation_scope,
         "0.0.0-ai-finops-fixture",
     )
     for index, (started_at, tokens) in enumerate(
         zip(_span_times(anchor), input_tokens)
     ):
         attributes: dict[str, object] = {
-            "gen_ai.system": "aws.bedrock",
             "gen_ai.operation.name": "chat",
             "gen_ai.request.model": model_id,
             "gen_ai.response.model": model_id,
             "gen_ai.usage.input_tokens": tokens,
             "gen_ai.usage.output_tokens": 100,
-            "aws.request_id": f"ai-finops-provider-{service_name}-{index}",
-            "aws.retry_count": 0,
         }
+        if provider_name == "aws.bedrock":
+            # The Bedrock qualification profile intentionally exercises the
+            # exact legacy provider alias emitted by the pinned instrumentor.
+            attributes.update(
+                {
+                    "gen_ai.system": provider_name,
+                    "aws.request_id": (
+                        f"ai-finops-provider-{service_name}-{index}"
+                    ),
+                    "aws.retry_count": 0,
+                }
+            )
+        else:
+            attributes["gen_ai.provider.name"] = provider_name
+        if explicit_usage_breakdowns:
+            attributes.update(
+                {
+                    "gen_ai.usage.cache_read.input_tokens": 0,
+                    "gen_ai.usage.cache_creation.input_tokens": 0,
+                    "gen_ai.usage.reasoning_tokens": 0,
+                }
+            )
         if content_attribute:
             attributes["gen_ai.prompt"] = "must-never-cross-iip-boundary"
         started_ns = int(started_at.timestamp() * 1_000_000_000)
@@ -286,6 +438,7 @@ def _finished_spans(
 def send_fixture(
     anchor: datetime,
     collector_endpoint: str,
+    openai_collector_endpoint: str,
     receiver_endpoint: str,
 ) -> None:
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
@@ -295,6 +448,10 @@ def send_fixture(
 
     exporter = OTLPSpanExporter(
         endpoint=collector_endpoint.rstrip("/") + "/v1/traces",
+        timeout=5,
+    )
+    openai_exporter = OTLPSpanExporter(
+        endpoint=openai_collector_endpoint.rstrip("/") + "/v1/traces",
         timeout=5,
     )
     known = _finished_spans(
@@ -309,19 +466,35 @@ def send_fixture(
         service_name="research-assistant",
         input_tokens=(800, 800, 800, 800),
     )
+    openai = _finished_spans(
+        anchor,
+        model_id=OPENAI_MODEL,
+        service_name="order-copilot",
+        input_tokens=(600, 600, 600, 600),
+        provider_name="openai",
+        service_namespace="commerce",
+        region="global",
+        instrumentation_scope=OPENAI_INSTRUMENTATION_SCOPE,
+        explicit_usage_breakdowns=True,
+    )
     try:
         for batch in (known, unknown):
             if exporter.export(batch) is not SpanExportResult.SUCCESS:
                 raise RuntimeError("ai-finops.fixture.export.failed")
+        if openai_exporter.export(openai) is not SpanExportResult.SUCCESS:
+            raise RuntimeError("ai-finops.fixture.openai-export.failed")
         # Let the Collector close the original batch before replaying the exact
         # same spans. Duplicate records inside one OTLP request are malformed;
         # redelivery of a previously committed request is idempotent.
         time.sleep(2)
         if exporter.export(known) is not SpanExportResult.SUCCESS:
             raise RuntimeError("ai-finops.fixture.replay.failed")
+        if openai_exporter.export(openai) is not SpanExportResult.SUCCESS:
+            raise RuntimeError("ai-finops.fixture.openai-replay.failed")
         time.sleep(2)
     finally:
         exporter.shutdown()
+        openai_exporter.shutdown()
 
     content = _finished_spans(
         anchor,
@@ -330,16 +503,32 @@ def send_fixture(
         input_tokens=(400, 400, 400, 400),
         content_attribute=True,
     )[:1]
-    privacy_probe = OTLPSpanExporter(
-        endpoint=receiver_endpoint.rstrip("/") + "/v1/traces",
-        headers={"Authorization": f"Bearer {CHANNEL_TOKEN}"},
-        timeout=5,
-    )
-    try:
-        if privacy_probe.export(content) is not SpanExportResult.FAILURE:
-            raise RuntimeError("ai-finops.fixture.content.accepted")
-    finally:
-        privacy_probe.shutdown()
+    openai_content = _finished_spans(
+        anchor,
+        model_id=OPENAI_MODEL,
+        service_name="order-copilot",
+        input_tokens=(400, 400, 400, 400),
+        provider_name="openai",
+        service_namespace="commerce",
+        region="global",
+        instrumentation_scope=OPENAI_INSTRUMENTATION_SCOPE,
+        explicit_usage_breakdowns=True,
+        content_attribute=True,
+    )[:1]
+    for token, batch in (
+        (CHANNEL_TOKEN, content),
+        (OPENAI_CHANNEL_TOKEN, openai_content),
+    ):
+        privacy_probe = OTLPSpanExporter(
+            endpoint=receiver_endpoint.rstrip("/") + "/v1/traces",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=5,
+        )
+        try:
+            if privacy_probe.export(batch) is not SpanExportResult.FAILURE:
+                raise RuntimeError("ai-finops.fixture.content.accepted")
+        finally:
+            privacy_probe.shutdown()
 
 
 def _json_url(
@@ -451,13 +640,13 @@ def verify_fixture(
     while time.monotonic() < deadline:
         try:
             snapshot = _database_snapshot(database_url)
-            _assert_equal(len(snapshot["usage"]), 8, "usage ledger count")
+            _assert_equal(len(snapshot["usage"]), 12, "usage ledger count")
             _assert_equal(
                 len(snapshot["attributions"]),
-                8,
+                12,
                 "attribution ledger count",
             )
-            _assert_equal(len(snapshot["costs"]), 8, "cost ledger count")
+            _assert_equal(len(snapshot["costs"]), 12, "cost ledger count")
             _assert_equal(len(snapshot["findings"]), 1, "finding ledger count")
 
             serialized = json.dumps(snapshot, sort_keys=True)
@@ -472,7 +661,7 @@ def verify_fixture(
             ]
             _assert_equal(
                 allocation_statuses.count("allocated"),
-                4,
+                8,
                 "allocated usage records",
             )
             _assert_equal(
@@ -484,7 +673,7 @@ def verify_fixture(
             costs = snapshot["costs"]
             assert isinstance(costs, tuple)
             statuses = [item["spec"]["result"]["costStatus"] for item in costs]
-            _assert_equal(statuses.count("priced"), 4, "priced records")
+            _assert_equal(statuses.count("priced"), 8, "priced records")
             _assert_equal(statuses.count("unpriced"), 4, "unpriced records")
             finding = snapshot["findings"][0]
             _assert_equal(
@@ -499,12 +688,12 @@ def verify_fixture(
 
             _assert_equal(
                 _scalar(prometheus_endpoint, "sum(iip_ai_usage_requests)"),
-                4.0,
+                6.0,
                 "current-window usage",
             )
             _assert_equal(
                 _scalar(prometheus_endpoint, "sum(iip_ai_cost_amount)"),
-                17_400_000.0,
+                19_400_000.0,
                 "current-window calculated cost",
             )
             _assert_equal(
@@ -528,9 +717,26 @@ def verify_fixture(
                 7_200_000.0,
                 "potential saving metric",
             )
-            for dimension, protected_id in (
-                ("application", "support-experience"),
-                ("team", "customer-experience"),
+            provider_series = _prometheus_query(
+                prometheus_endpoint,
+                "sum by (gen_ai_provider_name) (iip_ai_usage_requests)",
+            )
+            provider_usage = {
+                item.get("metric", {}).get("gen_ai_provider_name"): float(
+                    item.get("value", [0, "0"])[1]
+                )
+                for item in provider_series
+                if isinstance(item.get("metric"), dict)
+                and isinstance(item.get("value"), list)
+            }
+            _assert_equal(
+                provider_usage,
+                {"aws.bedrock": 4.0, "openai": 2.0},
+                "provider-neutral usage coverage",
+            )
+            for dimension, protected_ids in (
+                ("application", ("support-experience", "commerce-ai")),
+                ("team", ("customer-experience", "commerce-platform")),
             ):
                 _assert_equal(
                     _scalar(
@@ -538,18 +744,19 @@ def verify_fixture(
                         "sum(iip_ai_allocation_requests"
                         f'{{iip_ai_allocation_dimension="{dimension}"}})',
                     ),
-                    8.0,
+                    12.0,
                     f"{dimension} allocation coverage",
                 )
-                _assert_equal(
-                    _scalar(
-                        prometheus_endpoint,
-                        "sum(iip_ai_allocation_requests"
-                        f'{{iip_ai_{dimension}_id="{protected_id}"}})',
-                    ),
-                    4.0,
-                    f"protected {dimension} allocation",
-                )
+                for protected_id in protected_ids:
+                    _assert_equal(
+                        _scalar(
+                            prometheus_endpoint,
+                            "sum(iip_ai_allocation_requests"
+                            f'{{iip_ai_{dimension}_id="{protected_id}"}})',
+                        ),
+                        4.0,
+                        f"protected {dimension} allocation",
+                    )
                 _assert_equal(
                     _scalar(
                         prometheus_endpoint,
@@ -581,9 +788,9 @@ def verify_fixture(
 
             report_start = format_timestamp(anchor - timedelta(minutes=10))
             report_end = format_timestamp(anchor)
-            for group_by, protected_id in (
-                ("application", "support-experience"),
-                ("team", "customer-experience"),
+            for group_by, protected_ids in (
+                ("application", {"support-experience", "commerce-ai"}),
+                ("team", {"customer-experience", "commerce-platform"}),
             ):
                 parameters = urllib.parse.urlencode(
                     {
@@ -599,8 +806,8 @@ def verify_fixture(
                     headers={"Authorization": f"Bearer {CONTROL_TOKEN}"},
                 )
                 coverage = report.get("spec", {}).get("coverage", {})
-                _assert_equal(coverage.get("usageRecords"), 8, "API usage coverage")
-                _assert_equal(coverage.get("allocatedRecords"), 4, "API allocated coverage")
+                _assert_equal(coverage.get("usageRecords"), 12, "API usage coverage")
+                _assert_equal(coverage.get("allocatedRecords"), 8, "API allocated coverage")
                 _assert_equal(coverage.get("unallocatedRecords"), 4, "API unallocated coverage")
                 groups = report.get("spec", {}).get("groups", [])
                 allocated_ids = {
@@ -610,7 +817,7 @@ def verify_fixture(
                 }
                 _assert_equal(
                     allocated_ids,
-                    {protected_id},
+                    protected_ids,
                     f"API protected {group_by} group",
                 )
 
@@ -623,7 +830,7 @@ def verify_fixture(
                 raise AssertionError("Grafana dashboard is not provisioned")
             _assert_equal(
                 document.get("title"),
-                "IIP AI FinOps — Bedrock V0",
+                "IIP AI FinOps — Multi-provider V0",
                 "Grafana dashboard title",
             )
             with urllib.request.urlopen(
@@ -650,13 +857,21 @@ def main() -> None:
     configuration = subparsers.add_parser("configuration")
     configuration.add_argument(
         "name",
-        choices=("channel", "attribution", "catalog", "profiles", "token"),
+        choices=(
+            "channel",
+            "attribution",
+            "catalog",
+            "profiles",
+            "token",
+            "openai-token",
+        ),
     )
     configuration.add_argument("--anchor", required=True)
 
     send = subparsers.add_parser("send")
     send.add_argument("--anchor", required=True)
     send.add_argument("--collector", required=True)
+    send.add_argument("--openai-collector", required=True)
     send.add_argument("--receiver", required=True)
 
     verify = subparsers.add_parser("verify")
@@ -677,16 +892,18 @@ def main() -> None:
             "catalog": price_catalog_configuration(anchor),
             "profiles": savings_profile_configuration(anchor),
         }
-        print(
-            CHANNEL_TOKEN
-            if arguments.name == "token"
-            else _compact(documents[arguments.name])
-        )
+        if arguments.name == "token":
+            print(CHANNEL_TOKEN)
+        elif arguments.name == "openai-token":
+            print(OPENAI_CHANNEL_TOKEN)
+        else:
+            print(_compact(documents[arguments.name]))
         return
     if arguments.command == "send":
         send_fixture(
             _parse_anchor(arguments.anchor),
             arguments.collector,
+            arguments.openai_collector,
             arguments.receiver,
         )
         return

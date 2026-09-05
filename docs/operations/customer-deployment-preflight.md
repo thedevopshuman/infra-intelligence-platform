@@ -98,7 +98,10 @@ Preflight intentionally leaves the following gates explicit:
 - policy bundle and credential-broker correctness, rotation, and recovery;
 - customer Collector, PKI, CRL lifecycle, buffering, and loss behavior;
 - PostgreSQL HA, fencing, storage durability, PITR, and disaster recovery;
-- workload-specific capacity, latency, availability, and alert routing;
+- workload-specific capacity plus clean, exact-release external ingress
+  availability and latency evidence; use the
+  [ingress qualification profile](ingress-availability-qualification.md);
+- continuous regional SLO aggregation and customer alert routing;
 - for AI FinOps, live Bedrock model/region/streaming behavior, authoritative
   prices, and workload-quality validation of any proposed saving.
 

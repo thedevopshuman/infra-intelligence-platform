@@ -15,7 +15,7 @@
       "containerRuntime": "docker",
       "containerRuntimeVersion": "28.3.3",
       "pythonVersion": "3.12.11",
-      "applicationVersion": "0.72.0",
+      "applicationVersion": "0.73.0",
       "boto3Version": "1.43.73",
       "botocoreVersion": "1.43.73",
       "instrumentationVersion": "0.65b0",

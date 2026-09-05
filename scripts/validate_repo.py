@@ -80,6 +80,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0102-external-secret-controller-handoff.md",
     "docs/decisions/0103-source-bound-postgresql-physical-continuity-evidence.md",
     "docs/decisions/0104-minimized-customer-deployment-preflight.md",
+    "docs/decisions/0105-external-ingress-availability-qualification.md",
     "docs/operations/external-secrets.md",
     "deploy/helm/infra-intelligence/examples/iip-database.externalsecret.yaml",
     "scripts/test_external_secrets.sh",
@@ -95,6 +96,11 @@ REQUIRED_PATHS = (
     "deploy/helm/infra-intelligence/examples/production-core.values.yaml",
     "deploy/helm/infra-intelligence/examples/production-ai-finops.values.yaml",
     "scripts/deployment_preflight.py",
+    "docs/operations/ingress-availability-qualification.md",
+    "docs/specifications/ingress-availability-qualification-report-contract.md",
+    "contracts/schemas/ingress-availability-qualification-report.schema.json",
+    "contracts/examples/ingress-availability-qualification-report.json",
+    "scripts/qualify_ingress_availability.py",
     "docs/decisions/0026-resource-history-change-evidence.md",
     "docs/decisions/0029-investigation-context-correlation.md",
     "docs/decisions/0030-durable-investigation-lifecycle.md",
@@ -1596,6 +1602,34 @@ def validate_customer_deployment_preflight_example(
         validate_report_document(report)
     except DeploymentPreflightError:
         fail(errors, "customer deployment preflight example must be semantically valid")
+
+
+def validate_ingress_availability_qualification_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check minimized ingress evidence arithmetic and closed semantics."""
+
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "ingress-availability-qualification-report.json"
+    )
+    report = documents.get(path)
+    try:
+        from qualify_ingress_availability import (
+            IngressQualificationError,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "ingress availability example must be semantically valid")
+        return
+    try:
+        if not isinstance(report, dict):
+            raise IngressQualificationError("ingress-qualification.report.invalid")
+        validate_report_document(report)
+    except IngressQualificationError:
+        fail(errors, "ingress availability example must be semantically valid")
 
 
 def validate_postgresql_recovery_qualification_example(
@@ -4346,6 +4380,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerDeploymentPreflightReport",
         ),
         (
+            "ingress-availability-qualification-report.json",
+            "IngressAvailabilityQualificationReport",
+        ),
+        (
             "credential-broker-compatibility-report.json",
             "CredentialBrokerCompatibilityReport",
         ),
@@ -4410,6 +4448,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_openai_instrumentation_compatibility_example(documents, errors)
     validate_release_qualification_example(documents, errors)
     validate_customer_deployment_preflight_example(documents, errors)
+    validate_ingress_availability_qualification_example(documents, errors)
     validate_postgresql_recovery_qualification_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
     validate_ai_economics_examples(documents, errors)

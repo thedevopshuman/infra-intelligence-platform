@@ -3,7 +3,7 @@
   "kind": "CustomerDeploymentPreflightReport",
   "metadata": {
     "generatedAt": "2026-09-05T15:26:40Z",
-    "id": "cdp_1496098203c73d53f76b70808313feb4",
+    "id": "cdp_83bcfcfbd2c09c466001a08f05cd810a",
     "sourceDirty": false,
     "sourceRevision": "afd2ce4e600094fb481bc1da2789a35de00c8828"
   },
@@ -57,11 +57,11 @@
       "pythonVersion": "3.14.3"
     },
     "profile": {
-      "applicationVersion": "0.72.0",
-      "chartVersion": "0.75.0",
-      "configurationDigest": "sha256:21718a76c4a40332eac0fa0943452ba66808332ece57e6cc861ba67bda003627",
+      "applicationVersion": "0.73.0",
+      "chartVersion": "0.76.0",
+      "configurationDigest": "sha256:e43446234506b845d0c1cd8cc57be42d952fa776ef6f3eeb9ca31b91030565f0",
       "name": "production-core-v1",
-      "valuesDigest": "sha256:4c2a64ab06436fff8fbc74e57fe519fb9dec1d7b483dbc7108168d657211190f"
+      "valuesDigest": "sha256:cf4d74a907b571ed1ada35928ce858cb7a4dfe853954972ba16e052dd14f0ed3"
     },
     "qualificationBoundary": "pre-install-only",
     "status": "configuration-ready",

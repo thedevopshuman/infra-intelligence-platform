@@ -1,0 +1,77 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "IngressAvailabilityQualificationReport",
+  "metadata": {
+    "id": "iaq_93eb52fed8afde639ec09280812d52d4",
+    "generatedAt": "2026-09-06T12:00:05Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualificationLevel": "customer-ingress",
+    "targetBindingDigest": "sha256:67f7aaa3a40b5a2a295d84c806d41b6a1f226a432f8ebe6742019f464f6f4c1f",
+    "targetIdentity": {
+      "applicationVersion": "0.73.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "requiredMigration": "0022_ai_retry_savings_rule.sql",
+      "buildMode": "release",
+      "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+      "chartVersion": "0.76.0",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "objective": {
+      "sampleCount": 100,
+      "minimumAvailabilityBasisPoints": 9990,
+      "maximumP95LatencyMilliseconds": 750,
+      "requestTimeoutMilliseconds": 2000,
+      "intervalMilliseconds": 1000
+    },
+    "environment": {
+      "platform": "linux/amd64",
+      "pythonVersion": "3.12.10",
+      "transport": "verified-https",
+      "caSource": "system",
+      "proxyMode": "disabled",
+      "redirectMode": "deny"
+    },
+    "measurements": {
+      "startedAt": "2026-09-06T11:58:25Z",
+      "completedAt": "2026-09-06T12:00:05Z",
+      "sampleCount": 100,
+      "successfulSamples": 100,
+      "failedSamples": 0,
+      "availabilityBasisPoints": 10000,
+      "p95CycleLatencyMilliseconds": 143,
+      "paths": [
+        {"id": "liveness", "attempts": 100, "successes": 100, "failures": 0, "p95LatencyMilliseconds": 31},
+        {"id": "readiness", "attempts": 100, "successes": 100, "failures": 0, "p95LatencyMilliseconds": 47},
+        {"id": "runtime-identity", "attempts": 100, "successes": 100, "failures": 0, "p95LatencyMilliseconds": 65}
+      ],
+      "failureCategories": {
+        "transport": 0,
+        "http-status": 0,
+        "contract": 0,
+        "identity": 0
+      }
+    },
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"},
+      {"id": "direct-no-redirect-client", "status": "passed"},
+      {"id": "transport-profile", "status": "passed"},
+      {"id": "response-contracts-consistent", "status": "passed"},
+      {"id": "liveness-observed", "status": "passed"},
+      {"id": "readiness-observed", "status": "passed"},
+      {"id": "runtime-identity-consistent", "status": "passed"},
+      {"id": "availability-objective", "status": "passed"},
+      {"id": "latency-objective", "status": "passed"}
+    ],
+    "summary": {
+      "totalChecks": 10,
+      "passedChecks": 10,
+      "failedChecks": 0,
+      "overallStatus": "qualified"
+    }
+  }
+}

@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ingress-availability-qualification-report:v1alpha1",
+  "title": "Ingress Availability Qualification Report",
+  "description": "Value-minimized, source-bound evidence from an external liveness, readiness, authentication, release-identity, availability, and latency probe.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "IngressAvailabilityQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^iaq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationLevel", "targetBindingDigest", "targetIdentity", "objective", "environment", "measurements", "checks", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualificationLevel": {"enum": ["local-loopback", "customer-ingress"]},
+        "targetBindingDigest": {"$ref": "#/$defs/digest"},
+        "targetIdentity": {"$ref": "#/$defs/runtimeIdentity"},
+        "objective": {"$ref": "#/$defs/objective"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "checks": {"$ref": "#/$defs/checks"},
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 10},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 10},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 10},
+            "overallStatus": {"enum": ["qualified", "not-qualified"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "runtimeIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "contractsApiVersion", "requiredMigration", "buildMode"],
+      "properties": {
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+        "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"},
+        "buildMode": {"enum": ["development", "release"]},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      },
+      "oneOf": [
+        {
+          "properties": {"buildMode": {"const": "development"}},
+          "not": {
+            "anyOf": [
+              {"required": ["sourceRevision"]},
+              {"required": ["chartVersion"]},
+              {"required": ["imageDigest"]}
+            ]
+          }
+        },
+        {
+          "required": ["sourceRevision", "chartVersion", "imageDigest"],
+          "properties": {"buildMode": {"const": "release"}}
+        }
+      ]
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sampleCount", "minimumAvailabilityBasisPoints", "maximumP95LatencyMilliseconds", "requestTimeoutMilliseconds", "intervalMilliseconds"],
+      "properties": {
+        "sampleCount": {"type": "integer", "minimum": 3, "maximum": 10000},
+        "minimumAvailabilityBasisPoints": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "maximumP95LatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 60000},
+        "requestTimeoutMilliseconds": {"type": "integer", "minimum": 100, "maximum": 30000},
+        "intervalMilliseconds": {"type": "integer", "minimum": 0, "maximum": 60000}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "pythonVersion", "transport", "caSource", "proxyMode", "redirectMode"],
+      "properties": {
+        "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-z0-9_.-]+$", "maxLength": 128},
+        "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "transport": {"enum": ["loopback-http", "verified-https"]},
+        "caSource": {"enum": ["not-applicable", "system", "custom"]},
+        "proxyMode": {"const": "disabled"},
+        "redirectMode": {"const": "deny"}
+      }
+    },
+    "pathMeasurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "attempts", "successes", "failures", "p95LatencyMilliseconds"],
+      "properties": {
+        "id": {"enum": ["liveness", "readiness", "runtime-identity"]},
+        "attempts": {"type": "integer", "minimum": 3, "maximum": 10000},
+        "successes": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "failures": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "p95LatencyMilliseconds": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0, "maximum": 120000},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startedAt", "completedAt", "sampleCount", "successfulSamples", "failedSamples", "availabilityBasisPoints", "p95CycleLatencyMilliseconds", "paths", "failureCategories"],
+      "properties": {
+        "startedAt": {"type": "string", "format": "date-time"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "sampleCount": {"type": "integer", "minimum": 3, "maximum": 10000},
+        "successfulSamples": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "failedSamples": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "availabilityBasisPoints": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "p95CycleLatencyMilliseconds": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0, "maximum": 360000},
+            {"type": "null"}
+          ]
+        },
+        "paths": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {"$ref": "#/$defs/pathMeasurement", "properties": {"id": {"const": "liveness"}}},
+            {"$ref": "#/$defs/pathMeasurement", "properties": {"id": {"const": "readiness"}}},
+            {"$ref": "#/$defs/pathMeasurement", "properties": {"id": {"const": "runtime-identity"}}}
+          ],
+          "items": false
+        },
+        "failureCategories": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["transport", "http-status", "contract", "identity"],
+          "properties": {
+            "transport": {"type": "integer", "minimum": 0, "maximum": 30000},
+            "http-status": {"type": "integer", "minimum": 0, "maximum": 30000},
+            "contract": {"type": "integer", "minimum": 0, "maximum": 30000},
+            "identity": {"type": "integer", "minimum": 0, "maximum": 10000}
+          }
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 64},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^ingress-qualification\\.[a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "direct-no-redirect-client"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "transport-profile"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "response-contracts-consistent"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "liveness-observed"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "readiness-observed"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "runtime-identity-consistent"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "availability-objective"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "latency-objective"}}}
+      ],
+      "items": false
+    }
+  }
+}

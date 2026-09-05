@@ -59,7 +59,7 @@ class TokenBucketRateLimiter:
 class OtlpReceiverHandler(ApiHandler):
     """Expose only health and selected OTLP signal endpoints."""
 
-    server_version = "IIPOtlpReceiver/0.72.0"
+    server_version = "IIPOtlpReceiver/0.73.0"
     rate_limiter = TokenBucketRateLimiter(50, 100)
     client_identities: SpiffeClientIdentityRegistry | None = None
     client_crl_freshness: ClientCrlFreshnessPolicy | None = None

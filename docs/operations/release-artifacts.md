@@ -43,6 +43,13 @@ customer context and the exact protected values generation, verify it with
 release bundle. That report proves prerequisite presence, not external-system
 or workload qualification.
 
+After installation, run `make qualify-ingress-availability` from the same clean
+checkout against the external HTTPS URL and immutable image digest, then run
+`make verify-ingress-availability-report`. Retain the aggregate report beside
+the preflight and release qualification evidence. It proves one bounded
+external path and exact runtime identity, not continuous or regional
+availability.
+
 The default build produces `linux/amd64` and `linux/arm64` manifests for both the control plane and the trusted plugin-mediation bridge. BuildKit attaches an in-toto SPDX SBOM and SLSA v1 provenance statement to every platform inside each OCI layout. The base-image index and SBOM generator are digest pinned; dependency updates must intentionally update those pins and pass the normal verification gates.
 
 The build also writes the exact committed source revision into the OCI image label and the process environment. Once deployed, authenticated users can compare `GET /v1/system/version` with the manifest revision; Helm deployments additionally report the configured chart version and immutable OCI digest. A development build explicitly reports `development` and does not claim unverifiable release identity.
@@ -64,7 +71,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.72.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.73.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 
@@ -76,7 +83,7 @@ After verification, prove that the packaged chart and OCI image—not checkout
 copies—install on the explicit local Kind cluster:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.72.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.73.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -96,7 +103,7 @@ selected supported prior revision. The target may retain the same latest
 migration or add a newer one; migration regression is rejected:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.72.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.73.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
@@ -125,7 +132,7 @@ Run both packaged profiles in sequence and require their machine-readable
 evidence to agree on the candidate and local environment:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.72.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.73.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=<supported-ancestor> \
   make qualify-release PYTHON=.venv/bin/python
 ```
@@ -138,7 +145,7 @@ platform, Kubernetes, and Docker identity match. Verify a transported report
 and bundle with:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.72.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.73.0-0123456789ab \
 IIP_RELEASE_QUALIFICATION_REPORT=/absolute/path/to/report.json \
   make verify-release-qualification PYTHON=.venv/bin/python
 ```

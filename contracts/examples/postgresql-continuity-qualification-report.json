@@ -13,7 +13,7 @@
       "profile": "local-docker",
       "platform": "darwin/arm64",
       "pythonVersion": "3.14.3",
-      "applicationVersion": "0.72.0",
+      "applicationVersion": "0.73.0",
       "containerRuntime": {"name": "docker", "version": "29.7.2"},
       "database": {
         "engine": "postgresql",

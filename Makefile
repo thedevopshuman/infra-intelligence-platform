@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -12,6 +12,16 @@ IIP_DEPLOYMENT_PROFILE ?= production-core-v1
 IIP_DEPLOYMENT_VALUES ?= deploy/helm/infra-intelligence/examples/production-core.values.yaml
 IIP_DEPLOYMENT_NAMESPACE ?= iip-system
 IIP_KUBERNETES_CONTEXT ?=
+IIP_INGRESS_QUALIFICATION_REPORT ?= dist/ingress-availability-qualification-report.json
+IIP_INGRESS_BASE_URL ?=
+IIP_INGRESS_TOKEN_FILE ?=
+IIP_INGRESS_IMAGE_DIGEST ?=
+IIP_INGRESS_CA_FILE ?=
+IIP_INGRESS_SAMPLES ?= 100
+IIP_INGRESS_MINIMUM_AVAILABILITY_BASIS_POINTS ?= 9990
+IIP_INGRESS_MAXIMUM_P95_LATENCY_MILLISECONDS ?= 2000
+IIP_INGRESS_REQUEST_TIMEOUT_MILLISECONDS ?= 2000
+IIP_INGRESS_INTERVAL_MILLISECONDS ?= 1000
 
 help:
 	@echo "install-verify-deps Install pinned verification-only Python dependencies"
@@ -22,6 +32,9 @@ help:
 	@echo "test-deployment-preflight Validate both sanitized production Helm profiles"
 	@echo "preflight-deployment-live Check a customer values file and explicit Kubernetes context"
 	@echo "verify-deployment-preflight-report Verify current source/configuration-bound preflight evidence"
+	@echo "test-ingress-availability Exercise the minimized external probe against real local routes"
+	@echo "qualify-ingress-availability Qualify one HTTPS customer ingress and exact release identity"
+	@echo "verify-ingress-availability-report Verify clean current ingress qualification evidence"
 	@echo "test-postgres Run PostgreSQL integration tests with Docker Desktop"
 	@echo "test-capacity Certify large-tenant investigation dispatch capacity with PostgreSQL"
 	@echo "test-credential-broker Certify the external broker client over local TLS"
@@ -117,6 +130,34 @@ verify-deployment-preflight-report:
 		--values "$(IIP_DEPLOYMENT_VALUES)" \
 		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
 		--require-clean --require-install-ready
+
+test-ingress-availability:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_ingress_availability_qualification -v
+
+qualify-ingress-availability:
+	@test -n "$(IIP_INGRESS_BASE_URL)" || \
+		(echo "IIP_INGRESS_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_INGRESS_TOKEN_FILE)" || \
+		(echo "IIP_INGRESS_TOKEN_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_INGRESS_IMAGE_DIGEST)" || \
+		(echo "IIP_INGRESS_IMAGE_DIGEST is required" >&2; exit 2)
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/qualify_ingress_availability.py run \
+		--profile customer-ingress --base-url "$(IIP_INGRESS_BASE_URL)" \
+		--token-file "$(IIP_INGRESS_TOKEN_FILE)" \
+		--image-digest "$(IIP_INGRESS_IMAGE_DIGEST)" \
+		--samples "$(IIP_INGRESS_SAMPLES)" \
+		--minimum-availability-basis-points "$(IIP_INGRESS_MINIMUM_AVAILABILITY_BASIS_POINTS)" \
+		--maximum-p95-latency-milliseconds "$(IIP_INGRESS_MAXIMUM_P95_LATENCY_MILLISECONDS)" \
+		--request-timeout-milliseconds "$(IIP_INGRESS_REQUEST_TIMEOUT_MILLISECONDS)" \
+		--interval-milliseconds "$(IIP_INGRESS_INTERVAL_MILLISECONDS)" \
+		$(if $(IIP_INGRESS_CA_FILE),--ca-file "$(IIP_INGRESS_CA_FILE)",) \
+		--output "$(IIP_INGRESS_QUALIFICATION_REPORT)"
+
+verify-ingress-availability-report:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/qualify_ingress_availability.py verify \
+		--report "$(IIP_INGRESS_QUALIFICATION_REPORT)" \
+		--require-clean --require-qualified
 
 test-postgres:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_postgres.sh

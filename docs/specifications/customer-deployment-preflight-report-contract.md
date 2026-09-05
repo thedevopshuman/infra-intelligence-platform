@@ -52,7 +52,10 @@ new profile name and decision record.
 objects passed this pre-install gate. `qualificationBoundary` is permanently
 `pre-install-only`, and `customerQualificationRequired` enumerates the
 interoperability, resilience, signing, and workload evidence that this report
-cannot establish.
+cannot establish. The existing `customer-workload-slo` requirement includes
+the separate clean-release external
+[ingress availability qualification](ingress-availability-qualification-report-contract.md);
+preflight cannot satisfy it from chart values or cluster objects.
 
 ## Dependency minimization
 

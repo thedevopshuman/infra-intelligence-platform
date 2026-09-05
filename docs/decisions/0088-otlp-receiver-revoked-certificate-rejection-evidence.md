@@ -66,8 +66,10 @@ and the JSON Schema move from 16 to 17 required checks.
   customer deployment responsibility, the same way ADR 0080 makes queue
   capacity and retention a customer choice.
 
+ADR 0089 subsequently closes the local freshness/expiry-enforcement part of
+that gap. Distribution and rollout of a current CRL remain customer-owned.
+
 ## Revisit triggers
 
 Revisit if a customer requires OCSP, automatic CRL distribution-point
-fetching, or CRL freshness enforcement (rejecting connections once a
-loaded CRL's `nextUpdate` has passed) before a production claim.
+fetching, or hot reload without the receiver rollout required by ADR 0089.

@@ -43,6 +43,7 @@ CHECK_IDS = (
     "certificate-rotation-without-restart",
     "expired-client-certificate-rejected",
     "revoked-client-certificate-rejected",
+    "expired-client-crl-rejected",
     "health-probe-minimization",
     "durable-evidence-commit",
     "collector-persistent-queue-config",

@@ -39,6 +39,10 @@ def write_tls_material(
     validity window both check out. Distinct from expiry: a deployment can
     revoke a workload identity immediately without waiting for its
     certificate's natural validity window to close.
+
+    When revoked identities are requested, ``expired-ca.crl`` contains the
+    same revocations but has a closed ``nextUpdate`` window. It proves a
+    receiver cannot continue trusting stale revocation state.
     """
 
     now = datetime.now(timezone.utc)
@@ -249,19 +253,29 @@ def write_tls_material(
             ).serial_number
         )
     if revoked_client_identities is not None:
-        crl_builder = (
-            x509.CertificateRevocationListBuilder()
-            .issuer_name(ca_name)
-            .last_update(now - timedelta(minutes=1))
-            .next_update(now + timedelta(hours=1))
-        )
-        for serial_number in revoked_serials:
-            crl_builder = crl_builder.add_revoked_certificate(
-                x509.RevokedCertificateBuilder()
-                .serial_number(serial_number)
-                .revocation_date(now - timedelta(seconds=30))
-                .build()
+        def write_crl(name: str, last_update: datetime, next_update: datetime) -> None:
+            crl_builder = (
+                x509.CertificateRevocationListBuilder()
+                .issuer_name(ca_name)
+                .last_update(last_update)
+                .next_update(next_update)
             )
-        crl = crl_builder.sign(ca_key, hashes.SHA256())
-        (directory / "ca.crl").write_bytes(crl.public_bytes(serialization.Encoding.PEM))
-        os.chmod(directory / "ca.crl", 0o644)
+            for serial_number in revoked_serials:
+                crl_builder = crl_builder.add_revoked_certificate(
+                    x509.RevokedCertificateBuilder()
+                    .serial_number(serial_number)
+                    .revocation_date(now - timedelta(seconds=30))
+                    .build()
+                )
+            crl = crl_builder.sign(ca_key, hashes.SHA256())
+            (directory / name).write_bytes(
+                crl.public_bytes(serialization.Encoding.PEM)
+            )
+            os.chmod(directory / name, 0o644)
+
+        write_crl("ca.crl", now - timedelta(minutes=1), now + timedelta(hours=1))
+        write_crl(
+            "expired-ca.crl",
+            now - timedelta(hours=2),
+            now - timedelta(hours=1),
+        )

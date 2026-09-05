@@ -10,9 +10,11 @@ from http import HTTPStatus
 from http.server import ThreadingHTTPServer
 from urllib.parse import urlparse
 
+from iip.application.ingest_otlp_metrics import OtlpReceiverConfigurationError
 from iip.bootstrap import build_otlp_receiver_runtime_from_env
 from iip.surfaces.http import ApiHandler
 from iip.surfaces.otlp_tls import (
+    ClientCrlFreshnessPolicy,
     OtlpTlsConfiguration,
     SpiffeClientIdentityRegistry,
     peer_certificate,
@@ -57,9 +59,10 @@ class TokenBucketRateLimiter:
 class OtlpReceiverHandler(ApiHandler):
     """Expose only health and selected OTLP signal endpoints."""
 
-    server_version = "IIPOtlpReceiver/0.61.0"
+    server_version = "IIPOtlpReceiver/0.62.0"
     rate_limiter = TokenBucketRateLimiter(50, 100)
     client_identities: SpiffeClientIdentityRegistry | None = None
+    client_crl_freshness: ClientCrlFreshnessPolicy | None = None
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         path = urlparse(self.path).path
@@ -85,10 +88,29 @@ class OtlpReceiverHandler(ApiHandler):
         return self.rate_limiter.admit(channel_id)
 
     def _authorize_otlp_transport(self, channel_id: str) -> None:
+        freshness = self.client_crl_freshness
+        if freshness is not None:
+            freshness.assert_current()
         identities = self.client_identities
         if identities is None:
             return
         identities.authorize(peer_certificate(self.connection), channel_id)
+
+    def _readiness(self) -> None:
+        freshness = self.client_crl_freshness
+        if freshness is not None:
+            try:
+                freshness.assert_current()
+            except OtlpReceiverConfigurationError:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {
+                        "status": "unavailable",
+                        "error": {"code": "readiness.unavailable"},
+                    },
+                )
+                return
+        super()._readiness()
 
 
 def _bounded_integer(name: str, default: int, maximum: int) -> int:
@@ -109,12 +131,14 @@ def main() -> None:
     rate = _bounded_integer("IIP_OTLP_MAX_REQUESTS_PER_SECOND", 50, 100_000)
     burst = _bounded_integer("IIP_OTLP_REQUEST_BURST", 100, 100_000)
     tls = OtlpTlsConfiguration.from_environment()
-    ssl_context = tls.ssl_context()
+    client_crl_freshness = tls.client_crl_freshness_policy()
+    ssl_context = tls.ssl_context(client_crl_freshness=client_crl_freshness)
     runtime = build_otlp_receiver_runtime_from_env()
     try:
         OtlpReceiverHandler.runtime = runtime
         OtlpReceiverHandler.rate_limiter = TokenBucketRateLimiter(rate, burst)
         OtlpReceiverHandler.client_identities = tls.client_identities
+        OtlpReceiverHandler.client_crl_freshness = client_crl_freshness
         server = ThreadingHTTPServer((host, port), OtlpReceiverHandler)
         if ssl_context is not None:
             server.socket = ssl_context.wrap_socket(server.socket, server_side=True)

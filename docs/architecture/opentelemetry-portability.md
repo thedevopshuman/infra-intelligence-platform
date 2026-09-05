@@ -88,6 +88,8 @@ queue for pre-receiver buffering. Receiver HTTP availability semantics and
 backend-neutral export are accepted in ADR 0081. ADR 0082 adds a two-window
 IIP-to-Collector burn-rate report over the same samples; ADR 0087 adds a
 separate Collector-to-backend queue/loss objective sourced from the
-Collector's own self-metrics. Customer PKI interoperability, automated
-rotation, regional aggregation of the queue/loss objective, and notification
+Collector's own self-metrics. ADRs 0088 and 0089 additionally enforce a
+configured client CRL and fail readiness/intake when its validity window
+closes. Customer PKI chain/OCSP interoperability, CRL distribution and
+rollout, regional aggregation of the queue/loss objective, and notification
 routing remain Phase 3 operational-hardening gates.

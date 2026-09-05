@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.61.0"
+  tag: "0.62.0"
   digest: ""
 
 worker:
@@ -308,9 +308,10 @@ otlpIngest:
     clientCaExistingSecret: ""
     clientCaSecretKey: ca.crt
     clientCaMountPath: /var/run/iip-otlp-client-ca
-    # Optional customer revocation list (ADR 0088). Empty disables CRL
-    # checking entirely; the receiver still validates chain and validity
-    # window as before. May reference the same Secret as clientCaExistingSecret.
+    # Optional customer revocation list (ADRs 0088/0089). Empty disables CRL
+    # checking. A configured single PEM CRL must be <=1 MiB and current; the
+    # receiver fails readiness/intake at nextUpdate and requires a rollout
+    # after rotation. May reference the same Secret as clientCaExistingSecret.
     clientCrlExistingSecret: ""
     clientCrlSecretKey: ca.crl
     clientCrlMountPath: /var/run/iip-otlp-client-crl

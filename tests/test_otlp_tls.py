@@ -6,6 +6,7 @@ import ssl
 import tempfile
 import threading
 import unittest
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from io import BytesIO
 from pathlib import Path
@@ -18,6 +19,7 @@ from iip.application.ingest_otlp_metrics import (
 )
 from iip.surfaces.otlp_receiver import OtlpReceiverHandler
 from iip.surfaces.otlp_tls import (
+    ClientCrlFreshnessPolicy,
     OtlpTlsConfiguration,
     SpiffeClientIdentityRegistry,
 )
@@ -188,6 +190,71 @@ class OtlpTlsConfigurationTests(unittest.TestCase):
             assert with_crl is not None
             self.assertTrue(with_crl.verify_flags & ssl.VERIFY_CRL_CHECK_LEAF)
 
+    def test_client_crl_must_be_bounded_parseable_and_current(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "fixture"
+            write_fixture(root)
+            policy = ClientCrlFreshnessPolicy.from_pem_file(
+                str(root / "ca.crl"),
+                issuer_ca_path=str(root / "ca.crt"),
+            )
+            policy.assert_current(
+                evaluated_at=policy.next_update - timedelta(microseconds=1)
+            )
+            with self.assertRaisesRegex(
+                OtlpReceiverConfigurationError,
+                "otlp.tls.configuration.invalid",
+            ):
+                policy.assert_current(evaluated_at=policy.next_update)
+
+            for path in (root / "expired-ca.crl", root / "ca.crt"):
+                with self.subTest(path=path.name):
+                    with self.assertRaisesRegex(
+                        OtlpReceiverConfigurationError,
+                        "otlp.tls.configuration.invalid",
+                    ):
+                        ClientCrlFreshnessPolicy.from_pem_file(
+                            str(path),
+                            issuer_ca_path=str(root / "ca.crt"),
+                        )
+
+            oversized = root / "oversized.crl"
+            oversized.write_bytes(b"x" * 1_048_577)
+            with self.assertRaisesRegex(
+                OtlpReceiverConfigurationError,
+                "otlp.tls.configuration.invalid",
+            ):
+                ClientCrlFreshnessPolicy.from_pem_file(
+                    str(oversized),
+                    issuer_ca_path=str(root / "ca.crt"),
+                )
+
+            with self.assertRaisesRegex(
+                OtlpReceiverConfigurationError,
+                "otlp.tls.configuration.invalid",
+            ):
+                ClientCrlFreshnessPolicy.from_pem_file(
+                    str(root / "ca.crl"),
+                    issuer_ca_path=str(root / "untrusted" / "ca.crt"),
+                )
+
+    def test_future_crl_and_naive_evaluation_time_fail_closed(self) -> None:
+        now = datetime.now(timezone.utc)
+        future = ClientCrlFreshnessPolicy(
+            now + timedelta(seconds=1),
+            now + timedelta(hours=1),
+        )
+        with self.assertRaisesRegex(
+            OtlpReceiverConfigurationError,
+            "otlp.tls.configuration.invalid",
+        ):
+            future.assert_current(evaluated_at=now)
+        with self.assertRaisesRegex(
+            OtlpReceiverConfigurationError,
+            "otlp.tls.configuration.invalid",
+        ):
+            future.assert_current(evaluated_at=datetime.now())
+
     def test_real_handshake_rejects_only_the_revoked_identity(self) -> None:
         # A live TLS handshake against the configured CRL, not a fixture
         # double: the valid identity must still connect and the revoked one
@@ -334,6 +401,7 @@ class SpiffeClientIdentityTests(unittest.TestCase):
         handler.client_identities = SpiffeClientIdentityRegistry.from_json(
             identities()
         )
+        handler.client_crl_freshness = None
         handler.connection = _Connection(
             {"subjectAltName": (("URI", "spiffe://customer.example/other"),)}
         )
@@ -354,6 +422,61 @@ class SpiffeClientIdentityTests(unittest.TestCase):
         handler.do_POST()
 
         self.assertEqual(statuses, [HTTPStatus.UNAUTHORIZED])
+        self.assertNotEqual(output.getvalue(), b"")
+
+    def test_expired_crl_disables_readiness_and_intake_before_body_read(self) -> None:
+        now = datetime.now(timezone.utc)
+        stale = ClientCrlFreshnessPolicy(
+            now - timedelta(hours=2),
+            now - timedelta(hours=1),
+        )
+        handler = object.__new__(OtlpReceiverHandler)
+        handler.client_crl_freshness = stale
+        handler.client_identities = SpiffeClientIdentityRegistry.from_json(
+            identities()
+        )
+        responses: list[tuple[int, object]] = []
+        handler._json = lambda status, body: responses.append((status, body))
+
+        handler._readiness()
+
+        self.assertEqual(responses[0][0], HTTPStatus.SERVICE_UNAVAILABLE)
+        self.assertEqual(
+            responses[0][1],
+            {
+                "status": "unavailable",
+                "error": {"code": "readiness.unavailable"},
+            },
+        )
+
+        runtime = build_local_runtime(
+            otlp_metrics_receiver=ConfiguredOtlpMetricsReceiver.from_json(
+                receiver_config()
+            )
+        )
+        self.addCleanup(runtime.close)
+        ingest_fixture(runtime)
+        handler.runtime = runtime
+        handler.connection = _Connection(
+            {"subjectAltName": (("URI", AUTHORIZED_SPIFFE_ID),)}
+        )
+        handler.path = "/v1/metrics"
+        handler.headers = {
+            "authorization": f"Bearer {CHANNEL_TOKEN}",
+            "content-type": "application/x-protobuf",
+            "content-length": "100",
+        }
+        handler.rfile = None
+        output = BytesIO()
+        handler.wfile = output
+        statuses: list[int] = []
+        handler.send_response = lambda status: statuses.append(status)
+        handler.send_header = lambda _name, _value: None
+        handler.end_headers = lambda: None
+
+        handler.do_POST()
+
+        self.assertEqual(statuses, [HTTPStatus.SERVICE_UNAVAILABLE])
         self.assertNotEqual(output.getvalue(), b"")
 
 

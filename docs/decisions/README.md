@@ -92,3 +92,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0086](0086-multilingual-adversarial-instruction-corpus.md) | Accepted | Extend the instruction-boundary gate's coverage with a multilingual, multi-technique corpus |
 | [0087](0087-collector-observed-queue-loss-objective.md) | Accepted | Measure the customer Collector's own sending-queue depth and send-loss from its self-metrics |
 | [0088](0088-otlp-receiver-revoked-certificate-rejection-evidence.md) | Accepted | Prove the OTLP receiver rejects an otherwise-trusted, unexpired but CRL-revoked client certificate |
+| [0089](0089-fail-closed-otlp-client-crl-freshness.md) | Accepted | Reject stale client CRLs at startup and remove an expired receiver from readiness and intake |

@@ -19,6 +19,9 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader, MetricExportResult
 from opentelemetry.sdk.resources import Resource
 
+from iip.application.ingest_otlp_metrics import OtlpReceiverConfigurationError
+from iip.surfaces.otlp_tls import OtlpTlsConfiguration
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -299,6 +302,40 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
                 token=os.environ["IIP_TEST_OTLP_CHANNEL_TOKEN"],
                 context=revoked_identity,
             )
+
+    def test_expired_client_crl_is_rejected_before_listener_start(self) -> None:
+        configuration = OtlpTlsConfiguration.from_environment(
+            {
+                "IIP_OTLP_TLS_MODE": "mutual-spiffe",
+                "IIP_OTLP_TLS_CERTIFICATE_PATH": os.environ[
+                    "IIP_TEST_OTLP_SERVER_CERT_FILE"
+                ],
+                "IIP_OTLP_TLS_PRIVATE_KEY_PATH": os.environ[
+                    "IIP_TEST_OTLP_SERVER_KEY_FILE"
+                ],
+                "IIP_OTLP_TLS_CLIENT_CA_PATH": os.environ[
+                    "IIP_TEST_OTLP_CA_FILE"
+                ],
+                "IIP_OTLP_MTLS_IDENTITIES_JSON": json.dumps(
+                    {
+                        "identities": [
+                            {
+                                "spiffeId": "spiffe://customer.example/observability/collector",
+                                "channelIds": ["otlp-docker"],
+                            }
+                        ]
+                    }
+                ),
+                "IIP_OTLP_TLS_CLIENT_CRL_PATH": os.environ[
+                    "IIP_TEST_OTLP_EXPIRED_CRL_FILE"
+                ],
+            }
+        )
+        with self.assertRaisesRegex(
+            OtlpReceiverConfigurationError,
+            "otlp.tls.configuration.invalid",
+        ):
+            configuration.ssl_context()
 
     def test_certificate_rotation_preserves_the_same_spiffe_authority(self) -> None:
         rotated_identity = self.receiver_context(

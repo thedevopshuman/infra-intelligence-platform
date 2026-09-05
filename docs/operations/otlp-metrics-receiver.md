@@ -76,8 +76,15 @@ additionally fails closed for any presented certificate whose serial number
 appears on that CRL, before either of the two checks above runs. This lets a
 deployment revoke a workload identity immediately, without waiting for its
 certificate's `notAfter` or updating the SPIFFE identity registry. The
-receiver loads the CRL once at startup; keeping it current and distributing
-updates remains the customer's responsibility (ADR 0088).
+receiver accepts exactly one PEM CRL up to 1 MiB. Its `lastUpdate` may be at
+most equal to the receiver clock and its `nextUpdate` must be in the future. An
+invalid issuer/signature or already expired CRL rejects startup; reaching
+`nextUpdate` later removes the receiver from readiness and rejects metrics/logs
+intake before body read. Project a current CRL and roll the receiver before
+expiry because OpenSSL and the application intentionally load the same bytes
+once at startup. Distribution remains the customer's responsibility
+([ADRs 0088](../decisions/0088-otlp-receiver-revoked-certificate-rejection-evidence.md)
+and [0089](../decisions/0089-fail-closed-otlp-client-crl-freshness.md)).
 
 ## Protected channel configuration
 
@@ -111,9 +118,10 @@ For Helm, set `otlpReceiver.enabled: true`, `database.existingSecret`, and
 `identitiesExistingSecret`. The identity Secret value follows
 [`client-identities.example.json`](../../deploy/otlp/client-identities.example.json).
 Optionally set `clientCrlExistingSecret`/`clientCrlSecretKey` to enable CRL
-checking (ADR 0088); it may reference the same Secret as `clientCaExistingSecret`
-or a separate one, and is otherwise left empty. The chart never puts channel or
-identity configuration in a ConfigMap or mounts it into the control-plane pod.
+checking and freshness enforcement (ADRs 0088 and 0089); it may reference the
+same Secret as `clientCaExistingSecret` or a separate one, and is otherwise
+left empty. The chart never puts channel or identity configuration in a
+ConfigMap or mounts it into the control-plane pod.
 
 The chart creates a dedicated receiver Deployment and ClusterIP Service on
 OTLP/HTTP port `4318`. It exposes no console or control-plane operation, has no

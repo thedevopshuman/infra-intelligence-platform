@@ -6,10 +6,13 @@ import os
 import re
 import ssl
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
+
+from cryptography import x509
 
 from iip.application.ingest_otlp_metrics import (
     OtlpReceiverAuthenticationError,
@@ -29,6 +32,9 @@ _TLS_ENVIRONMENT_KEYS = (
     "IIP_OTLP_MTLS_IDENTITIES_JSON",
     "IIP_OTLP_TLS_CLIENT_CRL_PATH",
 )
+_MAX_CLIENT_CRL_BYTES = 1_048_576
+_CRL_BEGIN = b"-----BEGIN X509 CRL-----"
+_CRL_END = b"-----END X509 CRL-----"
 
 
 def _absolute_path(value: object) -> str | None:
@@ -132,6 +138,104 @@ class SpiffeClientIdentityRegistry:
 
 
 @dataclass(frozen=True)
+class ClientCrlFreshnessPolicy:
+    """Fail closed when a configured client CRL is not currently valid."""
+
+    last_update: datetime
+    next_update: datetime
+    pem_data: str = field(default="", repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if (
+            self.last_update.tzinfo is None
+            or self.next_update.tzinfo is None
+            or self.last_update >= self.next_update
+        ):
+            raise OtlpReceiverConfigurationError(
+                "otlp.tls.configuration.invalid"
+            )
+
+    @classmethod
+    def from_pem_file(
+        cls,
+        path: str,
+        *,
+        issuer_ca_path: str,
+        evaluated_at: datetime | None = None,
+    ) -> "ClientCrlFreshnessPolicy":
+        try:
+            crl_path = Path(path)
+            with crl_path.open("rb") as stream:
+                payload = stream.read(_MAX_CLIENT_CRL_BYTES + 1)
+            stripped = payload.strip()
+            if (
+                not 1 <= len(payload) <= _MAX_CLIENT_CRL_BYTES
+                or stripped.count(_CRL_BEGIN) != 1
+                or stripped.count(_CRL_END) != 1
+                or not stripped.startswith(_CRL_BEGIN)
+                or not stripped.endswith(_CRL_END)
+            ):
+                raise ValueError
+            crl = x509.load_pem_x509_crl(payload)
+            issuer_certificates = x509.load_pem_x509_certificates(
+                Path(issuer_ca_path).read_bytes()
+            )
+            issuer_valid = False
+            for certificate in issuer_certificates:
+                if certificate.subject != crl.issuer:
+                    continue
+                try:
+                    constraints = certificate.extensions.get_extension_for_class(
+                        x509.BasicConstraints
+                    ).value
+                    key_usage = certificate.extensions.get_extension_for_class(
+                        x509.KeyUsage
+                    ).value
+                except x509.ExtensionNotFound:
+                    continue
+                if (
+                    constraints.ca
+                    and key_usage.crl_sign
+                    and crl.is_signature_valid(certificate.public_key())
+                ):
+                    issuer_valid = True
+                    break
+            if not issuer_valid:
+                raise ValueError
+            next_update = crl.next_update_utc
+            if next_update is None:
+                raise ValueError
+            policy = cls(
+                crl.last_update_utc,
+                next_update,
+                payload.decode("ascii"),
+            )
+            policy.assert_current(evaluated_at=evaluated_at)
+            return policy
+        except OtlpReceiverConfigurationError:
+            raise
+        except (OSError, TypeError, ValueError):
+            raise OtlpReceiverConfigurationError(
+                "otlp.tls.configuration.invalid"
+            ) from None
+
+    def assert_current(self, *, evaluated_at: datetime | None = None) -> None:
+        now = evaluated_at or datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            raise OtlpReceiverConfigurationError(
+                "otlp.tls.configuration.invalid"
+            )
+        normalized = now.astimezone(timezone.utc)
+        if (
+            self.last_update.astimezone(timezone.utc) > normalized
+            or self.next_update.astimezone(timezone.utc) <= normalized
+        ):
+            raise OtlpReceiverConfigurationError(
+                "otlp.tls.configuration.invalid"
+            )
+
+
+@dataclass(frozen=True)
 class OtlpTlsConfiguration:
     """Closed listener TLS profile derived only from protected environment."""
 
@@ -205,7 +309,20 @@ class OtlpTlsConfiguration:
     def scheme(self) -> str:
         return "http" if self.mode == "disabled" else "https"
 
-    def ssl_context(self) -> ssl.SSLContext | None:
+    def client_crl_freshness_policy(self) -> ClientCrlFreshnessPolicy | None:
+        if self.client_crl_path is None:
+            return None
+        assert self.client_ca_path is not None
+        return ClientCrlFreshnessPolicy.from_pem_file(
+            self.client_crl_path,
+            issuer_ca_path=self.client_ca_path,
+        )
+
+    def ssl_context(
+        self,
+        *,
+        client_crl_freshness: ClientCrlFreshnessPolicy | None = None,
+    ) -> ssl.SSLContext | None:
         if self.mode == "disabled":
             return None
         assert self.certificate_path is not None
@@ -222,10 +339,26 @@ class OtlpTlsConfiguration:
                 assert self.client_ca_path is not None
                 context.load_verify_locations(cafile=self.client_ca_path)
                 if self.client_crl_path is not None:
-                    # OpenSSL's verify store accumulates across calls, so a
-                    # second load_verify_locations() call adds the CRL to the
-                    # same trust store built above rather than replacing it.
+                    freshness = (
+                        client_crl_freshness
+                        or self.client_crl_freshness_policy()
+                    )
+                    assert freshness is not None
+                    freshness.assert_current()
+                    if not freshness.pem_data:
+                        raise OtlpReceiverConfigurationError(
+                            "otlp.tls.configuration.invalid"
+                        )
+                    # Python/OpenSSL accepts a CRL only through a CA file, not
+                    # cadata. Re-read after loading and reject an atomic Secret
+                    # rotation race rather than pairing different validity
+                    # metadata with the trust-store bytes.
                     context.load_verify_locations(cafile=self.client_crl_path)
+                    loaded = self.client_crl_freshness_policy()
+                    if loaded is None or loaded.pem_data != freshness.pem_data:
+                        raise OtlpReceiverConfigurationError(
+                            "otlp.tls.configuration.invalid"
+                        )
                     context.verify_flags |= ssl.VERIFY_CRL_CHECK_LEAF
                 # Health and readiness expose only stable status and stay probeable
                 # without a client certificate. OTLP POST routes enforce a verified

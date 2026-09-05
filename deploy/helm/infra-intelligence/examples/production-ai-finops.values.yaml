@@ -1,0 +1,46 @@
+# Apply after production-core.values.yaml to enable the AI FinOps V0 profile.
+# This file contains references and non-secret policy only, never credentials.
+worker:
+  tenants: [tenant-example]
+
+aiAttribution:
+  enabled: true
+  policiesExistingSecret: iip-ai-attribution
+  allowTestFixtures: false
+
+aiCostEngine:
+  enabled: true
+  catalogsExistingSecret: iip-ai-prices
+  allowTestFixtures: false
+
+aiSavingsEngine:
+  enabled: true
+  profilesExistingSecret: iip-ai-savings
+
+aiAllocationReporting:
+  enabled: true
+
+aiUsageReceiver:
+  enabled: true
+  channelsExistingSecret: iip-ai-usage-channels
+
+otlpIngest:
+  replicaCount: 2
+  tls:
+    mode: mutual-spiffe
+    serverExistingSecret: iip-otlp-server-tls
+    clientCaExistingSecret: iip-otlp-client-ca
+    clientCrlExistingSecret: iip-otlp-client-crl-v1
+    identitiesExistingSecret: iip-otlp-client-identities
+
+collectorQueueLoss:
+  bindingJson: >-
+    {"integrationId":"customer-prometheus","exporter":"otlphttp/iip-ai-usage"}
+
+networkPolicy:
+  otlpReceiverIngress:
+    enabled: true
+    namespaceSelector:
+      kubernetes.io/metadata.name: observability
+    podSelector:
+      app.kubernetes.io/name: customer-collector

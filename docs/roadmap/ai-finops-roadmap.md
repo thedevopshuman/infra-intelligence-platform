@@ -56,6 +56,13 @@ cohorts. Its finding and dashboard signal carry an unresolved monetary status
 until billable-attempt evidence exists. Expensive-model anomaly detection
 remains open pending protected equivalence and workload-quality evidence.
 
+A closed `production-ai-finops-v0` Helm overlay and minimized deployment
+preflight are also executable. Static mode proves the complete non-secret
+configuration shape; explicit-context cluster mode additionally proves that
+every referenced Secret key, ConfigMap, and backup claim exists. This remains
+a pre-install gate: live provider/workload behavior, authoritative prices, and
+customer Collector/PKI interoperability require separate qualification.
+
 ## Phase B — application and team attribution
 
 **Outcome:** Operators can allocate observed usage and calculated cost to

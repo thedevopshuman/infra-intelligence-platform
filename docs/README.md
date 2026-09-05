@@ -44,6 +44,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Plugin contract](specifications/plugin-contract.md)
 - [Plugin compatibility report contract](specifications/plugin-compatibility-contract.md)
 - [Plugin action mediation contracts](specifications/plugin-action-mediation-contract.md)
+- [Customer deployment preflight report](specifications/customer-deployment-preflight-report-contract.md)
 
 ## Decisions and delivery
 
@@ -53,6 +54,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Local development](operations/local-development.md)
 - [Transactional outbox event delivery](operations/event-delivery.md)
 - [Helm deployment and schema migration](operations/helm-deployment.md)
+- [Customer deployment preflight](operations/customer-deployment-preflight.md)
 - [Release artifacts and supply-chain evidence](operations/release-artifacts.md)
 - [OpenTelemetry metrics export](operations/opentelemetry-export.md)
 - [Prometheus telemetry evidence](operations/prometheus-evidence.md)

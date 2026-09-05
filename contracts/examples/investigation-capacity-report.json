@@ -12,7 +12,7 @@
     "environment": {
       "platform": "darwin/arm64",
       "pythonVersion": "3.12.11",
-      "applicationVersion": "0.70.0",
+      "applicationVersion": "0.71.0",
       "database": {
         "engine": "postgresql",
         "version": "18.4",

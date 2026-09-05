@@ -19,6 +19,7 @@ from .models import (
     AiUsageAttributionRecord,
     CollectorQueueLossReport,
     ConsoleAuthenticationConfiguration,
+    CustomerDeploymentPreflightReport,
     ContextEvidenceRequest,
     ContextEvidenceResult,
     Evidence,
@@ -118,6 +119,7 @@ __all__ = [
     "Client",
     "CollectorQueueLossReport",
     "ConsoleAuthenticationConfiguration",
+    "CustomerDeploymentPreflightReport",
     "ContextEvidenceRequest",
     "ContextEvidenceResult",
     "Evidence",
@@ -201,4 +203,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.51.0"
+__version__ = "0.52.0"

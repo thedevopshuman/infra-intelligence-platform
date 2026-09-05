@@ -1,0 +1,114 @@
+# Non-secret production-core starting point for deployment preflight.
+# Replace every example endpoint, CIDR, registry, and identity value through a
+# reviewed customer change. Secret values never belong in this file.
+replicaCount: 2
+
+image:
+  repository: registry.example.test/iip/control-plane
+  tag: "0.71.0"
+  digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+worker:
+  enabled: true
+  replicaCount: 2
+  tenants: [tenant-example]
+
+database:
+  existingSecret: iip-database
+  migrations:
+    enabled: true
+
+backup:
+  enabled: true
+  destination:
+    existingClaim: iip-backups
+
+auth:
+  mode: oidc
+  existingSecret: ""
+  oidc:
+    configJson: >-
+      {"issuer":"https://identity.example.test/","audience":"iip-control-plane","jwksUrl":"https://identity.example.test/.well-known/jwks.json","actorClaim":"sub","tenantClaim":"iip_tenant_id","rolesClaim":"iip_roles","browser":{"clientId":"iip-console","authorizationEndpoint":"https://identity.example.test/oauth2/authorize","tokenEndpoint":"https://identity.example.test/oauth2/token","redirectUri":"https://iip.example.test/console","scopes":["openid","profile"],"providerLabel":"Organization SSO"},"cacheSeconds":300,"clockSkewSeconds":30}
+    caBundleExistingSecret: iip-oidc-ca
+
+policy:
+  mode: external-http
+  externalHttp:
+    configJson: >-
+      {"endpoint":"https://policy.example.test/v1/data/iip/decision","caBundlePath":"/var/run/iip-policy-ca/ca.crt","bearerTokenPath":"/var/run/iip-policy-token/token","timeoutSeconds":5,"maxResponseBytes":65536}
+    bearerTokenExistingSecret: iip-policy-token
+    caBundleExistingSecret: iip-policy-ca
+
+credentialBroker:
+  mode: external-http
+  externalHttp:
+    configJson: >-
+      {"endpoint":"https://credential-broker.example.test:8443","caBundlePath":"/var/run/iip-credential-broker-ca/ca.crt","workloadIdentityTokenPath":"/var/run/iip-credential-broker-identity/token","requestTimeoutSeconds":5,"maxResponseBytes":65536,"maxLeaseSeconds":900,"maxClockSkewSeconds":30}
+    caBundleExistingSecret: iip-credential-broker-ca
+
+telemetry:
+  metricsEnabled: true
+  tracesEnabled: true
+  otlpEndpoint: https://otel-collector.observability.svc:4318
+  existingSecret: iip-otel-export
+
+telemetryEvidence:
+  backend: prometheus
+  prometheus:
+    integrationsJson: >-
+      {"integrations":[{"id":"customer-prometheus","tenantId":"tenant-example","endpoint":"https://prometheus.observability.svc:9090","credentialRef":"prometheus-primary","allowedMetricPrefixes":["container_","kube_","node_"],"maxPoints":10000,"timeoutSeconds":10,"maxResponseBytes":1048576}]}
+    credentialsExistingSecret: iip-prometheus-credentials
+
+logEvidence:
+  backend: loki
+  loki:
+    integrationsJson: >-
+      {"integrations":[{"id":"customer-loki","tenantId":"tenant-example","endpoint":"https://loki.observability.svc:3100","credentialRef":"loki-primary","serviceLabel":"service_name","severityLabel":"severity","maxRecords":1000,"timeoutSeconds":10,"maxResponseBytes":1048576}]}
+    credentialsExistingSecret: iip-loki-credentials
+
+kubernetesEventEvidence:
+  backend: kubernetes-api
+  integrationsJson: >-
+    {"integrations":[{"id":"customer-kubernetes","tenantId":"tenant-example","endpoint":"https://kubernetes.default.svc","credentialRef":"kubernetes-events-primary","caBundlePath":"/var/run/iip-kubernetes-events/ca.crt","maxEvents":1000,"timeoutSeconds":10,"maxResponseBytes":1048576}]}
+  credentialsExistingSecret: iip-kubernetes-events-credentials
+  caBundleExistingSecret: iip-kubernetes-events-ca
+
+evidenceRetention:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: nginx
+  host: iip.example.test
+  tls:
+    existingSecret: iip-ingress-tls
+  tlsRedirectAnnotation: nginx.ingress.kubernetes.io/ssl-redirect
+
+networkPolicy:
+  enabled: true
+  ingressController:
+    enabled: true
+  databaseEgress:
+    enabled: true
+    cidr: 10.20.30.40/32
+  otlpEgress:
+    enabled: true
+  prometheusEgress:
+    enabled: true
+  lokiEgress:
+    enabled: true
+  kubernetesApiEgress:
+    enabled: true
+  credentialBrokerEgress:
+    enabled: true
+    cidr: 10.20.30.41/32
+  oidcEgress:
+    enabled: true
+    cidr: 203.0.113.10/32
+  policyEgress:
+    enabled: true
+    cidr: 10.20.30.42/32
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

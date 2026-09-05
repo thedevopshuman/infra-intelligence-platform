@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -7,6 +7,11 @@ DOCKER ?= docker
 NPM ?= npm
 IIP_DATABASE_RECOVERY_REPORT ?= dist/postgresql-recovery-qualification-report.json
 IIP_DATABASE_CONTINUITY_REPORT ?= dist/postgresql-continuity-qualification-report.json
+IIP_DEPLOYMENT_PREFLIGHT_REPORT ?= dist/customer-deployment-preflight-report.json
+IIP_DEPLOYMENT_PROFILE ?= production-core-v1
+IIP_DEPLOYMENT_VALUES ?= deploy/helm/infra-intelligence/examples/production-core.values.yaml
+IIP_DEPLOYMENT_NAMESPACE ?= iip-system
+IIP_KUBERNETES_CONTEXT ?=
 
 help:
 	@echo "install-verify-deps Install pinned verification-only Python dependencies"
@@ -14,6 +19,9 @@ help:
 	@echo "validate-schemas Validate contract examples against JSON Schemas"
 	@echo "test          Run the reference-kernel and SDK tests"
 	@echo "test-typescript Install locked TypeScript tooling and type-check the SDK"
+	@echo "test-deployment-preflight Validate both sanitized production Helm profiles"
+	@echo "preflight-deployment-live Check a customer values file and explicit Kubernetes context"
+	@echo "verify-deployment-preflight-report Verify current source/configuration-bound preflight evidence"
 	@echo "test-postgres Run PostgreSQL integration tests with Docker Desktop"
 	@echo "test-capacity Certify large-tenant investigation dispatch capacity with PostgreSQL"
 	@echo "test-credential-broker Certify the external broker client over local TLS"
@@ -76,6 +84,39 @@ test:
 test-typescript:
 	cd sdks/typescript && $(NPM) ci --ignore-scripts --no-audit --no-fund
 	cd sdks/typescript && $(NPM) run check
+
+test-deployment-preflight:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/deployment_preflight.py generate \
+		--profile production-core-v1 \
+		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml \
+		--output dist/customer-deployment-preflight-report.json
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/deployment_preflight.py verify \
+		--report dist/customer-deployment-preflight-report.json \
+		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/deployment_preflight.py generate \
+		--profile production-ai-finops-v0 \
+		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml \
+		--values deploy/helm/infra-intelligence/examples/production-ai-finops.values.yaml \
+		--output dist/customer-ai-finops-preflight-report.json
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/deployment_preflight.py verify \
+		--report dist/customer-ai-finops-preflight-report.json \
+		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml \
+		--values deploy/helm/infra-intelligence/examples/production-ai-finops.values.yaml
+
+preflight-deployment-live:
+	@test -n "$(IIP_KUBERNETES_CONTEXT)" || \
+		(echo "IIP_KUBERNETES_CONTEXT is required" >&2; exit 2)
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/deployment_preflight.py generate \
+		--profile "$(IIP_DEPLOYMENT_PROFILE)" --values "$(IIP_DEPLOYMENT_VALUES)" \
+		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" --context "$(IIP_KUBERNETES_CONTEXT)" \
+		--live --output "$(IIP_DEPLOYMENT_PREFLIGHT_REPORT)"
+
+verify-deployment-preflight-report:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/deployment_preflight.py verify \
+		--report "$(IIP_DEPLOYMENT_PREFLIGHT_REPORT)" \
+		--values "$(IIP_DEPLOYMENT_VALUES)" \
+		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
+		--require-clean --require-install-ready
 
 test-postgres:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_postgres.sh
@@ -349,7 +390,7 @@ helm-lint:
 		echo "Helm validation accepted backup without database-only NetworkPolicy" >&2; exit 1; \
 	fi
 
-verify: validate validate-schemas test test-typescript helm-lint
+verify: validate validate-schemas test test-typescript helm-lint test-deployment-preflight
 
 run:
 	PYTHONPATH=src $(PYTHON) -m iip.surfaces.http

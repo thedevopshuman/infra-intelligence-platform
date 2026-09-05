@@ -79,6 +79,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0101-source-bound-postgresql-recovery-evidence.md",
     "docs/decisions/0102-external-secret-controller-handoff.md",
     "docs/decisions/0103-source-bound-postgresql-physical-continuity-evidence.md",
+    "docs/decisions/0104-minimized-customer-deployment-preflight.md",
     "docs/operations/external-secrets.md",
     "deploy/helm/infra-intelligence/examples/iip-database.externalsecret.yaml",
     "scripts/test_external_secrets.sh",
@@ -86,6 +87,14 @@ REQUIRED_PATHS = (
     "docs/specifications/postgresql-recovery-qualification-contract.md",
     "docs/specifications/postgresql-continuity-qualification-contract.md",
     "docs/operations/postgresql-continuity.md",
+    "docs/operations/customer-deployment-preflight.md",
+    "docs/specifications/customer-deployment-preflight-report-contract.md",
+    "contracts/schemas/customer-deployment-preflight-report.schema.json",
+    "contracts/examples/customer-deployment-preflight-report.json",
+    "deploy/helm/infra-intelligence/templates/deployment-profile.yaml",
+    "deploy/helm/infra-intelligence/examples/production-core.values.yaml",
+    "deploy/helm/infra-intelligence/examples/production-ai-finops.values.yaml",
+    "scripts/deployment_preflight.py",
     "docs/decisions/0026-resource-history-change-evidence.md",
     "docs/decisions/0029-investigation-context-correlation.md",
     "docs/decisions/0030-durable-investigation-lifecycle.md",
@@ -1536,6 +1545,34 @@ def validate_release_qualification_example(
         "overallStatus": "qualified",
     } or spec.get("status") != "qualified":
         fail(errors, "release qualification summary must match its profiles")
+
+
+def validate_customer_deployment_preflight_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check the closed preflight profiles and derived minimized report."""
+
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "customer-deployment-preflight-report.json"
+    )
+    report = documents.get(path)
+    try:
+        from deployment_preflight import (
+            DeploymentPreflightError,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "customer deployment preflight example must be semantically valid")
+        return
+    try:
+        if not isinstance(report, dict):
+            raise DeploymentPreflightError("preflight.report.invalid")
+        validate_report_document(report)
+    except DeploymentPreflightError:
+        fail(errors, "customer deployment preflight example must be semantically valid")
 
 
 def validate_postgresql_recovery_qualification_example(
@@ -4278,6 +4315,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "PostgreSQLContinuityQualificationReport",
         ),
         (
+            "customer-deployment-preflight-report.json",
+            "CustomerDeploymentPreflightReport",
+        ),
+        (
             "credential-broker-compatibility-report.json",
             "CredentialBrokerCompatibilityReport",
         ),
@@ -4341,6 +4382,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_bedrock_instrumentation_compatibility_example(documents, errors)
     validate_openai_instrumentation_compatibility_example(documents, errors)
     validate_release_qualification_example(documents, errors)
+    validate_customer_deployment_preflight_example(documents, errors)
     validate_postgresql_recovery_qualification_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
     validate_ai_economics_examples(documents, errors)

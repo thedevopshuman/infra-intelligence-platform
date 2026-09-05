@@ -102,3 +102,7 @@ Version 0.51 adds the offline `PostgreSQLContinuityQualificationReport`, its
 closed physical-continuity checks, and minimized integrity types. It adds no
 database credential, tenant data, API method, automatic-failover behavior, or
 customer RPO/RTO claim.
+
+Version 0.52 adds the offline `CustomerDeploymentPreflightReport`, its closed
+core and AI FinOps checks, and minimized prerequisite summary types. It adds no
+cluster credential, deployment mutation, or customer production claim.

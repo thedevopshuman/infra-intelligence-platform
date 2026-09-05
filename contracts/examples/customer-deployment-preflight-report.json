@@ -1,0 +1,76 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerDeploymentPreflightReport",
+  "metadata": {
+    "generatedAt": "2026-09-05T15:26:40Z",
+    "id": "cdp_f615cb29f5db6d714012f60703c65815",
+    "sourceDirty": false,
+    "sourceRevision": "afd2ce4e600094fb481bc1da2789a35de00c8828"
+  },
+  "spec": {
+    "checks": [
+      {"id": "helm-render", "status": "passed"},
+      {"id": "immutable-image", "status": "passed"},
+      {"id": "published-image-repository", "status": "passed"},
+      {"id": "api-redundancy", "status": "passed"},
+      {"id": "worker-enrollment", "status": "passed"},
+      {"id": "worker-redundancy", "status": "passed"},
+      {"id": "external-database", "status": "passed"},
+      {"id": "controlled-migrations", "status": "passed"},
+      {"id": "oidc-authentication", "status": "passed"},
+      {"id": "external-policy", "status": "passed"},
+      {"id": "workload-identity-broker", "status": "passed"},
+      {"id": "tls-ingress", "status": "passed"},
+      {"id": "network-isolation", "status": "passed"},
+      {"id": "pod-disruption-budget", "status": "passed"},
+      {"id": "scheduled-backup", "status": "passed"},
+      {"id": "evidence-retention", "status": "passed"},
+      {"id": "platform-telemetry", "status": "passed"},
+      {"id": "evidence-backends", "status": "passed"},
+      {"id": "service-account-isolation", "status": "passed"},
+      {"id": "test-fixtures-denied", "status": "passed"},
+      {"errorCode": "preflight.cluster.not-run", "id": "cluster-api", "status": "not-run"},
+      {"errorCode": "preflight.dependencies.not-run", "id": "referenced-dependencies", "status": "not-run"}
+    ],
+    "customerQualificationRequired": [
+      "signed-published-release",
+      "customer-oidc-browser-issuer",
+      "customer-policy-bundle",
+      "customer-workload-identity-broker",
+      "customer-collector-pki",
+      "customer-postgresql-ha-dr",
+      "customer-workload-slo"
+    ],
+    "dependencies": {
+      "bindingDigest": "sha256:7b1dace137e4851b1ed3feeccc1698639c7c485deb39d115256446c27275be15",
+      "configuredCount": 12,
+      "invalidCount": 0,
+      "missingCount": 0,
+      "observedCount": 0,
+      "unavailableCount": 0,
+      "verificationStatus": "not-run"
+    },
+    "environment": {
+      "helmVersion": "v4.1.3",
+      "mode": "static",
+      "platform": "darwin/arm64",
+      "pythonVersion": "3.14.3"
+    },
+    "profile": {
+      "applicationVersion": "0.71.0",
+      "chartVersion": "0.74.0",
+      "configurationDigest": "sha256:1299ccb15d64fd4f773446fa0ba151a4f2a1fbfdae283682018065a97c90225b",
+      "name": "production-core-v1",
+      "valuesDigest": "sha256:9dfee04d65a033d3464a1d17a5093a44eb294ecd961a2246d7ffb8863fbd3e94"
+    },
+    "qualificationBoundary": "pre-install-only",
+    "status": "configuration-ready",
+    "summary": {
+      "failedChecks": 0,
+      "notRunChecks": 2,
+      "overallStatus": "configuration-ready",
+      "passedChecks": 20,
+      "totalChecks": 22
+    }
+  }
+}

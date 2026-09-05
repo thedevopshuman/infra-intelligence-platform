@@ -25,6 +25,17 @@ make verify
 
 This validates JSON documents and internal links, enforces Python package directions, checks every contract schema and example with the pinned Draft 2020-12 validator, runs unit tests, lints the chart, and renders Kubernetes templates.
 
+Render and evaluate both closed, non-secret customer deployment profiles with:
+
+```bash
+make test-deployment-preflight
+```
+
+Both results are deliberately `configuration-ready`: cluster access and
+referenced prerequisites were not observed. Use the explicit-context live
+command in the [customer deployment preflight](customer-deployment-preflight.md)
+only with an exact protected customer values generation.
+
 PostgreSQL integration tests skip when no database URL is supplied. With Docker Desktop running, execute the explicit durable-store gate:
 
 ```bash

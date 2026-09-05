@@ -61,6 +61,15 @@ helm template iip deploy/helm/infra-intelligence \
   --values /protected/path/iip-values.yaml >/dev/null
 ```
 
+For a production-shaped deployment, use the closed source- and
+configuration-bound gate instead of treating a successful render as enough.
+It ships non-secret core and AI FinOps examples, checks the complete profile,
+and can verify exact prerequisite objects and keys in an explicitly named
+context before Helm applies anything. Follow the
+[customer deployment preflight](customer-deployment-preflight.md). Only a
+cluster-mode pass is `install-ready`, and even that result remains
+`pre-install-only` rather than customer certification.
+
 The chart intentionally exposes only `ClusterIP` Services and keeps service-account token automounting disabled. Put any later external access behind a separately reviewed authenticated TLS boundary; do not turn the internal HTTP Service into an internet-facing load balancer.
 
 ## Authenticated TLS ingress
@@ -220,7 +229,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.70.0
+  tag: 0.71.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -362,7 +371,7 @@ To test the actual packaged release chart and attested OCI archive instead of
 checkout artifacts, first build the release bundle and then run:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.70.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.71.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -371,7 +380,7 @@ and the explicit prior release revision. Equal latest migrations are allowed;
 a migration regression is not:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.70.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.71.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
@@ -421,4 +430,4 @@ The first revision additionally proves the public local console-authentication d
 
 ## Production gaps
 
-This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance, a manifest-bound install/N-1 qualification report, separate source-bound PostgreSQL logical-recovery and physical-streaming/promotion/named-target-recovery reports, and 128-tenant PostgreSQL overload evidence; the chart declares guarded TLS ingress, ships a controller-neutral external-secret example, and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; the external-secret gate proves exact-key synchronization and rotation with named-secret-only source authority; the kind gate restores one; and the N-1 gate proves a data-preserving upgrade, application rollback against the forward schema, idempotent re-upgrade, zero-failure bounded reads through the internal Service, and completion of one deliberately blocked read during target-pod termination. Organizational image signing, customer secret-backend/controller interoperability, controller-specific end-to-end TLS and upgrade conformance, production request-duration and streaming profiles, production-scale latency/load and failure-injected availability, high availability, customer-environment sustained workload and failover tests, automatic database failover/fencing, storage durability/encryption/retention, customer-hosted point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.
+This proves deployment mechanics, not production certification. The local release path generates verified SBOM/provenance, a manifest-bound install/N-1 qualification report, separate source-bound PostgreSQL logical-recovery and physical-streaming/promotion/named-target-recovery reports, a minimized static/live customer deployment preflight report, and 128-tenant PostgreSQL overload evidence; the chart declares guarded TLS ingress, ships a controller-neutral external-secret example, and schedules logical backups; the worker enforces bounded tenant-fair investigation admission; the external-secret gate proves exact-key synchronization and rotation with named-secret-only source authority; the kind gate restores one; and the N-1 gate proves a data-preserving upgrade, application rollback against the forward schema, idempotent re-upgrade, zero-failure bounded reads through the internal Service, and completion of one deliberately blocked read during target-pod termination. The preflight proves configuration and prerequisite presence only. Organizational image signing, customer secret-backend/controller interoperability, controller-specific end-to-end TLS and upgrade conformance, production request-duration and streaming profiles, production-scale latency/load and failure-injected availability, high availability, customer-environment sustained workload and failover tests, automatic database failover/fencing, storage durability/encryption/retention, customer-hosted point-in-time recovery, disaster recovery, and environment-specific policy remain release and customer gates.

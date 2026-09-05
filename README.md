@@ -30,6 +30,16 @@ authority and propagates a source rotation. The
 [external-secret runbook](docs/operations/external-secrets.md) inventories every
 optional chart Secret boundary and keeps customer store credentials outside IIP.
 
+The chart also emits a sanitized deployment profile and ships composable
+production-core and AI FinOps values examples. A source-bound preflight renders
+the complete chart, evaluates closed production checks, and can use one
+explicit Kubernetes context to verify referenced Secret keys, ConfigMaps, and
+a bound backup claim before installation. Its retained report contains only
+counts and digests and remains explicitly `pre-install-only`; customer
+interoperability and resilience evidence cannot be promoted from a local or
+static pass. See the
+[customer deployment preflight](docs/operations/customer-deployment-preflight.md).
+
 The exact-host plugin matrix has separate offline observer, host-mediated read,
 and proposal-only action-provider rows. The action row runs in Docker's
 no-network sandbox, reaches the real governed proposal service through the SDK
@@ -124,6 +134,7 @@ make test-policy-engine
 make test-external-secrets
 make test-backup-restore
 make test-postgres-continuity
+make test-deployment-preflight
 make test-otel
 make test-otlp-receiver
 make test-ai-finops
@@ -148,6 +159,17 @@ IIP_KUBECONFIG=/absolute/path/to/.kube/config make test-kubernetes-live
 make run
 ```
 
+Before a customer Helm installation, merge the non-secret production examples
+into a protected values file and run the live gate with an explicit context:
+
+```bash
+IIP_DEPLOYMENT_PROFILE=production-core-v1 \
+IIP_DEPLOYMENT_VALUES=/absolute/protected/customer.values.yaml \
+IIP_DEPLOYMENT_NAMESPACE=iip-system \
+IIP_KUBERNETES_CONTEXT=customer-production \
+make preflight-deployment-live PYTHON=.venv/bin/python
+```
+
 Then, in another terminal:
 
 ```bash
@@ -158,7 +180,7 @@ curl -X POST http://localhost:8080/v1/resources \
   --data @contracts/examples/resource.json
 ```
 
-The API authenticates a Bearer credential into actor, tenant, and role context, exposes its non-secret runtime identity at `GET /v1/system/version`, validates collection/resource boundaries, and exposes graph/timeline, ingestion-freshness, normalized metric, log, Kubernetes Event, resource-change, and repository/runbook context evidence queries. A separate optional process accepts OTLP metrics/logs and metadata-only GenAI usage traces on port `4318` without exposing control-plane routes or credentials; its production profile requires both a CA-verified SPIFFE client certificate bound to the channel and the independent channel Bearer credential. The API accepts bounded investigations synchronously or through durable background jobs that survive HTTP disconnects, exposes queue attempts and cooperative cancellation, and supports separately governed actions and plugin-session workflows. The action default is non-mutating; the opt-in Kubernetes API executor adds server dry-run and a doubly enabled live path. Default external provider backends honestly return no data; selected live adapters require protected endpoint, trust, scope, and credential configuration. The built-in change provider reads only tenant-scoped accepted observation history, while the file context adapter reads only cataloged files under a protected root. The default local profile remains in memory; the Docker profile persists operational records in PostgreSQL. The Helm chart has a strict closed values contract, resolves every application workload from one optional immutable OCI digest, injects the chart and digest into the runtime report, applies packaged PostgreSQL migrations through a separately enabled database-only hook, keeps Services internal, can declare an existing-certificate TLS Ingress with exact controller NetworkPolicy authority, can schedule checksum-complete logical backups into pre-created protected storage, and ships a controller-neutral existing-Secret synchronization example. Clean revisions can be packaged as an unsigned multi-platform release candidate with separately attested control-plane and plugin-mediation bridge OCI layouts, checksums, SPDX SBOM, SLSA provenance, chart, contracts, and SDK artifacts. The local release gates install that exact package and prove a selected N-1 migration, data-preserving application rollback, idempotent re-upgrade, and bounded zero-failure authenticated Service reads throughout the transition; see the [release procedure](docs/operations/release-artifacts.md).
+The API authenticates a Bearer credential into actor, tenant, and role context, exposes its non-secret runtime identity at `GET /v1/system/version`, validates collection/resource boundaries, and exposes graph/timeline, ingestion-freshness, normalized metric, log, Kubernetes Event, resource-change, and repository/runbook context evidence queries. A separate optional process accepts OTLP metrics/logs and metadata-only GenAI usage traces on port `4318` without exposing control-plane routes or credentials; its production profile requires both a CA-verified SPIFFE client certificate bound to the channel and the independent channel Bearer credential. The API accepts bounded investigations synchronously or through durable background jobs that survive HTTP disconnects, exposes queue attempts and cooperative cancellation, and supports separately governed actions and plugin-session workflows. The action default is non-mutating; the opt-in Kubernetes API executor adds server dry-run and a doubly enabled live path. Default external provider backends honestly return no data; selected live adapters require protected endpoint, trust, scope, and credential configuration. The built-in change provider reads only tenant-scoped accepted observation history, while the file context adapter reads only cataloged files under a protected root. The default local profile remains in memory; the Docker profile persists operational records in PostgreSQL. The Helm chart has a strict closed values contract, resolves every application workload from one optional immutable OCI digest, injects the chart and digest into the runtime report, applies packaged PostgreSQL migrations through a separately enabled database-only hook, keeps Services internal, can declare an existing-certificate TLS Ingress with exact controller NetworkPolicy authority, can schedule checksum-complete logical backups into pre-created protected storage, ships a controller-neutral existing-Secret synchronization example, and emits a sanitized production profile for the pre-install gate. Clean revisions can be packaged as an unsigned multi-platform release candidate with separately attested control-plane and plugin-mediation bridge OCI layouts, checksums, SPDX SBOM, SLSA provenance, chart, contracts, and SDK artifacts. The local release gates install that exact package and prove a selected N-1 migration, data-preserving application rollback, idempotent re-upgrade, and bounded zero-failure authenticated Service reads throughout the transition; see the [release procedure](docs/operations/release-artifacts.md).
 
 ## Repository map
 

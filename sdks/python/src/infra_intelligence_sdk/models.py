@@ -495,6 +495,28 @@ class ReleaseQualificationReport:
 
 
 @dataclass(frozen=True)
+class CustomerDeploymentPreflightReport:
+    """Source- and configuration-bound pre-install customer evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerDeploymentPreflightReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerDeploymentPreflightReport",
+                label="customer deployment preflight report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class PostgreSQLRecoveryQualificationReport:
     """Source-bound complete-schema logical backup and restore evidence."""
 

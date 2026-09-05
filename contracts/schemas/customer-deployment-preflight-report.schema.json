@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-deployment-preflight-report:v1alpha1",
+  "title": "Customer Deployment Preflight Report",
+  "description": "Value-minimized, source-bound pre-install evidence for a production Helm profile and its referenced Kubernetes dependencies.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerDeploymentPreflightReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^cdp_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationBoundary", "profile", "environment", "dependencies", "checks", "customerQualificationRequired", "summary"],
+      "properties": {
+        "status": {"enum": ["blocked", "configuration-ready", "install-ready"]},
+        "qualificationBoundary": {"const": "pre-install-only"},
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "chartVersion", "applicationVersion", "valuesDigest", "configurationDigest"],
+          "properties": {
+            "name": {"enum": ["production-core-v1", "production-ai-finops-v0"]},
+            "chartVersion": {"$ref": "#/$defs/semver"},
+            "applicationVersion": {"$ref": "#/$defs/semver"},
+            "valuesDigest": {"$ref": "#/$defs/digest"},
+            "configurationDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "environment": {
+          "oneOf": [
+            {"$ref": "#/$defs/staticEnvironment"},
+            {"$ref": "#/$defs/clusterEnvironment"}
+          ]
+        },
+        "dependencies": {"$ref": "#/$defs/dependencies"},
+        "checks": {
+          "oneOf": [
+            {"$ref": "#/$defs/coreChecks"},
+            {"$ref": "#/$defs/aiChecks"}
+          ]
+        },
+        "customerQualificationRequired": {
+          "oneOf": [
+            {"$ref": "#/$defs/coreCustomerRequirements"},
+            {"$ref": "#/$defs/aiCustomerRequirements"}
+          ]
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "notRunChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"enum": [22, 27]},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 27},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 27},
+            "notRunChecks": {"type": "integer", "minimum": 0, "maximum": 2},
+            "overallStatus": {"enum": ["blocked", "configuration-ready", "install-ready"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "toolVersion": {"type": "string", "minLength": 1, "maxLength": 64},
+    "staticEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "platform", "pythonVersion", "helmVersion"],
+      "properties": {
+        "mode": {"const": "static"},
+        "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-z0-9_.-]+$", "maxLength": 128},
+        "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "helmVersion": {"$ref": "#/$defs/toolVersion"}
+      }
+    },
+    "clusterEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "platform", "pythonVersion", "helmVersion", "kubectlVersion"],
+      "properties": {
+        "mode": {"const": "cluster"},
+        "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-z0-9_.-]+$", "maxLength": 128},
+        "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "helmVersion": {"$ref": "#/$defs/toolVersion"},
+        "kubectlVersion": {"$ref": "#/$defs/toolVersion"},
+        "kubernetesVersion": {"$ref": "#/$defs/toolVersion"},
+        "clusterBindingDigest": {"$ref": "#/$defs/digest"},
+        "namespaceDigest": {"$ref": "#/$defs/digest"}
+      },
+      "oneOf": [
+        {
+          "required": ["kubernetesVersion", "clusterBindingDigest", "namespaceDigest"]
+        },
+        {
+          "not": {
+            "anyOf": [
+              {"required": ["kubernetesVersion"]},
+              {"required": ["clusterBindingDigest"]},
+              {"required": ["namespaceDigest"]}
+            ]
+          }
+        }
+      ]
+    },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configuredCount", "observedCount", "missingCount", "invalidCount", "unavailableCount", "bindingDigest", "verificationStatus"],
+      "properties": {
+        "configuredCount": {"type": "integer", "minimum": 1, "maximum": 64},
+        "observedCount": {"type": "integer", "minimum": 0, "maximum": 64},
+        "missingCount": {"type": "integer", "minimum": 0, "maximum": 64},
+        "invalidCount": {"type": "integer", "minimum": 0, "maximum": 64},
+        "unavailableCount": {"type": "integer", "minimum": 0, "maximum": 64},
+        "bindingDigest": {"$ref": "#/$defs/digest"},
+        "observationDigest": {"$ref": "#/$defs/digest"},
+        "verificationStatus": {"enum": ["not-run", "passed", "failed"]}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "verificationStatus": {"const": "not-run"},
+            "observedCount": {"const": 0},
+            "missingCount": {"const": 0},
+            "invalidCount": {"const": 0},
+            "unavailableCount": {"const": 0}
+          },
+          "not": {"required": ["observationDigest"]}
+        },
+        {
+          "required": ["observationDigest"],
+          "properties": {"verificationStatus": {"enum": ["passed", "failed"]}}
+        }
+      ]
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 64},
+        "status": {"enum": ["passed", "failed", "not-run"]},
+        "errorCode": {"type": "string", "pattern": "^preflight\\.[a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"enum": ["failed", "not-run"]}}}
+      ]
+    },
+    "commonCheckPrefix": {
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "helm-render"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "immutable-image"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "published-image-repository"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-redundancy"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "worker-enrollment"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "worker-redundancy"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "external-database"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "controlled-migrations"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "oidc-authentication"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "external-policy"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workload-identity-broker"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "tls-ingress"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "network-isolation"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "pod-disruption-budget"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "scheduled-backup"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "evidence-retention"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "platform-telemetry"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "evidence-backends"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "service-account-isolation"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "test-fixtures-denied"}}}
+      ]
+    },
+    "coreChecks": {
+      "type": "array",
+      "minItems": 22,
+      "maxItems": 22,
+      "allOf": [{"$ref": "#/$defs/commonCheckPrefix"}],
+      "prefixItems": [
+        {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "cluster-api"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "referenced-dependencies"}}}
+      ],
+      "items": false
+    },
+    "aiChecks": {
+      "type": "array",
+      "minItems": 27,
+      "maxItems": 27,
+      "allOf": [{"$ref": "#/$defs/commonCheckPrefix"}],
+      "prefixItems": [
+        {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-usage-intake"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-receiver-mtls"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-receiver-redundancy"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-cost-allocation-savings"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "collector-loss-objective"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "cluster-api"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "referenced-dependencies"}}}
+      ],
+      "items": false
+    },
+    "coreCustomerRequirements": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "prefixItems": [
+        {"const": "signed-published-release"},
+        {"const": "customer-oidc-browser-issuer"},
+        {"const": "customer-policy-bundle"},
+        {"const": "customer-workload-identity-broker"},
+        {"const": "customer-collector-pki"},
+        {"const": "customer-postgresql-ha-dr"},
+        {"const": "customer-workload-slo"}
+      ],
+      "items": false
+    },
+    "aiCustomerRequirements": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "prefixItems": [
+        {"const": "signed-published-release"},
+        {"const": "customer-oidc-browser-issuer"},
+        {"const": "customer-policy-bundle"},
+        {"const": "customer-workload-identity-broker"},
+        {"const": "customer-collector-pki"},
+        {"const": "customer-postgresql-ha-dr"},
+        {"const": "customer-workload-slo"},
+        {"const": "live-bedrock-model-region-streaming"},
+        {"const": "authoritative-ai-price-catalog"},
+        {"const": "ai-workload-saving-validation"}
+      ],
+      "items": false
+    }
+  }
+}

@@ -530,6 +530,118 @@ export interface RuntimeVersionReport {
   };
 }
 
+export type CustomerDeploymentPreflightCoreCheckId =
+  | "helm-render"
+  | "immutable-image"
+  | "published-image-repository"
+  | "api-redundancy"
+  | "worker-enrollment"
+  | "worker-redundancy"
+  | "external-database"
+  | "controlled-migrations"
+  | "oidc-authentication"
+  | "external-policy"
+  | "workload-identity-broker"
+  | "tls-ingress"
+  | "network-isolation"
+  | "pod-disruption-budget"
+  | "scheduled-backup"
+  | "evidence-retention"
+  | "platform-telemetry"
+  | "evidence-backends"
+  | "service-account-isolation"
+  | "test-fixtures-denied";
+
+export type CustomerDeploymentPreflightAiCheckId =
+  | "ai-usage-intake"
+  | "ai-receiver-mtls"
+  | "ai-receiver-redundancy"
+  | "ai-cost-allocation-savings"
+  | "collector-loss-objective";
+
+export type CustomerDeploymentPreflightCheckId =
+  | CustomerDeploymentPreflightCoreCheckId
+  | CustomerDeploymentPreflightAiCheckId
+  | "cluster-api"
+  | "referenced-dependencies";
+
+export type CustomerDeploymentPreflightRequirement =
+  | "signed-published-release"
+  | "customer-oidc-browser-issuer"
+  | "customer-policy-bundle"
+  | "customer-workload-identity-broker"
+  | "customer-collector-pki"
+  | "customer-postgresql-ha-dr"
+  | "customer-workload-slo"
+  | "live-bedrock-model-region-streaming"
+  | "authoritative-ai-price-catalog"
+  | "ai-workload-saving-validation";
+
+export interface CustomerDeploymentPreflightReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerDeploymentPreflightReport";
+  metadata: {
+    id: `cdp_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: boolean;
+  };
+  spec: {
+    status: "blocked" | "configuration-ready" | "install-ready";
+    qualificationBoundary: "pre-install-only";
+    profile: {
+      name: "production-core-v1" | "production-ai-finops-v0";
+      chartVersion: string;
+      applicationVersion: string;
+      valuesDigest: Sha256Digest;
+      configurationDigest: Sha256Digest;
+    };
+    environment:
+      | {
+          mode: "static";
+          platform: `${string}/${string}`;
+          pythonVersion: string;
+          helmVersion: string;
+        }
+      | {
+          mode: "cluster";
+          platform: `${string}/${string}`;
+          pythonVersion: string;
+          helmVersion: string;
+          kubectlVersion: string;
+          kubernetesVersion: string;
+          clusterBindingDigest: Sha256Digest;
+          namespaceDigest: Sha256Digest;
+        };
+    dependencies: {
+      configuredCount: number;
+      observedCount: number;
+      missingCount: number;
+      invalidCount: number;
+      unavailableCount: number;
+      bindingDigest: Sha256Digest;
+      observationDigest?: Sha256Digest;
+      verificationStatus: "not-run" | "passed" | "failed";
+    };
+    checks: Array<
+      | { id: CustomerDeploymentPreflightCheckId; status: "passed" }
+      | {
+          id: CustomerDeploymentPreflightCheckId;
+          status: "failed" | "not-run";
+          errorCode: `preflight.${string}`;
+        }
+    >;
+    customerQualificationRequired: CustomerDeploymentPreflightRequirement[];
+    summary: {
+      totalChecks: 22 | 27;
+      passedChecks: number;
+      failedChecks: number;
+      notRunChecks: number;
+      overallStatus: "blocked" | "configuration-ready" | "install-ready";
+    };
+  };
+}
+
 export type ReleaseQualificationInstallCheckId =
   | "bundle-integrity"
   | "source-identity"

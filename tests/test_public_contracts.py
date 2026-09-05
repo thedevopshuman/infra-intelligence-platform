@@ -14,6 +14,7 @@ from infra_intelligence_sdk import (
     ActionWorkflow,
     ActionWorkflowPage,
     ConsoleAuthenticationConfiguration,
+    CustomerDeploymentPreflightReport,
     ContextEvidenceRequest,
     ContextEvidenceResult,
     Evidence,
@@ -182,6 +183,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         release_qualification = ReleaseQualificationReport.from_dict(
             example("release-qualification-report.json")
+        )
+        deployment_preflight = CustomerDeploymentPreflightReport.from_dict(
+            example("customer-deployment-preflight-report.json")
         )
         postgresql_recovery = PostgreSQLRecoveryQualificationReport.from_dict(
             example("postgresql-recovery-qualification-report.json")
@@ -437,6 +441,10 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         self.assertEqual(
             release_qualification.to_dict()["spec"]["status"], "qualified"
+        )
+        self.assertEqual(
+            deployment_preflight.to_dict()["spec"]["status"],
+            "configuration-ready",
         )
         self.assertEqual(
             postgresql_recovery.to_dict()["spec"]["profile"]["name"],

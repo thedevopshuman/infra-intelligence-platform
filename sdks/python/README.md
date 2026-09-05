@@ -112,3 +112,8 @@ physical-continuity evidence tooling. It exposes only minimized streaming,
 promotion, row-integrity, safe-sequence, named-target recovery, and timing facts;
 it grants no database access and does not turn a local profile into a production
 HA or RPO/RTO claim.
+
+Version 0.52 adds `CustomerDeploymentPreflightReport` for minimized offline
+deployment evidence tooling. It carries closed configuration and prerequisite
+outcomes, counts, and digests only; it grants no cluster access and does not
+turn a pre-install pass into customer production certification.

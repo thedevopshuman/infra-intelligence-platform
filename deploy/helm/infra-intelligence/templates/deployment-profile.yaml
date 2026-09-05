@@ -1,0 +1,125 @@
+{{- $dependencies := list -}}
+{{- if .Values.database.existingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "database" "kind" "Secret" "name" .Values.database.existingSecret "keys" (list .Values.database.secretKey)) -}}
+{{- end -}}
+{{- if and (eq .Values.auth.mode "local-hashed") .Values.auth.existingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "authentication-identities" "kind" "Secret" "name" .Values.auth.existingSecret "keys" (list .Values.auth.secretKey)) -}}
+{{- end -}}
+{{- if .Values.auth.oidc.caBundleExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "oidc-ca" "kind" "Secret" "name" .Values.auth.oidc.caBundleExistingSecret "keys" (list .Values.auth.oidc.caBundleSecretKey)) -}}
+{{- end -}}
+{{- if .Values.ingress.tls.existingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "ingress-tls" "kind" "Secret" "name" .Values.ingress.tls.existingSecret "keys" (list "tls.crt" "tls.key")) -}}
+{{- end -}}
+{{- if .Values.policy.externalHttp.bearerTokenExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "policy-token" "kind" "Secret" "name" .Values.policy.externalHttp.bearerTokenExistingSecret "keys" (list .Values.policy.externalHttp.bearerTokenSecretKey)) -}}
+{{- end -}}
+{{- if .Values.policy.externalHttp.caBundleExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "policy-ca" "kind" "Secret" "name" .Values.policy.externalHttp.caBundleExistingSecret "keys" (list .Values.policy.externalHttp.caBundleSecretKey)) -}}
+{{- end -}}
+{{- if .Values.credentialBroker.externalHttp.caBundleExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "credential-broker-ca" "kind" "Secret" "name" .Values.credentialBroker.externalHttp.caBundleExistingSecret "keys" (list .Values.credentialBroker.externalHttp.caBundleSecretKey)) -}}
+{{- end -}}
+{{- if .Values.telemetry.existingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "telemetry-headers" "kind" "Secret" "name" .Values.telemetry.existingSecret "keys" (list .Values.telemetry.headersSecretKey)) -}}
+{{- end -}}
+{{- if .Values.telemetryEvidence.prometheus.credentialsExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "prometheus-credentials" "kind" "Secret" "name" .Values.telemetryEvidence.prometheus.credentialsExistingSecret "keys" (list .Values.telemetryEvidence.prometheus.credentialsSecretKey)) -}}
+{{- end -}}
+{{- if .Values.logEvidence.loki.credentialsExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "loki-credentials" "kind" "Secret" "name" .Values.logEvidence.loki.credentialsExistingSecret "keys" (list .Values.logEvidence.loki.credentialsSecretKey)) -}}
+{{- end -}}
+{{- if .Values.logEvidence.opensearch.credentialsExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "opensearch-credentials" "kind" "Secret" "name" .Values.logEvidence.opensearch.credentialsExistingSecret "keys" (list .Values.logEvidence.opensearch.credentialsSecretKey)) -}}
+{{- end -}}
+{{- if .Values.kubernetesEventEvidence.credentialsExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "kubernetes-event-credentials" "kind" "Secret" "name" .Values.kubernetesEventEvidence.credentialsExistingSecret "keys" (list .Values.kubernetesEventEvidence.credentialsSecretKey)) -}}
+{{- end -}}
+{{- if .Values.kubernetesEventEvidence.caBundleExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "kubernetes-event-ca" "kind" "Secret" "name" .Values.kubernetesEventEvidence.caBundleExistingSecret "keys" (list .Values.kubernetesEventEvidence.caBundleSecretKey)) -}}
+{{- end -}}
+{{- if .Values.kubernetesActions.credentialsExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "kubernetes-action-credentials" "kind" "Secret" "name" .Values.kubernetesActions.credentialsExistingSecret "keys" (list .Values.kubernetesActions.credentialsSecretKey)) -}}
+{{- end -}}
+{{- if .Values.kubernetesActions.caBundleExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "kubernetes-action-ca" "kind" "Secret" "name" .Values.kubernetesActions.caBundleExistingSecret "keys" (list .Values.kubernetesActions.caBundleSecretKey)) -}}
+{{- end -}}
+{{- if .Values.contextEvidence.integrationsExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "context-integrations" "kind" "Secret" "name" .Values.contextEvidence.integrationsExistingSecret "keys" (list .Values.contextEvidence.integrationsSecretKey)) -}}
+{{- end -}}
+{{- if .Values.contextEvidence.documentsExistingConfigMap -}}
+{{- $dependencies = append $dependencies (dict "purpose" "context-documents" "kind" "ConfigMap" "name" .Values.contextEvidence.documentsExistingConfigMap "keys" (list)) -}}
+{{- end -}}
+{{- if .Values.investigationSignalCatalog.existingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "investigation-signal-catalog" "kind" "Secret" "name" .Values.investigationSignalCatalog.existingSecret "keys" (list .Values.investigationSignalCatalog.secretKey)) -}}
+{{- end -}}
+{{- if .Values.otlpReceiver.channelsExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "metrics-receiver-channels" "kind" "Secret" "name" .Values.otlpReceiver.channelsExistingSecret "keys" (list .Values.otlpReceiver.channelsSecretKey)) -}}
+{{- end -}}
+{{- if .Values.otlpLogsReceiver.channelsExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "logs-receiver-channels" "kind" "Secret" "name" .Values.otlpLogsReceiver.channelsExistingSecret "keys" (list .Values.otlpLogsReceiver.channelsSecretKey)) -}}
+{{- end -}}
+{{- if .Values.aiUsageReceiver.channelsExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "ai-usage-receiver-channels" "kind" "Secret" "name" .Values.aiUsageReceiver.channelsExistingSecret "keys" (list .Values.aiUsageReceiver.channelsSecretKey)) -}}
+{{- end -}}
+{{- if .Values.otlpIngest.tls.serverExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "otlp-server-tls" "kind" "Secret" "name" .Values.otlpIngest.tls.serverExistingSecret "keys" (list .Values.otlpIngest.tls.certificateSecretKey .Values.otlpIngest.tls.privateKeySecretKey)) -}}
+{{- end -}}
+{{- if .Values.otlpIngest.tls.clientCaExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "otlp-client-ca" "kind" "Secret" "name" .Values.otlpIngest.tls.clientCaExistingSecret "keys" (list .Values.otlpIngest.tls.clientCaSecretKey)) -}}
+{{- end -}}
+{{- if .Values.otlpIngest.tls.clientCrlExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "otlp-client-crl" "kind" "Secret" "name" .Values.otlpIngest.tls.clientCrlExistingSecret "keys" (list .Values.otlpIngest.tls.clientCrlSecretKey)) -}}
+{{- end -}}
+{{- if .Values.otlpIngest.tls.identitiesExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "otlp-client-identities" "kind" "Secret" "name" .Values.otlpIngest.tls.identitiesExistingSecret "keys" (list .Values.otlpIngest.tls.identitiesSecretKey)) -}}
+{{- end -}}
+{{- if .Values.aiAttribution.policiesExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "ai-attribution-policies" "kind" "Secret" "name" .Values.aiAttribution.policiesExistingSecret "keys" (list .Values.aiAttribution.policiesSecretKey)) -}}
+{{- end -}}
+{{- if .Values.aiCostEngine.catalogsExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "ai-price-catalogs" "kind" "Secret" "name" .Values.aiCostEngine.catalogsExistingSecret "keys" (list .Values.aiCostEngine.catalogsSecretKey)) -}}
+{{- end -}}
+{{- if .Values.aiSavingsEngine.profilesExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "ai-savings-profiles" "kind" "Secret" "name" .Values.aiSavingsEngine.profilesExistingSecret "keys" (list .Values.aiSavingsEngine.profilesSecretKey)) -}}
+{{- end -}}
+{{- if .Values.eventPublisher.httpsWebhook.tokenExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "event-publisher-token" "kind" "Secret" "name" .Values.eventPublisher.httpsWebhook.tokenExistingSecret "keys" (list .Values.eventPublisher.httpsWebhook.tokenSecretKey)) -}}
+{{- end -}}
+{{- if .Values.eventPublisher.httpsWebhook.caBundleExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "event-publisher-ca" "kind" "Secret" "name" .Values.eventPublisher.httpsWebhook.caBundleExistingSecret "keys" (list .Values.eventPublisher.httpsWebhook.caBundleSecretKey)) -}}
+{{- end -}}
+{{- if .Values.backup.destination.existingClaim -}}
+{{- $dependencies = append $dependencies (dict "purpose" "backup-destination" "kind" "PersistentVolumeClaim" "name" .Values.backup.destination.existingClaim "keys" (list)) -}}
+{{- end -}}
+{{- $profile := dict
+  "schemaVersion" "1"
+  "chart" (dict "name" .Chart.Name "version" .Chart.Version "applicationVersion" .Chart.AppVersion)
+  "image" (dict "repository" .Values.image.repository "digest" .Values.image.digest)
+  "api" (dict "replicaCount" .Values.replicaCount)
+  "worker" (dict "enabled" .Values.worker.enabled "replicaCount" .Values.worker.replicaCount "tenantCount" (len .Values.worker.tenants))
+  "database" (dict "existingSecretConfigured" (not (empty .Values.database.existingSecret)) "migrationsEnabled" .Values.database.migrations.enabled)
+  "authentication" (dict "mode" .Values.auth.mode "oidcConfigurationReviewed" (ne .Values.auth.oidc.configJson "{}"))
+  "policy" (dict "mode" .Values.policy.mode "configurationReviewed" (ne .Values.policy.externalHttp.configJson "{}"))
+  "credentialBroker" (dict "mode" .Values.credentialBroker.mode "configurationReviewed" (ne .Values.credentialBroker.externalHttp.configJson "{}"))
+  "ingress" (dict "enabled" .Values.ingress.enabled "classConfigured" (not (empty .Values.ingress.className)) "hostConfigured" (not (empty .Values.ingress.host)) "tlsConfigured" (not (empty .Values.ingress.tls.existingSecret)) "redirectConfigured" (not (empty .Values.ingress.tlsRedirectAnnotation)))
+  "backup" (dict "enabled" .Values.backup.enabled "destinationConfigured" (not (empty .Values.backup.destination.existingClaim)))
+  "evidenceRetention" (dict "enabled" .Values.evidenceRetention.enabled)
+  "evidenceBackends" (dict "metrics" .Values.telemetryEvidence.backend "logs" .Values.logEvidence.backend "kubernetesEvents" .Values.kubernetesEventEvidence.backend "context" .Values.contextEvidence.backend)
+  "telemetry" (dict "metricsEnabled" .Values.telemetry.metricsEnabled "tracesEnabled" .Values.telemetry.tracesEnabled "endpointConfigured" (not (empty .Values.telemetry.otlpEndpoint)) "collectorQueueLossConfigured" (not (empty .Values.collectorQueueLoss.bindingJson)))
+  "networkPolicy" (dict "enabled" .Values.networkPolicy.enabled "ingressController" .Values.networkPolicy.ingressController.enabled "databaseEgress" .Values.networkPolicy.databaseEgress.enabled "otlpEgress" .Values.networkPolicy.otlpEgress.enabled "prometheusEgress" .Values.networkPolicy.prometheusEgress.enabled "lokiEgress" .Values.networkPolicy.lokiEgress.enabled "opensearchEgress" .Values.networkPolicy.opensearchEgress.enabled "kubernetesApiEgress" .Values.networkPolicy.kubernetesApiEgress.enabled "oidcEgress" .Values.networkPolicy.oidcEgress.enabled "policyEgress" .Values.networkPolicy.policyEgress.enabled "credentialBrokerEgress" .Values.networkPolicy.credentialBrokerEgress.enabled "otlpReceiverIngress" .Values.networkPolicy.otlpReceiverIngress.enabled)
+  "podDisruptionBudget" (dict "enabled" .Values.podDisruptionBudget.enabled "minAvailable" .Values.podDisruptionBudget.minAvailable)
+  "security" (dict "serviceAccountTokenAutomount" .Values.serviceAccount.automount "runAsNonRoot" .Values.podSecurityContext.runAsNonRoot "readOnlyRootFilesystem" .Values.securityContext.readOnlyRootFilesystem "allowPrivilegeEscalation" .Values.securityContext.allowPrivilegeEscalation)
+  "receivers" (dict "metricsEnabled" .Values.otlpReceiver.enabled "logsEnabled" .Values.otlpLogsReceiver.enabled "aiUsageEnabled" .Values.aiUsageReceiver.enabled "replicaCount" .Values.otlpIngest.replicaCount "tlsMode" .Values.otlpIngest.tls.mode "crlConfigured" (not (empty .Values.otlpIngest.tls.clientCrlExistingSecret)))
+  "aiEconomics" (dict "attributionEnabled" .Values.aiAttribution.enabled "costEngineEnabled" .Values.aiCostEngine.enabled "savingsEngineEnabled" .Values.aiSavingsEngine.enabled "allocationReportingEnabled" .Values.aiAllocationReporting.enabled "attributionTestFixtures" .Values.aiAttribution.allowTestFixtures "priceTestFixtures" .Values.aiCostEngine.allowTestFixtures)
+  "dependencies" $dependencies
+-}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "infra-intelligence.fullname" . }}-deployment-profile
+  labels:
+    {{- include "infra-intelligence.labels" . | nindent 4 }}
+    app.kubernetes.io/component: deployment-profile
+data:
+  profile.json: {{ $profile | toJson | quote }}

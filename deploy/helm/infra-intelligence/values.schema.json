@@ -216,12 +216,14 @@
         "enabled",
         "profilesExistingSecret",
         "profilesSecretKey",
+        "allowTestFixtures",
         "intervalSeconds"
       ],
       "properties": {
         "enabled": {"type": "boolean"},
         "profilesExistingSecret": {"$ref": "#/definitions/optionalName"},
         "profilesSecretKey": {"$ref": "#/definitions/nonEmptyString"},
+        "allowTestFixtures": {"type": "boolean"},
         "intervalSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}
       }
     },

@@ -33,8 +33,8 @@ def rendered_profile() -> dict[str, object]:
         "schemaVersion": "1",
         "chart": {
             "name": "infra-intelligence",
-            "version": "0.80.0",
-            "applicationVersion": "0.77.0",
+            "version": "0.81.0",
+            "applicationVersion": "0.78.0",
         },
         "image": {
             "repository": "registry.example.test/iip/control-plane",
@@ -120,6 +120,7 @@ def rendered_profile() -> dict[str, object]:
             "allocationReportingEnabled": False,
             "attributionTestFixtures": False,
             "priceTestFixtures": False,
+            "savingsTestFixtures": False,
         },
         "dependencies": [
             {
@@ -319,6 +320,7 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
             "allocationReportingEnabled": True,
             "attributionTestFixtures": False,
             "priceTestFixtures": False,
+            "savingsTestFixtures": False,
         }
         profile["telemetry"]["collectorQueueLossConfigured"] = True  # type: ignore[index]
         profile["networkPolicy"]["otlpReceiverIngress"] = True  # type: ignore[index]

@@ -21,15 +21,21 @@ from iip.application.ports import (
     AiEconomicsMeasurement,
     AiEconomicsLedger,
     AiEconomicsTelemetrySink,
+    AiModelSavingsMeasurement,
     AiRetryMeasurement,
     AiSavingsCohortQuery,
     Clock,
+)
+from iip.application.validate_ai_model_suitability import (
+    InvalidAiModelSuitabilityReportError,
+    validate_ai_model_suitability_report,
 )
 from iip.domain.models import PlatformEvent
 
 
 CONTEXT_GROWTH_RULE_ID = "context-growth"
 RETRY_AMPLIFICATION_RULE_ID = "retry-amplification"
+EXPENSIVE_MODEL_RULE_ID = "expensive-model-anomaly"
 RULE_ID = CONTEXT_GROWTH_RULE_ID
 RULE_VERSION = "1.0.0"
 MAX_COHORT_RECORDS = 100
@@ -43,6 +49,7 @@ _CATALOG_ID = re.compile(r"apc_[a-f0-9]{32}")
 _FINDING_ID = re.compile(r"aif_[a-f0-9]{32}")
 _USAGE_ID = re.compile(r"aiu_[a-f0-9]{32}")
 _COST_ID = re.compile(r"aic_[a-f0-9]{32}")
+_SUITABILITY_ID = re.compile(r"ams_[a-f0-9]{32}")
 _SAFE_TEXT = re.compile(r"[^\x00-\x1f\x7f]{1,1024}")
 
 
@@ -98,6 +105,32 @@ class RetryAmplificationProfile:
 
 
 @dataclass(frozen=True)
+class ExpensiveModelProfile:
+    profile_id: str
+    tenant_id: str
+    catalog_id: str
+    cost_engine_version: str
+    provider: str
+    model_id: str
+    candidate_model_id: str
+    region: str
+    service_name: str
+    deployment_environment: str
+    baseline_start: str
+    baseline_end: str
+    current_start: str
+    current_end: str
+    minimum_requests: int
+    cost_increase_threshold_basis_points: int
+    max_records_per_window: int
+    evaluation_grace_seconds: int
+    suitability_report_id: str
+    suitability_evaluated_at: str
+    suitability_valid_until: str
+    suitability_report: Mapping[str, object]
+
+
+@dataclass(frozen=True)
 class AiSavingsEvaluationPass:
     profiles: int
     qualified: int
@@ -114,7 +147,12 @@ class _EvaluationOutcome:
     status: str
     finding: Mapping[str, object] | None
     event: PlatformEvent | None
-    measurement: AiEconomicsMeasurement | AiRetryMeasurement | None
+    measurement: (
+        AiEconomicsMeasurement
+        | AiRetryMeasurement
+        | AiModelSavingsMeasurement
+        | None
+    )
 
 
 @dataclass(frozen=True)
@@ -135,6 +173,16 @@ class _RetryCohortItem:
     retry_count: int
 
 
+@dataclass(frozen=True)
+class _ModelCostCohortItem:
+    usage_id: str
+    cost_id: str
+    started_at: datetime
+    total_cost_subunits: int
+    currency: str
+    currency_scale: int
+
+
 class AiSavingsEvaluationService:
     """Evaluate fixed comparison windows outside the inference request path."""
 
@@ -144,6 +192,8 @@ class AiSavingsEvaluationService:
         clock: Clock,
         profiles: tuple[Mapping[str, object], ...],
         telemetry_sink: AiEconomicsTelemetrySink | None = None,
+        *,
+        allow_test_fixtures: bool = False,
     ) -> None:
         if (
             not isinstance(profiles, tuple)
@@ -153,13 +203,22 @@ class AiSavingsEvaluationService:
             raise AiSavingsConfigurationError(
                 "ai.savings.configuration.invalid"
             )
-        validated = tuple(validate_ai_savings_profile(item) for item in profiles)
+        if not isinstance(allow_test_fixtures, bool):
+            raise AiSavingsConfigurationError("ai.savings.configuration.invalid")
+        validated = tuple(
+            validate_ai_savings_profile(
+                item,
+                allow_test_fixtures=allow_test_fixtures,
+            )
+            for item in profiles
+        )
         identities = tuple((item.tenant_id, item.profile_id) for item in validated)
         if len(set(identities)) != len(identities):
             raise AiSavingsConfigurationError("ai.savings.profile.ambiguous")
         self._ledger = ledger
         self._clock = clock
         self._telemetry_sink = telemetry_sink
+        self._allow_test_fixtures = allow_test_fixtures
         self._profiles = tuple(
             sorted(validated, key=lambda item: (item.tenant_id, item.profile_id))
         )
@@ -187,6 +246,12 @@ class AiSavingsEvaluationService:
         }
         for profile in profiles:
             try:
+                if isinstance(profile, ExpensiveModelProfile):
+                    self._ledger.register_ai_model_suitability_report(
+                        actor,
+                        profile.suitability_report,
+                        allow_test_fixtures=self._allow_test_fixtures,
+                    )
                 outcome = self._evaluate(profile, actor, now)
                 counts[outcome.status] += 1
                 if outcome.finding is not None and outcome.event is not None:
@@ -213,12 +278,18 @@ class AiSavingsEvaluationService:
 
     def _evaluate(
         self,
-        profile: ContextGrowthProfile | RetryAmplificationProfile,
+        profile: (
+            ContextGrowthProfile
+            | RetryAmplificationProfile
+            | ExpensiveModelProfile
+        ),
         actor: ActorContext,
         now: datetime,
     ) -> _EvaluationOutcome:
         if isinstance(profile, RetryAmplificationProfile):
             return self._evaluate_retry_amplification(profile, actor, now)
+        if isinstance(profile, ExpensiveModelProfile):
+            return self._evaluate_expensive_model(profile, actor, now)
         return self._evaluate_context_growth(profile, actor, now)
 
     def _evaluate_context_growth(
@@ -406,14 +477,154 @@ class AiSavingsEvaluationService:
         )
         return outcome("qualified", finding, event)
 
+    def _evaluate_expensive_model(
+        self,
+        profile: ExpensiveModelProfile,
+        actor: ActorContext,
+        now: datetime,
+    ) -> _EvaluationOutcome:
+        current_end = _parse_time(profile.current_end)
+        if now < current_end + timedelta(seconds=profile.evaluation_grace_seconds):
+            return _EvaluationOutcome("pending", None, None, None)
+        if not (
+            _parse_time(profile.suitability_evaluated_at)
+            <= now
+            < _parse_time(profile.suitability_valid_until)
+        ):
+            return _EvaluationOutcome(
+                "unresolved",
+                None,
+                None,
+                _model_savings_measurement(
+                    profile,
+                    (),
+                    (),
+                    evaluation_status="unresolved",
+                    finding=None,
+                ),
+            )
+        candidate_rows = self._ledger.list_ai_savings_cohort(
+            actor,
+            _cohort_query(profile, baseline=True),
+        )
+        reference_rows = self._ledger.list_ai_savings_cohort(
+            actor,
+            _cohort_query(profile, baseline=False),
+        )
+
+        def outcome(
+            status: str,
+            finding: Mapping[str, object] | None = None,
+            event: PlatformEvent | None = None,
+        ) -> _EvaluationOutcome:
+            return _EvaluationOutcome(
+                status,
+                finding,
+                event,
+                _model_savings_measurement(
+                    profile,
+                    candidate_rows,
+                    reference_rows,
+                    evaluation_status=status,
+                    finding=finding,
+                ),
+            )
+
+        if (
+            len(candidate_rows) > profile.max_records_per_window
+            or len(reference_rows) > profile.max_records_per_window
+        ):
+            return _EvaluationOutcome("unsupported", None, None, None)
+        if (
+            len(candidate_rows) < profile.minimum_requests
+            or len(reference_rows) < profile.minimum_requests
+        ):
+            return outcome("insufficient")
+        if any(cost is None for _usage, cost in candidate_rows + reference_rows):
+            return outcome("unresolved")
+        try:
+            candidate = tuple(
+                _model_cost_cohort_item(
+                    profile,
+                    usage,
+                    cost,
+                    expected_model_id=profile.candidate_model_id,
+                )
+                for usage, cost in candidate_rows
+                if cost is not None
+            )
+            reference = tuple(
+                _model_cost_cohort_item(
+                    profile,
+                    usage,
+                    cost,
+                    expected_model_id=profile.model_id,
+                )
+                for usage, cost in reference_rows
+                if cost is not None
+            )
+        except _UnresolvedCohort:
+            return outcome("unresolved")
+        except _UnsupportedCohort:
+            return outcome("unsupported")
+        if not candidate or not reference:
+            return outcome("insufficient")
+        if len(
+            {
+                (item.currency, item.currency_scale)
+                for item in candidate + reference
+            }
+        ) != 1:
+            return outcome("unresolved")
+        candidate_mean = _half_up_divide(
+            sum(item.total_cost_subunits for item in candidate),
+            len(candidate),
+        )
+        reference_mean = _half_up_divide(
+            sum(item.total_cost_subunits for item in reference),
+            len(reference),
+        )
+        if candidate_mean == 0:
+            return outcome("unsupported")
+        if reference_mean <= candidate_mean:
+            return outcome("below-threshold")
+        increase = _half_up_divide(
+            (reference_mean - candidate_mean) * 10_000,
+            candidate_mean,
+        )
+        if increase > 1_000_000_000:
+            return outcome("unsupported")
+        if increase < profile.cost_increase_threshold_basis_points:
+            return outcome("below-threshold")
+        amount = (reference_mean - candidate_mean) * len(reference)
+        if amount > MAX_SAFE_INTEGER:
+            return outcome("unsupported")
+        finding, event = _build_expensive_model_finding(
+            profile,
+            candidate,
+            reference,
+            evaluated_at=_format_time(now),
+            candidate_cost_per_request=candidate_mean,
+            reference_cost_per_request=reference_mean,
+            increase_basis_points=increase,
+            amount_subunits=amount,
+        )
+        return outcome("qualified", finding, event)
+
     def _record_telemetry(
         self,
-        measurement: AiEconomicsMeasurement | AiRetryMeasurement,
+        measurement: (
+            AiEconomicsMeasurement
+            | AiRetryMeasurement
+            | AiModelSavingsMeasurement
+        ),
     ) -> None:
         if self._telemetry_sink is None:
             return
         try:
-            if isinstance(measurement, AiRetryMeasurement):
+            if isinstance(measurement, AiModelSavingsMeasurement):
+                self._telemetry_sink.record_ai_model_savings(measurement)
+            elif isinstance(measurement, AiRetryMeasurement):
                 self._telemetry_sink.record_ai_retry(measurement)
             else:
                 self._telemetry_sink.record_ai_economics(measurement)
@@ -602,14 +813,152 @@ def validate_retry_amplification_profile(
         raise AiSavingsConfigurationError("ai.savings.profile.invalid") from None
 
 
+def validate_expensive_model_profile(
+    document: object,
+    *,
+    allow_test_fixtures: bool = False,
+) -> ExpensiveModelProfile:
+    try:
+        root = _closed(
+            _json_copy(document),
+            {
+                "profileId",
+                "ruleId",
+                "tenantId",
+                "catalogId",
+                "costEngineVersion",
+                "scope",
+                "baselineWindow",
+                "currentWindow",
+                "minimumRequestsPerWindow",
+                "costIncreaseThresholdBasisPoints",
+                "maxRecordsPerWindow",
+                "evaluationGraceSeconds",
+                "modelSuitabilityReport",
+            },
+        )
+        if root["ruleId"] != EXPENSIVE_MODEL_RULE_ID:
+            raise ValueError
+        scope = _closed(
+            root["scope"],
+            {
+                "provider",
+                "modelId",
+                "candidateModelId",
+                "region",
+                "serviceName",
+                "deploymentEnvironment",
+            },
+        )
+        tenant_id = _matched(root["tenantId"], _TENANT_ID)
+        provider = _matched(scope["provider"], _PROVIDER)
+        model_id = _text(scope["modelId"], maximum=256)
+        candidate_model_id = _text(scope["candidateModelId"], maximum=256)
+        if model_id == candidate_model_id:
+            raise ValueError
+        region = _matched(scope["region"], _REGION)
+        service_name = _text(scope["serviceName"], maximum=256)
+        deployment_environment = _text(
+            scope["deploymentEnvironment"],
+            maximum=128,
+        )
+        baseline_start, baseline_end = _window(root["baselineWindow"])
+        current_start, current_end = _window(root["currentWindow"])
+        if (
+            baseline_end != current_start
+            or baseline_end - baseline_start != current_end - current_start
+            or not timedelta(minutes=1)
+            <= baseline_end - baseline_start
+            <= timedelta(days=31)
+        ):
+            raise ValueError
+        minimum = _integer(root["minimumRequestsPerWindow"], minimum=2, maximum=100)
+        maximum = _integer(
+            root["maxRecordsPerWindow"],
+            minimum=minimum,
+            maximum=MAX_COHORT_RECORDS,
+        )
+        threshold = _integer(
+            root["costIncreaseThresholdBasisPoints"],
+            minimum=1,
+            maximum=1_000_000_000,
+        )
+        grace = _integer(
+            root["evaluationGraceSeconds"],
+            minimum=0,
+            maximum=86_400,
+        )
+        engine_version = _text(root["costEngineVersion"], maximum=64)
+        if engine_version != COST_ENGINE_VERSION:
+            raise ValueError
+        report = validate_ai_model_suitability_report(
+            root["modelSuitabilityReport"],
+            allow_test_fixtures=allow_test_fixtures,
+        )
+        if (
+            report.tenant_id != tenant_id
+            or report.provider != provider
+            or report.reference_model_id != model_id
+            or report.candidate_model_id != candidate_model_id
+            or report.region != region
+            or report.service_name != service_name
+            or report.deployment_environment != deployment_environment
+            or report.valid_until
+            <= current_end + timedelta(seconds=grace)
+        ):
+            raise ValueError
+        return ExpensiveModelProfile(
+            _matched(root["profileId"], _PROFILE_ID),
+            tenant_id,
+            _matched(root["catalogId"], _CATALOG_ID),
+            engine_version,
+            provider,
+            model_id,
+            candidate_model_id,
+            region,
+            service_name,
+            deployment_environment,
+            _format_time(baseline_start),
+            _format_time(baseline_end),
+            _format_time(current_start),
+            _format_time(current_end),
+            minimum,
+            threshold,
+            maximum,
+            grace,
+            report.report_id,
+            _format_time(report.evaluated_at),
+            _format_time(report.valid_until),
+            report.document,
+        )
+    except (
+        KeyError,
+        TypeError,
+        ValueError,
+        OverflowError,
+        InvalidAiModelSuitabilityReportError,
+    ):
+        raise AiSavingsConfigurationError("ai.savings.profile.invalid") from None
+
+
 def validate_ai_savings_profile(
     document: object,
-) -> ContextGrowthProfile | RetryAmplificationProfile:
+    *,
+    allow_test_fixtures: bool = False,
+) -> ContextGrowthProfile | RetryAmplificationProfile | ExpensiveModelProfile:
     if (
         isinstance(document, Mapping)
         and document.get("ruleId") == RETRY_AMPLIFICATION_RULE_ID
     ):
         return validate_retry_amplification_profile(document)
+    if (
+        isinstance(document, Mapping)
+        and document.get("ruleId") == EXPENSIVE_MODEL_RULE_ID
+    ):
+        return validate_expensive_model_profile(
+            document,
+            allow_test_fixtures=allow_test_fixtures,
+        )
     return validate_context_growth_profile(document)
 
 
@@ -916,6 +1265,199 @@ def _validate_retry_amplification_finding(
     return root
 
 
+def _validate_expensive_model_finding(
+    document: object,
+) -> Mapping[str, object]:
+    try:
+        root = _closed(
+            _json_copy(document),
+            {"apiVersion", "kind", "metadata", "spec"},
+        )
+        if (
+            root["apiVersion"] != "iip.platform/v1alpha1"
+            or root["kind"] != "AiSavingsFinding"
+        ):
+            raise ValueError
+        metadata = _closed(root["metadata"], {"id", "tenantId", "evaluatedAt"})
+        spec = _closed(
+            root["spec"],
+            {
+                "rule",
+                "scope",
+                "finding",
+                "observations",
+                "potentialSavings",
+                "recommendation",
+                "evidenceRefs",
+            },
+        )
+        rule = _closed(spec["rule"], {"id", "version"})
+        if rule != {"id": EXPENSIVE_MODEL_RULE_ID, "version": RULE_VERSION}:
+            raise ValueError
+        scope = _closed(
+            spec["scope"],
+            {
+                "baselineWindow",
+                "currentWindow",
+                "provider",
+                "modelId",
+                "candidateModelId",
+                "region",
+                "serviceName",
+                "deploymentEnvironment",
+            },
+        )
+        baseline_start, baseline_end = _window(scope["baselineWindow"])
+        current_start, current_end = _window(scope["currentWindow"])
+        if (
+            baseline_end != current_start
+            or baseline_end - baseline_start != current_end - current_start
+        ):
+            raise ValueError
+        _matched(scope["provider"], _PROVIDER)
+        model_id = _text(scope["modelId"], maximum=256)
+        candidate_model_id = _text(scope["candidateModelId"], maximum=256)
+        if model_id == candidate_model_id:
+            raise ValueError
+        _matched(scope["region"], _REGION)
+        _text(scope["serviceName"], maximum=256)
+        _text(scope["deploymentEnvironment"], maximum=128)
+        finding = _closed(
+            spec["finding"],
+            {"category", "severity", "summary", "confidenceBasisPoints"},
+        )
+        if (
+            finding["category"] != EXPENSIVE_MODEL_RULE_ID
+            or finding["severity"] not in {"info", "low", "medium", "high"}
+        ):
+            raise ValueError
+        _text(finding["summary"], maximum=1024)
+        _integer(finding["confidenceBasisPoints"], minimum=0, maximum=10_000)
+        observations = spec["observations"]
+        if not isinstance(observations, list) or len(observations) != 1:
+            raise ValueError
+        observation = _closed(
+            observations[0],
+            {"metric", "unit", "baseline", "current", "changeBasisPoints"},
+        )
+        if (
+            observation["metric"] != "calculated-cost-per-request"
+            or observation["unit"] != "currency-subunits-per-request"
+        ):
+            raise ValueError
+        for name in ("baseline", "current"):
+            sample = _closed(observation[name], {"value", "sampleCount"})
+            _integer(sample["value"], minimum=0, maximum=MAX_SAFE_INTEGER)
+            _integer(sample["sampleCount"], minimum=1, maximum=MAX_COHORT_RECORDS)
+        _integer(
+            observation["changeBasisPoints"],
+            minimum=1,
+            maximum=1_000_000_000,
+        )
+        savings = _closed(
+            spec["potentialSavings"],
+            {
+                "status",
+                "currency",
+                "currencyScale",
+                "amountSubunits",
+                "period",
+                "calculation",
+                "costRecordRefs",
+            },
+        )
+        if (
+            savings["status"] != "calculated"
+            or savings["period"] != scope["currentWindow"]
+        ):
+            raise ValueError
+        currency = _text(savings["currency"], maximum=3)
+        if not re.fullmatch(r"[A-Z]{3}", currency):
+            raise ValueError
+        if _integer(savings["currencyScale"], minimum=6, maximum=12) not in (
+            6,
+            9,
+            12,
+        ):
+            raise ValueError
+        _integer(savings["amountSubunits"], minimum=0, maximum=MAX_SAFE_INTEGER)
+        calculation = _closed(
+            savings["calculation"],
+            {
+                "method",
+                "candidateCostPerRequestSubunits",
+                "referenceCostPerRequestSubunits",
+                "referenceRequestCount",
+                "suitabilityReportId",
+            },
+        )
+        if calculation["method"] != "qualified-model-cost-difference":
+            raise ValueError
+        _integer(
+            calculation["candidateCostPerRequestSubunits"],
+            minimum=0,
+            maximum=MAX_SAFE_INTEGER,
+        )
+        _integer(
+            calculation["referenceCostPerRequestSubunits"],
+            minimum=0,
+            maximum=MAX_SAFE_INTEGER,
+        )
+        _integer(
+            calculation["referenceRequestCount"],
+            minimum=1,
+            maximum=MAX_COHORT_RECORDS,
+        )
+        report_id = _matched(calculation["suitabilityReportId"], _SUITABILITY_ID)
+        cost_refs = _id_list(savings["costRecordRefs"], _COST_ID, maximum=200)
+        if cost_refs != sorted(cost_refs):
+            raise ValueError
+        recommendation = _closed(
+            spec["recommendation"],
+            {"actionCode", "summary", "requiresValidation"},
+        )
+        if (
+            recommendation["actionCode"] != "evaluate-lower-cost-model"
+            or recommendation["requiresValidation"] is not True
+        ):
+            raise ValueError
+        _text(recommendation["summary"], maximum=1024)
+        evidence = spec["evidenceRefs"]
+        if not isinstance(evidence, list) or not 2 <= len(evidence) <= 201:
+            raise ValueError
+        pairs: list[tuple[str, str]] = []
+        for raw_reference in evidence:
+            reference = _closed(raw_reference, {"type", "id"})
+            reference_type = reference["type"]
+            pattern = {
+                "ai-usage-record": _USAGE_ID,
+                "ai-model-suitability-report": _SUITABILITY_ID,
+            }.get(reference_type)
+            if pattern is None:
+                raise ValueError
+            pairs.append((str(reference_type), _matched(reference["id"], pattern)))
+        if (
+            len(set(pairs)) != len(pairs)
+            or [item for item in pairs if item[0] == "ai-model-suitability-report"]
+            != [("ai-model-suitability-report", report_id)]
+        ):
+            raise ValueError
+        usage_pairs = [item for item in pairs if item[0] == "ai-usage-record"]
+        if usage_pairs != sorted(usage_pairs):
+            raise ValueError
+        finding_id = _matched(metadata["id"], _FINDING_ID)
+        _matched(metadata["tenantId"], _TENANT_ID)
+        evaluated_at, _canonical_evaluated_at = _timestamp(metadata["evaluatedAt"])
+        if (
+            evaluated_at < current_end
+            or finding_id != "aif_" + _spec_digest(spec)[:32]
+        ):
+            raise ValueError
+    except (KeyError, TypeError, ValueError, OverflowError):
+        raise InvalidAiSavingsInputError("ai.savings.finding.invalid") from None
+    return root
+
+
 def validate_ai_savings_finding(document: object) -> Mapping[str, object]:
     """Validate a supported closed finding shape and deterministic identity."""
 
@@ -931,6 +1473,8 @@ def validate_ai_savings_finding(document: object) -> Mapping[str, object]:
         return _validate_context_growth_finding(document)
     if rule_id == RETRY_AMPLIFICATION_RULE_ID:
         return _validate_retry_amplification_finding(document)
+    if rule_id == EXPENSIVE_MODEL_RULE_ID:
+        return _validate_expensive_model_finding(document)
     raise InvalidAiSavingsInputError("ai.savings.finding.invalid")
 
 
@@ -1190,10 +1734,206 @@ def validate_retry_amplification_source_binding(
         raise InvalidAiSavingsInputError("ai.savings.sources.invalid") from None
 
 
+def validate_expensive_model_source_binding(
+    finding_document: object,
+    usage_documents: tuple[Mapping[str, object], ...],
+    cost_documents: tuple[Mapping[str, object], ...],
+    suitability_documents: tuple[Mapping[str, object], ...],
+) -> None:
+    """Recalculate a model recommendation from every immutable cited fact."""
+
+    try:
+        finding = _validate_expensive_model_finding(finding_document)
+        if len(suitability_documents) != 1:
+            raise ValueError
+        metadata = finding["metadata"]
+        spec = finding["spec"]
+        assert isinstance(metadata, Mapping) and isinstance(spec, Mapping)
+        scope = spec["scope"]
+        observation = spec["observations"][0]  # type: ignore[index]
+        savings = spec["potentialSavings"]
+        assert isinstance(scope, Mapping)
+        assert isinstance(observation, Mapping)
+        assert isinstance(savings, Mapping)
+        report = validate_ai_model_suitability_report(
+            suitability_documents[0],
+            allow_test_fixtures=True,
+        )
+        evaluated_at = _parse_time(metadata["evaluatedAt"])
+        calculation = savings["calculation"]
+        assert isinstance(calculation, Mapping)
+        if (
+            report.report_id != calculation["suitabilityReportId"]
+            or report.tenant_id != metadata["tenantId"]
+            or report.provider != scope["provider"]
+            or report.reference_model_id != scope["modelId"]
+            or report.candidate_model_id != scope["candidateModelId"]
+            or report.region != scope["region"]
+            or report.service_name != scope["serviceName"]
+            or report.deployment_environment != scope["deploymentEnvironment"]
+            or not report.evaluated_at <= evaluated_at < report.valid_until
+        ):
+            raise ValueError
+        usage_by_id: dict[str, Mapping[str, object]] = {}
+        for document in usage_documents:
+            usage = validate_ai_usage_for_economics(
+                document,
+                expected_tenant=str(metadata["tenantId"]),
+            )
+            usage_id = usage["usage_record_id"]
+            if not isinstance(usage_id, str) or usage_id in usage_by_id:
+                raise ValueError
+            usage_by_id[usage_id] = document
+        cost_by_usage: dict[str, Mapping[str, object]] = {}
+        cost_ids: list[str] = []
+        catalog_ids: set[str] = set()
+        engine_versions: set[str] = set()
+        for document in cost_documents:
+            cost = validate_ai_cost_record(document)
+            cost_metadata = cost["metadata"]
+            cost_spec = cost["spec"]
+            assert isinstance(cost_metadata, Mapping) and isinstance(
+                cost_spec,
+                Mapping,
+            )
+            calculation_value = cost_spec["calculation"]
+            assert isinstance(calculation_value, Mapping)
+            usage_id = cost_spec["usageRecordId"]
+            if (
+                cost_metadata["tenantId"] != metadata["tenantId"]
+                or not isinstance(usage_id, str)
+                or usage_id in cost_by_usage
+            ):
+                raise ValueError
+            cost_by_usage[usage_id] = document
+            cost_ids.append(str(cost_metadata["id"]))
+            catalog_ids.add(str(calculation_value["catalogId"]))
+            engine_versions.add(str(calculation_value["engineVersion"]))
+        if (
+            set(cost_by_usage) != set(usage_by_id)
+            or sorted(cost_ids) != savings["costRecordRefs"]
+            or len(catalog_ids) != 1
+            or len(engine_versions) != 1
+        ):
+            raise ValueError
+        profile = _model_profile_from_finding(
+            finding,
+            report.document,
+            catalog_id=next(iter(catalog_ids)),
+            cost_engine_version=next(iter(engine_versions)),
+        )
+        candidate: list[_ModelCostCohortItem] = []
+        reference: list[_ModelCostCohortItem] = []
+        baseline_start = _parse_time(profile.baseline_start)
+        baseline_end = _parse_time(profile.baseline_end)
+        current_start = _parse_time(profile.current_start)
+        current_end = _parse_time(profile.current_end)
+        for usage_id, usage_document in usage_by_id.items():
+            usage = validate_ai_usage_for_economics(
+                usage_document,
+                expected_tenant=profile.tenant_id,
+            )
+            started_at = usage["started_at"]
+            if not isinstance(started_at, datetime):
+                raise ValueError
+            if baseline_start <= started_at < baseline_end:
+                target = candidate
+                expected_model_id = profile.candidate_model_id
+            elif current_start <= started_at < current_end:
+                target = reference
+                expected_model_id = profile.model_id
+            else:
+                raise ValueError
+            target.append(
+                _model_cost_cohort_item(
+                    profile,
+                    usage_document,
+                    cost_by_usage[usage_id],
+                    expected_model_id=expected_model_id,
+                )
+            )
+        candidate.sort(key=lambda item: (item.started_at, item.usage_id))
+        reference.sort(key=lambda item: (item.started_at, item.usage_id))
+        if not candidate or not reference:
+            raise ValueError
+        candidate_mean = _half_up_divide(
+            sum(item.total_cost_subunits for item in candidate),
+            len(candidate),
+        )
+        reference_mean = _half_up_divide(
+            sum(item.total_cost_subunits for item in reference),
+            len(reference),
+        )
+        if candidate_mean == 0 or reference_mean <= candidate_mean:
+            raise ValueError
+        increase = _half_up_divide(
+            (reference_mean - candidate_mean) * 10_000,
+            candidate_mean,
+        )
+        amount = (reference_mean - candidate_mean) * len(reference)
+        currencies = {
+            (item.currency, item.currency_scale)
+            for item in candidate + reference
+        }
+        if len(currencies) != 1:
+            raise ValueError
+        currency, currency_scale = next(iter(currencies))
+        if (
+            observation["baseline"]
+            != {"value": candidate_mean, "sampleCount": len(candidate)}
+            or observation["current"]
+            != {"value": reference_mean, "sampleCount": len(reference)}
+            or observation["changeBasisPoints"] != increase
+            or savings["currency"] != currency
+            or savings["currencyScale"] != currency_scale
+            or savings["amountSubunits"] != amount
+            or calculation
+            != {
+                "method": "qualified-model-cost-difference",
+                "candidateCostPerRequestSubunits": candidate_mean,
+                "referenceCostPerRequestSubunits": reference_mean,
+                "referenceRequestCount": len(reference),
+                "suitabilityReportId": report.report_id,
+            }
+        ):
+            raise ValueError
+        usage_ids = sorted(usage_by_id)
+        expected_evidence = [
+            {"type": "ai-usage-record", "id": usage_id}
+            for usage_id in usage_ids
+        ] + [
+            {
+                "type": "ai-model-suitability-report",
+                "id": report.report_id,
+            }
+        ]
+        if (
+            spec["evidenceRefs"] != expected_evidence
+            or spec["finding"]
+            != _model_finding_summary(
+                _severity(increase),
+                _confidence(len(candidate), len(reference)),
+            )
+            or spec["recommendation"] != _model_recommendation()
+        ):
+            raise ValueError
+    except (
+        AssertionError,
+        KeyError,
+        TypeError,
+        ValueError,
+        InvalidAiCostInputError,
+        InvalidAiSavingsInputError,
+        InvalidAiModelSuitabilityReportError,
+    ):
+        raise InvalidAiSavingsInputError("ai.savings.sources.invalid") from None
+
+
 def validate_ai_savings_source_binding(
     finding_document: object,
     usage_documents: tuple[Mapping[str, object], ...],
     cost_documents: tuple[Mapping[str, object], ...],
+    suitability_documents: tuple[Mapping[str, object], ...] = (),
 ) -> None:
     finding = validate_ai_savings_finding(finding_document)
     spec = finding["spec"]
@@ -1201,12 +1941,24 @@ def validate_ai_savings_source_binding(
     rule = spec["rule"]
     assert isinstance(rule, Mapping)
     if rule["id"] == CONTEXT_GROWTH_RULE_ID:
+        if suitability_documents:
+            raise InvalidAiSavingsInputError("ai.savings.sources.invalid")
         validate_context_growth_source_binding(
             finding,
             usage_documents,
             cost_documents,
         )
         return
+    if rule["id"] == EXPENSIVE_MODEL_RULE_ID:
+        validate_expensive_model_source_binding(
+            finding,
+            usage_documents,
+            cost_documents,
+            suitability_documents,
+        )
+        return
+    if suitability_documents:
+        raise InvalidAiSavingsInputError("ai.savings.sources.invalid")
     validate_retry_amplification_source_binding(
         finding,
         usage_documents,
@@ -1314,6 +2066,73 @@ def _retry_cohort_item(
             retry_count,
         )
     except _UnsupportedCohort:
+        raise
+    except (KeyError, TypeError, ValueError, InvalidAiCostInputError):
+        raise InvalidAiSavingsInputError("ai.savings.sources.invalid") from None
+
+
+def _model_cost_cohort_item(
+    profile: ExpensiveModelProfile,
+    usage_document: Mapping[str, object],
+    cost_document: Mapping[str, object],
+    *,
+    expected_model_id: str,
+) -> _ModelCostCohortItem:
+    try:
+        usage = validate_ai_usage_for_economics(
+            usage_document,
+            expected_tenant=profile.tenant_id,
+        )
+        if (
+            usage["provider"] != profile.provider
+            or usage["model_id"] != expected_model_id
+            or usage["region"] != profile.region
+            or usage["service_name"] != profile.service_name
+            or usage["deployment_environment"] != profile.deployment_environment
+            or usage["outcome"] != "success"
+            or usage["completeness"] != "complete"
+            or usage["missing_fields"]
+        ):
+            raise _UnsupportedCohort
+        cost = validate_ai_cost_record(cost_document)
+        metadata = cost["metadata"]
+        spec = cost["spec"]
+        assert isinstance(metadata, Mapping) and isinstance(spec, Mapping)
+        calculation = spec["calculation"]
+        result = spec["result"]
+        assert isinstance(calculation, Mapping) and isinstance(result, Mapping)
+        if (
+            metadata["tenantId"] != profile.tenant_id
+            or spec["usageRecordId"] != usage["usage_record_id"]
+            or calculation["catalogId"] != profile.catalog_id
+            or calculation["engineVersion"] != profile.cost_engine_version
+        ):
+            raise ValueError
+        if result["costStatus"] != "priced":
+            raise _UnresolvedCohort
+        total = result["totalSubunits"]
+        currency = result["currency"]
+        scale = result["currencyScale"]
+        started_at = usage["started_at"]
+        if (
+            isinstance(total, bool)
+            or not isinstance(total, int)
+            or total < 0
+            or not isinstance(currency, str)
+            or isinstance(scale, bool)
+            or not isinstance(scale, int)
+            or not isinstance(started_at, datetime)
+        ):
+            raise ValueError
+        return _ModelCostCohortItem(
+            str(usage["usage_record_id"]),
+            str(metadata["id"]),
+            started_at,
+            total,
+            currency,
+            scale,
+        )
+    except (_UnsupportedCohort, _UnresolvedCohort):
         raise
     except (KeyError, TypeError, ValueError, InvalidAiCostInputError):
         raise InvalidAiSavingsInputError("ai.savings.sources.invalid") from None
@@ -1654,6 +2473,145 @@ def _retry_measurement(
         raise InvalidAiSavingsInputError("ai.savings.measurement.invalid") from None
 
 
+def _model_savings_measurement(
+    profile: ExpensiveModelProfile,
+    candidate_rows: tuple[
+        tuple[Mapping[str, object], Mapping[str, object] | None], ...
+    ],
+    reference_rows: tuple[
+        tuple[Mapping[str, object], Mapping[str, object] | None], ...
+    ],
+    *,
+    evaluation_status: str,
+    finding: Mapping[str, object] | None,
+) -> AiModelSavingsMeasurement:
+    try:
+        if evaluation_status not in {
+            "qualified",
+            "insufficient",
+            "unresolved",
+            "unsupported",
+            "below-threshold",
+        }:
+            raise ValueError
+
+        def items(
+            rows: tuple[
+                tuple[Mapping[str, object], Mapping[str, object] | None], ...
+            ],
+            model_id: str,
+        ) -> tuple[tuple[_ModelCostCohortItem, ...], bool]:
+            result: list[_ModelCostCohortItem] = []
+            complete = True
+            for usage_document, cost_document in rows:
+                usage = validate_ai_usage_for_economics(
+                    usage_document,
+                    expected_tenant=profile.tenant_id,
+                )
+                if (
+                    usage["provider"] != profile.provider
+                    or usage["model_id"] != model_id
+                    or usage["region"] != profile.region
+                    or usage["service_name"] != profile.service_name
+                    or usage["deployment_environment"]
+                    != profile.deployment_environment
+                    or usage["outcome"] != "success"
+                ):
+                    raise ValueError
+                if cost_document is None:
+                    complete = False
+                    continue
+                try:
+                    result.append(
+                        _model_cost_cohort_item(
+                            profile,
+                            usage_document,
+                            cost_document,
+                            expected_model_id=model_id,
+                        )
+                    )
+                except (_UnresolvedCohort, _UnsupportedCohort):
+                    complete = False
+            return tuple(result), complete and len(result) == len(rows)
+
+        candidate, candidate_complete = items(
+            candidate_rows,
+            profile.candidate_model_id,
+        )
+        reference, reference_complete = items(reference_rows, profile.model_id)
+        candidate_mean: int | None = None
+        reference_mean: int | None = None
+        increase: int | None = None
+        currency: str | None = None
+        currency_scale: int | None = None
+        if candidate and reference and candidate_complete and reference_complete:
+            money = {
+                (item.currency, item.currency_scale)
+                for item in candidate + reference
+            }
+            if len(money) == 1:
+                currency, currency_scale = next(iter(money))
+                candidate_mean = _half_up_divide(
+                    sum(item.total_cost_subunits for item in candidate),
+                    len(candidate),
+                )
+                reference_mean = _half_up_divide(
+                    sum(item.total_cost_subunits for item in reference),
+                    len(reference),
+                )
+                if candidate_mean > 0:
+                    increase = _signed_half_up_divide(
+                        (reference_mean - candidate_mean) * 10_000,
+                        candidate_mean,
+                    )
+        finding_count = 0
+        finding_severity = None
+        potential_savings = None
+        if finding is not None:
+            validated = _validate_expensive_model_finding(finding)
+            finding_spec = validated["spec"]
+            assert isinstance(finding_spec, Mapping)
+            finding_value = finding_spec["finding"]
+            savings = finding_spec["potentialSavings"]
+            assert isinstance(finding_value, Mapping) and isinstance(
+                savings,
+                Mapping,
+            )
+            finding_count = 1
+            finding_severity = str(finding_value["severity"])
+            potential_savings = int(savings["amountSubunits"])
+        return AiModelSavingsMeasurement(
+            tenant_id=profile.tenant_id,
+            profile_id=profile.profile_id,
+            provider=profile.provider,
+            reference_model_id=profile.model_id,
+            candidate_model_id=profile.candidate_model_id,
+            region=profile.region,
+            service_name=profile.service_name,
+            deployment_environment=profile.deployment_environment,
+            reference_request_count=len(reference_rows),
+            candidate_request_count=len(candidate_rows),
+            reference_cost_per_request_subunits=reference_mean,
+            candidate_cost_per_request_subunits=candidate_mean,
+            cost_increase_basis_points=increase,
+            currency=currency,
+            currency_scale=currency_scale,
+            evaluation_status=evaluation_status,
+            finding_count=finding_count,
+            finding_severity=finding_severity,
+            potential_savings_subunits=potential_savings,
+        )
+    except (
+        AssertionError,
+        KeyError,
+        TypeError,
+        ValueError,
+        InvalidAiCostInputError,
+        InvalidAiSavingsInputError,
+    ):
+        raise InvalidAiSavingsInputError("ai.savings.measurement.invalid") from None
+
+
 def _build_finding(
     profile: ContextGrowthProfile,
     baseline: tuple[_CohortItem, ...],
@@ -1855,6 +2813,121 @@ def _build_retry_finding(
     return document, event
 
 
+def _build_expensive_model_finding(
+    profile: ExpensiveModelProfile,
+    candidate: tuple[_ModelCostCohortItem, ...],
+    reference: tuple[_ModelCostCohortItem, ...],
+    *,
+    evaluated_at: str,
+    candidate_cost_per_request: int,
+    reference_cost_per_request: int,
+    increase_basis_points: int,
+    amount_subunits: int,
+) -> tuple[Mapping[str, object], PlatformEvent]:
+    currency = reference[0].currency
+    currency_scale = reference[0].currency_scale
+    severity = _severity(increase_basis_points)
+    confidence = _confidence(len(candidate), len(reference))
+    cost_refs = sorted(item.cost_id for item in candidate + reference)
+    usage_refs = sorted(item.usage_id for item in candidate + reference)
+    scope = {
+        "baselineWindow": {
+            "start": profile.baseline_start,
+            "end": profile.baseline_end,
+        },
+        "currentWindow": {
+            "start": profile.current_start,
+            "end": profile.current_end,
+        },
+        "provider": profile.provider,
+        "modelId": profile.model_id,
+        "candidateModelId": profile.candidate_model_id,
+        "region": profile.region,
+        "serviceName": profile.service_name,
+        "deploymentEnvironment": profile.deployment_environment,
+    }
+    spec: Mapping[str, object] = {
+        "rule": {"id": EXPENSIVE_MODEL_RULE_ID, "version": RULE_VERSION},
+        "scope": scope,
+        "finding": _model_finding_summary(severity, confidence),
+        "observations": [
+            {
+                "metric": "calculated-cost-per-request",
+                "unit": "currency-subunits-per-request",
+                "baseline": {
+                    "value": candidate_cost_per_request,
+                    "sampleCount": len(candidate),
+                },
+                "current": {
+                    "value": reference_cost_per_request,
+                    "sampleCount": len(reference),
+                },
+                "changeBasisPoints": increase_basis_points,
+            }
+        ],
+        "potentialSavings": {
+            "status": "calculated",
+            "currency": currency,
+            "currencyScale": currency_scale,
+            "amountSubunits": amount_subunits,
+            "period": scope["currentWindow"],
+            "calculation": {
+                "method": "qualified-model-cost-difference",
+                "candidateCostPerRequestSubunits": candidate_cost_per_request,
+                "referenceCostPerRequestSubunits": reference_cost_per_request,
+                "referenceRequestCount": len(reference),
+                "suitabilityReportId": profile.suitability_report_id,
+            },
+            "costRecordRefs": cost_refs,
+        },
+        "recommendation": _model_recommendation(),
+        "evidenceRefs": [
+            {"type": "ai-usage-record", "id": usage_id}
+            for usage_id in usage_refs
+        ]
+        + [
+            {
+                "type": "ai-model-suitability-report",
+                "id": profile.suitability_report_id,
+            }
+        ],
+    }
+    digest = _spec_digest(spec)
+    finding_id = "aif_" + digest[:32]
+    document: Mapping[str, object] = {
+        "apiVersion": "iip.platform/v1alpha1",
+        "kind": "AiSavingsFinding",
+        "metadata": {
+            "id": finding_id,
+            "tenantId": profile.tenant_id,
+            "evaluatedAt": evaluated_at,
+        },
+        "spec": spec,
+    }
+    event = PlatformEvent(
+        event_id="ai-savings-" + digest,
+        event_type="io.iip.ai.savings-finding-recorded.v1",
+        source=(
+            f"urn:iip:ai-savings:{EXPENSIVE_MODEL_RULE_ID}:{RULE_VERSION}"
+        ),
+        time=evaluated_at,
+        subject=finding_id,
+        tenant_id=profile.tenant_id,
+        data={
+            "findingId": finding_id,
+            "ruleId": EXPENSIVE_MODEL_RULE_ID,
+            "ruleVersion": RULE_VERSION,
+            "category": EXPENSIVE_MODEL_RULE_ID,
+            "severity": severity,
+            "provider": profile.provider,
+            "modelId": profile.model_id,
+            "serviceName": profile.service_name,
+        },
+    )
+    validate_ai_savings_finding(document)
+    return document, event
+
+
 def _profile_from_finding(
     finding: Mapping[str, object],
     *,
@@ -1924,14 +2997,70 @@ def _retry_profile_from_finding(
     )
 
 
+def _model_profile_from_finding(
+    finding: Mapping[str, object],
+    suitability_report: Mapping[str, object],
+    *,
+    catalog_id: str,
+    cost_engine_version: str,
+) -> ExpensiveModelProfile:
+    metadata = finding["metadata"]
+    spec = finding["spec"]
+    assert isinstance(metadata, Mapping) and isinstance(spec, Mapping)
+    scope = spec["scope"]
+    savings = spec["potentialSavings"]
+    assert isinstance(scope, Mapping) and isinstance(savings, Mapping)
+    baseline = scope["baselineWindow"]
+    current = scope["currentWindow"]
+    calculation = savings["calculation"]
+    assert isinstance(baseline, Mapping) and isinstance(current, Mapping)
+    assert isinstance(calculation, Mapping)
+    report = validate_ai_model_suitability_report(
+        suitability_report,
+        allow_test_fixtures=True,
+    )
+    return ExpensiveModelProfile(
+        "finding-source-validation",
+        str(metadata["tenantId"]),
+        catalog_id,
+        cost_engine_version,
+        str(scope["provider"]),
+        str(scope["modelId"]),
+        str(scope["candidateModelId"]),
+        str(scope["region"]),
+        str(scope["serviceName"]),
+        str(scope["deploymentEnvironment"]),
+        str(baseline["start"]),
+        str(baseline["end"]),
+        str(current["start"]),
+        str(current["end"]),
+        1,
+        1,
+        MAX_COHORT_RECORDS,
+        0,
+        str(calculation["suitabilityReportId"]),
+        _format_time(report.evaluated_at),
+        _format_time(report.valid_until),
+        report.document,
+    )
+
+
 def _cohort_query(
-    profile: ContextGrowthProfile | RetryAmplificationProfile,
+    profile: (
+        ContextGrowthProfile
+        | RetryAmplificationProfile
+        | ExpensiveModelProfile
+    ),
     *,
     baseline: bool,
 ) -> AiSavingsCohortQuery:
     return AiSavingsCohortQuery(
         provider=profile.provider,
-        model_id=profile.model_id,
+        model_id=(
+            profile.candidate_model_id
+            if isinstance(profile, ExpensiveModelProfile) and baseline
+            else profile.model_id
+        ),
         region=profile.region,
         service_name=profile.service_name,
         deployment_environment=profile.deployment_environment,
@@ -1997,6 +3126,21 @@ def _retry_finding_summary(
     }
 
 
+def _model_finding_summary(
+    severity: str,
+    confidence: int,
+) -> Mapping[str, object]:
+    return {
+        "category": EXPENSIVE_MODEL_RULE_ID,
+        "severity": severity,
+        "summary": (
+            "Calculated cost per request for the reference model exceeded the "
+            "qualified candidate-model cohort by the configured threshold."
+        ),
+        "confidenceBasisPoints": confidence,
+    }
+
+
 def _recommendation() -> Mapping[str, object]:
     return {
         "actionCode": "review-context-retention",
@@ -2014,6 +3158,17 @@ def _retry_recommendation() -> Mapping[str, object]:
         "summary": (
             "Review provider throttling, timeout, and retry-policy evidence; "
             "validate reliability before changing retry behavior."
+        ),
+        "requiresValidation": True,
+    }
+
+
+def _model_recommendation() -> Mapping[str, object]:
+    return {
+        "actionCode": "evaluate-lower-cost-model",
+        "summary": (
+            "Review the cited workload suitability report and validate the "
+            "candidate model against current traffic before changing models."
         ),
         "requiresValidation": True,
     }
@@ -2151,6 +3306,8 @@ __all__ = [
     "AiSavingsEvaluationService",
     "CONTEXT_GROWTH_RULE_ID",
     "ContextGrowthProfile",
+    "EXPENSIVE_MODEL_RULE_ID",
+    "ExpensiveModelProfile",
     "InvalidAiSavingsInputError",
     "MAX_COHORT_RECORDS",
     "RULE_ID",
@@ -2162,6 +3319,8 @@ __all__ = [
     "validate_ai_savings_source_binding",
     "validate_context_growth_profile",
     "validate_context_growth_source_binding",
+    "validate_expensive_model_profile",
+    "validate_expensive_model_source_binding",
     "validate_retry_amplification_profile",
     "validate_retry_amplification_source_binding",
 ]

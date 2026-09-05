@@ -35,6 +35,7 @@ class AiFinOpsTopologyTests(unittest.TestCase):
         self.assertEqual(
             authenticated.model_ids,
             (
+                ai_finops_fixture.CANDIDATE_MODEL,
                 ai_finops_fixture.KNOWN_MODEL,
                 ai_finops_fixture.UNKNOWN_MODEL,
             ),
@@ -68,10 +69,10 @@ class AiFinOpsTopologyTests(unittest.TestCase):
         )
         profiles = ai_finops_fixture.savings_profile_configuration(anchor)
         validated = tuple(
-            validate_ai_savings_profile(item)
+            validate_ai_savings_profile(item, allow_test_fixtures=True)
             for item in profiles["profiles"]
         )
-        self.assertEqual(len(validated), 4)
+        self.assertEqual(len(validated), 5)
         self.assertEqual(
             {item.profile_id for item in validated},
             {
@@ -79,6 +80,7 @@ class AiFinOpsTopologyTests(unittest.TestCase):
                 "research-assistant-coverage",
                 "order-copilot-coverage",
                 "support-assistant-retries",
+                "support-assistant-model-cost",
             },
         )
 
@@ -102,6 +104,7 @@ class AiFinOpsTopologyTests(unittest.TestCase):
             "One potential saving",
             "Can I trust the coverage?",
             "Are retries increasing?",
+            "Is a qualified lower-cost model available?",
             "Cost by protected application",
             "Cost by protected team",
         ):
@@ -117,6 +120,7 @@ class AiFinOpsTopologyTests(unittest.TestCase):
             "iip_ai_context_growth_change",
             "iip_ai_savings_potential_amount",
             "iip_ai_retry_operation_rate_increase",
+            "iip_ai_model_cost_increase",
             "iip_ai_cost_requests",
             "iip_ai_allocation_cost_amount",
         ):
@@ -203,7 +207,7 @@ class AiFinOpsTopologyTests(unittest.TestCase):
                 ai_finops_fixture.OPENAI_CHANNEL_TOKEN,
             )
             profiles = json.loads(values["IIP_AI_SAVINGS_PROFILES_JSON"])
-            self.assertEqual(len(profiles["profiles"]), 4)
+            self.assertEqual(len(profiles["profiles"]), 5)
             policies = json.loads(values["IIP_AI_ATTRIBUTION_POLICIES_JSON"])
             self.assertEqual(len(policies["policies"]), 1)
 

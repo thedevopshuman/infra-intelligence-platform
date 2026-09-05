@@ -1,0 +1,78 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiSavingsFinding",
+  "metadata": {
+    "evaluatedAt": "2026-09-05T11:00:00Z",
+    "id": "aif_df87ea37c2c3992e6c7641b045c2a8aa",
+    "tenantId": "local"
+  },
+  "spec": {
+    "evidenceRefs": [
+      {"id": "aiu_00000000000000000000000000000001", "type": "ai-usage-record"},
+      {"id": "aiu_00000000000000000000000000000002", "type": "ai-usage-record"},
+      {"id": "aiu_00000000000000000000000000000065", "type": "ai-usage-record"},
+      {"id": "aiu_00000000000000000000000000000066", "type": "ai-usage-record"},
+      {"id": "ams_ddfe85ca525f0c9b04145dccaaac613a", "type": "ai-model-suitability-report"}
+    ],
+    "finding": {
+      "category": "expensive-model-anomaly",
+      "confidenceBasisPoints": 6000,
+      "severity": "high",
+      "summary": "Calculated cost per request for the reference model exceeded the qualified candidate-model cohort by the configured threshold."
+    },
+    "observations": [
+      {
+        "baseline": {"sampleCount": 2, "value": 1300000},
+        "changeBasisPoints": 56923,
+        "current": {"sampleCount": 2, "value": 8700000},
+        "metric": "calculated-cost-per-request",
+        "unit": "currency-subunits-per-request"
+      }
+    ],
+    "potentialSavings": {
+      "amountSubunits": 14800000,
+      "calculation": {
+        "candidateCostPerRequestSubunits": 1300000,
+        "method": "qualified-model-cost-difference",
+        "referenceCostPerRequestSubunits": 8700000,
+        "referenceRequestCount": 2,
+        "suitabilityReportId": "ams_ddfe85ca525f0c9b04145dccaaac613a"
+      },
+      "costRecordRefs": [
+        "aic_10e0678c3fa2048ed336843fe5919f5c",
+        "aic_3a5a83060f290e507a9074d67429e9d9",
+        "aic_45f37066ea83ca432caf1958b673f0f5",
+        "aic_ff68e680d5dcb680442e8ecbf884731b"
+      ],
+      "currency": "USD",
+      "currencyScale": 9,
+      "period": {
+        "end": "2026-09-05T11:00:00Z",
+        "start": "2026-09-04T11:00:00Z"
+      },
+      "status": "calculated"
+    },
+    "recommendation": {
+      "actionCode": "evaluate-lower-cost-model",
+      "requiresValidation": true,
+      "summary": "Review the cited workload suitability report and validate the candidate model against current traffic before changing models."
+    },
+    "rule": {"id": "expensive-model-anomaly", "version": "1.0.0"},
+    "scope": {
+      "baselineWindow": {
+        "end": "2026-09-04T11:00:00Z",
+        "start": "2026-09-03T11:00:00Z"
+      },
+      "candidateModelId": "example.efficient-model-v1:0",
+      "currentWindow": {
+        "end": "2026-09-05T11:00:00Z",
+        "start": "2026-09-04T11:00:00Z"
+      },
+      "deploymentEnvironment": "ai-finops-demo",
+      "modelId": "example.foundation-model-v1:0",
+      "provider": "aws.bedrock",
+      "region": "us-east-1",
+      "serviceName": "support-assistant"
+    }
+  }
+}

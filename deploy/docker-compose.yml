@@ -15,12 +15,12 @@ services:
       - postgres-data:/var/lib/postgresql
 
   api:
-    image: iip-local-platform:0.77.0
+    image: iip-local-platform:0.78.0
     build:
       context: ..
       dockerfile: Dockerfile
       args:
-        IIP_IMAGE_VERSION: "0.77.0"
+        IIP_IMAGE_VERSION: "0.78.0"
         IIP_IMAGE_REVISION: development
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
@@ -113,7 +113,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-local-platform:0.77.0
+    image: iip-local-platform:0.78.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:
@@ -146,6 +146,7 @@ services:
       IIP_AI_COST_INTERVAL_SECONDS: ${IIP_AI_COST_INTERVAL_SECONDS:-10}
       IIP_AI_SAVINGS_ENGINE_ENABLED: ${IIP_AI_SAVINGS_ENGINE_ENABLED:-false}
       IIP_AI_SAVINGS_PROFILES_JSON: ${IIP_AI_SAVINGS_PROFILES_JSON:-}
+      IIP_AI_SAVINGS_ALLOW_TEST_FIXTURES: ${IIP_AI_SAVINGS_ALLOW_TEST_FIXTURES:-false}
       IIP_AI_SAVINGS_INTERVAL_SECONDS: ${IIP_AI_SAVINGS_INTERVAL_SECONDS:-60}
       IIP_EVENT_PUBLISHER_MODE: stdout-json
       IIP_OUTBOX_BATCH_SIZE: ${IIP_OUTBOX_BATCH_SIZE:-100}

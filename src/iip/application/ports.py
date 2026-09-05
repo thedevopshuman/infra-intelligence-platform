@@ -288,6 +288,31 @@ class AiRetryMeasurement:
 
 
 @dataclass(frozen=True)
+class AiModelSavingsMeasurement:
+    """One bounded qualified-model cost-comparison reporting snapshot."""
+
+    tenant_id: str
+    profile_id: str
+    provider: str
+    reference_model_id: str
+    candidate_model_id: str
+    region: str
+    service_name: str
+    deployment_environment: str
+    reference_request_count: int
+    candidate_request_count: int
+    reference_cost_per_request_subunits: Optional[int]
+    candidate_cost_per_request_subunits: Optional[int]
+    cost_increase_basis_points: Optional[int]
+    currency: Optional[str]
+    currency_scale: Optional[int]
+    evaluation_status: str
+    finding_count: int
+    finding_severity: Optional[str]
+    potential_savings_subunits: Optional[int]
+
+
+@dataclass(frozen=True)
 class AiAllocationMeasurement:
     """One bounded application or team allocation reporting projection."""
 
@@ -794,6 +819,15 @@ class AiEconomicsLedger(AiAttributionLedger, Protocol):
     ) -> tuple[Mapping[str, object], ...]:
         """Atomically persist cost records and their event/outbox side effects."""
 
+    def register_ai_model_suitability_report(
+        self,
+        actor: ActorContext,
+        report: Mapping[str, object],
+        *,
+        allow_test_fixtures: bool = False,
+    ) -> Mapping[str, object]:
+        """Idempotently register one immutable protected suitability report."""
+
     def list_ai_savings_cohort(
         self,
         actor: ActorContext,
@@ -950,6 +984,12 @@ class AiEconomicsTelemetrySink(Protocol):
 
     def record_ai_retry(self, measurement: AiRetryMeasurement) -> None:
         """Record bounded retry facts without inferring billed retry cost."""
+
+    def record_ai_model_savings(
+        self,
+        measurement: AiModelSavingsMeasurement,
+    ) -> None:
+        """Record a qualified model-cost comparison without becoming authority."""
 
 
 class AiAllocationTelemetrySink(Protocol):

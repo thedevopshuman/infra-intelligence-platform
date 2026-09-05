@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from iip.application.ports import (
     AiAllocationMeasurement,
     AiEconomicsMeasurement,
+    AiModelSavingsMeasurement,
     AiRetryMeasurement,
     IngestionFreshnessMeasurement,
     InvestigationExecutionMeasurement,
@@ -765,6 +766,22 @@ class OpenTelemetryAiEconomicsSink:
             unit="1",
             description="Absolute retrying-operation rate increase in basis points.",
         )
+        self._model_cost_per_request = meter.create_gauge(
+            "iip.ai.model.cost_per_request",
+            unit="{currency-subunit}/{request}",
+            description=(
+                "Calculated cost per request for qualified candidate and "
+                "reference model cohorts."
+            ),
+        )
+        self._model_cost_increase = meter.create_gauge(
+            "iip.ai.model.cost_increase",
+            unit="1",
+            description=(
+                "Reference cost-per-request change from the qualified candidate "
+                "cohort in basis points."
+            ),
+        )
         self._evaluation_status = meter.create_gauge(
             "iip.ai.savings.profile_status",
             unit="1",
@@ -945,6 +962,85 @@ class OpenTelemetryAiEconomicsSink:
             except Exception:
                 pass
 
+    def record_ai_model_savings(
+        self,
+        measurement: AiModelSavingsMeasurement,
+    ) -> None:
+        try:
+            self._validate_model_savings(measurement)
+            common = self._model_savings_attributes(measurement)
+            if (
+                measurement.currency is not None
+                and measurement.currency_scale is not None
+            ):
+                money = {
+                    **common,
+                    "iip.ai.currency": measurement.currency,
+                    "iip.ai.currency_scale": measurement.currency_scale,
+                    "iip.ai.cost.basis": "calculated-estimate",
+                }
+                for role, model_id, value in (
+                    (
+                        "candidate",
+                        measurement.candidate_model_id,
+                        measurement.candidate_cost_per_request_subunits,
+                    ),
+                    (
+                        "reference",
+                        measurement.reference_model_id,
+                        measurement.reference_cost_per_request_subunits,
+                    ),
+                ):
+                    if value is not None:
+                        attributes = dict(money)
+                        attributes["iip.ai.model.role"] = role
+                        attributes["gen_ai.response.model"] = model_id
+                        self._model_cost_per_request.set(value, attributes)
+            if measurement.cost_increase_basis_points is not None:
+                self._model_cost_increase.set(
+                    measurement.cost_increase_basis_points,
+                    common,
+                )
+            for status in _AI_ECONOMICS_EVALUATION_STATUSES:
+                attributes = dict(common)
+                attributes["iip.ai.savings.status"] = status
+                self._evaluation_status.set(
+                    1 if status == measurement.evaluation_status else 0,
+                    attributes,
+                )
+            finding_attributes = {
+                **common,
+                "iip.ai.savings.rule.id": "expensive-model-anomaly",
+                "iip.ai.savings.rule.version": "1.0.0",
+                "iip.ai.savings.severity": measurement.finding_severity or "none",
+            }
+            self._findings.set(measurement.finding_count, finding_attributes)
+            if measurement.potential_savings_subunits is not None:
+                assert measurement.currency is not None
+                assert measurement.currency_scale is not None
+                self._potential_savings.set(
+                    measurement.potential_savings_subunits,
+                    {
+                        **finding_attributes,
+                        "iip.ai.currency": measurement.currency,
+                        "iip.ai.currency_scale": measurement.currency_scale,
+                        "iip.ai.cost.basis": "calculated-estimate",
+                    },
+                )
+        except Exception:
+            with self._failure_lock:
+                self._failures += 1
+            try:
+                self._record_failure.add(
+                    1,
+                    {
+                        "iip.telemetry.signal": "metrics",
+                        "iip.telemetry.instrument": "ai-model-savings",
+                    },
+                )
+            except Exception:
+                pass
+
     def _attributes(
         self,
         measurement: AiEconomicsMeasurement,
@@ -969,6 +1065,23 @@ class OpenTelemetryAiEconomicsSink:
             "iip.ai.profile.id": measurement.profile_id,
             "gen_ai.provider.name": measurement.provider,
             "gen_ai.response.model": measurement.model_id,
+            "cloud.region": measurement.region,
+            "service.name": measurement.service_name,
+            "deployment.environment.name": measurement.deployment_environment,
+        }
+        if self._attribute_mode == "tenant-scope":
+            attributes["iip.tenant.id"] = measurement.tenant_id
+        return attributes
+
+    def _model_savings_attributes(
+        self,
+        measurement: AiModelSavingsMeasurement,
+    ) -> dict[str, str | int]:
+        attributes: dict[str, str | int] = {
+            "iip.ai.profile.id": measurement.profile_id,
+            "gen_ai.provider.name": measurement.provider,
+            "gen_ai.response.model": measurement.reference_model_id,
+            "iip.ai.candidate_model.id": measurement.candidate_model_id,
             "cloud.region": measurement.region,
             "service.name": measurement.service_name,
             "deployment.environment.name": measurement.deployment_environment,
@@ -1104,6 +1217,119 @@ class OpenTelemetryAiEconomicsSink:
             and (
                 measurement.finding_severity not in {"low", "medium", "high"}
                 or measurement.potential_savings_subunits is None
+            )
+        ):
+            raise ValueError
+
+    @staticmethod
+    def _validate_model_savings(measurement: AiModelSavingsMeasurement) -> None:
+        if not isinstance(measurement, AiModelSavingsMeasurement):
+            raise ValueError
+        text_values = (
+            (measurement.tenant_id, 128),
+            (measurement.profile_id, 128),
+            (measurement.provider, 64),
+            (measurement.reference_model_id, 256),
+            (measurement.candidate_model_id, 256),
+            (measurement.region, 64),
+            (measurement.service_name, 256),
+            (measurement.deployment_environment, 128),
+        )
+        if (
+            measurement.reference_model_id == measurement.candidate_model_id
+            or any(
+                not isinstance(value, str)
+                or not 1 <= len(value) <= maximum
+                or any(
+                    ord(character) < 32 or ord(character) == 127
+                    for character in value
+                )
+                for value, maximum in text_values
+            )
+        ):
+            raise ValueError
+        for value in (
+            measurement.reference_request_count,
+            measurement.candidate_request_count,
+            measurement.finding_count,
+        ):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not 0 <= value <= _MAX_COUNTER
+            ):
+                raise ValueError
+        for value in (
+            measurement.reference_cost_per_request_subunits,
+            measurement.candidate_cost_per_request_subunits,
+            measurement.potential_savings_subunits,
+        ):
+            if value is not None and (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not 0 <= value <= _MAX_COUNTER
+            ):
+                raise ValueError
+        if measurement.cost_increase_basis_points is not None and (
+            isinstance(measurement.cost_increase_basis_points, bool)
+            or not isinstance(measurement.cost_increase_basis_points, int)
+            or not -_MAX_COUNTER
+            <= measurement.cost_increase_basis_points
+            <= _MAX_COUNTER
+        ):
+            raise ValueError
+        has_money = any(
+            value is not None
+            for value in (
+                measurement.reference_cost_per_request_subunits,
+                measurement.candidate_cost_per_request_subunits,
+                measurement.potential_savings_subunits,
+            )
+        )
+        cost_means = (
+            measurement.reference_cost_per_request_subunits,
+            measurement.candidate_cost_per_request_subunits,
+        )
+        if (
+            measurement.evaluation_status
+            not in _AI_ECONOMICS_EVALUATION_STATUSES
+            or measurement.finding_count not in (0, 1)
+            or (
+                has_money
+                and (
+                    not isinstance(measurement.currency, str)
+                    or len(measurement.currency) != 3
+                    or not measurement.currency.isupper()
+                    or measurement.currency_scale not in (6, 9, 12)
+                )
+            )
+            or (
+                not has_money
+                and (
+                    measurement.currency is not None
+                    or measurement.currency_scale is not None
+                )
+            )
+            or sum(value is not None for value in cost_means) == 1
+            or (
+                measurement.cost_increase_basis_points is not None
+                and any(value is None for value in cost_means)
+            )
+            or (
+                measurement.finding_count == 0
+                and (
+                    measurement.finding_severity is not None
+                    or measurement.potential_savings_subunits is not None
+                )
+            )
+            or (
+                measurement.finding_count == 1
+                and (
+                    measurement.finding_severity not in {"low", "medium", "high"}
+                    or measurement.potential_savings_subunits is None
+                    or any(value is None for value in cost_means)
+                    or measurement.cost_increase_basis_points is None
+                )
             )
         ):
             raise ValueError
@@ -1619,15 +1845,15 @@ def build_otlp_metrics_runtime(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.77.0",
+                    "service.version": "0.78.0",
                 }
             ),
             metric_readers=(reader,),
         )
-        ingestion_meter = provider.get_meter("iip.ingestion", "0.77.0")
-        query_meter = provider.get_meter("iip.query", "0.77.0")
-        receiver_meter = provider.get_meter("iip.otlp.receiver", "0.77.0")
-        ai_economics_meter = provider.get_meter("iip.ai.economics", "0.77.0")
+        ingestion_meter = provider.get_meter("iip.ingestion", "0.78.0")
+        query_meter = provider.get_meter("iip.query", "0.78.0")
+        receiver_meter = provider.get_meter("iip.otlp.receiver", "0.78.0")
+        ai_economics_meter = provider.get_meter("iip.ai.economics", "0.78.0")
         sink = OpenTelemetryIngestionSink(
             ingestion_meter,
             attribute_mode=configuration.attribute_mode,
@@ -1679,7 +1905,7 @@ def build_otlp_traces_runtime(
             resource=Resource.create(
                 {
                     "service.name": configuration.service_name,
-                    "service.version": "0.77.0",
+                    "service.version": "0.78.0",
                 }
             )
         )
@@ -1692,7 +1918,7 @@ def build_otlp_traces_runtime(
                 max_export_batch_size=configuration.max_export_batch_size,
             )
         )
-        tracer = provider.get_tracer("iip.investigation", "0.77.0")
+        tracer = provider.get_tracer("iip.investigation", "0.78.0")
         sink = OpenTelemetryInvestigationSink(
             tracer,
             attribute_mode=configuration.attribute_mode,

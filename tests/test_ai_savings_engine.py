@@ -23,15 +23,21 @@ from iip.application.evaluate_ai_savings import (
     AiSavingsConfigurationError,
     AiSavingsEvaluationService,
     InvalidAiSavingsInputError,
+    validate_expensive_model_profile,
+    validate_expensive_model_source_binding,
     validate_ai_savings_finding,
     validate_ai_savings_source_binding,
     validate_context_growth_profile,
     validate_context_growth_source_binding,
     validate_retry_amplification_profile,
 )
+from iip.application.validate_ai_model_suitability import (
+    model_suitability_report_id,
+)
 from iip.application.ports import (
     ActorContext,
     AiEconomicsMeasurement,
+    AiModelSavingsMeasurement,
     AiRetryMeasurement,
     PersistenceError,
 )
@@ -59,6 +65,7 @@ class RecordingAiEconomicsSink:
         self.fail = fail
         self.measurements: list[AiEconomicsMeasurement] = []
         self.retry_measurements: list[AiRetryMeasurement] = []
+        self.model_measurements: list[AiModelSavingsMeasurement] = []
 
     def record_ai_economics(self, measurement: AiEconomicsMeasurement) -> None:
         if self.fail:
@@ -69,6 +76,14 @@ class RecordingAiEconomicsSink:
         if self.fail:
             raise RuntimeError("export unavailable")
         self.retry_measurements.append(measurement)
+
+    def record_ai_model_savings(
+        self,
+        measurement: AiModelSavingsMeasurement,
+    ) -> None:
+        if self.fail:
+            raise RuntimeError("export unavailable")
+        self.model_measurements.append(measurement)
 
 
 def fixture(name: str) -> dict:
@@ -123,6 +138,41 @@ def retry_profile(**changes: object) -> dict:
     return document
 
 
+def model_profile(**changes: object) -> dict:
+    report = fixture("ai-model-suitability-report")
+    report["spec"]["scope"]["deploymentEnvironment"] = "production"
+    report["metadata"]["id"] = model_suitability_report_id(report)
+    document = profile(
+        profileId="support-assistant-model-cost",
+        ruleId="expensive-model-anomaly",
+    )
+    document["scope"]["candidateModelId"] = "example.efficient-model-v1:0"
+    document.pop("growthThresholdBasisPoints")
+    document.update(
+        {
+            "costIncreaseThresholdBasisPoints": 2500,
+            "modelSuitabilityReport": report,
+        }
+    )
+    document.update(changes)
+    return document
+
+
+def price_catalog_with_candidate() -> dict:
+    catalog = fixture("ai-price-catalog")
+    candidate = copy.deepcopy(catalog["spec"]["entries"][0])
+    candidate.update(
+        {
+            "id": "aws-bedrock.example-efficient-model-v1.us-east-1.on-demand",
+            "modelId": "example.efficient-model-v1:0",
+        }
+    )
+    for rate in candidate["rates"].values():
+        rate["priceSubunitsPerMillionTokens"] = 1_000_000_000
+    catalog["spec"]["entries"].append(candidate)
+    return catalog
+
+
 def usage_record(
     index: int,
     started_at: str,
@@ -131,6 +181,7 @@ def usage_record(
     cache_read: int = 0,
     retry_count: int | None = 0,
     tenant_id: str = "local",
+    model_id: str = "example.foundation-model-v1:0",
 ) -> dict:
     document = copy.deepcopy(fixture("ai-usage-record"))
     document["metadata"].update(
@@ -147,6 +198,8 @@ def usage_record(
             "spanId": f"{index:016x}",
             "requestIdHash": f"sha256:{index:064x}",
             "outcome": "success",
+            "requestModel": model_id,
+            "responseModel": model_id,
         }
     )
     if retry_count is None:
@@ -167,6 +220,35 @@ def usage_record(
     )
     document["spec"]["deduplicationKey"] = f"sha256:{index:064x}"
     return document
+
+
+def seed_model_cohorts(store: object, clock: MutableClock) -> list[dict]:
+    documents = [
+        usage_record(
+            1,
+            "2026-09-03T12:00:00Z",
+            1200,
+            model_id="example.efficient-model-v1:0",
+        ),
+        usage_record(
+            2,
+            "2026-09-03T13:00:00Z",
+            1200,
+            model_id="example.efficient-model-v1:0",
+        ),
+        usage_record(101, "2026-09-04T12:00:00Z", 2400),
+        usage_record(102, "2026-09-04T13:00:00Z", 2400),
+    ]
+    seed_usage(store, documents)
+    result = AiCostCalculationService(
+        store,  # type: ignore[arg-type]
+        clock,
+        (price_catalog_with_candidate(),),
+        allow_test_fixtures=True,
+    ).run_once("local", "model-cost-test")
+    if result.priced != len(documents):
+        raise AssertionError("model cost fixture did not fully calculate")
+    return documents
 
 
 def usage_event(document: dict) -> PlatformEvent:
@@ -382,6 +464,153 @@ class AiSavingsRuleTests(unittest.TestCase):
         self.assertEqual(measurement.retry_rate_increase_basis_points, 10_000)
         self.assertEqual(measurement.finding_count, 1)
 
+    def test_expensive_model_requires_suitability_and_is_source_bound(self) -> None:
+        store = InMemoryResourceStore()
+        clock = MutableClock()
+        documents = seed_model_cohorts(store, clock)
+        telemetry = RecordingAiEconomicsSink()
+        service = AiSavingsEvaluationService(
+            store,
+            clock,
+            (model_profile(),),
+            telemetry_sink=telemetry,
+            allow_test_fixtures=True,
+        )
+
+        first = service.run_once("local", "model-savings-test")
+        clock.value = "2026-09-05T11:05:00Z"
+        second = service.run_once("local", "model-savings-test")
+
+        self.assertEqual((first.qualified, first.failures), (1, 0))
+        self.assertEqual((second.qualified, second.failures), (1, 0))
+        self.assertEqual(len(store.ai_savings_findings), 1)
+        self.assertEqual(len(store._ai_model_suitability_reports), 1)
+        finding = store.ai_savings_findings[0]
+        self.assertEqual(
+            finding["spec"]["rule"]["id"],
+            "expensive-model-anomaly",
+        )
+        self.assertEqual(
+            finding["spec"]["scope"]["candidateModelId"],
+            "example.efficient-model-v1:0",
+        )
+        observation = finding["spec"]["observations"][0]
+        self.assertEqual(
+            observation["baseline"],
+            {"value": 1_300_000, "sampleCount": 2},
+        )
+        self.assertEqual(
+            observation["current"],
+            {"value": 8_700_000, "sampleCount": 2},
+        )
+        self.assertEqual(observation["changeBasisPoints"], 56_923)
+        savings = finding["spec"]["potentialSavings"]
+        self.assertEqual(savings["amountSubunits"], 14_800_000)
+        self.assertEqual(
+            savings["calculation"]["method"],
+            "qualified-model-cost-difference",
+        )
+        self.assertTrue(
+            finding["spec"]["recommendation"]["requiresValidation"]
+        )
+        reports = tuple(
+            value[1] for value in store._ai_model_suitability_reports.values()
+        )
+        costs = tuple(value[1] for value in store._ai_costs.values())
+        validate_expensive_model_source_binding(
+            finding,
+            tuple(documents),
+            costs,
+            reports,
+        )
+        self.assertEqual(len(telemetry.model_measurements), 2)
+        measurement = telemetry.model_measurements[0]
+        self.assertEqual(measurement.candidate_request_count, 2)
+        self.assertEqual(measurement.reference_request_count, 2)
+        self.assertEqual(
+            measurement.candidate_cost_per_request_subunits,
+            1_300_000,
+        )
+        self.assertEqual(
+            measurement.reference_cost_per_request_subunits,
+            8_700_000,
+        )
+        self.assertEqual(measurement.cost_increase_basis_points, 56_923)
+        self.assertEqual(measurement.potential_savings_subunits, 14_800_000)
+
+    def test_expensive_model_rejects_unqualified_or_expired_evidence(self) -> None:
+        with self.assertRaisesRegex(
+            AiSavingsConfigurationError,
+            "ai.savings.profile.invalid",
+        ):
+            validate_expensive_model_profile(model_profile())
+
+        mismatched = model_profile()
+        mismatched["modelSuitabilityReport"]["spec"]["scope"][
+            "candidateModelId"
+        ] = "different-model"
+        mismatched["modelSuitabilityReport"]["metadata"]["id"] = (
+            model_suitability_report_id(mismatched["modelSuitabilityReport"])
+        )
+        with self.assertRaisesRegex(
+            AiSavingsConfigurationError,
+            "ai.savings.profile.invalid",
+        ):
+            validate_expensive_model_profile(
+                mismatched,
+                allow_test_fixtures=True,
+            )
+
+        expired = model_profile()
+        expired["modelSuitabilityReport"]["metadata"].update(
+            {
+                "evaluatedAt": "2026-08-01T00:00:00Z",
+                "validUntil": "2026-09-05T12:00:00Z",
+            }
+        )
+        expired["modelSuitabilityReport"]["spec"]["source"][
+            "retrievedAt"
+        ] = "2026-07-31T23:59:00Z"
+        expired["modelSuitabilityReport"]["metadata"]["id"] = (
+            model_suitability_report_id(expired["modelSuitabilityReport"])
+        )
+        store = InMemoryResourceStore()
+        clock = MutableClock("2026-09-06T11:00:00Z")
+        seed_model_cohorts(store, clock)
+        result = AiSavingsEvaluationService(
+            store,
+            clock,
+            (expired,),
+            allow_test_fixtures=True,
+        ).run_once("local", "model-savings-test")
+        self.assertEqual((result.unresolved, result.failures), (1, 0))
+        self.assertEqual(store.ai_savings_findings, ())
+
+    def test_expensive_model_source_binding_rejects_wrong_report(self) -> None:
+        store = InMemoryResourceStore()
+        clock = MutableClock()
+        documents = seed_model_cohorts(store, clock)
+        result = AiSavingsEvaluationService(
+            store,
+            clock,
+            (model_profile(),),
+            allow_test_fixtures=True,
+        ).run_once("local", "model-savings-test")
+        self.assertEqual(result.qualified, 1)
+        wrong = model_profile()["modelSuitabilityReport"]
+        wrong["spec"]["workload"]["profileId"] = "other-workload"
+        wrong["metadata"]["id"] = model_suitability_report_id(wrong)
+        with self.assertRaisesRegex(
+            InvalidAiSavingsInputError,
+            "ai.savings.sources.invalid",
+        ):
+            validate_expensive_model_source_binding(
+                store.ai_savings_findings[0],
+                tuple(documents),
+                tuple(value[1] for value in store._ai_costs.values()),
+                (wrong,),
+            )
+
     def test_retry_rule_requires_complete_retry_facts_and_thresholds(self) -> None:
         for name, retry_counts, expected in (
             ("missing", (0, 0, 1, None), "unsupported"),
@@ -522,6 +751,29 @@ class AiSavingsRuleTests(unittest.TestCase):
             ):
                 validate_retry_amplification_profile(retry_profile(**mutation))
 
+        validated_model = validate_expensive_model_profile(
+            model_profile(),
+            allow_test_fixtures=True,
+        )
+        self.assertEqual(
+            validated_model.candidate_model_id,
+            "example.efficient-model-v1:0",
+        )
+        expires_at_first_evaluation = model_profile()
+        expires_at_first_evaluation["modelSuitabilityReport"]["metadata"][
+            "validUntil"
+        ] = "2026-09-05T10:05:00Z"
+        report = expires_at_first_evaluation["modelSuitabilityReport"]
+        report["metadata"]["id"] = model_suitability_report_id(report)
+        with self.assertRaisesRegex(
+            AiSavingsConfigurationError,
+            "ai.savings.profile.invalid",
+        ):
+            validate_expensive_model_profile(
+                expires_at_first_evaluation,
+                allow_test_fixtures=True,
+            )
+
     def test_storage_rejects_cross_tenant_and_forged_finding(self) -> None:
         store = InMemoryResourceStore()
         clock = MutableClock()
@@ -565,7 +817,7 @@ class AiSavingsCompositionTests(unittest.TestCase):
         }
         with patch.dict(os.environ, environment, clear=False):
             configured = _ai_savings_engine_configuration_from_env(catalogs)
-            self.assertEqual(configured, (profile(),))
+            self.assertEqual(configured, ((profile(),), False))
             with self.assertRaisesRegex(
                 AiSavingsConfigurationError,
                 "ai.savings.configuration.required",
@@ -580,6 +832,34 @@ class AiSavingsCompositionTests(unittest.TestCase):
                 AiSavingsConfigurationError, "ai.savings.tenants.invalid"
             ):
                 _ai_savings_engine_configuration_from_env(catalogs)
+
+    def test_test_suitability_requires_explicit_non_production_switch(self) -> None:
+        environment = {
+            "IIP_AI_SAVINGS_ENGINE_ENABLED": "true",
+            "IIP_AI_SAVINGS_PROFILES_JSON": json.dumps(
+                {"profiles": [model_profile()]}
+            ),
+            "IIP_WORKER_TENANTS": "local",
+        }
+        with patch.dict(os.environ, environment, clear=False), self.assertRaisesRegex(
+            AiSavingsConfigurationError,
+            "ai.savings.profile.invalid",
+        ):
+            _ai_savings_engine_configuration_from_env(
+                (fixture("ai-price-catalog"),)
+            )
+        with patch.dict(
+            os.environ,
+            {
+                **environment,
+                "IIP_AI_SAVINGS_ALLOW_TEST_FIXTURES": "true",
+            },
+            clear=False,
+        ):
+            configured = _ai_savings_engine_configuration_from_env(
+                (fixture("ai-price-catalog"),)
+            )
+            self.assertEqual(configured, ((model_profile(),), True))
 
 
 @unittest.skipUnless(
@@ -596,6 +876,7 @@ class AiSavingsPostgresTests(unittest.TestCase):
             connection.execute(
                 """
                 TRUNCATE iip.event_outbox, iip.ai_savings_findings,
+                    iip.ai_model_suitability_reports,
                     iip.ai_usage_attributions, iip.ai_attribution_policies,
                     iip.ai_cost_records, iip.ai_price_catalogs,
                     iip.ai_usage_records, iip.event_log
@@ -668,6 +949,45 @@ class AiSavingsPostgresTests(unittest.TestCase):
         self.assertEqual(row[0], "retry-amplification")
         self.assertEqual(row[1]["spec"]["potentialSavings"]["status"], "unresolved")
         self.assertNotIn("costRecordRefs", row[1]["spec"]["potentialSavings"])
+
+    def test_model_finding_and_suitability_are_durable_and_idempotent(self) -> None:
+        seed_model_cohorts(self.store, self.clock)
+        service = AiSavingsEvaluationService(
+            self.store,
+            self.clock,
+            (model_profile(),),
+            allow_test_fixtures=True,
+        )
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = tuple(
+                executor.map(
+                    lambda worker: service.run_once("local", worker),
+                    ("model-a", "model-b"),
+                )
+            )
+        self.assertTrue(all(item.qualified == 1 for item in results))
+        self.assertTrue(all(item.failures == 0 for item in results))
+        with psycopg.connect(DATABASE_URL) as connection:
+            report_count = connection.execute(
+                """
+                SELECT count(*)
+                FROM iip.ai_model_suitability_reports
+                WHERE tenant_id = 'local'
+                """
+            ).fetchone()[0]
+            finding = connection.execute(
+                """
+                SELECT rule_id, document
+                FROM iip.ai_savings_findings
+                WHERE tenant_id = 'local'
+                """
+            ).fetchone()
+        self.assertEqual(report_count, 1)
+        self.assertEqual(finding[0], "expensive-model-anomaly")
+        self.assertEqual(
+            finding[1]["spec"]["potentialSavings"]["amountSubunits"],
+            14_800_000,
+        )
 
 
 if __name__ == "__main__":

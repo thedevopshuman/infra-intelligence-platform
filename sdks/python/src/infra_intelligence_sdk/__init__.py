@@ -13,6 +13,7 @@ from .models import (
     AiAllocationReport,
     AiAttributionPolicy,
     AiCostRecord,
+    AiModelSuitabilityReport,
     AiPriceCatalog,
     AiSavingsFinding,
     AiUsageRecord,
@@ -112,6 +113,7 @@ __all__ = [
     "AiAllocationReport",
     "AiAttributionPolicy",
     "AiCostRecord",
+    "AiModelSuitabilityReport",
     "AiPriceCatalog",
     "AiSavingsFinding",
     "AiUsageRecord",
@@ -205,4 +207,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.54.0"
+__version__ = "0.55.0"

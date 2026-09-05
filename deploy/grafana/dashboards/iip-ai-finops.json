@@ -208,7 +208,7 @@
         "type": "prometheus",
         "uid": "iip-prometheus"
       },
-      "description": "Potential saving backed by the committed context-growth cohort and exact catalog rate.",
+      "description": "Total potential saving backed by committed usage, cost, and any required workload-suitability evidence.",
       "fieldConfig": {
         "defaults": {
           "decimals": 6,
@@ -239,7 +239,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(iip_ai_savings_potential_amount{iip_ai_savings_rule_id=\"context-growth\",job=\"iip-ai-economics\"}) / 1e9",
+          "expr": "sum(iip_ai_savings_potential_amount{job=\"iip-ai-economics\"}) / 1e9",
           "instant": true,
           "legendFormat": "USD potential",
           "range": false,
@@ -454,6 +454,58 @@
         }
       ],
       "title": "Are retries increasing?",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Reference cost-per-request increase over a candidate backed by an unexpired workload-specific quality, latency, safety, and compliance report. This remains advisory.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 25},
+              {"color": "red", "value": 50}
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 23
+      },
+      "id": 10,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "iip_ai_model_cost_increase{job=\"iip-ai-economics\"} / 100",
+          "instant": true,
+          "legendFormat": "{{gen_ai_response_model}} → {{iip_ai_candidate_model_id}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Is a qualified lower-cost model available?",
       "type": "gauge"
     }
   ],

@@ -19,6 +19,7 @@ from iip.adapters.otel import (
 from iip.application.ports import (
     AiAllocationMeasurement,
     AiEconomicsMeasurement,
+    AiModelSavingsMeasurement,
     AiRetryMeasurement,
     IngestionFreshnessMeasurement,
     QueryAvailabilityMeasurement,
@@ -130,6 +131,30 @@ def ai_retry_measurement() -> AiRetryMeasurement:
         evaluation_status="qualified",
         finding_count=1,
         finding_severity="high",
+    )
+
+
+def ai_model_savings_measurement() -> AiModelSavingsMeasurement:
+    return AiModelSavingsMeasurement(
+        tenant_id="local",
+        profile_id="support-assistant-model-cost",
+        provider="aws.bedrock",
+        reference_model_id="example.foundation-model-v1:0",
+        candidate_model_id="example.efficient-model-v1:0",
+        region="us-east-1",
+        service_name="support-assistant",
+        deployment_environment="production",
+        reference_request_count=2,
+        candidate_request_count=2,
+        reference_cost_per_request_subunits=8_700_000,
+        candidate_cost_per_request_subunits=1_300_000,
+        cost_increase_basis_points=56_923,
+        currency="USD",
+        currency_scale=9,
+        evaluation_status="qualified",
+        finding_count=1,
+        finding_severity="high",
+        potential_savings_subunits=14_800_000,
     )
 
 
@@ -448,6 +473,47 @@ class OpenTelemetryAiEconomicsSinkTests(unittest.TestCase):
         for forbidden in ("aiu_", "aic_", "aif_", "amountSubunits", "prompt"):
             self.assertNotIn(forbidden, serialized)
         self.assertEqual(sink.record_failures, 0)
+
+    def test_qualified_model_snapshot_exports_bounded_comparison(self) -> None:
+        meter = RecordingMeter()
+        sink = OpenTelemetryAiEconomicsSink(
+            meter,
+            attribute_mode="tenant-scope",
+        )
+
+        sink.record_ai_model_savings(ai_model_savings_measurement())
+
+        costs = meter.instruments["iip.ai.model.cost_per_request"].records
+        self.assertEqual(
+            {
+                attributes["iip.ai.model.role"]: value
+                for value, attributes in costs
+            },
+            {"candidate": 1_300_000, "reference": 8_700_000},
+        )
+        self.assertEqual(
+            meter.instruments["iip.ai.model.cost_increase"].records[0][0],
+            56_923,
+        )
+        self.assertEqual(
+            meter.instruments["iip.ai.savings.potential_amount"].records[0][0],
+            14_800_000,
+        )
+        serialized = json.dumps(
+            meter.instruments,
+            default=lambda value: value.__dict__,
+        )
+        for forbidden in ("ams_", "aiu_", "aic_", "prompt", "resultDigest"):
+            self.assertNotIn(forbidden, serialized)
+        self.assertEqual(sink.record_failures, 0)
+
+        sink.record_ai_model_savings(
+            replace(
+                ai_model_savings_measurement(),
+                candidate_cost_per_request_subunits=None,
+            )
+        )
+        self.assertEqual(sink.record_failures, 1)
 
     def test_scope_mode_omits_tenant_and_invalid_snapshot_fails_locally(self) -> None:
         meter = RecordingMeter()

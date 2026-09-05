@@ -46,7 +46,8 @@ TypeScript package intentionally provides types only because Unix-domain socket
 transport is runtime-specific.
 
 `AiUsageRecord`, `AiAttributionPolicy`, `AiUsageAttributionRecord`,
-`AiPriceCatalog`, `AiCostRecord`, `AiSavingsFinding`, and `AiAllocationReport`
+`AiPriceCatalog`, `AiCostRecord`, `AiSavingsFinding`, `AiModelSuitabilityReport`,
+and `AiAllocationReport`
 describe the
 metadata-only AI economics ledger. The SDK does not instrument or
 proxy model calls; applications continue using standard OpenTelemetry
@@ -116,3 +117,7 @@ Version 0.54 adds the offline
 `KubernetesAvailabilityQualificationReport`, component/phase state, and closed
 check identifiers. It adds no API method, Kubernetes credential, mutation
 authority, or production availability claim.
+
+Version 0.55 adds `AiModelSuitabilityReport` plus the qualified-model saving
+calculation and evidence-reference types. These types cannot attest gate
+results, install protected profiles, switch models, or grant action authority.

@@ -3704,6 +3704,29 @@ class AiCostRecord:
 
 
 @dataclass(frozen=True)
+class AiModelSuitabilityReport:
+    """Protected time-bounded evidence for one candidate/reference model pair."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "AiModelSuitabilityReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiModelSuitabilityReport",
+                label="AI model suitability report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class AiSavingsFinding:
     """Deterministic evidence-backed AI economics finding."""
 

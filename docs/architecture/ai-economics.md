@@ -136,9 +136,13 @@ potential-saving status or formula, supporting record references, and a
 validation-bound recommendation. A rule emits no finding when its minimum
 cohort or evidence requirements are not met.
 
-The executable rules are `context-growth` and `retry-amplification` version
-`1.0.0`. The expensive-model rule remains disabled until protected model
-equivalence and workload quality evidence have executable coverage.
+The executable rules are `context-growth`, `retry-amplification`, and
+`expensive-model-anomaly` version `1.0.0`. The expensive-model rule cannot run
+from price evidence alone: its protected profile embeds one immutable,
+time-bounded `AiModelSuitabilityReport` for the exact tenant, provider,
+reference/candidate model pair, region, service, environment, and workload.
+All quality, latency, safety, and compliance gates must be passed. The worker
+registers that report before evaluation, and the finding cites it.
 
 The context-growth rule runs only in the tenant-explicit workflow worker. A
 protected profile fixes the exact provider, model, region, service,
@@ -167,14 +171,27 @@ explicitly unresolved because a final span does not establish the billable
 usage of hidden retry attempts. Retry reporting uses separate gauges so adding
 a second rule for one scope cannot double-count usage or cost totals.
 
-After persistence, the same worker offers one bounded current-window aggregate
+The expensive-model rule treats the candidate-model baseline and currently
+observed reference-model window as separate exact cohorts. Both must meet the
+same protected sample and record limits, contain only successful complete
+usage, have exact priced cost records from one catalog/engine generation, and
+use one currency and scale. It compares half-up mean calculated cost per
+request, then applies the observed per-request difference only to the
+reference window request count. The result is a calculated scenario—not an
+invoice, quality claim, or permission to switch models. A missing, expired,
+scope-mismatched, or test-only-in-production suitability report produces no
+finding. Persistence reloads the stored report and every cited usage and cost
+fact before committing the recommendation.
+
+After persistence, the same worker offers bounded current-window aggregates
 to the existing OTLP metrics runtime. It reports request/token volume, meter
 and pricing coverage, calculated cost, baseline/current means, signed change,
-rule status, and potential saving. Series dimensions come only from protected
-profiles; invocation, trace, usage, cost, finding, evidence, and catalog
-identities never become labels. More than the configured cohort maximum
-suppresses the aggregate rather than presenting a truncated total. Recording
-or export failure is isolated from ledger and rule outcomes.
+retry facts, qualified candidate/reference cost per request, rule status, and
+potential saving. Series dimensions come only from protected profiles;
+invocation, trace, usage, cost, finding, suitability-report, evidence, and
+catalog identities never become labels. More than the configured cohort
+maximum suppresses the aggregate rather than presenting a truncated total.
+Recording or export failure is isolated from ledger and rule outcomes.
 
 The reference Compose topology routes independently authenticated Bedrock- and
 OpenAI-shaped spans through an upstream Collector into the same isolated

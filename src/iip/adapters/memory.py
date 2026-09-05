@@ -38,6 +38,9 @@ from iip.adapters.ai_cost_store import (
     validate_ai_cost_actor,
     validate_ai_cost_usage_binding,
 )
+from iip.adapters.ai_model_suitability_store import (
+    prepare_ai_model_suitability_report,
+)
 from iip.adapters.ai_savings_store import (
     PreparedAiSavingsWrite,
     prepare_ai_savings_writes,
@@ -108,6 +111,9 @@ class InMemoryResourceStore:
             tuple[str, str], tuple[str, Mapping[str, object]]
         ] = {}
         self._ai_cost_identities: Dict[tuple[str, str, str, str], str] = {}
+        self._ai_model_suitability_reports: Dict[
+            tuple[str, str], tuple[str, Mapping[str, object]]
+        ] = {}
         self._ai_savings: Dict[
             tuple[str, str], tuple[str, Mapping[str, object]]
         ] = {}
@@ -718,6 +724,34 @@ class InMemoryResourceStore:
                 for _started_at, _usage_id, usage, cost in candidates[: query.limit]
             )
 
+    def register_ai_model_suitability_report(
+        self,
+        actor: ActorContext,
+        report: Mapping[str, object],
+        *,
+        allow_test_fixtures: bool = False,
+    ) -> Mapping[str, object]:
+        """Register one immutable exact-tenant model suitability report."""
+
+        prepared = prepare_ai_model_suitability_report(
+            actor,
+            report,
+            allow_test_fixtures=allow_test_fixtures,
+        )
+        key = (prepared.tenant_id, prepared.report_id)
+        with self._lock:
+            existing = self._ai_model_suitability_reports.get(key)
+            if existing is not None:
+                if existing[0] != prepared.document_hash:
+                    raise PersistenceError("storage.conflict")
+                return self._json_copy(existing[1])
+            copied = self._json_copy(prepared.document)
+            self._ai_model_suitability_reports[key] = (
+                prepared.document_hash,
+                copied,
+            )
+            return self._json_copy(copied)
+
     def list_ai_allocation_rows(
         self,
         actor: ActorContext,
@@ -840,11 +874,23 @@ class InMemoryResourceStore:
                     if stored_cost is None:
                         raise PersistenceError("storage.request.invalid")
                     cost_documents.append(stored_cost[1])
+                suitability_documents: tuple[Mapping[str, object], ...] = ()
+                if item.suitability_report_ids:
+                    reports: list[Mapping[str, object]] = []
+                    for report_id in item.suitability_report_ids:
+                        stored_report = self._ai_model_suitability_reports.get(
+                            (item.tenant_id, report_id)
+                        )
+                        if stored_report is None:
+                            raise PersistenceError("storage.request.invalid")
+                        reports.append(stored_report[1])
+                    suitability_documents = tuple(reports)
                 try:
                     validate_ai_savings_source_binding(
                         item.document,
                         usage_documents,
                         tuple(cost_documents),
+                        suitability_documents,
                     )
                 except InvalidAiSavingsInputError:
                     raise PersistenceError("storage.request.invalid") from None
@@ -916,14 +962,40 @@ class InMemoryResourceStore:
         usage: Mapping[str, object],
         finding: PreparedAiSavingsWrite,
     ) -> bool:
+        model_id = finding.model_id
+        start = finding.baseline_start
+        end = finding.current_end
+        if finding.candidate_model_id is not None:
+            try:
+                spec = usage["spec"]
+                assert isinstance(spec, Mapping)
+                invocation = spec["invocation"]
+                assert isinstance(invocation, Mapping)
+                usage_model = invocation.get(
+                    "responseModel",
+                    invocation["requestModel"],
+                )
+                started_at = datetime.fromisoformat(
+                    str(invocation["startedAt"]).replace("Z", "+00:00")
+                )
+                current_start = datetime.fromisoformat(
+                    finding.current_start.replace("Z", "+00:00")
+                )
+            except (AssertionError, KeyError, TypeError, ValueError):
+                raise PersistenceError("storage.state.invalid") from None
+            if started_at < current_start:
+                model_id = finding.candidate_model_id
+                end = finding.baseline_end
+            else:
+                start = finding.current_start
         baseline_query = AiSavingsCohortQuery(
             provider=finding.provider,
-            model_id=finding.model_id,
+            model_id=model_id,
             region=finding.region,
             service_name=finding.service_name,
             deployment_environment=finding.deployment_environment,
-            start=finding.baseline_start,
-            end=finding.current_end,
+            start=start,
+            end=end,
             catalog_id="apc_00000000000000000000000000000000",
             engine_version="0.1.0",
             limit=1,

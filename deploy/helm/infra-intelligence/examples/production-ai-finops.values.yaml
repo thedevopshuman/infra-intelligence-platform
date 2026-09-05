@@ -16,6 +16,7 @@ aiCostEngine:
 aiSavingsEngine:
   enabled: true
   profilesExistingSecret: iip-ai-savings
+  allowTestFixtures: false
 
 aiAllocationReporting:
   enabled: true

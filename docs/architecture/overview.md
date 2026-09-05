@@ -131,9 +131,14 @@ The tenant-explicit workflow worker now implements the separate pricing use
 case: protected immutable catalogs drive bounded integer cost calculation, and
 each new cost fact, minimized event, and outbox row commit atomically. Saving
 evaluation remains a separate downstream use case: executable context-growth
-and retry-amplification rules compare protected fixed windows, revalidate exact
-source evidence in storage, and atomically record deterministic findings,
-minimized events, and outbox rows. Retry savings remain explicitly unresolved
+and retry-amplification rules plus a qualified model-cost comparison evaluate
+protected fixed windows, revalidate exact source evidence in storage, and
+atomically record deterministic findings, minimized events, and outbox rows.
+The model-cost rule additionally requires an immutable, workload-specific,
+time-bounded suitability report with passed quality, latency, safety, and
+compliance gates, as fixed by
+[ADR 0111](../decisions/0111-qualified-expensive-model-anomaly.md). Retry
+savings remain explicitly unresolved
 until billable-attempt evidence exists, as fixed by
 [ADR 0096](../decisions/0096-source-bound-retry-amplification.md). Protected effective-time mappings separately
 resolve observed service/resource identity into immutable application/team or

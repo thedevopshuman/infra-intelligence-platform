@@ -1,0 +1,20 @@
+{
+  "specversion": "1.0",
+  "id": "ai-savings-df87ea37c2c3992e6c7641b045c2a8aacb2876dad29b2ccc29469416ba5de46e",
+  "type": "io.iip.ai.savings-finding-recorded.v1",
+  "source": "urn:iip:ai-savings:expensive-model-anomaly:1.0.0",
+  "time": "2026-09-05T11:00:00Z",
+  "subject": "aif_df87ea37c2c3992e6c7641b045c2a8aa",
+  "datacontenttype": "application/json",
+  "tenantid": "local",
+  "data": {
+    "findingId": "aif_df87ea37c2c3992e6c7641b045c2a8aa",
+    "ruleId": "expensive-model-anomaly",
+    "ruleVersion": "1.0.0",
+    "category": "expensive-model-anomaly",
+    "severity": "high",
+    "provider": "aws.bedrock",
+    "modelId": "example.foundation-model-v1:0",
+    "serviceName": "support-assistant"
+  }
+}

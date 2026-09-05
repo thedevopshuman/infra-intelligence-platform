@@ -14,8 +14,11 @@ versioned pricing runtime are delivered. The first evidence-backed
 context-growth rule and its privacy-bounded OTLP aggregate metric projection
 are also executable. A second source-bound retry-amplification rule now maps
 provider attributes through protected channel policy and reports an unresolved
-monetary status rather than guessing billed retry cost. The reference dashboard
-topology and separate pinned official botocore `Converse`/`ConverseStream`
+monetary status rather than guessing billed retry cost. A third rule now
+requires an immutable workload suitability report before comparing a qualified
+candidate-model cohort with the reference-model cohort and calculating a
+scenario saving. The reference dashboard topology and separate pinned official
+botocore `Converse`/`ConverseStream`
 offline interoperability gates are executable; live Bedrock
 model/region/operation qualification remains.
 The first Phase B unit is also executable: protected effective-time policies

@@ -108,7 +108,7 @@ See the [OpenAI instrumentation qualification](openai-instrumentation-qualificat
 
 ## Run the isolated process
 
-Apply all packaged migrations through `0022_ai_retry_savings_rule.sql`, then
+Apply all packaged migrations through `0023_ai_model_suitability.sql`, then
 configure the receiver. The usage ledger itself is introduced by
 `0018_ai_usage_ledger.sql`; migrations `0019` through `0021` add the separately
 operated price/cost, savings, and attribution ledgers, while `0022` enables the

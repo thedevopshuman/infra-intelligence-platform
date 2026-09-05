@@ -51,12 +51,15 @@ content rejection, exact cost, and one saving. A source-bound offline report
 now also proves official SDK interoperability and asynchronous exporter-failure
 isolation. The explicitly enabled real-provider call remains.
 
-The first additional deterministic rule is delivered: protected channel
+Two additional deterministic rules are delivered. Protected channel
 configuration maps provider retry attributes into `retryCount`, and the
 source-bound retry-amplification evaluator compares complete fixed-window
 cohorts. Its finding and dashboard signal carry an unresolved monetary status
-until billable-attempt evidence exists. Expensive-model anomaly detection
-remains open pending protected equivalence and workload-quality evidence.
+until billable-attempt evidence exists. The expensive-model evaluator requires
+a protected, immutable, time-bounded suitability report with passed
+workload-specific quality, latency, safety, and compliance gates before it can
+compare candidate/reference cost per request. Its calculated scenario cites
+the report and complete usage/cost cohorts and remains advisory.
 
 A closed `production-ai-finops-v0` Helm overlay and minimized deployment
 preflight are also executable. Static mode proves the complete non-secret

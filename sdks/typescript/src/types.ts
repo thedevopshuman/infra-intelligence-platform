@@ -20,6 +20,7 @@ export type AiUsageAttributionRecordId = `aia_${string}`;
 export type AiPriceCatalogId = `apc_${string}`;
 export type AiCostRecordId = `aic_${string}`;
 export type AiSavingsFindingId = `aif_${string}`;
+export type AiModelSuitabilityReportId = `ams_${string}`;
 export type Sha256Digest = `sha256:${string}`;
 export type ResourceLifecycle =
   | "active"
@@ -405,7 +406,11 @@ export interface AiSavingsObservation {
 export type AiSavingsEvidenceRef =
   | { type: "ai-usage-record"; id: AiUsageRecordId }
   | { type: "ai-cost-record"; id: AiCostRecordId }
-  | { type: "evidence"; id: EvidenceId };
+  | { type: "evidence"; id: EvidenceId }
+  | {
+      type: "ai-model-suitability-report";
+      id: AiModelSuitabilityReportId;
+    };
 
 export type AiPotentialSavings =
   | {
@@ -414,15 +419,23 @@ export type AiPotentialSavings =
       currencyScale: AiCurrencyScale;
       amountSubunits: number;
       period: { start: string; end: string };
-      calculation: {
-        method: "avoidable-excess-at-observed-rate";
-        excessQuantity: number;
-        chargeCategory:
-          | "uncached-input-tokens"
-          | "cache-read-input-tokens"
-          | "cache-write-input-tokens";
-        priceSubunitsPerMillionTokens: number;
-      };
+      calculation:
+        | {
+            method: "avoidable-excess-at-observed-rate";
+            excessQuantity: number;
+            chargeCategory:
+              | "uncached-input-tokens"
+              | "cache-read-input-tokens"
+              | "cache-write-input-tokens";
+            priceSubunitsPerMillionTokens: number;
+          }
+        | {
+            method: "qualified-model-cost-difference";
+            candidateCostPerRequestSubunits: number;
+            referenceCostPerRequestSubunits: number;
+            referenceRequestCount: number;
+            suitabilityReportId: AiModelSuitabilityReportId;
+          };
       costRecordRefs: AiCostRecordId[];
     }
   | {
@@ -453,6 +466,7 @@ export interface AiSavingsFinding {
       currentWindow: { start: string; end: string };
       provider: string;
       modelId: string;
+      candidateModelId?: string;
       region: string;
       serviceName: string;
       deploymentEnvironment?: string;
@@ -474,6 +488,52 @@ export interface AiSavingsFinding {
       requiresValidation: true;
     };
     evidenceRefs: AiSavingsEvidenceRef[];
+  };
+}
+
+export interface AiModelSuitabilityReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiModelSuitabilityReport";
+  metadata: {
+    id: AiModelSuitabilityReportId;
+    tenantId: string;
+    evaluatedAt: string;
+    validUntil: string;
+  };
+  spec: {
+    status: "qualified";
+    evaluatorVersion: "1.0.0";
+    source: {
+      kind: "operator-attested" | "test-fixture";
+      locator: string;
+      retrievedAt: string;
+      contentHash: Sha256Digest;
+    };
+    scope: {
+      provider: string;
+      referenceModelId: string;
+      candidateModelId: string;
+      region: string;
+      serviceName: string;
+      deploymentEnvironment: string;
+    };
+    workload: {
+      profileId: string;
+      criteriaDigest: Sha256Digest;
+    };
+    gates: Array<{
+      id: "quality" | "latency" | "safety" | "compliance";
+      status: "passed";
+      sampleCount: number;
+      resultDigest: Sha256Digest;
+    }>;
+    contentHandling: {
+      promptContentPersisted: false;
+      responseContentPersisted: false;
+      toolContentPersisted: false;
+      artifactContainsContent: false;
+    };
+    limitations: ["workload-specific", "time-bounded", "advisory-only"];
   };
 }
 

@@ -51,6 +51,7 @@ class PreparedAiSavingsWrite:
     severity: str
     provider: str
     model_id: str
+    candidate_model_id: str | None
     region: str
     service_name: str
     deployment_environment: str
@@ -61,6 +62,7 @@ class PreparedAiSavingsWrite:
     evaluated_at: str
     usage_record_ids: tuple[str, ...]
     cost_record_ids: tuple[str, ...]
+    suitability_report_ids: tuple[str, ...]
 
 
 def validate_ai_savings_actor(actor: ActorContext) -> None:
@@ -157,6 +159,7 @@ def _prepare_one(
         evaluated_at = metadata["evaluatedAt"]
         provider = scope["provider"]
         model_id = scope["modelId"]
+        candidate_model_id = scope.get("candidateModelId")
         service_name = scope["serviceName"]
         severity = finding_value["severity"]
         usage_ids = tuple(
@@ -169,6 +172,12 @@ def _prepare_one(
         if not isinstance(raw_cost_ids, (list, tuple)):
             raise ValueError
         cost_ids = tuple(raw_cost_ids)
+        suitability_report_ids = tuple(
+            reference["id"]
+            for reference in evidence
+            if isinstance(reference, Mapping)
+            and reference.get("type") == "ai-model-suitability-report"
+        )
         digest = hashlib.sha256(
             json.dumps(
                 spec,
@@ -227,6 +236,7 @@ def _prepare_one(
         str(severity),
         str(provider),
         str(model_id),
+        str(candidate_model_id) if candidate_model_id is not None else None,
         str(scope["region"]),
         str(service_name),
         str(scope["deploymentEnvironment"]),
@@ -237,6 +247,7 @@ def _prepare_one(
         str(evaluated_at),
         tuple(str(item) for item in usage_ids),
         tuple(str(item) for item in cost_ids),
+        tuple(str(item) for item in suitability_report_ids),
     )
 
 

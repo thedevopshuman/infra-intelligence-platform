@@ -304,6 +304,7 @@ def build_local_runtime(
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
     ai_savings_profiles: tuple[Mapping[str, object], ...] | None = None,
+    ai_savings_allow_test_fixtures: bool = False,
     ai_allocation_policies: tuple[Mapping[str, object], ...] | None = None,
     ai_allocation_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_allocation_allow_test_fixtures: bool = False,
@@ -357,6 +358,7 @@ def build_local_runtime(
         ai_cost_allow_test_fixtures,
         ai_cost_batch_size,
         ai_savings_profiles,
+        ai_savings_allow_test_fixtures,
         ai_allocation_policies,
         ai_allocation_catalogs,
         ai_allocation_allow_test_fixtures,
@@ -411,6 +413,7 @@ def _compose_runtime(
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
     ai_savings_profiles: tuple[Mapping[str, object], ...] | None = None,
+    ai_savings_allow_test_fixtures: bool = False,
     ai_allocation_policies: tuple[Mapping[str, object], ...] | None = None,
     ai_allocation_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_allocation_allow_test_fixtures: bool = False,
@@ -664,6 +667,7 @@ def _compose_runtime(
                 clock,
                 ai_savings_profiles,
                 telemetry_sink=ai_economics_telemetry_sink,
+                allow_test_fixtures=ai_savings_allow_test_fixtures,
             )
             if ai_savings_profiles is not None
             else None
@@ -801,6 +805,7 @@ def build_postgres_runtime(
     ai_cost_allow_test_fixtures: bool = False,
     ai_cost_batch_size: int = 100,
     ai_savings_profiles: tuple[Mapping[str, object], ...] | None = None,
+    ai_savings_allow_test_fixtures: bool = False,
     ai_allocation_policies: tuple[Mapping[str, object], ...] | None = None,
     ai_allocation_catalogs: tuple[Mapping[str, object], ...] | None = None,
     ai_allocation_allow_test_fixtures: bool = False,
@@ -861,6 +866,7 @@ def build_postgres_runtime(
         ai_cost_allow_test_fixtures,
         ai_cost_batch_size,
         ai_savings_profiles,
+        ai_savings_allow_test_fixtures,
         ai_allocation_policies,
         ai_allocation_catalogs,
         ai_allocation_allow_test_fixtures,
@@ -1032,10 +1038,15 @@ def _build_runtime_from_env(
             if include_ai_economics_engine
             else (None, False, 100)
         )
-        ai_savings_profiles = (
+        ai_savings_configuration = (
             _ai_savings_engine_configuration_from_env(ai_cost_catalogs)
             if include_ai_economics_engine
             else None
+        )
+        ai_savings_profiles, ai_savings_allow_test_fixtures = (
+            ai_savings_configuration
+            if ai_savings_configuration is not None
+            else (None, False)
         )
         (
             ai_allocation_policies,
@@ -1106,6 +1117,9 @@ def _build_runtime_from_env(
                 ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
                 ai_cost_batch_size=ai_cost_batch_size,
                 ai_savings_profiles=ai_savings_profiles,
+                ai_savings_allow_test_fixtures=(
+                    ai_savings_allow_test_fixtures
+                ),
                 ai_allocation_policies=ai_allocation_policies,
                 ai_allocation_catalogs=ai_allocation_catalogs,
                 ai_allocation_allow_test_fixtures=(
@@ -1187,6 +1201,7 @@ def _build_runtime_from_env(
             ai_cost_allow_test_fixtures=ai_cost_allow_test_fixtures,
             ai_cost_batch_size=ai_cost_batch_size,
             ai_savings_profiles=ai_savings_profiles,
+            ai_savings_allow_test_fixtures=ai_savings_allow_test_fixtures,
             ai_allocation_policies=ai_allocation_policies,
             ai_allocation_catalogs=ai_allocation_catalogs,
             ai_allocation_allow_test_fixtures=(
@@ -2226,12 +2241,19 @@ def _ai_cost_engine_configuration_from_env() -> tuple[
 
 def _ai_savings_engine_configuration_from_env(
     catalogs: tuple[Mapping[str, object], ...] | None,
-) -> tuple[Mapping[str, object], ...] | None:
+) -> tuple[tuple[Mapping[str, object], ...], bool] | None:
     enabled = os.environ.get("IIP_AI_SAVINGS_ENGINE_ENABLED", "false").lower()
     if enabled not in ("false", "true"):
         raise AiSavingsConfigurationError("ai.savings.configuration.invalid")
     if enabled == "false":
         return None
+    allow_raw = os.environ.get(
+        "IIP_AI_SAVINGS_ALLOW_TEST_FIXTURES",
+        "false",
+    ).lower()
+    if allow_raw not in ("false", "true"):
+        raise AiSavingsConfigurationError("ai.savings.configuration.invalid")
+    allow_test_fixtures = allow_raw == "true"
     raw_profiles = os.environ.get("IIP_AI_SAVINGS_PROFILES_JSON")
     if raw_profiles is None or catalogs is None:
         raise AiSavingsConfigurationError("ai.savings.configuration.required")
@@ -2239,7 +2261,13 @@ def _ai_savings_engine_configuration_from_env(
     from iip.adapters.ai_savings_profiles import ai_savings_profiles_from_json
 
     profiles = ai_savings_profiles_from_json(raw_profiles)
-    validated = tuple(validate_ai_savings_profile(item) for item in profiles)
+    validated = tuple(
+        validate_ai_savings_profile(
+            item,
+            allow_test_fixtures=allow_test_fixtures,
+        )
+        for item in profiles
+    )
     worker_tenants = {
         item.strip()
         for item in os.environ.get("IIP_WORKER_TENANTS", "").split(",")
@@ -2264,4 +2292,4 @@ def _ai_savings_engine_configuration_from_env(
         )
     ):
         raise AiSavingsConfigurationError("ai.savings.tenants.invalid")
-    return profiles
+    return profiles, allow_test_fixtures

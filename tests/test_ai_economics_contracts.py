@@ -11,6 +11,7 @@ from infra_intelligence_sdk import (
     AiAllocationReport,
     AiAttributionPolicy,
     AiCostRecord,
+    AiModelSuitabilityReport,
     AiPriceCatalog,
     AiSavingsFinding,
     AiUsageRecord,
@@ -29,6 +30,7 @@ CONTRACTS = (
     ("ai-usage-attribution-record", AiUsageAttributionRecord),
     ("ai-price-catalog", AiPriceCatalog),
     ("ai-cost-record", AiCostRecord),
+    ("ai-model-suitability-report", AiModelSuitabilityReport),
     ("ai-savings-finding", AiSavingsFinding),
 )
 
@@ -51,6 +53,7 @@ def example_documents() -> dict[Path, object]:
         "ai-cost-calculated-event.json",
         "ai-savings-finding-event.json",
         "ai-retry-savings-finding-event.json",
+        "ai-expensive-model-savings-finding-event.json",
     )
     return {EXAMPLES / name: load(EXAMPLES / name) for name in names}
 
@@ -88,6 +91,21 @@ class AiEconomicsContractTests(unittest.TestCase):
         )
         self.assertEqual(retry, AiSavingsFinding.from_dict(retry).to_dict())
         validate_ai_savings_finding(retry)
+        expensive = load(EXAMPLES / "ai-expensive-model-savings-finding.json")
+        self.assertEqual(
+            [],
+            list(
+                Draft202012Validator(
+                    schema,
+                    format_checker=checker,
+                ).iter_errors(expensive)
+            ),
+        )
+        self.assertEqual(
+            expensive,
+            AiSavingsFinding.from_dict(expensive).to_dict(),
+        )
+        validate_ai_savings_finding(expensive)
 
     def test_usage_contract_prohibits_content_and_raw_payload_capture(self) -> None:
         schema = load(SCHEMAS / "ai-usage-record.schema.json")

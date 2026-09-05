@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-model-suitability-report:v1alpha1",
+  "title": "AI Model Suitability Report",
+  "description": "A tenant-scoped, time-bounded attestation that one candidate model passed workload-specific comparison gates against a reference model.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "AiModelSuitabilityReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "evaluatedAt", "validUntil"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^ams_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "evaluatedAt": {"type": "string", "format": "date-time"},
+        "validUntil": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "evaluatorVersion",
+        "source",
+        "scope",
+        "workload",
+        "gates",
+        "contentHandling",
+        "limitations"
+      ],
+      "properties": {
+        "status": {"const": "qualified"},
+        "evaluatorVersion": {"const": "1.0.0"},
+        "source": {"$ref": "#/$defs/source"},
+        "scope": {"$ref": "#/$defs/scope"},
+        "workload": {"$ref": "#/$defs/workload"},
+        "gates": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {"$ref": "#/$defs/qualityGate"},
+            {"$ref": "#/$defs/latencyGate"},
+            {"$ref": "#/$defs/safetyGate"},
+            {"$ref": "#/$defs/complianceGate"}
+          ],
+          "items": false
+        },
+        "contentHandling": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "promptContentPersisted",
+            "responseContentPersisted",
+            "toolContentPersisted",
+            "artifactContainsContent"
+          ],
+          "properties": {
+            "promptContentPersisted": {"const": false},
+            "responseContentPersisted": {"const": false},
+            "toolContentPersisted": {"const": false},
+            "artifactContainsContent": {"const": false}
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {"const": "workload-specific"},
+            {"const": "time-bounded"},
+            {"const": "advisory-only"}
+          ],
+          "items": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator", "retrievedAt", "contentHash"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["operator-attested", "test-fixture"]},
+        "locator": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^(?:https://|urn:)[^?#]+$",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "retrievedAt": {"type": "string", "format": "date-time"},
+        "contentHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "referenceModelId",
+        "candidateModelId",
+        "region",
+        "serviceName",
+        "deploymentEnvironment"
+      ],
+      "properties": {
+        "provider": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"},
+        "referenceModelId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "candidateModelId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "region": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"},
+        "serviceName": {"type": "string", "minLength": 1, "maxLength": 256},
+        "deploymentEnvironment": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "criteriaDigest"],
+      "properties": {
+        "profileId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "criteriaDigest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "sampleCount", "resultDigest"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"const": "passed"},
+        "sampleCount": {"type": "integer", "minimum": 1, "maximum": 1000000},
+        "resultDigest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "qualityGate": {
+      "allOf": [
+        {"$ref": "#/$defs/gate"},
+        {"properties": {"id": {"const": "quality"}}}
+      ]
+    },
+    "latencyGate": {
+      "allOf": [
+        {"$ref": "#/$defs/gate"},
+        {"properties": {"id": {"const": "latency"}}}
+      ]
+    },
+    "safetyGate": {
+      "allOf": [
+        {"$ref": "#/$defs/gate"},
+        {"properties": {"id": {"const": "safety"}}}
+      ]
+    },
+    "complianceGate": {
+      "allOf": [
+        {"$ref": "#/$defs/gate"},
+        {"properties": {"id": {"const": "compliance"}}}
+      ]
+    }
+  }
+}

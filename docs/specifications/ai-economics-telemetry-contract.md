@@ -13,9 +13,12 @@ are not the accounting ledger or an invoice.
 One economics measurement represents the current window of one protected
 `context-growth` profile after its window and grace period have ended. A
 separate retry measurement represents one `retry-amplification` profile and
-does not repeat the scope's usage or cost totals. The worker derives both from
-the exact bounded cohorts used by their rules and offers them to the telemetry
-sink only after any qualifying finding has committed.
+does not repeat the scope's usage or cost totals. A qualified-model measurement
+represents one `expensive-model-anomaly` profile and carries only bounded
+candidate/reference cost aggregates; it never exports the suitability report
+or its source identities. The worker derives all three from the exact bounded
+cohorts used by their rules and offers them to the telemetry sink only after
+any qualifying finding has committed.
 
 A separate allocation snapshot represents one tenant's complete bounded
 rolling ledger report, projected once by protected application and once by
@@ -41,6 +44,13 @@ baseline/current retrying-operation rates; their absolute basis-point
 increase; and zero or one committed retry finding. It deliberately contains no
 currency or potential-saving amount because a final successful span does not
 prove hidden attempts were billable.
+
+The qualified-model snapshot contains candidate and reference request counts,
+their calculated cost per request when both exact cohorts are fully priced in
+one currency/scale, the signed reference-versus-candidate basis-point change,
+and zero or one committed finding with its calculated scenario amount. A
+missing or expired suitability report produces an `unresolved` status without
+exporting report, source, gate-result, usage, or cost identifiers.
 
 If a profile exceeds its configured record ceiling, no partial aggregate is
 exported as a window total. Missing cost is represented by coverage, never by
@@ -68,6 +78,8 @@ platform telemetry sinks.
 | `iip.ai.retry.excess_attempts` | `{attempt}` | Sum of reported attempts beyond the initial attempt in the current window. |
 | `iip.ai.retry.operation_rate` | `1` | Baseline or current share of operations reporting retries, in basis points. |
 | `iip.ai.retry.operation_rate_increase` | `1` | Absolute current-minus-baseline retrying-operation rate, in basis points. |
+| `iip.ai.model.cost_per_request` | `{currency-subunit}/{request}` | Calculated cost per request for the `candidate` or `reference` model cohort. |
+| `iip.ai.model.cost_increase` | `1` | Signed reference-versus-candidate cost-per-request change, in basis points. |
 | `iip.ai.savings.profile_status` | `1` | One-hot deterministic evaluation status. |
 | `iip.ai.savings.findings` | `{finding}` | Zero or one committed finding for the profile snapshot. |
 | `iip.ai.savings.potential_amount` | `{currency-subunit}` | Calculated potential saving for a committed finding. |
@@ -94,6 +106,7 @@ attributes:
 - `iip.ai.profile.id`
 - `gen_ai.provider.name`
 - `gen_ai.response.model`
+- `iip.ai.candidate_model.id` for qualified-model profiles
 - `cloud.region`
 - `service.name`
 - `deployment.environment.name`
@@ -107,8 +120,9 @@ Individual instruments add only their declared closed dimensions:
 | `iip.ai.cost.status` | `priced`, `unpriced`, `ambiguous`, `pending` |
 | `iip.ai.comparison.window` | `baseline`, `current` |
 | `iip.ai.retry.status` | `retrying`, `not-retrying`, `fact-missing` |
+| `iip.ai.model.role` | `candidate`, `reference` |
 | `iip.ai.savings.status` | `qualified`, `insufficient`, `unresolved`, `unsupported`, `below-threshold` |
-| `iip.ai.savings.rule.id` | `context-growth`, `retry-amplification` |
+| `iip.ai.savings.rule.id` | `context-growth`, `retry-amplification`, `expensive-model-anomaly` |
 | `iip.ai.savings.rule.version` | `1.0.0` |
 | `iip.ai.savings.severity` | `none`, `low`, `medium`, `high` |
 | `iip.ai.currency` | Three-letter uppercase currency code from the catalog. |
@@ -136,8 +150,8 @@ not grant cross-tenant query authority; the customer must independently route
 and authorize backend access.
 
 Recording is best effort. A rejected measurement increments
-`iip.telemetry.record.failures` with instrument `ai-economics`, `ai-retry`, or
-`ai-allocation`. Collector or
+`iip.telemetry.record.failures` with instrument `ai-economics`, `ai-retry`,
+`ai-model-savings`, or `ai-allocation`. Collector or
 backend delivery is covered by the existing metrics exporter-health path.
 Neither failure changes cost/finding persistence, worker success, API
 readiness, or customer inference.

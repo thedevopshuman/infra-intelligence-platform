@@ -125,3 +125,8 @@ remains an opaque validated envelope and grants no Kubernetes authority.
 Version 0.54 adds `KubernetesAvailabilityQualificationReport` for minimized,
 source-bound planned worker-drain evidence. It adds no API method, cluster
 credential, mutation authority, or customer availability claim.
+
+Version 0.55 adds `AiModelSuitabilityReport`, the protected immutable input
+required before an expensive-model saving can be calculated. The SDK exposes
+the validated envelope only; it cannot attest gate results, install profiles,
+switch models, or grant action authority.

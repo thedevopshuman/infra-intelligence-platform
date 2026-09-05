@@ -95,13 +95,15 @@
         "provider",
         "modelId",
         "region",
-        "serviceName"
+        "serviceName",
+        "deploymentEnvironment"
       ],
       "properties": {
         "baselineWindow": {"$ref": "#/$defs/window"},
         "currentWindow": {"$ref": "#/$defs/window"},
         "provider": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"},
         "modelId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "candidateModelId": {"type": "string", "minLength": 1, "maxLength": 256},
         "region": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"},
         "serviceName": {"type": "string", "minLength": 1, "maxLength": 256},
         "deploymentEnvironment": {"type": "string", "minLength": 1, "maxLength": 128}
@@ -181,23 +183,10 @@
         "amountSubunits": {"$ref": "#/$defs/nonNegativeSafeInteger"},
         "period": {"$ref": "#/$defs/window"},
         "calculation": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "method",
-            "excessQuantity",
-            "chargeCategory",
-            "priceSubunitsPerMillionTokens"
-          ],
-          "properties": {
-            "method": {"const": "avoidable-excess-at-observed-rate"},
-            "excessQuantity": {"$ref": "#/$defs/nonNegativeSafeInteger"},
-            "chargeCategory": {
-              "type": "string",
-              "enum": ["uncached-input-tokens", "cache-read-input-tokens", "cache-write-input-tokens"]
-            },
-            "priceSubunitsPerMillionTokens": {"$ref": "#/$defs/nonNegativeSafeInteger"}
-          }
+          "oneOf": [
+            {"$ref": "#/$defs/excessCostCalculation"},
+            {"$ref": "#/$defs/modelCostCalculation"}
+          ]
         },
         "costRecordRefs": {
           "type": "array",
@@ -206,6 +195,43 @@
           "uniqueItems": true,
           "items": {"type": "string", "pattern": "^aic_[a-f0-9]{32}$"}
         }
+      }
+    },
+    "excessCostCalculation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "excessQuantity",
+        "chargeCategory",
+        "priceSubunitsPerMillionTokens"
+      ],
+      "properties": {
+        "method": {"const": "avoidable-excess-at-observed-rate"},
+        "excessQuantity": {"$ref": "#/$defs/nonNegativeSafeInteger"},
+        "chargeCategory": {
+          "type": "string",
+          "enum": ["uncached-input-tokens", "cache-read-input-tokens", "cache-write-input-tokens"]
+        },
+        "priceSubunitsPerMillionTokens": {"$ref": "#/$defs/nonNegativeSafeInteger"}
+      }
+    },
+    "modelCostCalculation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "candidateCostPerRequestSubunits",
+        "referenceCostPerRequestSubunits",
+        "referenceRequestCount",
+        "suitabilityReportId"
+      ],
+      "properties": {
+        "method": {"const": "qualified-model-cost-difference"},
+        "candidateCostPerRequestSubunits": {"$ref": "#/$defs/nonNegativeSafeInteger"},
+        "referenceCostPerRequestSubunits": {"$ref": "#/$defs/nonNegativeSafeInteger"},
+        "referenceRequestCount": {"type": "integer", "minimum": 1, "maximum": 100},
+        "suitabilityReportId": {"type": "string", "pattern": "^ams_[a-f0-9]{32}$"}
       }
     },
     "unpricedSavings": {
@@ -270,6 +296,15 @@
           "properties": {
             "type": {"const": "evidence"},
             "id": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id"],
+          "properties": {
+            "type": {"const": "ai-model-suitability-report"},
+            "id": {"type": "string", "pattern": "^ams_[a-f0-9]{32}$"}
           }
         }
       ]

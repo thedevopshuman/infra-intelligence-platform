@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import time
 import urllib.parse
@@ -27,6 +28,7 @@ CONTROL_TOKEN_SHA256 = (
     "sha256:d52e86d5eeda090d11d9c961632390e6da1356df217d662abde728312befb25d"
 )
 KNOWN_MODEL = "example.foundation-model-v1:0"
+CANDIDATE_MODEL = "example.efficient-model-v1:0"
 UNKNOWN_MODEL = "unpriced.foundation-model-v1:0"
 OPENAI_MODEL = "example-openai-model"
 CATALOG_ID = "apc_11111111111111111111111111111111"
@@ -86,7 +88,7 @@ def channel_configuration() -> Mapping[str, object]:
                         "resourceRefs": [],
                     },
                 ],
-                "models": [KNOWN_MODEL, UNKNOWN_MODEL],
+                "models": [CANDIDATE_MODEL, KNOWN_MODEL, UNKNOWN_MODEL],
                 "operations": ["chat"],
                 "regions": ["us-east-1"],
                 "instrumentationScopes": [INSTRUMENTATION_SCOPE],
@@ -202,6 +204,16 @@ def price_catalog_configuration(anchor: datetime) -> Mapping[str, object]:
     catalog["spec"]["entries"][0]["effectiveFrom"] = format_timestamp(
         anchor - timedelta(days=1)
     )
+    candidate = json.loads(json.dumps(catalog["spec"]["entries"][0]))
+    candidate.update(
+        {
+            "id": "aws-bedrock.example-efficient-model-v1.us-east-1.on-demand",
+            "modelId": CANDIDATE_MODEL,
+        }
+    )
+    for rate in candidate["rates"].values():
+        rate["priceSubunitsPerMillionTokens"] = 1_000_000_000
+    catalog["spec"]["entries"].append(candidate)
     catalog["spec"]["entries"].append(
         {
             "id": "openai.example-openai-model.global.on-demand",
@@ -357,6 +369,51 @@ def savings_profile_configuration(anchor: datetime) -> Mapping[str, object]:
         }
     )
     profiles.append(retry_profile)
+    report = json.loads(
+        (
+            ROOT
+            / "contracts"
+            / "examples"
+            / "ai-model-suitability-report.json"
+        ).read_text(encoding="utf-8")
+    )
+    report["metadata"].update(
+        {
+            "evaluatedAt": format_timestamp(anchor - timedelta(minutes=10)),
+            "validUntil": format_timestamp(anchor + timedelta(days=30)),
+        }
+    )
+    report["spec"]["source"]["retrievedAt"] = format_timestamp(
+        anchor - timedelta(minutes=11)
+    )
+    identity = json.loads(json.dumps(report))
+    identity["metadata"].pop("id")
+    report["metadata"]["id"] = "ams_" + hashlib.sha256(
+        json.dumps(
+            identity,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()[:32]
+    model_profile = profile(
+        "support-assistant-model-cost",
+        "aws.bedrock",
+        KNOWN_MODEL,
+        "us-east-1",
+        "support-assistant",
+    )
+    model_profile["ruleId"] = "expensive-model-anomaly"
+    model_profile["scope"]["candidateModelId"] = CANDIDATE_MODEL
+    model_profile.pop("growthThresholdBasisPoints")
+    model_profile.update(
+        {
+            "costIncreaseThresholdBasisPoints": 2500,
+            "modelSuitabilityReport": report,
+        }
+    )
+    profiles.append(model_profile)
     return {"profiles": profiles}
 
 
@@ -495,6 +552,12 @@ def send_fixture(
         service_name="research-assistant",
         input_tokens=(800, 800, 800, 800),
     )
+    candidate = _finished_spans(
+        anchor,
+        model_id=CANDIDATE_MODEL,
+        service_name="support-assistant",
+        input_tokens=(1200, 1200, 1200, 1200),
+    )[:2]
     openai = _finished_spans(
         anchor,
         model_id=OPENAI_MODEL,
@@ -507,7 +570,7 @@ def send_fixture(
         explicit_usage_breakdowns=True,
     )
     try:
-        for batch in (known, unknown):
+        for batch in (known, candidate, unknown):
             if exporter.export(batch) is not SpanExportResult.SUCCESS:
                 raise RuntimeError("ai-finops.fixture.export.failed")
         if openai_exporter.export(openai) is not SpanExportResult.SUCCESS:
@@ -518,6 +581,8 @@ def send_fixture(
         time.sleep(2)
         if exporter.export(known) is not SpanExportResult.SUCCESS:
             raise RuntimeError("ai-finops.fixture.replay.failed")
+        if exporter.export(candidate) is not SpanExportResult.SUCCESS:
+            raise RuntimeError("ai-finops.fixture.candidate-replay.failed")
         if openai_exporter.export(openai) is not SpanExportResult.SUCCESS:
             raise RuntimeError("ai-finops.fixture.openai-replay.failed")
         time.sleep(2)
@@ -641,11 +706,23 @@ def _database_snapshot(database_url: str) -> Mapping[str, object]:
                 """
             ).fetchall()
         )
+        suitability_reports = tuple(
+            row[0]
+            for row in connection.execute(
+                """
+                SELECT document
+                FROM iip.ai_model_suitability_reports
+                WHERE tenant_id = 'local'
+                ORDER BY report_id
+                """
+            ).fetchall()
+        )
     return {
         "usage": usage,
         "attributions": attributions,
         "costs": costs,
         "findings": findings,
+        "suitabilityReports": suitability_reports,
     }
 
 
@@ -669,14 +746,19 @@ def verify_fixture(
     while time.monotonic() < deadline:
         try:
             snapshot = _database_snapshot(database_url)
-            _assert_equal(len(snapshot["usage"]), 12, "usage ledger count")
+            _assert_equal(len(snapshot["usage"]), 14, "usage ledger count")
             _assert_equal(
                 len(snapshot["attributions"]),
-                12,
+                14,
                 "attribution ledger count",
             )
-            _assert_equal(len(snapshot["costs"]), 12, "cost ledger count")
-            _assert_equal(len(snapshot["findings"]), 2, "finding ledger count")
+            _assert_equal(len(snapshot["costs"]), 14, "cost ledger count")
+            _assert_equal(len(snapshot["findings"]), 3, "finding ledger count")
+            _assert_equal(
+                len(snapshot["suitabilityReports"]),
+                1,
+                "model suitability ledger count",
+            )
 
             serialized = json.dumps(snapshot, sort_keys=True)
             if "must-never-cross-iip-boundary" in serialized:
@@ -690,7 +772,7 @@ def verify_fixture(
             ]
             _assert_equal(
                 allocation_statuses.count("allocated"),
-                8,
+                10,
                 "allocated usage records",
             )
             _assert_equal(
@@ -702,7 +784,7 @@ def verify_fixture(
             costs = snapshot["costs"]
             assert isinstance(costs, tuple)
             statuses = [item["spec"]["result"]["costStatus"] for item in costs]
-            _assert_equal(statuses.count("priced"), 8, "priced records")
+            _assert_equal(statuses.count("priced"), 10, "priced records")
             _assert_equal(statuses.count("unpriced"), 4, "unpriced records")
             findings = {
                 item["spec"]["rule"]["id"]: item
@@ -724,6 +806,17 @@ def verify_fixture(
                 retry_finding["spec"]["observations"][0]["changeBasisPoints"],
                 10_000,
                 "retry amplification evidence",
+            )
+            model_finding = findings["expensive-model-anomaly"]
+            _assert_equal(
+                model_finding["spec"]["potentialSavings"]["amountSubunits"],
+                14_800_000,
+                "qualified model potential saving",
+            )
+            _assert_equal(
+                model_finding["spec"]["recommendation"]["requiresValidation"],
+                True,
+                "model recommendation remains advisory",
             )
             priced_total = sum(
                 item["spec"]["result"].get("totalSubunits", 0)
@@ -758,8 +851,16 @@ def verify_fixture(
             )
             _assert_equal(
                 _scalar(prometheus_endpoint, "sum(iip_ai_savings_potential_amount)"),
-                7_200_000.0,
+                22_000_000.0,
                 "potential saving metric",
+            )
+            _assert_equal(
+                _scalar(
+                    prometheus_endpoint,
+                    'max(iip_ai_model_cost_increase{service_name="support-assistant"})',
+                ),
+                56_923.0,
+                "qualified model cost increase",
             )
             _assert_equal(
                 _scalar(
@@ -809,7 +910,7 @@ def verify_fixture(
                         "sum(iip_ai_allocation_requests"
                         f'{{iip_ai_allocation_dimension="{dimension}"}})',
                     ),
-                    12.0,
+                    14.0,
                     f"{dimension} allocation coverage",
                 )
                 for protected_id in protected_ids:
@@ -819,7 +920,10 @@ def verify_fixture(
                             "sum(iip_ai_allocation_requests"
                             f'{{iip_ai_{dimension}_id="{protected_id}"}})',
                         ),
-                        4.0,
+                        6.0 if protected_id in {
+                            "support-experience",
+                            "customer-experience",
+                        } else 4.0,
                         f"protected {dimension} allocation",
                     )
                 _assert_equal(
@@ -871,8 +975,8 @@ def verify_fixture(
                     headers={"Authorization": f"Bearer {CONTROL_TOKEN}"},
                 )
                 coverage = report.get("spec", {}).get("coverage", {})
-                _assert_equal(coverage.get("usageRecords"), 12, "API usage coverage")
-                _assert_equal(coverage.get("allocatedRecords"), 8, "API allocated coverage")
+                _assert_equal(coverage.get("usageRecords"), 14, "API usage coverage")
+                _assert_equal(coverage.get("allocatedRecords"), 10, "API allocated coverage")
                 _assert_equal(coverage.get("unallocatedRecords"), 4, "API unallocated coverage")
                 groups = report.get("spec", {}).get("groups", [])
                 allocated_ids = {

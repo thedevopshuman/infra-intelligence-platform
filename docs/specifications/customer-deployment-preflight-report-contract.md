@@ -31,8 +31,8 @@ context, namespace, dependency name, endpoint, CIDR, tenant, or secret value.
 - `production-ai-finops-v0` adds tenant-bound AI usage intake, redundant
   mutual-SPIFFE receiver replicas with their own disruption budget and a
   current-CRL reference, attribution, pricing, saving, allocation reporting,
-  and the customer-Collector queue/loss objective. Test pricing and attribution
-  fixtures are forbidden in both production profiles.
+  and the customer-Collector queue/loss objective. Test pricing, attribution,
+  and model-suitability fixtures are forbidden in both production profiles.
 
 The check identifiers and order are closed. `pod-disruption-budget` covers the
 API, worker, and every enabled receiver; it accepts only a minimum that both

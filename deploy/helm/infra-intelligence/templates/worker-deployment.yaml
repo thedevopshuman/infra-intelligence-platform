@@ -108,6 +108,8 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.aiSavingsEngine.profilesExistingSecret | quote }}
                   key: {{ .Values.aiSavingsEngine.profilesSecretKey | quote }}
+            - name: IIP_AI_SAVINGS_ALLOW_TEST_FIXTURES
+              value: {{ .Values.aiSavingsEngine.allowTestFixtures | quote }}
             - name: IIP_AI_SAVINGS_INTERVAL_SECONDS
               value: {{ .Values.aiSavingsEngine.intervalSeconds | quote }}
             {{- end }}

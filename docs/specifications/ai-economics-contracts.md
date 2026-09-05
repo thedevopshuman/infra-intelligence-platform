@@ -9,6 +9,7 @@
 - `contracts/schemas/ai-price-catalog.schema.json`
 - `contracts/schemas/ai-cost-record.schema.json`
 - `contracts/schemas/ai-savings-finding.schema.json`
+- `contracts/schemas/ai-model-suitability-report.schema.json`
 
 These contracts separate observed model usage, price configuration, calculated
 cost, and potential savings. An implementation must not mutate one record to
@@ -119,13 +120,11 @@ A finding is a deterministic rule result. It freezes rule ID/version,
 attribution, baseline and current windows, observations, confidence, potential
 saving calculation, recommendation, and evidence references.
 
-The contract reserves `context-growth`, `retry-amplification`, and
-`expensive-model-anomaly`. The executable runtime supports `context-growth`
-and `retry-amplification` version `1.0.0`; the expensive-model category remains
-reserved and does not imply an evaluator exists. Only a rule with complete
-source facts and a declared minimum cohort may emit a finding. Potential
-savings can be `calculated`, `unpriced`, or explicitly `unresolved`; missing
-price or billing evidence is never zero savings.
+The executable runtime supports `context-growth`, `retry-amplification`, and
+`expensive-model-anomaly` version `1.0.0`. Only a rule with complete source
+facts and a declared minimum cohort may emit a finding. Potential savings can
+be `calculated`, `unpriced`, or explicitly `unresolved`; missing price,
+billing, or suitability evidence is never zero savings.
 
 The V0 profile fixes adjacent, equal-duration baseline and current windows and
 the exact tenant, provider, model, region, service, deployment environment,
@@ -166,9 +165,36 @@ final successful span does not establish whether hidden retry attempts used
 billable tokens. It recommends reviewing throttling, timeouts, and retry
 policy; it never manufactures a currency amount.
 
-Recommendations are advisory and always set `requiresValidation: true`. A
-lower-cost model suggestion requires separate workload-specific quality,
-latency, safety, and compliance evaluation.
+The expensive-model profile adds an exact candidate model and embeds one
+protected `AiModelSuitabilityReport`. The report must be immutable,
+content-addressed, valid at finding evaluation time, and bound to the exact
+tenant, provider, reference/candidate model pair, region, service, and
+deployment environment. It attests that workload-specific quality, latency,
+safety, and compliance gates passed without persisting prompt, response, tool,
+or evaluation-example content. Test-fixture reports require a separate
+explicit non-production switch.
+
+Its adjacent baseline window contains the candidate-model cohort and its
+current window contains the reference-model cohort. Every record must be a
+successful complete usage fact with a priced cost fact from the configured
+catalog and engine generation. Both cohorts use one currency and scale. V1
+uses integer half-up arithmetic:
+
+```text
+candidateMean = roundHalfUp(sum(candidateCostSubunits) / candidateCount)
+referenceMean = roundHalfUp(sum(referenceCostSubunits) / referenceCount)
+increaseBasisPoints = roundHalfUp((referenceMean - candidateMean) * 10000 / candidateMean)
+amountSubunits = (referenceMean - candidateMean) * referenceCount
+```
+
+A qualifying finding cites every usage and cost record plus the registered
+suitability report. Persistence reloads and revalidates all of them before the
+atomic finding/event/outbox commit. The monetary result is a calculated
+scenario, not an invoice, guarantee, or permission to change models.
+
+Recommendations are advisory and always set `requiresValidation: true`.
+Despite the prior suitability result, `evaluate-lower-cost-model` explicitly
+requires validation against current traffic before a model change.
 
 ## CloudEvent
 
@@ -187,7 +213,7 @@ finding. Its data contains the finding and rule identities plus bounded
 category, severity, provider, model, and service routing dimensions. It omits
 windows, samples, quantities, rates, currency, monetary values, and evidence
 record IDs. An exact deterministic retry creates no second finding or event.
-Both supported rules use this event type and a rule-specific source URN.
+All three supported rules use this event type and a rule-specific source URN.
 
 ## Compatibility
 

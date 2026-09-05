@@ -16,7 +16,7 @@ services:
       - /var/lib/postgresql
 
   api:
-    image: iip-ai-finops:0.77.0
+    image: iip-ai-finops:0.78.0
     build:
       context: ..
       dockerfile: Dockerfile
@@ -53,7 +53,7 @@ services:
       - no-new-privileges:true
 
   ai-usage-receiver:
-    image: iip-ai-finops:0.77.0
+    image: iip-ai-finops:0.78.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.otlp_receiver"]
     environment:
@@ -88,7 +88,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-ai-finops:0.77.0
+    image: iip-ai-finops:0.78.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:
@@ -110,6 +110,7 @@ services:
       IIP_AI_COST_INTERVAL_SECONDS: "1"
       IIP_AI_SAVINGS_ENGINE_ENABLED: "true"
       IIP_AI_SAVINGS_PROFILES_JSON: ${IIP_AI_SAVINGS_PROFILES_JSON:?set IIP_AI_SAVINGS_PROFILES_JSON}
+      IIP_AI_SAVINGS_ALLOW_TEST_FIXTURES: "true"
       IIP_AI_SAVINGS_INTERVAL_SECONDS: "1"
       IIP_AI_ALLOCATION_REPORTING_ENABLED: "true"
       IIP_AI_ALLOCATION_SOURCE_RECORD_LIMIT: "10000"

@@ -20,6 +20,9 @@ from iip.adapters.ai_cost_store import (
     validate_ai_cost_actor,
     validate_ai_cost_usage_binding,
 )
+from iip.adapters.ai_model_suitability_store import (
+    prepare_ai_model_suitability_report,
+)
 from iip.adapters.ai_attribution_store import (
     prepare_ai_attribution_policy,
     prepare_ai_attribution_writes,
@@ -90,6 +93,7 @@ SCHEMA_MIGRATIONS = (
     "0020_ai_savings_ledger.sql",
     "0021_ai_attribution_ledger.sql",
     "0022_ai_retry_savings_rule.sql",
+    "0023_ai_model_suitability.sql",
 )
 
 
@@ -1125,6 +1129,75 @@ class PostgresResourceStore:
         )
 
     @_translate_database_errors
+    def register_ai_model_suitability_report(
+        self,
+        actor: ActorContext,
+        report: Mapping[str, object],
+        *,
+        allow_test_fixtures: bool = False,
+    ) -> Mapping[str, object]:
+        """Idempotently register one immutable tenant suitability report."""
+
+        prepared = prepare_ai_model_suitability_report(
+            actor,
+            report,
+            allow_test_fixtures=allow_test_fixtures,
+        )
+        with self._connect() as connection:
+            connection.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (
+                    "iip.ai-model-suitability\x1f"
+                    f"{prepared.tenant_id}\x1f{prepared.report_id}",
+                ),
+            )
+            row = connection.execute(
+                """
+                SELECT document_hash, document
+                FROM iip.ai_model_suitability_reports
+                WHERE tenant_id = %s AND report_id = %s
+                FOR UPDATE
+                """,
+                (prepared.tenant_id, prepared.report_id),
+            ).fetchone()
+            if row is not None:
+                if row["document_hash"] != prepared.document_hash:
+                    raise PersistenceError("storage.conflict")
+                return row["document"]
+            connection.execute(
+                """
+                INSERT INTO iip.ai_model_suitability_reports (
+                    tenant_id, report_id, document_hash, source_kind,
+                    source_hash, provider, reference_model_id,
+                    candidate_model_id, region, service_name,
+                    deployment_environment, workload_profile_id,
+                    evaluated_at, valid_until, document
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s
+                )
+                """,
+                (
+                    prepared.tenant_id,
+                    prepared.report_id,
+                    prepared.document_hash,
+                    prepared.source_kind,
+                    prepared.source_hash,
+                    prepared.provider,
+                    prepared.reference_model_id,
+                    prepared.candidate_model_id,
+                    prepared.region,
+                    prepared.service_name,
+                    prepared.deployment_environment,
+                    prepared.workload_profile_id,
+                    prepared.evaluated_at,
+                    prepared.valid_until,
+                    Jsonb(dict(prepared.document)),
+                ),
+            )
+            return prepared.document
+
+    @_translate_database_errors
     def list_ai_allocation_rows(
         self,
         actor: ActorContext,
@@ -1202,8 +1275,8 @@ class PostgresResourceStore:
             stored: dict[tuple[str, str], Mapping[str, object]] = {}
             new_items = []
             for item in prepared:
-                usage_rows = connection.execute(
-                    """
+                if item.candidate_model_id is None:
+                    usage_sql = """
                     SELECT document
                     FROM iip.ai_usage_records
                     WHERE tenant_id = %s
@@ -1218,8 +1291,8 @@ class PostgresResourceStore:
                       AND invocation_started_at < %s
                     ORDER BY invocation_started_at, usage_record_id
                     FOR SHARE
-                    """,
-                    (
+                    """
+                    usage_parameters = (
                         item.tenant_id,
                         item.provider,
                         item.model_id,
@@ -1228,7 +1301,48 @@ class PostgresResourceStore:
                         item.deployment_environment,
                         item.baseline_start,
                         item.current_end,
-                    ),
+                    )
+                else:
+                    usage_sql = """
+                    SELECT document
+                    FROM iip.ai_usage_records
+                    WHERE tenant_id = %s
+                      AND provider = %s
+                      AND service_name = %s
+                      AND document->'spec'->'invocation'->>'region' = %s
+                      AND document->'spec'->'invocation'->>'outcome' = 'success'
+                      AND document->'spec'->'attribution'
+                            ->>'deploymentEnvironment' = %s
+                      AND (
+                        (
+                          model_id = %s
+                          AND invocation_started_at >= %s
+                          AND invocation_started_at < %s
+                        ) OR (
+                          model_id = %s
+                          AND invocation_started_at >= %s
+                          AND invocation_started_at < %s
+                        )
+                      )
+                    ORDER BY invocation_started_at, usage_record_id
+                    FOR SHARE
+                    """
+                    usage_parameters = (
+                        item.tenant_id,
+                        item.provider,
+                        item.service_name,
+                        item.region,
+                        item.deployment_environment,
+                        item.candidate_model_id,
+                        item.baseline_start,
+                        item.baseline_end,
+                        item.model_id,
+                        item.current_start,
+                        item.current_end,
+                    )
+                usage_rows = connection.execute(
+                    usage_sql,
+                    usage_parameters,
                 ).fetchall()
                 usage_documents = tuple(row["document"] for row in usage_rows)
                 usage_ids = {
@@ -1251,11 +1365,35 @@ class PostgresResourceStore:
                 cost_documents = tuple(row["document"] for row in cost_rows)
                 if len(cost_documents) != len(item.cost_record_ids):
                     raise PersistenceError("storage.request.invalid")
+                suitability_documents: tuple[Mapping[str, object], ...] = ()
+                if item.suitability_report_ids:
+                    report_rows = connection.execute(
+                        """
+                        SELECT document
+                        FROM iip.ai_model_suitability_reports
+                        WHERE tenant_id = %s
+                          AND report_id = ANY(%s)
+                        ORDER BY report_id
+                        FOR SHARE
+                        """,
+                        (
+                            item.tenant_id,
+                            list(item.suitability_report_ids),
+                        ),
+                    ).fetchall()
+                    suitability_documents = tuple(
+                        row["document"] for row in report_rows
+                    )
+                    if len(suitability_documents) != len(
+                        item.suitability_report_ids
+                    ):
+                        raise PersistenceError("storage.request.invalid")
                 try:
                     validate_ai_savings_source_binding(
                         item.document,
                         usage_documents,
                         cost_documents,
+                        suitability_documents,
                     )
                 except InvalidAiSavingsInputError:
                     raise PersistenceError("storage.request.invalid") from None

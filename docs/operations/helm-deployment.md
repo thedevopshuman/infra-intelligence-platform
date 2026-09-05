@@ -26,7 +26,9 @@ pricing remains separately prohibited by default. Follow the
 The optional AI savings engine is also worker-owned and disabled by default.
 It requires the cost engine, exact worker tenant enrollment, and a protected
 profile wrapper from an existing Secret. `aiSavingsEngine` configuration is
-never projected into the API or OTLP receiver. Follow the
+never projected into the API or OTLP receiver. Suitability reports marked
+`test-fixture` are rejected unless `aiSavingsEngine.allowTestFixtures=true`;
+that switch is forbidden by the production preflight profile. Follow the
 [AI savings-engine runbook](ai-savings-engine.md) before enabling it.
 When OTLP metrics are enabled, its aggregate projection uses
 `telemetry.aiEconomicsAttributeMode`; retain the default `tenant-scope` unless
@@ -239,7 +241,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.77.0
+  tag: 0.78.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -400,7 +402,7 @@ To test the actual packaged release chart and attested OCI archive instead of
 checkout artifacts, first build the release bundle and then run:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.77.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.78.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -409,7 +411,7 @@ and the explicit prior release revision. Equal latest migrations are allowed;
 a migration regression is not:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.77.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.78.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```

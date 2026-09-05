@@ -167,9 +167,9 @@ class KubernetesAvailabilityQualificationTests(unittest.TestCase):
                 qualification,
                 "_repository_identity",
                 return_value={
-                    "applicationVersion": "0.77.0",
-                    "chartVersion": "0.80.0",
-                    "requiredMigration": "0022_ai_retry_savings_rule.sql",
+                    "applicationVersion": "0.78.0",
+                    "chartVersion": "0.81.0",
+                    "requiredMigration": "0023_ai_model_suitability.sql",
                 },
             ),
             patch.object(qualification, "_platform_name", return_value="linux/arm64"),

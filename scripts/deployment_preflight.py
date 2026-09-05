@@ -372,7 +372,7 @@ def _validate_rendered_profile(profile: Mapping[str, Any]) -> None:
             ),
         ),
         ("security", ("serviceAccountTokenAutomount", "runAsNonRoot", "readOnlyRootFilesystem", "allowPrivilegeEscalation")),
-        ("aiEconomics", ("attributionEnabled", "costEngineEnabled", "savingsEngineEnabled", "allocationReportingEnabled", "attributionTestFixtures", "priceTestFixtures")),
+        ("aiEconomics", ("attributionEnabled", "costEngineEnabled", "savingsEngineEnabled", "allocationReportingEnabled", "attributionTestFixtures", "priceTestFixtures", "savingsTestFixtures")),
     ):
         item = _object(profile, section)
         if set(item) != set(booleans):
@@ -532,7 +532,7 @@ def _static_checks(
         _check("platform-telemetry", telemetry["metricsEnabled"] is True and telemetry["tracesEnabled"] is True and telemetry["endpointConfigured"] is True, "preflight.telemetry.required"),
         _check("evidence-backends", evidence["metrics"] == "prometheus" and evidence["logs"] in {"loki", "opensearch"} and evidence["kubernetesEvents"] == "kubernetes-api", "preflight.evidence-backends.required"),
         _check("service-account-isolation", security == {"serviceAccountTokenAutomount": False, "runAsNonRoot": True, "readOnlyRootFilesystem": True, "allowPrivilegeEscalation": False}, "preflight.security.workload-isolation-required"),
-        _check("test-fixtures-denied", ai["attributionTestFixtures"] is False and ai["priceTestFixtures"] is False, "preflight.test-fixtures.forbidden"),
+        _check("test-fixtures-denied", all(ai[key] is False for key in ("attributionTestFixtures", "priceTestFixtures", "savingsTestFixtures")), "preflight.test-fixtures.forbidden"),
     ]
     if profile_name == "production-ai-finops-v0":
         checks.extend(

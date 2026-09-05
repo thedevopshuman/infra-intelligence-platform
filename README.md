@@ -84,7 +84,7 @@ The operational console and SDKs expose public non-secret authentication discove
 The repository now includes a metadata-only, OpenTelemetry-native AI FinOps
 flow. Bedrock- and OpenAI-shaped traces reach the same normalized usage ledger,
 data-driven calculated-cost engine, protected application/team allocation,
-two evidence-backed deterministic rules, and provider-neutral Grafana dashboard. IIP
+three evidence-backed deterministic rules, and provider-neutral Grafana dashboard. IIP
 remains outside the inference path
 and does not collect prompts or responses by default. An isolated, tenant-bound
 `/v1/traces` route now normalizes approved GenAI client metadata
@@ -97,14 +97,19 @@ and revalidates each decision against its exact usage and policy sources. A boun
 authenticated API now joins those facts to the exact calculated-cost generation,
 and the worker exports protected application/team IDs to dedicated dashboard views
 without accepting workload-controlled ownership labels. A separate
-tenant-explicit deterministic service evaluates fixed context-growth and
-retry-amplification windows, revalidates every cited source fact, and
+tenant-explicit deterministic service evaluates fixed context-growth,
+retry-amplification, and qualified model-cost windows, revalidates every cited
+source fact, and
 atomically records each evidence-backed finding plus a value-minimized event.
 Provider retry facts are mapped through protected channel configuration;
 retry monetary savings remain explicitly unresolved until billed-attempt
-evidence exists. Separate bounded projections export request/token volume,
-pricing coverage, calculated cost, context change, retry change, and potential
-saving through the existing OTLP metrics boundary. A disposable
+evidence exists. Lower-cost model findings require a protected, immutable,
+time-bounded suitability report proving workload-specific quality, latency,
+safety, and compliance gates; price difference alone cannot create a
+recommendation. Separate bounded projections export request/token volume,
+pricing coverage, calculated cost, context change, retry change, qualified
+model-cost difference, and potential saving through the existing OTLP metrics
+boundary. A disposable
 Collector/Prometheus/Loki/Grafana topology and deterministic multi-provider
 full-flow gate now renders the usage, cost, change, saving, coverage, and protected
 application/team allocation dashboard. Separate

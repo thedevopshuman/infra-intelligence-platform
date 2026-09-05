@@ -10,8 +10,8 @@
   "spec": {
     "status": "qualified",
     "candidate": {
-      "version": "0.77.0",
-      "chartVersion": "0.80.0",
+      "version": "0.78.0",
+      "chartVersion": "0.81.0",
       "revision": "0123456789abcdef0123456789abcdef01234567",
       "releaseManifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
       "controlPlaneImageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -46,12 +46,12 @@
         ],
         "measurement": {
           "runtime": {
-            "version": "0.77.0",
-            "chartVersion": "0.80.0",
+            "version": "0.78.0",
+            "chartVersion": "0.81.0",
             "revision": "0123456789abcdef0123456789abcdef01234567",
             "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
-          "requiredMigration": "0022_ai_retry_savings_rule.sql",
+          "requiredMigration": "0023_ai_model_suitability.sql",
           "appliedMigrationCount": 22,
           "finalHelmRevision": 2,
           "backupChecksumVerified": true,
@@ -81,14 +81,14 @@
             "version": "0.68.0",
             "chartVersion": "0.75.0",
             "revision": "48f2168e534aba6761730d3537da70f2283ace13",
-            "migration": "0022_ai_retry_savings_rule.sql",
+            "migration": "0023_ai_model_suitability.sql",
             "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
           },
           "target": {
-            "version": "0.77.0",
-            "chartVersion": "0.80.0",
+            "version": "0.78.0",
+            "chartVersion": "0.81.0",
             "revision": "0123456789abcdef0123456789abcdef01234567",
-            "migration": "0022_ai_retry_savings_rule.sql",
+            "migration": "0023_ai_model_suitability.sql",
             "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
           "migrationRelation": "retained",

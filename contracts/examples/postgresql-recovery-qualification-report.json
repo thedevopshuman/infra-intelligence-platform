@@ -13,7 +13,7 @@
       "profile": "local-docker",
       "platform": "darwin/arm64",
       "pythonVersion": "3.12.11",
-      "applicationVersion": "0.77.0",
+      "applicationVersion": "0.78.0",
       "containerRuntime": {
         "name": "docker",
         "version": "29.7.2"
@@ -21,7 +21,7 @@
       "database": {
         "engine": "postgresql",
         "version": "18.4",
-        "migration": "0022_ai_retry_savings_rule.sql",
+        "migration": "0023_ai_model_suitability.sql",
         "image": "postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15"
       }
     },

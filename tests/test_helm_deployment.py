@@ -384,6 +384,7 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             "IIP_AI_SAVINGS_PROFILES_JSON",
             "aiSavingsEngine.profilesExistingSecret",
             "aiSavingsEngine.profilesSecretKey",
+            "IIP_AI_SAVINGS_ALLOW_TEST_FIXTURES",
             "IIP_AI_SAVINGS_INTERVAL_SECONDS",
         ):
             with self.subTest(expected=expected):

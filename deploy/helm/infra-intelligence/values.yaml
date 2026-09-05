@@ -7,7 +7,7 @@ apiTermination:
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.77.0"
+  tag: "0.78.0"
   digest: ""
 
 worker:
@@ -55,6 +55,7 @@ aiSavingsEngine:
   enabled: false
   profilesExistingSecret: ""
   profilesSecretKey: ai-savings-profiles-json
+  allowTestFixtures: false
   intervalSeconds: 60
 
 aiAllocationReporting:

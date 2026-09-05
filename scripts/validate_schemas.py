@@ -67,6 +67,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "ai-cost-calculated-event.json",
         "ai-savings-finding-event.json",
         "ai-retry-savings-finding-event.json",
+        "ai-expensive-model-savings-finding-event.json",
     ),
     "event-delivery-health-report.schema.json": (
         "event-delivery-health-report.json",
@@ -160,6 +161,10 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "ai-savings-finding.schema.json": (
         "ai-savings-finding.json",
         "ai-retry-savings-finding.json",
+        "ai-expensive-model-savings-finding.json",
+    ),
+    "ai-model-suitability-report.schema.json": (
+        "ai-model-suitability-report.json",
     ),
     "integration-config.schema.json": ("integration-config.json",),
     "log-evidence-request.schema.json": ("log-evidence-request.json",),

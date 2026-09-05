@@ -103,6 +103,7 @@ class HelmValuesContractTests(unittest.TestCase):
             "worker.enabled must be true when aiSavingsEngine.enabled=true",
             "aiCostEngine.enabled must be true when aiSavingsEngine.enabled=true",
             "aiSavingsEngine.profilesExistingSecret is required",
+            "aiSavingsEngine.enabled must be true when savings test fixtures are allowed",
             "worker.enabled must be true when aiAllocationReporting.enabled=true",
             "aiAttribution.enabled must be true when aiAllocationReporting.enabled=true",
             "aiCostEngine.enabled must be true when aiAllocationReporting.enabled=true",

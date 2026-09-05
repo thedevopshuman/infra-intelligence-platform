@@ -1,0 +1,44 @@
+{
+  "apiVersion": "iip.dev/v1alpha1",
+  "kind": "ReleaseSignaturePolicy",
+  "metadata": {
+    "id": "rsp_organizational-release",
+    "generation": 1,
+    "effectiveAt": "2026-09-07T00:00:00Z"
+  },
+  "spec": {
+    "profile": "sigstore-keyless-v1",
+    "cosignVersion": "3.1.2",
+    "transparencyMode": "required",
+    "artifacts": [
+      {
+        "role": "control-plane-image",
+        "repository": "ghcr.io/replace-me/infra-intelligence-platform",
+        "trust": {
+          "mode": "keyless",
+          "identities": [
+            {
+              "id": "release-workflow",
+              "certificateIdentity": "https://github.com/replace-me/infra-intelligence-platform/.github/workflows/release.yml@refs/tags/v0.75.0",
+              "certificateOidcIssuer": "https://token.actions.githubusercontent.com"
+            }
+          ]
+        }
+      },
+      {
+        "role": "plugin-mediation-bridge-image",
+        "repository": "ghcr.io/replace-me/infra-intelligence-plugin-mediation-bridge",
+        "trust": {
+          "mode": "keyless",
+          "identities": [
+            {
+              "id": "release-workflow",
+              "certificateIdentity": "https://github.com/replace-me/infra-intelligence-platform/.github/workflows/release.yml@refs/tags/v0.75.0",
+              "certificateOidcIssuer": "https://token.actions.githubusercontent.com"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

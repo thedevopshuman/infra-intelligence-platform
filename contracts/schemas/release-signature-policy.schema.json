@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:release-signature-policy:v1alpha1",
+  "title": "Release signature policy",
+  "description": "Closed trust policy for verifying the two published IIP OCI indexes at the exact digests in a verified release manifest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.dev/v1alpha1"},
+    "kind": {"const": "ReleaseSignaturePolicy"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generation", "effectiveAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^rsp_[a-z0-9][a-z0-9._-]{2,63}$"},
+        "generation": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "effectiveAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "oneOf": [
+        {"$ref": "#/$defs/keylessProfile"},
+        {"$ref": "#/$defs/localPublicKeyProfile"}
+      ]
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "repository": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 512,
+      "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]{1,5})?/[a-z0-9][a-z0-9._/-]*[a-z0-9]$"
+    },
+    "trustId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,63}$"},
+    "keylessIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "certificateIdentity", "certificateOidcIssuer"],
+      "properties": {
+        "id": {"$ref": "#/$defs/trustId"},
+        "certificateIdentity": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 2048,
+          "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$"
+        },
+        "certificateOidcIssuer": {
+          "type": "string",
+          "minLength": 9,
+          "maxLength": 2048,
+          "pattern": "^https://[^\\s?#]+(?:/[^\\s?#]*)?$"
+        }
+      }
+    },
+    "publicKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "sha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/trustId"},
+        "path": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 2048,
+          "pattern": "^/[^\\x00-\\x1f\\x7f]*$"
+        },
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "keylessArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "repository", "trust"],
+      "properties": {
+        "role": {"enum": ["control-plane-image", "plugin-mediation-bridge-image"]},
+        "repository": {"$ref": "#/$defs/repository"},
+        "trust": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "identities"],
+          "properties": {
+            "mode": {"const": "keyless"},
+            "identities": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {"$ref": "#/$defs/keylessIdentity"}
+            }
+          }
+        }
+      }
+    },
+    "publicKeyArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "repository", "trust"],
+      "properties": {
+        "role": {"enum": ["control-plane-image", "plugin-mediation-bridge-image"]},
+        "repository": {"$ref": "#/$defs/repository"},
+        "trust": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "keys"],
+          "properties": {
+            "mode": {"const": "public-key"},
+            "keys": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {"$ref": "#/$defs/publicKey"}
+            }
+          }
+        }
+      }
+    },
+    "keylessProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "cosignVersion", "transparencyMode", "artifacts"],
+      "properties": {
+        "profile": {"const": "sigstore-keyless-v1"},
+        "cosignVersion": {"$ref": "#/$defs/semver"},
+        "transparencyMode": {"const": "required"},
+        "artifacts": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {"$ref": "#/$defs/keylessArtifact", "properties": {"role": {"const": "control-plane-image"}}},
+            {"$ref": "#/$defs/keylessArtifact", "properties": {"role": {"const": "plugin-mediation-bridge-image"}}}
+          ],
+          "items": false
+        }
+      }
+    },
+    "localPublicKeyProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "cosignVersion", "transparencyMode", "artifacts"],
+      "properties": {
+        "profile": {"const": "local-public-key-v1"},
+        "cosignVersion": {"$ref": "#/$defs/semver"},
+        "transparencyMode": {"const": "disabled-local-only"},
+        "artifacts": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {"$ref": "#/$defs/publicKeyArtifact", "properties": {"role": {"const": "control-plane-image"}}},
+            {"$ref": "#/$defs/publicKeyArtifact", "properties": {"role": {"const": "plugin-mediation-bridge-image"}}}
+          ],
+          "items": false
+        }
+      }
+    }
+  }
+}

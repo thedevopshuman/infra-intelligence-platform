@@ -110,3 +110,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0104](0104-minimized-customer-deployment-preflight.md) | Accepted | Fail closed on incomplete production profiles and retain only digests/counts from explicit-context dependency checks |
 | [0105](0105-external-ingress-availability-qualification.md) | Accepted | Qualify external liveness, readiness, authentication, release identity, availability, and latency with minimized evidence |
 | [0106](0106-protected-github-repository-context-adapter.md) | Accepted | Read allowlisted GitHub context at an immutable commit through exact brokered authority and direct verified HTTPS |
+| [0107](0107-exact-release-signature-verification.md) | Accepted | Verify both published OCI indexes at manifest digests against exact organizational signer identity and transparency evidence |

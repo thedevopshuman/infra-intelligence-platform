@@ -236,6 +236,12 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "release-qualification-report.schema.json": (
         "release-qualification-report.json",
     ),
+    "release-signature-policy.schema.json": (
+        "release-signature-policy.json",
+    ),
+    "release-signature-verification-report.schema.json": (
+        "release-signature-verification-report.json",
+    ),
     "runtime-version-report.schema.json": ("runtime-version-report.json",),
     "session-context.schema.json": ("session-context.json",),
     "resource-timeline.schema.json": ("resource-timeline.json",),

@@ -81,6 +81,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0103-source-bound-postgresql-physical-continuity-evidence.md",
     "docs/decisions/0104-minimized-customer-deployment-preflight.md",
     "docs/decisions/0105-external-ingress-availability-qualification.md",
+    "docs/decisions/0107-exact-release-signature-verification.md",
     "docs/operations/external-secrets.md",
     "deploy/helm/infra-intelligence/examples/iip-database.externalsecret.yaml",
     "scripts/test_external_secrets.sh",
@@ -198,6 +199,8 @@ REQUIRED_PATHS = (
     "contracts/schemas/resource.schema.json",
     "contracts/schemas/release-manifest.schema.json",
     "contracts/schemas/release-qualification-report.schema.json",
+    "contracts/schemas/release-signature-policy.schema.json",
+    "contracts/schemas/release-signature-verification-report.schema.json",
     "contracts/schemas/credential-lease-request.schema.json",
     "contracts/schemas/credential-lease.schema.json",
     "contracts/schemas/credential-broker-compatibility-report.schema.json",
@@ -365,6 +368,8 @@ REQUIRED_PATHS = (
     "contracts/examples/resource-timeline.json",
     "contracts/examples/release-manifest.json",
     "contracts/examples/release-qualification-report.json",
+    "contracts/examples/release-signature-policy.json",
+    "contracts/examples/release-signature-verification-report.json",
     "contracts/examples/page-info.json",
     "contracts/examples/error.json",
     "docs/specifications/evidence-contract.md",
@@ -390,6 +395,8 @@ REQUIRED_PATHS = (
     "docs/specifications/resource-query-contract.md",
     "docs/specifications/release-manifest-contract.md",
     "docs/specifications/release-qualification-report-contract.md",
+    "docs/specifications/release-signature-policy-contract.md",
+    "docs/specifications/release-signature-verification-report-contract.md",
     "docs/specifications/resource-change-evidence-contract.md",
     "requirements/verify.in",
     "requirements/verify.txt",
@@ -468,6 +475,7 @@ REQUIRED_PATHS = (
     "tests/test_helm_values.py",
     "tests/test_release_bundle.py",
     "tests/test_release_qualification.py",
+    "tests/test_release_signature_verification.py",
     "tests/test_plugin_invocation_lifecycle.py",
     "tests/test_plugin_compatibility.py",
     "tests/test_plugin_action_mediation.py",
@@ -479,6 +487,8 @@ REQUIRED_PATHS = (
     "scripts/build_release_bundle.sh",
     "scripts/release_bundle.py",
     "scripts/release_qualification.py",
+    "scripts/release_signature_verification.py",
+    "scripts/test_release_signatures.sh",
     "scripts/run_plugin_runner_conformance.py",
     "scripts/run_capacity_certification.py",
     "scripts/test_capacity.sh",
@@ -1654,6 +1664,35 @@ def validate_release_qualification_example(
         "overallStatus": "qualified",
     } or spec.get("status") != "qualified":
         fail(errors, "release qualification summary must match its profiles")
+
+
+def validate_release_signature_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check release trust-policy and minimized-report semantics."""
+
+    try:
+        from release_signature_verification import (
+            ReleaseSignatureError,
+            validate_policy_document,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "release signature validator must be importable")
+        return
+    example_dir = ROOT / "contracts" / "examples"
+    policy = documents.get(example_dir / "release-signature-policy.json")
+    report = documents.get(
+        example_dir / "release-signature-verification-report.json"
+    )
+    try:
+        validate_policy_document(policy)
+    except ReleaseSignatureError:
+        fail(errors, "release signature policy example must be semantically valid")
+    try:
+        validate_report_document(report)
+    except ReleaseSignatureError:
+        fail(errors, "release signature report example must be semantically valid")
 
 
 def validate_customer_deployment_preflight_example(
@@ -4528,6 +4567,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_bedrock_instrumentation_compatibility_example(documents, errors)
     validate_openai_instrumentation_compatibility_example(documents, errors)
     validate_release_qualification_example(documents, errors)
+    validate_release_signature_examples(documents, errors)
     validate_customer_deployment_preflight_example(documents, errors)
     validate_ingress_availability_qualification_example(documents, errors)
     validate_postgresql_recovery_qualification_example(documents, errors)

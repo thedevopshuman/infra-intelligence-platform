@@ -15,6 +15,13 @@ packaged gates retains a separate manifest-bound, environment-scoped
 qualification report; incomplete or internally inconsistent evidence cannot be
 promoted by the repository verifier.
 
+After registry publication, a separate promotion verifier derives both OCI
+index digests from that verified manifest and checks exact Cosign signer
+identity, issuer, version, and transparency evidence under a reviewed policy.
+Its local public-key profile is explicitly non-promotable. The checked example
+retains placeholders until repository ownership and organizational release
+identity are accepted; see the [release procedure](docs/operations/release-artifacts.md).
+
 The Docker recovery gates retain separate source-bound logical
 `PostgreSQLRecoveryQualificationReport` and physical
 `PostgreSQLContinuityQualificationReport` evidence. The latter proves local

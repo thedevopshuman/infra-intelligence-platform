@@ -1,6 +1,6 @@
 # Release artifacts and supply-chain evidence
 
-**Status:** Executable unsigned release-candidate path
+**Status:** Executable unsigned candidate and signed-promotion verification path
 
 ## Build from one revision
 
@@ -20,6 +20,7 @@ make test-backup-restore PYTHON=.venv/bin/python
 make test-postgres-continuity PYTHON=.venv/bin/python
 make test-deployment-preflight PYTHON=.venv/bin/python
 make test-github-context PYTHON=.venv/bin/python
+make test-release-signatures PYTHON=.venv/bin/python
 make release-bundle PYTHON=.venv/bin/python
 ```
 
@@ -72,7 +73,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.74.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.75.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 
@@ -84,7 +85,7 @@ After verification, prove that the packaged chart and OCI image—not checkout
 copies—install on the explicit local Kind cluster:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.74.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.75.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -104,7 +105,7 @@ selected supported prior revision. The target may retain the same latest
 migration or add a newer one; migration regression is rejected:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.74.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.75.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
@@ -133,7 +134,7 @@ Run both packaged profiles in sequence and require their machine-readable
 evidence to agree on the candidate and local environment:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.74.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.75.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=<supported-ancestor> \
   make qualify-release PYTHON=.venv/bin/python
 ```
@@ -146,7 +147,7 @@ platform, Kubernetes, and Docker identity match. Verify a transported report
 and bundle with:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.74.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.75.0-0123456789ab \
 IIP_RELEASE_QUALIFICATION_REPORT=/absolute/path/to/report.json \
   make verify-release-qualification PYTHON=.venv/bin/python
 ```
@@ -175,8 +176,47 @@ The local bundle is explicitly unsigned. It proves artifact integrity and build 
 7. scan the attached SBOM under a documented vulnerability exception policy;
 8. distribute only the verified digest and matching manifest/checksums through a trusted release channel.
 
+The repository implements step 6 without selecting the organization. Copy the
+example policy to a reviewed location, replace every placeholder with the
+accepted registry repositories and exact release-workflow certificate identity,
+increment its generation when trust changes, and run from the same clean
+release checkout:
+
+```bash
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.75.0-0123456789ab \
+IIP_RELEASE_SIGNATURE_POLICY=/absolute/protected/release-signature-policy.json \
+IIP_RELEASE_SIGNATURE_REPORT=/absolute/path/to/release-signatures.json \
+COSIGN=/absolute/path/to/cosign \
+  make qualify-release-signatures PYTHON=.venv/bin/python
+```
+
+The command verifies the bundle first, derives both exact index digests from
+its manifest, and invokes the policy-pinned Cosign version against
+`repository@sha256:...`. The production profile requires exact certificate
+identity, exact OIDC issuer, ordinary Cosign claims, and transparency evidence.
+It rejects a dirty source, placeholder policy, local key profile, version
+mismatch, missing or substituted signature, and inconsistent Cosign output.
+It never accepts a caller-provided tag or digest.
+
+The minimized report can be checked for schema, content identity, source
+binding, and derived semantic consistency with:
+
+```bash
+IIP_RELEASE_SIGNATURE_REPORT=/absolute/path/to/release-signatures.json \
+  make verify-release-signature-report PYTHON=.venv/bin/python
+```
+
+That second command validates retained evidence; it does not contact the
+registry and is not a substitute for rerunning `qualify-release-signatures` at
+the production promotion boundary. Keep the policy in reviewed source or an
+equivalently protected configuration repository and keep the report in the
+release evidence channel. The checked example is intentionally non-promotable.
+See the [trust-policy contract](../specifications/release-signature-policy-contract.md),
+[report contract](../specifications/release-signature-verification-report-contract.md),
+and [ADR 0107](../decisions/0107-exact-release-signature-verification.md).
+
 Deploy that verified OCI index as `image.repository@image.digest` through the Helm values contract. The chart resolves the same immutable reference for its API, worker, OTLP receiver, and schema-migration Job; a mutable tag is only a local-development fallback.
 
 Repository CI pins all third-party Actions by commit SHA, pins its PostgreSQL service by OCI digest, and runs with read-only contents permission and no persisted checkout credential. Dependabot may propose reviewed identity updates. This narrows the build boundary but does not replace release signing or a hermetic organizational runner.
 
-Docker documents the [SBOM attestation](https://docs.docker.com/build/metadata/attestations/sbom/) and [SLSA provenance](https://docs.docker.com/build/metadata/attestations/slsa-provenance/) formats used by the local BuildKit path. The repository does not claim a production signature until the external identity gate is real and independently verifiable.
+Docker documents the [SBOM attestation](https://docs.docker.com/build/metadata/attestations/sbom/) and [SLSA provenance](https://docs.docker.com/build/metadata/attestations/slsa-provenance/) formats used by the local BuildKit path. Sigstore documents [exact identity and issuer verification](https://docs.sigstore.dev/cosign/verifying/verify/). The repository does not claim a production signature until the external identity policy is real and the production qualification command returns `verified`.

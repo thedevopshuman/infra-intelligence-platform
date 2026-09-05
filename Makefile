@@ -1,10 +1,11 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-signatures qualify-release-signatures verify-release-signature-report db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
 KUBECTL ?= kubectl
 DOCKER ?= docker
 NPM ?= npm
+COSIGN ?= cosign
 IIP_DATABASE_RECOVERY_REPORT ?= dist/postgresql-recovery-qualification-report.json
 IIP_DATABASE_CONTINUITY_REPORT ?= dist/postgresql-continuity-qualification-report.json
 IIP_DEPLOYMENT_PREFLIGHT_REPORT ?= dist/customer-deployment-preflight-report.json
@@ -23,6 +24,8 @@ IIP_INGRESS_MAXIMUM_P95_LATENCY_MILLISECONDS ?= 2000
 IIP_INGRESS_REQUEST_TIMEOUT_MILLISECONDS ?= 2000
 IIP_INGRESS_INTERVAL_MILLISECONDS ?= 1000
 IIP_GITHUB_CONTEXT_COMPATIBILITY_REPORT ?= dist/github-context-compatibility-report.json
+IIP_RELEASE_SIGNATURE_POLICY ?=
+IIP_RELEASE_SIGNATURE_REPORT ?= dist/release-signature-verification-report.json
 
 help:
 	@echo "install-verify-deps Install pinned verification-only Python dependencies"
@@ -70,6 +73,9 @@ help:
 	@echo "test-release-install Install a verified packaged release on the explicit local kind cluster"
 	@echo "test-release-upgrade Prove sustained availability across a packaged N-1 transition"
 	@echo "qualify-release Run both packaged profiles and require one complete report"
+	@echo "test-release-signatures Exercise pinned Cosign signing and tamper rejection locally"
+	@echo "qualify-release-signatures Verify published release digests against organizational trust"
+	@echo "verify-release-signature-report Validate retained minimized signature evidence"
 	@echo "db-migrate    Apply PostgreSQL migrations using IIP_DATABASE_URL"
 	@echo "helm-lint     Lint and render the Helm chart"
 	@echo "verify        Run all local quality gates"
@@ -305,6 +311,28 @@ test-release-upgrade:
 		IIP_TEST_PYTHON=$(PYTHON) scripts/test_release_upgrade.sh
 
 qualify-release: test-release-install test-release-upgrade verify-release-qualification
+
+test-release-signatures:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_release_signature_verification -v
+	IIP_DOCKER_BIN=$(DOCKER) scripts/test_release_signatures.sh
+
+qualify-release-signatures:
+	@test -n "$(IIP_RELEASE_BUNDLE)" || \
+		(echo "IIP_RELEASE_BUNDLE is required" >&2; exit 2)
+	@test -n "$(IIP_RELEASE_SIGNATURE_POLICY)" || \
+		(echo "IIP_RELEASE_SIGNATURE_POLICY is required" >&2; exit 2)
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/release_signature_verification.py run \
+		--bundle "$(IIP_RELEASE_BUNDLE)" \
+		--policy "$(IIP_RELEASE_SIGNATURE_POLICY)" \
+		--output "$(IIP_RELEASE_SIGNATURE_REPORT)" \
+		--cosign "$(COSIGN)" --require-clean --require-promotable
+
+verify-release-signature-report:
+	@test -n "$(IIP_RELEASE_SIGNATURE_REPORT)" || \
+		(echo "IIP_RELEASE_SIGNATURE_REPORT is required" >&2; exit 2)
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/release_signature_verification.py verify \
+		--report "$(IIP_RELEASE_SIGNATURE_REPORT)" --require-clean
 
 db-migrate:
 	PYTHONPATH=src $(PYTHON) -m iip.adapters.postgres

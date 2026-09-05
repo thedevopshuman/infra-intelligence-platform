@@ -99,10 +99,12 @@ Before enabling it for customer data, prove that the claim is encrypted, replica
 ## Production gap
 
 The chart now provides scheduling and a least-authority logical-dump job, and
-the local report is strict source-bound evidence for one quiesced restore. It
-does not provide or qualify off-host durability, encryption/key policy,
-immutability, retention, restore approvals, replicas, failover, regional
-recovery, or point-in-time recovery. Those controls must be selected with the
-production PostgreSQL hosting model and tested under sustained writes and
-representative data volume. Never treat the disposable local dump as a
-retained backup or a production continuity certificate.
+this local report is strict source-bound evidence for one quiesced restore. The
+separate [physical continuity gate](postgresql-continuity.md) proves local
+streaming replication, planned promotion, and named-target WAL recovery. Neither
+profile provides or qualifies off-host durability, encryption/key policy,
+immutability, retention, restore approvals, automatic failover/fencing,
+regional recovery, or customer objectives. Those controls must be selected
+with the production PostgreSQL hosting model and tested under sustained writes
+and representative data volume. Never treat either disposable local profile as
+a retained backup or a production continuity certificate.

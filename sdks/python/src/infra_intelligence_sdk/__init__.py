@@ -79,6 +79,7 @@ from .models import (
     PluginSession,
     PolicyDecision,
     PolicyDecisionRequest,
+    PostgreSQLContinuityQualificationReport,
     PostgreSQLRecoveryQualificationReport,
     ResourceCollectionRequest,
     ResourceCollectionResult,
@@ -179,6 +180,7 @@ __all__ = [
     "PluginSession",
     "PolicyDecision",
     "PolicyDecisionRequest",
+    "PostgreSQLContinuityQualificationReport",
     "PostgreSQLRecoveryQualificationReport",
     "ResourceCollectionRequest",
     "ResourceCollectionResult",
@@ -199,4 +201,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.50.0"
+__version__ = "0.51.0"

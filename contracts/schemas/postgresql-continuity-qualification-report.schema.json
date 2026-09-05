@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:postgresql-continuity-qualification-report:v1alpha1",
+  "title": "PostgreSQL Continuity Qualification Report",
+  "description": "Source-bound local evidence for physical PostgreSQL streaming replication, manual promotion, WAL archiving, and named-target recovery.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "PostgreSQLContinuityQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^pgc_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "environment", "profile", "measurements", "checks"],
+      "properties": {
+        "status": {"enum": ["qualified", "failed"]},
+        "environment": {"$ref": "#/$defs/environment"},
+        "profile": {"$ref": "#/$defs/profile"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "checks": {
+          "type": "array",
+          "minItems": 20,
+          "maxItems": 20,
+          "prefixItems": [
+            {"$ref": "#/$defs/representativeStateCheck"},
+            {"$ref": "#/$defs/physicalBaseBackupsCheck"},
+            {"$ref": "#/$defs/streamingStandbyCheck"},
+            {"$ref": "#/$defs/zeroLagCutoverCheck"},
+            {"$ref": "#/$defs/replicaRowIntegrityCheck"},
+            {"$ref": "#/$defs/replicaSequenceSafetyCheck"},
+            {"$ref": "#/$defs/primaryStoppedCheck"},
+            {"$ref": "#/$defs/standbyPromotedCheck"},
+            {"$ref": "#/$defs/failoverRowIntegrityCheck"},
+            {"$ref": "#/$defs/failoverSequenceSafetyCheck"},
+            {"$ref": "#/$defs/failoverProjectionConsistencyCheck"},
+            {"$ref": "#/$defs/walArchiveCheck"},
+            {"$ref": "#/$defs/namedRestoreTargetCheck"},
+            {"$ref": "#/$defs/pitrBoundaryCheck"},
+            {"$ref": "#/$defs/pitrRowIntegrityCheck"},
+            {"$ref": "#/$defs/pitrSequenceSafetyCheck"},
+            {"$ref": "#/$defs/pitrProjectionConsistencyCheck"},
+            {"$ref": "#/$defs/catchupObjectiveCheck"},
+            {"$ref": "#/$defs/failoverReadyObjectiveCheck"},
+            {"$ref": "#/$defs/pitrReadyObjectiveCheck"}
+          ],
+          "items": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "counter": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "milliseconds": {"type": "integer", "minimum": 0, "maximum": 86400000},
+    "lsn": {"type": "string", "pattern": "^[A-F0-9]+/[A-F0-9]+$"},
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "platform", "pythonVersion", "applicationVersion", "containerRuntime", "database"],
+      "properties": {
+        "profile": {"const": "local-docker"},
+        "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+        "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "containerRuntime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "version"],
+          "properties": {
+            "name": {"const": "docker"},
+            "version": {"type": "string", "minLength": 1, "maxLength": 64}
+          }
+        },
+        "database": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["engine", "version", "migration", "image"],
+          "properties": {
+            "engine": {"const": "postgresql"},
+            "version": {"type": "string", "minLength": 1, "maxLength": 64},
+            "migration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"},
+            "image": {"type": "string", "pattern": "^postgres:18\\.4-alpine@sha256:[a-f0-9]{64}$"}
+          }
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "backup", "replication", "failover", "recovery", "workload", "scope", "objectives"],
+      "properties": {
+        "name": {"const": "physical-streaming-pitr-v1"},
+        "backup": {"const": "pg-basebackup-stream-wal"},
+        "replication": {"const": "asynchronous-streaming"},
+        "failover": {"const": "manual-pg-promote"},
+        "recovery": {"const": "archived-wal-named-restore-point"},
+        "workload": {"const": "bounded-committed-resource-writes"},
+        "scope": {"const": "complete-iip-schema"},
+        "objectives": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["classification", "maximumCatchupMilliseconds", "maximumFailoverReadyMilliseconds", "maximumPitrReadyMilliseconds"],
+          "properties": {
+            "classification": {"const": "local-regression-guardrail"},
+            "maximumCatchupMilliseconds": {"type": "integer", "minimum": 1, "maximum": 3600000},
+            "maximumFailoverReadyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 3600000},
+            "maximumPitrReadyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 3600000}
+          }
+        }
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantCount", "resourceCount", "relationshipCount", "investigationCount", "governedActionCount", "pluginSessionCount", "pluginInvocationCount", "beforeTargetResourceCount", "afterTargetResourceCount"],
+      "properties": {
+        "tenantCount": {"const": 1},
+        "resourceCount": {"type": "integer", "minimum": 1},
+        "relationshipCount": {"type": "integer", "minimum": 1},
+        "investigationCount": {"const": 1},
+        "governedActionCount": {"const": 1},
+        "pluginSessionCount": {"const": 1},
+        "pluginInvocationCount": {"const": 1},
+        "beforeTargetResourceCount": {"const": 1},
+        "afterTargetResourceCount": {"const": 1}
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rowMatched", "rowDigest", "tableCount", "rowCount", "tables", "sequenceCount", "sequenceDigest", "sequenceFloorSatisfied", "projectionVerification"],
+      "properties": {
+        "rowMatched": {"const": true},
+        "rowDigest": {"$ref": "#/$defs/sha256"},
+        "tableCount": {"type": "integer", "minimum": 1},
+        "rowCount": {"type": "integer", "minimum": 1},
+        "tables": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"pattern": "^[a-z][a-z0-9_]{0,62}$"},
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["rowCount", "digest"],
+            "properties": {
+              "rowCount": {"$ref": "#/$defs/counter"},
+              "digest": {"$ref": "#/$defs/sha256"}
+            }
+          }
+        },
+        "sequenceCount": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "sequenceDigest": {"$ref": "#/$defs/sha256"},
+        "sequenceFloorSatisfied": {"const": true},
+        "projectionVerification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["driftDetected", "resourceCount", "relationshipCount", "latestObservationOffset", "projectionDigest"],
+          "properties": {
+            "driftDetected": {"const": false},
+            "resourceCount": {"type": "integer", "minimum": 1},
+            "relationshipCount": {"type": "integer", "minimum": 1},
+            "latestObservationOffset": {"type": "integer", "minimum": 1},
+            "projectionDigest": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture", "physicalBackup", "replication", "failover", "pitr"],
+      "properties": {
+        "fixture": {"$ref": "#/$defs/fixture"},
+        "physicalBackup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["copyCount", "totalBytes", "durationMilliseconds"],
+          "properties": {
+            "copyCount": {"const": 2},
+            "totalBytes": {"type": "integer", "minimum": 1},
+            "durationMilliseconds": {"$ref": "#/$defs/milliseconds"}
+          }
+        },
+        "replication": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["standbyInRecovery", "primaryTimeline", "primaryFlushLsn", "standbyReplayLsn", "replayLagBytes", "catchupMilliseconds", "sourceRowDigest", "standbyRowDigest", "sourceSequenceDigest", "standbySequenceDigest", "sequenceFloorSatisfied"],
+          "properties": {
+            "standbyInRecovery": {"const": true},
+            "primaryTimeline": {"type": "integer", "minimum": 1},
+            "primaryFlushLsn": {"$ref": "#/$defs/lsn"},
+            "standbyReplayLsn": {"$ref": "#/$defs/lsn"},
+            "replayLagBytes": {"const": 0},
+            "catchupMilliseconds": {"$ref": "#/$defs/milliseconds"},
+            "sourceRowDigest": {"$ref": "#/$defs/sha256"},
+            "standbyRowDigest": {"$ref": "#/$defs/sha256"},
+            "sourceSequenceDigest": {"$ref": "#/$defs/sha256"},
+            "standbySequenceDigest": {"$ref": "#/$defs/sha256"},
+            "sequenceFloorSatisfied": {"const": true}
+          }
+        },
+        "failover": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["primaryStopped", "standbyPromoted", "promotedTimeline", "readyMilliseconds", "committedRecordLoss", "integrity"],
+          "properties": {
+            "primaryStopped": {"const": true},
+            "standbyPromoted": {"const": true},
+            "promotedTimeline": {"type": "integer", "minimum": 2},
+            "readyMilliseconds": {"$ref": "#/$defs/milliseconds"},
+            "committedRecordLoss": {"const": 0},
+            "integrity": {"$ref": "#/$defs/integrity"}
+          }
+        },
+        "pitr": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["restorePointName", "archivedWalFileCount", "targetReached", "readyMilliseconds", "boundary", "expectedTargetRowDigest", "recoveredRowDigest", "expectedSequenceDigest", "recoveredSequenceDigest", "sequenceFloorSatisfied", "integrity"],
+          "properties": {
+            "restorePointName": {"const": "iip_pitr_target"},
+            "archivedWalFileCount": {"type": "integer", "minimum": 2},
+            "targetReached": {"const": true},
+            "readyMilliseconds": {"$ref": "#/$defs/milliseconds"},
+            "boundary": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["baselinePresent", "beforeTargetPresent", "afterTargetAbsent"],
+              "properties": {
+                "baselinePresent": {"const": true},
+                "beforeTargetPresent": {"const": true},
+                "afterTargetAbsent": {"const": true}
+              }
+            },
+            "expectedTargetRowDigest": {"$ref": "#/$defs/sha256"},
+            "recoveredRowDigest": {"$ref": "#/$defs/sha256"},
+            "expectedSequenceDigest": {"$ref": "#/$defs/sha256"},
+            "recoveredSequenceDigest": {"$ref": "#/$defs/sha256"},
+            "sequenceFloorSatisfied": {"const": true},
+            "integrity": {"$ref": "#/$defs/integrity"}
+          }
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^postgresql\\.continuity\\.[a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "representativeStateCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "representative-state"}}}]},
+    "physicalBaseBackupsCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "physical-base-backups"}}}]},
+    "streamingStandbyCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "streaming-standby"}}}]},
+    "zeroLagCutoverCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "zero-lag-cutover"}}}]},
+    "replicaRowIntegrityCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "replica-row-integrity"}}}]},
+    "replicaSequenceSafetyCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "replica-sequence-safety"}}}]},
+    "primaryStoppedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "primary-stopped"}}}]},
+    "standbyPromotedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "standby-promoted"}}}]},
+    "failoverRowIntegrityCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "failover-row-integrity"}}}]},
+    "failoverSequenceSafetyCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "failover-sequence-safety"}}}]},
+    "failoverProjectionConsistencyCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "failover-projection-consistency"}}}]},
+    "walArchiveCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "wal-archive"}}}]},
+    "namedRestoreTargetCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "named-restore-target"}}}]},
+    "pitrBoundaryCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "pitr-boundary"}}}]},
+    "pitrRowIntegrityCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "pitr-row-integrity"}}}]},
+    "pitrSequenceSafetyCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "pitr-sequence-safety"}}}]},
+    "pitrProjectionConsistencyCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "pitr-projection-consistency"}}}]},
+    "catchupObjectiveCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "catchup-objective"}}}]},
+    "failoverReadyObjectiveCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "failover-ready-objective"}}}]},
+    "pitrReadyObjectiveCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "pitr-ready-objective"}}}]}
+  }
+}

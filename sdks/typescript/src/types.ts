@@ -740,6 +740,149 @@ export interface PostgreSQLRecoveryQualificationReport {
   };
 }
 
+export type PostgreSQLContinuityQualificationCheckId =
+  | "representative-state"
+  | "physical-base-backups"
+  | "streaming-standby"
+  | "zero-lag-cutover"
+  | "replica-row-integrity"
+  | "replica-sequence-safety"
+  | "primary-stopped"
+  | "standby-promoted"
+  | "failover-row-integrity"
+  | "failover-sequence-safety"
+  | "failover-projection-consistency"
+  | "wal-archive"
+  | "named-restore-target"
+  | "pitr-boundary"
+  | "pitr-row-integrity"
+  | "pitr-sequence-safety"
+  | "pitr-projection-consistency"
+  | "catchup-objective"
+  | "failover-ready-objective"
+  | "pitr-ready-objective";
+
+export interface PostgreSQLContinuityIntegrity {
+  rowMatched: true;
+  rowDigest: Sha256Digest;
+  tableCount: number;
+  rowCount: number;
+  tables: Record<string, { rowCount: number; digest: Sha256Digest }>;
+  sequenceCount: number;
+  sequenceDigest: Sha256Digest;
+  sequenceFloorSatisfied: true;
+  projectionVerification: {
+    driftDetected: false;
+    resourceCount: number;
+    relationshipCount: number;
+    latestObservationOffset: number;
+    projectionDigest: Sha256Digest;
+  };
+}
+
+export interface PostgreSQLContinuityQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "PostgreSQLContinuityQualificationReport";
+  metadata: {
+    id: `pgc_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: boolean;
+  };
+  spec: {
+    status: "qualified" | "failed";
+    environment: {
+      profile: "local-docker";
+      platform: `${string}/${string}`;
+      pythonVersion: string;
+      applicationVersion: string;
+      containerRuntime: { name: "docker"; version: string };
+      database: {
+        engine: "postgresql";
+        version: string;
+        migration: `${number}_${string}.sql`;
+        image: `postgres:18.4-alpine@sha256:${string}`;
+      };
+    };
+    profile: {
+      name: "physical-streaming-pitr-v1";
+      backup: "pg-basebackup-stream-wal";
+      replication: "asynchronous-streaming";
+      failover: "manual-pg-promote";
+      recovery: "archived-wal-named-restore-point";
+      workload: "bounded-committed-resource-writes";
+      scope: "complete-iip-schema";
+      objectives: {
+        classification: "local-regression-guardrail";
+        maximumCatchupMilliseconds: number;
+        maximumFailoverReadyMilliseconds: number;
+        maximumPitrReadyMilliseconds: number;
+      };
+    };
+    measurements: {
+      fixture: {
+        tenantCount: 1;
+        resourceCount: number;
+        relationshipCount: number;
+        investigationCount: 1;
+        governedActionCount: 1;
+        pluginSessionCount: 1;
+        pluginInvocationCount: 1;
+        beforeTargetResourceCount: 1;
+        afterTargetResourceCount: 1;
+      };
+      physicalBackup: {
+        copyCount: 2;
+        totalBytes: number;
+        durationMilliseconds: number;
+      };
+      replication: {
+        standbyInRecovery: true;
+        primaryTimeline: number;
+        primaryFlushLsn: string;
+        standbyReplayLsn: string;
+        replayLagBytes: 0;
+        catchupMilliseconds: number;
+        sourceRowDigest: Sha256Digest;
+        standbyRowDigest: Sha256Digest;
+        sourceSequenceDigest: Sha256Digest;
+        standbySequenceDigest: Sha256Digest;
+        sequenceFloorSatisfied: true;
+      };
+      failover: {
+        primaryStopped: true;
+        standbyPromoted: true;
+        promotedTimeline: number;
+        readyMilliseconds: number;
+        committedRecordLoss: 0;
+        integrity: PostgreSQLContinuityIntegrity;
+      };
+      pitr: {
+        restorePointName: "iip_pitr_target";
+        archivedWalFileCount: number;
+        targetReached: true;
+        readyMilliseconds: number;
+        boundary: {
+          baselinePresent: true;
+          beforeTargetPresent: true;
+          afterTargetAbsent: true;
+        };
+        expectedTargetRowDigest: Sha256Digest;
+        recoveredRowDigest: Sha256Digest;
+        expectedSequenceDigest: Sha256Digest;
+        recoveredSequenceDigest: Sha256Digest;
+        sequenceFloorSatisfied: true;
+        integrity: PostgreSQLContinuityIntegrity;
+      };
+    };
+    checks: Array<{
+      id: PostgreSQLContinuityQualificationCheckId;
+      status: "passed" | "failed";
+      errorCode?: `postgresql.continuity.${string}`;
+    }>;
+  };
+}
+
 export interface ResourceRelationship {
   type: string;
   target: string;

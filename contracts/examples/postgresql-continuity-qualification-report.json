@@ -1,0 +1,169 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "PostgreSQLContinuityQualificationReport",
+  "metadata": {
+    "id": "pgc_51813c9b734096b70ac6ba9d82ebfbe3",
+    "generatedAt": "2026-09-06T12:00:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "environment": {
+      "profile": "local-docker",
+      "platform": "darwin/arm64",
+      "pythonVersion": "3.14.3",
+      "applicationVersion": "0.70.0",
+      "containerRuntime": {"name": "docker", "version": "29.7.2"},
+      "database": {
+        "engine": "postgresql",
+        "version": "18.4",
+        "migration": "0022_ai_retry_savings_rule.sql",
+        "image": "postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15"
+      }
+    },
+    "profile": {
+      "name": "physical-streaming-pitr-v1",
+      "backup": "pg-basebackup-stream-wal",
+      "replication": "asynchronous-streaming",
+      "failover": "manual-pg-promote",
+      "recovery": "archived-wal-named-restore-point",
+      "workload": "bounded-committed-resource-writes",
+      "scope": "complete-iip-schema",
+      "objectives": {
+        "classification": "local-regression-guardrail",
+        "maximumCatchupMilliseconds": 60000,
+        "maximumFailoverReadyMilliseconds": 120000,
+        "maximumPitrReadyMilliseconds": 180000
+      }
+    },
+    "measurements": {
+      "fixture": {
+        "tenantCount": 1,
+        "resourceCount": 1,
+        "relationshipCount": 1,
+        "investigationCount": 1,
+        "governedActionCount": 1,
+        "pluginSessionCount": 1,
+        "pluginInvocationCount": 1,
+        "beforeTargetResourceCount": 1,
+        "afterTargetResourceCount": 1
+      },
+      "physicalBackup": {
+        "copyCount": 2,
+        "totalBytes": 131072,
+        "durationMilliseconds": 400
+      },
+      "replication": {
+        "standbyInRecovery": true,
+        "primaryTimeline": 1,
+        "primaryFlushLsn": "0/3000128",
+        "standbyReplayLsn": "0/3000128",
+        "replayLagBytes": 0,
+        "catchupMilliseconds": 250,
+        "sourceRowDigest": "sha256:ccb8306f2f7746a076ac15e7d4bac8bb5067339e669fa3f5ae58deeb78e677f5",
+        "standbyRowDigest": "sha256:ccb8306f2f7746a076ac15e7d4bac8bb5067339e669fa3f5ae58deeb78e677f5",
+        "sourceSequenceDigest": "sha256:156537ab94a89b81620a41b20837f3dd376864134d51b28233cb248413ae5e9e",
+        "standbySequenceDigest": "sha256:156537ab94a89b81620a41b20837f3dd376864134d51b28233cb248413ae5e9e",
+        "sequenceFloorSatisfied": true
+      },
+      "failover": {
+        "primaryStopped": true,
+        "standbyPromoted": true,
+        "promotedTimeline": 2,
+        "readyMilliseconds": 500,
+        "committedRecordLoss": 0,
+        "integrity": {
+          "rowMatched": true,
+          "rowDigest": "sha256:ccb8306f2f7746a076ac15e7d4bac8bb5067339e669fa3f5ae58deeb78e677f5",
+          "tableCount": 2,
+          "rowCount": 4,
+          "tables": {
+            "resource_observations": {
+              "rowCount": 2,
+              "digest": "sha256:c13b36080f2acaa10ac43aa64a129d2e6319619d4799ba55f240c7da94259ac5"
+            },
+            "resource_projections": {
+              "rowCount": 2,
+              "digest": "sha256:47d82702dda5c7899aa7cdce9ddf2ce8b5ed251bea31c6f9297ce7418f6cfc0a"
+            }
+          },
+          "sequenceCount": 1,
+          "sequenceDigest": "sha256:156537ab94a89b81620a41b20837f3dd376864134d51b28233cb248413ae5e9e",
+          "sequenceFloorSatisfied": true,
+          "projectionVerification": {
+            "driftDetected": false,
+            "resourceCount": 3,
+            "relationshipCount": 1,
+            "latestObservationOffset": 3,
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        }
+      },
+      "pitr": {
+        "restorePointName": "iip_pitr_target",
+        "archivedWalFileCount": 3,
+        "targetReached": true,
+        "readyMilliseconds": 750,
+        "boundary": {
+          "baselinePresent": true,
+          "beforeTargetPresent": true,
+          "afterTargetAbsent": true
+        },
+        "expectedTargetRowDigest": "sha256:e95c4d35dcd5a7ca4699f8689f8969947a70c0d5202a60fdd7012e6aeace805e",
+        "recoveredRowDigest": "sha256:e95c4d35dcd5a7ca4699f8689f8969947a70c0d5202a60fdd7012e6aeace805e",
+        "expectedSequenceDigest": "sha256:9882f57b3829ba127bb3920ef84c05d64c0f45af7c84197839a4a4bc2e35260a",
+        "recoveredSequenceDigest": "sha256:9882f57b3829ba127bb3920ef84c05d64c0f45af7c84197839a4a4bc2e35260a",
+        "sequenceFloorSatisfied": true,
+        "integrity": {
+          "rowMatched": true,
+          "rowDigest": "sha256:e95c4d35dcd5a7ca4699f8689f8969947a70c0d5202a60fdd7012e6aeace805e",
+          "tableCount": 2,
+          "rowCount": 2,
+          "tables": {
+            "resource_observations": {
+              "rowCount": 1,
+              "digest": "sha256:948e1ede756479b57ab92e1337b576db849ce5d41d560836520d145af6acc5fb"
+            },
+            "resource_projections": {
+              "rowCount": 1,
+              "digest": "sha256:07b2f612b381e29caab9c4ee296d7d517b8e2cf8125985f7d0451aaf81891787"
+            }
+          },
+          "sequenceCount": 1,
+          "sequenceDigest": "sha256:9882f57b3829ba127bb3920ef84c05d64c0f45af7c84197839a4a4bc2e35260a",
+          "sequenceFloorSatisfied": true,
+          "projectionVerification": {
+            "driftDetected": false,
+            "resourceCount": 2,
+            "relationshipCount": 1,
+            "latestObservationOffset": 2,
+            "projectionDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        }
+      }
+    },
+    "checks": [
+      {"id": "representative-state", "status": "passed"},
+      {"id": "physical-base-backups", "status": "passed"},
+      {"id": "streaming-standby", "status": "passed"},
+      {"id": "zero-lag-cutover", "status": "passed"},
+      {"id": "replica-row-integrity", "status": "passed"},
+      {"id": "replica-sequence-safety", "status": "passed"},
+      {"id": "primary-stopped", "status": "passed"},
+      {"id": "standby-promoted", "status": "passed"},
+      {"id": "failover-row-integrity", "status": "passed"},
+      {"id": "failover-sequence-safety", "status": "passed"},
+      {"id": "failover-projection-consistency", "status": "passed"},
+      {"id": "wal-archive", "status": "passed"},
+      {"id": "named-restore-target", "status": "passed"},
+      {"id": "pitr-boundary", "status": "passed"},
+      {"id": "pitr-row-integrity", "status": "passed"},
+      {"id": "pitr-sequence-safety", "status": "passed"},
+      {"id": "pitr-projection-consistency", "status": "passed"},
+      {"id": "catchup-objective", "status": "passed"},
+      {"id": "failover-ready-objective", "status": "passed"},
+      {"id": "pitr-ready-objective", "status": "passed"}
+    ]
+  }
+}

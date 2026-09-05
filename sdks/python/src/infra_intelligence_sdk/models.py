@@ -517,6 +517,28 @@ class PostgreSQLRecoveryQualificationReport:
 
 
 @dataclass(frozen=True)
+class PostgreSQLContinuityQualificationReport:
+    """Source-bound physical replication, promotion, and PITR evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "PostgreSQLContinuityQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="PostgreSQLContinuityQualificationReport",
+                label="PostgreSQL continuity qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class SessionContext:
     """Non-secret identity context derived from the client's credential."""
 

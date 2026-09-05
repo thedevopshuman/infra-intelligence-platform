@@ -70,6 +70,20 @@ make test-backup-restore
 
 It seeds the durable reference workflow, backs up the complete platform schema, restores into a fresh database, verifies every table and sequence plus projection consistency, writes a source-bound qualification report under `dist/`, and removes its isolated Compose project and volume. See the [backup and restore procedure](postgresql-backup-restore.md) for the measurement semantics, clean-report verification command, and production gaps.
 
+Exercise the separate physical streaming, planned-promotion, and named-target
+PITR profile with:
+
+```bash
+make test-postgres-continuity
+```
+
+It creates two physical copies, catches up a standby to an exact WAL boundary,
+promotes it after stopping the primary, recovers the other copy to a named point,
+verifies every platform table plus safe sequence floors and projections, writes
+a source-bound report under `dist/`, and removes its labeled Docker resources.
+See the [physical continuity procedure](postgresql-continuity.md) for report
+semantics and the remaining production hosting boundary.
+
 Exercise the official OTLP/HTTP exporter against a real OpenTelemetry Collector with:
 
 ```bash

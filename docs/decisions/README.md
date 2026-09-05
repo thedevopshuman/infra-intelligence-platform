@@ -106,3 +106,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0100](0100-environment-scoped-release-qualification-evidence.md) | Accepted | Retain closed, manifest-bound packaged install and N-1 observations outside the immutable bundle |
 | [0101](0101-source-bound-postgresql-recovery-evidence.md) | Accepted | Retain minimized, source-bound complete-schema logical recovery evidence outside the source tree |
 | [0102](0102-external-secret-controller-handoff.md) | Accepted | Keep secret synchronization outside the chart and prove the exact-key handoff locally |
+| [0103](0103-source-bound-postgresql-physical-continuity-evidence.md) | Accepted | Qualify physical replication, manual promotion, and named-target recovery without overstating local evidence |

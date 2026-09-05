@@ -106,3 +106,9 @@ Version 0.50 adds `PostgreSQLRecoveryQualificationReport` for offline recovery
 evidence tooling. It carries aggregate, source-bound logical restore facts only;
 the executable repository verifier remains authoritative for derived checks and
 clean-current-source qualification.
+
+Version 0.51 adds `PostgreSQLContinuityQualificationReport` for offline
+physical-continuity evidence tooling. It exposes only minimized streaming,
+promotion, row-integrity, safe-sequence, named-target recovery, and timing facts;
+it grants no database access and does not turn a local profile into a production
+HA or RPO/RTO claim.

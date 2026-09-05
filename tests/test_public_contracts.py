@@ -63,6 +63,7 @@ from infra_intelligence_sdk import (
     PluginSession,
     PolicyDecision,
     PolicyDecisionRequest,
+    PostgreSQLContinuityQualificationReport,
     PostgreSQLRecoveryQualificationReport,
     ResourceCollectionRequest,
     ResourceCollectionResult,
@@ -184,6 +185,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         postgresql_recovery = PostgreSQLRecoveryQualificationReport.from_dict(
             example("postgresql-recovery-qualification-report.json")
+        )
+        postgresql_continuity = PostgreSQLContinuityQualificationReport.from_dict(
+            example("postgresql-continuity-qualification-report.json")
         )
         session = SessionContext.from_dict(example("session-context.json"))
         local_console_authentication = ConsoleAuthenticationConfiguration.from_dict(
@@ -437,6 +441,10 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             postgresql_recovery.to_dict()["spec"]["profile"]["name"],
             "quiesced-logical-restore-v1",
+        )
+        self.assertEqual(
+            postgresql_continuity.to_dict()["spec"]["profile"]["name"],
+            "physical-streaming-pitr-v1",
         )
         self.assertEqual(session.to_dict()["kind"], "SessionContext")
         self.assertEqual(

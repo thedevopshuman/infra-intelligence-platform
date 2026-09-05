@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-external-secrets test-backup-restore verify-backup-restore-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -6,6 +6,7 @@ KUBECTL ?= kubectl
 DOCKER ?= docker
 NPM ?= npm
 IIP_DATABASE_RECOVERY_REPORT ?= dist/postgresql-recovery-qualification-report.json
+IIP_DATABASE_CONTINUITY_REPORT ?= dist/postgresql-continuity-qualification-report.json
 
 help:
 	@echo "install-verify-deps Install pinned verification-only Python dependencies"
@@ -21,6 +22,8 @@ help:
 	@echo "test-external-secrets Certify exact-key secret synchronization and rotation on local Kind"
 	@echo "test-backup-restore Measure and verify PostgreSQL recovery with Docker Desktop"
 	@echo "verify-backup-restore-report Verify clean-current PostgreSQL recovery evidence"
+	@echo "test-postgres-continuity Qualify physical replication, promotion, and PITR locally"
+	@echo "verify-postgres-continuity-report Verify clean-current physical continuity evidence"
 	@echo "test-otel     Send reference metrics and traces to an OpenTelemetry Collector"
 	@echo "test-otlp-receiver Send official OTLP metrics, logs, and AI usage-to-cost traces"
 	@echo "test-ai-finops Prove the local multi-provider AI economics slice"
@@ -104,6 +107,16 @@ verify-backup-restore-report:
 		(echo "IIP_DATABASE_RECOVERY_REPORT is required" >&2; exit 2)
 	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/backup_restore_experiment.py \
 		--verify-report "$(IIP_DATABASE_RECOVERY_REPORT)" --require-clean
+
+test-postgres-continuity:
+	IIP_DOCKER_BIN=$(DOCKER) PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/postgresql_continuity_experiment.py \
+		--output "$(IIP_DATABASE_CONTINUITY_REPORT)"
+
+verify-postgres-continuity-report:
+	@test -n "$(IIP_DATABASE_CONTINUITY_REPORT)" || \
+		(echo "IIP_DATABASE_CONTINUITY_REPORT is required" >&2; exit 2)
+	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/postgresql_continuity_experiment.py \
+		--verify-report "$(IIP_DATABASE_CONTINUITY_REPORT)" --require-clean
 
 test-otel:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_otel.sh

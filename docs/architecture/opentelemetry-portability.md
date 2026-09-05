@@ -90,6 +90,8 @@ IIP-to-Collector burn-rate report over the same samples; ADR 0087 adds a
 separate Collector-to-backend queue/loss objective sourced from the
 Collector's own self-metrics. ADRs 0088 and 0089 additionally enforce a
 configured client CRL and fail readiness/intake when its validity window
-closes. Customer PKI chain/OCSP interoperability, CRL distribution and
-rollout, regional aggregation of the queue/loss objective, and notification
-routing remain Phase 3 operational-hardening gates.
+closes. ADR 0090 proves a root/intermediate/leaf client hierarchy plus
+activation of a newer CRL through an explicit receiver rollout.
+Customer-specific PKI/OCSP and CRL-distribution qualification, regional
+aggregation of the queue/loss objective, and notification routing remain
+Phase 3 operational-hardening gates.

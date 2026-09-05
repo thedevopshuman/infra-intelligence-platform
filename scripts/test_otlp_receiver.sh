@@ -31,6 +31,9 @@ fi
 
 cleanup
 "$IIP_TEST_PYTHON" scripts/write_otlp_mtls_fixture.py "$IIP_OTLP_MTLS_FIXTURE_DIR"
+PYTHONPATH=src:sdks/python/src "$IIP_TEST_PYTHON" -m unittest \
+    tests.test_otlp_tls.OtlpTlsConfigurationTests.test_intermediate_client_chain_builds_to_the_root_trust_anchor \
+    -v
 "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
     -f "$IIP_COMPOSE_FILE" up --build --detach --wait
 
@@ -39,6 +42,7 @@ IIP_TEST_OTLP_RECEIVER_ENDPOINT=https://127.0.0.1:18081 \
 IIP_TEST_OTLP_CHANNEL_TOKEN="$IIP_TEST_OTLP_CHANNEL_TOKEN" \
 IIP_TEST_OTLP_CONTROL_TOKEN="$IIP_TEST_OTLP_CONTROL_TOKEN" \
 IIP_TEST_OTLP_CA_FILE="$IIP_OTLP_MTLS_FIXTURE_DIR/ca.crt" \
+IIP_TEST_OTLP_CLIENT_CA_FILE="$IIP_OTLP_MTLS_FIXTURE_DIR/client-ca.crt" \
 IIP_TEST_OTLP_SERVER_CERT_FILE="$IIP_OTLP_MTLS_FIXTURE_DIR/server.crt" \
 IIP_TEST_OTLP_SERVER_KEY_FILE="$IIP_OTLP_MTLS_FIXTURE_DIR/server.key" \
 IIP_TEST_OTLP_EXPIRED_CRL_FILE="$IIP_OTLP_MTLS_FIXTURE_DIR/expired-ca.crl" \
@@ -57,6 +61,24 @@ IIP_TEST_OTLP_REVOKED_CLIENT_KEY_FILE="$IIP_OTLP_MTLS_FIXTURE_DIR/collector-revo
 IIP_TEST_OTLP_DATABASE_URL=postgresql://iip@127.0.0.1:15434/iip \
 PYTHONPATH=src:sdks/python/src \
     "$IIP_TEST_PYTHON" -m unittest tests.test_otlp_receiver_integration -v
+
+"$IIP_TEST_PYTHON" scripts/write_otlp_mtls_fixture.py \
+    --activate-rotated-crl "$IIP_OTLP_MTLS_FIXTURE_DIR"
+"$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
+    -f "$IIP_COMPOSE_FILE" up --detach --wait --no-deps --force-recreate receiver
+
+IIP_TEST_OTLP_RECEIVER_ENDPOINT=https://127.0.0.1:18081 \
+IIP_TEST_OTLP_ROTATED_CRL_ACTIVE=true \
+IIP_TEST_OTLP_CHANNEL_TOKEN="$IIP_TEST_OTLP_CHANNEL_TOKEN" \
+IIP_TEST_OTLP_CA_FILE="$IIP_OTLP_MTLS_FIXTURE_DIR/ca.crt" \
+IIP_TEST_OTLP_CLIENT_CERT_FILE="$IIP_OTLP_MTLS_FIXTURE_DIR/collector-a.crt" \
+IIP_TEST_OTLP_CLIENT_KEY_FILE="$IIP_OTLP_MTLS_FIXTURE_DIR/collector-a.key" \
+IIP_TEST_OTLP_ROTATED_CLIENT_CERT_FILE="$IIP_OTLP_MTLS_FIXTURE_DIR/collector-b.crt" \
+IIP_TEST_OTLP_ROTATED_CLIENT_KEY_FILE="$IIP_OTLP_MTLS_FIXTURE_DIR/collector-b.key" \
+PYTHONPATH=src:sdks/python/src \
+    "$IIP_TEST_PYTHON" -m unittest \
+    tests.test_otlp_receiver_integration.OtlpReceiverCrlRotationDockerIntegrationTests \
+    -v
 
 IIP_RECEIVER_METRIC_FOUND=false
 IIP_RECEIVER_METRIC_ATTEMPT=0
@@ -86,4 +108,4 @@ IIP_DOCKER_BIN="$IIP_DOCKER_BIN" PYTHONPATH=src:sdks/python/src \
     "$IIP_TEST_PYTHON" scripts/write_otlp_receiver_compatibility_report.py \
     --report dist/otlp-receiver-compatibility-report.json
 
-echo "Official OTLP/HTTP exporters delivered customer signals and receiver availability telemetry across separate boundaries"
+echo "Official OTLP/HTTP exporters, an intermediate client CA, and CRL rollout passed across isolated boundaries"

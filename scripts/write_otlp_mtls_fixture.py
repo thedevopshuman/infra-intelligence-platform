@@ -33,6 +33,8 @@ def write_fixture(directory: Path) -> None:
         },
         expired_client_identities={"collector-expired": AUTHORIZED_SPIFFE_ID},
         revoked_client_identities={"collector-revoked": AUTHORIZED_SPIFFE_ID},
+        intermediate_client_ca=True,
+        rotated_crl_identity_names=("collector-b",),
     )
     untrusted = directory / "untrusted"
     untrusted.mkdir()
@@ -45,11 +47,34 @@ def write_fixture(directory: Path) -> None:
     )
 
 
+def activate_rotated_crl(directory: Path) -> None:
+    """Atomically promote the newer fixture CRL at the mounted receiver path."""
+
+    current = directory / "ca.crl"
+    rotated = directory / "rotated-ca.crl"
+    if not current.is_file() or not rotated.is_file():
+        raise ValueError("OTLP mTLS rotation fixture is incomplete")
+    payload = rotated.read_bytes()
+    temporary = directory / ".ca.crl.next"
+    temporary.write_bytes(payload)
+    os.chmod(temporary, 0o644)
+    os.replace(temporary, current)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("directory", type=Path)
+    parser.add_argument(
+        "--activate-rotated-crl",
+        action="store_true",
+        help="atomically replace ca.crl with the generated rotated CRL",
+    )
     arguments = parser.parse_args()
-    write_fixture(arguments.directory.resolve())
+    directory = arguments.directory.resolve()
+    if arguments.activate_rotated_crl:
+        activate_rotated_crl(directory)
+    else:
+        write_fixture(directory)
     return 0
 
 

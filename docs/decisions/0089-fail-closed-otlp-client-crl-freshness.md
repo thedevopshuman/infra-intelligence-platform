@@ -54,6 +54,10 @@ startup-rejection check alongside the revoked-certificate handshake check.
 - automatic distribution-point fetching, hot reload, OCSP, intermediate-chain
   qualification, and customer-specific rotation cadence remain separate work.
 
+ADR 0090 subsequently adds local one-intermediate chain evidence and proves
+activation of a newer CRL through receiver rollout. Customer PKI/distribution
+qualification, deeper or cross-signed chains, hot reload, and OCSP remain open.
+
 ## Revisit triggers
 
 Revisit when a customer requires hot CRL rotation without a pod rollout, OCSP,

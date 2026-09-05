@@ -27,6 +27,14 @@ class OtlpReceiverCompatibilityTests(unittest.TestCase):
             [check["id"] for check in report["spec"]["checks"]],
             list(compatibility.CHECK_IDS),
         )
+        self.assertEqual(
+            report["spec"]["profile"]["clientCertificateChain"],
+            "root-intermediate-leaf",
+        )
+        self.assertEqual(
+            report["spec"]["profile"]["crlRotation"],
+            "projected-file-receiver-rollout",
+        )
         encoded = json.dumps(report, sort_keys=True)
         for protected in (
             "tenant-a",

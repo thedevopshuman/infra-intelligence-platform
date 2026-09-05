@@ -156,7 +156,10 @@ networkPolicy:
 ```
 
 The server Secret uses the configured `tls.crt` and `tls.key` keys. The client
-CA Secret contains `ca.crt`; the optional CRL Secret contains exactly one PEM
+CA Secret contains `ca.crt`; for an intermediate-issued client, this bundle
+must include the intended root and the CRL-signing issuing intermediate while
+the Collector presents its leaf plus required intermediate chain. The optional
+CRL Secret contains exactly one PEM
 CRL under `ca.crl`; and the identity Secret contains
 `otlp-client-identities-json` in the shape of
 [`client-identities.example.json`](../../deploy/otlp/client-identities.example.json).
@@ -164,14 +167,19 @@ The CRL must be signed by a CA in the configured client bundle with explicit
 CA and CRL-signing authority. The chart mounts these only into the receiver. Health probes use HTTPS without
 a client certificate and reveal only stable status. A configured CRL must be
 no larger than 1 MiB, have a `lastUpdate` no later than the receiver clock, and
-have a future `nextUpdate`. Once it expires, readiness
-and intake fail closed; project a current CRL and roll the receiver before that
-deadline. Every OTLP POST still requires both the client certificate and
-channel Bearer credential.
+have a future `nextUpdate`. Once it expires, readiness and intake fail closed.
+Before that deadline, publish a new immutable, version-named CRL Secret and
+atomically upgrade `otlpIngest.tls.clientCrlExistingSecret`; changing the Secret
+reference rolls the receiver Deployment. If the same Secret name is updated in
+place, an explicit receiver rollout is still required because the SSL context
+does not hot-reload projected bytes. Every OTLP POST still requires both the
+client certificate and channel Bearer credential. Follow the complete rotation
+and rollback procedure in the
+[receiver runbook](otlp-metrics-receiver.md#crl-rotation-runbook).
 
 Run `make test-otlp-receiver` before promotion. It writes a source-bound report
-after real official-exporter, mTLS/SPIFFE, current-CRL, PostgreSQL durability,
-and Collector persistent-queue checks. Production Collectors should adapt the validated
+after real official-exporter, intermediate-CA mTLS/SPIFFE, current and rotated
+CRL, PostgreSQL durability, and Collector persistent-queue checks. Production Collectors should adapt the validated
 [`collector-to-iip.example.yaml`](../../deploy/otel/collector-to-iip.example.yaml)
 and mount its queue directory on a durable volume.
 
@@ -182,7 +190,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.62.0
+  tag: 0.63.0
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:

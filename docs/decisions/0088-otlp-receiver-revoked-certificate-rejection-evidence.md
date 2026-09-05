@@ -67,9 +67,11 @@ and the JSON Schema move from 16 to 17 required checks.
   capacity and retention a customer choice.
 
 ADR 0089 subsequently closes the local freshness/expiry-enforcement part of
-that gap. Distribution and rollout of a current CRL remain customer-owned.
+that gap. ADR 0090 proves a one-intermediate hierarchy and local activation of
+a current CRL through receiver rollout. CRL publication/distribution and
+customer-environment rollout qualification remain customer-owned.
 
 ## Revisit triggers
 
 Revisit if a customer requires OCSP, automatic CRL distribution-point
-fetching, or hot reload without the receiver rollout required by ADR 0089.
+fetching, or hot reload instead of the receiver rollout proven by ADR 0090.

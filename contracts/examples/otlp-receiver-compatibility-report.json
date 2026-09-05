@@ -14,7 +14,7 @@
       "containerRuntime": "docker",
       "containerRuntimeVersion": "28.3.3",
       "pythonVersion": "3.14.0",
-      "applicationVersion": "0.62.0",
+      "applicationVersion": "0.63.0",
       "collectorVersion": "0.158.0",
       "collectorImageDigest": "sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5"
     },
@@ -22,15 +22,18 @@
       "name": "local-mutual-spiffe-otlp-http-v1",
       "transport": "https-otlp-http-protobuf",
       "workloadIdentity": "x509-spiffe-uri-san",
+      "clientCertificateChain": "root-intermediate-leaf",
       "channelCredential": "tenant-bound-bearer-sha256",
       "commitBoundary": "postgresql-before-success",
-      "preReceiverBuffering": "collector-persistent-sending-queue"
+      "preReceiverBuffering": "collector-persistent-sending-queue",
+      "crlRotation": "projected-file-receiver-rollout"
     },
     "checks": [
       {"id": "isolated-route-surface", "status": "passed"},
       {"id": "server-ca-verified-tls", "status": "passed"},
       {"id": "plaintext-denial", "status": "passed"},
       {"id": "client-ca-validation", "status": "passed"},
+      {"id": "intermediate-ca-client-certificate", "status": "passed"},
       {"id": "spiffe-workload-identity", "status": "passed"},
       {"id": "channel-identity-binding", "status": "passed"},
       {"id": "bearer-channel-authentication", "status": "passed"},
@@ -41,14 +44,15 @@
       {"id": "expired-client-certificate-rejected", "status": "passed"},
       {"id": "revoked-client-certificate-rejected", "status": "passed"},
       {"id": "expired-client-crl-rejected", "status": "passed"},
+      {"id": "crl-rotation-with-receiver-rollout", "status": "passed"},
       {"id": "health-probe-minimization", "status": "passed"},
       {"id": "durable-evidence-commit", "status": "passed"},
       {"id": "collector-persistent-queue-config", "status": "passed"},
       {"id": "secret-redaction", "status": "passed"}
     ],
     "summary": {
-      "totalChecks": 18,
-      "passedChecks": 18,
+      "totalChecks": 20,
+      "passedChecks": 20,
       "failedChecks": 0,
       "overallStatus": "compatible"
     }

@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/replace-me/infra-intelligence-platform
   pullPolicy: IfNotPresent
-  tag: "0.62.0"
+  tag: "0.63.0"
   digest: ""
 
 worker:
@@ -308,10 +308,12 @@ otlpIngest:
     clientCaExistingSecret: ""
     clientCaSecretKey: ca.crt
     clientCaMountPath: /var/run/iip-otlp-client-ca
-    # Optional customer revocation list (ADRs 0088/0089). Empty disables CRL
+    # Optional customer revocation list (ADRs 0088-0090). Empty disables CRL
     # checking. A configured single PEM CRL must be <=1 MiB and current; the
     # receiver fails readiness/intake at nextUpdate and requires a rollout
-    # after rotation. May reference the same Secret as clientCaExistingSecret.
+    # after rotation. Prefer a version-named immutable Secret so changing this
+    # reference rolls the Deployment. The client CA bundle must include the
+    # CRL-signing issuer. May reference the same Secret as clientCaExistingSecret.
     clientCrlExistingSecret: ""
     clientCrlSecretKey: ca.crl
     clientCrlMountPath: /var/run/iip-otlp-client-crl

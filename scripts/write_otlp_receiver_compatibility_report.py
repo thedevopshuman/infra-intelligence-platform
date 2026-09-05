@@ -34,6 +34,7 @@ CHECK_IDS = (
     "server-ca-verified-tls",
     "plaintext-denial",
     "client-ca-validation",
+    "intermediate-ca-client-certificate",
     "spiffe-workload-identity",
     "channel-identity-binding",
     "bearer-channel-authentication",
@@ -44,6 +45,7 @@ CHECK_IDS = (
     "expired-client-certificate-rejected",
     "revoked-client-certificate-rejected",
     "expired-client-crl-rejected",
+    "crl-rotation-with-receiver-rollout",
     "health-probe-minimization",
     "durable-evidence-commit",
     "collector-persistent-queue-config",
@@ -116,9 +118,11 @@ def compatibility_report(
                 "name": "local-mutual-spiffe-otlp-http-v1",
                 "transport": "https-otlp-http-protobuf",
                 "workloadIdentity": "x509-spiffe-uri-san",
+                "clientCertificateChain": "root-intermediate-leaf",
                 "channelCredential": "tenant-bound-bearer-sha256",
                 "commitBoundary": "postgresql-before-success",
                 "preReceiverBuffering": "collector-persistent-sending-queue",
+                "crlRotation": "projected-file-receiver-rollout",
             },
             "checks": checks,
             "summary": {
@@ -188,8 +192,9 @@ def main() -> int:
         return 1
     print(
         "OTLP receiver compatibility passed: "
-        f"{len(CHECK_IDS)}/{len(CHECK_IDS)} checks; mTLS/SPIFFE, durable commit, "
-        "and persistent Collector queue configuration"
+        f"{len(CHECK_IDS)}/{len(CHECK_IDS)} checks; intermediate-chain "
+        "mTLS/SPIFFE, CRL rollout, durable commit, and persistent Collector "
+        "queue configuration"
     )
     print(f"report: {arguments.report.resolve()}")
     return 0

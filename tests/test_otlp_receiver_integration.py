@@ -314,7 +314,7 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
                     "IIP_TEST_OTLP_SERVER_KEY_FILE"
                 ],
                 "IIP_OTLP_TLS_CLIENT_CA_PATH": os.environ[
-                    "IIP_TEST_OTLP_CA_FILE"
+                    "IIP_TEST_OTLP_CLIENT_CA_FILE"
                 ],
                 "IIP_OTLP_MTLS_IDENTITIES_JSON": json.dumps(
                     {
@@ -365,6 +365,53 @@ class OtlpReceiverDockerIntegrationTests(unittest.TestCase):
         counts = {str(row[0]): int(row[1]) for row in rows}
         self.assertGreaterEqual(counts.get("telemetry.metrics.push", 0), 1)
         self.assertGreaterEqual(counts.get("telemetry.logs.push", 0), 1)
+
+
+@unittest.skipUnless(
+    os.environ.get("IIP_TEST_OTLP_RECEIVER_ENDPOINT")
+    and os.environ.get("IIP_TEST_OTLP_ROTATED_CRL_ACTIVE") == "true",
+    "set the OTLP endpoint and activate the rotated CRL fixture",
+)
+class OtlpReceiverCrlRotationDockerIntegrationTests(unittest.TestCase):
+    def context_for(self, certificate_prefix: str) -> ssl.SSLContext:
+        variable_prefix = (
+            "IIP_TEST_OTLP_CLIENT"
+            if certificate_prefix == "VALID"
+            else f"IIP_TEST_OTLP_{certificate_prefix}_CLIENT"
+        )
+        context = ssl.create_default_context(
+            cafile=os.environ["IIP_TEST_OTLP_CA_FILE"]
+        )
+        context.load_cert_chain(
+            certfile=os.environ[f"{variable_prefix}_CERT_FILE"],
+            keyfile=os.environ[f"{variable_prefix}_KEY_FILE"],
+        )
+        return context
+
+    def request(self, context: ssl.SSLContext) -> int:
+        request = urllib.request.Request(
+            os.environ["IIP_TEST_OTLP_RECEIVER_ENDPOINT"].rstrip("/")
+            + "/v1/metrics",
+            data=b"",
+            method="POST",
+            headers={
+                "Authorization": (
+                    "Bearer " + os.environ["IIP_TEST_OTLP_CHANNEL_TOKEN"]
+                ),
+                "Content-Type": "application/x-protobuf",
+            },
+        )
+        with urllib.request.urlopen(request, context=context, timeout=5) as response:
+            return response.status
+
+    def test_new_crl_is_effective_only_after_receiver_rollout(self) -> None:
+        # collector-b succeeded in the first integration stage. The rotated
+        # CRL adds only that certificate, and the shell gate recreates the
+        # receiver before this second stage.
+        with self.assertRaises((urllib.error.URLError, ssl.SSLError)):
+            self.request(self.context_for("ROTATED"))
+
+        self.assertEqual(self.request(self.context_for("VALID")), 200)
 
 
 if __name__ == "__main__":

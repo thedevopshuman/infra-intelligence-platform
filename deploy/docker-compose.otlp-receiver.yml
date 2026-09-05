@@ -14,7 +14,7 @@ services:
       - "127.0.0.1:15434:5432"
 
   api:
-    image: iip-otlp-receiver-test:0.62.0
+    image: iip-otlp-receiver-test:0.63.0
     build:
       context: ..
       dockerfile: Dockerfile
@@ -43,7 +43,7 @@ services:
       - no-new-privileges:true
 
   receiver:
-    image: iip-otlp-receiver-test:0.62.0
+    image: iip-otlp-receiver-test:0.63.0
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.otlp_receiver"]
     environment:
@@ -54,7 +54,7 @@ services:
       IIP_OTLP_TLS_MODE: mutual-spiffe
       IIP_OTLP_TLS_CERTIFICATE_PATH: /tls/server.crt
       IIP_OTLP_TLS_PRIVATE_KEY_PATH: /tls/server.key
-      IIP_OTLP_TLS_CLIENT_CA_PATH: /tls/ca.crt
+      IIP_OTLP_TLS_CLIENT_CA_PATH: /tls/client-ca.crt
       IIP_OTLP_TLS_CLIENT_CRL_PATH: /tls/ca.crl
       IIP_OTLP_MTLS_IDENTITIES_JSON: ${IIP_OTLP_MTLS_IDENTITIES_JSON:?set IIP_OTLP_MTLS_IDENTITIES_JSON}
       IIP_OTLP_MAX_REQUESTS_PER_SECOND: "50"

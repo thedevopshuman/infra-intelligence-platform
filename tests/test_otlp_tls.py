@@ -12,6 +12,7 @@ from io import BytesIO
 from pathlib import Path
 
 from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 
 from iip.application.ingest_otlp_metrics import (
     OtlpReceiverAuthenticationError,
@@ -25,6 +26,7 @@ from iip.surfaces.otlp_tls import (
 )
 from scripts.write_otlp_mtls_fixture import (
     AUTHORIZED_SPIFFE_ID,
+    activate_rotated_crl,
     write_fixture,
 )
 from tests.test_otlp_receiver import (
@@ -176,7 +178,7 @@ class OtlpTlsConfigurationTests(unittest.TestCase):
                 "IIP_OTLP_TLS_MODE": "mutual-spiffe",
                 "IIP_OTLP_TLS_CERTIFICATE_PATH": str(root / "server.crt"),
                 "IIP_OTLP_TLS_PRIVATE_KEY_PATH": str(root / "server.key"),
-                "IIP_OTLP_TLS_CLIENT_CA_PATH": str(root / "ca.crt"),
+                "IIP_OTLP_TLS_CLIENT_CA_PATH": str(root / "client-ca.crt"),
                 "IIP_OTLP_MTLS_IDENTITIES_JSON": identities(),
             }
 
@@ -196,7 +198,7 @@ class OtlpTlsConfigurationTests(unittest.TestCase):
             write_fixture(root)
             policy = ClientCrlFreshnessPolicy.from_pem_file(
                 str(root / "ca.crl"),
-                issuer_ca_path=str(root / "ca.crt"),
+                issuer_ca_path=str(root / "client-ca.crt"),
             )
             policy.assert_current(
                 evaluated_at=policy.next_update - timedelta(microseconds=1)
@@ -215,7 +217,7 @@ class OtlpTlsConfigurationTests(unittest.TestCase):
                     ):
                         ClientCrlFreshnessPolicy.from_pem_file(
                             str(path),
-                            issuer_ca_path=str(root / "ca.crt"),
+                            issuer_ca_path=str(root / "client-ca.crt"),
                         )
 
             oversized = root / "oversized.crl"
@@ -226,7 +228,7 @@ class OtlpTlsConfigurationTests(unittest.TestCase):
             ):
                 ClientCrlFreshnessPolicy.from_pem_file(
                     str(oversized),
-                    issuer_ca_path=str(root / "ca.crt"),
+                    issuer_ca_path=str(root / "client-ca.crt"),
                 )
 
             with self.assertRaisesRegex(
@@ -267,7 +269,7 @@ class OtlpTlsConfigurationTests(unittest.TestCase):
                     "IIP_OTLP_TLS_MODE": "mutual-spiffe",
                     "IIP_OTLP_TLS_CERTIFICATE_PATH": str(root / "server.crt"),
                     "IIP_OTLP_TLS_PRIVATE_KEY_PATH": str(root / "server.key"),
-                    "IIP_OTLP_TLS_CLIENT_CA_PATH": str(root / "ca.crt"),
+                    "IIP_OTLP_TLS_CLIENT_CA_PATH": str(root / "client-ca.crt"),
                     "IIP_OTLP_MTLS_IDENTITIES_JSON": identities(),
                     "IIP_OTLP_TLS_CLIENT_CRL_PATH": str(root / "ca.crl"),
                 }
@@ -313,6 +315,105 @@ class OtlpTlsConfigurationTests(unittest.TestCase):
 
             self.assertEqual(attempt("collector-a"), "accepted")
             self.assertEqual(attempt("collector-revoked"), "rejected")
+
+    def test_intermediate_client_chain_builds_to_the_root_trust_anchor(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "fixture"
+            write_fixture(root)
+            server_context = OtlpTlsConfiguration.from_environment(
+                {
+                    "IIP_OTLP_TLS_MODE": "mutual-spiffe",
+                    "IIP_OTLP_TLS_CERTIFICATE_PATH": str(root / "server.crt"),
+                    "IIP_OTLP_TLS_PRIVATE_KEY_PATH": str(root / "server.key"),
+                    # Trust only the root here. The client must supply the
+                    # generated intermediate in its presented chain.
+                    "IIP_OTLP_TLS_CLIENT_CA_PATH": str(root / "ca.crt"),
+                    "IIP_OTLP_MTLS_IDENTITIES_JSON": identities(),
+                }
+            ).ssl_context()
+            assert server_context is not None
+            server_context.verify_mode = ssl.CERT_REQUIRED
+
+            listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.addCleanup(listener.close)
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            port = listener.getsockname()[1]
+
+            def attempt(certificate_name: str) -> str:
+                outcomes: list[str] = []
+
+                def accept_once() -> None:
+                    try:
+                        raw, _ = listener.accept()
+                        tls = server_context.wrap_socket(raw, server_side=True)
+                        outcomes.append("accepted")
+                        tls.close()
+                    except ssl.SSLError:
+                        outcomes.append("rejected")
+
+                thread = threading.Thread(target=accept_once)
+                thread.start()
+                client_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                client_context.load_verify_locations(cafile=str(root / "ca.crt"))
+                client_context.load_cert_chain(
+                    certfile=str(root / certificate_name),
+                    keyfile=str(root / "collector-a.key"),
+                )
+                try:
+                    with socket.create_connection(("127.0.0.1", port)) as raw:
+                        with client_context.wrap_socket(
+                            raw,
+                            server_hostname="otlp-receiver.fixture",
+                        ):
+                            pass
+                except ssl.SSLError:
+                    pass
+                thread.join(timeout=5)
+                return outcomes[0] if outcomes else "no-attempt"
+
+            self.assertEqual(attempt("collector-a.crt"), "accepted")
+            self.assertEqual(attempt("collector-a-leaf.crt"), "rejected")
+
+    def test_rotated_crl_adds_only_the_selected_current_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "fixture"
+            write_fixture(root)
+
+            initial = x509.load_pem_x509_crl((root / "ca.crl").read_bytes())
+            rotated = x509.load_pem_x509_crl(
+                (root / "rotated-ca.crl").read_bytes()
+            )
+            collector_b = x509.load_pem_x509_certificate(
+                (root / "collector-b.crt").read_bytes()
+            )
+            collector_a = x509.load_pem_x509_certificate(
+                (root / "collector-a.crt").read_bytes()
+            )
+
+            self.assertIsNone(
+                initial.get_revoked_certificate_by_serial_number(
+                    collector_b.serial_number
+                )
+            )
+            self.assertIsNotNone(
+                rotated.get_revoked_certificate_by_serial_number(
+                    collector_b.serial_number
+                )
+            )
+            self.assertIsNone(
+                rotated.get_revoked_certificate_by_serial_number(
+                    collector_a.serial_number
+                )
+            )
+
+            activate_rotated_crl(root)
+
+            active = x509.load_pem_x509_crl((root / "ca.crl").read_bytes())
+            self.assertEqual(
+                active.fingerprint(hashes.SHA256()),
+                rotated.fingerprint(hashes.SHA256()),
+            )
 
     def test_missing_or_malformed_tls_files_fail_with_stable_configuration_code(
         self,

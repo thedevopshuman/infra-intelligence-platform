@@ -61,8 +61,9 @@ volume the queue does not survive pod replacement.
 
 Every OTLP POST in `mutual-spiffe` mode must satisfy two independent checks:
 
-- a client certificate chains to the configured client CA, contains exactly one
-  URI SAN, and that SPIFFE ID is mapped to the selected channel; and
+- a client certificate chains to the configured client CA bundle, contains
+  exactly one URI SAN, and that SPIFFE ID is mapped to the selected channel;
+  the client must present every required intermediate certificate; and
 - the Bearer token matches the SHA-256 verifier for that tenant-bound channel.
 
 The receiver validates both before reading the request body. Rotating a client
@@ -82,9 +83,43 @@ invalid issuer/signature or already expired CRL rejects startup; reaching
 `nextUpdate` later removes the receiver from readiness and rejects metrics/logs
 intake before body read. Project a current CRL and roll the receiver before
 expiry because OpenSSL and the application intentionally load the same bytes
-once at startup. Distribution remains the customer's responsibility
+once at startup. The client CA bundle must include the CRL issuer certificate
+as well as the intended trust anchor so startup can validate the CRL signature
+and CRL-signing authority. Distribution remains the customer's responsibility
 ([ADRs 0088](../decisions/0088-otlp-receiver-revoked-certificate-rejection-evidence.md)
-and [0089](../decisions/0089-fail-closed-otlp-client-crl-freshness.md)).
+and [0089](../decisions/0089-fail-closed-otlp-client-crl-freshness.md)). The
+local gate now exercises a root/intermediate/leaf hierarchy and an
+intermediate-signed CRL ([ADR 0090](../decisions/0090-intermediate-ca-and-otlp-crl-rollout-evidence.md)).
+
+## CRL rotation runbook
+
+Treat the CRL as a versioned deployment input, not as a file that the running
+receiver hot-reloads:
+
+1. Obtain the next CRL through the customer PKI distribution path. Validate
+   that its issuer certificate is present in the configured client CA bundle,
+   `lastUpdate` is not in the future, `nextUpdate` leaves enough time for a
+   failed rollout and rollback, and the expected serials are present without
+   logging them.
+2. Publish it through the cluster secret-management workflow under a new,
+   immutable Secret name such as `iip-otlp-client-crl-20260905`. Never put CRL
+   or certificate material in Helm values or Git.
+3. Run an atomic, waiting Helm upgrade that changes only
+   `otlpIngest.tls.clientCrlExistingSecret` to the new name. The pod-template
+   change rolls the receiver; an invalid or stale CRL keeps the replacement
+   pod unready.
+4. Wait for Deployment rollout completion, then verify `/readyz` through
+   server-authenticated TLS, a permitted Collector export, and denial of a
+   deliberately revoked non-production compatibility identity.
+5. Retain the previous Secret through the declared rollback window, then
+   remove it through the customer's secret-retention process.
+
+If an operator updates the contents of the existing Secret name instead, an
+explicit receiver Deployment restart and rollout wait are mandatory. A
+projected-volume update alone does not replace the process-local SSL context.
+Schedule rotation with overlap before `nextUpdate`; do not wait for readiness
+to fail. For more than one replica, qualify rolling availability, disruption
+budgets, Collector retry behavior, and rollback in the customer environment.
 
 ## Protected channel configuration
 
@@ -118,19 +153,22 @@ For Helm, set `otlpReceiver.enabled: true`, `database.existingSecret`, and
 `identitiesExistingSecret`. The identity Secret value follows
 [`client-identities.example.json`](../../deploy/otlp/client-identities.example.json).
 Optionally set `clientCrlExistingSecret`/`clientCrlSecretKey` to enable CRL
-checking and freshness enforcement (ADRs 0088 and 0089); it may reference the
-same Secret as `clientCaExistingSecret` or a separate one, and is otherwise
-left empty. The chart never puts channel or identity configuration in a
-ConfigMap or mounts it into the control-plane pod.
+checking and freshness enforcement (ADRs 0088–0090); it may reference the same
+Secret as `clientCaExistingSecret` or a separate one, and is otherwise left
+empty. Prefer a separate version-named immutable CRL Secret so changing the
+reference creates an observable receiver rollout. The chart never puts
+channel or identity configuration in a ConfigMap or mounts it into the
+control-plane pod.
 
 The chart creates a dedicated receiver Deployment and ClusterIP Service on
 OTLP/HTTP port `4318`. It exposes no console or control-plane operation, has no
 interactive identity configuration or ambient service-account token, and
 applies per-channel process admission. If NetworkPolicy is enabled, both
 `networkPolicy.databaseEgress` and an exact
-`networkPolicy.otlpReceiverIngress` must be configured. Automated CA/channel
-rotation, distributed gateway admission, and queue sizing remain customer
-production decisions.
+`networkPolicy.otlpReceiverIngress` must be configured. The chart supports the
+versioned-Secret receiver rollout fixed by ADR 0090; automating CRL publication,
+CA/channel rotation, distributed gateway admission, and queue sizing remains a
+customer production decision.
 
 When `telemetry.metricsEnabled` is true, the receiver exports privacy-bounded
 request availability and duration through the same customer-selected outbound
@@ -151,9 +189,11 @@ For one-process development compatibility only, set `IIP_OTLP_RECEIVER_MODE=shar
 separation, TLS/SPIFFE policy, gzip and post-decompression limits,
 tenant/resource binding, redaction, immutable persistence, separate OpenAPI
 documents, SDK types, and Helm rendering. The Docker gate sends real exports
-from the official Python exporters, tests certificate and credential denial,
-queries PostgreSQL, validates the persistent Collector queue configuration, and
-writes `dist/otlp-receiver-compatibility-report.json`:
+from the official Python exporters through an intermediate-issued client chain,
+tests certificate and credential denial, atomically rotates the CRL and
+recreates the receiver, proves newly revoked and unaffected identities, queries
+PostgreSQL, validates the persistent Collector queue configuration, and writes
+`dist/otlp-receiver-compatibility-report.json`:
 
 ```bash
 make test-otlp-receiver

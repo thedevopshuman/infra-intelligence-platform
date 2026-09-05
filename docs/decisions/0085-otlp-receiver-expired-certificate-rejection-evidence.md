@@ -47,3 +47,7 @@ and the JSON Schema move from 15 to 16 required checks.
   boundary enforces the standard X.509 validity window it is given, not that
   a customer's issuer, revocation infrastructure, or rotation automation is
   itself correct.
+
+ADRs 0088–0090 subsequently add current-CRL revocation and freshness evidence,
+a one-intermediate client hierarchy, and explicit receiver-rollout evidence.
+Customer-specific PKI and rotation qualification remain open.

@@ -43,25 +43,28 @@
         "profile": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["name", "transport", "workloadIdentity", "channelCredential", "commitBoundary", "preReceiverBuffering"],
+          "required": ["name", "transport", "workloadIdentity", "clientCertificateChain", "channelCredential", "commitBoundary", "preReceiverBuffering", "crlRotation"],
           "properties": {
             "name": {"const": "local-mutual-spiffe-otlp-http-v1"},
             "transport": {"const": "https-otlp-http-protobuf"},
             "workloadIdentity": {"const": "x509-spiffe-uri-san"},
+            "clientCertificateChain": {"const": "root-intermediate-leaf"},
             "channelCredential": {"const": "tenant-bound-bearer-sha256"},
             "commitBoundary": {"const": "postgresql-before-success"},
-            "preReceiverBuffering": {"const": "collector-persistent-sending-queue"}
+            "preReceiverBuffering": {"const": "collector-persistent-sending-queue"},
+            "crlRotation": {"const": "projected-file-receiver-rollout"}
           }
         },
         "checks": {
           "type": "array",
-          "minItems": 18,
-          "maxItems": 18,
+          "minItems": 20,
+          "maxItems": 20,
           "prefixItems": [
             {"$ref": "#/$defs/isolatedRouteSurfaceCheck"},
             {"$ref": "#/$defs/serverCaVerifiedTlsCheck"},
             {"$ref": "#/$defs/plaintextDenialCheck"},
             {"$ref": "#/$defs/clientCaValidationCheck"},
+            {"$ref": "#/$defs/intermediateCaClientCertificateCheck"},
             {"$ref": "#/$defs/spiffeWorkloadIdentityCheck"},
             {"$ref": "#/$defs/channelIdentityBindingCheck"},
             {"$ref": "#/$defs/bearerChannelAuthenticationCheck"},
@@ -72,6 +75,7 @@
             {"$ref": "#/$defs/expiredClientCertificateRejectedCheck"},
             {"$ref": "#/$defs/revokedClientCertificateRejectedCheck"},
             {"$ref": "#/$defs/expiredClientCrlRejectedCheck"},
+            {"$ref": "#/$defs/crlRotationWithReceiverRolloutCheck"},
             {"$ref": "#/$defs/healthProbeMinimizationCheck"},
             {"$ref": "#/$defs/durableEvidenceCommitCheck"},
             {"$ref": "#/$defs/collectorPersistentQueueConfigCheck"},
@@ -84,9 +88,9 @@
           "additionalProperties": false,
           "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
           "properties": {
-            "totalChecks": {"const": 18},
-            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 18},
-            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 18},
+            "totalChecks": {"const": 20},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 20},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 20},
             "overallStatus": {"enum": ["compatible", "incompatible"]}
           }
         }
@@ -109,6 +113,7 @@
     "serverCaVerifiedTlsCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "server-ca-verified-tls"}}}]},
     "plaintextDenialCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "plaintext-denial"}}}]},
     "clientCaValidationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "client-ca-validation"}}}]},
+    "intermediateCaClientCertificateCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "intermediate-ca-client-certificate"}}}]},
     "spiffeWorkloadIdentityCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "spiffe-workload-identity"}}}]},
     "channelIdentityBindingCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "channel-identity-binding"}}}]},
     "bearerChannelAuthenticationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "bearer-channel-authentication"}}}]},
@@ -119,6 +124,7 @@
     "expiredClientCertificateRejectedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "expired-client-certificate-rejected"}}}]},
     "revokedClientCertificateRejectedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "revoked-client-certificate-rejected"}}}]},
     "expiredClientCrlRejectedCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "expired-client-crl-rejected"}}}]},
+    "crlRotationWithReceiverRolloutCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "crl-rotation-with-receiver-rollout"}}}]},
     "healthProbeMinimizationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "health-probe-minimization"}}}]},
     "durableEvidenceCommitCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "durable-evidence-commit"}}}]},
     "collectorPersistentQueueConfigCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "collector-persistent-queue-config"}}}]},

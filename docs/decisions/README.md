@@ -105,3 +105,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0099](0099-graceful-api-termination-and-drain-conformance.md) | Accepted | Drain endpoints and active API handlers, then prove a blocked tenant read survives pod termination |
 | [0100](0100-environment-scoped-release-qualification-evidence.md) | Accepted | Retain closed, manifest-bound packaged install and N-1 observations outside the immutable bundle |
 | [0101](0101-source-bound-postgresql-recovery-evidence.md) | Accepted | Retain minimized, source-bound complete-schema logical recovery evidence outside the source tree |
+| [0102](0102-external-secret-controller-handoff.md) | Accepted | Keep secret synchronization outside the chart and prove the exact-key handoff locally |

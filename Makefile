@@ -1,7 +1,8 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-backup-restore verify-backup-restore-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-postgres test-capacity test-credential-broker test-oidc test-policy-engine test-external-secrets test-backup-restore verify-backup-restore-report test-otel test-otlp-receiver test-ai-finops test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
+KUBECTL ?= kubectl
 DOCKER ?= docker
 NPM ?= npm
 IIP_DATABASE_RECOVERY_REPORT ?= dist/postgresql-recovery-qualification-report.json
@@ -17,6 +18,7 @@ help:
 	@echo "test-credential-broker Certify the external broker client over local TLS"
 	@echo "test-oidc     Certify OIDC/JWKS authentication over local TLS"
 	@echo "test-policy-engine Certify external policy decisions over local TLS"
+	@echo "test-external-secrets Certify exact-key secret synchronization and rotation on local Kind"
 	@echo "test-backup-restore Measure and verify PostgreSQL recovery with Docker Desktop"
 	@echo "verify-backup-restore-report Verify clean-current PostgreSQL recovery evidence"
 	@echo "test-otel     Send reference metrics and traces to an OpenTelemetry Collector"
@@ -89,6 +91,9 @@ test-oidc:
 test-policy-engine:
 	IIP_DOCKER_BIN=$(DOCKER) PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/run_policy_engine_compatibility.py \
 		--report dist/policy-engine-compatibility-report.json
+
+test-external-secrets:
+	IIP_KUBECTL_BIN=$(KUBECTL) IIP_HELM_BIN=$(HELM) scripts/test_external_secrets.sh
 
 test-backup-restore:
 	IIP_DOCKER_BIN=$(DOCKER) PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/backup_restore_experiment.py \

@@ -14,7 +14,7 @@
       "revision": "0123456789abcdef0123456789abcdef01234567"
     },
     "deployment": {
-      "helmChartVersion": "0.71.0",
+      "helmChartVersion": "0.72.0",
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     }
   }

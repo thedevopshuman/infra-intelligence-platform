@@ -12,6 +12,7 @@ make test-capacity PYTHON=.venv/bin/python
 make test-credential-broker PYTHON=.venv/bin/python
 make test-oidc PYTHON=.venv/bin/python
 make test-policy-engine PYTHON=.venv/bin/python
+make test-external-secrets PYTHON=.venv/bin/python
 make test-otlp-receiver PYTHON=.venv/bin/python
 make test-backup-restore PYTHON=.venv/bin/python
 make release-bundle PYTHON=.venv/bin/python
@@ -25,6 +26,9 @@ checkout with `make verify-backup-restore-report`. These reports are deliberatel
 embedded in the portable bundle because their PostgreSQL, host,
 container-runtime, PKI fixture, and Collector measurements describe the
 certification environment, not every installation target.
+The external-secret profile emits no report or secret material; retain its
+terminal pass/fail result in the release workflow log. It proves the local
+Kubernetes provider handoff, not the selected customer secret backend.
 
 The default build produces `linux/amd64` and `linux/arm64` manifests for both the control plane and the trusted plugin-mediation bridge. BuildKit attaches an in-toto SPDX SBOM and SLSA v1 provenance statement to every platform inside each OCI layout. The base-image index and SBOM generator are digest pinned; dependency updates must intentionally update those pins and pass the normal verification gates.
 
@@ -34,7 +38,7 @@ The directory under `dist/iip-<version>-<revision>/` contains:
 
 - the multi-platform control-plane OCI image archive;
 - the separately multi-platform, no-network plugin-mediation bridge OCI image archive;
-- the Helm chart, including its strict values schema;
+- the Helm chart, including its strict values schema and value-free external-secret example;
 - public JSON Schemas, examples, specifications, and OpenAPI documents;
 - a Python SDK source package and a compiled npm package;
 - `release-manifest.json` with revision, size, digest, platform, SBOM, and provenance evidence;

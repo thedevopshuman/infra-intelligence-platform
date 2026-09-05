@@ -7,6 +7,11 @@
 
 The roadmap is outcome-based. Dates should be added after team size and pilot constraints are known. Each phase ends with evidence that the next risk is worth taking.
 
+The separately sequenced [AI FinOps roadmap](ai-finops-roadmap.md) extends this
+foundation with an OpenTelemetry-native AWS Bedrock vertical slice. Its
+contract and architecture unit is delivered; trace intake, normalization,
+ledger, pricing runtime, rules, and dashboard remain implementation work.
+
 ## Phase 0 — foundation (current repository)
 
 **Outcome:** One coherent project can be opened in Codex and extended without rediscovering product or architecture intent.

@@ -42,8 +42,12 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | Console authentication | [console-authentication-contract.md](console-authentication-contract.md) | `contracts/schemas/console-authentication.schema.json` | `contracts/examples/console-authentication-local.json`, `contracts/examples/console-authentication-oidc.json` |
 | Page information | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/page-info.schema.json` | `contracts/examples/page-info.json` |
 | Error | [resource-query-contract.md](resource-query-contract.md) | `contracts/schemas/error.schema.json` | `contracts/examples/error.json` |
-| Event | [event-contract.md](event-contract.md) | `contracts/schemas/event.schema.json` | `contracts/examples/event.json` |
+| Event | [event-contract.md](event-contract.md) | `contracts/schemas/event.schema.json` | `contracts/examples/event.json`, `contracts/examples/ai-usage-recorded-event.json` |
 | Evidence | [evidence-contract.md](evidence-contract.md) | `contracts/schemas/evidence.schema.json` | `contracts/examples/evidence.json` |
+| AI usage record | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-usage-record.schema.json` | `contracts/examples/ai-usage-record.json` |
+| AI price catalog | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-price-catalog.schema.json` | `contracts/examples/ai-price-catalog.json` |
+| AI cost record | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-cost-record.schema.json` | `contracts/examples/ai-cost-record.json` |
+| AI savings finding | [ai-economics-contracts.md](ai-economics-contracts.md) | `contracts/schemas/ai-savings-finding.schema.json` | `contracts/examples/ai-savings-finding.json` |
 | Kubernetes Event evidence request | [kubernetes-event-evidence-contract.md](kubernetes-event-evidence-contract.md) | `contracts/schemas/kubernetes-event-evidence-request.schema.json` | `contracts/examples/kubernetes-event-evidence-request.json` |
 | Kubernetes Event evidence result | [kubernetes-event-evidence-contract.md](kubernetes-event-evidence-contract.md) | `contracts/schemas/kubernetes-event-evidence-result.schema.json` | `contracts/examples/kubernetes-event-evidence-result.json` |
 | Telemetry evidence request | [telemetry-evidence-contract.md](telemetry-evidence-contract.md) | `contracts/schemas/telemetry-evidence-request.schema.json` | `contracts/examples/telemetry-evidence-request.json` |
@@ -89,4 +93,4 @@ The authenticated control plane and the independently authenticated OTLP intake 
 
 `v1alpha1` means consumers should pin versions and expect deliberate evolution. Breaking changes create a new API/schema version. Fields are never silently repurposed.
 
-Planned contracts: evaluation results.
+Planned contracts: evaluation results and AI economics query pages.

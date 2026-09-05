@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-savings-finding:v1alpha1",
+  "title": "AI Savings Finding",
+  "description": "A deterministic, evidence-backed AI economics finding and bounded potential-saving estimate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "AiSavingsFinding"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "evaluatedAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^aif_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "evaluatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule",
+        "scope",
+        "finding",
+        "observations",
+        "potentialSavings",
+        "recommendation",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "rule": {"$ref": "#/$defs/rule"},
+        "scope": {"$ref": "#/$defs/scope"},
+        "finding": {"$ref": "#/$defs/finding"},
+        "observations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {"$ref": "#/$defs/observation"}
+        },
+        "potentialSavings": {
+          "oneOf": [
+            {"$ref": "#/$defs/calculatedSavings"},
+            {"$ref": "#/$defs/unpricedSavings"}
+          ]
+        },
+        "recommendation": {"$ref": "#/$defs/recommendation"},
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/evidenceRef"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nonNegativeSafeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"}
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": ["context-growth", "retry-amplification", "expensive-model-anomaly"]
+        },
+        "version": {"type": "string", "pattern": "^[0-9]+[.][0-9]+[.][0-9]+$"}
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baselineWindow",
+        "currentWindow",
+        "provider",
+        "modelId",
+        "region",
+        "serviceName"
+      ],
+      "properties": {
+        "baselineWindow": {"$ref": "#/$defs/window"},
+        "currentWindow": {"$ref": "#/$defs/window"},
+        "provider": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"},
+        "modelId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "region": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"},
+        "serviceName": {"type": "string", "minLength": 1, "maxLength": 256},
+        "deploymentEnvironment": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "severity", "summary", "confidenceBasisPoints"],
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": ["context-growth", "retry-amplification", "expensive-model-anomaly"]
+        },
+        "severity": {"type": "string", "enum": ["info", "low", "medium", "high"]},
+        "summary": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "confidenceBasisPoints": {"type": "integer", "minimum": 0, "maximum": 10000}
+      }
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "sampleCount"],
+      "properties": {
+        "value": {"$ref": "#/$defs/nonNegativeSafeInteger"},
+        "sampleCount": {"type": "integer", "minimum": 1, "maximum": 1000000000}
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric", "unit", "baseline", "current", "changeBasisPoints"],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "enum": [
+            "input-tokens-per-request",
+            "request-attempts-per-operation",
+            "calculated-cost-per-request"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "tokens-per-request",
+            "attempts-per-operation",
+            "currency-subunits-per-request"
+          ]
+        },
+        "baseline": {"$ref": "#/$defs/sample"},
+        "current": {"$ref": "#/$defs/sample"},
+        "changeBasisPoints": {
+          "type": "integer",
+          "minimum": -10000,
+          "maximum": 1000000000
+        }
+      }
+    },
+    "calculatedSavings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "currency",
+        "currencyScale",
+        "amountSubunits",
+        "period",
+        "calculation",
+        "costRecordRefs"
+      ],
+      "properties": {
+        "status": {"const": "calculated"},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "currencyScale": {"type": "integer", "enum": [6, 9, 12]},
+        "amountSubunits": {"$ref": "#/$defs/nonNegativeSafeInteger"},
+        "period": {"$ref": "#/$defs/window"},
+        "calculation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "excessQuantity",
+            "chargeCategory",
+            "priceSubunitsPerMillionTokens"
+          ],
+          "properties": {
+            "method": {"const": "avoidable-excess-at-observed-rate"},
+            "excessQuantity": {"$ref": "#/$defs/nonNegativeSafeInteger"},
+            "chargeCategory": {
+              "type": "string",
+              "enum": ["uncached-input-tokens", "cache-read-input-tokens", "cache-write-input-tokens"]
+            },
+            "priceSubunitsPerMillionTokens": {"$ref": "#/$defs/nonNegativeSafeInteger"}
+          }
+        },
+        "costRecordRefs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^aic_[a-f0-9]{32}$"}
+        }
+      }
+    },
+    "unpricedSavings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reasonCode"],
+      "properties": {
+        "status": {"const": "unpriced"},
+        "reasonCode": {
+          "type": "string",
+          "enum": ["unpriced-usage", "ambiguous-pricing", "insufficient-baseline"]
+        }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actionCode", "summary", "requiresValidation"],
+      "properties": {
+        "actionCode": {
+          "type": "string",
+          "enum": ["review-context-retention", "review-retry-policy", "evaluate-lower-cost-model"]
+        },
+        "summary": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "requiresValidation": {"const": true}
+      }
+    },
+    "evidenceRef": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id"],
+          "properties": {
+            "type": {"const": "ai-usage-record"},
+            "id": {"type": "string", "pattern": "^aiu_[a-f0-9]{32}$"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id"],
+          "properties": {
+            "type": {"const": "ai-cost-record"},
+            "id": {"type": "string", "pattern": "^aic_[a-f0-9]{32}$"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id"],
+          "properties": {
+            "type": {"const": "evidence"},
+            "id": {"type": "string", "pattern": "^evd_[a-f0-9]{32}$"}
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiSavingsFinding",
+  "metadata": {
+    "id": "aif_33333333333333333333333333333333",
+    "tenantId": "local",
+    "evaluatedAt": "2026-09-05T11:00:00Z"
+  },
+  "spec": {
+    "rule": {
+      "id": "context-growth",
+      "version": "1.0.0"
+    },
+    "scope": {
+      "baselineWindow": {
+        "start": "2026-09-03T10:00:00Z",
+        "end": "2026-09-04T10:00:00Z"
+      },
+      "currentWindow": {
+        "start": "2026-09-04T10:00:00Z",
+        "end": "2026-09-05T10:00:00Z"
+      },
+      "provider": "aws.bedrock",
+      "modelId": "example.foundation-model-v1:0",
+      "region": "us-east-1",
+      "serviceName": "support-assistant",
+      "deploymentEnvironment": "production"
+    },
+    "finding": {
+      "category": "context-growth",
+      "severity": "medium",
+      "summary": "Mean input tokens per request doubled against the preceding comparison window.",
+      "confidenceBasisPoints": 9000
+    },
+    "observations": [
+      {
+        "metric": "input-tokens-per-request",
+        "unit": "tokens-per-request",
+        "baseline": {
+          "value": 1200,
+          "sampleCount": 100
+        },
+        "current": {
+          "value": 2400,
+          "sampleCount": 100
+        },
+        "changeBasisPoints": 10000
+      }
+    ],
+    "potentialSavings": {
+      "status": "calculated",
+      "currency": "USD",
+      "currencyScale": 9,
+      "amountSubunits": 360000000,
+      "period": {
+        "start": "2026-09-04T10:00:00Z",
+        "end": "2026-09-05T10:00:00Z"
+      },
+      "calculation": {
+        "method": "avoidable-excess-at-observed-rate",
+        "excessQuantity": 120000,
+        "chargeCategory": "uncached-input-tokens",
+        "priceSubunitsPerMillionTokens": 3000000000
+      },
+      "costRecordRefs": ["aic_22222222222222222222222222222222"]
+    },
+    "recommendation": {
+      "actionCode": "review-context-retention",
+      "summary": "Review retained conversation context and retrieval payload size; validate quality before reducing either.",
+      "requiresValidation": true
+    },
+    "evidenceRefs": [
+      {
+        "type": "ai-usage-record",
+        "id": "aiu_0123456789abcdef0123456789abcdef"
+      },
+      {
+        "type": "ai-cost-record",
+        "id": "aic_22222222222222222222222222222222"
+      }
+    ]
+  }
+}

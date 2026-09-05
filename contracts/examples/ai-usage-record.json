@@ -1,0 +1,62 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiUsageRecord",
+  "metadata": {
+    "id": "aiu_0123456789abcdef0123456789abcdef",
+    "tenantId": "local",
+    "recordedAt": "2026-09-05T10:00:02Z"
+  },
+  "spec": {
+    "source": {
+      "integrationId": "aws-bedrock-local",
+      "channelId": "bedrock-traces-local",
+      "transport": "otlp",
+      "signal": "traces",
+      "semanticConventionVersion": "1.37.0-development",
+      "instrumentation": {
+        "scopeName": "opentelemetry.instrumentation.botocore",
+        "scopeVersion": "0.0.0-example"
+      }
+    },
+    "invocation": {
+      "provider": "aws.bedrock",
+      "operationName": "chat",
+      "requestModel": "example.foundation-model-v1:0",
+      "responseModel": "example.foundation-model-v1:0",
+      "region": "us-east-1",
+      "serviceTier": "standard",
+      "routingMode": "in-region",
+      "purchaseMode": "on-demand",
+      "startedAt": "2026-09-05T10:00:00Z",
+      "durationMillis": 1250,
+      "outcome": "success",
+      "traceId": "0123456789abcdef0123456789abcdef",
+      "spanId": "0123456789abcdef",
+      "requestIdHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retryCount": 0
+    },
+    "attribution": {
+      "serviceName": "support-assistant",
+      "serviceNamespace": "customer-experience",
+      "deploymentEnvironment": "production",
+      "resourceRefs": []
+    },
+    "usage": {
+      "inputTokens": 2400,
+      "outputTokens": 600,
+      "cacheReadInputTokens": 200,
+      "cacheWriteInputTokens": 100,
+      "reasoningOutputTokens": 150,
+      "reportedBy": "provider",
+      "completeness": "complete",
+      "missingFields": []
+    },
+    "privacy": {
+      "contentPolicy": "metadata-only",
+      "contentCaptured": false,
+      "rawPayloadPersisted": false,
+      "droppedAttributeCount": 4
+    },
+    "deduplicationKey": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

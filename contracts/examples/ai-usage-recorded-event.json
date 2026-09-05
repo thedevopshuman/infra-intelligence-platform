@@ -1,0 +1,20 @@
+{
+  "specversion": "1.0",
+  "id": "01K4C0STA00000000000000000",
+  "source": "urn:iip:ai-usage:aws-bedrock-local",
+  "type": "io.iip.ai.usage-recorded.v1",
+  "time": "2026-09-05T10:00:02Z",
+  "subject": "aiu_0123456789abcdef0123456789abcdef",
+  "datacontenttype": "application/json",
+  "tenantid": "local",
+  "correlationid": "0123456789abcdef0123456789abcdef",
+  "traceparent": "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
+  "data": {
+    "usageRecordId": "aiu_0123456789abcdef0123456789abcdef",
+    "deduplicationKey": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "provider": "aws.bedrock",
+    "modelId": "example.foundation-model-v1:0",
+    "serviceName": "support-assistant",
+    "outcome": "success"
+  }
+}

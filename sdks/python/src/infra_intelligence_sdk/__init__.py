@@ -10,6 +10,10 @@ from .models import (
     ActionResult,
     ActionWorkflow,
     ActionWorkflowPage,
+    AiCostRecord,
+    AiPriceCatalog,
+    AiSavingsFinding,
+    AiUsageRecord,
     CollectorQueueLossReport,
     ConsoleAuthenticationConfiguration,
     ContextEvidenceRequest,
@@ -97,6 +101,10 @@ __all__ = [
     "ActionResult",
     "ActionWorkflow",
     "ActionWorkflowPage",
+    "AiCostRecord",
+    "AiPriceCatalog",
+    "AiSavingsFinding",
+    "AiUsageRecord",
     "ApiError",
     "Client",
     "CollectorQueueLossReport",
@@ -181,4 +189,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.45.0"
+__version__ = "0.46.0"

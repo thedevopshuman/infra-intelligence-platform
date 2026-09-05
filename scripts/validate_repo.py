@@ -29,9 +29,13 @@ REQUIRED_PATHS = (
     "docs/architecture/evidence-collection-pipeline.md",
     "docs/architecture/ingestion-freshness-telemetry.md",
     "docs/architecture/opentelemetry-portability.md",
+    "docs/architecture/ai-economics.md",
+    "docs/product/ai-finops-vision.md",
     "docs/research/opensre-reference-analysis.md",
     "docs/research/brand/README.md",
     "docs/roadmap/initial-roadmap.md",
+    "docs/roadmap/ai-finops-roadmap.md",
+    "docs/specifications/ai-economics-contracts.md",
     "docs/specifications/policy-contract.md",
     "docs/specifications/plugin-invocation-contract.md",
     "docs/decisions/0005-credential-derived-request-identity.md",
@@ -61,6 +65,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0088-otlp-receiver-revoked-certificate-rejection-evidence.md",
     "docs/decisions/0089-fail-closed-otlp-client-crl-freshness.md",
     "docs/decisions/0090-intermediate-ca-and-otlp-crl-rollout-evidence.md",
+    "docs/decisions/0091-opentelemetry-native-ai-economics.md",
     "docs/specifications/collector-queue-loss-contract.md",
     "docs/decisions/0026-resource-history-change-evidence.md",
     "docs/decisions/0029-investigation-context-correlation.md",
@@ -210,12 +215,21 @@ REQUIRED_PATHS = (
     "contracts/schemas/telemetry-export-slo-report.schema.json",
     "contracts/schemas/telemetry-export-burn-rate-report.schema.json",
     "contracts/schemas/collector-queue-loss-report.schema.json",
+    "contracts/schemas/ai-usage-record.schema.json",
+    "contracts/schemas/ai-price-catalog.schema.json",
+    "contracts/schemas/ai-cost-record.schema.json",
+    "contracts/schemas/ai-savings-finding.schema.json",
     "contracts/schemas/investigation-capacity-report.schema.json",
     "contracts/schemas/runtime-version-report.schema.json",
     "contracts/schemas/session-context.schema.json",
     "contracts/schemas/console-authentication.schema.json",
     "contracts/schemas/evaluation-scenario.schema.json",
     "contracts/examples/evidence.json",
+    "contracts/examples/ai-usage-record.json",
+    "contracts/examples/ai-price-catalog.json",
+    "contracts/examples/ai-cost-record.json",
+    "contracts/examples/ai-savings-finding.json",
+    "contracts/examples/ai-usage-recorded-event.json",
     "contracts/examples/evidence-retention-report.json",
     "contracts/examples/credential-lease-request.json",
     "contracts/examples/credential-lease.json",
@@ -3282,6 +3296,234 @@ def validate_otlp_logs_evidence_example(
         fail(errors, "OTLP logs evidence summary must match its records")
 
 
+def validate_ai_economics_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Validate relationships and arithmetic JSON Schema cannot express."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    usage = documents.get(example_dir / "ai-usage-record.json")
+    catalog = documents.get(example_dir / "ai-price-catalog.json")
+    cost = documents.get(example_dir / "ai-cost-record.json")
+    finding = documents.get(example_dir / "ai-savings-finding.json")
+    event = documents.get(example_dir / "ai-usage-recorded-event.json")
+    named = {
+        "AI usage": usage,
+        "AI price catalog": catalog,
+        "AI cost": cost,
+        "AI savings finding": finding,
+        "AI usage event": event,
+    }
+    for label, document in named.items():
+        if not isinstance(document, dict):
+            fail(errors, f"{label} example must be an object")
+    if not all(isinstance(document, dict) for document in named.values()):
+        return
+
+    assert isinstance(usage, dict)
+    assert isinstance(catalog, dict)
+    assert isinstance(cost, dict)
+    assert isinstance(finding, dict)
+    assert isinstance(event, dict)
+
+    tenant_ids = {
+        document.get("metadata", {}).get("tenantId")
+        for document in (usage, catalog, cost, finding)
+        if isinstance(document.get("metadata"), dict)
+    }
+    if len(tenant_ids) != 1:
+        fail(errors, "AI economics examples must use one tenant")
+
+    usage_metadata = usage.get("metadata", {})
+    usage_spec = usage.get("spec", {})
+    usage_values = usage_spec.get("usage", {}) if isinstance(usage_spec, dict) else {}
+    privacy = usage_spec.get("privacy", {}) if isinstance(usage_spec, dict) else {}
+    invocation = usage_spec.get("invocation", {}) if isinstance(usage_spec, dict) else {}
+    attribution = usage_spec.get("attribution", {}) if isinstance(usage_spec, dict) else {}
+
+    input_tokens = usage_values.get("inputTokens")
+    output_tokens = usage_values.get("outputTokens")
+    cache_read = usage_values.get("cacheReadInputTokens", 0)
+    cache_write = usage_values.get("cacheWriteInputTokens", 0)
+    reasoning = usage_values.get("reasoningOutputTokens", 0)
+    if all(isinstance(value, int) for value in (input_tokens, cache_read, cache_write)):
+        if cache_read + cache_write > input_tokens:
+            fail(errors, "AI usage cache token subsets exceed inputTokens")
+    if all(isinstance(value, int) for value in (output_tokens, reasoning)):
+        if reasoning > output_tokens:
+            fail(errors, "AI usage reasoning token subset exceeds outputTokens")
+
+    if (
+        privacy.get("contentPolicy") != "metadata-only"
+        or privacy.get("contentCaptured") is not False
+        or privacy.get("rawPayloadPersisted") is not False
+    ):
+        fail(errors, "AI usage example must remain metadata-only")
+
+    forbidden_keys = {
+        "prompt",
+        "prompts",
+        "completion",
+        "completions",
+        "messages",
+        "requestbody",
+        "responsebody",
+        "toolarguments",
+        "embedding",
+        "embeddings",
+        "retrieveddocuments",
+    }
+
+    def visit_keys(value: object) -> Iterable[str]:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                yield str(key).replace("_", "").replace(".", "").lower()
+                yield from visit_keys(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from visit_keys(child)
+
+    if forbidden_keys.intersection(visit_keys(usage)):
+        fail(errors, "AI usage example contains a prohibited content field")
+
+    catalog_metadata = catalog.get("metadata", {})
+    catalog_spec = catalog.get("spec", {})
+    source = catalog_spec.get("source", {}) if isinstance(catalog_spec, dict) else {}
+    entries = catalog_spec.get("entries", []) if isinstance(catalog_spec, dict) else []
+    entry_ids = [entry.get("id") for entry in entries if isinstance(entry, dict)]
+    if len(entry_ids) != len(set(entry_ids)):
+        fail(errors, "AI price catalog entry IDs must be unique")
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        start = parse_timestamp(entry.get("effectiveFrom"))
+        end = parse_timestamp(entry.get("effectiveUntil"))
+        if end is not None and (start is None or end <= start):
+            fail(errors, "AI price catalog effectiveUntil must follow effectiveFrom")
+
+    cost_spec = cost.get("spec", {})
+    calculation = cost_spec.get("calculation", {}) if isinstance(cost_spec, dict) else {}
+    result = cost_spec.get("result", {}) if isinstance(cost_spec, dict) else {}
+    if cost_spec.get("usageRecordId") != usage_metadata.get("id"):
+        fail(errors, "AI cost record must reference the usage example")
+    if (
+        calculation.get("catalogId") != catalog_metadata.get("id")
+        or calculation.get("catalogVersion") != catalog_metadata.get("version")
+        or calculation.get("catalogSourceHash") != source.get("contentHash")
+    ):
+        fail(errors, "AI cost record must bind the example catalog source and version")
+
+    if result.get("costStatus") == "priced":
+        lines = result.get("lines", [])
+        line_categories = [
+            line.get("chargeCategory") for line in lines if isinstance(line, dict)
+        ]
+        if len(line_categories) != len(set(line_categories)):
+            fail(errors, "AI cost categories must be unique")
+        total = sum(
+            line.get("amountSubunits", 0)
+            for line in lines
+            if isinstance(line, dict) and isinstance(line.get("amountSubunits"), int)
+        )
+        if result.get("totalSubunits") != total:
+            fail(errors, "AI cost totalSubunits must equal its line amounts")
+
+        first_entry = entries[0] if len(entries) == 1 and isinstance(entries[0], dict) else {}
+        rates = first_entry.get("rates", {}) if isinstance(first_entry, dict) else {}
+        expected = {}
+        if all(
+            isinstance(value, int)
+            for value in (input_tokens, output_tokens, cache_read, cache_write, reasoning)
+        ):
+            expected = {
+                "uncached-input-tokens": (input_tokens, input_tokens - cache_read - cache_write, "uncachedInputTokens"),
+                "cache-read-input-tokens": (cache_read, cache_read, "cacheReadInputTokens"),
+                "cache-write-input-tokens": (cache_write, cache_write, "cacheWriteInputTokens"),
+                "non-reasoning-output-tokens": (output_tokens, output_tokens - reasoning, "nonReasoningOutputTokens"),
+                "reasoning-output-tokens": (reasoning, reasoning, "reasoningOutputTokens"),
+            }
+        for line in lines:
+            if not isinstance(line, dict):
+                continue
+            category = line.get("chargeCategory")
+            expectation = expected.get(category)
+            if expectation is None:
+                fail(errors, "AI cost line has no matching canonical usage category")
+                continue
+            observed, billable, rate_name = expectation
+            rate = rates.get(rate_name, {}) if isinstance(rates, dict) else {}
+            price = rate.get("priceSubunitsPerMillionTokens") if isinstance(rate, dict) else None
+            if (
+                line.get("observedQuantity") != observed
+                or line.get("billableQuantity") != billable
+                or line.get("catalogEntryId") != first_entry.get("id")
+                or line.get("priceSubunitsPerMillionTokens") != price
+            ):
+                fail(errors, f"AI cost line {category} does not match usage and catalog")
+            if isinstance(billable, int) and isinstance(price, int):
+                half_up = (billable * price + 500000) // 1000000
+                if line.get("amountSubunits") != half_up:
+                    fail(errors, f"AI cost line {category} amount is not half-up rounded")
+
+    finding_spec = finding.get("spec", {})
+    rule = finding_spec.get("rule", {}) if isinstance(finding_spec, dict) else {}
+    finding_value = finding_spec.get("finding", {}) if isinstance(finding_spec, dict) else {}
+    if rule.get("id") != finding_value.get("category"):
+        fail(errors, "AI savings rule and finding category must match")
+    scope = finding_spec.get("scope", {}) if isinstance(finding_spec, dict) else {}
+    baseline = scope.get("baselineWindow", {}) if isinstance(scope, dict) else {}
+    current = scope.get("currentWindow", {}) if isinstance(scope, dict) else {}
+    baseline_start = parse_timestamp(baseline.get("start")) if isinstance(baseline, dict) else None
+    baseline_end = parse_timestamp(baseline.get("end")) if isinstance(baseline, dict) else None
+    current_start = parse_timestamp(current.get("start")) if isinstance(current, dict) else None
+    current_end = parse_timestamp(current.get("end")) if isinstance(current, dict) else None
+    if not (
+        baseline_start is not None
+        and baseline_end is not None
+        and current_start is not None
+        and current_end is not None
+        and baseline_start < baseline_end <= current_start < current_end
+    ):
+        fail(errors, "AI savings comparison windows must be ordered and non-overlapping")
+
+    savings = finding_spec.get("potentialSavings", {}) if isinstance(finding_spec, dict) else {}
+    if savings.get("status") == "calculated":
+        savings_calculation = savings.get("calculation", {})
+        excess = savings_calculation.get("excessQuantity")
+        price = savings_calculation.get("priceSubunitsPerMillionTokens")
+        if isinstance(excess, int) and isinstance(price, int):
+            expected_savings = (excess * price + 500000) // 1000000
+            if savings.get("amountSubunits") != expected_savings:
+                fail(errors, "AI potential savings amount is not supported by its formula")
+        cost_id = cost.get("metadata", {}).get("id")
+        if cost_id not in savings.get("costRecordRefs", []):
+            fail(errors, "AI potential savings must cite the example cost record")
+
+    evidence_refs = finding_spec.get("evidenceRefs", []) if isinstance(finding_spec, dict) else []
+    evidence_pairs = {
+        (reference.get("type"), reference.get("id"))
+        for reference in evidence_refs
+        if isinstance(reference, dict)
+    }
+    if ("ai-usage-record", usage_metadata.get("id")) not in evidence_pairs:
+        fail(errors, "AI savings finding must cite the usage example")
+    if ("ai-cost-record", cost.get("metadata", {}).get("id")) not in evidence_pairs:
+        fail(errors, "AI savings finding must cite the cost example")
+
+    event_data = event.get("data", {})
+    if (
+        event.get("tenantid") not in tenant_ids
+        or event.get("subject") != usage_metadata.get("id")
+        or event_data.get("usageRecordId") != usage_metadata.get("id")
+        or event_data.get("deduplicationKey") != usage_spec.get("deduplicationKey")
+        or event_data.get("provider") != invocation.get("provider")
+        or event_data.get("modelId") != invocation.get("responseModel", invocation.get("requestModel"))
+        or event_data.get("serviceName") != attribution.get("serviceName")
+        or event_data.get("outcome") != invocation.get("outcome")
+    ):
+        fail(errors, "AI usage CloudEvent must match the normalized usage example")
+
+
 def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> None:
     from iip.domain.models import ContractError, Resource
 
@@ -3348,6 +3590,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
         ("action-execution-status.json", "ActionExecutionStatus"),
         ("action-proposal.json", "ActionProposal"),
         ("action-result.json", "ActionResult"),
+        ("ai-usage-record.json", "AiUsageRecord"),
+        ("ai-price-catalog.json", "AiPriceCatalog"),
+        ("ai-cost-record.json", "AiCostRecord"),
+        ("ai-savings-finding.json", "AiSavingsFinding"),
         ("agent-manifest.json", "Agent"),
         ("integration-config.json", "IntegrationConfig"),
         ("plugin-manifest.json", "Plugin"),
@@ -3473,6 +3719,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_policy_engine_compatibility_example(documents, errors)
     validate_otlp_receiver_compatibility_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
+    validate_ai_economics_examples(documents, errors)
 
     policy_request = documents.get(example_dir / "policy-decision-request.json")
     policy_decision = documents.get(example_dir / "policy-decision.json")

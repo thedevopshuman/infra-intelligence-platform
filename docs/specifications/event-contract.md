@@ -38,5 +38,11 @@ Events are immutable. A correction creates a new event that references the prior
 - `io.iip.action.executed.v1`
 - `io.iip.policy.decided.v1`
 - `io.iip.plugin.failed.v1`
+- `io.iip.ai.usage-recorded.v1`
+
+`io.iip.ai.usage-recorded.v1` is emitted only after the tenant-scoped usage
+record is durable. Its data contains bounded routing identity and the canonical
+deduplication digest; it never contains prompts, responses, token content, or
+price configuration. See the [AI economics contracts](ai-economics-contracts.md).
 
 Event type versions change only for incompatible `data` semantics. Additive optional data fields remain within the major version.

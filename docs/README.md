@@ -7,6 +7,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Product constitution](product/constitution.md)
 - [Vision and scope](product/vision-and-scope.md)
 - [Open-source and commercial boundary](product/open-source-boundary.md)
+- [AI FinOps and generative-AI observability vision](product/ai-finops-vision.md)
 
 ## Architecture
 
@@ -19,6 +20,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Evidence collection pipeline](architecture/evidence-collection-pipeline.md)
 - [Ingestion freshness telemetry](architecture/ingestion-freshness-telemetry.md)
 - [OpenTelemetry portability boundary](architecture/opentelemetry-portability.md)
+- [AI economics architecture](architecture/ai-economics.md)
 
 ## Specifications
 
@@ -26,6 +28,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Resource contract](specifications/resource-contract.md)
 - [Event contract](specifications/event-contract.md)
 - [Evidence contract](specifications/evidence-contract.md)
+- [AI economics contracts](specifications/ai-economics-contracts.md)
 - [Telemetry evidence request and result contracts](specifications/telemetry-evidence-contract.md)
 - [Log evidence request and result contracts](specifications/log-evidence-contract.md)
 - [OTLP metrics evidence contract](specifications/otlp-metrics-evidence-contract.md)
@@ -42,6 +45,7 @@ The documentation tree is the product and engineering system of record. A change
 
 - [Architecture decision records](decisions/README.md)
 - [Initial roadmap](roadmap/initial-roadmap.md)
+- [AI FinOps roadmap](roadmap/ai-finops-roadmap.md)
 - [Local development](operations/local-development.md)
 - [Transactional outbox event delivery](operations/event-delivery.md)
 - [Helm deployment and schema migration](operations/helm-deployment.md)

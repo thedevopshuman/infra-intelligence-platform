@@ -57,7 +57,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "console-authentication-oidc.json",
     ),
     "evaluation-scenario.schema.json": ("evaluation-scenario.json",),
-    "event.schema.json": ("event.json",),
+    "event.schema.json": ("event.json", "ai-usage-recorded-event.json"),
     "event-delivery-health-report.schema.json": (
         "event-delivery-health-report.json",
     ),
@@ -124,6 +124,10 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "collector-queue-loss-report.schema.json": (
         "collector-queue-loss-report.json",
     ),
+    "ai-usage-record.schema.json": ("ai-usage-record.json",),
+    "ai-price-catalog.schema.json": ("ai-price-catalog.json",),
+    "ai-cost-record.schema.json": ("ai-cost-record.json",),
+    "ai-savings-finding.schema.json": ("ai-savings-finding.json",),
     "integration-config.schema.json": ("integration-config.json",),
     "log-evidence-request.schema.json": ("log-evidence-request.json",),
     "log-evidence-result.schema.json": ("log-evidence-result.json",),

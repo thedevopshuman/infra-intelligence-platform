@@ -1,0 +1,69 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiCostRecord",
+  "metadata": {
+    "id": "aic_22222222222222222222222222222222",
+    "tenantId": "local",
+    "calculatedAt": "2026-09-05T10:00:03Z"
+  },
+  "spec": {
+    "usageRecordId": "aiu_0123456789abcdef0123456789abcdef",
+    "calculation": {
+      "engineVersion": "0.1.0",
+      "costBasis": "calculated-estimate",
+      "catalogId": "apc_11111111111111111111111111111111",
+      "catalogVersion": "2026-09-05.1",
+      "catalogSourceHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "result": {
+      "costStatus": "priced",
+      "coverage": "complete",
+      "currency": "USD",
+      "currencyScale": 9,
+      "totalSubunits": 15735000,
+      "lines": [
+        {
+          "chargeCategory": "uncached-input-tokens",
+          "observedQuantity": 2400,
+          "billableQuantity": 2100,
+          "catalogEntryId": "aws-bedrock.example-foundation-model-v1.us-east-1.on-demand",
+          "priceSubunitsPerMillionTokens": 3000000000,
+          "amountSubunits": 6300000
+        },
+        {
+          "chargeCategory": "cache-read-input-tokens",
+          "observedQuantity": 200,
+          "billableQuantity": 200,
+          "catalogEntryId": "aws-bedrock.example-foundation-model-v1.us-east-1.on-demand",
+          "priceSubunitsPerMillionTokens": 300000000,
+          "amountSubunits": 60000
+        },
+        {
+          "chargeCategory": "cache-write-input-tokens",
+          "observedQuantity": 100,
+          "billableQuantity": 100,
+          "catalogEntryId": "aws-bedrock.example-foundation-model-v1.us-east-1.on-demand",
+          "priceSubunitsPerMillionTokens": 3750000000,
+          "amountSubunits": 375000
+        },
+        {
+          "chargeCategory": "non-reasoning-output-tokens",
+          "observedQuantity": 600,
+          "billableQuantity": 450,
+          "catalogEntryId": "aws-bedrock.example-foundation-model-v1.us-east-1.on-demand",
+          "priceSubunitsPerMillionTokens": 15000000000,
+          "amountSubunits": 6750000
+        },
+        {
+          "chargeCategory": "reasoning-output-tokens",
+          "observedQuantity": 150,
+          "billableQuantity": 150,
+          "catalogEntryId": "aws-bedrock.example-foundation-model-v1.us-east-1.on-demand",
+          "priceSubunitsPerMillionTokens": 15000000000,
+          "amountSubunits": 2250000
+        }
+      ],
+      "warnings": ["calculated-cost-not-invoice"]
+    }
+  }
+}

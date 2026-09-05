@@ -1,0 +1,49 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiPriceCatalog",
+  "metadata": {
+    "id": "apc_11111111111111111111111111111111",
+    "tenantId": "local",
+    "version": "2026-09-05.1",
+    "publishedAt": "2026-09-05T09:00:00Z"
+  },
+  "spec": {
+    "currency": "USD",
+    "currencyScale": 9,
+    "source": {
+      "kind": "test-fixture",
+      "locator": "urn:iip:pricing-fixture:aws-bedrock:v1",
+      "retrievedAt": "2026-09-05T08:55:00Z",
+      "contentHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "entries": [
+      {
+        "id": "aws-bedrock.example-foundation-model-v1.us-east-1.on-demand",
+        "provider": "aws.bedrock",
+        "modelId": "example.foundation-model-v1:0",
+        "regions": ["us-east-1"],
+        "serviceTiers": ["standard"],
+        "routingModes": ["in-region"],
+        "purchaseModes": ["on-demand"],
+        "effectiveFrom": "2026-09-01T00:00:00Z",
+        "rates": {
+          "uncachedInputTokens": {
+            "priceSubunitsPerMillionTokens": 3000000000
+          },
+          "cacheReadInputTokens": {
+            "priceSubunitsPerMillionTokens": 300000000
+          },
+          "cacheWriteInputTokens": {
+            "priceSubunitsPerMillionTokens": 3750000000
+          },
+          "nonReasoningOutputTokens": {
+            "priceSubunitsPerMillionTokens": 15000000000
+          },
+          "reasoningOutputTokens": {
+            "priceSubunitsPerMillionTokens": 15000000000
+          }
+        }
+      }
+    ]
+  }
+}

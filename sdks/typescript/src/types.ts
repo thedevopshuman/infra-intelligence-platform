@@ -14,6 +14,10 @@ export type PluginMediationGrantId = `pmg_${string}`;
 export type PluginMediationRequestId = `pmr_${string}`;
 export type PluginActionMediationGrantId = `pag_${string}`;
 export type PluginActionMediationRequestId = `par_${string}`;
+export type AiUsageRecordId = `aiu_${string}`;
+export type AiPriceCatalogId = `apc_${string}`;
+export type AiCostRecordId = `aic_${string}`;
+export type AiSavingsFindingId = `aif_${string}`;
 export type Sha256Digest = `sha256:${string}`;
 export type ResourceLifecycle =
   | "active"
@@ -22,6 +26,285 @@ export type ResourceLifecycle =
   | "deleting"
   | "deleted"
   | "unknown";
+
+export type AiServiceTier =
+  | "default"
+  | "standard"
+  | "flex"
+  | "priority"
+  | "reserved"
+  | "unknown";
+export type AiRoutingMode =
+  | "in-region"
+  | "geographic"
+  | "global"
+  | "unknown";
+export type AiPurchaseMode =
+  | "on-demand"
+  | "batch"
+  | "provisioned-throughput"
+  | "unknown";
+export type AiCurrencyScale = 6 | 9 | 12;
+
+export interface AiUsageRecord {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiUsageRecord";
+  metadata: {
+    id: AiUsageRecordId;
+    tenantId: string;
+    recordedAt: string;
+  };
+  spec: {
+    source: {
+      integrationId: string;
+      channelId: string;
+      transport: "otlp";
+      signal: "traces";
+      semanticConventionVersion: string;
+      instrumentation: { scopeName: string; scopeVersion?: string };
+    };
+    invocation: {
+      provider: string;
+      operationName: string;
+      requestModel: string;
+      responseModel?: string;
+      region: string;
+      serviceTier: AiServiceTier;
+      routingMode: AiRoutingMode;
+      purchaseMode: AiPurchaseMode;
+      startedAt: string;
+      durationMillis: number;
+      outcome: "success" | "error" | "cancelled";
+      errorType?: string;
+      traceId: string;
+      spanId: string;
+      requestIdHash?: Sha256Digest;
+      retryCount?: number;
+    };
+    attribution: {
+      serviceName: string;
+      serviceNamespace?: string;
+      deploymentEnvironment?: string;
+      resourceRefs: ResourceUid[];
+    };
+    usage: {
+      inputTokens?: number;
+      outputTokens?: number;
+      cacheReadInputTokens?: number;
+      cacheWriteInputTokens?: number;
+      reasoningOutputTokens?: number;
+      reportedBy: "provider" | "instrumentation" | "derived";
+      completeness: "complete" | "partial";
+      missingFields: (
+        | "inputTokens"
+        | "outputTokens"
+        | "cacheReadInputTokens"
+        | "cacheWriteInputTokens"
+        | "reasoningOutputTokens"
+      )[];
+    };
+    privacy: {
+      contentPolicy: "metadata-only";
+      contentCaptured: false;
+      rawPayloadPersisted: false;
+      droppedAttributeCount: number;
+    };
+    deduplicationKey: Sha256Digest;
+  };
+}
+
+export interface AiTokenPrice {
+  priceSubunitsPerMillionTokens: number;
+}
+
+export interface AiPriceCatalogEntry {
+  id: string;
+  provider: string;
+  modelId: string;
+  regions: string[];
+  serviceTiers: AiServiceTier[];
+  routingModes: AiRoutingMode[];
+  purchaseModes: AiPurchaseMode[];
+  effectiveFrom: string;
+  effectiveUntil?: string;
+  rates: {
+    uncachedInputTokens: AiTokenPrice;
+    cacheReadInputTokens: AiTokenPrice;
+    cacheWriteInputTokens: AiTokenPrice;
+    nonReasoningOutputTokens: AiTokenPrice;
+    reasoningOutputTokens: AiTokenPrice;
+  };
+}
+
+export interface AiPriceCatalog {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiPriceCatalog";
+  metadata: {
+    id: AiPriceCatalogId;
+    tenantId: string;
+    version: string;
+    publishedAt: string;
+  };
+  spec: {
+    currency: string;
+    currencyScale: AiCurrencyScale;
+    source: {
+      kind: "provider-published" | "operator-managed" | "test-fixture";
+      locator: string;
+      retrievedAt: string;
+      contentHash: Sha256Digest;
+    };
+    entries: AiPriceCatalogEntry[];
+  };
+}
+
+export type AiChargeCategory =
+  | "uncached-input-tokens"
+  | "cache-read-input-tokens"
+  | "cache-write-input-tokens"
+  | "non-reasoning-output-tokens"
+  | "reasoning-output-tokens";
+
+export interface AiCostLine {
+  chargeCategory: AiChargeCategory;
+  observedQuantity: number;
+  billableQuantity: number;
+  catalogEntryId: string;
+  priceSubunitsPerMillionTokens: number;
+  amountSubunits: number;
+}
+
+export type AiCostResult =
+  | {
+      costStatus: "priced";
+      coverage: "complete";
+      currency: string;
+      currencyScale: AiCurrencyScale;
+      totalSubunits: number;
+      lines: AiCostLine[];
+      warnings: string[];
+    }
+  | {
+      costStatus: "unpriced" | "ambiguous";
+      coverage: "none" | "partial";
+      reasonCode:
+        | "no-catalog-match"
+        | "multiple-catalog-matches"
+        | "missing-usage"
+        | "unsupported-meter"
+        | "invalid-breakdown";
+      warnings: string[];
+    };
+
+export interface AiCostRecord {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiCostRecord";
+  metadata: {
+    id: AiCostRecordId;
+    tenantId: string;
+    calculatedAt: string;
+  };
+  spec: {
+    usageRecordId: AiUsageRecordId;
+    calculation: {
+      engineVersion: string;
+      costBasis: "calculated-estimate";
+      catalogId: AiPriceCatalogId;
+      catalogVersion: string;
+      catalogSourceHash: Sha256Digest;
+    };
+    result: AiCostResult;
+  };
+}
+
+export type AiSavingsRule =
+  | "context-growth"
+  | "retry-amplification"
+  | "expensive-model-anomaly";
+
+export interface AiSavingsObservation {
+  metric:
+    | "input-tokens-per-request"
+    | "request-attempts-per-operation"
+    | "calculated-cost-per-request";
+  unit:
+    | "tokens-per-request"
+    | "attempts-per-operation"
+    | "currency-subunits-per-request";
+  baseline: { value: number; sampleCount: number };
+  current: { value: number; sampleCount: number };
+  changeBasisPoints: number;
+}
+
+export type AiSavingsEvidenceRef =
+  | { type: "ai-usage-record"; id: AiUsageRecordId }
+  | { type: "ai-cost-record"; id: AiCostRecordId }
+  | { type: "evidence"; id: EvidenceId };
+
+export type AiPotentialSavings =
+  | {
+      status: "calculated";
+      currency: string;
+      currencyScale: AiCurrencyScale;
+      amountSubunits: number;
+      period: { start: string; end: string };
+      calculation: {
+        method: "avoidable-excess-at-observed-rate";
+        excessQuantity: number;
+        chargeCategory:
+          | "uncached-input-tokens"
+          | "cache-read-input-tokens"
+          | "cache-write-input-tokens";
+        priceSubunitsPerMillionTokens: number;
+      };
+      costRecordRefs: AiCostRecordId[];
+    }
+  | {
+      status: "unpriced";
+      reasonCode:
+        | "unpriced-usage"
+        | "ambiguous-pricing"
+        | "insufficient-baseline";
+    };
+
+export interface AiSavingsFinding {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiSavingsFinding";
+  metadata: {
+    id: AiSavingsFindingId;
+    tenantId: string;
+    evaluatedAt: string;
+  };
+  spec: {
+    rule: { id: AiSavingsRule; version: string };
+    scope: {
+      baselineWindow: { start: string; end: string };
+      currentWindow: { start: string; end: string };
+      provider: string;
+      modelId: string;
+      region: string;
+      serviceName: string;
+      deploymentEnvironment?: string;
+    };
+    finding: {
+      category: AiSavingsRule;
+      severity: "info" | "low" | "medium" | "high";
+      summary: string;
+      confidenceBasisPoints: number;
+    };
+    observations: AiSavingsObservation[];
+    potentialSavings: AiPotentialSavings;
+    recommendation: {
+      actionCode:
+        | "review-context-retention"
+        | "review-retry-policy"
+        | "evaluate-lower-cost-model";
+      summary: string;
+      requiresValidation: true;
+    };
+    evidenceRefs: AiSavingsEvidenceRef[];
+  };
+}
 
 export interface SessionContext {
   apiVersion: "iip.platform/v1alpha1";

@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-usage-record:v1alpha1",
+  "title": "AI Usage Record",
+  "description": "One tenant-scoped, metadata-only generative-AI invocation normalized from an authenticated telemetry channel.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "AiUsageRecord"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "recordedAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^aiu_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "recordedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "invocation",
+        "attribution",
+        "usage",
+        "privacy",
+        "deduplicationKey"
+      ],
+      "properties": {
+        "source": {"$ref": "#/$defs/source"},
+        "invocation": {"$ref": "#/$defs/invocation"},
+        "attribution": {"$ref": "#/$defs/attribution"},
+        "usage": {"$ref": "#/$defs/usage"},
+        "privacy": {"$ref": "#/$defs/privacy"},
+        "deduplicationKey": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "tokenCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "integrationId",
+        "channelId",
+        "transport",
+        "signal",
+        "semanticConventionVersion",
+        "instrumentation"
+      ],
+      "properties": {
+        "integrationId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{2,127}$"
+        },
+        "channelId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{2,127}$"
+        },
+        "transport": {"const": "otlp"},
+        "signal": {"const": "traces"},
+        "semanticConventionVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "instrumentation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scopeName"],
+          "properties": {
+            "scopeName": {"type": "string", "minLength": 1, "maxLength": 256},
+            "scopeVersion": {"type": "string", "minLength": 1, "maxLength": 64}
+          }
+        }
+      }
+    },
+    "invocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "operationName",
+        "requestModel",
+        "region",
+        "serviceTier",
+        "routingMode",
+        "purchaseMode",
+        "startedAt",
+        "durationMillis",
+        "outcome",
+        "traceId",
+        "spanId"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"
+        },
+        "operationName": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{1,63}$"
+        },
+        "requestModel": {"type": "string", "minLength": 1, "maxLength": 256},
+        "responseModel": {"type": "string", "minLength": 1, "maxLength": 256},
+        "region": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+        },
+        "serviceTier": {
+          "type": "string",
+          "enum": ["default", "standard", "flex", "priority", "reserved", "unknown"]
+        },
+        "routingMode": {
+          "type": "string",
+          "enum": ["in-region", "geographic", "global", "unknown"]
+        },
+        "purchaseMode": {
+          "type": "string",
+          "enum": ["on-demand", "batch", "provisioned-throughput", "unknown"]
+        },
+        "startedAt": {"type": "string", "format": "date-time"},
+        "durationMillis": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000
+        },
+        "outcome": {
+          "type": "string",
+          "enum": ["success", "error", "cancelled"]
+        },
+        "errorType": {"type": "string", "minLength": 1, "maxLength": 128},
+        "traceId": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+        "spanId": {"type": "string", "pattern": "^[a-f0-9]{16}$"},
+        "requestIdHash": {"$ref": "#/$defs/sha256"},
+        "retryCount": {"type": "integer", "minimum": 0, "maximum": 100}
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["outcome"],
+            "properties": {"outcome": {"const": "error"}}
+          },
+          "then": {"required": ["errorType"]},
+          "else": {"not": {"required": ["errorType"]}}
+        }
+      ]
+    },
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["serviceName", "resourceRefs"],
+      "properties": {
+        "serviceName": {"type": "string", "minLength": 1, "maxLength": 256},
+        "serviceNamespace": {"type": "string", "minLength": 1, "maxLength": 256},
+        "deploymentEnvironment": {"type": "string", "minLength": 1, "maxLength": 128},
+        "resourceRefs": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"}
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reportedBy", "completeness", "missingFields"],
+      "properties": {
+        "inputTokens": {"$ref": "#/$defs/tokenCount"},
+        "outputTokens": {"$ref": "#/$defs/tokenCount"},
+        "cacheReadInputTokens": {"$ref": "#/$defs/tokenCount"},
+        "cacheWriteInputTokens": {"$ref": "#/$defs/tokenCount"},
+        "reasoningOutputTokens": {"$ref": "#/$defs/tokenCount"},
+        "reportedBy": {
+          "type": "string",
+          "enum": ["provider", "instrumentation", "derived"]
+        },
+        "completeness": {"type": "string", "enum": ["complete", "partial"]},
+        "missingFields": {
+          "type": "array",
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "inputTokens",
+              "outputTokens",
+              "cacheReadInputTokens",
+              "cacheWriteInputTokens",
+              "reasoningOutputTokens"
+            ]
+          }
+        }
+      },
+      "anyOf": [
+        {"required": ["inputTokens"]},
+        {"required": ["outputTokens"]}
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": ["completeness"],
+            "properties": {"completeness": {"const": "complete"}}
+          },
+          "then": {
+            "required": ["inputTokens", "outputTokens"],
+            "properties": {"missingFields": {"maxItems": 0}}
+          },
+          "else": {"properties": {"missingFields": {"minItems": 1}}}
+        }
+      ]
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contentPolicy",
+        "contentCaptured",
+        "rawPayloadPersisted",
+        "droppedAttributeCount"
+      ],
+      "properties": {
+        "contentPolicy": {"const": "metadata-only"},
+        "contentCaptured": {"const": false},
+        "rawPayloadPersisted": {"const": false},
+        "droppedAttributeCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        }
+      }
+    }
+  }
+}

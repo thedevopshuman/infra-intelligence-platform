@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-cost-record:v1alpha1",
+  "title": "AI Cost Record",
+  "description": "An explainable calculated-cost result for one normalized AI usage record.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "AiCostRecord"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "calculatedAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^aic_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "calculatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["usageRecordId", "calculation", "result"],
+      "properties": {
+        "usageRecordId": {"type": "string", "pattern": "^aiu_[a-f0-9]{32}$"},
+        "calculation": {"$ref": "#/$defs/calculation"},
+        "result": {
+          "oneOf": [
+            {"$ref": "#/$defs/pricedResult"},
+            {"$ref": "#/$defs/unresolvedResult"}
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nonNegativeSafeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "calculation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engineVersion",
+        "costBasis",
+        "catalogId",
+        "catalogVersion",
+        "catalogSourceHash"
+      ],
+      "properties": {
+        "engineVersion": {"type": "string", "minLength": 1, "maxLength": 64},
+        "costBasis": {"const": "calculated-estimate"},
+        "catalogId": {"type": "string", "pattern": "^apc_[a-f0-9]{32}$"},
+        "catalogVersion": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][0-9]+$"},
+        "catalogSourceHash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+      }
+    },
+    "line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chargeCategory",
+        "observedQuantity",
+        "billableQuantity",
+        "catalogEntryId",
+        "priceSubunitsPerMillionTokens",
+        "amountSubunits"
+      ],
+      "properties": {
+        "chargeCategory": {
+          "type": "string",
+          "enum": [
+            "uncached-input-tokens",
+            "cache-read-input-tokens",
+            "cache-write-input-tokens",
+            "non-reasoning-output-tokens",
+            "reasoning-output-tokens"
+          ]
+        },
+        "observedQuantity": {"$ref": "#/$defs/nonNegativeSafeInteger"},
+        "billableQuantity": {"$ref": "#/$defs/nonNegativeSafeInteger"},
+        "catalogEntryId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "priceSubunitsPerMillionTokens": {"$ref": "#/$defs/nonNegativeSafeInteger"},
+        "amountSubunits": {"$ref": "#/$defs/nonNegativeSafeInteger"}
+      }
+    },
+    "pricedResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "costStatus",
+        "coverage",
+        "currency",
+        "currencyScale",
+        "totalSubunits",
+        "lines",
+        "warnings"
+      ],
+      "properties": {
+        "costStatus": {"const": "priced"},
+        "coverage": {"const": "complete"},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "currencyScale": {"type": "integer", "enum": [6, 9, 12]},
+        "totalSubunits": {"$ref": "#/$defs/nonNegativeSafeInteger"},
+        "lines": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/line"}
+        },
+        "warnings": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,63}$"}
+        }
+      }
+    },
+    "unresolvedResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["costStatus", "coverage", "reasonCode", "warnings"],
+      "properties": {
+        "costStatus": {"type": "string", "enum": ["unpriced", "ambiguous"]},
+        "coverage": {"type": "string", "enum": ["none", "partial"]},
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "no-catalog-match",
+            "multiple-catalog-matches",
+            "missing-usage",
+            "unsupported-meter",
+            "invalid-breakdown"
+          ]
+        },
+        "warnings": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,63}$"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["costStatus"],
+            "properties": {"costStatus": {"const": "ambiguous"}}
+          },
+          "then": {
+            "properties": {"reasonCode": {"const": "multiple-catalog-matches"}}
+          },
+          "else": {
+            "properties": {
+              "reasonCode": {
+                "enum": [
+                  "no-catalog-match",
+                  "missing-usage",
+                  "unsupported-meter",
+                  "invalid-breakdown"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

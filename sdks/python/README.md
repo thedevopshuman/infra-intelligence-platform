@@ -49,6 +49,11 @@ bounded Unix-socket protocol from an isolated plugin without importing server
 code, selecting a destination, or receiving a credential. It returns stable
 host-created failures for plugin handling; it is not a control-plane HTTP client.
 
+`AiUsageRecord`, `AiPriceCatalog`, `AiCostRecord`, and `AiSavingsFinding`
+expose the AI economics records as public metadata-only envelopes. They do not
+instrument provider calls, send OTLP, or import an AWS SDK. Standard
+OpenTelemetry instrumentation remains the collection boundary.
+
 Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. Supply a Bearer credential; the authenticated server derives tenant, actor, and roles from that credential. The SDK never sends identity assertion headers.
 
 Version 0.4 adds opaque provider cursor resume fields, ingestion-freshness telemetry, backend-neutral telemetry evidence, and the stored `OtlpMetricsEvidence` artifact model. OTLP transport is intentionally not reimplemented by this client; send metrics with a standard OpenTelemetry SDK/Collector and the separately provisioned channel credential.
@@ -77,3 +82,7 @@ action-provider profile and closed checks proving the host stored only a pending
 governed proposal. It remains exact-host evidence, not a customer support claim.
 
 Version 0.40 adds typed bounded adaptive investigation promotions. The SDK exposes only signal and selection IDs, stable provider-gap outcomes, and aggregate remaining capacity; it never exposes provider details or grants a new query.
+
+Version 0.46 adds the vendor-neutral AI usage, price catalog, calculated-cost,
+and evidence-backed savings record models. It intentionally adds no inference
+instrumentation SDK.

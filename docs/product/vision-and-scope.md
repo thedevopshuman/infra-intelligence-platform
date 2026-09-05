@@ -28,6 +28,8 @@ Infrastructure knowledge is fragmented across cloud APIs, Kubernetes, observabil
 7. Propose, approve, execute, and audit workflows under policy.
 8. Expose UI, API, CLI, SDK, webhooks, and MCP-facing surfaces.
 9. Support a signed, permissioned plugin ecosystem.
+10. Observe generative-AI usage and calculate evidence-backed cost and savings
+    without entering the inference request path.
 
 ## First wedge
 
@@ -41,6 +43,12 @@ The first end-to-end product slice is **read-only Kubernetes incident investigat
 - require human approval before any mutation.
 
 This wedge exercises the platform primitives without prematurely committing to every cloud or observability system.
+
+The first adjacent domain extension is the
+[AI FinOps and generative-AI observability slice](ai-finops-vision.md). It
+reuses the same tenancy, evidence, event, PostgreSQL, OpenTelemetry, and
+deployment primitives; its first wedge is metadata-only AWS Bedrock economics,
+not an inference proxy or autonomous agent.
 
 ## Foundation-stage non-goals
 
@@ -59,4 +67,3 @@ This wedge exercises the platform primitives without prematurely committing to e
 - Cross-tenant contract tests show no data, credential, event, or cache leakage.
 - Median investigation completes within five minutes and a declared cost budget.
 - A service owner can trace alert → resource → change → evidence → conclusion in one timeline.
-

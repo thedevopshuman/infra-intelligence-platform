@@ -22,6 +22,19 @@ The operational console and SDKs expose public non-secret authentication discove
 4. Follow the [initial roadmap](docs/roadmap/initial-roadmap.md).
 5. When changing code with Codex, follow [AGENTS.md](AGENTS.md).
 
+## AI economics extension
+
+The repository now defines the contract and architecture boundary for a
+metadata-only, OpenTelemetry-native AI FinOps flow. The first target is AWS
+Bedrock → OTLP traces → normalized usage → data-driven calculated cost → one
+evidence-backed saving → Grafana. IIP remains outside the inference path and
+does not collect prompts or responses by default. The trace receiver, ledger,
+cost runtime, rule runtime, and dashboard are the next implementation units;
+the existing metrics/logs receiver must not be mistaken for completed GenAI
+trace intake. See the [product direction](docs/product/ai-finops-vision.md),
+[architecture](docs/architecture/ai-economics.md), [contracts](docs/specifications/ai-economics-contracts.md),
+and [roadmap](docs/roadmap/ai-finops-roadmap.md).
+
 ## Local quick start
 
 Use Python 3.11 or newer and Node.js 24 for the TypeScript SDK boundary. Python and npm verification dependencies are locked for reproducible local and CI behavior. With Docker Desktop running, the durable product stack now has a one-command start:

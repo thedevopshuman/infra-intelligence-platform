@@ -45,6 +45,11 @@ internals, provider endpoints, credential references, or secrets. The
 TypeScript package intentionally provides types only because Unix-domain socket
 transport is runtime-specific.
 
+`AiUsageRecord`, `AiPriceCatalog`, `AiCostRecord`, and `AiSavingsFinding`
+describe the metadata-only AI economics ledger. The SDK does not instrument or
+proxy model calls; applications continue using standard OpenTelemetry
+instrumentation and a customer-controlled Collector.
+
 Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. The server derives tenant, actor, and roles after credential verification; the SDK does not send caller-controlled identity headers.
 
 Version 0.4 adds opaque provider cursor resume fields, ingestion-freshness telemetry, backend-neutral telemetry evidence, the stored `OtlpMetricsEvidence` artifact type, and `InvestigationTelemetrySelection`. Investigation candidates reuse the public metric query and limit types while identity, resources, time range, and deadline remain inherited server-side. OTLP transport is intentionally not reimplemented by this client; use a standard OpenTelemetry SDK/Collector and the separately provisioned channel credential.
@@ -70,3 +75,7 @@ Version 0.37 adds the action-provider compatibility profile and its closed
 proposal-queue, no-approval, and no-execution check identifiers.
 
 Version 0.40 adds `InvestigationSignalPlan` and `InvestigationSignalPromotion` for one bounded promotion of an accepted candidate after a provider gap. The transition carries no query body or authority.
+
+Version 0.46 adds vendor-neutral AI usage, price catalog, calculated-cost, and
+evidence-backed savings record types without adding a provider or
+instrumentation dependency.

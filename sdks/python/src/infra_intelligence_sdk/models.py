@@ -3446,6 +3446,93 @@ class PluginInvocationReconciliationRequest:
 
 
 @dataclass(frozen=True)
+class AiUsageRecord:
+    """Metadata-only generative-AI invocation accepted from telemetry."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "AiUsageRecord":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiUsageRecord",
+                label="AI usage record",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class AiPriceCatalog:
+    """Versioned data-driven token prices used for calculated cost."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "AiPriceCatalog":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiPriceCatalog",
+                label="AI price catalog",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class AiCostRecord:
+    """Explainable calculated-cost result for one AI usage record."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "AiCostRecord":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiCostRecord",
+                label="AI cost record",
+            )
+        )
+
+    @property
+    def cost_status(self) -> Optional[str]:
+        spec = self.payload.get("spec")
+        result = spec.get("result") if isinstance(spec, Mapping) else None
+        value = result.get("costStatus") if isinstance(result, Mapping) else None
+        return value if isinstance(value, str) else None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class AiSavingsFinding:
+    """Deterministic evidence-backed AI economics finding."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "AiSavingsFinding":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiSavingsFinding",
+                label="AI savings finding",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class PolicyDecisionRequest:
     """Authenticated, tenant-scoped input sent to a replaceable policy service."""
 

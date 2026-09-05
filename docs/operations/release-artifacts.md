@@ -69,6 +69,26 @@ Helm, TLS ingress, backup, checksum, and isolated restore checks used by the
 source-install gate. It refuses non-Kind contexts and removes its disposable
 namespace unless explicitly retained for debugging.
 
+## Prove the supported N-1 upgrade locally
+
+For a target release that adds a schema migration, run the packaged target
+against the explicitly selected prior revision:
+
+```bash
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.66.0-0123456789ab \
+IIP_UPGRADE_FROM_REVISION=a36c79a \
+  make test-release-upgrade PYTHON=.venv/bin/python
+```
+
+The gate builds the exact ancestor image and chart, installs them by immutable
+digest, and writes a tenant Resource through the authenticated public API. It
+then upgrades with the verified target bundle, rolls only the application back
+while retaining the forward migration, and upgrades to the target again. Every
+stage must report the expected runtime identity and return the same tenant data;
+the final database must contain every target migration exactly once. This proves
+the selected N-1 pair, not arbitrary-version compatibility or uninterrupted
+availability under live traffic.
+
 ## Production promotion boundary
 
 The local bundle is explicitly unsigned. It proves artifact integrity and build evidence, not who published it. Once repository hosting and organizational release identity are accepted, production promotion must:

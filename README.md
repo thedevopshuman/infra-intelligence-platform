@@ -177,6 +177,13 @@ unsafe archive structure. It does not invent customer contacts, staffed
 channels, response objectives, acceptance, or a production claim; see the
 [private-pilot onboarding guide](docs/operations/private-pilot-onboarding.md).
 
+The Helm chart also ships an optional Prometheus Operator alert-policy
+handoff for privacy-bounded query/receiver availability, ingestion freshness,
+local recording failures, and AI usage/cost coverage. It assumes the documented
+OpenTelemetry-to-Prometheus metric-name profile and installs no monitoring CRD,
+backend, notification receiver, contact, or route. Those remain customer-owned;
+see the [operational alert runbook](docs/operations/operational-alerts.md).
+
 An external PostgreSQL gate then uses a verified-TLS, default-read-only observer
 to prove that the stable writer endpoint advanced to a new writable WAL
 timeline while API, non-empty OTLP, and durable investigation workflows
@@ -266,7 +273,7 @@ no-network sandbox, reaches the real governed proposal service through the SDK
 and trusted relay, and must stop before approval or execution. Customer-owned
 plugin and live environment qualification remain deployment gates.
 
-The operational console and SDKs expose public non-secret authentication discovery, rolling transport-neutral event-publication attainment, and useful asynchronous investigation-completion attainment. The OIDC browser profile is provider-neutral and never carries a client secret; separate executable real-TLS profiles certify the shipped verifier's exact claims/cache/rotation/outage behavior and the actual authorization redirect, `S256` exchange, exact-origin CORS, replay denial, and token-to-API path. The external customer prerequisite gate binds selected issuer metadata, CORS, claims, the deployed session, and exact release identity while retaining no identity or credential values. Customers still own issuer enrollment, interactive redirect/login, MFA/session/logout policy, disablement/revocation latency, and certificate/key rotation and availability objectives. The API and SDKs also expose observe-only, tenant-scoped Evidence artifact-retention state; automatic byte expiration is disabled by default, bounded, policy-gated, legal-hold aware, and audited when explicitly enabled. Recognized control-plane reads emit a deployment-objective-bound query availability counter and duration histogram over OTLP. A separate direct, no-redirect external probe now qualifies liveness, readiness, authentication, exact release identity, availability, and latency through customer HTTPS ingress while retaining aggregate-only evidence. Continuous regional scheduling, long-window aggregation, burn-rate policy, and alert routing remain deployment work.
+The operational console and SDKs expose public non-secret authentication discovery, rolling transport-neutral event-publication attainment, and useful asynchronous investigation-completion attainment. The OIDC browser profile is provider-neutral and never carries a client secret; separate executable real-TLS profiles certify the shipped verifier's exact claims/cache/rotation/outage behavior and the actual authorization redirect, `S256` exchange, exact-origin CORS, replay denial, and token-to-API path. The external customer prerequisite gate binds selected issuer metadata, CORS, claims, the deployed session, and exact release identity while retaining no identity or credential values. Customers still own issuer enrollment, interactive redirect/login, MFA/session/logout policy, disablement/revocation latency, and certificate/key rotation and availability objectives. The API and SDKs also expose observe-only, tenant-scoped Evidence artifact-retention state; automatic byte expiration is disabled by default, bounded, policy-gated, legal-hold aware, and audited when explicitly enabled. Recognized control-plane reads emit a deployment-objective-bound query availability counter and duration histogram over OTLP. A separate direct, no-redirect external probe now qualifies liveness, readiness, authentication, exact release identity, availability, and latency through customer HTTPS ingress while retaining aggregate-only evidence. An optional Prometheus Operator adapter renders privacy-bounded default rules, while continuous regional scheduling, long-window operation, missing-telemetry observation, and customer notification routing remain deployment work.
 
 ## Start here
 

@@ -117,6 +117,7 @@ class HelmValuesContractTests(unittest.TestCase):
             "aiCostEngine.enabled must be true when aiAllocationReporting.enabled=true",
             "telemetry.traceMaxExportBatchSize must not exceed",
             "telemetry.otlpEndpoint is required",
+            "telemetry.metricsEnabled must be true when operationalAlerts.enabled=true",
             "auth.existingSecret is required",
             "policy.externalHttp.configJson is required",
             "credentialBroker.externalHttp.configJson is required",
@@ -173,6 +174,30 @@ class HelmValuesContractTests(unittest.TestCase):
             ["scope", "tenant-scope"],
         )
         self.assertIn("aiEconomicsAttributeMode: tenant-scope", self.values)
+
+        operational_alerts = self.schema["properties"]["operationalAlerts"]
+        self.assertFalse(operational_alerts["additionalProperties"])
+        self.assertEqual(
+            operational_alerts["properties"]["apiVersion"]["const"],
+            "monitoring.coreos.com/v1",
+        )
+        self.assertEqual(
+            operational_alerts["properties"]["metricNameProfile"]["const"],
+            "otel-prometheus-underscore-no-suffix-v1",
+        )
+        self.assertEqual(
+            operational_alerts["properties"]["evaluationIntervalSeconds"][
+                "minimum"
+            ],
+            15,
+        )
+        self.assertEqual(
+            operational_alerts["properties"]["maximumIncompleteAiRequests"][
+                "minimum"
+            ],
+            0,
+        )
+        self.assertIn("operationalAlerts:\n  enabled: false", self.values)
 
         termination = self.schema["properties"]["apiTermination"]
         self.assertFalse(termination["additionalProperties"])

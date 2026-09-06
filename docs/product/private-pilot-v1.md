@@ -39,6 +39,9 @@ unavailable. Prompt and response content is rejected by default.
 - Signed immutable image publication, software-bill-of-materials and
   vulnerability gates, a verified Helm bundle, minimized diagnostics, and the
   private-pilot readiness evidence join.
+- Optional privacy-bounded Prometheus operational rules, with the customer
+  retaining the monitoring CRD, evaluation, routing, contact, and escalation
+  authority.
 
 The customer may operate only a subset of the investigation integrations, but
 the first AI FinOps pilot admission requires the same-invocation Bedrock flow

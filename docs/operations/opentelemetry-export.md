@@ -26,7 +26,7 @@ Each newly committed terminal report can emit one `iip.investigation.execute` sp
 | `iip.ingestion.objective.violation` | dimensionless | One bounded series per known violation, with `1` for active |
 | `iip.query.requests` | dimensionless | One increment per recognized control-plane read, classified as available, unavailable, or excluded |
 | `iip.query.duration` | seconds | Monotonic serving time for the same recognized read |
-| `iip.otlp.receiver.requests` | dimensionless | One increment per completed metrics/logs intake request, classified as available, unavailable, or excluded |
+| `iip.otlp.receiver.requests` | dimensionless | One increment per completed metrics, logs, or metadata-only GenAI trace intake request, classified as available, unavailable, or excluded |
 | `iip.otlp.receiver.duration` | seconds | Monotonic serving time for the same intake request |
 | `iip.ai.*` | contract-specific | Bounded AI usage, coverage, calculated cost, comparison, and potential-saving gauges |
 | `iip.telemetry.record.failures` | dimensionless | Local instrument-recording failures; not network delivery failures |
@@ -36,6 +36,14 @@ Every measurement has `iip.ingestion.status`. `IIP_OTEL_INGESTION_ATTRIBUTE_MODE
 Query metrics use only closed operation, outcome, availability, and objective attributes. They never include raw paths, query values, tenant/actor identity, credentials, object identifiers, bodies, or error text. Invalid, unauthenticated, and denied requests are exported as `excluded`; valid successful/not-found/conflict responses are `available`; server and dependency failures are `unavailable`. The configured availability basis-point target, window, and minimum eligible count accompany each observation so the customer backend can aggregate the same semantics. See the [query availability telemetry contract](../specifications/query-availability-telemetry-contract.md) and [ADR 0059](../decisions/0059-backend-neutral-query-availability-telemetry.md).
 
 Receiver metrics use only signal, closed outcome, availability, and objective attributes. They exclude tenant/channel/SPIFFE identity, certificates, credentials, payloads, endpoints, paths, numeric status, and error text. An authenticated request rejected by the receiver rate limit is unavailable; invalid, unauthenticated, denied, or disabled requests are excluded. See the [receiver availability telemetry contract](../specifications/otlp-receiver-availability-telemetry-contract.md) and [ADR 0081](../decisions/0081-backend-neutral-otlp-receiver-availability.md).
+
+The Helm chart can optionally translate a bounded subset of these semantic
+conditions into a Prometheus Operator rule resource. That adapter assumes the
+documented underscore/no-suffix metric-name profile, deliberately removes
+dynamic identities from alert labels, and does not own routing or contacts.
+See the [operational alert-policy handoff](operational-alerts.md). Other
+backends should translate the same OpenTelemetry semantics rather than import
+PromQL into the application.
 
 AI economics metrics are refreshed from one protected, bounded savings profile
 after its fixed current window ends. They expose only profile-controlled scope,

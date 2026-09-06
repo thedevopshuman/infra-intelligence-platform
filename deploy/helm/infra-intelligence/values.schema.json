@@ -32,6 +32,7 @@
     "policy",
     "credentialBroker",
     "telemetry",
+    "operationalAlerts",
     "collectorQueueLoss",
     "telemetryEvidence",
     "logEvidence",
@@ -766,6 +767,74 @@
         "exportBurnRateCriticalHundredths": { "type": "integer", "minimum": 101, "maximum": 1000000 },
         "existingSecret": { "$ref": "#/definitions/optionalName" },
         "headersSecretKey": { "$ref": "#/definitions/nonEmptyString" }
+      }
+    },
+    "operationalAlerts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "apiVersion",
+        "metricNameProfile",
+        "namespace",
+        "labels",
+        "evaluationIntervalSeconds",
+        "availabilityForSeconds",
+        "ingestionFreshnessForSeconds",
+        "telemetryRecordingFailureWindowSeconds",
+        "telemetryRecordingFailureForSeconds",
+        "aiCoverageForSeconds",
+        "maximumIncompleteAiRequests",
+        "maximumUnresolvedAiCostRequests"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "apiVersion": { "const": "monitoring.coreos.com/v1" },
+        "metricNameProfile": {
+          "const": "otel-prometheus-underscore-no-suffix-v1"
+        },
+        "namespace": { "$ref": "#/definitions/optionalName" },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "evaluationIntervalSeconds": {
+          "type": "integer",
+          "minimum": 15,
+          "maximum": 300
+        },
+        "availabilityForSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
+        },
+        "ingestionFreshnessForSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
+        },
+        "telemetryRecordingFailureWindowSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
+        },
+        "telemetryRecordingFailureForSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
+        },
+        "aiCoverageForSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
+        },
+        "maximumIncompleteAiRequests": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "maximumUnresolvedAiCostRequests": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
       }
     },
     "collectorQueueLoss": {

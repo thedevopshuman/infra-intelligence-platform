@@ -114,6 +114,9 @@ with their named owners.
 - Route IIP operational and AI economics signals through the customer
   Collector; watch exporter delivery and Collector queue/loss, not just local
   acceptance.
+- Install and test the optional [operational alert policy](operational-alerts.md)
+  or an equivalent backend-native adapter, including one synthetic firing and
+  recovery through the customer's private route.
 - Review freshness, query/receiver availability, investigation completion, AI
   coverage, unknown pricing/attribution, and evidence-backed savings on the
   agreed cadence.

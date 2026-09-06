@@ -1735,6 +1735,11 @@ helm-lint:
 		--set ingress.tlsRedirectAnnotation=nginx.ingress.kubernetes.io/force-ssl-redirect \
 		--set networkPolicy.enabled=true \
 		--set networkPolicy.ingressController.enabled=true >/dev/null
+	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml \
+		--values deploy/helm/infra-intelligence/examples/production-ai-finops.values.yaml \
+		--values deploy/helm/infra-intelligence/examples/production-operational-alerts.values.yaml \
+		--show-only templates/operational-alerts.yaml >/dev/null
 	@if $(HELM) lint deploy/helm/infra-intelligence --set replicaCount=0 >/dev/null 2>&1; then \
 		echo "Helm values schema accepted an invalid replica count" >&2; exit 1; \
 	fi
@@ -1810,6 +1815,10 @@ helm-lint:
 		--set contextEvidence.credentialsExistingSecret=iip-github-context-token \
 		--set networkPolicy.enabled=true >/dev/null 2>&1; then \
 		echo "Helm validation accepted GitHub context without explicit provider egress" >&2; exit 1; \
+	fi
+	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set operationalAlerts.enabled=true >/dev/null 2>&1; then \
+		echo "Helm validation accepted operational alerts without metric export" >&2; exit 1; \
 	fi
 
 verify: validate validate-schemas test test-console-javascript test-typescript helm-lint test-deployment-preflight

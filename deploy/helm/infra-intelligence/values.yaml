@@ -271,6 +271,24 @@ telemetry:
   existingSecret: ""
   headersSecretKey: otlp-headers
 
+# Optional Prometheus Operator handoff for backend-observed IIP signals.
+# The customer Collector must expose the documented underscore/no-suffix
+# metric profile. Alert delivery and receivers remain customer-owned.
+operationalAlerts:
+  enabled: false
+  apiVersion: monitoring.coreos.com/v1
+  metricNameProfile: otel-prometheus-underscore-no-suffix-v1
+  namespace: ""
+  labels: {}
+  evaluationIntervalSeconds: 60
+  availabilityForSeconds: 600
+  ingestionFreshnessForSeconds: 600
+  telemetryRecordingFailureWindowSeconds: 900
+  telemetryRecordingFailureForSeconds: 300
+  aiCoverageForSeconds: 900
+  maximumIncompleteAiRequests: 0
+  maximumUnresolvedAiCostRequests: 0
+
 # Collector-observed sending-queue depth and send-loss objective (ADR 0087).
 # Distinct from telemetry.exportBurnRate*, which measures IIP's own
 # outbound exporter attempts rather than the customer Collector's internal

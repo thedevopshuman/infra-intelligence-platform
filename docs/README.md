@@ -85,6 +85,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Kubernetes planned-disruption availability qualification](operations/kubernetes-availability-qualification.md)
 - [Release artifacts and supply-chain evidence](operations/release-artifacts.md)
 - [OpenTelemetry metrics export](operations/opentelemetry-export.md)
+- [Operational alert-policy handoff](operations/operational-alerts.md)
 - [Prometheus telemetry evidence](operations/prometheus-evidence.md)
 - [OTLP metrics receiver](operations/otlp-metrics-receiver.md)
 - [AI usage OTLP trace receiver](operations/ai-usage-receiver.md)

@@ -39,6 +39,14 @@ The adapters use the [standard exporter endpoint configuration](https://opentele
 
 Export is disabled by default, asynchronous, and observational. Endpoint unavailability does not roll back ingestion, block an investigation, or change report results. The reference adapter has bounded timeouts, SDK retry behavior, local recording-failure counting, controlled dimensions, recent deployment-wide API/worker/receiver delivery health through a failure-isolated shared-store heartbeat, rolling per-signal export-attempt attainment from bounded counter samples, and a two-window burn rate calculated from the same samples. Receiver request counter/histogram observations use the same exporter but never include customer identity or payload data. It does not provide a durable queue itself; the customer-Collector's own queue depth and send-loss are a separate, opt-in report (ADR 0087) sourced from the Collector's self-metrics, not automatic discovery, and regional aggregation of it is still required before production enablement.
 
+[ADR 0148](../decisions/0148-customer-owned-operational-alert-policy-handoff.md)
+adds an optional Prometheus Operator translation for a bounded set of those
+signals. The adapter stays in Helm, assumes one explicit Collector metric-name
+profile, aggregates protected identities out of notification labels, and
+leaves rule selection, delivery, contacts, escalation, and missing-telemetry
+observation with the customer. It does not make Prometheus part of the core
+portability contract.
+
 ## Customer telemetry evidence
 
 OTLP is a push/export protocol, not a historical query protocol. The executable customer-telemetry boundaries therefore also address data already retained in a backend. `TelemetryEvidenceRequest` and `LogEvidenceRequest` express bounded normalized selectors; `TelemetryMetricsBackend` and `TelemetryLogsBackend` hide vendor query APIs; and the application validates normalized results before storing them through the immutable Evidence pipeline. [ADR 0014](../decisions/0014-backend-neutral-telemetry-evidence-query.md) records the metric decision, while [ADR 0023](../decisions/0023-backend-neutral-log-evidence-and-otlp-intake.md) records the stricter log minimization/redaction boundary. Defaults remain no-data; [ADR 0015](../decisions/0015-prometheus-telemetry-evidence-adapter.md) adds the first explicitly selected metric adapter, and [ADR 0025](../decisions/0025-loki-historical-log-evidence-adapter.md) adds the first explicitly selected historical log adapter. Both use protected catalogs and the shared credential-broker port without changing public selectors.

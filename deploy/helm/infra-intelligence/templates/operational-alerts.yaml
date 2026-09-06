@@ -1,0 +1,103 @@
+{{- if .Values.operationalAlerts.enabled }}
+apiVersion: {{ .Values.operationalAlerts.apiVersion }}
+kind: PrometheusRule
+metadata:
+  name: {{ include "infra-intelligence.fullname" . }}-operational-alerts
+  namespace: {{ default .Release.Namespace .Values.operationalAlerts.namespace }}
+  labels:
+    {{- include "infra-intelligence.labels" . | nindent 4 }}
+    {{- with .Values.operationalAlerts.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: iip.platform.availability
+      interval: {{ printf "%ds" (int .Values.operationalAlerts.evaluationIntervalSeconds) }}
+      rules:
+        - alert: IIPQueryAvailabilityBelowObjective
+          expr: |-
+            (
+              10000 *
+              sum(increase(iip_query_requests{job={{ .Values.telemetry.serviceName | toJson }},iip_query_availability="available"}[{{ int .Values.queryAvailabilitySlo.windowSeconds }}s]))
+              /
+              clamp_min(sum(increase(iip_query_requests{job={{ .Values.telemetry.serviceName | toJson }},iip_query_availability=~"available|unavailable"}[{{ int .Values.queryAvailabilitySlo.windowSeconds }}s])), 1)
+            ) < {{ int .Values.queryAvailabilitySlo.minimumAvailabilityBasisPoints }}
+            and
+            sum(increase(iip_query_requests{job={{ .Values.telemetry.serviceName | toJson }},iip_query_availability=~"available|unavailable"}[{{ int .Values.queryAvailabilitySlo.windowSeconds }}s])) >= {{ int .Values.queryAvailabilitySlo.minimumEligibleRequests }}
+          for: {{ printf "%ds" (int .Values.operationalAlerts.availabilityForSeconds) }}
+          labels:
+            severity: critical
+            iip_alert_scope: platform
+          annotations:
+            summary: IIP control-plane query availability is below its declared objective
+            description: Backend-observed eligible queries are below the chart-configured availability objective after the minimum sample floor.
+            runbook: docs/operations/operational-alerts.md#query-availability
+        {{- if or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled .Values.aiUsageReceiver.enabled }}
+        - alert: IIPOtlpReceiverAvailabilityBelowObjective
+          expr: |-
+            (
+              10000 *
+              sum(increase(iip_otlp_receiver_requests{job={{ .Values.telemetry.receiverServiceName | toJson }},iip_otlp_receiver_availability="available"}[{{ int .Values.otlpIngest.availabilitySlo.windowSeconds }}s]))
+              /
+              clamp_min(sum(increase(iip_otlp_receiver_requests{job={{ .Values.telemetry.receiverServiceName | toJson }},iip_otlp_receiver_availability=~"available|unavailable"}[{{ int .Values.otlpIngest.availabilitySlo.windowSeconds }}s])), 1)
+            ) < {{ int .Values.otlpIngest.availabilitySlo.minimumAvailabilityBasisPoints }}
+            and
+            sum(increase(iip_otlp_receiver_requests{job={{ .Values.telemetry.receiverServiceName | toJson }},iip_otlp_receiver_availability=~"available|unavailable"}[{{ int .Values.otlpIngest.availabilitySlo.windowSeconds }}s])) >= {{ int .Values.otlpIngest.availabilitySlo.minimumEligibleRequests }}
+          for: {{ printf "%ds" (int .Values.operationalAlerts.availabilityForSeconds) }}
+          labels:
+            severity: critical
+            iip_alert_scope: platform
+          annotations:
+            summary: IIP OTLP intake availability is below its declared objective
+            description: Backend-observed eligible OTLP requests are below the chart-configured receiver objective after the minimum sample floor.
+            runbook: docs/operations/operational-alerts.md#receiver-availability
+        {{- end }}
+        - alert: IIPIngestionFreshnessObjectiveViolated
+          expr: |-
+            min(iip_ingestion_within_objective{{ printf "{job=~%s}" (printf "%s|%s" (regexQuoteMeta .Values.telemetry.serviceName) (regexQuoteMeta .Values.telemetry.workerServiceName) | toJson) }}) < 1
+          for: {{ printf "%ds" (int .Values.operationalAlerts.ingestionFreshnessForSeconds) }}
+          labels:
+            severity: warning
+            iip_alert_scope: platform
+          annotations:
+            summary: At least one IIP ingestion source is outside its freshness objective
+            description: The alert deliberately aggregates source identity; inspect the authenticated freshness report for the authorized tenant and source.
+            runbook: docs/operations/operational-alerts.md#ingestion-freshness
+        - alert: IIPTelemetryRecordingFailures
+          expr: |-
+            sum(increase(iip_telemetry_record_failures{{ printf "{job=~%s}" (printf "%s|%s|%s" (regexQuoteMeta .Values.telemetry.serviceName) (regexQuoteMeta .Values.telemetry.workerServiceName) (regexQuoteMeta .Values.telemetry.receiverServiceName) | toJson) }}[{{ int .Values.operationalAlerts.telemetryRecordingFailureWindowSeconds }}s])) > 0
+          for: {{ printf "%ds" (int .Values.operationalAlerts.telemetryRecordingFailureForSeconds) }}
+          labels:
+            severity: warning
+            iip_alert_scope: platform
+          annotations:
+            summary: IIP rejected one or more local telemetry measurements
+            description: This signal covers local instrument recording only; exporter and Collector delivery require independent monitoring.
+            runbook: docs/operations/operational-alerts.md#local-recording-failures
+        {{- if .Values.aiUsageReceiver.enabled }}
+        - alert: IIPAiUsageCoverageIncomplete
+          expr: |-
+            sum(iip_ai_usage_incomplete_requests{job={{ .Values.telemetry.workerServiceName | toJson }}}) > {{ int .Values.operationalAlerts.maximumIncompleteAiRequests }}
+          for: {{ printf "%ds" (int .Values.operationalAlerts.aiCoverageForSeconds) }}
+          labels:
+            severity: warning
+            iip_alert_scope: ai-economics
+          annotations:
+            summary: IIP AI usage coverage is incomplete
+            description: One or more profile-window requests are missing a supported usage fact; no zero value is inferred.
+            runbook: docs/operations/operational-alerts.md#ai-usage-and-cost-coverage
+        {{- end }}
+        {{- if .Values.aiCostEngine.enabled }}
+        - alert: IIPAiCostCoverageUnresolved
+          expr: |-
+            sum(iip_ai_cost_requests{job={{ .Values.telemetry.workerServiceName | toJson }},iip_ai_cost_status=~"unpriced|ambiguous|pending"}) > {{ int .Values.operationalAlerts.maximumUnresolvedAiCostRequests }}
+          for: {{ printf "%ds" (int .Values.operationalAlerts.aiCoverageForSeconds) }}
+          labels:
+            severity: warning
+            iip_alert_scope: ai-economics
+          annotations:
+            summary: IIP AI cost coverage has unresolved requests
+            description: Unpriced, ambiguous, or pending requests are visible and must not be treated as zero cost.
+            runbook: docs/operations/operational-alerts.md#ai-usage-and-cost-coverage
+        {{- end }}
+{{- end }}

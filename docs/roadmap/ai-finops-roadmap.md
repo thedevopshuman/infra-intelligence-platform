@@ -111,6 +111,12 @@ customer-controlled OTel scorecard, support/security boundary, rollback, and
 decommissioning. It does not create a feedback export, staffed channel,
 customer approval, or production claim; those remain external.
 
+An optional Helm alert-policy overlay now maps incomplete AI usage and
+unresolved cost coverage, alongside core platform health, into privacy-bounded
+Prometheus rules. OpenTelemetry semantics remain authoritative; the customer
+still owns rule discovery, backend evaluation, missing-telemetry observation,
+notification routes, contacts, and escalation.
+
 Two additional deterministic rules are delivered. Protected channel
 configuration maps provider retry attributes into `retryCount`, and the
 source-bound retry-amplification evaluator compares complete fixed-window

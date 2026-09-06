@@ -112,6 +112,9 @@
 {{- if and (or .Values.telemetry.metricsEnabled .Values.telemetry.tracesEnabled) (not .Values.telemetry.otlpEndpoint) }}
 {{- fail "telemetry.otlpEndpoint is required when telemetry export is enabled" }}
 {{- end }}
+{{- if and .Values.operationalAlerts.enabled (not .Values.telemetry.metricsEnabled) }}
+{{- fail "telemetry.metricsEnabled must be true when operationalAlerts.enabled=true" }}
+{{- end }}
 {{- if and (or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled .Values.aiUsageReceiver.enabled) .Values.telemetry.metricsEnabled .Values.networkPolicy.enabled (not .Values.networkPolicy.otlpEgress.enabled) }}
 {{- fail "networkPolicy.otlpEgress.enabled is required for OTLP receiver telemetry export" }}
 {{- end }}

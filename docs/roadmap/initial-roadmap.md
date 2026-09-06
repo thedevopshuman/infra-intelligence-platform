@@ -91,6 +91,12 @@ qualification order, privacy-first feedback, rollback, and decommissioning
 guidance. It establishes no customer contact, staffed channel, response
 objective, approval, or production claim.
 
+The handoff also carries an optional privacy-bounded Prometheus Operator rule
+profile for backend-observed availability, freshness, local recording, and AI
+coverage signals. Customer rule discovery, missing-telemetry detection,
+notification routes, contacts, escalation, and long-window/regional operation
+remain external deployment gates.
+
 One fail-closed local release command now composes the source, integration,
 recovery, multi-node availability, bundle, packaged N-1, vulnerability, and
 19-evidence readiness workflow while retaining each owning report and refusing
@@ -130,7 +136,7 @@ Deliverables:
 
 Exit gate: a seeded cluster can be rebuilt from observations/events; graph correctness and source lag are measurable.
 
-Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, complete-snapshot membership, deterministic tombstones, exact-result replay, atomic reconciliation/checkpoint/provider-cursor commit, per-API-path list/watch resume with `410 Gone` full-reconciliation recovery, tenant-scoped at-least-once outbox delivery through local structured-log and authenticated HTTPS publishers, finite terminal quarantine with a privileged value-minimized exact-tenant delivery-health report, transport-neutral rolling publication SLOs from mature durable outbox cohorts, exact-generation quarantine recovery through the one-shot governed-action chain, a privileged tenant-scoped projection drift/rebuild command from accepted observation history, source-bound complete-schema PostgreSQL logical recovery plus local physical streaming/promotion/named-target-PITR qualification reports with canonical row, safe sequence, and projection verification, an opt-in database-only Helm CronJob that writes checksum-complete logical backups to customer-managed storage, a live isolated restore gate, tenant-scoped point-in-time freshness/source-lag telemetry, optional outbound OTLP/HTTP freshness metrics, automatic exact-source sampling from a non-interactive tenant-enrolled worker, privileged process-local plus shared-store API/worker exporter-delivery health, a provider-neutral customer writer-endpoint promotion observer using native WAL timeline evidence, and pinned official-Collector delivery qualification against one exact customer receiver. The local Phase 1 exit gate is complete; production broker selection, sustained-write storage durability/retention, customer-hosting automatic-failover topology/fencing/RPO/PITR and disaster-recovery qualification, workload objectives, long-term/regional SLO aggregation and alerting, bulk-recovery policy, and permanent customer Collector/PKI/queue lifecycle qualification remain Phase 3 deliverables.
+Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, complete-snapshot membership, deterministic tombstones, exact-result replay, atomic reconciliation/checkpoint/provider-cursor commit, per-API-path list/watch resume with `410 Gone` full-reconciliation recovery, tenant-scoped at-least-once outbox delivery through local structured-log and authenticated HTTPS publishers, finite terminal quarantine with a privileged value-minimized exact-tenant delivery-health report, transport-neutral rolling publication SLOs from mature durable outbox cohorts, exact-generation quarantine recovery through the one-shot governed-action chain, a privileged tenant-scoped projection drift/rebuild command from accepted observation history, source-bound complete-schema PostgreSQL logical recovery plus local physical streaming/promotion/named-target-PITR qualification reports with canonical row, safe sequence, and projection verification, an opt-in database-only Helm CronJob that writes checksum-complete logical backups to customer-managed storage, a live isolated restore gate, tenant-scoped point-in-time freshness/source-lag telemetry, optional outbound OTLP/HTTP freshness metrics, automatic exact-source sampling from a non-interactive tenant-enrolled worker, privileged process-local plus shared-store API/worker exporter-delivery health, a provider-neutral customer writer-endpoint promotion observer using native WAL timeline evidence, pinned official-Collector delivery qualification against one exact customer receiver, and a bounded optional Prometheus rule adapter. The local Phase 1 exit gate is complete; production broker selection, sustained-write storage durability/retention, customer-hosting automatic-failover topology/fencing/RPO/PITR and disaster-recovery qualification, workload objectives, long-term/regional SLO aggregation and customer-owned alert delivery, bulk-recovery policy, and permanent customer Collector/PKI/queue lifecycle qualification remain Phase 3 deliverables.
 
 Readiness update: the workflow worker now exposes only a private liveness and
 required-store readiness listener. Helm and Docker use it to reject stale
@@ -185,8 +191,9 @@ value classes, media inspectors, and source-specific classification remain.
 Qualification update: ADR 0105 adds a direct no-redirect HTTPS ingress probe
 with aggregate-only source/target-bound availability and latency evidence. This
 closes the portable bounded external qualification harness described above;
-continuous multi-region probing, long-term aggregation, burn-rate policy, and
-alert routing remain open.
+continuous multi-region probing, long-term aggregation, and customer
+notification operation remain open. ADR 0148 supplies an optional bounded
+Prometheus rule profile without claiming those customer-owned outcomes.
 
 Deployment update: ADR 0109 adds zero-unavailable worker and receiver rollouts,
 component-specific disruption budgets, chart-generated hard topology spread,

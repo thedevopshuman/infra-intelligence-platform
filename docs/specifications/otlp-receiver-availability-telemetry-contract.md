@@ -3,7 +3,7 @@
 **Status:** v1alpha1 semantic convention
 
 This contract defines backend-neutral OTLP metrics for completed IIP OTLP/HTTP
-metrics and logs intake requests. It is an operational telemetry contract, so
+metrics, logs, and metadata-only GenAI trace intake requests. It is an operational telemetry contract, so
 the machine envelope is OpenTelemetry Metrics protobuf rather than a repository
 JSON Schema.
 
@@ -20,7 +20,7 @@ attributes:
 
 | Attribute | Type | Values |
 | --- | --- | --- |
-| `iip.otlp.receiver.signal` | string | `metrics` or `logs` |
+| `iip.otlp.receiver.signal` | string | `metrics`, `logs`, or `traces` |
 | `iip.otlp.receiver.outcome` | string | `success`, `invalid`, `unauthenticated`, `denied`, `disabled`, `rate-limited`, `unavailable`, or `internal-error` |
 | `iip.otlp.receiver.availability` | string | `available`, `unavailable`, or `excluded` |
 | `iip.otlp.receiver.objective.window_seconds` | integer | deployment-configured rolling window |

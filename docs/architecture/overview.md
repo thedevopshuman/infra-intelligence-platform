@@ -117,6 +117,16 @@ decision upgrades the deployment aggregate to bind this fifth report, its
 protected profile and component targets, and a health observation after all
 three planned pod disruptions.
 
+[ADR 0130](../decisions/0130-customer-postgresql-primary-promotion-continuity.md)
+adds a provider-neutral customer database gate. A direct verified-TLS,
+default-read-only libpq session selects only a writable endpoint and observes
+the WAL timeline through native read-only PostgreSQL functions while the
+existing API/OTLP/workflow probes continue. A strictly higher timeline proves
+promotion rather than restart; the qualifier never triggers failover or gains
+provider authority. The aggregate binds this sixth report and requires final
+health after database recovery while preserving topology, fencing, zero-loss
+RPO, and regional DR as explicit non-claims.
+
 [ADR 0125](../decisions/0125-bounded-fixed-rate-control-plane-load-qualification.md)
 keeps external read-load evidence separate from availability and disruption
 evidence. Its operator-run harness uses the existing direct verified-HTTPS

@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-postgresql-continuity qualify-customer-postgresql-continuity verify-customer-postgresql-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -63,6 +63,23 @@ IIP_PROCESSING_PROBE_INTERVAL_MILLISECONDS ?= 250
 IIP_PROCESSING_MAXIMUM_WORKFLOW_MILLISECONDS ?= 60000
 IIP_PROCESSING_MAXIMUM_RECOVERY_MILLISECONDS ?= 120000
 IIP_PROCESSING_REQUEST_TIMEOUT_MILLISECONDS ?= 2000
+IIP_CUSTOMER_POSTGRESQL_REPORT ?= dist/customer-postgresql-continuity-qualification-report.json
+IIP_CUSTOMER_POSTGRESQL_PROFILE ?=
+IIP_CUSTOMER_POSTGRESQL_HOST ?=
+IIP_CUSTOMER_POSTGRESQL_PORT ?= 5432
+IIP_CUSTOMER_POSTGRESQL_PASSWORD_FILE ?=
+IIP_CUSTOMER_POSTGRESQL_CA_FILE ?=
+IIP_CUSTOMER_POSTGRESQL_CLIENT_CERT_FILE ?=
+IIP_CUSTOMER_POSTGRESQL_CLIENT_KEY_FILE ?=
+IIP_CUSTOMER_POSTGRESQL_ALLOW_FAILOVER_OBSERVATION ?= false
+IIP_CUSTOMER_POSTGRESQL_ATTEMPTS_PER_PHASE ?= 20
+IIP_CUSTOMER_POSTGRESQL_PROBE_INTERVAL_MILLISECONDS ?= 250
+IIP_CUSTOMER_POSTGRESQL_MAXIMUM_PROMOTION_MILLISECONDS ?= 300000
+IIP_CUSTOMER_POSTGRESQL_MAXIMUM_WORKFLOW_MILLISECONDS ?= 60000
+IIP_CUSTOMER_POSTGRESQL_REQUEST_TIMEOUT_MILLISECONDS ?= 2000
+IIP_CUSTOMER_POSTGRESQL_MINIMUM_API_AVAILABILITY_BASIS_POINTS ?= 9500
+IIP_CUSTOMER_POSTGRESQL_MINIMUM_RECEIVER_AVAILABILITY_BASIS_POINTS ?= 9500
+IIP_CUSTOMER_POSTGRESQL_MAXIMUM_CONSECUTIVE_FAILURES ?= 20
 IIP_CUSTOMER_DEPLOYMENT_QUALIFICATION_REPORT ?= dist/customer-deployment-qualification-report.json
 IIP_CUSTOMER_QUALIFICATION_VALUES ?= $(IIP_DEPLOYMENT_VALUES)
 IIP_CUSTOMER_QUALIFICATION_MAXIMUM_EVIDENCE_AGE_SECONDS ?= 86400
@@ -122,6 +139,9 @@ help:
 	@echo "test-customer-processing-continuity Validate worker/receiver processing evidence"
 	@echo "qualify-customer-processing-continuity Evict worker and receiver pods under live processing"
 	@echo "verify-customer-processing-continuity-report Recompute exact processing evidence bindings"
+	@echo "test-customer-postgresql-continuity Validate customer PostgreSQL promotion evidence"
+	@echo "qualify-customer-postgresql-continuity Observe an externally initiated primary promotion"
+	@echo "verify-customer-postgresql-continuity-report Recompute exact PostgreSQL target evidence"
 	@echo "test-customer-deployment-qualification Validate exact customer evidence aggregation"
 	@echo "qualify-customer-deployment Bind preflight, ingress, processing, and health evidence"
 	@echo "verify-customer-deployment-qualification-report Recompute the customer evidence chain"
@@ -443,6 +463,91 @@ verify-customer-processing-continuity-report:
 		--receiver-deployment "$(IIP_PROCESSING_RECEIVER_DEPLOYMENT)" \
 		--require-clean --require-qualified
 
+test-customer-postgresql-continuity:
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_customer_postgresql_continuity -v
+
+qualify-customer-postgresql-continuity:
+	@test "$(IIP_CUSTOMER_POSTGRESQL_ALLOW_FAILOVER_OBSERVATION)" = true || \
+		(echo "IIP_CUSTOMER_POSTGRESQL_ALLOW_FAILOVER_OBSERVATION must equal true" >&2; exit 2)
+	@test -n "$(IIP_KUBERNETES_CONTEXT)" || \
+		(echo "IIP_KUBERNETES_CONTEXT is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_API_BASE_URL)" || \
+		(echo "IIP_PROCESSING_API_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_API_TOKEN_FILE)" || \
+		(echo "IIP_PROCESSING_API_TOKEN_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_OTLP_BASE_URL)" || \
+		(echo "IIP_PROCESSING_OTLP_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_OTLP_TOKEN_FILE)" || \
+		(echo "IIP_PROCESSING_OTLP_TOKEN_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_OTLP_CLIENT_CERT_FILE)" || \
+		(echo "IIP_PROCESSING_OTLP_CLIENT_CERT_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_OTLP_CLIENT_KEY_FILE)" || \
+		(echo "IIP_PROCESSING_OTLP_CLIENT_KEY_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_IMAGE_DIGEST)" || \
+		(echo "IIP_PROCESSING_IMAGE_DIGEST is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_POSTGRESQL_PROFILE)" || \
+		(echo "IIP_CUSTOMER_POSTGRESQL_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_POSTGRESQL_HOST)" || \
+		(echo "IIP_CUSTOMER_POSTGRESQL_HOST is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_POSTGRESQL_PASSWORD_FILE)" || \
+		(echo "IIP_CUSTOMER_POSTGRESQL_PASSWORD_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_POSTGRESQL_CA_FILE)" || \
+		(echo "IIP_CUSTOMER_POSTGRESQL_CA_FILE is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_postgresql_continuity.py run \
+		--api-base-url "$(IIP_PROCESSING_API_BASE_URL)" \
+		--api-token-file "$(IIP_PROCESSING_API_TOKEN_FILE)" \
+		--otlp-base-url "$(IIP_PROCESSING_OTLP_BASE_URL)" \
+		--otlp-token-file "$(IIP_PROCESSING_OTLP_TOKEN_FILE)" \
+		--otlp-client-cert-file "$(IIP_PROCESSING_OTLP_CLIENT_CERT_FILE)" \
+		--otlp-client-key-file "$(IIP_PROCESSING_OTLP_CLIENT_KEY_FILE)" \
+		$(if $(IIP_PROCESSING_API_CA_FILE),--api-ca-file "$(IIP_PROCESSING_API_CA_FILE)",) \
+		$(if $(IIP_PROCESSING_OTLP_CA_FILE),--otlp-ca-file "$(IIP_PROCESSING_OTLP_CA_FILE)",) \
+		--profile "$(IIP_CUSTOMER_POSTGRESQL_PROFILE)" \
+		--image-digest "$(IIP_PROCESSING_IMAGE_DIGEST)" \
+		--context "$(IIP_KUBERNETES_CONTEXT)" \
+		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
+		--database-host "$(IIP_CUSTOMER_POSTGRESQL_HOST)" \
+		--database-port "$(IIP_CUSTOMER_POSTGRESQL_PORT)" \
+		--database-password-file "$(IIP_CUSTOMER_POSTGRESQL_PASSWORD_FILE)" \
+		--database-ca-file "$(IIP_CUSTOMER_POSTGRESQL_CA_FILE)" \
+		$(if $(IIP_CUSTOMER_POSTGRESQL_CLIENT_CERT_FILE),--database-client-cert-file "$(IIP_CUSTOMER_POSTGRESQL_CLIENT_CERT_FILE)",) \
+		$(if $(IIP_CUSTOMER_POSTGRESQL_CLIENT_KEY_FILE),--database-client-key-file "$(IIP_CUSTOMER_POSTGRESQL_CLIENT_KEY_FILE)",) \
+		--attempts-per-phase "$(IIP_CUSTOMER_POSTGRESQL_ATTEMPTS_PER_PHASE)" \
+		--probe-interval-milliseconds "$(IIP_CUSTOMER_POSTGRESQL_PROBE_INTERVAL_MILLISECONDS)" \
+		--maximum-promotion-milliseconds "$(IIP_CUSTOMER_POSTGRESQL_MAXIMUM_PROMOTION_MILLISECONDS)" \
+		--maximum-workflow-milliseconds "$(IIP_CUSTOMER_POSTGRESQL_MAXIMUM_WORKFLOW_MILLISECONDS)" \
+		--request-timeout-milliseconds "$(IIP_CUSTOMER_POSTGRESQL_REQUEST_TIMEOUT_MILLISECONDS)" \
+		--minimum-api-availability-basis-points "$(IIP_CUSTOMER_POSTGRESQL_MINIMUM_API_AVAILABILITY_BASIS_POINTS)" \
+		--minimum-receiver-availability-basis-points "$(IIP_CUSTOMER_POSTGRESQL_MINIMUM_RECEIVER_AVAILABILITY_BASIS_POINTS)" \
+		--maximum-consecutive-failures "$(IIP_CUSTOMER_POSTGRESQL_MAXIMUM_CONSECUTIVE_FAILURES)" \
+		--output "$(IIP_CUSTOMER_POSTGRESQL_REPORT)" --allow-failover-observation
+
+verify-customer-postgresql-continuity-report:
+	@test -n "$(IIP_KUBERNETES_CONTEXT)" || \
+		(echo "IIP_KUBERNETES_CONTEXT is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_API_BASE_URL)" || \
+		(echo "IIP_PROCESSING_API_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_OTLP_BASE_URL)" || \
+		(echo "IIP_PROCESSING_OTLP_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_IMAGE_DIGEST)" || \
+		(echo "IIP_PROCESSING_IMAGE_DIGEST is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_POSTGRESQL_PROFILE)" || \
+		(echo "IIP_CUSTOMER_POSTGRESQL_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_POSTGRESQL_HOST)" || \
+		(echo "IIP_CUSTOMER_POSTGRESQL_HOST is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_postgresql_continuity.py verify \
+		--report "$(IIP_CUSTOMER_POSTGRESQL_REPORT)" \
+		--api-base-url "$(IIP_PROCESSING_API_BASE_URL)" \
+		--otlp-base-url "$(IIP_PROCESSING_OTLP_BASE_URL)" \
+		--profile "$(IIP_CUSTOMER_POSTGRESQL_PROFILE)" \
+		--image-digest "$(IIP_PROCESSING_IMAGE_DIGEST)" \
+		--context "$(IIP_KUBERNETES_CONTEXT)" \
+		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
+		--database-host "$(IIP_CUSTOMER_POSTGRESQL_HOST)" \
+		--database-port "$(IIP_CUSTOMER_POSTGRESQL_PORT)" \
+		--require-clean --require-qualified
+
 test-customer-deployment-qualification:
 	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
 		tests.test_customer_deployment_qualification -v
@@ -460,6 +565,10 @@ qualify-customer-deployment:
 		(echo "IIP_PROCESSING_API_BASE_URL is required" >&2; exit 2)
 	@test -n "$(IIP_PROCESSING_OTLP_BASE_URL)" || \
 		(echo "IIP_PROCESSING_OTLP_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_POSTGRESQL_PROFILE)" || \
+		(echo "IIP_CUSTOMER_POSTGRESQL_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_POSTGRESQL_HOST)" || \
+		(echo "IIP_CUSTOMER_POSTGRESQL_HOST is required" >&2; exit 2)
 	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_deployment.py generate \
 		--preflight-report "$(IIP_DEPLOYMENT_PREFLIGHT_REPORT)" \
 		--diagnostic-report "$(IIP_DEPLOYMENT_DIAGNOSTIC_REPORT)" \
@@ -469,6 +578,10 @@ qualify-customer-deployment:
 		--processing-profile "$(IIP_PROCESSING_PROFILE)" \
 		--processing-api-base-url "$(IIP_PROCESSING_API_BASE_URL)" \
 		--processing-otlp-base-url "$(IIP_PROCESSING_OTLP_BASE_URL)" \
+		--postgresql-report "$(IIP_CUSTOMER_POSTGRESQL_REPORT)" \
+		--postgresql-profile "$(IIP_CUSTOMER_POSTGRESQL_PROFILE)" \
+		--postgresql-database-host "$(IIP_CUSTOMER_POSTGRESQL_HOST)" \
+		--postgresql-database-port "$(IIP_CUSTOMER_POSTGRESQL_PORT)" \
 		$(foreach value,$(IIP_CUSTOMER_QUALIFICATION_VALUES),--values "$(value)") \
 		--context "$(IIP_KUBERNETES_CONTEXT)" \
 		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
@@ -493,6 +606,10 @@ verify-customer-deployment-qualification-report:
 		(echo "IIP_PROCESSING_API_BASE_URL is required" >&2; exit 2)
 	@test -n "$(IIP_PROCESSING_OTLP_BASE_URL)" || \
 		(echo "IIP_PROCESSING_OTLP_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_POSTGRESQL_PROFILE)" || \
+		(echo "IIP_CUSTOMER_POSTGRESQL_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_POSTGRESQL_HOST)" || \
+		(echo "IIP_CUSTOMER_POSTGRESQL_HOST is required" >&2; exit 2)
 	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_deployment.py verify \
 		--report "$(IIP_CUSTOMER_DEPLOYMENT_QUALIFICATION_REPORT)" \
 		--preflight-report "$(IIP_DEPLOYMENT_PREFLIGHT_REPORT)" \
@@ -503,6 +620,10 @@ verify-customer-deployment-qualification-report:
 		--processing-profile "$(IIP_PROCESSING_PROFILE)" \
 		--processing-api-base-url "$(IIP_PROCESSING_API_BASE_URL)" \
 		--processing-otlp-base-url "$(IIP_PROCESSING_OTLP_BASE_URL)" \
+		--postgresql-report "$(IIP_CUSTOMER_POSTGRESQL_REPORT)" \
+		--postgresql-profile "$(IIP_CUSTOMER_POSTGRESQL_PROFILE)" \
+		--postgresql-database-host "$(IIP_CUSTOMER_POSTGRESQL_HOST)" \
+		--postgresql-database-port "$(IIP_CUSTOMER_POSTGRESQL_PORT)" \
 		$(foreach value,$(IIP_CUSTOMER_QUALIFICATION_VALUES),--values "$(value)") \
 		--context "$(IIP_KUBERNETES_CONTEXT)" \
 		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \

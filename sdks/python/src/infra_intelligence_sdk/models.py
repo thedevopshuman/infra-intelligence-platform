@@ -627,6 +627,50 @@ class CustomerProcessingQualificationProfile:
 
 
 @dataclass(frozen=True)
+class CustomerPostgreSQLContinuityProfile:
+    """Protected input for one customer PostgreSQL promotion observation."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerPostgreSQLContinuityProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerPostgreSQLContinuityProfile",
+                label="customer PostgreSQL continuity profile",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerPostgreSQLContinuityQualificationReport:
+    """Minimized evidence for a customer PostgreSQL primary promotion."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerPostgreSQLContinuityQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerPostgreSQLContinuityQualificationReport",
+                label="customer PostgreSQL continuity qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerDeploymentQualificationReport:
     """Exact-release customer install, ingress, and processing evidence chain."""
 

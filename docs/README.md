@@ -84,6 +84,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Repository and runbook context evidence](operations/context-evidence.md)
 - [PostgreSQL backup and restore experiment](operations/postgresql-backup-restore.md)
 - [PostgreSQL physical continuity qualification](operations/postgresql-continuity.md)
+- [Customer PostgreSQL primary-promotion qualification](operations/customer-postgresql-continuity-qualification.md)
 - [Glossary](glossary.md)
 
 ## Research

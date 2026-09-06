@@ -21,6 +21,7 @@ import deployment_diagnostics as diagnostics
 import deployment_preflight as preflight
 import qualify_customer_continuity as continuity
 import qualify_customer_processing_continuity as processing
+import qualify_customer_postgresql_continuity as postgresql
 import qualify_ingress_availability as ingress
 
 
@@ -28,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "contracts/schemas/customer-deployment-qualification-report.schema.json"
 API_VERSION = "iip.platform/v1alpha1"
 KIND = "CustomerDeploymentQualificationReport"
-QUALIFICATION_LEVEL = "single-cluster-processing-v2"
+QUALIFICATION_LEVEL = "single-cluster-database-continuity-v3"
 REPORT_ID = re.compile(r"^cdq_[a-f0-9]{32}$")
 DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 MAX_DOCUMENT_BYTES = 16 * 1024 * 1024
@@ -64,6 +65,12 @@ EVIDENCE_DEFINITIONS = (
         "qualified",
         "customer-deployment-qualification.processing.not-qualified",
     ),
+    (
+        "postgresql-primary-promotion",
+        "CustomerPostgreSQLContinuityQualificationReport",
+        "qualified",
+        "customer-deployment-qualification.database.not-qualified",
+    ),
 )
 CHECK_IDS = (
     "source-binding",
@@ -75,8 +82,10 @@ CHECK_IDS = (
     "customer-ingress",
     "control-plane-continuity",
     "worker-receiver-processing",
+    "postgresql-primary-promotion",
     "continuity-ingress-chain",
     "processing-target-chain",
+    "database-target-chain",
     "evidence-order",
     "evidence-freshness",
     "minimized-output",
@@ -86,8 +95,8 @@ LIMITATIONS = (
     "planned-sequential-api-worker-receiver-pod-disruptions",
     "point-in-time-dependency-observation",
     "artifact-publication-signatures-vulnerabilities-not-qualified",
-    "database-ha-dr-not-qualified",
-    "shared-database-failure-not-qualified",
+    "database-topology-fencing-and-rpo-not-qualified",
+    "regional-database-disaster-recovery-not-qualified",
     "customer-integrations-and-live-ai-not-qualified",
     "regional-slo-and-capacity-not-qualified",
     "design-partner-legal-brand-governance-not-qualified",
@@ -268,6 +277,7 @@ def _subject_and_bindings(
     ingress_report: Mapping[str, Any],
     continuity_report: Mapping[str, Any],
     processing_report: Mapping[str, Any],
+    postgresql_report: Mapping[str, Any],
     context: str,
     namespace: str,
     release_name: str,
@@ -345,6 +355,22 @@ def _subject_and_bindings(
         processing_spec.get("bindings"),
         "customer-deployment-qualification.processing.invalid",
     )
+    postgresql_metadata = _mapping(
+        postgresql_report.get("metadata"),
+        "customer-deployment-qualification.database.invalid",
+    )
+    postgresql_spec = _mapping(
+        postgresql_report.get("spec"),
+        "customer-deployment-qualification.database.invalid",
+    )
+    postgresql_subject = _mapping(
+        postgresql_spec.get("subject"),
+        "customer-deployment-qualification.database.invalid",
+    )
+    postgresql_bindings = _mapping(
+        postgresql_spec.get("bindings"),
+        "customer-deployment-qualification.database.invalid",
+    )
 
     revisions = {
         preflight_metadata.get("sourceRevision"),
@@ -354,6 +380,8 @@ def _subject_and_bindings(
         continuity_subject.get("sourceRevision"),
         processing_metadata.get("sourceRevision"),
         processing_subject.get("sourceRevision"),
+        postgresql_metadata.get("sourceRevision"),
+        postgresql_subject.get("sourceRevision"),
     }
     if len(revisions) != 1 or None in revisions:
         _fail("customer-deployment-qualification.source.crossed")
@@ -372,6 +400,7 @@ def _subject_and_bindings(
         or continuity_subject.get("imageDigest") != image_digest
         or continuity_subject.get("contractsApiVersion") != API_VERSION
         or processing_subject != continuity_subject
+        or postgresql_subject != continuity_subject
         or ingress_spec.get("targetIdentity")
         != {
             **{key: continuity_subject.get(key) for key in (
@@ -436,6 +465,17 @@ def _subject_and_bindings(
         ]
     ):
         _fail("customer-deployment-qualification.processing.crossed")
+    if (
+        postgresql_bindings.get("apiTargetBindingDigest")
+        != processing_bindings.get("apiTargetBindingDigest")
+        or postgresql_bindings.get("otlpTargetBindingDigest")
+        != processing_bindings.get("otlpTargetBindingDigest")
+        or postgresql_bindings.get("kubernetesContextBindingDigest")
+        != processing_bindings.get("kubernetesContextBindingDigest")
+        or postgresql_bindings.get("namespaceBindingDigest")
+        != processing_bindings.get("namespaceBindingDigest")
+    ):
+        _fail("customer-deployment-qualification.database.crossed")
     diagnostic_binding, _ = diagnostics._target(
         context=context,
         namespace=namespace,
@@ -484,6 +524,10 @@ def _subject_and_bindings(
         "receiverDeploymentBindingDigest": str(
             processing_components[1]["deploymentBindingDigest"]
         ),
+        "databaseTargetBindingDigest": str(
+            postgresql_bindings["databaseTargetBindingDigest"]
+        ),
+        "databaseProfileDigest": str(postgresql_bindings["profileDigest"]),
     }
     return subject, bindings
 
@@ -494,7 +538,8 @@ def _input_times(
     diagnostic_report: Mapping[str, Any],
     continuity_report: Mapping[str, Any],
     processing_report: Mapping[str, Any],
-) -> tuple[datetime, datetime, datetime, datetime, datetime, datetime]:
+    postgresql_report: Mapping[str, Any],
+) -> tuple[datetime, datetime, datetime, datetime, datetime, datetime, datetime, datetime]:
     preflight_metadata = _mapping(
         preflight_report.get("metadata"),
         "customer-deployment-qualification.time.invalid",
@@ -523,6 +568,14 @@ def _input_times(
         processing_spec.get("measurements"),
         "customer-deployment-qualification.time.invalid",
     )
+    postgresql_spec = _mapping(
+        postgresql_report.get("spec"),
+        "customer-deployment-qualification.time.invalid",
+    )
+    postgresql_measurements = _mapping(
+        postgresql_spec.get("measurements"),
+        "customer-deployment-qualification.time.invalid",
+    )
     return (
         _parse_timestamp(
             preflight_metadata.get("generatedAt"),
@@ -545,6 +598,14 @@ def _input_times(
             "customer-deployment-qualification.time.invalid",
         ),
         _parse_timestamp(
+            postgresql_measurements.get("startedAt"),
+            "customer-deployment-qualification.time.invalid",
+        ),
+        _parse_timestamp(
+            postgresql_measurements.get("completedAt"),
+            "customer-deployment-qualification.time.invalid",
+        ),
+        _parse_timestamp(
             diagnostic_environment.get("observedAt"),
             "customer-deployment-qualification.time.invalid",
         ),
@@ -563,6 +624,8 @@ def build_report(
     continuity_digest: str,
     processing_report: Mapping[str, Any],
     processing_digest: str,
+    postgresql_report: Mapping[str, Any],
+    postgresql_digest: str,
     context: str,
     namespace: str,
     release_name: str,
@@ -592,6 +655,7 @@ def build_report(
         ingress_report=ingress_report,
         continuity_report=continuity_report,
         processing_report=processing_report,
+        postgresql_report=postgresql_report,
         context=context,
         namespace=namespace,
         release_name=release_name,
@@ -607,12 +671,15 @@ def build_report(
         continuity_completed,
         processing_started,
         processing_completed,
+        postgresql_started,
+        postgresql_completed,
         health_observed,
     ) = _input_times(
         preflight_report=preflight_report,
         diagnostic_report=diagnostic_report,
         continuity_report=continuity_report,
         processing_report=processing_report,
+        postgresql_report=postgresql_report,
     )
     skew = maximum_clock_skew_seconds
     ordered = (
@@ -620,7 +687,9 @@ def build_report(
         and continuity_started <= continuity_completed
         and continuity_completed <= processing_started
         and processing_started <= processing_completed
-        and processing_completed <= health_observed
+        and processing_completed <= postgresql_started
+        and postgresql_started <= postgresql_completed
+        and postgresql_completed <= health_observed
     )
     times = (
         preflight_at,
@@ -628,6 +697,8 @@ def build_report(
         continuity_completed,
         processing_started,
         processing_completed,
+        postgresql_started,
+        postgresql_completed,
         health_observed,
     )
     fresh = all(
@@ -655,6 +726,7 @@ def build_report(
                 ingress_report,
                 continuity_report,
                 processing_report,
+                postgresql_report,
             ),
             (
                 preflight_digest,
@@ -662,6 +734,7 @@ def build_report(
                 ingress_digest,
                 continuity_digest,
                 processing_digest,
+                postgresql_digest,
             ),
         )
     ]
@@ -696,8 +769,14 @@ def build_report(
             evidence_by_id["worker-receiver-processing"]["status"] == "passed",
             "customer-deployment-qualification.processing.not-qualified",
         ),
+        _check(
+            "postgresql-primary-promotion",
+            evidence_by_id["postgresql-primary-promotion"]["status"] == "passed",
+            "customer-deployment-qualification.database.not-qualified",
+        ),
         _check("continuity-ingress-chain", True, "customer-deployment-qualification.ingress.crossed"),
         _check("processing-target-chain", True, "customer-deployment-qualification.processing.crossed"),
+        _check("database-target-chain", True, "customer-deployment-qualification.database.crossed"),
         _check("evidence-order", ordered, "customer-deployment-qualification.evidence.order-invalid"),
         _check("evidence-freshness", fresh, "customer-deployment-qualification.evidence.stale"),
         _check("minimized-output", True, "customer-deployment-qualification.output.not-minimized"),
@@ -726,6 +805,8 @@ def build_report(
             "continuityCompletedAt": _timestamp(continuity_completed),
             "processingStartedAt": _timestamp(processing_started),
             "processingCompletedAt": _timestamp(processing_completed),
+            "databaseContinuityStartedAt": _timestamp(postgresql_started),
+            "databaseContinuityCompletedAt": _timestamp(postgresql_completed),
             "postContinuityHealthObservedAt": _timestamp(health_observed),
             "qualifiedAt": generated_at,
             "oldestEvidenceAgeSeconds": oldest_age,
@@ -812,6 +893,14 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         measurements.get("processingCompletedAt"),
         "customer-deployment-qualification.report.time-invalid",
     )
+    postgresql_started = _parse_timestamp(
+        measurements.get("databaseContinuityStartedAt"),
+        "customer-deployment-qualification.report.time-invalid",
+    )
+    postgresql_completed = _parse_timestamp(
+        measurements.get("databaseContinuityCompletedAt"),
+        "customer-deployment-qualification.report.time-invalid",
+    )
     health_observed = _parse_timestamp(
         measurements.get("postContinuityHealthObservedAt"),
         "customer-deployment-qualification.report.time-invalid",
@@ -834,7 +923,9 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         and continuity_started <= continuity_completed
         and continuity_completed <= processing_started
         and processing_started <= processing_completed
-        and processing_completed <= health_observed
+        and processing_completed <= postgresql_started
+        and postgresql_started <= postgresql_completed
+        and postgresql_completed <= health_observed
     )
     values = (
         preflight_at,
@@ -842,6 +933,8 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         continuity_completed,
         processing_started,
         processing_completed,
+        postgresql_started,
+        postgresql_completed,
         health_observed,
     )
     fresh = all(
@@ -884,8 +977,15 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
             == "passed",
             "customer-deployment-qualification.processing.not-qualified",
         ),
+        _check(
+            "postgresql-primary-promotion",
+            evidence_by_id.get("postgresql-primary-promotion", {}).get("status")
+            == "passed",
+            "customer-deployment-qualification.database.not-qualified",
+        ),
         _check("continuity-ingress-chain", True, "customer-deployment-qualification.ingress.crossed"),
         _check("processing-target-chain", True, "customer-deployment-qualification.processing.crossed"),
+        _check("database-target-chain", True, "customer-deployment-qualification.database.crossed"),
         _check("evidence-order", ordered, "customer-deployment-qualification.evidence.order-invalid"),
         _check("evidence-freshness", fresh, "customer-deployment-qualification.evidence.stale"),
         _check(
@@ -977,6 +1077,10 @@ def _validate_inputs(
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
+    postgresql_path: Path,
+    postgresql_profile_path: Path,
+    postgresql_database_host: str,
+    postgresql_database_port: int,
     processing_api_base_url: str,
     processing_otlp_base_url: str,
     values: Sequence[Path],
@@ -989,6 +1093,8 @@ def _validate_inputs(
     image_digest: str,
     helm: str,
 ) -> tuple[
+    Mapping[str, Any],
+    str,
     Mapping[str, Any],
     str,
     Mapping[str, Any],
@@ -1016,6 +1122,9 @@ def _validate_inputs(
     )
     processing_report, processing_digest = _load_document(
         processing_path, "customer-deployment-qualification.processing.unreadable"
+    )
+    postgresql_report, postgresql_digest = _load_document(
+        postgresql_path, "customer-deployment-qualification.database.unreadable"
     )
     try:
         preflight.verify_report(
@@ -1056,12 +1165,26 @@ def _validate_inputs(
             require_clean=True,
             require_qualified=False,
         )
+        postgresql.verify_report(
+            report_path=postgresql_path,
+            profile_path=postgresql_profile_path,
+            api_base_url=processing_api_base_url,
+            otlp_base_url=processing_otlp_base_url,
+            database_host=postgresql_database_host,
+            database_port=postgresql_database_port,
+            image_digest=image_digest,
+            context=context,
+            namespace=namespace,
+            require_clean=True,
+            require_qualified=False,
+        )
     except (
         preflight.DeploymentPreflightError,
         diagnostics.DeploymentDiagnosticError,
         ingress.IngressQualificationError,
         continuity.CustomerContinuityQualificationError,
         processing.CustomerProcessingContinuityError,
+        postgresql.CustomerPostgreSQLContinuityError,
     ):
         _fail("customer-deployment-qualification.input.verification-failed")
     for path, expected, code in (
@@ -1070,6 +1193,7 @@ def _validate_inputs(
         (ingress_path, ingress_digest, "customer-deployment-qualification.ingress.changed"),
         (continuity_path, continuity_digest, "customer-deployment-qualification.continuity.changed"),
         (processing_path, processing_digest, "customer-deployment-qualification.processing.changed"),
+        (postgresql_path, postgresql_digest, "customer-deployment-qualification.database.changed"),
     ):
         if _file_digest(path, code) != expected:
             _fail(code)
@@ -1084,6 +1208,8 @@ def _validate_inputs(
         continuity_digest,
         processing_report,
         processing_digest,
+        postgresql_report,
+        postgresql_digest,
     )
 
 
@@ -1097,6 +1223,10 @@ def qualify(
     processing_profile_path: Path,
     processing_api_base_url: str,
     processing_otlp_base_url: str,
+    postgresql_path: Path,
+    postgresql_profile_path: Path,
+    postgresql_database_host: str,
+    postgresql_database_port: int,
     values: Sequence[Path],
     context: str,
     namespace: str,
@@ -1121,6 +1251,10 @@ def qualify(
         processing_profile_path=processing_profile_path,
         processing_api_base_url=processing_api_base_url,
         processing_otlp_base_url=processing_otlp_base_url,
+        postgresql_path=postgresql_path,
+        postgresql_profile_path=postgresql_profile_path,
+        postgresql_database_host=postgresql_database_host,
+        postgresql_database_port=postgresql_database_port,
         values=values,
         context=context,
         namespace=namespace,
@@ -1147,6 +1281,8 @@ def qualify(
         continuity_digest=inputs[7],
         processing_report=inputs[8],
         processing_digest=inputs[9],
+        postgresql_report=inputs[10],
+        postgresql_digest=inputs[11],
         context=context,
         namespace=namespace,
         release_name=release_name,
@@ -1174,6 +1310,10 @@ def verify_report(
     processing_profile_path: Path,
     processing_api_base_url: str,
     processing_otlp_base_url: str,
+    postgresql_path: Path,
+    postgresql_profile_path: Path,
+    postgresql_database_host: str,
+    postgresql_database_port: int,
     values: Sequence[Path],
     context: str,
     namespace: str,
@@ -1200,6 +1340,10 @@ def verify_report(
         processing_profile_path=processing_profile_path,
         processing_api_base_url=processing_api_base_url,
         processing_otlp_base_url=processing_otlp_base_url,
+        postgresql_path=postgresql_path,
+        postgresql_profile_path=postgresql_profile_path,
+        postgresql_database_host=postgresql_database_host,
+        postgresql_database_port=postgresql_database_port,
         values=values,
         context=context,
         namespace=namespace,
@@ -1237,6 +1381,8 @@ def verify_report(
         continuity_digest=inputs[7],
         processing_report=inputs[8],
         processing_digest=inputs[9],
+        postgresql_report=inputs[10],
+        postgresql_digest=inputs[11],
         context=context,
         namespace=namespace,
         release_name=release_name,
@@ -1268,6 +1414,10 @@ def _common_inputs(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--processing-profile", type=Path, required=True)
     parser.add_argument("--processing-api-base-url", required=True)
     parser.add_argument("--processing-otlp-base-url", required=True)
+    parser.add_argument("--postgresql-report", type=Path, required=True)
+    parser.add_argument("--postgresql-profile", type=Path, required=True)
+    parser.add_argument("--postgresql-database-host", required=True)
+    parser.add_argument("--postgresql-database-port", type=int, default=5432)
     parser.add_argument("--values", type=Path, action="append", required=True)
     parser.add_argument("--context", required=True)
     parser.add_argument("--namespace", default="iip-system")
@@ -1311,6 +1461,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "processing_profile_path": arguments.processing_profile,
         "processing_api_base_url": arguments.processing_api_base_url,
         "processing_otlp_base_url": arguments.processing_otlp_base_url,
+        "postgresql_path": arguments.postgresql_report,
+        "postgresql_profile_path": arguments.postgresql_profile,
+        "postgresql_database_host": arguments.postgresql_database_host,
+        "postgresql_database_port": arguments.postgresql_database_port,
         "values": arguments.values,
         "context": arguments.context,
         "namespace": arguments.namespace,

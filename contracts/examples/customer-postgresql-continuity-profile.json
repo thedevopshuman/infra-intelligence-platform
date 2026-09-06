@@ -1,0 +1,29 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerPostgreSQLContinuityProfile",
+  "metadata": {
+    "tenantId": "customer-qualification",
+    "actorId": "continuity-operator"
+  },
+  "spec": {
+    "resourceUid": "res_0123456789abcdef0123456789abcdef",
+    "metric": {
+      "name": "iip.qualification.database.request.count",
+      "unit": "{request}",
+      "serviceName": "customer-database-continuity-probe"
+    },
+    "investigation": {
+      "evidenceTypes": ["resource.change"],
+      "allowedTools": ["resources/query", "evidence/fetch"],
+      "maxToolCalls": 8,
+      "maxWallTimeSeconds": 60,
+      "maxEvidenceItems": 16,
+      "maxIterations": 8
+    },
+    "database": {
+      "name": "iip",
+      "user": "iip_continuity_observer",
+      "minimumMajorVersion": 14
+    }
+  }
+}

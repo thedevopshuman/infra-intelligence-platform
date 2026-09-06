@@ -21,6 +21,7 @@ import deployment_preflight as preflight  # noqa: E402
 import qualify_customer_continuity as continuity  # noqa: E402
 import qualify_customer_deployment as qualification  # noqa: E402
 import qualify_customer_processing_continuity as processing  # noqa: E402
+import qualify_customer_postgresql_continuity as postgresql  # noqa: E402
 from infra_intelligence_sdk import CustomerDeploymentQualificationReport  # noqa: E402
 from tests.test_customer_continuity_qualification import (  # noqa: E402
     COMPLETED,
@@ -36,6 +37,11 @@ from tests.test_customer_continuity_qualification import (  # noqa: E402
 from tests.test_customer_processing_continuity import (  # noqa: E402
     observation as processing_observation,
     phase as processing_phase,
+)
+from tests.test_customer_postgresql_continuity import (  # noqa: E402
+    observation as postgresql_observation,
+    objective as postgresql_objective,
+    phase as postgresql_phase,
 )
 
 
@@ -226,14 +232,49 @@ def processing_report(
     )
 
 
+def postgresql_report(processing_document: dict[str, object]) -> dict[str, object]:
+    bindings = processing_document["spec"]["bindings"]
+    return postgresql.build_report(
+        revision=REVISION,
+        repository={
+            "applicationVersion": "0.84.0",
+            "chartVersion": "0.87.0",
+            "requiredMigration": "0023_ai_model_suitability.sql",
+        },
+        image_digest=IMAGE_DIGEST,
+        api_target_digest=bindings["apiTargetBindingDigest"],
+        otlp_target_digest=bindings["otlpTargetBindingDigest"],
+        database_target_digest="sha256:" + "4" * 64,
+        context=CONTEXT,
+        namespace=NAMESPACE,
+        profile_digest="sha256:" + "3" * 64,
+        api_ca_source="custom",
+        otlp_ca_source="custom",
+        database_client_identity="password",
+        objective=postgresql_objective(),
+        initial=postgresql_observation(7, server="1"),
+        promoted=postgresql_observation(8, server="2"),
+        connection_attempts=8,
+        connection_failures=2,
+        promotion_milliseconds=5_000,
+        phases=[postgresql_phase(identifier) for identifier in postgresql.PHASES],
+        started_at=datetime(2026, 9, 6, 12, 36, 51, tzinfo=timezone.utc),
+        promotion_wait_started_at=datetime(2026, 9, 6, 12, 36, 52, tzinfo=timezone.utc),
+        promotion_observed_at=datetime(2026, 9, 6, 12, 36, 57, tzinfo=timezone.utc),
+        completed_at=datetime(2026, 9, 6, 12, 36, 59, tzinfo=timezone.utc),
+    )
+
+
 def inputs() -> tuple[dict[str, object], ...]:
     ingress_document, continuity_document = continuity_inputs()
+    processing_document = processing_report(continuity_document)
     return (
         live_preflight(),
         healthy_diagnostic(),
         ingress_document,
         continuity_document,
-        processing_report(continuity_document),
+        processing_document,
+        postgresql_report(processing_document),
     )
 
 
@@ -244,6 +285,7 @@ def build(
     ingress_document: dict[str, object] | None = None,
     continuity_document: dict[str, object] | None = None,
     processing_document: dict[str, object] | None = None,
+    postgresql_document: dict[str, object] | None = None,
 ) -> dict[str, object]:
     documents = inputs()
     selected = (
@@ -252,6 +294,7 @@ def build(
         ingress_document or documents[2],
         continuity_document or documents[3],
         processing_document or documents[4],
+        postgresql_document or documents[5],
     )
     return qualification.build_report(
         preflight_report=selected[0],
@@ -264,6 +307,8 @@ def build(
         continuity_digest=_digest(selected[3]),
         processing_report=selected[4],
         processing_digest=_digest(selected[4]),
+        postgresql_report=selected[5],
+        postgresql_digest=_digest(selected[5]),
         context=CONTEXT,
         namespace=NAMESPACE,
         release_name=RELEASE,
@@ -300,7 +345,7 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
     def test_exact_bound_inputs_produce_minimized_qualified_report(self) -> None:
         report = build()
         self.assertEqual(report["spec"]["status"], "qualified")
-        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 5)
+        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 6)
         serialized = json.dumps(report, sort_keys=True)
         for forbidden in (
             CONTEXT,
@@ -327,6 +372,18 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
         ):
             build(processing_document=crossed)
 
+    def test_crossed_database_target_is_rejected(self) -> None:
+        documents = inputs()
+        crossed = copy.deepcopy(documents[5])
+        crossed["spec"]["bindings"]["otlpTargetBindingDigest"] = (
+            "sha256:" + "f" * 64
+        )
+        with self.assertRaisesRegex(
+            qualification.CustomerDeploymentQualificationError,
+            "customer-deployment-qualification.database.crossed",
+        ):
+            build(postgresql_document=crossed)
+
     def test_crossed_source_and_current_cluster_are_rejected(self) -> None:
         crossed = healthy_diagnostic()
         crossed["metadata"]["sourceRevision"] = "f" * 40
@@ -351,6 +408,8 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
                 continuity_digest=_digest(documents[3]),
                 processing_report=documents[4],
                 processing_digest=_digest(documents[4]),
+                postgresql_report=documents[5],
+                postgresql_digest=_digest(documents[5]),
                 context=CONTEXT,
                 namespace=NAMESPACE,
                 release_name=RELEASE,
@@ -425,6 +484,8 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
             _digest(documents[3]),
             documents[4],
             _digest(documents[4]),
+            documents[5],
+            _digest(documents[5]),
         )
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "report.json"
@@ -445,6 +506,10 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
                     processing_profile_path=Path("processing-profile.json"),
                     processing_api_base_url="https://api.example.test",
                     processing_otlp_base_url="https://otlp.example.test:4318",
+                    postgresql_path=Path("postgresql.json"),
+                    postgresql_profile_path=Path("postgresql-profile.json"),
+                    postgresql_database_host="database.example.test",
+                    postgresql_database_port=5432,
                     values=[Path("values.yaml")],
                     context=CONTEXT,
                     namespace=NAMESPACE,

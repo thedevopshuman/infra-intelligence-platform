@@ -4,7 +4,8 @@
 
 This workflow turns the separate live preflight, sustained ingress/API-pod
 Eviction, worker/receiver processing continuity, and post-install diagnostic
-reports into one exact-release evidence chain. It does not install IIP and it
+reports plus PostgreSQL primary-promotion evidence into one exact-release
+evidence chain. It does not install IIP and it
 does not perform another disruption.
 Run it only after the owning workflows have completed in the same selected
 cluster.
@@ -19,9 +20,12 @@ cluster.
 4. Run the separately enabled customer processing-continuity workflow. It
    performs sequential worker and receiver pod Evictions while proving durable
    OTLP metric intake and investigation completion.
-5. Run deployment diagnostics after both workflows have completed, so health
+5. Run the customer PostgreSQL continuity observer and have a separately
+   authorized operator initiate the planned promotion only after its readiness
+   message.
+6. Run deployment diagnostics after all workflows have completed, so health
    is observed after every planned disruption.
-6. Aggregate the five reports while their timestamps remain within the chosen
+7. Aggregate the six reports while their timestamps remain within the chosen
    evidence-age objective.
 
 For a core deployment with one values file:
@@ -35,6 +39,8 @@ IIP_CONTINUITY_IMAGE_DIGEST=sha256:<64 lowercase hex characters> \
 IIP_PROCESSING_PROFILE=/absolute/protected/customer-processing-profile.json \
 IIP_PROCESSING_API_BASE_URL=https://iip.example.com \
 IIP_PROCESSING_OTLP_BASE_URL=https://otlp.example.com:4318 \
+IIP_CUSTOMER_POSTGRESQL_PROFILE=/absolute/protected/customer-postgresql-profile.json \
+IIP_CUSTOMER_POSTGRESQL_HOST=writer.database.example.com \
   make qualify-customer-deployment PYTHON=.venv/bin/python
 ```
 
@@ -50,7 +56,8 @@ The defaults consume:
 - `dist/deployment-diagnostic-report.json`;
 - `dist/customer-continuity-ingress-report.json`;
 - `dist/customer-continuity-qualification-report.json`; and
-- `dist/customer-processing-continuity-qualification-report.json`.
+- `dist/customer-processing-continuity-qualification-report.json`; and
+- `dist/customer-postgresql-continuity-qualification-report.json`.
 
 The aggregate is written to
 `dist/customer-deployment-qualification-report.json`. The command retains a
@@ -72,6 +79,8 @@ IIP_CONTINUITY_IMAGE_DIGEST=sha256:<64 lowercase hex characters> \
 IIP_PROCESSING_PROFILE=/absolute/protected/customer-processing-profile.json \
 IIP_PROCESSING_API_BASE_URL=https://iip.example.com \
 IIP_PROCESSING_OTLP_BASE_URL=https://otlp.example.com:4318 \
+IIP_CUSTOMER_POSTGRESQL_PROFILE=/absolute/protected/customer-postgresql-profile.json \
+IIP_CUSTOMER_POSTGRESQL_HOST=writer.database.example.com \
   make verify-customer-deployment-qualification-report \
   PYTHON=.venv/bin/python
 ```
@@ -86,11 +95,11 @@ historical chain, but the Make gate always rechecks the cluster.
 
 Aggregation requires only the existing preflight/diagnostic read authority:
 Kubernetes `/version` and `get` on the selected Namespace, plus local access to
-the protected values and evidence files. It reads no Secret values and has no
-mutation authority. The separate API and processing-continuity steps remain
-the only disruptive operations. Each requires its own explicit enable flag;
-the latter needs narrow Eviction authority only for the selected worker and
-receiver.
+the protected values, profiles, and evidence files. It reads no Secret values
+and has no mutation authority. The separate API and processing-continuity steps
+perform the pod Evictions. The database qualifier only observes; the separately
+authorized customer operator owns promotion. Each active workflow requires its
+own explicit enable flag.
 
 The aggregate retains no customer, cluster, namespace, release, Deployment,
 Pod, endpoint, or credential value. Share the minimized report only under the
@@ -100,8 +109,8 @@ values separately for reproducible verification.
 ## Non-claims
 
 This profile does not qualify artifact publication/signatures/vulnerabilities,
-automatic database failover or disaster recovery, involuntary or simultaneous
-failures, representative sustained throughput, customer identity/policy/
+automatic database failover, topology, fencing, zero-loss RPO, or regional
+disaster recovery; involuntary or simultaneous failures; representative sustained throughput; customer identity/policy/
 broker/Collector interoperability, live AI providers or price authority,
 regional capacity/SLOs, a design-partner outcome, or public legal/brand/
 governance approval. Those remain independent release gates.

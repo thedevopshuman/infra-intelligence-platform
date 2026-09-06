@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-postgresql-continuity-profile:v1alpha1",
+  "title": "Customer PostgreSQL Continuity Profile",
+  "description": "Protected tenant, workload, and least-privilege database identity used only by the customer PostgreSQL primary-promotion qualifier.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerPostgreSQLContinuityProfile"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId", "actorId"],
+      "properties": {
+        "tenantId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$"},
+        "actorId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]{0,127}$"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resourceUid", "metric", "investigation", "database"],
+      "properties": {
+        "resourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
+        "metric": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "unit", "serviceName"],
+          "properties": {
+            "name": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]{0,126}[a-zA-Z0-9]$"},
+            "unit": {"type": "string", "minLength": 1, "maxLength": 32},
+            "serviceName": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,126}[a-zA-Z0-9]$"}
+          }
+        },
+        "investigation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["evidenceTypes", "allowedTools", "maxToolCalls", "maxWallTimeSeconds", "maxEvidenceItems", "maxIterations"],
+          "properties": {
+            "evidenceTypes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {"enum": ["resource.change", "kubernetes.event", "telemetry.metric", "telemetry.log"]}
+            },
+            "allowedTools": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {"enum": ["resources/query", "evidence/fetch", "events/query", "metrics/query", "logs/query"]}
+            },
+            "maxToolCalls": {"type": "integer", "minimum": 1, "maximum": 16},
+            "maxWallTimeSeconds": {"type": "integer", "minimum": 10, "maximum": 120},
+            "maxEvidenceItems": {"type": "integer", "minimum": 1, "maximum": 32},
+            "maxIterations": {"type": "integer", "minimum": 1, "maximum": 16}
+          }
+        },
+        "database": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "user", "minimumMajorVersion"],
+          "properties": {
+            "name": {"type": "string", "pattern": "^[a-zA-Z_][a-zA-Z0-9_$.-]{0,62}$"},
+            "user": {"type": "string", "pattern": "^[a-zA-Z_][a-zA-Z0-9_$.-]{0,62}$"},
+            "minimumMajorVersion": {"type": "integer", "minimum": 14, "maximum": 99}
+          }
+        }
+      }
+    }
+  }
+}

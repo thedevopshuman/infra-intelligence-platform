@@ -1,5 +1,9 @@
 # TypeScript SDK boundary
 
+Version 0.64 adds the customer PostgreSQL continuity profile/report types and
+upgrades the customer deployment evidence chain to its six-report database-
+continuity profile. No client method receives promotion authority.
+
 The SDK exposes public contract types and a small fetch-based client. It has no dependency on server code or a framework runtime.
 
 `getTelemetryExportHealth()` reads the answering API process; `getTelemetryDeploymentExportHealth()` returns bounded recent pseudonymous API and workflow-worker heartbeats. Both stay backend-neutral and exclude endpoint, credential, payload, provider-response, and raw workload identity data.

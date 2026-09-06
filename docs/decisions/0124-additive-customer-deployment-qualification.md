@@ -58,3 +58,8 @@ pilot, and governance evidence.
 the aggregate to `single-cluster-processing-v2` by adding exact worker and
 receiver processing-continuity evidence. The original control-plane profile
 remains historical and is not accepted by the current aggregate schema.
+
+[ADR 0130](0130-customer-postgresql-primary-promotion-continuity.md) then
+upgrades it to `single-cluster-database-continuity-v3` by adding portable,
+least-privilege PostgreSQL timeline-promotion evidence. Both earlier aggregate
+profiles remain historical and are not accepted by the current schema.

@@ -1,5 +1,9 @@
 # Python SDK boundary
 
+Version 0.64 adds transport wrappers for the protected customer PostgreSQL
+continuity profile and its privacy-minimized primary-promotion report. These
+types convey evidence only; they expose no database or provider mutation API.
+
 This package contains public transport and model types only. It does not import the server kernel. The API will expand contract-first; unstable methods remain under the `v1alpha1` namespace in their paths and models.
 
 ```python

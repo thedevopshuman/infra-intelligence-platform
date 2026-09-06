@@ -29,7 +29,7 @@ REGISTRY_IMAGE = (
     "registry@sha256:"
     "a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373"
 )
-SDK_VERSION = "0.63.0"
+SDK_VERSION = "0.64.0"
 
 
 def _run(command: tuple[str, ...], *, capture: bool = False) -> str:

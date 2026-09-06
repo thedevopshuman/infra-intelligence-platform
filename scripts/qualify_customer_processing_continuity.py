@@ -375,6 +375,7 @@ class ProcessingClient:
         api_ca_file: Path | None,
         otlp_ca_file: Path | None,
         request_timeout_milliseconds: int,
+        qualification_id: str = "customer-processing-continuity",
     ) -> None:
         self.api_base_url, self.api_target_digest = _https_target(api_base_url)
         self.otlp_base_url, self.otlp_target_digest = _https_target(otlp_base_url)
@@ -395,6 +396,12 @@ class ProcessingClient:
         self.profile = profile
         self.subject = subject
         self.request_timeout_milliseconds = request_timeout_milliseconds
+        if qualification_id not in {
+            "customer-processing-continuity",
+            "customer-postgresql-continuity",
+        }:
+            _fail("customer-processing-continuity.client.invalid")
+        self.qualification_id = qualification_id
 
     def _runtime_identity_valid(self, payload: bytes) -> bool:
         try:
@@ -427,7 +434,7 @@ class ProcessingClient:
             key="service.name"
         ).value.string_value = str(metric_profile["serviceName"])
         scope_metrics = resource_metrics.scope_metrics.add()
-        scope_metrics.scope.name = "iip.customer-processing-continuity"
+        scope_metrics.scope.name = "iip." + self.qualification_id
         metric = scope_metrics.metrics.add(
             name=str(metric_profile["name"]), unit=str(metric_profile["unit"])
         )
@@ -525,14 +532,14 @@ class ProcessingClient:
                 "tenantId": metadata["tenantId"],
                 "actorId": metadata["actorId"],
                 "requestedAt": _timestamp(now),
-                "correlationId": "customer-processing-continuity-" + phase,
+                "correlationId": self.qualification_id + "-" + phase,
             },
             "spec": {
                 "question": "Can the installed platform complete bounded queued work?",
                 "trigger": {
                     "type": "scheduled",
-                    "source": "urn:iip:qualification:customer-processing-continuity",
-                    "summary": "Customer processing continuity qualification",
+                    "source": "urn:iip:qualification:" + self.qualification_id,
+                    "summary": self.qualification_id.replace("-", " ").title(),
                 },
                 "scope": {
                     "resourceUids": [profile_spec["resourceUid"]],

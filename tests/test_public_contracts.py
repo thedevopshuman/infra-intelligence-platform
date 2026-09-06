@@ -20,6 +20,8 @@ from infra_intelligence_sdk import (
     CustomerDeploymentPreflightReport,
     CustomerProcessingContinuityQualificationReport,
     CustomerProcessingQualificationProfile,
+    CustomerPostgreSQLContinuityProfile,
+    CustomerPostgreSQLContinuityQualificationReport,
     ContextEvidenceRequest,
     ContextEvidenceResult,
     Evidence,
@@ -201,6 +203,12 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         customer_processing = CustomerProcessingContinuityQualificationReport.from_dict(
             example("customer-processing-continuity-qualification-report.json")
+        )
+        customer_postgresql_profile = CustomerPostgreSQLContinuityProfile.from_dict(
+            example("customer-postgresql-continuity-profile.json")
+        )
+        customer_postgresql = CustomerPostgreSQLContinuityQualificationReport.from_dict(
+            example("customer-postgresql-continuity-qualification-report.json")
         )
         customer_deployment = CustomerDeploymentQualificationReport.from_dict(
             example("customer-deployment-qualification-report.json")
@@ -476,7 +484,7 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         self.assertEqual(
             customer_deployment.to_dict()["spec"]["qualificationLevel"],
-            "single-cluster-processing-v2",
+            "single-cluster-database-continuity-v3",
         )
         self.assertEqual(
             customer_processing_profile.to_dict()["kind"],
@@ -485,6 +493,14 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             customer_processing.to_dict()["spec"]["qualificationLevel"],
             "customer-worker-receiver-pod-eviction-v1",
+        )
+        self.assertEqual(
+            customer_postgresql_profile.to_dict()["kind"],
+            "CustomerPostgreSQLContinuityProfile",
+        )
+        self.assertEqual(
+            customer_postgresql.to_dict()["spec"]["qualificationLevel"],
+            "customer-postgresql-primary-promotion-v1",
         )
         self.assertEqual(
             control_plane_load.to_dict()["spec"]["qualificationLevel"],

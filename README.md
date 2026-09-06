@@ -47,16 +47,23 @@ mutual-TLS OTLP metric traffic while sequentially evicting one worker and one
 receiver pod. It submits one durable investigation only after each reduced-
 capacity state is observed and requires replacement recovery before moving to
 the next component. The report proves bounded disruption overlap—not sustained
-capacity, database failover, or regional availability; see the [customer
+capacity or regional availability; see the [customer
 processing-continuity runbook](docs/operations/customer-processing-continuity-qualification.md).
 
-After those disruptions, the customer deployment gate binds the live
+An external PostgreSQL gate then uses a verified-TLS, default-read-only observer
+to prove that the stable writer endpoint advanced to a new writable WAL
+timeline while API, non-empty OTLP, and durable investigation workflows
+recovered. Promotion remains with a separately authorized customer operator;
+see the [customer PostgreSQL continuity
+runbook](docs/operations/customer-postgresql-continuity-qualification.md).
+
+After those continuity exercises, the customer deployment gate binds the live
 dependency preflight, exact installed health, nested ingress/API continuity,
-and worker/receiver processing report to one clean release and current
-namespace UID/server. It requires a fresh health observation after both
-workflows and retains only report digests and hashed target bindings. Its fixed
-limitations prevent this narrow single-cluster result from becoming a
-publication, database, integration, regional, pilot, or governance claim; see
+worker/receiver processing, and database-promotion reports to one clean release
+and current namespace UID/server. It requires a fresh health observation after
+all workflows and retains only report digests and hashed target bindings. Its
+fixed limitations prevent this narrow single-environment result from becoming a
+publication, database-topology/RPO, integration, regional, pilot, or governance claim; see
 the [customer deployment qualification
 runbook](docs/operations/customer-deployment-qualification.md).
 

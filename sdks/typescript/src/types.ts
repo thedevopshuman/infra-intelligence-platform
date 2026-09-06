@@ -1334,6 +1334,185 @@ export interface CustomerProcessingQualificationProfile {
   };
 }
 
+export interface CustomerPostgreSQLContinuityProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerPostgreSQLContinuityProfile";
+  metadata: { tenantId: string; actorId: string };
+  spec: {
+    resourceUid: `res_${string}`;
+    metric: { name: string; unit: string; serviceName: string };
+    investigation: CustomerProcessingQualificationProfile["spec"]["investigation"];
+    database: { name: string; user: string; minimumMajorVersion: number };
+  };
+}
+
+export type CustomerPostgreSQLContinuityCheckId =
+  | "source-binding"
+  | "minimized-output"
+  | "explicit-target-bindings"
+  | "api-verified-https"
+  | "receiver-mutual-tls"
+  | "database-verified-tls"
+  | "database-read-only-probe"
+  | "initial-writable-primary"
+  | "promotion-observed"
+  | "timeline-advanced"
+  | "promoted-writable-primary"
+  | "api-availability"
+  | "receiver-availability"
+  | "bounded-api-outage"
+  | "bounded-receiver-outage"
+  | "receiver-durable-intake"
+  | "workflow-baseline-completion"
+  | "workflow-survived-promotion"
+  | "workflow-recovery-completion";
+
+export interface CustomerPostgreSQLContinuityQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerPostgreSQLContinuityQualificationReport";
+  metadata: {
+    id: `cpgq_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualificationLevel: "customer-postgresql-primary-promotion-v1";
+    subject: {
+      applicationVersion: string;
+      chartVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      requiredMigration: `${number}_${string}.sql`;
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      apiTargetBindingDigest: Sha256Digest;
+      otlpTargetBindingDigest: Sha256Digest;
+      databaseTargetBindingDigest: Sha256Digest;
+      kubernetesContextBindingDigest: Sha256Digest;
+      namespaceBindingDigest: Sha256Digest;
+      profileDigest: Sha256Digest;
+    };
+    objective: {
+      minimumProbeAttemptsPerPhase: number;
+      probeIntervalMilliseconds: number;
+      maximumPromotionMilliseconds: number;
+      maximumWorkflowCompletionMilliseconds: number;
+      requestTimeoutMilliseconds: number;
+      minimumApiAvailabilityBasisPoints: number;
+      minimumReceiverAvailabilityBasisPoints: number;
+      maximumConsecutiveFailures: number;
+    };
+    environment: {
+      platform: `${string}/${string}`;
+      pythonVersion: string;
+      databaseEngine: "postgresql";
+      databaseMajorVersion: number;
+      databaseTransport: "verified-tls";
+      databaseCaSource: "custom";
+      databaseClientIdentity: "password" | "mutual-tls-password";
+      apiTransport: "verified-https";
+      otlpTransport: "mutual-tls-https";
+      apiCaSource: "system" | "custom";
+      otlpCaSource: "system" | "custom";
+      proxyMode: "disabled";
+      redirectMode: "deny";
+    };
+    databaseProbe: {
+      mode: "read-only-native-functions";
+      session: "default-transaction-read-only";
+      primarySelection: "libpq-target-session-attrs-read-write";
+      promotionTrigger: "external-operator";
+      promotionProof: "writable-primary-wal-timeline-advance";
+    };
+    receiverIntake: {
+      signal: "metric";
+      payload: "non-empty-otlp-protobuf";
+      successBoundary: "postgresql-commit-before-http-200";
+    };
+    measurements: {
+      startedAt: string;
+      promotionWaitStartedAt: string;
+      promotionObservedAt: string;
+      completedAt: string;
+      database: {
+        initialTimeline: number;
+        promotedTimeline: number;
+        timelineDelta: number;
+        primaryBefore: boolean;
+        primaryAfter: boolean;
+        tlsBefore: boolean;
+        tlsAfter: boolean;
+        transactionReadOnlyBefore: boolean;
+        transactionReadOnlyAfter: boolean;
+        initialServerBindingDigest: Sha256Digest;
+        promotedServerBindingDigest: Sha256Digest;
+        serverIdentityChanged: boolean;
+        connectionAttempts: number;
+        connectionFailures: number;
+        promotionMilliseconds: number;
+      };
+      phases: Array<{
+        id: "baseline" | "promotion-observation" | "recovery";
+        apiAttempts: number;
+        apiSuccesses: number;
+        apiFailures: number;
+        apiMaximumConsecutiveFailures: number;
+        receiverAttempts: number;
+        receiverSuccesses: number;
+        receiverFailures: number;
+        receiverMaximumConsecutiveFailures: number;
+        workflowSubmitted: 1;
+        workflowCompleted: 0 | 1;
+        workflowFailures: 0 | 1;
+        workflowPollAttempts: number;
+        workflowCompletionMilliseconds: number;
+        workflowBoundary:
+          | "completed-before-promotion"
+          | "submitted-before-observed-after-promotion"
+          | "completed-after-promotion";
+      }>;
+    };
+    checks: Array<
+      | { id: CustomerPostgreSQLContinuityCheckId; status: "passed" }
+      | {
+          id: CustomerPostgreSQLContinuityCheckId;
+          status: "failed";
+          errorCode: `customer-postgresql-continuity.${string}`;
+        }
+    >;
+    limitations: [
+      "operator-triggered-planned-promotion",
+      "single-stable-database-endpoint",
+      "topology-and-failure-domain-not-proven",
+      "fencing-and-split-brain-not-proven",
+      "zero-data-loss-and-rpo-not-proven",
+      "synthetic-qualification-traffic",
+      "regional-disaster-recovery-not-proven",
+    ];
+    summary: {
+      totalChecks: 19;
+      passedChecks: number;
+      failedChecks: number;
+      totalApiAttempts: number;
+      failedApiAttempts: number;
+      apiAvailabilityBasisPoints: number;
+      totalReceiverAttempts: number;
+      failedReceiverAttempts: number;
+      receiverAvailabilityBasisPoints: number;
+      totalWorkflowSubmissions: 3;
+      completedWorkflows: number;
+      failedWorkflows: number;
+      maximumApiConsecutiveFailures: number;
+      maximumReceiverConsecutiveFailures: number;
+      promotionMilliseconds: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export type CustomerProcessingContinuityCheckId =
   | "source-binding"
   | "minimized-output"
@@ -1486,7 +1665,8 @@ export type CustomerDeploymentQualificationEvidenceId =
   | "post-install-health"
   | "customer-ingress"
   | "control-plane-continuity"
-  | "worker-receiver-processing";
+  | "worker-receiver-processing"
+  | "postgresql-primary-promotion";
 
 export type CustomerDeploymentQualificationCheckId =
   | "source-binding"
@@ -1498,8 +1678,10 @@ export type CustomerDeploymentQualificationCheckId =
   | "customer-ingress"
   | "control-plane-continuity"
   | "worker-receiver-processing"
+  | "postgresql-primary-promotion"
   | "continuity-ingress-chain"
   | "processing-target-chain"
+  | "database-target-chain"
   | "evidence-order"
   | "evidence-freshness"
   | "minimized-output";
@@ -1515,7 +1697,7 @@ export interface CustomerDeploymentQualificationReport {
   };
   spec: {
     status: "qualified" | "not-qualified";
-    qualificationLevel: "single-cluster-processing-v2";
+    qualificationLevel: "single-cluster-database-continuity-v3";
     subject: {
       profile: "production-core-v1" | "production-ai-finops-v0";
       applicationVersion: string;
@@ -1535,6 +1717,8 @@ export interface CustomerDeploymentQualificationReport {
       processingProfileDigest: Sha256Digest;
       workerDeploymentBindingDigest: Sha256Digest;
       receiverDeploymentBindingDigest: Sha256Digest;
+      databaseTargetBindingDigest: Sha256Digest;
+      databaseProfileDigest: Sha256Digest;
     };
     objective: {
       maximumEvidenceAgeSeconds: number;
@@ -1547,6 +1731,8 @@ export interface CustomerDeploymentQualificationReport {
       continuityCompletedAt: string;
       processingStartedAt: string;
       processingCompletedAt: string;
+      databaseContinuityStartedAt: string;
+      databaseContinuityCompletedAt: string;
       postContinuityHealthObservedAt: string;
       qualifiedAt: string;
       oldestEvidenceAgeSeconds: number;
@@ -1558,7 +1744,8 @@ export interface CustomerDeploymentQualificationReport {
         | "DeploymentDiagnosticReport"
         | "IngressAvailabilityQualificationReport"
         | "CustomerContinuityQualificationReport"
-        | "CustomerProcessingContinuityQualificationReport";
+        | "CustomerProcessingContinuityQualificationReport"
+        | "CustomerPostgreSQLContinuityQualificationReport";
       reportId: string;
       reportDigest: Sha256Digest;
       observedStatus:
@@ -1585,17 +1772,17 @@ export interface CustomerDeploymentQualificationReport {
       "planned-sequential-api-worker-receiver-pod-disruptions",
       "point-in-time-dependency-observation",
       "artifact-publication-signatures-vulnerabilities-not-qualified",
-      "database-ha-dr-not-qualified",
-      "shared-database-failure-not-qualified",
+      "database-topology-fencing-and-rpo-not-qualified",
+      "regional-database-disaster-recovery-not-qualified",
       "customer-integrations-and-live-ai-not-qualified",
       "regional-slo-and-capacity-not-qualified",
       "design-partner-legal-brand-governance-not-qualified",
     ];
     summary: {
-      requiredEvidence: 5;
+      requiredEvidence: 6;
       passedEvidence: number;
       rejectedEvidence: number;
-      totalChecks: 14;
+      totalChecks: 16;
       passedChecks: number;
       failedChecks: number;
       overallStatus: "qualified" | "not-qualified";

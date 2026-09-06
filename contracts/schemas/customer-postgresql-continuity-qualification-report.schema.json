@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-postgresql-continuity-qualification-report:v1alpha1",
+  "title": "Customer PostgreSQL Continuity Qualification Report",
+  "description": "Privacy-minimized, source- and target-bound evidence that an external PostgreSQL endpoint advanced to a writable primary timeline while the platform recovered.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerPostgreSQLContinuityQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^cpgq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationLevel", "subject", "bindings", "objective", "environment", "databaseProbe", "receiverIntake", "measurements", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualificationLevel": {"const": "customer-postgresql-primary-promotion-v1"},
+        "subject": {"$ref": "#/$defs/subject"},
+        "bindings": {"$ref": "#/$defs/bindings"},
+        "objective": {"$ref": "#/$defs/objective"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "databaseProbe": {"$ref": "#/$defs/databaseProbe"},
+        "receiverIntake": {"$ref": "#/$defs/receiverIntake"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "checks": {"$ref": "#/$defs/checks"},
+        "limitations": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "prefixItems": [
+            {"const": "operator-triggered-planned-promotion"},
+            {"const": "single-stable-database-endpoint"},
+            {"const": "topology-and-failure-domain-not-proven"},
+            {"const": "fencing-and-split-brain-not-proven"},
+            {"const": "zero-data-loss-and-rpo-not-proven"},
+            {"const": "synthetic-qualification-traffic"},
+            {"const": "regional-disaster-recovery-not-proven"}
+          ],
+          "items": false
+        },
+        "summary": {"$ref": "#/$defs/summary"}
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "counter": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "milliseconds": {"type": "integer", "minimum": 0, "maximum": 3600000},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "chartVersion", "contractsApiVersion", "requiredMigration", "sourceRevision", "imageDigest"],
+      "properties": {
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+        "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["apiTargetBindingDigest", "otlpTargetBindingDigest", "databaseTargetBindingDigest", "kubernetesContextBindingDigest", "namespaceBindingDigest", "profileDigest"],
+      "properties": {
+        "apiTargetBindingDigest": {"$ref": "#/$defs/digest"},
+        "otlpTargetBindingDigest": {"$ref": "#/$defs/digest"},
+        "databaseTargetBindingDigest": {"$ref": "#/$defs/digest"},
+        "kubernetesContextBindingDigest": {"$ref": "#/$defs/digest"},
+        "namespaceBindingDigest": {"$ref": "#/$defs/digest"},
+        "profileDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimumProbeAttemptsPerPhase", "probeIntervalMilliseconds", "maximumPromotionMilliseconds", "maximumWorkflowCompletionMilliseconds", "requestTimeoutMilliseconds", "minimumApiAvailabilityBasisPoints", "minimumReceiverAvailabilityBasisPoints", "maximumConsecutiveFailures"],
+      "properties": {
+        "minimumProbeAttemptsPerPhase": {"type": "integer", "minimum": 5, "maximum": 1000},
+        "probeIntervalMilliseconds": {"type": "integer", "minimum": 50, "maximum": 5000},
+        "maximumPromotionMilliseconds": {"type": "integer", "minimum": 10000, "maximum": 3600000},
+        "maximumWorkflowCompletionMilliseconds": {"type": "integer", "minimum": 1000, "maximum": 120000},
+        "requestTimeoutMilliseconds": {"type": "integer", "minimum": 100, "maximum": 30000},
+        "minimumApiAvailabilityBasisPoints": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "minimumReceiverAvailabilityBasisPoints": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "maximumConsecutiveFailures": {"type": "integer", "minimum": 0, "maximum": 1000}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "pythonVersion", "databaseEngine", "databaseMajorVersion", "databaseTransport", "databaseCaSource", "databaseClientIdentity", "apiTransport", "otlpTransport", "apiCaSource", "otlpCaSource", "proxyMode", "redirectMode"],
+      "properties": {
+        "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+        "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "databaseEngine": {"const": "postgresql"},
+        "databaseMajorVersion": {"type": "integer", "minimum": 14, "maximum": 99},
+        "databaseTransport": {"const": "verified-tls"},
+        "databaseCaSource": {"const": "custom"},
+        "databaseClientIdentity": {"enum": ["password", "mutual-tls-password"]},
+        "apiTransport": {"const": "verified-https"},
+        "otlpTransport": {"const": "mutual-tls-https"},
+        "apiCaSource": {"enum": ["system", "custom"]},
+        "otlpCaSource": {"enum": ["system", "custom"]},
+        "proxyMode": {"const": "disabled"},
+        "redirectMode": {"const": "deny"}
+      }
+    },
+    "databaseProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "session", "primarySelection", "promotionTrigger", "promotionProof"],
+      "properties": {
+        "mode": {"const": "read-only-native-functions"},
+        "session": {"const": "default-transaction-read-only"},
+        "primarySelection": {"const": "libpq-target-session-attrs-read-write"},
+        "promotionTrigger": {"const": "external-operator"},
+        "promotionProof": {"const": "writable-primary-wal-timeline-advance"}
+      }
+    },
+    "receiverIntake": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal", "payload", "successBoundary"],
+      "properties": {
+        "signal": {"const": "metric"},
+        "payload": {"const": "non-empty-otlp-protobuf"},
+        "successBoundary": {"const": "postgresql-commit-before-http-200"}
+      }
+    },
+    "phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "apiAttempts", "apiSuccesses", "apiFailures", "apiMaximumConsecutiveFailures", "receiverAttempts", "receiverSuccesses", "receiverFailures", "receiverMaximumConsecutiveFailures", "workflowSubmitted", "workflowCompleted", "workflowFailures", "workflowPollAttempts", "workflowCompletionMilliseconds", "workflowBoundary"],
+      "properties": {
+        "id": {"enum": ["baseline", "promotion-observation", "recovery"]},
+        "apiAttempts": {"type": "integer", "minimum": 5, "maximum": 100000},
+        "apiSuccesses": {"$ref": "#/$defs/counter"},
+        "apiFailures": {"$ref": "#/$defs/counter"},
+        "apiMaximumConsecutiveFailures": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "receiverAttempts": {"type": "integer", "minimum": 5, "maximum": 100000},
+        "receiverSuccesses": {"$ref": "#/$defs/counter"},
+        "receiverFailures": {"$ref": "#/$defs/counter"},
+        "receiverMaximumConsecutiveFailures": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "workflowSubmitted": {"const": 1},
+        "workflowCompleted": {"type": "integer", "minimum": 0, "maximum": 1},
+        "workflowFailures": {"type": "integer", "minimum": 0, "maximum": 1},
+        "workflowPollAttempts": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "workflowCompletionMilliseconds": {"$ref": "#/$defs/milliseconds"},
+        "workflowBoundary": {"enum": ["completed-before-promotion", "submitted-before-observed-after-promotion", "completed-after-promotion"]}
+      }
+    },
+    "databaseMeasurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["initialTimeline", "promotedTimeline", "timelineDelta", "primaryBefore", "primaryAfter", "tlsBefore", "tlsAfter", "transactionReadOnlyBefore", "transactionReadOnlyAfter", "initialServerBindingDigest", "promotedServerBindingDigest", "serverIdentityChanged", "connectionAttempts", "connectionFailures", "promotionMilliseconds"],
+      "properties": {
+        "initialTimeline": {"type": "integer", "minimum": 1},
+        "promotedTimeline": {"type": "integer", "minimum": 1},
+        "timelineDelta": {"type": "integer", "minimum": 0},
+        "primaryBefore": {"type": "boolean"},
+        "primaryAfter": {"type": "boolean"},
+        "tlsBefore": {"type": "boolean"},
+        "tlsAfter": {"type": "boolean"},
+        "transactionReadOnlyBefore": {"type": "boolean"},
+        "transactionReadOnlyAfter": {"type": "boolean"},
+        "initialServerBindingDigest": {"$ref": "#/$defs/digest"},
+        "promotedServerBindingDigest": {"$ref": "#/$defs/digest"},
+        "serverIdentityChanged": {"type": "boolean"},
+        "connectionAttempts": {"type": "integer", "minimum": 2, "maximum": 100002},
+        "connectionFailures": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "promotionMilliseconds": {"$ref": "#/$defs/milliseconds"}
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startedAt", "promotionWaitStartedAt", "promotionObservedAt", "completedAt", "database", "phases"],
+      "properties": {
+        "startedAt": {"type": "string", "format": "date-time"},
+        "promotionWaitStartedAt": {"type": "string", "format": "date-time"},
+        "promotionObservedAt": {"type": "string", "format": "date-time"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "database": {"$ref": "#/$defs/databaseMeasurements"},
+        "phases": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {"$ref": "#/$defs/phase", "properties": {"id": {"const": "baseline"}, "workflowBoundary": {"const": "completed-before-promotion"}}},
+            {"$ref": "#/$defs/phase", "properties": {"id": {"const": "promotion-observation"}, "workflowBoundary": {"const": "submitted-before-observed-after-promotion"}}},
+            {"$ref": "#/$defs/phase", "properties": {"id": {"const": "recovery"}, "workflowBoundary": {"const": "completed-after-promotion"}}}
+          ],
+          "items": false
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-postgresql-continuity\\.[a-z0-9.-]+$", "maxLength": 160}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 19,
+      "maxItems": 19,
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "explicit-target-bindings"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-verified-https"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-mutual-tls"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "database-verified-tls"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "database-read-only-probe"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "initial-writable-primary"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "promotion-observed"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "timeline-advanced"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "promoted-writable-primary"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-availability"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-availability"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "bounded-api-outage"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "bounded-receiver-outage"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-durable-intake"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workflow-baseline-completion"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workflow-survived-promotion"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workflow-recovery-completion"}}}
+      ],
+      "items": false
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalChecks", "passedChecks", "failedChecks", "totalApiAttempts", "failedApiAttempts", "apiAvailabilityBasisPoints", "totalReceiverAttempts", "failedReceiverAttempts", "receiverAvailabilityBasisPoints", "totalWorkflowSubmissions", "completedWorkflows", "failedWorkflows", "maximumApiConsecutiveFailures", "maximumReceiverConsecutiveFailures", "promotionMilliseconds", "overallStatus"],
+      "properties": {
+        "totalChecks": {"const": 19},
+        "passedChecks": {"type": "integer", "minimum": 0, "maximum": 19},
+        "failedChecks": {"type": "integer", "minimum": 0, "maximum": 19},
+        "totalApiAttempts": {"type": "integer", "minimum": 15, "maximum": 102000},
+        "failedApiAttempts": {"type": "integer", "minimum": 0, "maximum": 102000},
+        "apiAvailabilityBasisPoints": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "totalReceiverAttempts": {"type": "integer", "minimum": 15, "maximum": 102000},
+        "failedReceiverAttempts": {"type": "integer", "minimum": 0, "maximum": 102000},
+        "receiverAvailabilityBasisPoints": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "totalWorkflowSubmissions": {"const": 3},
+        "completedWorkflows": {"type": "integer", "minimum": 0, "maximum": 3},
+        "failedWorkflows": {"type": "integer", "minimum": 0, "maximum": 3},
+        "maximumApiConsecutiveFailures": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "maximumReceiverConsecutiveFailures": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "promotionMilliseconds": {"$ref": "#/$defs/milliseconds"},
+        "overallStatus": {"enum": ["qualified", "not-qualified"]}
+      }
+    }
+  }
+}

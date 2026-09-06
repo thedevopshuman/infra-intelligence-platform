@@ -1,0 +1,191 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerPostgreSQLContinuityQualificationReport",
+  "metadata": {
+    "id": "cpgq_68b8745b2a2a7fd33a874e728aaafffd",
+    "generatedAt": "2026-09-07T10:02:05.000Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualificationLevel": "customer-postgresql-primary-promotion-v1",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "requiredMigration": "0023_ai_model_suitability.sql",
+      "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "apiTargetBindingDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "otlpTargetBindingDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "databaseTargetBindingDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "kubernetesContextBindingDigest": "sha256:be47d2ea1997d22616c57f2cc3006d0de70dad1b8ae77bc080bdac21c4e4e558",
+      "namespaceBindingDigest": "sha256:c9dbff0c151173617eb3e25cf0337b4df9c924c9eb60cb0889e9656d35a1ddf0",
+      "profileDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    "objective": {
+      "minimumProbeAttemptsPerPhase": 20,
+      "probeIntervalMilliseconds": 250,
+      "maximumPromotionMilliseconds": 300000,
+      "maximumWorkflowCompletionMilliseconds": 60000,
+      "requestTimeoutMilliseconds": 2000,
+      "minimumApiAvailabilityBasisPoints": 9500,
+      "minimumReceiverAvailabilityBasisPoints": 9500,
+      "maximumConsecutiveFailures": 20
+    },
+    "environment": {
+      "platform": "darwin/arm64",
+      "pythonVersion": "3.14.3",
+      "databaseEngine": "postgresql",
+      "databaseMajorVersion": 18,
+      "databaseTransport": "verified-tls",
+      "databaseCaSource": "custom",
+      "databaseClientIdentity": "password",
+      "apiTransport": "verified-https",
+      "otlpTransport": "mutual-tls-https",
+      "apiCaSource": "custom",
+      "otlpCaSource": "custom",
+      "proxyMode": "disabled",
+      "redirectMode": "deny"
+    },
+    "databaseProbe": {
+      "mode": "read-only-native-functions",
+      "session": "default-transaction-read-only",
+      "primarySelection": "libpq-target-session-attrs-read-write",
+      "promotionTrigger": "external-operator",
+      "promotionProof": "writable-primary-wal-timeline-advance"
+    },
+    "receiverIntake": {
+      "signal": "metric",
+      "payload": "non-empty-otlp-protobuf",
+      "successBoundary": "postgresql-commit-before-http-200"
+    },
+    "measurements": {
+      "startedAt": "2026-09-07T10:00:00.000Z",
+      "promotionWaitStartedAt": "2026-09-07T10:01:00.000Z",
+      "promotionObservedAt": "2026-09-07T10:01:05.000Z",
+      "completedAt": "2026-09-07T10:02:05.000Z",
+      "database": {
+        "initialTimeline": 7,
+        "promotedTimeline": 8,
+        "timelineDelta": 1,
+        "primaryBefore": true,
+        "primaryAfter": true,
+        "tlsBefore": true,
+        "tlsAfter": true,
+        "transactionReadOnlyBefore": true,
+        "transactionReadOnlyAfter": true,
+        "initialServerBindingDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "promotedServerBindingDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "serverIdentityChanged": true,
+        "connectionAttempts": 8,
+        "connectionFailures": 2,
+        "promotionMilliseconds": 5000
+      },
+      "phases": [
+        {
+          "id": "baseline",
+          "apiAttempts": 20,
+          "apiSuccesses": 20,
+          "apiFailures": 0,
+          "apiMaximumConsecutiveFailures": 0,
+          "receiverAttempts": 20,
+          "receiverSuccesses": 20,
+          "receiverFailures": 0,
+          "receiverMaximumConsecutiveFailures": 0,
+          "workflowSubmitted": 1,
+          "workflowCompleted": 1,
+          "workflowFailures": 0,
+          "workflowPollAttempts": 2,
+          "workflowCompletionMilliseconds": 500,
+          "workflowBoundary": "completed-before-promotion"
+        },
+        {
+          "id": "promotion-observation",
+          "apiAttempts": 20,
+          "apiSuccesses": 20,
+          "apiFailures": 0,
+          "apiMaximumConsecutiveFailures": 0,
+          "receiverAttempts": 20,
+          "receiverSuccesses": 20,
+          "receiverFailures": 0,
+          "receiverMaximumConsecutiveFailures": 0,
+          "workflowSubmitted": 1,
+          "workflowCompleted": 1,
+          "workflowFailures": 0,
+          "workflowPollAttempts": 2,
+          "workflowCompletionMilliseconds": 500,
+          "workflowBoundary": "submitted-before-observed-after-promotion"
+        },
+        {
+          "id": "recovery",
+          "apiAttempts": 20,
+          "apiSuccesses": 20,
+          "apiFailures": 0,
+          "apiMaximumConsecutiveFailures": 0,
+          "receiverAttempts": 20,
+          "receiverSuccesses": 20,
+          "receiverFailures": 0,
+          "receiverMaximumConsecutiveFailures": 0,
+          "workflowSubmitted": 1,
+          "workflowCompleted": 1,
+          "workflowFailures": 0,
+          "workflowPollAttempts": 2,
+          "workflowCompletionMilliseconds": 500,
+          "workflowBoundary": "completed-after-promotion"
+        }
+      ]
+    },
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"},
+      {"id": "explicit-target-bindings", "status": "passed"},
+      {"id": "api-verified-https", "status": "passed"},
+      {"id": "receiver-mutual-tls", "status": "passed"},
+      {"id": "database-verified-tls", "status": "passed"},
+      {"id": "database-read-only-probe", "status": "passed"},
+      {"id": "initial-writable-primary", "status": "passed"},
+      {"id": "promotion-observed", "status": "passed"},
+      {"id": "timeline-advanced", "status": "passed"},
+      {"id": "promoted-writable-primary", "status": "passed"},
+      {"id": "api-availability", "status": "passed"},
+      {"id": "receiver-availability", "status": "passed"},
+      {"id": "bounded-api-outage", "status": "passed"},
+      {"id": "bounded-receiver-outage", "status": "passed"},
+      {"id": "receiver-durable-intake", "status": "passed"},
+      {"id": "workflow-baseline-completion", "status": "passed"},
+      {"id": "workflow-survived-promotion", "status": "passed"},
+      {"id": "workflow-recovery-completion", "status": "passed"}
+    ],
+    "limitations": [
+      "operator-triggered-planned-promotion",
+      "single-stable-database-endpoint",
+      "topology-and-failure-domain-not-proven",
+      "fencing-and-split-brain-not-proven",
+      "zero-data-loss-and-rpo-not-proven",
+      "synthetic-qualification-traffic",
+      "regional-disaster-recovery-not-proven"
+    ],
+    "summary": {
+      "totalChecks": 19,
+      "passedChecks": 19,
+      "failedChecks": 0,
+      "totalApiAttempts": 60,
+      "failedApiAttempts": 0,
+      "apiAvailabilityBasisPoints": 10000,
+      "totalReceiverAttempts": 60,
+      "failedReceiverAttempts": 0,
+      "receiverAvailabilityBasisPoints": 10000,
+      "totalWorkflowSubmissions": 3,
+      "completedWorkflows": 3,
+      "failedWorkflows": 0,
+      "maximumApiConsecutiveFailures": 0,
+      "maximumReceiverConsecutiveFailures": 0,
+      "promotionMilliseconds": 5000,
+      "overallStatus": "qualified"
+    }
+  }
+}

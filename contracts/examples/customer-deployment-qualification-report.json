@@ -2,16 +2,16 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerDeploymentQualificationReport",
   "metadata": {
-    "id": "cdq_e3332d61d41fe4695016801e94d32331",
+    "id": "cdq_347d2dc6b9a8bdd03aa1535ed8fb3627",
     "generatedAt": "2026-09-06T12:38:00Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
   },
   "spec": {
     "status": "qualified",
-    "qualificationLevel": "single-cluster-processing-v2",
+    "qualificationLevel": "single-cluster-database-continuity-v3",
     "subject": {
-      "profile": "production-ai-finops-v0",
+      "profile": "production-core-v1",
       "applicationVersion": "0.84.0",
       "chartVersion": "0.87.0",
       "contractsApiVersion": "iip.platform/v1alpha1",
@@ -20,15 +20,17 @@
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "bindings": {
-      "clusterBindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "namespaceBindingDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "releaseBindingDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "deploymentBindingDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "continuityTargetBindingDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      "processingOtlpTargetBindingDigest": "sha256:abababababababababababababababababababababababababababababababab",
-      "processingProfileDigest": "sha256:acacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacac",
-      "workerDeploymentBindingDigest": "sha256:adadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadad",
-      "receiverDeploymentBindingDigest": "sha256:aeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeae"
+      "clusterBindingDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "namespaceBindingDigest": "sha256:c9dbff0c151173617eb3e25cf0337b4df9c924c9eb60cb0889e9656d35a1ddf0",
+      "releaseBindingDigest": "sha256:d420db402c2dc96897b9b89bf1dae85be1ae39f126da933f2b3cea28e43b0d88",
+      "deploymentBindingDigest": "sha256:250573787913639e4d614526d978ece70aca756695b2da90861f69ec5ba45432",
+      "continuityTargetBindingDigest": "sha256:67f7aaa3a40b5a2a295d84c806d41b6a1f226a432f8ebe6742019f464f6f4c1f",
+      "processingOtlpTargetBindingDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "processingProfileDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "workerDeploymentBindingDigest": "sha256:a119bf7efb51d7364093d7ff7d9f3be0f456dfe3219a6a4205e86480fdc30197",
+      "receiverDeploymentBindingDigest": "sha256:028fb6f98af1e9b07020a50c8e9b6bdeba89eda7f95169979a7ef83850b86813",
+      "databaseTargetBindingDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "databaseProfileDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
     },
     "objective": {
       "maximumEvidenceAgeSeconds": 86400,
@@ -41,6 +43,8 @@
       "continuityCompletedAt": "2026-09-06T12:36:05Z",
       "processingStartedAt": "2026-09-06T12:36:10Z",
       "processingCompletedAt": "2026-09-06T12:36:50Z",
+      "databaseContinuityStartedAt": "2026-09-06T12:36:51Z",
+      "databaseContinuityCompletedAt": "2026-09-06T12:36:59Z",
       "postContinuityHealthObservedAt": "2026-09-06T12:37:00Z",
       "qualifiedAt": "2026-09-06T12:38:00Z",
       "oldestEvidenceAgeSeconds": 2280
@@ -49,40 +53,48 @@
       {
         "id": "live-install-preflight",
         "contractKind": "CustomerDeploymentPreflightReport",
-        "reportId": "cdp_11111111111111111111111111111111",
-        "reportDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "reportId": "cdp_1ed54f373d82977591c4cdf2dce9a12a",
+        "reportDigest": "sha256:5b1c15b937d01d118845a1475ff3a30c38e2259afc81acfbe4e69c0e19397125",
         "observedStatus": "install-ready",
         "status": "passed"
       },
       {
         "id": "post-install-health",
         "contractKind": "DeploymentDiagnosticReport",
-        "reportId": "ddr_22222222222222222222222222222222",
-        "reportDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "reportId": "ddr_4302b2e339fc4d54b01075a57454566e",
+        "reportDigest": "sha256:7a64d52a40dce23f391f2a072868816ce50caf5f7cb6af0638fbd5667aa40053",
         "observedStatus": "healthy",
         "status": "passed"
       },
       {
         "id": "customer-ingress",
         "contractKind": "IngressAvailabilityQualificationReport",
-        "reportId": "iaq_33333333333333333333333333333333",
-        "reportDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "reportId": "iaq_824b482488dd3d0898670c69283cb6cd",
+        "reportDigest": "sha256:a348323471785a790195bbc463deb8093615a066562faeb5bb5d3eda1012b697",
         "observedStatus": "qualified",
         "status": "passed"
       },
       {
         "id": "control-plane-continuity",
         "contractKind": "CustomerContinuityQualificationReport",
-        "reportId": "ccq_44444444444444444444444444444444",
-        "reportDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "reportId": "ccq_a3aec6f511240ee7f6833809f33277d4",
+        "reportDigest": "sha256:388911416ade8cb61677ae15e747c505d6507dd0ef5002b40b4b4e5808cdf1ee",
         "observedStatus": "qualified",
         "status": "passed"
       },
       {
         "id": "worker-receiver-processing",
         "contractKind": "CustomerProcessingContinuityQualificationReport",
-        "reportId": "cpcq_55555555555555555555555555555555",
-        "reportDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "reportId": "cpcq_ac9c5d03d898a755c4f9e1277da1af73",
+        "reportDigest": "sha256:57b0f89b39ae07e3f13ffb638e530179969e958cff6612cdb68a1ae38e365d8d",
+        "observedStatus": "qualified",
+        "status": "passed"
+      },
+      {
+        "id": "postgresql-primary-promotion",
+        "contractKind": "CustomerPostgreSQLContinuityQualificationReport",
+        "reportId": "cpgq_67129066ac814de2431e37bdc303f5af",
+        "reportDigest": "sha256:40f3adb5219e677b812287c6905dead59e36974f9bedada807f88aadb5a7ffbe",
         "observedStatus": "qualified",
         "status": "passed"
       }
@@ -97,8 +109,10 @@
       {"id": "customer-ingress", "status": "passed"},
       {"id": "control-plane-continuity", "status": "passed"},
       {"id": "worker-receiver-processing", "status": "passed"},
+      {"id": "postgresql-primary-promotion", "status": "passed"},
       {"id": "continuity-ingress-chain", "status": "passed"},
       {"id": "processing-target-chain", "status": "passed"},
+      {"id": "database-target-chain", "status": "passed"},
       {"id": "evidence-order", "status": "passed"},
       {"id": "evidence-freshness", "status": "passed"},
       {"id": "minimized-output", "status": "passed"}
@@ -108,18 +122,18 @@
       "planned-sequential-api-worker-receiver-pod-disruptions",
       "point-in-time-dependency-observation",
       "artifact-publication-signatures-vulnerabilities-not-qualified",
-      "database-ha-dr-not-qualified",
-      "shared-database-failure-not-qualified",
+      "database-topology-fencing-and-rpo-not-qualified",
+      "regional-database-disaster-recovery-not-qualified",
       "customer-integrations-and-live-ai-not-qualified",
       "regional-slo-and-capacity-not-qualified",
       "design-partner-legal-brand-governance-not-qualified"
     ],
     "summary": {
-      "requiredEvidence": 5,
-      "passedEvidence": 5,
+      "requiredEvidence": 6,
+      "passedEvidence": 6,
       "rejectedEvidence": 0,
-      "totalChecks": 14,
-      "passedChecks": 14,
+      "totalChecks": 16,
+      "passedChecks": 16,
       "failedChecks": 0,
       "overallStatus": "qualified"
     }

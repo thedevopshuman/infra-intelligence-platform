@@ -89,7 +89,7 @@ Deliverables:
 
 Exit gate: a seeded cluster can be rebuilt from observations/events; graph correctness and source lag are measurable.
 
-Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, complete-snapshot membership, deterministic tombstones, exact-result replay, atomic reconciliation/checkpoint/provider-cursor commit, per-API-path list/watch resume with `410 Gone` full-reconciliation recovery, tenant-scoped at-least-once outbox delivery through local structured-log and authenticated HTTPS publishers, finite terminal quarantine with a privileged value-minimized exact-tenant delivery-health report, transport-neutral rolling publication SLOs from mature durable outbox cohorts, exact-generation quarantine recovery through the one-shot governed-action chain, a privileged tenant-scoped projection drift/rebuild command from accepted observation history, source-bound complete-schema PostgreSQL logical recovery plus local physical streaming/promotion/named-target-PITR qualification reports with canonical row, safe sequence, and projection verification, an opt-in database-only Helm CronJob that writes checksum-complete logical backups to customer-managed storage, a live isolated restore gate, tenant-scoped point-in-time freshness/source-lag telemetry, optional outbound OTLP/HTTP freshness metrics, automatic exact-source sampling from a non-interactive tenant-enrolled worker, and privileged process-local plus shared-store API/worker exporter-delivery health. The local Phase 1 exit gate is complete; production broker selection, sustained-write storage durability/retention, customer-hosting replication/failover/PITR and disaster-recovery qualification, workload objectives, long-term/regional SLO aggregation and alerting, bulk-recovery policy, and receiver interoperability remain Phase 3 deliverables.
+Reference slice delivered: explicit live kind collection, safe image-pull status normalization, host-side collection validation, durable PostgreSQL projection/event/evidence substrate, complete-snapshot membership, deterministic tombstones, exact-result replay, atomic reconciliation/checkpoint/provider-cursor commit, per-API-path list/watch resume with `410 Gone` full-reconciliation recovery, tenant-scoped at-least-once outbox delivery through local structured-log and authenticated HTTPS publishers, finite terminal quarantine with a privileged value-minimized exact-tenant delivery-health report, transport-neutral rolling publication SLOs from mature durable outbox cohorts, exact-generation quarantine recovery through the one-shot governed-action chain, a privileged tenant-scoped projection drift/rebuild command from accepted observation history, source-bound complete-schema PostgreSQL logical recovery plus local physical streaming/promotion/named-target-PITR qualification reports with canonical row, safe sequence, and projection verification, an opt-in database-only Helm CronJob that writes checksum-complete logical backups to customer-managed storage, a live isolated restore gate, tenant-scoped point-in-time freshness/source-lag telemetry, optional outbound OTLP/HTTP freshness metrics, automatic exact-source sampling from a non-interactive tenant-enrolled worker, privileged process-local plus shared-store API/worker exporter-delivery health, and a provider-neutral customer writer-endpoint promotion observer using native WAL timeline evidence. The local Phase 1 exit gate is complete; production broker selection, sustained-write storage durability/retention, customer-hosting automatic-failover topology/fencing/RPO/PITR and disaster-recovery qualification, workload objectives, long-term/regional SLO aggregation and alerting, bulk-recovery policy, and receiver interoperability remain Phase 3 deliverables.
 
 Readiness update: the workflow worker now exposes only a private liveness and
 required-store readiness listener. Helm and Docker use it to reject stale
@@ -182,19 +182,32 @@ that sends direct verified-HTTPS identity probes and non-empty mutual-TLS OTLP
 metrics while sequentially evicting one worker and one receiver pod. One
 durable investigation is submitted only after each reduced-capacity state is
 observed, and both components must recover under the declared objective.
-Shared-database failure, involuntary node/zone/region loss, simultaneous
-failure, and sustained representative load remain external.
+Shared-database failure is addressed by the separately observed promotion gate
+below; involuntary node/zone/region loss, simultaneous failure, and sustained
+representative load remain external.
 
 Customer-deployment update: ADR 0124 now aggregates one exact cluster-mode
 preflight, post-install diagnostic, customer ingress report, and the ADR 0123
 continuity chain. ADR 0129 upgrades that aggregate with a fifth
 worker/receiver processing report, rechecks the namespace UID/server and
 processing endpoint/profile/component bindings, requires health after both
-disruption workflows, and fails closed on crossed or stale evidence. This
-closes the manual correlation gap for the narrow installed processing profile;
-artifact trust, customer-environment database continuity, integrations, live
+disruption workflows, and fails closed on crossed or stale evidence. ADR 0130
+adds a sixth, provider-neutral PostgreSQL timeline-promotion report, binds its
+API/OTLP/database/profile/environment targets, and requires final health after
+promotion recovery. This closes the manual correlation gap for the narrow
+installed database-continuity profile; artifact trust, database topology/
+fencing/zero-loss RPO and regional DR, integrations, live
 AI/pricing, regional capacity, sustained load, pilot, and public-governance
 gates remain independent.
+
+Customer-database update: ADR 0130 adds a separately enabled external observer
+that uses `sslmode=verify-full`, a default-read-only session, writable-primary
+selection, and native WAL timeline functions. It continues exact-release API,
+durable OTLP, and investigation probes while a separately authorized operator
+performs a planned promotion. A higher timeline closes the restart-versus-
+promotion ambiguity without a cloud-specific API. Automatic failover cause,
+topology/failure domain, fencing, split-brain prevention, acknowledged-write
+loss, failback, and regional disaster recovery remain customer/provider gates.
 
 Load-qualification update: ADR 0125 adds a separately enabled, fixed-rate
 external identity-read workload with exact release binding, explicit scheduler

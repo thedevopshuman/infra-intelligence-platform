@@ -671,8 +671,52 @@ class CustomerPostgreSQLContinuityQualificationReport:
 
 
 @dataclass(frozen=True)
+class CustomerOidcQualificationProfile:
+    """Protected expected customer OIDC identity and endpoint policy."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerOidcQualificationProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerOidcQualificationProfile",
+                label="customer OIDC qualification profile",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerOidcQualificationReport:
+    """Minimized customer OIDC verifier and browser-prerequisite evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerOidcQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerOidcQualificationReport",
+                label="customer OIDC qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerDeploymentQualificationReport:
-    """Exact-release customer install, ingress, and processing evidence chain."""
+    """Exact-release customer install, identity, continuity, and database chain."""
 
     payload: Mapping[str, Any]
 

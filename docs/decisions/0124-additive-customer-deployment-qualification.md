@@ -63,3 +63,10 @@ remains historical and is not accepted by the current aggregate schema.
 upgrades it to `single-cluster-database-continuity-v3` by adding portable,
 least-privilege PostgreSQL timeline-promotion evidence. Both earlier aggregate
 profiles remain historical and are not accepted by the current schema.
+
+[ADR 0131](0131-customer-oidc-prerequisite-qualification.md) upgrades the
+current aggregate to `single-cluster-database-oidc-prerequisites-v4`. It adds
+one real customer issuer/verifier/browser-prerequisite report, binds its API
+target to the continuity target, and keeps interactive login, MFA, session,
+logout, revocation, rotation, and issuer-availability evidence outside the
+aggregate claim. All three earlier profiles remain historical.

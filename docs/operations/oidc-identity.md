@@ -1,6 +1,6 @@
 # OIDC identity-provider qualification
 
-**Status:** Executable verifier and browser-flow profiles; customer issuer qualification required
+**Status:** Executable local profiles and customer prerequisite gate; interactive customer qualification required
 
 The production-facing authenticator verifies RS256 access tokens against one explicitly configured HTTPS JWKS endpoint and derives actor, tenant, and roles only from signed claims. The optional browser profile exposes non-secret Authorization Code + `S256` PKCE discovery; the platform never holds an OAuth client secret, refresh token, identity-provider password, or server session.
 
@@ -48,7 +48,16 @@ Run one boundary alone while developing with `make test-oidc-verifier` or
 
 ## Customer qualification
 
-Before rollout, repeat interoperability against the selected customer issuer and real console origin. At minimum verify:
+Use the [customer OIDC prerequisite qualification](customer-oidc-qualification.md)
+to bind one selected issuer's discovery, JWKS, public-client metadata,
+token-endpoint CORS, expected claims, deployed session, and exact release
+identity into a minimized report. That gate consumes an operator-supplied
+short-lived access token; it does not perform an interactive authorization or
+token exchange.
+
+Before rollout, complete the remaining interactive interoperability checks
+against the selected customer issuer and real console origin. At minimum
+verify:
 
 - exact issuer, API audience, actor, tenant, and role claims for every supported user class;
 - Authorization Code with `S256` PKCE, exact redirect registration, and no client secret;

@@ -2,10 +2,10 @@
 
 **Status:** Executable customer-environment gate
 
-This workflow turns the separate live preflight, sustained ingress/API-pod
-Eviction, worker/receiver processing continuity, and post-install diagnostic
-reports plus PostgreSQL primary-promotion evidence into one exact-release
-evidence chain. It does not install IIP and it
+This workflow turns the separate live preflight, customer OIDC prerequisite,
+sustained ingress/API-pod Eviction, worker/receiver processing continuity,
+post-install diagnostic, and PostgreSQL primary-promotion reports into one
+exact-release evidence chain. It does not install IIP and it
 does not perform another disruption.
 Run it only after the owning workflows have completed in the same selected
 cluster.
@@ -15,17 +15,20 @@ cluster.
 1. Generate a cluster-mode, `install-ready` preflight using the exact protected
    production values.
 2. Install the verified immutable release.
-3. Run the explicitly enabled customer continuity workflow. That workflow
+3. Run the customer OIDC prerequisite qualification using the selected issuer,
+   protected profile, short-lived qualification token, and exact console/API
+   origin.
+4. Run the explicitly enabled customer continuity workflow. That workflow
    performs the single API-pod Eviction and retains its nested ingress report.
-4. Run the separately enabled customer processing-continuity workflow. It
+5. Run the separately enabled customer processing-continuity workflow. It
    performs sequential worker and receiver pod Evictions while proving durable
    OTLP metric intake and investigation completion.
-5. Run the customer PostgreSQL continuity observer and have a separately
+6. Run the customer PostgreSQL continuity observer and have a separately
    authorized operator initiate the planned promotion only after its readiness
    message.
-6. Run deployment diagnostics after all workflows have completed, so health
+7. Run deployment diagnostics after all workflows have completed, so health
    is observed after every planned disruption.
-7. Aggregate the six reports while their timestamps remain within the chosen
+8. Aggregate the seven reports while their timestamps remain within the chosen
    evidence-age objective.
 
 For a core deployment with one values file:
@@ -36,6 +39,8 @@ IIP_DEPLOYMENT_NAMESPACE=iip-system \
 IIP_DEPLOYMENT_VALUES=/absolute/protected/customer.values.yaml \
 IIP_CUSTOMER_QUALIFICATION_VALUES=/absolute/protected/customer.values.yaml \
 IIP_CONTINUITY_IMAGE_DIGEST=sha256:<64 lowercase hex characters> \
+IIP_CUSTOMER_OIDC_PROFILE=/absolute/protected/customer-oidc-profile.json \
+IIP_CUSTOMER_OIDC_API_BASE_URL=https://iip.example.com \
 IIP_PROCESSING_PROFILE=/absolute/protected/customer-processing-profile.json \
 IIP_PROCESSING_API_BASE_URL=https://iip.example.com \
 IIP_PROCESSING_OTLP_BASE_URL=https://otlp.example.com:4318 \
@@ -55,7 +60,8 @@ The defaults consume:
 - `dist/customer-deployment-preflight-report.json`;
 - `dist/deployment-diagnostic-report.json`;
 - `dist/customer-continuity-ingress-report.json`;
-- `dist/customer-continuity-qualification-report.json`; and
+- `dist/customer-oidc-qualification-report.json`;
+- `dist/customer-continuity-qualification-report.json`;
 - `dist/customer-processing-continuity-qualification-report.json`; and
 - `dist/customer-postgresql-continuity-qualification-report.json`.
 
@@ -76,6 +82,8 @@ IIP_KUBERNETES_CONTEXT=customer-production \
 IIP_DEPLOYMENT_NAMESPACE=iip-system \
 IIP_CUSTOMER_QUALIFICATION_VALUES=/absolute/protected/customer.values.yaml \
 IIP_CONTINUITY_IMAGE_DIGEST=sha256:<64 lowercase hex characters> \
+IIP_CUSTOMER_OIDC_PROFILE=/absolute/protected/customer-oidc-profile.json \
+IIP_CUSTOMER_OIDC_API_BASE_URL=https://iip.example.com \
 IIP_PROCESSING_PROFILE=/absolute/protected/customer-processing-profile.json \
 IIP_PROCESSING_API_BASE_URL=https://iip.example.com \
 IIP_PROCESSING_OTLP_BASE_URL=https://otlp.example.com:4318 \
@@ -96,10 +104,12 @@ historical chain, but the Make gate always rechecks the cluster.
 Aggregation requires only the existing preflight/diagnostic read authority:
 Kubernetes `/version` and `get` on the selected Namespace, plus local access to
 the protected values, profiles, and evidence files. It reads no Secret values
-and has no mutation authority. The separate API and processing-continuity steps
-perform the pod Evictions. The database qualifier only observes; the separately
-authorized customer operator owns promotion. Each active workflow requires its
-own explicit enable flag.
+and has no mutation authority. The OIDC prerequisite step uses its short-lived
+token before aggregation; aggregation never reads that token or calls the
+issuer. The separate API and processing-continuity steps perform the pod
+Evictions. The database qualifier only observes; the separately authorized
+customer operator owns promotion. Each active workflow requires its own
+explicit enable flag.
 
 The aggregate retains no customer, cluster, namespace, release, Deployment,
 Pod, endpoint, or credential value. Share the minimized report only under the
@@ -110,7 +120,9 @@ values separately for reproducible verification.
 
 This profile does not qualify artifact publication/signatures/vulnerabilities,
 automatic database failover, topology, fencing, zero-loss RPO, or regional
-disaster recovery; involuntary or simultaneous failures; representative sustained throughput; customer identity/policy/
-broker/Collector interoperability, live AI providers or price authority,
-regional capacity/SLOs, a design-partner outcome, or public legal/brand/
-governance approval. Those remain independent release gates.
+disaster recovery; involuntary or simultaneous failures; representative
+sustained throughput; interactive OIDC login/MFA/session/logout/revocation,
+issuer rotation/HA, customer policy/broker/Collector or other integration
+interoperability; live AI providers or price authority; regional capacity/SLOs;
+a design-partner outcome; or public legal/brand/governance approval. Those
+remain independent release gates.

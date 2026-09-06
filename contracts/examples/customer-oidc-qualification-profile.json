@@ -1,0 +1,38 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerOidcQualificationProfile",
+  "metadata": {
+    "name": "customer-oidc-production",
+    "reviewedAt": "2026-09-07T08:00:00Z"
+  },
+  "spec": {
+    "identity": {
+      "tenantId": "tenant-acme",
+      "actorId": "qualification-operator",
+      "roles": ["operator"]
+    },
+    "oidc": {
+      "issuer": "https://identity.example.test/",
+      "audience": "iip-control-plane",
+      "discoveryUrl": "https://identity.example.test/.well-known/openid-configuration",
+      "jwksUrl": "https://identity.example.test/oauth2/jwks",
+      "actorClaim": "sub",
+      "tenantClaim": "iip_tenant_id",
+      "rolesClaim": "iip_roles",
+      "browser": {
+        "clientId": "iip-console",
+        "authorizationEndpoint": "https://identity.example.test/oauth2/authorize",
+        "tokenEndpoint": "https://identity.example.test/oauth2/token",
+        "redirectUri": "https://control-plane.example.test/console",
+        "scopes": ["openid", "profile"],
+        "providerLabel": "Organization SSO"
+      }
+    },
+    "objective": {
+      "minimumRemainingTokenSeconds": 60,
+      "maximumTokenLifetimeSeconds": 3600,
+      "requestTimeoutMilliseconds": 5000,
+      "maximumResponseBytes": 262144
+    }
+  }
+}

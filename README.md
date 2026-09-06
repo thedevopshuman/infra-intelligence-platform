@@ -32,7 +32,16 @@ after recovery. The retained report contains aggregate states and digests only;
 it does not claim involuntary-node, database, regional, or customer-cluster
 availability. See the [Kubernetes availability qualification runbook](docs/operations/kubernetes-availability-qualification.md).
 
-For a customer-like deployment, a separate continuity gate runs at least five
+For a customer-like deployment, a host-side OIDC prerequisite gate compares one
+protected expected identity and issuer profile with live discovery, JWKS,
+token-endpoint CORS, deployed console discovery, API-derived session context,
+tampered-token denial, and exact runtime identity. It accepts a short-lived
+token only from a mode-`0600` file and retains no issuer, URL, audience, client,
+identity, roles, or credential values. It does not automate login, MFA,
+consent, logout, revocation, or issuer rotation/HA; see the [customer OIDC
+qualification runbook](docs/operations/customer-oidc-qualification.md).
+
+A separate continuity gate runs at least five
 minutes of direct verified-HTTPS liveness, readiness, authentication, and exact
 release-identity probes while evicting one ready API pod through an
 explicit-context, UID-preconditioned `policy/v1` request. It requires redundant
@@ -58,12 +67,14 @@ see the [customer PostgreSQL continuity
 runbook](docs/operations/customer-postgresql-continuity-qualification.md).
 
 After those continuity exercises, the customer deployment gate binds the live
-dependency preflight, exact installed health, nested ingress/API continuity,
-worker/receiver processing, and database-promotion reports to one clean release
-and current namespace UID/server. It requires a fresh health observation after
-all workflows and retains only report digests and hashed target bindings. Its
-fixed limitations prevent this narrow single-environment result from becoming a
-publication, database-topology/RPO, integration, regional, pilot, or governance claim; see
+dependency preflight, exact installed health, customer OIDC prerequisites,
+nested ingress/API continuity, worker/receiver processing, and
+database-promotion reports to one clean release and current namespace
+UID/server. It requires a fresh health observation after all workflows and
+retains only report digests and hashed target bindings. Its fixed limitations
+prevent this narrow single-environment result from becoming an interactive
+identity, publication, database-topology/RPO, integration, regional, pilot, or
+governance claim; see
 the [customer deployment qualification
 runbook](docs/operations/customer-deployment-qualification.md).
 
@@ -136,7 +147,7 @@ no-network sandbox, reaches the real governed proposal service through the SDK
 and trusted relay, and must stop before approval or execution. Customer-owned
 plugin and live environment qualification remain deployment gates.
 
-The operational console and SDKs expose public non-secret authentication discovery, rolling transport-neutral event-publication attainment, and useful asynchronous investigation-completion attainment. The OIDC browser profile is provider-neutral and never carries a client secret; separate executable real-TLS profiles certify the shipped verifier's exact claims/cache/rotation/outage behavior and the actual authorization redirect, `S256` exchange, exact-origin CORS, replay denial, and token-to-API path. Customers still own issuer enrollment, MFA/session/logout policy, redirect registration, token-endpoint CORS, certificate/revocation objectives, and claim interoperability. The API and SDKs also expose observe-only, tenant-scoped Evidence artifact-retention state; automatic byte expiration is disabled by default, bounded, policy-gated, legal-hold aware, and audited when explicitly enabled. Recognized control-plane reads emit a deployment-objective-bound query availability counter and duration histogram over OTLP. A separate direct, no-redirect external probe now qualifies liveness, readiness, authentication, exact release identity, availability, and latency through customer HTTPS ingress while retaining aggregate-only evidence. Continuous regional scheduling, long-window aggregation, burn-rate policy, and alert routing remain deployment work.
+The operational console and SDKs expose public non-secret authentication discovery, rolling transport-neutral event-publication attainment, and useful asynchronous investigation-completion attainment. The OIDC browser profile is provider-neutral and never carries a client secret; separate executable real-TLS profiles certify the shipped verifier's exact claims/cache/rotation/outage behavior and the actual authorization redirect, `S256` exchange, exact-origin CORS, replay denial, and token-to-API path. The external customer prerequisite gate binds selected issuer metadata, CORS, claims, the deployed session, and exact release identity while retaining no identity or credential values. Customers still own issuer enrollment, interactive redirect/login, MFA/session/logout policy, disablement/revocation latency, and certificate/key rotation and availability objectives. The API and SDKs also expose observe-only, tenant-scoped Evidence artifact-retention state; automatic byte expiration is disabled by default, bounded, policy-gated, legal-hold aware, and audited when explicitly enabled. Recognized control-plane reads emit a deployment-objective-bound query availability counter and duration histogram over OTLP. A separate direct, no-redirect external probe now qualifies liveness, readiness, authentication, exact release identity, availability, and latency through customer HTTPS ingress while retaining aggregate-only evidence. Continuous regional scheduling, long-window aggregation, burn-rate policy, and alert routing remain deployment work.
 
 ## Start here
 

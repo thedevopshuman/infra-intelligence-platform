@@ -2,14 +2,14 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerDeploymentQualificationReport",
   "metadata": {
-    "id": "cdq_347d2dc6b9a8bdd03aa1535ed8fb3627",
+    "id": "cdq_e544176f8d87712bb60d2ceeb386c2f9",
     "generatedAt": "2026-09-06T12:38:00Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
   },
   "spec": {
     "status": "qualified",
-    "qualificationLevel": "single-cluster-database-continuity-v3",
+    "qualificationLevel": "single-cluster-database-oidc-prerequisites-v4",
     "subject": {
       "profile": "production-core-v1",
       "applicationVersion": "0.84.0",
@@ -25,6 +25,8 @@
       "releaseBindingDigest": "sha256:d420db402c2dc96897b9b89bf1dae85be1ae39f126da933f2b3cea28e43b0d88",
       "deploymentBindingDigest": "sha256:250573787913639e4d614526d978ece70aca756695b2da90861f69ec5ba45432",
       "continuityTargetBindingDigest": "sha256:67f7aaa3a40b5a2a295d84c806d41b6a1f226a432f8ebe6742019f464f6f4c1f",
+      "oidcProfileDigest": "sha256:4b504195e5619acaad6f34fbe31e7a5bed1b62f90684226927304b63194feaf5",
+      "oidcIssuerMetadataDigest": "sha256:7a80373b9a9a5a3dc4b243bc78e11c611e4ae05ff4ef941c9e1137610d988c55",
       "processingOtlpTargetBindingDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
       "processingProfileDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
       "workerDeploymentBindingDigest": "sha256:a119bf7efb51d7364093d7ff7d9f3be0f456dfe3219a6a4205e86480fdc30197",
@@ -39,6 +41,8 @@
     },
     "measurements": {
       "preflightGeneratedAt": "2026-09-06T12:00:00Z",
+      "oidcStartedAt": "2026-09-06T12:10:00Z",
+      "oidcCompletedAt": "2026-09-06T12:10:04Z",
       "continuityStartedAt": "2026-09-06T12:30:00Z",
       "continuityCompletedAt": "2026-09-06T12:36:05Z",
       "processingStartedAt": "2026-09-06T12:36:10Z",
@@ -75,6 +79,14 @@
         "status": "passed"
       },
       {
+        "id": "customer-oidc",
+        "contractKind": "CustomerOidcQualificationReport",
+        "reportId": "coq_71a76a10c48b21815ebb73bf9f6e5bd4",
+        "reportDigest": "sha256:2c6eed5a7d08eb528d2c43677fe323837a3b9c5d171e405daac14b76a8025930",
+        "observedStatus": "qualified",
+        "status": "passed"
+      },
+      {
         "id": "control-plane-continuity",
         "contractKind": "CustomerContinuityQualificationReport",
         "reportId": "ccq_a3aec6f511240ee7f6833809f33277d4",
@@ -107,10 +119,12 @@
       {"id": "live-install-preflight", "status": "passed"},
       {"id": "post-continuity-health", "status": "passed"},
       {"id": "customer-ingress", "status": "passed"},
+      {"id": "customer-oidc", "status": "passed"},
       {"id": "control-plane-continuity", "status": "passed"},
       {"id": "worker-receiver-processing", "status": "passed"},
       {"id": "postgresql-primary-promotion", "status": "passed"},
       {"id": "continuity-ingress-chain", "status": "passed"},
+      {"id": "oidc-target-chain", "status": "passed"},
       {"id": "processing-target-chain", "status": "passed"},
       {"id": "database-target-chain", "status": "passed"},
       {"id": "evidence-order", "status": "passed"},
@@ -124,16 +138,16 @@
       "artifact-publication-signatures-vulnerabilities-not-qualified",
       "database-topology-fencing-and-rpo-not-qualified",
       "regional-database-disaster-recovery-not-qualified",
-      "customer-integrations-and-live-ai-not-qualified",
+      "customer-oidc-interactive-lifecycle-other-integrations-and-live-ai-not-qualified",
       "regional-slo-and-capacity-not-qualified",
       "design-partner-legal-brand-governance-not-qualified"
     ],
     "summary": {
-      "requiredEvidence": 6,
-      "passedEvidence": 6,
+      "requiredEvidence": 7,
+      "passedEvidence": 7,
       "rejectedEvidence": 0,
-      "totalChecks": 16,
-      "passedChecks": 16,
+      "totalChecks": 18,
+      "passedChecks": 18,
       "failedChecks": 0,
       "overallStatus": "qualified"
     }

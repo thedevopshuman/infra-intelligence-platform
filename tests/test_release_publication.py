@@ -19,7 +19,7 @@ from tests.test_release_bundle import write_oci_fixture
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "0.84.0"
 CHART_VERSION = "0.87.0"
-SDK_VERSION = "0.64.0"
+SDK_VERSION = "0.65.0"
 
 
 class RecordingPublisher:

@@ -20,6 +20,7 @@ import deployment_diagnostics as diagnostics  # noqa: E402
 import deployment_preflight as preflight  # noqa: E402
 import qualify_customer_continuity as continuity  # noqa: E402
 import qualify_customer_deployment as qualification  # noqa: E402
+import qualify_customer_oidc as oidc  # noqa: E402
 import qualify_customer_processing_continuity as processing  # noqa: E402
 import qualify_customer_postgresql_continuity as postgresql  # noqa: E402
 from infra_intelligence_sdk import CustomerDeploymentQualificationReport  # noqa: E402
@@ -187,6 +188,48 @@ def continuity_inputs() -> tuple[dict[str, object], dict[str, object]]:
     return ingress_document, continuity_document
 
 
+def oidc_report() -> dict[str, object]:
+    profile = json.loads(
+        (
+            ROOT / "contracts/examples/customer-oidc-qualification-profile.json"
+        ).read_text(encoding="utf-8")
+    )
+    profile["spec"]["oidc"]["browser"]["redirectUri"] = (
+        "https://iip.example.test/console"
+    )
+    oidc_profile = profile["spec"]["oidc"]
+    browser = oidc_profile["browser"]
+    metadata = {
+        "issuer": oidc_profile["issuer"],
+        "authorization_endpoint": browser["authorizationEndpoint"],
+        "token_endpoint": browser["tokenEndpoint"],
+        "jwks_uri": oidc_profile["jwksUrl"],
+        "response_types_supported": ["code"],
+        "code_challenge_methods_supported": ["S256"],
+        "token_endpoint_auth_methods_supported": ["none"],
+    }
+    return oidc.build_report(
+        revision=REVISION,
+        source_dirty=False,
+        profile=profile,
+        api_base_url="https://iip.example.test",
+        issuer_metadata=metadata,
+        subject={
+            **REPOSITORY,
+            "contractsApiVersion": oidc.API_VERSION,
+            "sourceRevision": REVISION,
+            "imageDigest": IMAGE_DIGEST,
+        },
+        started_at=datetime(2026, 9, 6, 12, 10, tzinfo=timezone.utc),
+        completed_at=datetime(2026, 9, 6, 12, 10, 4, tzinfo=timezone.utc),
+        discovery_response_bytes=812,
+        jwks_response_bytes=438,
+        jwks_key_count=2,
+        token_lifetime_seconds=900,
+        token_remaining_seconds=780,
+    )
+
+
 def processing_report(
     continuity_document: dict[str, object],
 ) -> dict[str, object]:
@@ -272,6 +315,7 @@ def inputs() -> tuple[dict[str, object], ...]:
         live_preflight(),
         healthy_diagnostic(),
         ingress_document,
+        oidc_report(),
         continuity_document,
         processing_document,
         postgresql_report(processing_document),
@@ -283,6 +327,7 @@ def build(
     preflight_document: dict[str, object] | None = None,
     diagnostic_document: dict[str, object] | None = None,
     ingress_document: dict[str, object] | None = None,
+    oidc_document: dict[str, object] | None = None,
     continuity_document: dict[str, object] | None = None,
     processing_document: dict[str, object] | None = None,
     postgresql_document: dict[str, object] | None = None,
@@ -292,9 +337,10 @@ def build(
         preflight_document or documents[0],
         diagnostic_document or documents[1],
         ingress_document or documents[2],
-        continuity_document or documents[3],
-        processing_document or documents[4],
-        postgresql_document or documents[5],
+        oidc_document or documents[3],
+        continuity_document or documents[4],
+        processing_document or documents[5],
+        postgresql_document or documents[6],
     )
     return qualification.build_report(
         preflight_report=selected[0],
@@ -303,12 +349,14 @@ def build(
         diagnostic_digest=_digest(selected[1]),
         ingress_report=selected[2],
         ingress_digest=_digest(selected[2]),
-        continuity_report=selected[3],
-        continuity_digest=_digest(selected[3]),
-        processing_report=selected[4],
-        processing_digest=_digest(selected[4]),
-        postgresql_report=selected[5],
-        postgresql_digest=_digest(selected[5]),
+        oidc_report=selected[3],
+        oidc_digest=_digest(selected[3]),
+        continuity_report=selected[4],
+        continuity_digest=_digest(selected[4]),
+        processing_report=selected[5],
+        processing_digest=_digest(selected[5]),
+        postgresql_report=selected[6],
+        postgresql_digest=_digest(selected[6]),
         context=CONTEXT,
         namespace=NAMESPACE,
         release_name=RELEASE,
@@ -345,7 +393,7 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
     def test_exact_bound_inputs_produce_minimized_qualified_report(self) -> None:
         report = build()
         self.assertEqual(report["spec"]["status"], "qualified")
-        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 6)
+        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 7)
         serialized = json.dumps(report, sort_keys=True)
         for forbidden in (
             CONTEXT,
@@ -362,7 +410,7 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
 
     def test_crossed_processing_target_is_rejected(self) -> None:
         documents = inputs()
-        crossed = copy.deepcopy(documents[4])
+        crossed = copy.deepcopy(documents[5])
         crossed["spec"]["bindings"]["apiTargetBindingDigest"] = (
             "sha256:" + "f" * 64
         )
@@ -372,9 +420,21 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
         ):
             build(processing_document=crossed)
 
+    def test_crossed_oidc_target_is_rejected(self) -> None:
+        documents = inputs()
+        crossed = copy.deepcopy(documents[3])
+        crossed["spec"]["bindings"]["apiTargetBindingDigest"] = (
+            "sha256:" + "f" * 64
+        )
+        with self.assertRaisesRegex(
+            qualification.CustomerDeploymentQualificationError,
+            "customer-deployment-qualification.oidc.crossed",
+        ):
+            build(oidc_document=crossed)
+
     def test_crossed_database_target_is_rejected(self) -> None:
         documents = inputs()
-        crossed = copy.deepcopy(documents[5])
+        crossed = copy.deepcopy(documents[6])
         crossed["spec"]["bindings"]["otlpTargetBindingDigest"] = (
             "sha256:" + "f" * 64
         )
@@ -404,12 +464,14 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
                 diagnostic_digest=_digest(documents[1]),
                 ingress_report=documents[2],
                 ingress_digest=_digest(documents[2]),
-                continuity_report=documents[3],
-                continuity_digest=_digest(documents[3]),
-                processing_report=documents[4],
-                processing_digest=_digest(documents[4]),
-                postgresql_report=documents[5],
-                postgresql_digest=_digest(documents[5]),
+                oidc_report=documents[3],
+                oidc_digest=_digest(documents[3]),
+                continuity_report=documents[4],
+                continuity_digest=_digest(documents[4]),
+                processing_report=documents[5],
+                processing_digest=_digest(documents[5]),
+                postgresql_report=documents[6],
+                postgresql_digest=_digest(documents[6]),
                 context=CONTEXT,
                 namespace=NAMESPACE,
                 release_name=RELEASE,
@@ -486,6 +548,8 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
             _digest(documents[4]),
             documents[5],
             _digest(documents[5]),
+            documents[6],
+            _digest(documents[6]),
         )
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "report.json"
@@ -501,6 +565,9 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
                     preflight_path=Path("preflight.json"),
                     diagnostic_path=Path("diagnostic.json"),
                     ingress_path=Path("ingress.json"),
+                    oidc_path=Path("oidc.json"),
+                    oidc_profile_path=Path("oidc-profile.json"),
+                    oidc_api_base_url="https://iip.example.test",
                     continuity_path=Path("continuity.json"),
                     processing_path=Path("processing.json"),
                     processing_profile_path=Path("processing-profile.json"),

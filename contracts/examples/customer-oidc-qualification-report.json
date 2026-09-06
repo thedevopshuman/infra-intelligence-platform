@@ -1,0 +1,83 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerOidcQualificationReport",
+  "metadata": {
+    "id": "coq_5984208b3931fbfc081c571d69e61b15",
+    "generatedAt": "2026-09-07T09:00:04Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualification": "customer-oidc-verifier-browser-prerequisites-v1",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "requiredMigration": "0015_plugin_invocation_lifecycle.sql",
+      "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "apiTargetBindingDigest": "sha256:c4e1dc10fa4c4cce7b440725348917d3283042695978c296f20a636e3e915e00",
+      "profileDigest": "sha256:ce13acbc5ce684d98dcf02f1a0b6b2fb3bd1b6f9210b6f15dc7afaf21e4a1225",
+      "issuerMetadataDigest": "sha256:7a80373b9a9a5a3dc4b243bc78e11c611e4ae05ff4ef941c9e1137610d988c55",
+      "runtimeBindingDigest": "sha256:75e709fabe57c1dad38606a23392c152abd8a50a94369c8e38397195cd18d1c3"
+    },
+    "objective": {
+      "minimumRemainingTokenSeconds": 60,
+      "maximumTokenLifetimeSeconds": 3600,
+      "requestTimeoutMilliseconds": 5000,
+      "maximumResponseBytes": 262144
+    },
+    "protocol": {
+      "discoveryTransport": "ca-verified-https-no-redirect",
+      "apiTransport": "ca-verified-https-no-redirect",
+      "flow": "authorization-code",
+      "pkceMethod": "S256",
+      "tokenEndpointAuthentication": "none",
+      "accessTokenAlgorithm": "RS256",
+      "apiAuthentication": "bearer"
+    },
+    "measurements": {
+      "startedAt": "2026-09-07T09:00:00Z",
+      "completedAt": "2026-09-07T09:00:04Z",
+      "discoveryResponseBytes": 812,
+      "jwksResponseBytes": 438,
+      "jwksKeyCount": 2,
+      "tokenLifetimeSeconds": 900,
+      "tokenRemainingSeconds": 780
+    },
+    "checks": [
+      {"id": "profile-binding", "status": "passed"},
+      {"id": "source-binding", "status": "passed"},
+      {"id": "api-target-binding", "status": "passed"},
+      {"id": "ca-verified-discovery", "status": "passed"},
+      {"id": "issuer-metadata-binding", "status": "passed"},
+      {"id": "jwks-metadata-binding", "status": "passed"},
+      {"id": "authorization-code-supported", "status": "passed"},
+      {"id": "s256-supported", "status": "passed"},
+      {"id": "public-client-supported", "status": "passed"},
+      {"id": "console-profile-binding", "status": "passed"},
+      {"id": "token-cors-exact-origin", "status": "passed"},
+      {"id": "token-cors-other-origin-denied", "status": "passed"},
+      {"id": "access-token-claims-binding", "status": "passed"},
+      {"id": "access-token-api-authentication", "status": "passed"},
+      {"id": "tampered-token-denial", "status": "passed"},
+      {"id": "runtime-release-binding", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"}
+    ],
+    "limitations": [
+      "interactive-authorization-and-mfa-not-observed",
+      "logout-session-and-consent-not-qualified",
+      "disablement-and-revocation-latency-not-qualified",
+      "issuer-ha-certificate-and-key-rotation-not-qualified"
+    ],
+    "summary": {
+      "totalChecks": 17,
+      "passedChecks": 17,
+      "failedChecks": 0,
+      "overallStatus": "qualified"
+    }
+  }
+}

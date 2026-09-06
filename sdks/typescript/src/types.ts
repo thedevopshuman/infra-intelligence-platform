@@ -1513,6 +1513,125 @@ export interface CustomerPostgreSQLContinuityQualificationReport {
   };
 }
 
+export interface CustomerOidcQualificationProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerOidcQualificationProfile";
+  metadata: { name: string; reviewedAt: string };
+  spec: {
+    identity: { tenantId: string; actorId: string; roles: string[] };
+    oidc: {
+      issuer: string;
+      audience: string;
+      discoveryUrl: string;
+      jwksUrl: string;
+      actorClaim: string;
+      tenantClaim: string;
+      rolesClaim: string;
+      browser: {
+        clientId: string;
+        authorizationEndpoint: string;
+        tokenEndpoint: string;
+        redirectUri: string;
+        scopes: string[];
+        providerLabel: string;
+      };
+    };
+    objective: {
+      minimumRemainingTokenSeconds: number;
+      maximumTokenLifetimeSeconds: number;
+      requestTimeoutMilliseconds: number;
+      maximumResponseBytes: number;
+    };
+  };
+}
+
+export type CustomerOidcQualificationCheckId =
+  | "profile-binding"
+  | "source-binding"
+  | "api-target-binding"
+  | "ca-verified-discovery"
+  | "issuer-metadata-binding"
+  | "jwks-metadata-binding"
+  | "authorization-code-supported"
+  | "s256-supported"
+  | "public-client-supported"
+  | "console-profile-binding"
+  | "token-cors-exact-origin"
+  | "token-cors-other-origin-denied"
+  | "access-token-claims-binding"
+  | "access-token-api-authentication"
+  | "tampered-token-denial"
+  | "runtime-release-binding"
+  | "minimized-output";
+
+export interface CustomerOidcQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerOidcQualificationReport";
+  metadata: {
+    id: `coq_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualification: "customer-oidc-verifier-browser-prerequisites-v1";
+    subject: {
+      applicationVersion: string;
+      chartVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      requiredMigration: `${number}_${string}.sql`;
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      apiTargetBindingDigest: Sha256Digest;
+      profileDigest: Sha256Digest;
+      issuerMetadataDigest: Sha256Digest;
+      runtimeBindingDigest: Sha256Digest;
+    };
+    objective: CustomerOidcQualificationProfile["spec"]["objective"];
+    protocol: {
+      discoveryTransport: "ca-verified-https-no-redirect";
+      apiTransport: "ca-verified-https-no-redirect";
+      flow: "authorization-code";
+      pkceMethod: "S256";
+      tokenEndpointAuthentication: "none";
+      accessTokenAlgorithm: "RS256";
+      apiAuthentication: "bearer";
+    };
+    measurements: {
+      startedAt: string;
+      completedAt: string;
+      discoveryResponseBytes: number;
+      jwksResponseBytes: number;
+      jwksKeyCount: number;
+      tokenLifetimeSeconds: number;
+      tokenRemainingSeconds: number;
+    };
+    checks: Array<
+      | { id: CustomerOidcQualificationCheckId; status: "passed" }
+      | {
+          id: CustomerOidcQualificationCheckId;
+          status: "failed";
+          errorCode: `customer-oidc-qualification.${string}`;
+        }
+    >;
+    limitations: [
+      "interactive-authorization-and-mfa-not-observed",
+      "logout-session-and-consent-not-qualified",
+      "disablement-and-revocation-latency-not-qualified",
+      "issuer-ha-certificate-and-key-rotation-not-qualified",
+    ];
+    summary: {
+      totalChecks: 17;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export type CustomerProcessingContinuityCheckId =
   | "source-binding"
   | "minimized-output"
@@ -1664,6 +1783,7 @@ export type CustomerDeploymentQualificationEvidenceId =
   | "live-install-preflight"
   | "post-install-health"
   | "customer-ingress"
+  | "customer-oidc"
   | "control-plane-continuity"
   | "worker-receiver-processing"
   | "postgresql-primary-promotion";
@@ -1676,10 +1796,12 @@ export type CustomerDeploymentQualificationCheckId =
   | "live-install-preflight"
   | "post-continuity-health"
   | "customer-ingress"
+  | "customer-oidc"
   | "control-plane-continuity"
   | "worker-receiver-processing"
   | "postgresql-primary-promotion"
   | "continuity-ingress-chain"
+  | "oidc-target-chain"
   | "processing-target-chain"
   | "database-target-chain"
   | "evidence-order"
@@ -1697,7 +1819,7 @@ export interface CustomerDeploymentQualificationReport {
   };
   spec: {
     status: "qualified" | "not-qualified";
-    qualificationLevel: "single-cluster-database-continuity-v3";
+    qualificationLevel: "single-cluster-database-oidc-prerequisites-v4";
     subject: {
       profile: "production-core-v1" | "production-ai-finops-v0";
       applicationVersion: string;
@@ -1713,6 +1835,8 @@ export interface CustomerDeploymentQualificationReport {
       releaseBindingDigest: Sha256Digest;
       deploymentBindingDigest: Sha256Digest;
       continuityTargetBindingDigest: Sha256Digest;
+      oidcProfileDigest: Sha256Digest;
+      oidcIssuerMetadataDigest: Sha256Digest;
       processingOtlpTargetBindingDigest: Sha256Digest;
       processingProfileDigest: Sha256Digest;
       workerDeploymentBindingDigest: Sha256Digest;
@@ -1727,6 +1851,8 @@ export interface CustomerDeploymentQualificationReport {
     };
     measurements: {
       preflightGeneratedAt: string;
+      oidcStartedAt: string;
+      oidcCompletedAt: string;
       continuityStartedAt: string;
       continuityCompletedAt: string;
       processingStartedAt: string;
@@ -1743,6 +1869,7 @@ export interface CustomerDeploymentQualificationReport {
         | "CustomerDeploymentPreflightReport"
         | "DeploymentDiagnosticReport"
         | "IngressAvailabilityQualificationReport"
+        | "CustomerOidcQualificationReport"
         | "CustomerContinuityQualificationReport"
         | "CustomerProcessingContinuityQualificationReport"
         | "CustomerPostgreSQLContinuityQualificationReport";
@@ -1774,15 +1901,15 @@ export interface CustomerDeploymentQualificationReport {
       "artifact-publication-signatures-vulnerabilities-not-qualified",
       "database-topology-fencing-and-rpo-not-qualified",
       "regional-database-disaster-recovery-not-qualified",
-      "customer-integrations-and-live-ai-not-qualified",
+      "customer-oidc-interactive-lifecycle-other-integrations-and-live-ai-not-qualified",
       "regional-slo-and-capacity-not-qualified",
       "design-partner-legal-brand-governance-not-qualified",
     ];
     summary: {
-      requiredEvidence: 6;
+      requiredEvidence: 7;
       passedEvidence: number;
       rejectedEvidence: number;
-      totalChecks: 16;
+      totalChecks: 18;
       passedChecks: number;
       failedChecks: number;
       overallStatus: "qualified" | "not-qualified";

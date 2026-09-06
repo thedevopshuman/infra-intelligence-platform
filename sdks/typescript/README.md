@@ -1,8 +1,9 @@
 # TypeScript SDK boundary
 
-Version 0.64 adds the customer PostgreSQL continuity profile/report types and
-upgrades the customer deployment evidence chain to its six-report database-
-continuity profile. No client method receives promotion authority.
+Version 0.65 adds the customer OIDC profile/report types and upgrades the
+customer deployment evidence chain to seven bound reports. Version 0.64 added
+the customer PostgreSQL continuity types. No client method receives identity,
+promotion, provider, or production authority.
 
 The SDK exposes public contract types and a small fetch-based client. It has no dependency on server code or a framework runtime.
 

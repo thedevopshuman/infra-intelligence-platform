@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-oidc-qualification-report:v1alpha1",
+  "title": "Customer OIDC Qualification Report",
+  "description": "Privacy-minimized evidence for one customer issuer, deployed verifier, console browser prerequisites, and exact release identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerOidcQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^coq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualification", "subject", "bindings", "objective", "protocol", "measurements", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualification": {"const": "customer-oidc-verifier-browser-prerequisites-v1"},
+        "subject": {"$ref": "#/$defs/subject"},
+        "bindings": {"$ref": "#/$defs/bindings"},
+        "objective": {"$ref": "#/$defs/objective"},
+        "protocol": {"$ref": "#/$defs/protocol"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "checks": {"$ref": "#/$defs/checks"},
+        "limitations": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {"const": "interactive-authorization-and-mfa-not-observed"},
+            {"const": "logout-session-and-consent-not-qualified"},
+            {"const": "disablement-and-revocation-latency-not-qualified"},
+            {"const": "issuer-ha-certificate-and-key-rotation-not-qualified"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 17},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 17},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 17},
+            "overallStatus": {"enum": ["qualified", "not-qualified"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "chartVersion", "contractsApiVersion", "requiredMigration", "sourceRevision", "imageDigest"],
+      "properties": {
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+        "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["apiTargetBindingDigest", "profileDigest", "issuerMetadataDigest", "runtimeBindingDigest"],
+      "properties": {
+        "apiTargetBindingDigest": {"$ref": "#/$defs/digest"},
+        "profileDigest": {"$ref": "#/$defs/digest"},
+        "issuerMetadataDigest": {"$ref": "#/$defs/digest"},
+        "runtimeBindingDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimumRemainingTokenSeconds", "maximumTokenLifetimeSeconds", "requestTimeoutMilliseconds", "maximumResponseBytes"],
+      "properties": {
+        "minimumRemainingTokenSeconds": {"type": "integer", "minimum": 30, "maximum": 3600},
+        "maximumTokenLifetimeSeconds": {"type": "integer", "minimum": 300, "maximum": 86400},
+        "requestTimeoutMilliseconds": {"type": "integer", "minimum": 100, "maximum": 30000},
+        "maximumResponseBytes": {"type": "integer", "minimum": 4096, "maximum": 262144}
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["discoveryTransport", "apiTransport", "flow", "pkceMethod", "tokenEndpointAuthentication", "accessTokenAlgorithm", "apiAuthentication"],
+      "properties": {
+        "discoveryTransport": {"const": "ca-verified-https-no-redirect"},
+        "apiTransport": {"const": "ca-verified-https-no-redirect"},
+        "flow": {"const": "authorization-code"},
+        "pkceMethod": {"const": "S256"},
+        "tokenEndpointAuthentication": {"const": "none"},
+        "accessTokenAlgorithm": {"const": "RS256"},
+        "apiAuthentication": {"const": "bearer"}
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startedAt", "completedAt", "discoveryResponseBytes", "jwksResponseBytes", "jwksKeyCount", "tokenLifetimeSeconds", "tokenRemainingSeconds"],
+      "properties": {
+        "startedAt": {"type": "string", "format": "date-time"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "discoveryResponseBytes": {"type": "integer", "minimum": 2, "maximum": 262144},
+        "jwksResponseBytes": {"type": "integer", "minimum": 2, "maximum": 262144},
+        "jwksKeyCount": {"type": "integer", "minimum": 1, "maximum": 100},
+        "tokenLifetimeSeconds": {"type": "integer", "minimum": 1, "maximum": 86400},
+        "tokenRemainingSeconds": {"type": "integer", "minimum": 0, "maximum": 86400}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-oidc-qualification\\.[a-z0-9.-]+$", "maxLength": 160}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 17,
+      "maxItems": 17,
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-target-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ca-verified-discovery"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "issuer-metadata-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "jwks-metadata-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "authorization-code-supported"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "s256-supported"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "public-client-supported"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "console-profile-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "token-cors-exact-origin"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "token-cors-other-origin-denied"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "access-token-claims-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "access-token-api-authentication"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "tampered-token-denial"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "runtime-release-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}}
+      ],
+      "items": false
+    }
+  }
+}

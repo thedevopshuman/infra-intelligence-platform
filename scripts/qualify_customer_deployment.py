@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate exact customer install, ingress, and processing-continuity evidence."""
+"""Aggregate exact customer install, identity, continuity, and database evidence."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 import deployment_diagnostics as diagnostics
 import deployment_preflight as preflight
 import qualify_customer_continuity as continuity
+import qualify_customer_oidc as oidc
 import qualify_customer_processing_continuity as processing
 import qualify_customer_postgresql_continuity as postgresql
 import qualify_ingress_availability as ingress
@@ -29,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "contracts/schemas/customer-deployment-qualification-report.schema.json"
 API_VERSION = "iip.platform/v1alpha1"
 KIND = "CustomerDeploymentQualificationReport"
-QUALIFICATION_LEVEL = "single-cluster-database-continuity-v3"
+QUALIFICATION_LEVEL = "single-cluster-database-oidc-prerequisites-v4"
 REPORT_ID = re.compile(r"^cdq_[a-f0-9]{32}$")
 DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 MAX_DOCUMENT_BYTES = 16 * 1024 * 1024
@@ -52,6 +53,12 @@ EVIDENCE_DEFINITIONS = (
         "IngressAvailabilityQualificationReport",
         "qualified",
         "customer-deployment-qualification.ingress.not-qualified",
+    ),
+    (
+        "customer-oidc",
+        "CustomerOidcQualificationReport",
+        "qualified",
+        "customer-deployment-qualification.oidc.not-qualified",
     ),
     (
         "control-plane-continuity",
@@ -80,10 +87,12 @@ CHECK_IDS = (
     "live-install-preflight",
     "post-continuity-health",
     "customer-ingress",
+    "customer-oidc",
     "control-plane-continuity",
     "worker-receiver-processing",
     "postgresql-primary-promotion",
     "continuity-ingress-chain",
+    "oidc-target-chain",
     "processing-target-chain",
     "database-target-chain",
     "evidence-order",
@@ -97,7 +106,7 @@ LIMITATIONS = (
     "artifact-publication-signatures-vulnerabilities-not-qualified",
     "database-topology-fencing-and-rpo-not-qualified",
     "regional-database-disaster-recovery-not-qualified",
-    "customer-integrations-and-live-ai-not-qualified",
+    "customer-oidc-interactive-lifecycle-other-integrations-and-live-ai-not-qualified",
     "regional-slo-and-capacity-not-qualified",
     "design-partner-legal-brand-governance-not-qualified",
 )
@@ -275,6 +284,7 @@ def _subject_and_bindings(
     preflight_report: Mapping[str, Any],
     diagnostic_report: Mapping[str, Any],
     ingress_report: Mapping[str, Any],
+    oidc_report: Mapping[str, Any],
     continuity_report: Mapping[str, Any],
     processing_report: Mapping[str, Any],
     postgresql_report: Mapping[str, Any],
@@ -322,6 +332,22 @@ def _subject_and_bindings(
     ingress_spec = _mapping(
         ingress_report.get("spec"),
         "customer-deployment-qualification.ingress.invalid",
+    )
+    oidc_metadata = _mapping(
+        oidc_report.get("metadata"),
+        "customer-deployment-qualification.oidc.invalid",
+    )
+    oidc_spec = _mapping(
+        oidc_report.get("spec"),
+        "customer-deployment-qualification.oidc.invalid",
+    )
+    oidc_subject = _mapping(
+        oidc_spec.get("subject"),
+        "customer-deployment-qualification.oidc.invalid",
+    )
+    oidc_bindings = _mapping(
+        oidc_spec.get("bindings"),
+        "customer-deployment-qualification.oidc.invalid",
     )
     continuity_metadata = _mapping(
         continuity_report.get("metadata"),
@@ -376,6 +402,8 @@ def _subject_and_bindings(
         preflight_metadata.get("sourceRevision"),
         diagnostic_metadata.get("sourceRevision"),
         ingress_metadata.get("sourceRevision"),
+        oidc_metadata.get("sourceRevision"),
+        oidc_subject.get("sourceRevision"),
         continuity_metadata.get("sourceRevision"),
         continuity_subject.get("sourceRevision"),
         processing_metadata.get("sourceRevision"),
@@ -399,6 +427,7 @@ def _subject_and_bindings(
         or diagnostic_identity != expected_identity
         or continuity_subject.get("imageDigest") != image_digest
         or continuity_subject.get("contractsApiVersion") != API_VERSION
+        or oidc_subject != continuity_subject
         or processing_subject != continuity_subject
         or postgresql_subject != continuity_subject
         or ingress_spec.get("targetIdentity")
@@ -444,6 +473,11 @@ def _subject_and_bindings(
         ("workflow-worker", worker_deployment_name),
         ("otlp-receiver", receiver_deployment_name),
     )
+    if (
+        oidc_bindings.get("apiTargetBindingDigest")
+        != continuity_bindings.get("targetBindingDigest")
+    ):
+        _fail("customer-deployment-qualification.oidc.crossed")
     if (
         processing_bindings.get("apiTargetBindingDigest")
         != continuity_bindings.get("targetBindingDigest")
@@ -514,6 +548,10 @@ def _subject_and_bindings(
         "continuityTargetBindingDigest": str(
             continuity_bindings["targetBindingDigest"]
         ),
+        "oidcProfileDigest": str(oidc_bindings["profileDigest"]),
+        "oidcIssuerMetadataDigest": str(
+            oidc_bindings["issuerMetadataDigest"]
+        ),
         "processingOtlpTargetBindingDigest": str(
             processing_bindings["otlpTargetBindingDigest"]
         ),
@@ -536,10 +574,22 @@ def _input_times(
     *,
     preflight_report: Mapping[str, Any],
     diagnostic_report: Mapping[str, Any],
+    oidc_report: Mapping[str, Any],
     continuity_report: Mapping[str, Any],
     processing_report: Mapping[str, Any],
     postgresql_report: Mapping[str, Any],
-) -> tuple[datetime, datetime, datetime, datetime, datetime, datetime, datetime, datetime]:
+) -> tuple[
+    datetime,
+    datetime,
+    datetime,
+    datetime,
+    datetime,
+    datetime,
+    datetime,
+    datetime,
+    datetime,
+    datetime,
+]:
     preflight_metadata = _mapping(
         preflight_report.get("metadata"),
         "customer-deployment-qualification.time.invalid",
@@ -550,6 +600,14 @@ def _input_times(
     )
     diagnostic_environment = _mapping(
         diagnostic_spec.get("environment"),
+        "customer-deployment-qualification.time.invalid",
+    )
+    oidc_spec = _mapping(
+        oidc_report.get("spec"),
+        "customer-deployment-qualification.time.invalid",
+    )
+    oidc_measurements = _mapping(
+        oidc_spec.get("measurements"),
         "customer-deployment-qualification.time.invalid",
     )
     continuity_spec = _mapping(
@@ -579,6 +637,14 @@ def _input_times(
     return (
         _parse_timestamp(
             preflight_metadata.get("generatedAt"),
+            "customer-deployment-qualification.time.invalid",
+        ),
+        _parse_timestamp(
+            oidc_measurements.get("startedAt"),
+            "customer-deployment-qualification.time.invalid",
+        ),
+        _parse_timestamp(
+            oidc_measurements.get("completedAt"),
             "customer-deployment-qualification.time.invalid",
         ),
         _parse_timestamp(
@@ -620,6 +686,8 @@ def build_report(
     diagnostic_digest: str,
     ingress_report: Mapping[str, Any],
     ingress_digest: str,
+    oidc_report: Mapping[str, Any],
+    oidc_digest: str,
     continuity_report: Mapping[str, Any],
     continuity_digest: str,
     processing_report: Mapping[str, Any],
@@ -653,6 +721,7 @@ def build_report(
         preflight_report=preflight_report,
         diagnostic_report=diagnostic_report,
         ingress_report=ingress_report,
+        oidc_report=oidc_report,
         continuity_report=continuity_report,
         processing_report=processing_report,
         postgresql_report=postgresql_report,
@@ -667,6 +736,8 @@ def build_report(
     )
     (
         preflight_at,
+        oidc_started,
+        oidc_completed,
         continuity_started,
         continuity_completed,
         processing_started,
@@ -677,13 +748,16 @@ def build_report(
     ) = _input_times(
         preflight_report=preflight_report,
         diagnostic_report=diagnostic_report,
+        oidc_report=oidc_report,
         continuity_report=continuity_report,
         processing_report=processing_report,
         postgresql_report=postgresql_report,
     )
     skew = maximum_clock_skew_seconds
     ordered = (
-        preflight_at <= continuity_started
+        preflight_at <= oidc_started
+        and oidc_started <= oidc_completed
+        and oidc_completed <= continuity_started
         and continuity_started <= continuity_completed
         and continuity_completed <= processing_started
         and processing_started <= processing_completed
@@ -693,6 +767,8 @@ def build_report(
     )
     times = (
         preflight_at,
+        oidc_started,
+        oidc_completed,
         continuity_started,
         continuity_completed,
         processing_started,
@@ -724,6 +800,7 @@ def build_report(
                 preflight_report,
                 diagnostic_report,
                 ingress_report,
+                oidc_report,
                 continuity_report,
                 processing_report,
                 postgresql_report,
@@ -732,6 +809,7 @@ def build_report(
                 preflight_digest,
                 diagnostic_digest,
                 ingress_digest,
+                oidc_digest,
                 continuity_digest,
                 processing_digest,
                 postgresql_digest,
@@ -760,6 +838,11 @@ def build_report(
             "customer-deployment-qualification.ingress.not-qualified",
         ),
         _check(
+            "customer-oidc",
+            evidence_by_id["customer-oidc"]["status"] == "passed",
+            "customer-deployment-qualification.oidc.not-qualified",
+        ),
+        _check(
             "control-plane-continuity",
             evidence_by_id["control-plane-continuity"]["status"] == "passed",
             "customer-deployment-qualification.continuity.not-qualified",
@@ -775,6 +858,7 @@ def build_report(
             "customer-deployment-qualification.database.not-qualified",
         ),
         _check("continuity-ingress-chain", True, "customer-deployment-qualification.ingress.crossed"),
+        _check("oidc-target-chain", True, "customer-deployment-qualification.oidc.crossed"),
         _check("processing-target-chain", True, "customer-deployment-qualification.processing.crossed"),
         _check("database-target-chain", True, "customer-deployment-qualification.database.crossed"),
         _check("evidence-order", ordered, "customer-deployment-qualification.evidence.order-invalid"),
@@ -801,6 +885,8 @@ def build_report(
         },
         "measurements": {
             "preflightGeneratedAt": _timestamp(preflight_at),
+            "oidcStartedAt": _timestamp(oidc_started),
+            "oidcCompletedAt": _timestamp(oidc_completed),
             "continuityStartedAt": _timestamp(continuity_started),
             "continuityCompletedAt": _timestamp(continuity_completed),
             "processingStartedAt": _timestamp(processing_started),
@@ -877,6 +963,14 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         measurements.get("preflightGeneratedAt"),
         "customer-deployment-qualification.report.time-invalid",
     )
+    oidc_started = _parse_timestamp(
+        measurements.get("oidcStartedAt"),
+        "customer-deployment-qualification.report.time-invalid",
+    )
+    oidc_completed = _parse_timestamp(
+        measurements.get("oidcCompletedAt"),
+        "customer-deployment-qualification.report.time-invalid",
+    )
     continuity_started = _parse_timestamp(
         measurements.get("continuityStartedAt"),
         "customer-deployment-qualification.report.time-invalid",
@@ -919,7 +1013,9 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
     ):
         _fail("customer-deployment-qualification.report.objective-invalid")
     ordered = (
-        preflight_at <= continuity_started
+        preflight_at <= oidc_started
+        and oidc_started <= oidc_completed
+        and oidc_completed <= continuity_started
         and continuity_started <= continuity_completed
         and continuity_completed <= processing_started
         and processing_started <= processing_completed
@@ -929,6 +1025,8 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
     )
     values = (
         preflight_at,
+        oidc_started,
+        oidc_completed,
         continuity_started,
         continuity_completed,
         processing_started,
@@ -967,6 +1065,11 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
             "customer-deployment-qualification.ingress.not-qualified",
         ),
         _check(
+            "customer-oidc",
+            evidence_by_id.get("customer-oidc", {}).get("status") == "passed",
+            "customer-deployment-qualification.oidc.not-qualified",
+        ),
+        _check(
             "control-plane-continuity",
             evidence_by_id.get("control-plane-continuity", {}).get("status") == "passed",
             "customer-deployment-qualification.continuity.not-qualified",
@@ -984,6 +1087,7 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
             "customer-deployment-qualification.database.not-qualified",
         ),
         _check("continuity-ingress-chain", True, "customer-deployment-qualification.ingress.crossed"),
+        _check("oidc-target-chain", True, "customer-deployment-qualification.oidc.crossed"),
         _check("processing-target-chain", True, "customer-deployment-qualification.processing.crossed"),
         _check("database-target-chain", True, "customer-deployment-qualification.database.crossed"),
         _check("evidence-order", ordered, "customer-deployment-qualification.evidence.order-invalid"),
@@ -1074,6 +1178,9 @@ def _validate_inputs(
     preflight_path: Path,
     diagnostic_path: Path,
     ingress_path: Path,
+    oidc_path: Path,
+    oidc_profile_path: Path,
+    oidc_api_base_url: str,
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
@@ -1105,6 +1212,8 @@ def _validate_inputs(
     str,
     Mapping[str, Any],
     str,
+    Mapping[str, Any],
+    str,
 ]:
     if not values or len(values) > MAX_VALUES_FILES:
         _fail("customer-deployment-qualification.values.invalid")
@@ -1116,6 +1225,9 @@ def _validate_inputs(
     )
     ingress_report, ingress_digest = _load_document(
         ingress_path, "customer-deployment-qualification.ingress.unreadable"
+    )
+    oidc_report, oidc_digest = _load_document(
+        oidc_path, "customer-deployment-qualification.oidc.unreadable"
     )
     continuity_report, continuity_digest = _load_document(
         continuity_path, "customer-deployment-qualification.continuity.unreadable"
@@ -1146,6 +1258,13 @@ def _validate_inputs(
             require_healthy=False,
         )
         ingress.validate_report_document(ingress_report)
+        oidc.verify_report(
+            report_path=oidc_path,
+            profile_path=oidc_profile_path,
+            api_base_url=oidc_api_base_url,
+            image_digest=image_digest,
+            require_qualified=False,
+        )
         continuity.verify_report(
             report_path=continuity_path,
             ingress_report_path=ingress_path,
@@ -1182,6 +1301,7 @@ def _validate_inputs(
         preflight.DeploymentPreflightError,
         diagnostics.DeploymentDiagnosticError,
         ingress.IngressQualificationError,
+        oidc.CustomerOidcQualificationError,
         continuity.CustomerContinuityQualificationError,
         processing.CustomerProcessingContinuityError,
         postgresql.CustomerPostgreSQLContinuityError,
@@ -1191,6 +1311,7 @@ def _validate_inputs(
         (preflight_path, preflight_digest, "customer-deployment-qualification.preflight.changed"),
         (diagnostic_path, diagnostic_digest, "customer-deployment-qualification.diagnostic.changed"),
         (ingress_path, ingress_digest, "customer-deployment-qualification.ingress.changed"),
+        (oidc_path, oidc_digest, "customer-deployment-qualification.oidc.changed"),
         (continuity_path, continuity_digest, "customer-deployment-qualification.continuity.changed"),
         (processing_path, processing_digest, "customer-deployment-qualification.processing.changed"),
         (postgresql_path, postgresql_digest, "customer-deployment-qualification.database.changed"),
@@ -1204,6 +1325,8 @@ def _validate_inputs(
         diagnostic_digest,
         ingress_report,
         ingress_digest,
+        oidc_report,
+        oidc_digest,
         continuity_report,
         continuity_digest,
         processing_report,
@@ -1218,6 +1341,9 @@ def qualify(
     preflight_path: Path,
     diagnostic_path: Path,
     ingress_path: Path,
+    oidc_path: Path,
+    oidc_profile_path: Path,
+    oidc_api_base_url: str,
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
@@ -1246,6 +1372,9 @@ def qualify(
         preflight_path=preflight_path,
         diagnostic_path=diagnostic_path,
         ingress_path=ingress_path,
+        oidc_path=oidc_path,
+        oidc_profile_path=oidc_profile_path,
+        oidc_api_base_url=oidc_api_base_url,
         continuity_path=continuity_path,
         processing_path=processing_path,
         processing_profile_path=processing_profile_path,
@@ -1277,12 +1406,14 @@ def qualify(
         diagnostic_digest=inputs[3],
         ingress_report=inputs[4],
         ingress_digest=inputs[5],
-        continuity_report=inputs[6],
-        continuity_digest=inputs[7],
-        processing_report=inputs[8],
-        processing_digest=inputs[9],
-        postgresql_report=inputs[10],
-        postgresql_digest=inputs[11],
+        oidc_report=inputs[6],
+        oidc_digest=inputs[7],
+        continuity_report=inputs[8],
+        continuity_digest=inputs[9],
+        processing_report=inputs[10],
+        processing_digest=inputs[11],
+        postgresql_report=inputs[12],
+        postgresql_digest=inputs[13],
         context=context,
         namespace=namespace,
         release_name=release_name,
@@ -1305,6 +1436,9 @@ def verify_report(
     preflight_path: Path,
     diagnostic_path: Path,
     ingress_path: Path,
+    oidc_path: Path,
+    oidc_profile_path: Path,
+    oidc_api_base_url: str,
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
@@ -1335,6 +1469,9 @@ def verify_report(
         preflight_path=preflight_path,
         diagnostic_path=diagnostic_path,
         ingress_path=ingress_path,
+        oidc_path=oidc_path,
+        oidc_profile_path=oidc_profile_path,
+        oidc_api_base_url=oidc_api_base_url,
         continuity_path=continuity_path,
         processing_path=processing_path,
         processing_profile_path=processing_profile_path,
@@ -1377,12 +1514,14 @@ def verify_report(
         diagnostic_digest=inputs[3],
         ingress_report=inputs[4],
         ingress_digest=inputs[5],
-        continuity_report=inputs[6],
-        continuity_digest=inputs[7],
-        processing_report=inputs[8],
-        processing_digest=inputs[9],
-        postgresql_report=inputs[10],
-        postgresql_digest=inputs[11],
+        oidc_report=inputs[6],
+        oidc_digest=inputs[7],
+        continuity_report=inputs[8],
+        continuity_digest=inputs[9],
+        processing_report=inputs[10],
+        processing_digest=inputs[11],
+        postgresql_report=inputs[12],
+        postgresql_digest=inputs[13],
         context=context,
         namespace=namespace,
         release_name=release_name,
@@ -1409,6 +1548,9 @@ def _common_inputs(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--preflight-report", type=Path, required=True)
     parser.add_argument("--diagnostic-report", type=Path, required=True)
     parser.add_argument("--ingress-report", type=Path, required=True)
+    parser.add_argument("--oidc-report", type=Path, required=True)
+    parser.add_argument("--oidc-profile", type=Path, required=True)
+    parser.add_argument("--oidc-api-base-url", required=True)
     parser.add_argument("--continuity-report", type=Path, required=True)
     parser.add_argument("--processing-report", type=Path, required=True)
     parser.add_argument("--processing-profile", type=Path, required=True)
@@ -1456,6 +1598,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "preflight_path": arguments.preflight_report,
         "diagnostic_path": arguments.diagnostic_report,
         "ingress_path": arguments.ingress_report,
+        "oidc_path": arguments.oidc_report,
+        "oidc_profile_path": arguments.oidc_profile,
+        "oidc_api_base_url": arguments.oidc_api_base_url,
         "continuity_path": arguments.continuity_report,
         "processing_path": arguments.processing_report,
         "processing_profile_path": arguments.processing_profile,

@@ -134,3 +134,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0128](0128-source-bound-worker-receiver-processing-continuity.md) | Accepted | Prove durable receiver intake and workflow completion during one planned worker-node drain |
 | [0129](0129-customer-worker-receiver-processing-continuity.md) | Accepted | Prove customer worker and receiver continuity with bounded UID-preconditioned pod Evictions |
 | [0130](0130-customer-postgresql-primary-promotion-continuity.md) | Accepted | Prove customer PostgreSQL promotion through least-privilege native WAL timeline evidence |
+| [0131](0131-customer-oidc-prerequisite-qualification.md) | Accepted | Qualify one customer issuer's verifier and browser prerequisites without retaining identity or credential values |

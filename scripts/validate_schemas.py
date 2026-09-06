@@ -105,6 +105,12 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "customer-postgresql-continuity-qualification-report.schema.json": (
         "customer-postgresql-continuity-qualification-report.json",
     ),
+    "customer-oidc-qualification-profile.schema.json": (
+        "customer-oidc-qualification-profile.json",
+    ),
+    "customer-oidc-qualification-report.schema.json": (
+        "customer-oidc-qualification-report.json",
+    ),
     "customer-deployment-qualification-report.schema.json": (
         "customer-deployment-qualification-report.json",
     ),

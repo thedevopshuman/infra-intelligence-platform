@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.iip.dev/v1alpha1/release-publication-report.schema.json",
+  "title": "Release publication report",
+  "description": "Source-bound evidence that verified OCI indexes were copied to exact registry digests without claiming promotion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.dev/v1alpha1"},
+    "kind": {"const": "ReleasePublicationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^rpr_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "promotionStatus", "release", "channel", "environment", "targets", "checks", "summary"],
+      "properties": {
+        "status": {"const": "published-unsigned"},
+        "promotionStatus": {"const": "requires-signature-and-vulnerability-qualification"},
+        "release": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "tag", "manifestDigest"],
+          "properties": {
+            "version": {"$ref": "#/$defs/releaseVersion"},
+            "tag": {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"},
+            "manifestDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "channel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profile", "registryHost"],
+          "properties": {
+            "profile": {"const": "oci-layout-to-registry-v1"},
+            "registryHost": {"$ref": "#/$defs/registryHost"}
+          }
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["platform", "pythonVersion", "dockerBuildxVersion"],
+          "properties": {
+            "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+            "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+            "dockerBuildxVersion": {"$ref": "#/$defs/toolVersion"}
+          }
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {"$ref": "#/$defs/controlPlaneTarget"},
+            {"$ref": "#/$defs/bridgeTarget"}
+          ],
+          "items": false
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "prefixItems": [
+            {"$ref": "#/$defs/bundleCheck"},
+            {"$ref": "#/$defs/sourceCheck"},
+            {"$ref": "#/$defs/tagCheck"},
+            {"$ref": "#/$defs/repositoriesCheck"},
+            {"$ref": "#/$defs/controlCopyCheck"},
+            {"$ref": "#/$defs/bridgeCopyCheck"},
+            {"$ref": "#/$defs/digestCheck"},
+            {"$ref": "#/$defs/minimizationCheck"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 8},
+            "passedChecks": {"const": 8},
+            "failedChecks": {"const": 0},
+            "overallStatus": {"const": "published-unsigned"}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "releaseVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"},
+    "toolVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "registryHost": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?$", "maxLength": 255},
+    "repository": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?/[a-z0-9]+(?:[._/-][a-z0-9]+)*$", "maxLength": 512},
+    "tagReference": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?/[a-z0-9]+(?:[._/-][a-z0-9]+)*:v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$", "maxLength": 640},
+    "immutableReference": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?/[a-z0-9]+(?:[._/-][a-z0-9]+)*@sha256:[a-f0-9]{64}$", "maxLength": 640},
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "repository", "tagReference", "immutableReference", "indexDigest"],
+      "properties": {
+        "role": {"type": "string"},
+        "repository": {"$ref": "#/$defs/repository"},
+        "tagReference": {"$ref": "#/$defs/tagReference"},
+        "immutableReference": {"$ref": "#/$defs/immutableReference"},
+        "indexDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "controlPlaneTarget": {"allOf": [{"$ref": "#/$defs/target"}, {"properties": {"role": {"const": "control-plane-image"}}}]},
+    "bridgeTarget": {"allOf": [{"$ref": "#/$defs/target"}, {"properties": {"role": {"const": "plugin-mediation-bridge-image"}}}]},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {"id": {"type": "string"}, "status": {"const": "passed"}}
+    },
+    "bundleCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "release-bundle-integrity"}}}]},
+    "sourceCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "source-binding"}}}]},
+    "tagCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "exact-version-tag"}}}]},
+    "repositoriesCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "distinct-role-repositories"}}}]},
+    "controlCopyCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "control-plane-index-copy"}}}]},
+    "bridgeCopyCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "bridge-index-copy"}}}]},
+    "digestCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "registry-digest-verification"}}}]},
+    "minimizationCheck": {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"id": {"const": "output-minimization"}}}]}
+  }
+}

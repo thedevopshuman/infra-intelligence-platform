@@ -75,7 +75,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.83.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 
@@ -87,7 +87,7 @@ After verification, prove that the packaged chart and OCI image—not checkout
 copies—install on the explicit local Kind cluster:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.83.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.0-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -107,7 +107,7 @@ selected supported prior revision. The target may retain the same latest
 migration or add a newer one; migration regression is rejected:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.83.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
@@ -136,7 +136,7 @@ Run both packaged profiles in sequence and require their machine-readable
 evidence to agree on the candidate and local environment:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.83.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.0-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=<supported-ancestor> \
   make qualify-release PYTHON=.venv/bin/python
 ```
@@ -149,7 +149,7 @@ platform, Kubernetes, and Docker identity match. Verify a transported report
 and bundle with:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.83.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.0-0123456789ab \
 IIP_RELEASE_QUALIFICATION_REPORT=/absolute/path/to/report.json \
   make verify-release-qualification PYTHON=.venv/bin/python
 ```
@@ -172,12 +172,82 @@ The local bundle is explicitly unsigned. It proves artifact integrity and build 
    customer values generation and explicit Kubernetes context;
 3. qualify the protected GitHub or GitHub Enterprise repository profile when
    it is enabled and retain the clean-revision compatibility report;
-4. publish both OCI indexes and the Helm chart to immutable registry digests;
+4. publish both OCI indexes to immutable registry digests and distribute the
+   verified Helm chart inside the signed release bundle;
 5. sign both OCI digests with the accepted organizational identity;
 6. verify both signatures, identities, issuers, and transparency evidence under a checked-in policy;
 7. qualify every exact attached SPDX SBOM under the checked vulnerability
    policy and retain the minimized report;
 8. distribute only the verified digest and matching manifest/checksums through a trusted release channel.
+
+The exact-index publication boundary is executable independently of the final
+registry namespace. It verifies the bundle, requires the exact version tag and
+two distinct repositories on one registry host, copies each OCI layout without
+rebuilding, and verifies both the immutable digest and convenience tag after
+transport:
+
+```bash
+PYTHONPATH=src:sdks/python/src python scripts/release_publication.py publish \
+  /absolute/path/to/iip-0.84.0-0123456789ab \
+  --control-plane-repository registry.example.test/team/control-plane \
+  --bridge-repository registry.example.test/team/plugin-mediation-bridge \
+  --tag v0.84.0 \
+  --report /absolute/path/to/release-publication.json
+```
+
+The report remains explicitly `published-unsigned`; use its immutable
+references for signing and installation. `make test-release-publication`
+proves digest-preserving transfer and conflicting-tag rejection against an
+isolated local registry without using customer credentials. Registry-side tag
+immutability and protected release permissions remain required because no
+client-side preflight can eliminate a remote race.
+
+### Protected GitHub release path
+
+`.github/workflows/release.yml` turns an accepted `v<application-version>` tag
+into a release without rebuilding during registry publication. It requires the
+tag commit to equal both the clean checkout and fetched `main` tip, runs
+`make verify`, builds the attested bundle, publishes both exact OCI indexes to
+separate GHCR repositories, signs their immutable references with GitHub OIDC,
+generates the matching exact-identity policy, and then runs the signature and
+fresh-database vulnerability gates. Only after those gates pass does it sign
+the complete customer archive and create the GitHub release with the manifest,
+checksums, Helm chart, and minimized qualification reports.
+
+Before pushing the first release tag, repository owners must:
+
+1. protect the `release` environment with required reviewers and restrict it to
+   protected tags;
+2. require an exact-version tag ruleset and ensure releases originate at the
+   current protected `main` tip;
+3. configure both GHCR packages as immutable for released version tags and set
+   the intended package visibility;
+4. review the checked vulnerability policy, the generated GitHub workflow
+   identity, retention, and release-asset visibility; and
+5. require the ordinary CI and applicable customer qualification evidence
+   before authorizing the tag.
+
+The release job intentionally has no manual-dispatch path. A retry is
+idempotent when both version tags still name the verified digests and fails if
+it observes a conflicting tag. The workflow does not turn local Kind, fixture,
+or offline-provider evidence into customer-environment qualification.
+
+Verify the downloaded archive before extracting it. Substitute the accepted
+repository and version in the certificate identity:
+
+```bash
+cosign verify-blob \
+  --bundle iip-0.84.0-0123456789ab.tar.gz.sigstore.json \
+  --certificate-identity \
+    https://github.com/OWNER/REPOSITORY/.github/workflows/release.yml@refs/tags/v0.84.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  iip-0.84.0-0123456789ab.tar.gz
+```
+
+Then verify `SHA256SUMS` inside the extracted directory and install the chart
+with the control-plane `repository@sha256:...` reference from
+`release-manifest.json`; never derive installation authority from the version
+tag.
 
 The repository implements step 6 without selecting the organization. Copy the
 example policy to a reviewed location, replace every placeholder with the
@@ -186,7 +256,7 @@ increment its generation when trust changes, and run from the same clean
 release checkout:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.83.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.0-0123456789ab \
 IIP_RELEASE_SIGNATURE_POLICY=/absolute/protected/release-signature-policy.json \
 IIP_RELEASE_SIGNATURE_REPORT=/absolute/path/to/release-signatures.json \
 COSIGN=/absolute/path/to/cosign \
@@ -224,7 +294,7 @@ fetches the policy-pinned scanner database with constrained network authority,
 and then scans offline:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.83.0-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.0-0123456789ab \
 IIP_RELEASE_VULNERABILITY_POLICY=/absolute/protected/release-vulnerability-policy.json \
 IIP_RELEASE_VULNERABILITY_REPORT=/absolute/path/to/release-vulnerabilities.json \
   make qualify-release-vulnerabilities PYTHON=.venv/bin/python

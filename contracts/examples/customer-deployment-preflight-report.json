@@ -3,7 +3,7 @@
   "kind": "CustomerDeploymentPreflightReport",
   "metadata": {
     "generatedAt": "2026-09-05T15:26:40Z",
-    "id": "cdp_f9b4e02c3ce1429ed58be69a35e6fdb2",
+    "id": "cdp_a1ae962fad28409155e47d3b8a44e379",
     "sourceDirty": false,
     "sourceRevision": "afd2ce4e600094fb481bc1da2789a35de00c8828"
   },
@@ -59,8 +59,8 @@
       "pythonVersion": "3.14.3"
     },
     "profile": {
-      "applicationVersion": "0.83.0",
-      "chartVersion": "0.86.0",
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
       "configurationDigest": "sha256:a4fdec3b341df69fba314407f0301aa1239f1383e9f30c3c4d21743c61b1fb5a",
       "name": "production-core-v1",
       "valuesDigest": "sha256:b7903095301e6c3d2e6a6927a69d0521f5994a6c25bd26311ea8e4ad3dd526e7"

@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -96,6 +96,7 @@ help:
 	@echo "test-release-install Install a verified packaged release on the explicit local kind cluster"
 	@echo "test-release-upgrade Prove sustained availability across a packaged N-1 transition"
 	@echo "qualify-release Run both packaged profiles and require one complete report"
+	@echo "test-release-publication Copy exact OCI layouts to an isolated local registry"
 	@echo "test-release-signatures Exercise pinned Cosign signing and tamper rejection locally"
 	@echo "qualify-release-signatures Verify published release digests against organizational trust"
 	@echo "verify-release-signature-report Validate retained minimized signature evidence"
@@ -423,6 +424,14 @@ test-release-signatures:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \
 		tests.test_release_signature_verification -v
 	IIP_DOCKER_BIN=$(DOCKER) scripts/test_release_signatures.sh
+
+test-release-publication:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_release_publication tests.test_release_workflow -v
+	IIP_DOCKER_BIN=$(DOCKER) PYTHONPATH=src:sdks/python/src $(PYTHON) \
+		scripts/run_release_publication_compatibility.py
+	IIP_COSIGN_DOCKER_BIN=$(DOCKER) scripts/cosign_container.sh \
+		version --json >/dev/null
 
 qualify-release-signatures:
 	@test -n "$(IIP_RELEASE_BUNDLE)" || \

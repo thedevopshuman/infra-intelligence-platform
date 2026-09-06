@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "KubernetesAvailabilityQualificationReport",
   "metadata": {
-    "id": "kaq_89fe7f25bfcc3249e169432aba87023c",
+    "id": "kaq_6d397e089359ca07033365a7d4128c02",
     "generatedAt": "2026-09-06T12:30:00Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
@@ -11,8 +11,8 @@
     "status": "qualified",
     "qualificationLevel": "local-multi-node-kind-v1",
     "subject": {
-      "applicationVersion": "0.83.0",
-      "chartVersion": "0.86.0",
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
       "requiredMigration": "0023_ai_model_suitability.sql",
       "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

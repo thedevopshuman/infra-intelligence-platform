@@ -38,6 +38,15 @@ under closed severity thresholds and exact expiring exceptions. Only minimized
 counts, digests, and exception IDs are retained; see the [vulnerability
 qualification runbook](docs/operations/release-vulnerability-qualification.md).
 
+The protected tag-only release workflow now connects those gates: from a clean
+exact-version tag at the fetched `main` tip it builds the verified bundle,
+copies both OCI indexes unchanged to GHCR, signs their immutable digests with
+GitHub OIDC, qualifies signatures and every attached SPDX SBOM, signs the
+customer archive, and only then creates a GitHub release. It remains dormant
+until repository owners configure the `release` environment, protected tag
+rules, GHCR package immutability/visibility, and organizational ownership. See
+the [release procedure](docs/operations/release-artifacts.md).
+
 The Docker recovery gates retain separate source-bound logical
 `PostgreSQLRecoveryQualificationReport` and physical
 `PostgreSQLContinuityQualificationReport` evidence. The latter proves local

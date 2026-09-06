@@ -21,8 +21,8 @@ from scripts.release_bundle import (
 )
 
 
-VERSION = "0.83.0"
-CHART_VERSION = "0.86.0"
+VERSION = "0.84.0"
+CHART_VERSION = "0.87.0"
 SDK_VERSION = "0.58.0"
 REVISION = "0123456789abcdef0123456789abcdef01234567"
 SOURCE_DATE = "2026-08-17T04:45:00+00:00"
@@ -37,7 +37,12 @@ def digest(content: bytes) -> str:
     return "sha256:" + hashlib.sha256(content).hexdigest()
 
 
-def write_oci_fixture(path: Path, *, include_sbom: bool = True) -> None:
+def write_oci_fixture(
+    path: Path,
+    *,
+    include_sbom: bool = True,
+    marker: str = "release-bundle-fixture",
+) -> None:
     blobs: dict[str, bytes] = {}
 
     def store(document: Any) -> tuple[str, int]:
@@ -46,15 +51,32 @@ def write_oci_fixture(path: Path, *, include_sbom: bool = True) -> None:
         blobs[identifier] = content
         return identifier, len(content)
 
+    empty_digest, empty_size = store({})
     descriptors = []
     for platform in PLATFORMS:
         os_name, architecture = platform.split("/")
+        config_digest, config_size = store(
+            {
+                "architecture": architecture,
+                "os": os_name,
+                "config": {},
+                "rootfs": {"type": "layers", "diff_ids": []},
+            }
+        )
         image_digest, image_size = store(
             {
                 "schemaVersion": 2,
                 "mediaType": OCI_MANIFEST,
+                "config": {
+                    "mediaType": "application/vnd.oci.image.config.v1+json",
+                    "digest": config_digest,
+                    "size": config_size,
+                },
                 "layers": [],
-                "annotations": {"fixture.platform": platform},
+                "annotations": {
+                    "fixture.platform": platform,
+                    "fixture.marker": marker,
+                },
             }
         )
         descriptors.append(
@@ -86,7 +108,16 @@ def write_oci_fixture(path: Path, *, include_sbom: bool = True) -> None:
                 }
             )
         attestation_digest, attestation_size = store(
-            {"schemaVersion": 2, "mediaType": OCI_MANIFEST, "layers": layers}
+            {
+                "schemaVersion": 2,
+                "mediaType": OCI_MANIFEST,
+                "config": {
+                    "mediaType": "application/vnd.oci.empty.v1+json",
+                    "digest": empty_digest,
+                    "size": empty_size,
+                },
+                "layers": layers,
+            }
         )
         descriptors.append(
             {

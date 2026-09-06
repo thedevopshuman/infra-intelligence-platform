@@ -74,7 +74,7 @@ Plugins are signed artifacts with immutable version and digest, explicit network
 
 ## Build and CI authority
 
-CI has read-only repository permission, does not persist checkout credentials, and runs within a fixed deadline on an explicit runner generation. Third-party Actions are referenced by reviewed commit SHA and service containers by OCI digest; comments retain human-readable release versions. Automated dependency checks may propose pull requests but never bypass review or verification. Release publication and signing require separate organizational identities that are not present in this repository.
+CI has read-only repository permission, does not persist checkout credentials, and runs within a fixed deadline on an explicit runner generation. Third-party Actions are referenced by reviewed commit SHA and service containers by OCI digest; comments retain human-readable release versions. Automated dependency checks may propose pull requests but never bypass review or verification. The separate tag-only release workflow receives job-scoped package, release, and OIDC authority only inside the named protected `release` environment. It accepts only a clean exact-version tag at the fetched `main` tip, copies verified OCI indexes without rebuilding, signs exact digests with the workflow identity, and releases only after signature and vulnerability qualification. Repository rules, environment reviewers, GHCR immutability, and organizational ownership remain hosting controls and are not inferred from workflow source.
 
 ## Audit minimum
 

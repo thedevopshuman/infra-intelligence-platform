@@ -120,3 +120,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0114](0114-exact-aws-bedrock-public-price-import.md) | Accepted | Import exact AWS Bedrock public price dimensions into reproducible provider-neutral catalogs |
 | [0115](0115-tenant-bound-additive-evidence-redaction.md) | Accepted | Add bounded exact-tenant privacy detectors without weakening mandatory credential redaction |
 | [0116](0116-executable-oidc-browser-pkce-evidence.md) | Accepted | Prove the console's exact public-client authorization, S256 exchange, CORS, replay, and API-token path over real TLS |
+| [0117](0117-exact-release-index-publication.md) | Accepted | Copy both verified OCI layouts to exact registry digests and retain explicitly unsigned publication evidence |

@@ -1,0 +1,153 @@
+name: protected release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/verify.txt
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: sdks/typescript/package-lock.json
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: v4.1.3
+      - name: Validate exact protected tag context
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_REVISION: ${{ github.sha }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          python -m pip install --requirement requirements/verify.txt
+          python scripts/release_publication.py validate-github-context \
+            --tag "$RELEASE_TAG" \
+            --revision "$RELEASE_REVISION" \
+            --main-revision "$(git rev-parse refs/remotes/origin/main)" \
+            --github-repository "$RELEASE_REPOSITORY"
+      - name: Derive exact release destinations
+        id: release
+        env:
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_REVISION: ${{ github.sha }}
+        run: |
+          version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          chart_version=$(awk '$1 == "version:" {print $2; exit}' deploy/helm/infra-intelligence/Chart.yaml)
+          repository=$(printf '%s' "$RELEASE_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          short_revision=$(printf '%s' "$RELEASE_REVISION" | cut -c1-12)
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+          printf 'chart_version=%s\n' "$chart_version" >> "$GITHUB_OUTPUT"
+          printf 'bundle=dist/iip-%s-%s\n' "$version" "$short_revision" >> "$GITHUB_OUTPUT"
+          printf 'control_repository=ghcr.io/%s\n' "$repository" >> "$GITHUB_OUTPUT"
+          printf 'bridge_repository=ghcr.io/%s-plugin-mediation-bridge\n' "$repository" >> "$GITHUB_OUTPUT"
+      - name: Verify and build the clean candidate
+        run: |
+          make verify
+          make release-bundle
+      - name: Authenticate the publication boundary
+        env:
+          GHCR_PASSWORD: ${{ github.token }}
+        run: |
+          printf '%s' "$GHCR_PASSWORD" | docker login ghcr.io \
+            --username "$GITHUB_ACTOR" --password-stdin
+      - name: Publish exact verified OCI indexes
+        env:
+          RELEASE_BUNDLE: ${{ steps.release.outputs.bundle }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          CONTROL_REPOSITORY: ${{ steps.release.outputs.control_repository }}
+          BRIDGE_REPOSITORY: ${{ steps.release.outputs.bridge_repository }}
+        run: |
+          python scripts/release_publication.py publish "$RELEASE_BUNDLE" \
+            --control-plane-repository "$CONTROL_REPOSITORY" \
+            --bridge-repository "$BRIDGE_REPOSITORY" \
+            --tag "$RELEASE_TAG" \
+            --report dist/release-publication-report.json
+      - name: Sign exact published indexes
+        run: |
+          control_reference=$(python scripts/release_publication.py reference \
+            dist/release-publication-report.json --role control-plane-image)
+          bridge_reference=$(python scripts/release_publication.py reference \
+            dist/release-publication-report.json --role plugin-mediation-bridge-image)
+          scripts/cosign_container.sh sign --yes "$control_reference"
+          scripts/cosign_container.sh sign --yes "$bridge_reference"
+      - name: Qualify release signatures and vulnerabilities
+        env:
+          IIP_RELEASE_BUNDLE: ${{ steps.release.outputs.bundle }}
+          IIP_RELEASE_SIGNATURE_POLICY: dist/release-signature-policy.json
+          IIP_RELEASE_SIGNATURE_REPORT: dist/release-signature-verification-report.json
+          IIP_RELEASE_VULNERABILITY_REPORT: dist/release-vulnerability-qualification-report.json
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          python scripts/release_publication.py github-signature-policy \
+            dist/release-publication-report.json \
+            --github-repository "$RELEASE_REPOSITORY" \
+            --generation "$GITHUB_RUN_NUMBER" \
+            --output "$IIP_RELEASE_SIGNATURE_POLICY"
+          make qualify-release-signatures COSIGN=scripts/cosign_container.sh
+          make qualify-release-vulnerabilities
+      - name: Prepare signed customer release assets
+        id: assets
+        env:
+          RELEASE_BUNDLE: ${{ steps.release.outputs.bundle }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_REVISION: ${{ github.sha }}
+        run: |
+          short_revision=$(printf '%s' "$RELEASE_REVISION" | cut -c1-12)
+          archive="dist/iip-$RELEASE_VERSION-$short_revision.tar.gz"
+          tar --create --gzip --file "$archive" \
+            --directory dist "$(basename "$RELEASE_BUNDLE")"
+          sha256sum "$archive" > "$archive.sha256"
+          scripts/cosign_container.sh sign-blob --yes \
+            --bundle "$archive.sigstore.json" "$archive"
+          printf 'archive=%s\n' "$archive" >> "$GITHUB_OUTPUT"
+      - name: Publish verified GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ARCHIVE: ${{ steps.assets.outputs.archive }}
+          RELEASE_BUNDLE: ${{ steps.release.outputs.bundle }}
+          RELEASE_CHART_VERSION: ${{ steps.release.outputs.chart_version }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          printf '%s\n' \
+            'Verified IIP release candidate.' \
+            'Install only by the immutable image digest in the attached manifest.' \
+            > dist/release-notes.md
+          gh release create "$RELEASE_TAG" \
+            "$RELEASE_ARCHIVE#Verified release bundle" \
+            "$RELEASE_ARCHIVE.sha256#Release bundle checksum" \
+            "$RELEASE_ARCHIVE.sigstore.json#Release bundle Sigstore evidence" \
+            "$RELEASE_BUNDLE/release-manifest.json#Release manifest" \
+            "$RELEASE_BUNDLE/SHA256SUMS#Bundle checksums" \
+            "$RELEASE_BUNDLE/infra-intelligence-$RELEASE_CHART_VERSION.tgz#Helm chart" \
+            "dist/release-publication-report.json#Publication evidence" \
+            "dist/release-signature-policy.json#Signature policy" \
+            "dist/release-signature-verification-report.json#Signature evidence" \
+            "dist/release-vulnerability-qualification-report.json#Vulnerability evidence" \
+            --verify-tag --title "IIP $RELEASE_TAG" \
+            --notes-file dist/release-notes.md

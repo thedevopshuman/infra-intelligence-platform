@@ -212,6 +212,7 @@ REQUIRED_PATHS = (
     "contracts/schemas/resource.schema.json",
     "contracts/schemas/release-manifest.schema.json",
     "contracts/schemas/release-qualification-report.schema.json",
+    "contracts/schemas/release-publication-report.schema.json",
     "contracts/schemas/release-signature-policy.schema.json",
     "contracts/schemas/release-signature-verification-report.schema.json",
     "contracts/schemas/release-vulnerability-policy.schema.json",
@@ -400,6 +401,7 @@ REQUIRED_PATHS = (
     "contracts/examples/resource-timeline.json",
     "contracts/examples/release-manifest.json",
     "contracts/examples/release-qualification-report.json",
+    "contracts/examples/release-publication-report.json",
     "contracts/examples/release-signature-policy.json",
     "contracts/examples/release-signature-verification-report.json",
     "contracts/examples/release-vulnerability-policy.json",
@@ -429,6 +431,7 @@ REQUIRED_PATHS = (
     "docs/specifications/resource-query-contract.md",
     "docs/specifications/release-manifest-contract.md",
     "docs/specifications/release-qualification-report-contract.md",
+    "docs/specifications/release-publication-report-contract.md",
     "docs/specifications/release-signature-policy-contract.md",
     "docs/specifications/release-signature-verification-report-contract.md",
     "docs/specifications/release-vulnerability-policy-contract.md",
@@ -447,6 +450,9 @@ REQUIRED_PATHS = (
     "docs/decisions/0114-exact-aws-bedrock-public-price-import.md",
     "docs/decisions/0115-tenant-bound-additive-evidence-redaction.md",
     "docs/decisions/0116-executable-oidc-browser-pkce-evidence.md",
+    "docs/decisions/0117-exact-release-index-publication.md",
+    "scripts/release_publication.py",
+    "scripts/run_release_publication_compatibility.py",
     "scripts/import_aws_bedrock_price_catalog.py",
     "scripts/qualify_ai_price_catalog.py",
     "src/iip/adapters/aws_bedrock_price_catalog.py",
@@ -456,6 +462,7 @@ REQUIRED_PATHS = (
     "tests/test_ai_price_catalog_qualification.py",
     "tests/test_aws_bedrock_price_catalog_import.py",
     "tests/test_evidence_redaction_policy.py",
+    "tests/test_release_publication.py",
     "tests/fixtures/aws-bedrock-price-list.json",
     "requirements/verify.in",
     "requirements/verify.txt",
@@ -552,6 +559,9 @@ REQUIRED_PATHS = (
     "scripts/release_qualification.py",
     "scripts/release_signature_verification.py",
     "scripts/test_release_signatures.sh",
+    "scripts/cosign_container.sh",
+    ".github/workflows/release.yml",
+    "tests/test_release_workflow.py",
     "scripts/run_plugin_runner_conformance.py",
     "scripts/run_capacity_certification.py",
     "scripts/test_capacity.sh",
@@ -1831,6 +1841,28 @@ def validate_release_qualification_example(
         "overallStatus": "qualified",
     } or spec.get("status") != "qualified":
         fail(errors, "release qualification summary must match its profiles")
+
+
+def validate_release_publication_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check release publication identity and reference relationships."""
+
+    try:
+        from release_publication import (
+            ReleasePublicationError,
+            validate_report,
+        )
+    except ImportError:
+        fail(errors, "release publication validator must be importable")
+        return
+    report = documents.get(
+        ROOT / "contracts" / "examples" / "release-publication-report.json"
+    )
+    try:
+        validate_report(report)
+    except ReleasePublicationError:
+        fail(errors, "release publication report example must be semantically valid")
 
 
 def validate_release_signature_examples(
@@ -4883,6 +4915,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_bedrock_instrumentation_compatibility_example(documents, errors)
     validate_openai_instrumentation_compatibility_example(documents, errors)
     validate_release_qualification_example(documents, errors)
+    validate_release_publication_example(documents, errors)
     validate_release_signature_examples(documents, errors)
     validate_release_vulnerability_examples(documents, errors)
     validate_customer_deployment_preflight_example(documents, errors)

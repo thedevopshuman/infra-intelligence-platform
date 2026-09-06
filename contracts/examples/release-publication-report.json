@@ -1,0 +1,60 @@
+{
+  "apiVersion": "iip.dev/v1alpha1",
+  "kind": "ReleasePublicationReport",
+  "metadata": {
+    "id": "rpr_25556b4bc3577af045f902bbf72ec659",
+    "generatedAt": "2026-09-07T08:00:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "published-unsigned",
+    "promotionStatus": "requires-signature-and-vulnerability-qualification",
+    "release": {
+      "version": "0.84.0",
+      "tag": "v0.84.0",
+      "manifestDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "channel": {
+      "profile": "oci-layout-to-registry-v1",
+      "registryHost": "ghcr.io"
+    },
+    "environment": {
+      "platform": "linux/amd64",
+      "pythonVersion": "3.12.12",
+      "dockerBuildxVersion": "0.36.0"
+    },
+    "targets": [
+      {
+        "role": "control-plane-image",
+        "repository": "ghcr.io/acme/infra-intelligence-platform",
+        "tagReference": "ghcr.io/acme/infra-intelligence-platform:v0.84.0",
+        "immutableReference": "ghcr.io/acme/infra-intelligence-platform@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "indexDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+        "role": "plugin-mediation-bridge-image",
+        "repository": "ghcr.io/acme/infra-intelligence-platform-plugin-mediation-bridge",
+        "tagReference": "ghcr.io/acme/infra-intelligence-platform-plugin-mediation-bridge:v0.84.0",
+        "immutableReference": "ghcr.io/acme/infra-intelligence-platform-plugin-mediation-bridge@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "indexDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    ],
+    "checks": [
+      {"id": "release-bundle-integrity", "status": "passed"},
+      {"id": "source-binding", "status": "passed"},
+      {"id": "exact-version-tag", "status": "passed"},
+      {"id": "distinct-role-repositories", "status": "passed"},
+      {"id": "control-plane-index-copy", "status": "passed"},
+      {"id": "bridge-index-copy", "status": "passed"},
+      {"id": "registry-digest-verification", "status": "passed"},
+      {"id": "output-minimization", "status": "passed"}
+    ],
+    "summary": {
+      "totalChecks": 8,
+      "passedChecks": 8,
+      "failedChecks": 0,
+      "overallStatus": "published-unsigned"
+    }
+  }
+}

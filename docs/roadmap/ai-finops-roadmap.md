@@ -95,8 +95,9 @@ remain external.
 
 An additive private-pilot preflight now binds that same-invocation report to
 the exact prerequisite file, customer deployment, post-deployment bounded load,
-local release evidence, registry publication, and organizational keyless
-signatures. `design-partner-candidate` closes the manual-correlation gap for
+post-deployment sustained core-workload evidence, local release evidence,
+registry publication, and organizational keyless signatures.
+`design-partner-candidate` closes the manual-correlation gap for
 one exact build and customer target; actual partner operation/acceptance,
 production operating qualification, and public license/legal/brand/governance
 remain external decisions.

@@ -190,6 +190,7 @@ REQUIRED_PATHS = (
     "docs/operations/customer-sustained-workload-qualification.md",
     "scripts/qualify_customer_sustained_workload.py",
     "tests/test_customer_sustained_workload.py",
+    "docs/decisions/0145-require-sustained-workload-before-private-pilot.md",
     "docs/decisions/0141-privacy-minimized-exact-ai-invocation-observation.md",
     "docs/specifications/ai-invocation-observation-contract.md",
     "contracts/schemas/ai-economics-invocation-observation-request.schema.json",
@@ -2707,6 +2708,8 @@ def validate_customer_pilot_readiness_examples(
                 "clusterBindingDigest",
                 "environmentBindingDigest",
                 "controlPlaneTargetDigest",
+                "otlpTargetDigest",
+                "sustainedWorkloadProfileDigest",
             )
         }
         if (

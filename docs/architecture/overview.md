@@ -163,6 +163,13 @@ processing client, and emits aggregate-only evidence. It does not become a
 serving workload or claim customer representativeness, provider traffic,
 failure behavior, regional capacity, or long-window SLO attainment.
 
+[ADR 0145](../decisions/0145-require-sustained-workload-before-private-pilot.md)
+adds that report to the private-pilot evidence join. The host-side aggregator
+requires the exact sustained profile, release, API/OTLP targets, post-deployment
+window, and report expiry while retaining only pseudonymous bindings and
+aggregate timing. It imports no traffic or promotion authority and preserves
+representative workload, failure-overlap, and production-operation gates.
+
 The signed plugin runner claims each exact-tenant request against its persisted
 session and canonical invocation digest before a container starts. PostgreSQL
 serializes the session request limit across replicas, retains host-created

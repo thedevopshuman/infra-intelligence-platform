@@ -2551,6 +2551,8 @@ export interface CustomerPilotReadinessProfile {
       clusterBindingDigest: Sha256Digest;
       environmentBindingDigest: Sha256Digest;
       controlPlaneTargetDigest: Sha256Digest;
+      otlpTargetDigest: Sha256Digest;
+      sustainedWorkloadProfileDigest: Sha256Digest;
     };
     objective: {
       maximumProfileAgeSeconds: number;
@@ -2568,6 +2570,7 @@ export type CustomerPilotReadinessEvidenceId =
   | "organizational-signatures"
   | "customer-deployment"
   | "control-plane-load"
+  | "sustained-core-workload"
   | "ai-finops-prerequisites"
   | "same-invocation-ai-finops";
 
@@ -2581,12 +2584,15 @@ export type CustomerPilotReadinessCheckId =
   | "organizational-signatures"
   | "customer-deployment"
   | "control-plane-load"
+  | "sustained-core-workload"
   | "ai-finops-prerequisites"
   | "same-invocation-ai-finops"
   | "publication-signature-chain"
   | "deployed-image-chain"
   | "customer-environment-chain"
+  | "sustained-workload-environment-chain"
   | "post-deployment-load-window"
+  | "post-deployment-sustained-workload-window"
   | "minimized-output";
 
 export interface CustomerPilotReadinessReport {
@@ -2619,6 +2625,7 @@ export interface CustomerPilotReadinessReport {
       releaseSignatureReportDigest: Sha256Digest;
       customerDeploymentReportDigest: Sha256Digest;
       controlPlaneLoadReportDigest: Sha256Digest;
+      sustainedWorkloadReportDigest: Sha256Digest;
       aiFinopsPrerequisiteReportDigest: Sha256Digest;
       aiFinopsFlowReportDigest: Sha256Digest;
       signaturePolicyDigest: Sha256Digest;
@@ -2640,6 +2647,8 @@ export interface CustomerPilotReadinessReport {
       customerDeploymentQualifiedAt: string;
       controlPlaneLoadStartedAt: string;
       controlPlaneLoadCompletedAt: string;
+      sustainedWorkloadStartedAt: string;
+      sustainedWorkloadCompletedAt: string;
       aiFinopsFlowCompletedAt: string;
       assessedAt: string;
       oldestFoundationEvidenceAgeSeconds: number;
@@ -2653,6 +2662,7 @@ export interface CustomerPilotReadinessReport {
         | "ReleaseSignatureVerificationReport"
         | "CustomerDeploymentQualificationReport"
         | "ControlPlaneLoadQualificationReport"
+        | "CustomerSustainedWorkloadQualificationReport"
         | "CustomerAiFinopsPrerequisiteReport"
         | "CustomerAiFinopsFlowQualificationReport";
       qualificationBoundary:
@@ -2661,6 +2671,7 @@ export interface CustomerPilotReadinessReport {
         | "organizational-trust"
         | "customer-deployment"
         | "customer-load"
+        | "customer-environment-sustained-workload"
         | "ai-finops-prerequisites"
         | "same-invocation-customer-runtime";
       reportId: string;
@@ -2686,7 +2697,7 @@ export interface CustomerPilotReadinessReport {
       "design-partner-operation-and-acceptance-not-qualified",
       "public-license-legal-brand-and-governance-not-qualified",
       "invoice-private-rates-discounts-and-commitments-not-qualified",
-      "sustained-representative-write-worker-receiver-load-not-qualified",
+      "customer-workload-representativeness-and-failure-overlap-not-qualified",
       "node-zone-region-and-long-window-slo-not-qualified",
       "additional-integrations-models-providers-and-backends-not-qualified",
     ];
@@ -2708,10 +2719,10 @@ export interface CustomerPilotReadinessReport {
       },
     ];
     summary: {
-      requiredEvidence: 7;
+      requiredEvidence: 8;
       passedEvidence: number;
       rejectedEvidence: number;
-      totalChecks: 16;
+      totalChecks: 19;
       passedChecks: number;
       failedChecks: number;
       externalGateCount: 3;

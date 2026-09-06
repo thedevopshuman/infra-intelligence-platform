@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerPilotReadinessProfile",
   "metadata": {
-    "id": "cprp_a525f64325da66041ad5bed4ce8553be",
+    "id": "cprp_03e4437548fc0192a9050fa7379dd44b",
     "reviewedAt": "2026-09-08T08:00:00Z",
     "validUntil": "2026-09-15T08:00:00Z"
   },
@@ -21,7 +21,9 @@
       "publicationTargetSetDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "clusterBindingDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       "environmentBindingDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      "controlPlaneTargetDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+      "controlPlaneTargetDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "otlpTargetDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "sustainedWorkloadProfileDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
     },
     "objective": {
       "maximumProfileAgeSeconds": 2592000,

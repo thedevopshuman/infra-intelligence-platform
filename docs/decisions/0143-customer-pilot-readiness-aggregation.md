@@ -3,6 +3,8 @@
 **Status:** Accepted
 **Date:** 2026-09-08
 
+**Amended by:** [ADR 0145](0145-require-sustained-workload-before-private-pilot.md)
+
 ## Context
 
 The local release-readiness report deliberately leaves publication,
@@ -24,11 +26,12 @@ private design-partner evaluation?
    manifest and both OCI index digests; organizational signature-policy and
    publication-target-set digests; customer cluster, environment, and
    control-plane target bindings; and bounded evidence ages.
-2. Add a `CustomerPilotReadinessReport` that consumes seven existing owning
+2. Add a `CustomerPilotReadinessReport` that initially consumes seven owning
    reports in a fixed order: local release readiness, registry publication,
    organizational signature verification, customer deployment qualification,
    bounded control-plane load, AI FinOps prerequisites, and the exact
-   same-invocation AI FinOps flow.
+   same-invocation AI FinOps flow. ADR 0145 adds sustained core-workload
+   evidence as the eighth input.
 3. Require registry index digests to equal the organizationally verified
    signatures and require the published control-plane digest to equal the
    installed, load-tested, and AI-qualified image. Rebind the prerequisite
@@ -51,7 +54,7 @@ private design-partner evaluation?
 ## Consequences
 
 - Release owners get one fail-closed pre-pilot artifact instead of manually
-  correlating seven independently owned evidence chains.
+  correlating the independently owned evidence chains.
 - Organizational publication and trust are no longer blurred with an unsigned
   local candidate, and the installed image cannot differ from the signed OCI
   index.
@@ -59,8 +62,8 @@ private design-partner evaluation?
   mutation, publication, signing, pilot start, or production promotion. Those
   actions remain with the owning workflows and human decision makers.
 - A candidate report expires at the earliest of the protected profile,
-  profile-age, applicable evidence-age, AI prerequisite, live-flow, and
-  configured report-validity limits.
+  profile-age, applicable evidence-age, sustained workload, AI prerequisite,
+  live-flow, and configured report-validity limits.
 - Naming and `IIP` identifiers remain neutral placeholders. This decision does
   not select a public product name, license, trademark policy, company, or
   commercial boundary.

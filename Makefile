@@ -241,7 +241,7 @@ help:
 	@echo "qualify-customer-ai-finops-flow Make and bind one Bedrock-to-dashboard customer call"
 	@echo "verify-customer-ai-finops-flow-report Rebind retained same-invocation evidence"
 	@echo "test-customer-pilot-readiness Validate exact pre-pilot evidence aggregation"
-	@echo "assess-customer-pilot-readiness Bind signed release, deployment, load, and live AI evidence"
+	@echo "assess-customer-pilot-readiness Bind signed release, deployment, sustained load, and live AI evidence"
 	@echo "verify-customer-pilot-readiness-report Rebind retained private-pilot candidate evidence"
 	@echo "test-customer-otlp-receiver-qualification Validate pinned Collector-to-customer receiver evidence"
 	@echo "qualify-customer-otlp-receiver Deliver metrics, logs, and GenAI traces through a pinned Collector"
@@ -770,6 +770,7 @@ assess-customer-pilot-readiness:
 		--release-signatures "$(IIP_RELEASE_SIGNATURE_REPORT)" \
 		--customer-deployment "$(IIP_CUSTOMER_DEPLOYMENT_QUALIFICATION_REPORT)" \
 		--control-plane-load "$(IIP_CONTROL_PLANE_LOAD_REPORT)" \
+		--sustained-workload "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_REPORT)" \
 		--ai-finops-prerequisites "$(IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_REPORT)" \
 		--ai-finops-flow "$(IIP_CUSTOMER_AI_FINOPS_FLOW_REPORT)" \
 		--output "$(IIP_CUSTOMER_PILOT_READINESS_REPORT)"
@@ -785,6 +786,7 @@ verify-customer-pilot-readiness-report:
 		--release-signatures "$(IIP_RELEASE_SIGNATURE_REPORT)" \
 		--customer-deployment "$(IIP_CUSTOMER_DEPLOYMENT_QUALIFICATION_REPORT)" \
 		--control-plane-load "$(IIP_CONTROL_PLANE_LOAD_REPORT)" \
+		--sustained-workload "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_REPORT)" \
 		--ai-finops-prerequisites "$(IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_REPORT)" \
 		--ai-finops-flow "$(IIP_CUSTOMER_AI_FINOPS_FLOW_REPORT)" \
 		--require-candidate

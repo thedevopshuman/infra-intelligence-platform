@@ -283,4 +283,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.78.0"
+__version__ = "0.79.0"

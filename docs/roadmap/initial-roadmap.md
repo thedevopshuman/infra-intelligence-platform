@@ -78,10 +78,10 @@ that billable flow with customer credentials and endpoints remains external.
 
 A separate customer pilot readiness aggregate now joins the exact local
 candidate, registry publication, organizational signatures, qualified customer
-deployment, post-deployment bounded read load, AI prerequisites, and
-same-invocation result. Its `design-partner-candidate` status is deliberately a
-private preflight rather than pilot acceptance, production certification, or
-public-launch approval.
+deployment, post-deployment bounded read load, bounded sustained core workload,
+AI prerequisites, and same-invocation result. Its `design-partner-candidate`
+status is deliberately a private preflight rather than pilot acceptance,
+production certification, or public-launch approval.
 
 One fail-closed local release command now composes the source, integration,
 recovery, multi-node availability, bundle, packaged N-1, vulnerability, and
@@ -267,6 +267,12 @@ PostgreSQL-durable OTLP metric writes, and asynchronous investigations under
 independent fixed-rate schedules. It closes the first sustained synthetic core
 mix gap while retaining customer representativeness, provider traffic, failure
 overlap, regional behavior, and long-window SLOs as separate gates.
+
+Pilot-readiness update: ADR 0145 makes that sustained report the eighth private
+pilot input, rebinds its protected profile plus API/OTLP targets to the exact
+deployment, and requires a post-deployment window. It still leaves customer
+representativeness, failure overlap, production operation, and partner
+acceptance outside the preflight.
 
 Update: ADR 0058 adds a deployment-configured rolling useful-completion SLO over durable asynchronous jobs, including explicit late, failed, cancelled, and unfinished misses. ADR 0059 adds a privacy-bounded query availability counter and duration histogram with explicit objective values over the replaceable OTLP metrics boundary. Bounded external ingress qualification is delivered by ADR 0105; continuous regional coverage and notification routing remain open.
 

@@ -17,13 +17,16 @@ Retain the exact current files from these owning workflows:
 3. organizational keyless signature verification;
 4. customer deployment qualification;
 5. bounded customer control-plane load qualification;
-6. customer AI FinOps prerequisite aggregation; and
-7. customer same-invocation AI FinOps qualification.
+6. bounded sustained customer core-workload qualification;
+7. customer AI FinOps prerequisite aggregation; and
+8. customer same-invocation AI FinOps qualification.
 
-The load workflow must run after the customer deployment report is generated.
-The live AI workflow already binds its prerequisite report, and that
-prerequisite report must bind the same local-readiness and customer-deployment
-files supplied here.
+Both load workflows must run after the customer deployment report is generated.
+The sustained report must bind the protected workload profile selected in this
+preflight, the same API target, and the deployment-qualified OTLP receiver. The
+live AI workflow already binds its prerequisite report, and that prerequisite
+report must bind the same local-readiness and customer-deployment files
+supplied here.
 
 ## Prepare the protected profile
 
@@ -32,6 +35,10 @@ repository, replace every example value with the exact reviewed release and
 customer binding digests, and update its review/expiry/objective values. Keep
 the file mode at `0600` because its digest set can link customer operational
 evidence.
+
+Copy the `profileDigest` and `otlpTargetBindingDigest` from the sustained
+workload report into `sustainedWorkloadProfileDigest` and `otlpTargetDigest`.
+The sustained report's API target must equal `controlPlaneTargetDigest`.
 
 After editing, compute the content-derived ID, place the returned value in
 `metadata.id`, and repeat until the command returns that same value:
@@ -65,6 +72,7 @@ IIP_RELEASE_PUBLICATION_REPORT=/evidence/release-publication-report.json \
 IIP_RELEASE_SIGNATURE_REPORT=/evidence/release-signature-verification-report.json \
 IIP_CUSTOMER_DEPLOYMENT_QUALIFICATION_REPORT=/evidence/customer-deployment-qualification-report.json \
 IIP_CONTROL_PLANE_LOAD_REPORT=/evidence/control-plane-load-qualification-report.json \
+IIP_CUSTOMER_SUSTAINED_WORKLOAD_REPORT=/evidence/customer-sustained-workload-qualification-report.json \
 IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_REPORT=/evidence/customer-ai-finops-prerequisite-report.json \
 IIP_CUSTOMER_AI_FINOPS_FLOW_REPORT=/evidence/customer-ai-finops-flow-qualification-report.json \
 IIP_CUSTOMER_PILOT_READINESS_REPORT=/evidence/customer-pilot-readiness-report.json \
@@ -78,13 +86,13 @@ Malformed, crossed, symlinked, over-sized, or output-overlapping inputs fail
 without emitting a new credible report.
 
 The generated report expires at the earliest applicable profile, evidence-age,
-AI FinOps input, or report-validity boundary. An unsuccessful but temporally
-current input fails its owning qualification check without being mislabeled as
-stale.
+sustained-workload, AI FinOps input, or report-validity boundary. An
+unsuccessful but temporally current input fails its owning qualification check
+without being mislabeled as stale.
 
 ## Verify retained evidence
 
-Use the same profile and seven source paths:
+Use the same profile and eight source paths:
 
 ```bash
 make verify-customer-pilot-readiness-report PYTHON=.venv/bin/python
@@ -105,5 +113,6 @@ token quantity, price, or amount.
 
 `design-partner-candidate` is a preflight status, not approval. Before a public
 or production release, complete actual partner operation and acceptance,
-customer-specific long-running operations and recovery objectives, and the
-license/legal/brand/governance decisions listed in the report.
+customer-reviewed representative and failure-overlap workloads, recovery
+objectives, and the license/legal/brand/governance decisions listed in the
+report.

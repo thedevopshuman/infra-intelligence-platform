@@ -23,6 +23,8 @@ POLICY = "sha256:" + "c" * 64
 CLUSTER = "sha256:" + "d" * 64
 ENVIRONMENT = "sha256:" + "e" * 64
 TARGET = "sha256:" + "f" * 64
+OTLP_TARGET = "sha256:" + "0" * 64
+SUSTAINED_PROFILE = "sha256:" + "9" * 64
 
 
 def _stamp(value: datetime) -> str:
@@ -56,6 +58,8 @@ def _profile(now: datetime, targets: list[dict[str, str]]) -> dict:
             "clusterBindingDigest": CLUSTER,
             "environmentBindingDigest": ENVIRONMENT,
             "controlPlaneTargetDigest": TARGET,
+            "otlpTargetDigest": OTLP_TARGET,
+            "sustainedWorkloadProfileDigest": SUSTAINED_PROFILE,
         },
         "objective": {
             "maximumProfileAgeSeconds": 604800,
@@ -79,6 +83,8 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
     deployment_at = now - timedelta(hours=1)
     load_started = now - timedelta(minutes=50)
     load_completed = now - timedelta(minutes=45)
+    sustained_started = now - timedelta(minutes=40)
+    sustained_completed = now - timedelta(minutes=25)
     prerequisite_at = now - timedelta(minutes=30)
     flow_at = now - timedelta(minutes=5)
     targets = [
@@ -189,6 +195,8 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
                 "bindings": {
                     "clusterBindingDigest": CLUSTER,
                     "continuityTargetBindingDigest": TARGET,
+                    "processingOtlpTargetBindingDigest": OTLP_TARGET,
+                    "otlpReceiverEndpointBindingDigest": OTLP_TARGET,
                 },
             },
         },
@@ -217,9 +225,38 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
                 },
             },
         },
+        "sustained-core-workload": {
+            "metadata": {
+                "id": "cswq_" + "6" * 32,
+                "generatedAt": _stamp(sustained_completed),
+                "validUntil": _stamp(now + timedelta(hours=18)),
+                "sourceRevision": REVISION,
+                "sourceDirty": False,
+            },
+            "spec": {
+                "status": "qualified",
+                "subject": {
+                    "applicationVersion": "0.84.0",
+                    "chartVersion": "0.87.0",
+                    "contractsApiVersion": pilot.API_VERSION,
+                    "requiredMigration": "0023_ai_model_suitability.sql",
+                    "sourceRevision": REVISION,
+                    "imageDigest": CONTROL_IMAGE,
+                },
+                "bindings": {
+                    "profileDigest": SUSTAINED_PROFILE,
+                    "apiTargetBindingDigest": TARGET,
+                    "otlpTargetBindingDigest": OTLP_TARGET,
+                },
+                "measurements": {
+                    "startedAt": _stamp(sustained_started),
+                    "completedAt": _stamp(sustained_completed),
+                },
+            },
+        },
         "ai-finops-prerequisites": {
             "metadata": {
-                "id": "cafp_" + "6" * 32,
+                "id": "cafp_" + "7" * 32,
                 "generatedAt": _stamp(prerequisite_at),
                 "validUntil": _stamp(now + timedelta(days=1)),
                 "sourceRevision": REVISION,
@@ -237,7 +274,7 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
         },
         "same-invocation-ai-finops": {
             "metadata": {
-                "id": "caff_" + "7" * 32,
+                "id": "caff_" + "8" * 32,
                 "generatedAt": _stamp(flow_at),
                 "validUntil": _stamp(now + timedelta(hours=20)),
                 "sourceRevision": REVISION,
@@ -249,7 +286,7 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
                 "bindings": {
                     "environmentBindingDigest": ENVIRONMENT,
                     "controlPlaneTargetDigest": TARGET,
-                    "prerequisiteReportDigest": _digest("6"),
+                    "prerequisiteReportDigest": _digest("7"),
                 },
             },
         },
@@ -287,11 +324,11 @@ class CustomerPilotReadinessTests(unittest.TestCase):
             profile=self.profile, sources=self.sources, generated_at=self.now
         )
         self.assertEqual(report["spec"]["status"], "design-partner-candidate")
-        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 7)
+        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 8)
         self.assertEqual(len(report["spec"]["externalGates"]), 3)
         self.assertEqual(
             report["metadata"]["validUntil"],
-            _stamp(self.now + timedelta(hours=20)),
+            _stamp(self.now + timedelta(hours=18)),
         )
         encoded = json.dumps(report)
         for forbidden in (
@@ -364,6 +401,35 @@ class CustomerPilotReadinessTests(unittest.TestCase):
             assessed,
         )
 
+    def test_unsuccessful_sustained_workload_rejects_the_candidate(self) -> None:
+        sources = dict(self.sources)
+        sustained = copy.deepcopy(sources["sustained-core-workload"].document)
+        sustained["spec"]["status"] = "not-qualified"
+        sources["sustained-core-workload"] = pilot.EvidenceDocument(
+            sustained,
+            sources["sustained-core-workload"].file_digest,
+            sources["sustained-core-workload"].generated_at,
+        )
+        report = pilot.build_report(
+            profile=self.profile, sources=sources, generated_at=self.now
+        )
+        evidence = next(
+            item
+            for item in report["spec"]["evidence"]
+            if item["id"] == "sustained-core-workload"
+        )
+        check = next(
+            item
+            for item in report["spec"]["checks"]
+            if item["id"] == "sustained-core-workload"
+        )
+        self.assertEqual(report["spec"]["status"], "not-candidate")
+        self.assertEqual(
+            evidence["errorCode"],
+            "customer-pilot-readiness.evidence.status-not-qualified",
+        )
+        self.assertEqual(check["status"], "failed")
+
     def test_dirty_source_is_rejected_and_crossed_revision_fails_closed(self) -> None:
         sources = dict(self.sources)
         publication = copy.deepcopy(sources["registry-publication"].document)
@@ -416,6 +482,22 @@ class CustomerPilotReadinessTests(unittest.TestCase):
             )
 
         sources = dict(self.sources)
+        sustained = copy.deepcopy(sources["sustained-core-workload"].document)
+        sustained["spec"]["bindings"]["otlpTargetBindingDigest"] = _digest("8")
+        sources["sustained-core-workload"] = pilot.EvidenceDocument(
+            sustained,
+            sources["sustained-core-workload"].file_digest,
+            sources["sustained-core-workload"].generated_at,
+        )
+        with self.assertRaisesRegex(
+            pilot.CustomerPilotReadinessError,
+            "customer-pilot-readiness.evidence.crossed",
+        ):
+            pilot.build_report(
+                profile=self.profile, sources=sources, generated_at=self.now
+            )
+
+        sources = dict(self.sources)
         prerequisite = copy.deepcopy(sources["ai-finops-prerequisites"].document)
         prerequisite["spec"]["bindings"]["customerDeploymentReportDigest"] = _digest("9")
         sources["ai-finops-prerequisites"] = pilot.EvidenceDocument(
@@ -453,12 +535,59 @@ class CustomerPilotReadinessTests(unittest.TestCase):
         )
         self.assertEqual(check["errorCode"], "customer-pilot-readiness.load.before-deployment")
 
+    def test_sustained_workload_must_follow_deployment_qualification(self) -> None:
+        sources = dict(self.sources)
+        sustained = copy.deepcopy(sources["sustained-core-workload"].document)
+        sustained["spec"]["measurements"]["startedAt"] = _stamp(
+            self.now - timedelta(hours=2)
+        )
+        sources["sustained-core-workload"] = pilot.EvidenceDocument(
+            sustained,
+            sources["sustained-core-workload"].file_digest,
+            sources["sustained-core-workload"].generated_at,
+        )
+        report = pilot.build_report(
+            profile=self.profile, sources=sources, generated_at=self.now
+        )
+        self.assertEqual(report["spec"]["status"], "not-candidate")
+        check = next(
+            item
+            for item in report["spec"]["checks"]
+            if item["id"] == "post-deployment-sustained-workload-window"
+        )
+        self.assertEqual(
+            check["errorCode"],
+            "customer-pilot-readiness.sustained-workload.before-deployment",
+        )
+
+    def test_report_binding_digests_must_match_evidence_items(self) -> None:
+        report = copy.deepcopy(
+            pilot.build_report(
+                profile=self.profile, sources=self.sources, generated_at=self.now
+            )
+        )
+        report["spec"]["bindings"]["sustainedWorkloadReportDigest"] = _digest("0")
+        metadata = dict(report["metadata"])
+        metadata.pop("id")
+        report["metadata"]["id"] = pilot._report_id(metadata, report["spec"])
+        with self.assertRaisesRegex(
+            pilot.CustomerPilotReadinessError,
+            "customer-pilot-readiness.report.invalid",
+        ):
+            pilot.validate_report_document(report)
+
     def test_profile_file_is_owner_only_and_not_a_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             profile = root / "profile.json"
             profile.write_text(json.dumps(self.profile))
             os.chmod(profile, 0o644)
+            with self.assertRaisesRegex(
+                pilot.CustomerPilotReadinessError,
+                "customer-pilot-readiness.profile.unreadable",
+            ):
+                pilot.load_profile(profile)
+            os.chmod(profile, 0o400)
             with self.assertRaisesRegex(
                 pilot.CustomerPilotReadinessError,
                 "customer-pilot-readiness.profile.unreadable",

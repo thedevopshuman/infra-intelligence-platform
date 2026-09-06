@@ -104,7 +104,8 @@ agent runtime, or plugin authority boundary.
 Customer pilot readiness is an additive host-side promotion preflight.
 `scripts/assess_customer_pilot_readiness.py` revalidates and cross-binds the
 existing publication, organizational signature, local readiness, customer
-deployment, bounded load, AI prerequisite, and same-invocation reports. It
+deployment, bounded read load, sustained core-workload, AI prerequisite, and
+same-invocation reports. It
 does not repeat their external actions or import signing, registry, customer,
 provider, load-generation, installation, or mutation authority. Only the
 protected profile and minimized report shapes enter the public SDK boundary.

@@ -124,7 +124,8 @@ runbook](docs/operations/customer-ai-finops-flow-qualification.md).
 
 The private-pilot preflight now binds that live flow to the exact local release
 evidence, registry publication, organizational signatures, customer deployment,
-and a post-deployment bounded load report. It emits a minimized
+post-deployment bounded read load, and bounded sustained API/OTLP/investigation
+workload reports. It emits a minimized
 `design-partner-candidate` artifact without authorizing a pilot or overstating
 production/public-launch readiness; see the [customer pilot readiness
 runbook](docs/operations/customer-pilot-readiness.md).

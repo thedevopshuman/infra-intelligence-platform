@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:iip:contracts:customer-pilot-readiness-profile:v1alpha1",
   "title": "Customer Pilot Readiness Profile",
-  "description": "Protected reviewed selection binding one published and organizationally signed IIP release to one customer deployment, bounded load target, and same-invocation AI FinOps environment before a private design-partner trial.",
+  "description": "Protected reviewed selection binding one published and organizationally signed IIP release to one customer deployment, narrow load target, sustained core-workload profile, and same-invocation AI FinOps environment before a private design-partner trial.",
   "type": "object",
   "additionalProperties": false,
   "required": ["apiVersion", "kind", "metadata", "spec"],
@@ -41,13 +41,15 @@
         "bindings": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["signaturePolicyDigest", "publicationTargetSetDigest", "clusterBindingDigest", "environmentBindingDigest", "controlPlaneTargetDigest"],
+          "required": ["signaturePolicyDigest", "publicationTargetSetDigest", "clusterBindingDigest", "environmentBindingDigest", "controlPlaneTargetDigest", "otlpTargetDigest", "sustainedWorkloadProfileDigest"],
           "properties": {
             "signaturePolicyDigest": {"$ref": "#/$defs/digest"},
             "publicationTargetSetDigest": {"$ref": "#/$defs/digest"},
             "clusterBindingDigest": {"$ref": "#/$defs/digest"},
             "environmentBindingDigest": {"$ref": "#/$defs/digest"},
-            "controlPlaneTargetDigest": {"$ref": "#/$defs/digest"}
+            "controlPlaneTargetDigest": {"$ref": "#/$defs/digest"},
+            "otlpTargetDigest": {"$ref": "#/$defs/digest"},
+            "sustainedWorkloadProfileDigest": {"$ref": "#/$defs/digest"}
           }
         },
         "objective": {

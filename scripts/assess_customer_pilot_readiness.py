@@ -28,6 +28,7 @@ import qualify_control_plane_load as control_plane_load  # noqa: E402
 import qualify_customer_ai_finops as ai_prerequisite  # noqa: E402
 import qualify_customer_ai_finops_flow as ai_flow  # noqa: E402
 import qualify_customer_deployment as customer_deployment  # noqa: E402
+import qualify_customer_sustained_workload as sustained_workload  # noqa: E402
 import release_publication  # noqa: E402
 import release_readiness  # noqa: E402
 import release_signature_verification as release_signature  # noqa: E402
@@ -52,12 +53,15 @@ CHECK_IDS = (
     "organizational-signatures",
     "customer-deployment",
     "control-plane-load",
+    "sustained-core-workload",
     "ai-finops-prerequisites",
     "same-invocation-ai-finops",
     "publication-signature-chain",
     "deployed-image-chain",
     "customer-environment-chain",
+    "sustained-workload-environment-chain",
     "post-deployment-load-window",
+    "post-deployment-sustained-workload-window",
     "minimized-output",
 )
 
@@ -66,7 +70,7 @@ LIMITATIONS = (
     "design-partner-operation-and-acceptance-not-qualified",
     "public-license-legal-brand-and-governance-not-qualified",
     "invoice-private-rates-discounts-and-commitments-not-qualified",
-    "sustained-representative-write-worker-receiver-load-not-qualified",
+    "customer-workload-representativeness-and-failure-overlap-not-qualified",
     "node-zone-region-and-long-window-slo-not-qualified",
     "additional-integrations-models-providers-and-backends-not-qualified",
 )
@@ -273,19 +277,34 @@ def _read_document(
     protected: bool = False,
 ) -> tuple[Mapping[str, Any], str]:
     candidate = path.expanduser()
+    descriptor = -1
     try:
-        details = candidate.lstat()
+        if candidate.is_symlink():
+            _fail(code)
+        descriptor = os.open(candidate, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        details = os.fstat(descriptor)
         if (
-            stat.S_ISLNK(details.st_mode)
-            or not stat.S_ISREG(details.st_mode)
-            or details.st_size > MAX_DOCUMENT_BYTES
-            or (protected and stat.S_IMODE(details.st_mode) & 0o077)
+            not stat.S_ISREG(details.st_mode)
+            or not 1 <= details.st_size <= MAX_DOCUMENT_BYTES
+            or (protected and stat.S_IMODE(details.st_mode) != 0o600)
+            or (
+                protected
+                and hasattr(os, "getuid")
+                and details.st_uid != os.getuid()
+            )
         ):
             _fail(code)
-        raw = candidate.read_bytes()
+        with os.fdopen(descriptor, "rb", closefd=True) as handle:
+            descriptor = -1
+            raw = handle.read(MAX_DOCUMENT_BYTES + 1)
+        if len(raw) > MAX_DOCUMENT_BYTES:
+            _fail(code)
         value = json.loads(raw.decode("utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError):
         _fail(code)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
     return _mapping(value, code), _bytes_digest(raw)
 
 
@@ -408,6 +427,18 @@ REQUIREMENTS = (
         ),
     ),
     Requirement(
+        "sustained-core-workload",
+        "CustomerSustainedWorkloadQualificationReport",
+        "customer-environment-sustained-workload",
+        "qualified",
+        "customer",
+        _wrap_validator(
+            sustained_workload.validate_report_document,
+            sustained_workload.CustomerSustainedWorkloadError,
+            "customer-pilot-readiness.sustained-workload.invalid",
+        ),
+    ),
+    Requirement(
         "ai-finops-prerequisites",
         "CustomerAiFinopsPrerequisiteReport",
         "ai-finops-prerequisites",
@@ -497,6 +528,7 @@ def _release_and_environment_bindings(
     signature = sources["organizational-signatures"].document
     deployment = sources["customer-deployment"].document
     load = sources["control-plane-load"].document
+    sustained = sources["sustained-core-workload"].document
     prerequisites = sources["ai-finops-prerequisites"].document
     flow = sources["same-invocation-ai-finops"].document
 
@@ -506,6 +538,8 @@ def _release_and_environment_bindings(
     deployment_subject = _mapping(_path(deployment, ("spec", "subject")), code)
     deployment_bindings = _mapping(_path(deployment, ("spec", "bindings")), code)
     load_identity = _mapping(_path(load, ("spec", "targetIdentity")), code)
+    sustained_subject = _mapping(_path(sustained, ("spec", "subject")), code)
+    sustained_bindings = _mapping(_path(sustained, ("spec", "bindings")), code)
     prerequisite_subject = _mapping(_path(prerequisites, ("spec", "subject")), code)
     prerequisite_bindings = _mapping(_path(prerequisites, ("spec", "bindings")), code)
     flow_subject = _mapping(_path(flow, ("spec", "subject")), code)
@@ -547,6 +581,14 @@ def _release_and_environment_bindings(
         "sourceRevision": exact_release["sourceRevision"],
         "imageDigest": control_digest,
     }
+    expected_sustained_subject = {
+        "applicationVersion": exact_release["applicationVersion"],
+        "chartVersion": exact_release["chartVersion"],
+        "contractsApiVersion": API_VERSION,
+        "requiredMigration": deployment_subject.get("requiredMigration"),
+        "sourceRevision": exact_release["sourceRevision"],
+        "imageDigest": control_digest,
+    }
     if (
         dict(expected_release) != exact_release
         or publication_release.get("version") != exact_release["applicationVersion"]
@@ -581,6 +623,7 @@ def _release_and_environment_bindings(
         )}
         or prerequisite_subject != expected_customer_subject
         or flow_subject != expected_customer_subject
+        or sustained_subject != expected_sustained_subject
         or any(
             metadata.get("sourceRevision") != exact_release["sourceRevision"]
             for metadata in source_metadata
@@ -607,6 +650,8 @@ def _release_and_environment_bindings(
         "clusterBindingDigest": cluster_digest,
         "environmentBindingDigest": environment_digest,
         "controlPlaneTargetDigest": control_target_digest,
+        "otlpTargetDigest": sustained_bindings.get("otlpTargetBindingDigest"),
+        "sustainedWorkloadProfileDigest": sustained_bindings.get("profileDigest"),
     }
     if (
         expected_bindings.get("signaturePolicyDigest") != policy_digest
@@ -614,7 +659,17 @@ def _release_and_environment_bindings(
         or expected_bindings.get("clusterBindingDigest") != cluster_digest
         or expected_bindings.get("environmentBindingDigest") != environment_digest
         or expected_bindings.get("controlPlaneTargetDigest") != control_target_digest
+        or expected_bindings.get("otlpTargetDigest")
+        != sustained_bindings.get("otlpTargetBindingDigest")
+        or expected_bindings.get("sustainedWorkloadProfileDigest")
+        != sustained_bindings.get("profileDigest")
         or _path(load, ("spec", "targetBindingDigest")) != control_target_digest
+        or sustained_bindings.get("apiTargetBindingDigest")
+        != control_target_digest
+        or sustained_bindings.get("otlpTargetBindingDigest")
+        != deployment_bindings.get("processingOtlpTargetBindingDigest")
+        or sustained_bindings.get("otlpTargetBindingDigest")
+        != deployment_bindings.get("otlpReceiverEndpointBindingDigest")
         or flow_bindings.get("controlPlaneTargetDigest") != control_target_digest
         or flow_bindings.get("environmentBindingDigest") != environment_digest
         or prerequisite_bindings.get("releaseReadinessReportDigest")
@@ -660,6 +715,7 @@ def _evidence_item(
     elif current - source.generated_at >= timedelta(seconds=maximum_age_seconds):
         reason = "customer-pilot-readiness.evidence.stale"
     elif requirement.identifier in {
+        "sustained-core-workload",
         "ai-finops-prerequisites",
         "same-invocation-ai-finops",
     }:
@@ -702,7 +758,10 @@ def _summary(
 
 
 def _derived_checks(
-    evidence: Sequence[Mapping[str, Any]], *, post_deployment_load: bool
+    evidence: Sequence[Mapping[str, Any]],
+    *,
+    post_deployment_load: bool,
+    post_deployment_sustained_workload: bool,
 ) -> list[dict[str, str]]:
     evidence_pass = {
         str(item["id"]): item["status"] == "passed" for item in evidence
@@ -728,6 +787,10 @@ def _derived_checks(
         _check("customer-deployment", evidence_pass["customer-deployment"]),
         _check("control-plane-load", evidence_pass["control-plane-load"]),
         _check(
+            "sustained-core-workload",
+            evidence_pass["sustained-core-workload"],
+        ),
+        _check(
             "ai-finops-prerequisites", evidence_pass["ai-finops-prerequisites"]
         ),
         _check(
@@ -737,10 +800,16 @@ def _derived_checks(
         _check("publication-signature-chain", True),
         _check("deployed-image-chain", True),
         _check("customer-environment-chain", True),
+        _check("sustained-workload-environment-chain", True),
         _check(
             "post-deployment-load-window",
             post_deployment_load,
             "customer-pilot-readiness.load.before-deployment",
+        ),
+        _check(
+            "post-deployment-sustained-workload-window",
+            post_deployment_sustained_workload,
+            "customer-pilot-readiness.sustained-workload.before-deployment",
         ),
         _check("minimized-output", True),
     ]
@@ -831,13 +900,28 @@ def build_report(
         "customer-pilot-readiness.control-plane-load.invalid",
     )
     load_completed = sources["control-plane-load"].generated_at
+    sustained_started = _parse_time(
+        _path(
+            sources["sustained-core-workload"].document,
+            ("spec", "measurements", "startedAt"),
+        ),
+        "customer-pilot-readiness.sustained-workload.invalid",
+    )
+    sustained_completed = sources["sustained-core-workload"].generated_at
     flow_completed = sources["same-invocation-ai-finops"].generated_at
     post_deployment_load = deployment_time <= load_started <= load_completed
+    post_deployment_sustained_workload = (
+        deployment_time <= sustained_started <= sustained_completed
+    )
     evidence_fresh = {
         str(item["id"]): item.get("errorCode") not in TEMPORAL_EVIDENCE_ERRORS
         for item in evidence
     }
-    checks = _derived_checks(evidence, post_deployment_load=post_deployment_load)
+    checks = _derived_checks(
+        evidence,
+        post_deployment_load=post_deployment_load,
+        post_deployment_sustained_workload=post_deployment_sustained_workload,
+    )
     summary = _summary(evidence, checks)
     validity_limits = [
         profile_valid_until,
@@ -860,6 +944,7 @@ def build_report(
             + timedelta(seconds=maximum_age)
         )
         if requirement.identifier in {
+            "sustained-core-workload",
             "ai-finops-prerequisites",
             "same-invocation-ai-finops",
         }:
@@ -906,6 +991,9 @@ def build_report(
             "controlPlaneLoadReportDigest": sources[
                 "control-plane-load"
             ].file_digest,
+            "sustainedWorkloadReportDigest": sources[
+                "sustained-core-workload"
+            ].file_digest,
             "aiFinopsPrerequisiteReportDigest": sources[
                 "ai-finops-prerequisites"
             ].file_digest,
@@ -942,6 +1030,8 @@ def build_report(
             "customerDeploymentQualifiedAt": _timestamp(deployment_time),
             "controlPlaneLoadStartedAt": _timestamp(load_started),
             "controlPlaneLoadCompletedAt": _timestamp(load_completed),
+            "sustainedWorkloadStartedAt": _timestamp(sustained_started),
+            "sustainedWorkloadCompletedAt": _timestamp(sustained_completed),
             "aiFinopsFlowCompletedAt": _timestamp(flow_completed),
             "assessedAt": _timestamp(current),
             "oldestFoundationEvidenceAgeSeconds": max(
@@ -1035,10 +1125,19 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
     load_completed = _parse_time(
         measurements.get("controlPlaneLoadCompletedAt"), code
     )
+    sustained_started = _parse_time(
+        measurements.get("sustainedWorkloadStartedAt"), code
+    )
+    sustained_completed = _parse_time(
+        measurements.get("sustainedWorkloadCompletedAt"), code
+    )
     flow_completed = _parse_time(measurements.get("aiFinopsFlowCompletedAt"), code)
     expected_checks = _derived_checks(
         evidence,
         post_deployment_load=deployment <= load_started <= load_completed,
+        post_deployment_sustained_workload=(
+            deployment <= sustained_started <= sustained_completed
+        ),
     )
     expected_foundation_age = max(
         0, int((generated - oldest_foundation).total_seconds())
@@ -1084,6 +1183,20 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
         or spec.get("status") != expected_summary["overallStatus"]
         or spec.get("summary") != expected_summary
         or observed_evidence != expected_evidence
+        or any(
+            _path(spec, ("bindings", binding_name))
+            != evidence_by_id[evidence_id].get("reportDigest")
+            for binding_name, evidence_id in (
+                ("releaseReadinessReportDigest", "release-readiness"),
+                ("releasePublicationReportDigest", "registry-publication"),
+                ("releaseSignatureReportDigest", "organizational-signatures"),
+                ("customerDeploymentReportDigest", "customer-deployment"),
+                ("controlPlaneLoadReportDigest", "control-plane-load"),
+                ("sustainedWorkloadReportDigest", "sustained-core-workload"),
+                ("aiFinopsPrerequisiteReportDigest", "ai-finops-prerequisites"),
+                ("aiFinopsFlowReportDigest", "same-invocation-ai-finops"),
+            )
+        )
         or list(checks) != expected_checks
         or tuple(item.get("id") for item in checks) != CHECK_IDS
         or spec.get("limitations") != list(LIMITATIONS)
@@ -1096,6 +1209,9 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
         or valid_until > validity_ceiling
         or oldest_foundation > newest_foundation
         or flow_completed > generated + timedelta(
+            seconds=int(objective["maximumClockSkewSeconds"])
+        )
+        or sustained_completed > generated + timedelta(
             seconds=int(objective["maximumClockSkewSeconds"])
         )
         or measurements.get("oldestFoundationEvidenceAgeSeconds")
@@ -1209,6 +1325,7 @@ def _source_paths(arguments: argparse.Namespace) -> dict[str, Path]:
         "organizational-signatures": arguments.release_signatures,
         "customer-deployment": arguments.customer_deployment,
         "control-plane-load": arguments.control_plane_load,
+        "sustained-core-workload": arguments.sustained_workload,
         "ai-finops-prerequisites": arguments.ai_finops_prerequisites,
         "same-invocation-ai-finops": arguments.ai_finops_flow,
     }
@@ -1221,6 +1338,7 @@ def _add_inputs(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--release-signatures", type=Path, required=True)
     parser.add_argument("--customer-deployment", type=Path, required=True)
     parser.add_argument("--control-plane-load", type=Path, required=True)
+    parser.add_argument("--sustained-workload", type=Path, required=True)
     parser.add_argument("--ai-finops-prerequisites", type=Path, required=True)
     parser.add_argument("--ai-finops-flow", type=Path, required=True)
 

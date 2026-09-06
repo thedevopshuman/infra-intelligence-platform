@@ -55,6 +55,8 @@ The documentation tree is the product and engineering system of record. A change
 - [Customer policy qualification contracts](specifications/customer-policy-qualification-report-contract.md)
 - [Customer deployment qualification report](specifications/customer-deployment-qualification-report-contract.md)
 - [Control-plane load qualification report](specifications/control-plane-load-qualification-report-contract.md)
+- [Customer sustained core-workload contracts](specifications/customer-sustained-workload-qualification-contract.md)
+- [Customer private-pilot readiness contracts](specifications/customer-pilot-readiness-contract.md)
 - [Kubernetes availability qualification report](specifications/kubernetes-availability-qualification-report-contract.md)
 - [Workflow worker health contract](specifications/worker-health-contract.md)
 
@@ -73,6 +75,8 @@ The documentation tree is the product and engineering system of record. A change
 - [Customer policy-engine bundle qualification](operations/customer-policy-qualification.md)
 - [Customer deployment qualification](operations/customer-deployment-qualification.md)
 - [Customer control-plane load qualification](operations/control-plane-load-qualification.md)
+- [Customer sustained core-workload qualification](operations/customer-sustained-workload-qualification.md)
+- [Customer private-pilot readiness](operations/customer-pilot-readiness.md)
 - [Kubernetes planned-disruption availability qualification](operations/kubernetes-availability-qualification.md)
 - [Release artifacts and supply-chain evidence](operations/release-artifacts.md)
 - [OpenTelemetry metrics export](operations/opentelemetry-export.md)

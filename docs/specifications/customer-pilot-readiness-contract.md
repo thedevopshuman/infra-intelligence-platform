@@ -2,7 +2,8 @@
 
 **Status:** `v1alpha1`
 
-**Decision:** [ADR 0143](../decisions/0143-customer-pilot-readiness-aggregation.md)
+**Decisions:** [ADR 0143](../decisions/0143-customer-pilot-readiness-aggregation.md),
+[ADR 0145](../decisions/0145-require-sustained-workload-before-private-pilot.md)
 
 The customer pilot readiness contracts answer whether one exact published,
 organizationally signed release has the complete current evidence required to
@@ -16,8 +17,8 @@ start that evaluation and do not claim production or public-launch readiness.
 - application and chart versions, clean source revision, release-manifest
   digest, and both OCI index digests;
 - organizational signature-policy and publication-target-set digests;
-- selected customer cluster, environment, and control-plane target digests;
-  and
+- selected customer cluster, environment, control-plane target, OTLP target,
+  and sustained-workload profile digests; and
 - profile, foundation-evidence, customer-evidence, clock-skew, and report
   validity limits.
 
@@ -27,7 +28,7 @@ review timestamps and complete specification.
 
 ## Transportable report
 
-`CustomerPilotReadinessReport` binds seven owning artifacts:
+`CustomerPilotReadinessReport` binds eight owning artifacts:
 
 1. `ReleaseReadinessReport` with `locally-qualified` status;
 2. `ReleasePublicationReport` with `published-unsigned` status;
@@ -36,22 +37,28 @@ review timestamps and complete specification.
 4. `CustomerDeploymentQualificationReport` with `qualified` status;
 5. `ControlPlaneLoadQualificationReport` with `qualified` status and a window
    starting after deployment qualification;
-6. `CustomerAiFinopsPrerequisiteReport` with `prerequisites-ready` status; and
-7. `CustomerAiFinopsFlowQualificationReport` with `qualified` status.
+6. `CustomerSustainedWorkloadQualificationReport` with `qualified` status, an
+   exact protected profile, matching API/OTLP targets, and a window starting
+   after deployment qualification;
+7. `CustomerAiFinopsPrerequisiteReport` with `prerequisites-ready` status; and
+8. `CustomerAiFinopsFlowQualificationReport` with `qualified` status.
 
 The release manifest, source, versions, published index digests, signed index
-digests, installed image, target identity, customer environment, exact input
-file digests, and validity windows must agree. The `cpr_` report identifier is
-content-derived from the complete minimized artifact. A candidate report can
-never outlive the reviewed profile, its profile-age limit, either evidence-age
-limit, either expiring AI FinOps input, or its own configured validity period.
-Status failure and temporal freshness are reported independently.
+digests, installed image, target identity, customer environment, sustained
+workload profile, API/OTLP targets, exact input file digests, and validity
+windows must agree. Every source-report binding equals its evidence-item
+digest. The `cpr_` report identifier is content-derived from the complete
+minimized artifact. A candidate report can never outlive the reviewed profile,
+its profile-age limit, either evidence-age limit, the sustained workload or AI
+FinOps inputs, or its own configured validity period. Status failure and
+temporal freshness are reported independently.
 
 `design-partner-candidate` means only that this closed preflight passed. Three
 external gates always remain: the partner must actually operate and accept the
 product, the customer must qualify its longer-running production operating
 profile, and public launch needs accepted license/legal/brand/governance
-decisions.
+decisions. The sustained input remains synthetic and does not qualify customer
+workload representativeness or failure overlap.
 
 ## Machine contracts
 

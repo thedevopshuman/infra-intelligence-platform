@@ -1,5 +1,9 @@
 # TypeScript SDK boundary
 
+Version 0.79 extends the private-pilot types with the eighth sustained
+core-workload input, its protected profile and target bindings, and aggregate
+timing/check results. It adds no load-generation or promotion method.
+
 Version 0.78 adds the protected sustained-workload profile and minimized
 qualification report. These offline types describe aggregate API, durable
 OTLP, scheduler, and asynchronous-investigation measurements; they do not
@@ -80,8 +84,9 @@ into customer workload representativeness or an availability certification.
 Version 0.77 adds the customer pilot preflight types. A candidate report binds
 one published and organizationally signed release to current local readiness,
 customer deployment, post-deployment load, AI prerequisites, and an exact
-same-invocation flow while leaving actual partner acceptance and public
-governance external.
+same-invocation flow. Version 0.79 additionally requires sustained
+core-workload evidence while leaving representativeness, actual partner
+acceptance, and public governance external.
 
 Version 0.76 adds the customer flow profile/report types. A qualified report
 binds one live Bedrock invocation to the exact usage, active attribution,

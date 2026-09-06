@@ -81,6 +81,8 @@ class ExternalSecretHandoffTests(unittest.TestCase):
         self.assertIn("--timeout 600s", script)
         self.assertIn("secretKey: identities-json", script)
         self.assertIn("property: identities-json", script)
+        self.assertIn('--context "$IIP_KUBE_CONTEXT" cluster-info', script)
+        self.assertNotIn("current-context", script)
         self.assertLess(
             script.index("delete externalsecret"),
             script.index("uninstall external-secrets"),

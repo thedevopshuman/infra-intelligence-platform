@@ -87,7 +87,8 @@ helm upgrade --install iip deploy/helm/infra-intelligence \
 ```
 
 Run the local compatibility profile with Docker Desktop and the explicit
-`kind-iip-dev` context:
+`kind-iip-dev` context. Every Kubernetes and Helm operation names that context;
+the profile does not read or change the caller's current context:
 
 ```bash
 make test-external-secrets

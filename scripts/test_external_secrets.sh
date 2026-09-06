@@ -57,10 +57,6 @@ for binary in "$IIP_KUBECTL_BIN" "$IIP_HELM_BIN" "$IIP_CURL_BIN" jq openssl shas
     fi
 done
 
-if [ "$("$IIP_KUBECTL_BIN" config current-context)" != "$IIP_KUBE_CONTEXT" ]; then
-    echo "Refusing external-secret test outside context $IIP_KUBE_CONTEXT" >&2
-    exit 2
-fi
 case "$IIP_KUBE_CONTEXT" in
     kind-*) ;;
     *)
@@ -68,6 +64,11 @@ case "$IIP_KUBE_CONTEXT" in
         exit 2
         ;;
 esac
+if ! "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" cluster-info \
+    >/dev/null 2>&1; then
+    echo "Required explicit Kind context is unavailable: $IIP_KUBE_CONTEXT" >&2
+    exit 2
+fi
 
 cleanup_resources
 for attempt in $(seq 1 120); do

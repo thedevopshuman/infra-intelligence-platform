@@ -29,6 +29,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Event contract](specifications/event-contract.md)
 - [Evidence contract](specifications/evidence-contract.md)
 - [AI economics contracts](specifications/ai-economics-contracts.md)
+- [AI savings finding read contract](specifications/ai-savings-finding-page-contract.md)
 - [AI price-catalog qualification contracts](specifications/ai-price-catalog-qualification-contract.md)
 - [AI model suitability report contract](specifications/ai-model-suitability-report-contract.md)
 - [AI attribution contracts](specifications/ai-attribution-contracts.md)

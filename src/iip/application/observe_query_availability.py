@@ -35,6 +35,7 @@ QUERY_OPERATIONS = frozenset(
         "investigation-job-get",
         "actions-list",
         "ai-allocation-report",
+        "ai-savings-findings",
         "action-get",
         "action-workflow-get",
         "plugin-session-get",

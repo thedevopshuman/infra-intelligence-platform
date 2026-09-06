@@ -13,6 +13,7 @@ from iip.application.ports import (
     ActorContext,
     AiAllocationLedgerQuery,
     AiSavingsCohortQuery,
+    AiSavingsFindingLedgerQuery,
     EventDeliverySloState,
     EventDeliveryState,
     OutboxMessage,
@@ -27,6 +28,9 @@ from iip.application.ports import (
     StoredEvent,
 )
 from iip.application.query_ai_allocations import validate_ai_allocation_ledger_query
+from iip.application.query_ai_savings import (
+    validate_ai_savings_finding_ledger_query,
+)
 from iip.adapters.ai_attribution_store import (
     prepare_ai_attribution_policy,
     prepare_ai_attribution_writes,
@@ -837,6 +841,48 @@ class InMemoryResourceStore:
                 for _started, _usage_id, usage, attribution, cost in candidates[
                     : query.limit
                 ]
+            )
+
+    def list_ai_savings_findings(
+        self,
+        actor: ActorContext,
+        query: AiSavingsFindingLedgerQuery,
+    ) -> tuple[Mapping[str, object], ...]:
+        """Read a bounded newest-first page of exact-tenant findings."""
+
+        start, end, before = validate_ai_savings_finding_ledger_query(actor, query)
+        with self._lock:
+            candidates: list[
+                tuple[datetime, str, Mapping[str, object]]
+            ] = []
+            try:
+                for (tenant_id, finding_id), (_digest, document) in self._ai_savings.items():
+                    if tenant_id != actor.tenant_id:
+                        continue
+                    metadata = document["metadata"]
+                    if not isinstance(metadata, Mapping):
+                        raise ValueError
+                    evaluated_text = metadata["evaluatedAt"]
+                    if (
+                        metadata.get("id") != finding_id
+                        or not isinstance(evaluated_text, str)
+                    ):
+                        raise ValueError
+                    evaluated_at = datetime.fromisoformat(
+                        evaluated_text.replace("Z", "+00:00")
+                    )
+                    key = (evaluated_at, finding_id)
+                    if (
+                        start <= evaluated_at < end
+                        and (before is None or key < before)
+                    ):
+                        candidates.append((evaluated_at, finding_id, document))
+            except (KeyError, TypeError, ValueError, OverflowError):
+                raise PersistenceError("storage.state.invalid") from None
+            candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+            return tuple(
+                self._json_copy(document)
+                for _evaluated_at, _finding_id, document in candidates[: query.limit]
             )
 
     def commit_ai_savings_batch(

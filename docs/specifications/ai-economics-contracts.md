@@ -13,6 +13,7 @@
 - `contracts/schemas/ai-price-catalog-qualification-report.schema.json`
 - `contracts/schemas/ai-cost-record.schema.json`
 - `contracts/schemas/ai-savings-finding.schema.json`
+- `contracts/schemas/ai-savings-finding-page.schema.json`
 - `contracts/schemas/ai-model-suitability-report.schema.json`
 
 These contracts separate observed model usage, price configuration, calculated
@@ -213,6 +214,11 @@ scenario, not an invoice, guarantee, or permission to change models.
 Recommendations are advisory and always set `requiresValidation: true`.
 Despite the prior suitability result, `evaluate-lower-cost-model` explicitly
 requires validation against current traffic before a model change.
+
+Committed findings are exposed through the separate bounded
+[`AiSavingsFindingPage` read contract](ai-savings-finding-page-contract.md).
+That tenant- and interval-scoped API pages immutable records without running a
+rule, dereferencing evidence, or granting action authority.
 
 ## CloudEvent
 

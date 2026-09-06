@@ -6,7 +6,7 @@ This Docker Desktop profile demonstrates the complete local metadata path:
 
 ```text
 Bedrock/OpenAI-shaped OTel spans -> protected Collector routes -> isolated IIP receiver -> PostgreSQL
--> attribution and cost workers -> context-growth + retry + qualified-model rules -> allocation reports
+-> attribution and cost workers -> context-growth + retry + qualified-model rules -> allocation and finding reads
 -> OTLP metrics -> Collector
 -> Prometheus -> Grafana
 ```
@@ -37,9 +37,11 @@ checks pass. Open:
 
 For the disposable profile only, connect the console with the fixed fixture
 token printed by `make ai-finops-up`, then select **AI Economics**. The default
-24-hour application view reads the public tenant-scoped allocation contract;
-switch to team or another bounded window without changing collection or the
-protected pricing and attribution generations.
+24-hour application view reads the public tenant-scoped allocation and
+committed-finding contracts; switch to team or another bounded window without
+changing collection or the protected pricing and attribution generations. The
+opportunity card shows the newest finding evaluated in that window and retains
+its advisory validation requirement.
 
 The dashboard answers:
 
@@ -103,7 +105,7 @@ privacy-safe labels.
 | Prometheus | Reference aggregate metric store | Replace with any backend accepting the customer's chosen Collector exporter. |
 | Loki | Provisioned reference OTLP log destination | Optional; it is not an accounting source and the V0 finding panel uses bounded metrics. |
 | Grafana | Provisioned usage/cost/change/saving/coverage and application/team allocation visualization | Point equivalent queries at the selected telemetry backend. |
-| IIP web console | Read-only bounded usage, estimated cost, source generation, and incomplete-coverage view over the public allocation contract | Authenticate through the deployed console profile; no telemetry-backend or provider credential reaches the browser. |
+| IIP web console | Read-only bounded usage, estimated cost, source generation, incomplete coverage, and one committed evidence-backed opportunity over public allocation/finding contracts | Authenticate through the deployed console profile; no telemetry-backend, evidence payload, or provider credential reaches the browser. |
 
 ## Security boundary
 

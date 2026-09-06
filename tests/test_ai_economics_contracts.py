@@ -16,6 +16,7 @@ from infra_intelligence_sdk import (
     AiPriceCatalogQualificationPolicy,
     AiPriceCatalogQualificationReport,
     AiSavingsFinding,
+    AiSavingsFindingPage,
     AiUsageRecord,
     AiUsageAttributionRecord,
 )
@@ -121,6 +122,11 @@ class AiEconomicsContractTests(unittest.TestCase):
             AiSavingsFinding.from_dict(expensive).to_dict(),
         )
         validate_ai_savings_finding(expensive)
+        page = load(EXAMPLES / "ai-savings-finding-page.json")
+        parsed_page = AiSavingsFindingPage.from_dict(page)
+        self.assertEqual(page, parsed_page.to_dict())
+        self.assertEqual(len(parsed_page.items), 1)
+        self.assertIsInstance(parsed_page.items[0], AiSavingsFinding)
 
     def test_usage_contract_prohibits_content_and_raw_payload_capture(self) -> None:
         schema = load(SCHEMAS / "ai-usage-record.schema.json")

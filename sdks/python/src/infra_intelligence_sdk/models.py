@@ -3981,6 +3981,36 @@ class AiSavingsFinding:
 
 
 @dataclass(frozen=True)
+class AiSavingsFindingPage:
+    """Bounded newest-first page of tenant-scoped AI savings findings."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "AiSavingsFindingPage":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiSavingsFindingPage",
+                label="AI savings finding page",
+            )
+        )
+
+    @property
+    def items(self) -> tuple[AiSavingsFinding, ...]:
+        spec = self.payload.get("spec")
+        items = spec.get("items") if isinstance(spec, Mapping) else None
+        if not isinstance(items, list) or any(
+            not isinstance(item, Mapping) for item in items
+        ):
+            raise ValueError("AI savings finding page items are invalid")
+        return tuple(AiSavingsFinding.from_dict(item) for item in items)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class PolicyDecisionRequest:
     """Authenticated, tenant-scoped input sent to a replaceable policy service."""
 

@@ -153,6 +153,10 @@ allocation contract for a selected one-hour through 30-day window. It presents
 exact calculated-cost subunits as estimates, shows unpriced, ambiguous, pending,
 and unallocated coverage before totals, verifies the authenticated tenant and
 requested scope in the response, and never fetches prompt or response content.
+The same view reads the newest committed finding through a tenant- and
+interval-bound paginated API, preserves calculated, unpriced, and unresolved
+money, and keeps the mandatory validation warning visible without
+dereferencing evidence or granting action authority.
 A separate
 tenant-explicit deterministic service evaluates fixed context-growth,
 retry-amplification, and qualified model-cost windows, revalidates every cited

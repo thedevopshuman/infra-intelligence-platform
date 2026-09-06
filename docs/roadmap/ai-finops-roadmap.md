@@ -103,7 +103,9 @@ tenant-bound in-memory/PostgreSQL persistence, worker authority, CloudEvent,
 bounded generation-bound allocation query, calculated-cost join, public API
 and SDK types, privacy-bounded export dimensions, Docker/Helm configuration,
 application/team dashboard views, a responsive read-only web-console view over
-the same contract with defensive tenant/scope/coverage validation, and
+the same contract with defensive tenant/scope/coverage validation, a bounded
+newest-first finding API and SDK read, and a console opportunity view that
+preserves evidence references, unresolved money, and validation requirements, and
 executable isolation/rename/replay/cardinality tests are delivered. Optional
 business attributes remain deferred pending evidence that standard
 service/resource identity is insufficient.

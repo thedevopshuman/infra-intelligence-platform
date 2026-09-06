@@ -52,7 +52,8 @@ host-created failures for plugin handling; it is not a control-plane HTTP client
 `AiUsageRecord`, `AiAttributionPolicy`, `AiUsageAttributionRecord`,
 `AiPriceCatalog`, `AwsBedrockPriceCatalogImportPolicy`,
 `AiPriceCatalogImportReport`, `AiPriceCatalogQualificationPolicy`,
-`AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`, and `AiAllocationReport`
+`AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`,
+`AiSavingsFindingPage`, and `AiAllocationReport`
 expose the AI economics
 records as public metadata-only envelopes. They do not
 instrument provider calls, send OTLP, or import an AWS SDK. Standard
@@ -94,6 +95,11 @@ instrumentation SDK.
 Version 0.56 adds protected AI price-catalog qualification policy and minimized
 report envelopes. These types add no provider pricing client, promotion API, or
 access to negotiated rates.
+
+Version 0.62 adds `AiSavingsFindingPage` and
+`Client.list_ai_savings_findings()` for newest-first, tenant- and
+interval-bound access to committed advisory findings. Evidence dereferencing
+and action authority remain separate.
 
 Version 0.61 adds `ControlPlaneLoadQualificationReport` for aggregate,
 source-bound fixed-rate identity-read evidence. It adds no traffic generator,

@@ -9,6 +9,10 @@ const examplePath = new URL(
   "../contracts/examples/ai-allocation-report.json",
   import.meta.url,
 );
+const savingsPagePath = new URL(
+  "../contracts/examples/ai-savings-finding-page.json",
+  import.meta.url,
+);
 const source = readFileSync(scriptPath, "utf8");
 const sourceWithoutStart = source.replace(/\nstart\(\);\s*$/, "");
 assert.notEqual(sourceWithoutStart, source, "console entrypoint was not isolated");
@@ -31,7 +35,9 @@ vm.runInContext(
 globalThis.consoleContractTest = {
   state,
   validateAiAllocationReport,
+  validateAiSavingsFindingPage,
   formatCalculatedCost,
+  formatPotentialSaving,
   selectedAiScope,
 };`,
   context,
@@ -40,6 +46,7 @@ globalThis.consoleContractTest = {
 const subject = context.consoleContractTest;
 subject.state.session = { metadata: { tenantId: "local" } };
 const example = JSON.parse(readFileSync(examplePath, "utf8"));
+const savingsPage = JSON.parse(readFileSync(savingsPagePath, "utf8"));
 const expectedScope = {
   start: example.spec.scope.start,
   end: example.spec.scope.end,
@@ -47,11 +54,22 @@ const expectedScope = {
 };
 
 assert.equal(subject.validateAiAllocationReport(example, expectedScope), example);
+const savingsScope = savingsPage.spec.scope;
+assert.equal(subject.validateAiSavingsFindingPage(savingsPage, savingsScope), savingsPage);
 assert.equal(
   subject.formatCalculatedCost(example.spec.totals.pricedCost),
   "USD 0.03147 est.",
 );
 assert.equal(subject.formatCalculatedCost(undefined), "Unresolved");
+assert.equal(
+  subject.formatPotentialSaving(savingsPage.spec.items[0].spec.potentialSavings),
+  "USD 0.36 est.",
+);
+assert.equal(subject.formatPotentialSaving({ status: "unpriced" }), "Unpriced");
+assert.equal(
+  subject.formatPotentialSaving({ status: "unresolved" }),
+  "Billing unresolved",
+);
 
 const selectedScope = subject.selectedAiScope();
 assert.match(selectedScope.start, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
@@ -77,5 +95,25 @@ expectInvalid((candidate) => {
   candidate.spec.groups.forEach((group) => { delete group.pricedCost; });
 });
 expectInvalid((candidate) => { candidate.spec.groups[0].unexpected = "untrusted"; });
+
+function expectInvalidSavings(mutate) {
+  const candidate = structuredClone(savingsPage);
+  mutate(candidate);
+  assert.throws(
+    () => subject.validateAiSavingsFindingPage(candidate, savingsScope),
+    /ai[.]savings[.]response[.]invalid/,
+  );
+}
+
+expectInvalidSavings((candidate) => { candidate.metadata.tenantId = "another-tenant"; });
+expectInvalidSavings((candidate) => { candidate.spec.scope.end = "2026-09-05T23:00:00Z"; });
+expectInvalidSavings((candidate) => { candidate.spec.items[0].metadata.evaluatedAt = "2026-09-06T00:00:00Z"; });
+expectInvalidSavings((candidate) => { candidate.spec.items[0].spec.recommendation.requiresValidation = false; });
+expectInvalidSavings((candidate) => { candidate.spec.items[0].spec.potentialSavings.amountSubunits = Number.MAX_SAFE_INTEGER + 1; });
+expectInvalidSavings((candidate) => { candidate.spec.items[0].spec.evidenceRefs[0].type = "prompt"; });
+expectInvalidSavings((candidate) => { candidate.spec.items[0].spec.unexpected = "untrusted"; });
+expectInvalidSavings((candidate) => {
+  candidate.spec.page.hasMore = true;
+});
 
 console.log("AI Economics console contract checks passed");

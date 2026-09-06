@@ -15,6 +15,8 @@ const state = {
   evidenceRetention: null,
   aiAllocationReport: null,
   aiAllocationError: null,
+  aiSavingsPage: null,
+  aiSavingsError: null,
   resources: [],
   investigations: [],
   evidence: [],
@@ -434,6 +436,149 @@ function validateAiAllocationReport(document, expectedScope) {
   return document;
 }
 
+function validAiSavingsWindow(value) {
+  return hasOnlyKeys(value, ["start", "end"])
+    && isCanonicalUtc(value.start) && isCanonicalUtc(value.end)
+    && new Date(value.start) < new Date(value.end);
+}
+
+function validateAiSavingsFinding(document, expectedTenant) {
+  const invalid = () => { throw new Error("ai.savings.response.invalid"); };
+  const rules = ["context-growth", "retry-amplification", "expensive-model-anomaly"];
+  if (!hasOnlyKeys(document, ["apiVersion", "kind", "metadata", "spec"])
+      || document.apiVersion !== "iip.platform/v1alpha1"
+      || document.kind !== "AiSavingsFinding"
+      || !hasOnlyKeys(document.metadata, ["id", "tenantId", "evaluatedAt"])
+      || !/^aif_[a-f0-9]{32}$/.test(document.metadata.id)
+      || document.metadata.tenantId !== expectedTenant
+      || !isCanonicalUtc(document.metadata.evaluatedAt)
+      || !hasOnlyKeys(document.spec, ["rule", "scope", "finding", "observations", "potentialSavings", "recommendation", "evidenceRefs"])) invalid();
+
+  const { rule, scope, finding, observations, potentialSavings, recommendation, evidenceRefs } = document.spec;
+  if (!hasOnlyKeys(rule, ["id", "version"])
+      || !rules.includes(rule.id)
+      || !/^[0-9]+[.][0-9]+[.][0-9]+$/.test(rule.version)
+      || !hasOnlyKeys(scope, ["baselineWindow", "currentWindow", "provider", "modelId", "region", "serviceName", "deploymentEnvironment"], ["candidateModelId"])
+      || !validAiSavingsWindow(scope.baselineWindow)
+      || !validAiSavingsWindow(scope.currentWindow)
+      || scope.baselineWindow.end !== scope.currentWindow.start
+      || new Date(document.metadata.evaluatedAt) < new Date(scope.currentWindow.end)
+      || typeof scope.provider !== "string" || !/^[a-z0-9][a-z0-9._-]{1,63}$/.test(scope.provider)
+      || typeof scope.modelId !== "string" || scope.modelId.length < 1 || scope.modelId.length > 256
+      || (Object.hasOwn(scope, "candidateModelId") && (typeof scope.candidateModelId !== "string" || scope.candidateModelId.length < 1 || scope.candidateModelId.length > 256))
+      || typeof scope.region !== "string" || !/^[a-z0-9][a-z0-9-]{1,63}$/.test(scope.region)
+      || typeof scope.serviceName !== "string" || scope.serviceName.length < 1 || scope.serviceName.length > 256
+      || typeof scope.deploymentEnvironment !== "string" || scope.deploymentEnvironment.length < 1 || scope.deploymentEnvironment.length > 128
+      || !hasOnlyKeys(finding, ["category", "severity", "summary", "confidenceBasisPoints"])
+      || finding.category !== rule.id
+      || !["info", "low", "medium", "high"].includes(finding.severity)
+      || typeof finding.summary !== "string" || finding.summary.length < 1 || finding.summary.length > 1024
+      || !Number.isInteger(finding.confidenceBasisPoints) || finding.confidenceBasisPoints < 0 || finding.confidenceBasisPoints > 10_000
+      || !Array.isArray(observations) || observations.length < 1 || observations.length > 16) invalid();
+
+  const metricUnits = {
+    "input-tokens-per-request": "tokens-per-request",
+    "retrying-operations-rate": "basis-points",
+    "request-attempts-per-operation": "attempts-per-operation",
+    "calculated-cost-per-request": "currency-subunits-per-request",
+  };
+  observations.forEach((observation) => {
+    const validSample = (sample) => hasOnlyKeys(sample, ["value", "sampleCount"])
+      && isCount(sample.value) && Number.isInteger(sample.sampleCount)
+      && sample.sampleCount >= 1 && sample.sampleCount <= 1_000_000_000;
+    if (!hasOnlyKeys(observation, ["metric", "unit", "baseline", "current", "changeBasisPoints"])
+        || metricUnits[observation.metric] !== observation.unit
+        || !validSample(observation.baseline) || !validSample(observation.current)
+        || !Number.isInteger(observation.changeBasisPoints)
+        || observation.changeBasisPoints < -10_000 || observation.changeBasisPoints > 1_000_000_000) invalid();
+  });
+
+  const validReferenceList = (references, pattern) => Array.isArray(references)
+    && references.length >= 1 && references.length <= 256
+    && new Set(references).size === references.length
+    && references.every((value) => typeof value === "string" && pattern.test(value));
+  if (potentialSavings?.status === "calculated") {
+    if (!hasOnlyKeys(potentialSavings, ["status", "currency", "currencyScale", "amountSubunits", "period", "calculation", "costRecordRefs"])
+        || !/^[A-Z]{3}$/.test(potentialSavings.currency)
+        || ![6, 9, 12].includes(potentialSavings.currencyScale)
+        || !isCount(potentialSavings.amountSubunits)
+        || !validAiSavingsWindow(potentialSavings.period)
+        || !validReferenceList(potentialSavings.costRecordRefs, /^aic_[a-f0-9]{32}$/)) invalid();
+    const calculation = potentialSavings.calculation;
+    if (calculation?.method === "avoidable-excess-at-observed-rate") {
+      if (!hasOnlyKeys(calculation, ["method", "excessQuantity", "chargeCategory", "priceSubunitsPerMillionTokens"])
+          || !isCount(calculation.excessQuantity) || !isCount(calculation.priceSubunitsPerMillionTokens)
+          || !["uncached-input-tokens", "cache-read-input-tokens", "cache-write-input-tokens"].includes(calculation.chargeCategory)) invalid();
+    } else if (calculation?.method === "qualified-model-cost-difference") {
+      if (!hasOnlyKeys(calculation, ["method", "candidateCostPerRequestSubunits", "referenceCostPerRequestSubunits", "referenceRequestCount", "suitabilityReportId"])
+          || !isCount(calculation.candidateCostPerRequestSubunits)
+          || !isCount(calculation.referenceCostPerRequestSubunits)
+          || !Number.isInteger(calculation.referenceRequestCount) || calculation.referenceRequestCount < 1 || calculation.referenceRequestCount > 100
+          || !/^ams_[a-f0-9]{32}$/.test(calculation.suitabilityReportId)) invalid();
+    } else invalid();
+  } else if (potentialSavings?.status === "unpriced") {
+    if (!hasOnlyKeys(potentialSavings, ["status", "reasonCode"])
+        || !["unpriced-usage", "ambiguous-pricing", "insufficient-baseline"].includes(potentialSavings.reasonCode)) invalid();
+  } else if (potentialSavings?.status === "unresolved") {
+    if (!hasOnlyKeys(potentialSavings, ["status", "reasonCode", "period"])
+        || potentialSavings.reasonCode !== "retry-billing-unproven"
+        || !validAiSavingsWindow(potentialSavings.period)) invalid();
+  } else invalid();
+
+  if (!hasOnlyKeys(recommendation, ["actionCode", "summary", "requiresValidation"])
+      || !["review-context-retention", "review-retry-policy", "evaluate-lower-cost-model"].includes(recommendation.actionCode)
+      || typeof recommendation.summary !== "string" || recommendation.summary.length < 1 || recommendation.summary.length > 1024
+      || recommendation.requiresValidation !== true
+      || !Array.isArray(evidenceRefs) || evidenceRefs.length < 1 || evidenceRefs.length > 256) invalid();
+  const referencePatterns = {
+    "ai-usage-record": /^aiu_[a-f0-9]{32}$/,
+    "ai-cost-record": /^aic_[a-f0-9]{32}$/,
+    evidence: /^evd_[a-f0-9]{32}$/,
+    "ai-model-suitability-report": /^ams_[a-f0-9]{32}$/,
+  };
+  const seenReferences = new Set();
+  evidenceRefs.forEach((reference) => {
+    const key = `${reference?.type}:${reference?.id}`;
+    if (!hasOnlyKeys(reference, ["type", "id"])
+        || !referencePatterns[reference.type]?.test(reference.id)
+        || seenReferences.has(key)) invalid();
+    seenReferences.add(key);
+  });
+  return document;
+}
+
+function validateAiSavingsFindingPage(document, expectedScope) {
+  const invalid = () => { throw new Error("ai.savings.response.invalid"); };
+  if (!hasOnlyKeys(document, ["apiVersion", "kind", "metadata", "spec"])
+      || document.apiVersion !== "iip.platform/v1alpha1"
+      || document.kind !== "AiSavingsFindingPage"
+      || !hasOnlyKeys(document.metadata, ["tenantId", "generatedAt"])
+      || document.metadata.tenantId !== state.session?.metadata?.tenantId
+      || !isCanonicalUtc(document.metadata.generatedAt)
+      || !hasOnlyKeys(document.spec, ["scope", "items", "page"])
+      || !hasOnlyKeys(document.spec.scope, ["start", "end"])
+      || document.spec.scope.start !== expectedScope.start
+      || document.spec.scope.end !== expectedScope.end
+      || !Array.isArray(document.spec.items)
+      || !hasOnlyKeys(document.spec.page, ["limit", "hasMore"], ["nextCursor"])
+      || !Number.isInteger(document.spec.page.limit) || document.spec.page.limit < 1 || document.spec.page.limit > 100
+      || document.spec.items.length > document.spec.page.limit
+      || typeof document.spec.page.hasMore !== "boolean"
+      || (document.spec.page.hasMore !== Object.hasOwn(document.spec.page, "nextCursor"))
+      || (Object.hasOwn(document.spec.page, "nextCursor") && (typeof document.spec.page.nextCursor !== "string" || !/^p1[.][A-Za-z0-9_-]+$/.test(document.spec.page.nextCursor) || document.spec.page.nextCursor.length > 2048))) invalid();
+  let previous = null;
+  document.spec.items.forEach((item) => {
+    validateAiSavingsFinding(item, document.metadata.tenantId);
+    const evaluatedAt = new Date(item.metadata.evaluatedAt).valueOf();
+    const key = [evaluatedAt, item.metadata.id];
+    if (evaluatedAt < new Date(expectedScope.start).valueOf()
+        || evaluatedAt >= new Date(expectedScope.end).valueOf()
+        || (previous && (key[0] > previous[0] || (key[0] === previous[0] && key[1] >= previous[1])))) invalid();
+    previous = key;
+  });
+  return document;
+}
+
 function formatInteger(value) {
   return new Intl.NumberFormat().format(value);
 }
@@ -449,6 +594,17 @@ function formatCalculatedCost(money) {
   const whole = subunits / divisor;
   const fraction = (subunits % divisor).toString().padStart(money.currencyScale, "0").replace(/0+$/, "");
   return `${money.currency} ${whole}${fraction ? `.${fraction}` : ""} est.`;
+}
+
+function formatPotentialSaving(savings) {
+  if (savings.status === "calculated") {
+    return formatCalculatedCost({
+      currency: savings.currency,
+      currencyScale: savings.currencyScale,
+      totalSubunits: savings.amountSubunits,
+    });
+  }
+  return savings.status === "unpriced" ? "Unpriced" : "Billing unresolved";
 }
 
 function selectedAiScope() {
@@ -559,11 +715,78 @@ function renderAiAllocationReport() {
   }
 }
 
+function renderAiSavingsFinding() {
+  const page = state.aiSavingsPage;
+  const error = state.aiSavingsError;
+  const content = $("#ai-opportunity-content");
+  const chip = $("#ai-opportunity-state");
+  clear(content);
+  if (!page || !page.spec.items.length) {
+    content.className = "empty-state ai-opportunity-empty";
+    content.append(node("div", "empty-icon", "◇"));
+    const title = node("h3");
+    const copy = node("p");
+    if (!state.session) {
+      chip.textContent = "Connect to inspect";
+      title.textContent = "Connect to inspect potential savings";
+      copy.textContent = "Recommendations appear only after a deterministic rule commits its evidence-backed finding.";
+    } else if (error === "policy.denied") {
+      chip.textContent = "Access restricted";
+      title.textContent = "Savings findings are restricted";
+      copy.textContent = "Your authenticated role does not have ai-economics:read authority for this tenant.";
+    } else if (error) {
+      chip.textContent = "Unavailable";
+      title.textContent = "Savings findings are unavailable";
+      copy.textContent = "The control plane returned a stable error without exposing evidence or storage details.";
+    } else {
+      chip.textContent = "No finding";
+      title.textContent = "No evidence-backed saving in this window";
+      copy.textContent = "The platform does not invent a recommendation when no committed finding matches the selected interval.";
+    }
+    chip.className = "status-chip neutral";
+    content.append(title, copy);
+    return;
+  }
+
+  const findingDocument = page.spec.items[0];
+  const { finding, recommendation, potentialSavings, rule, scope, evidenceRefs } = findingDocument.spec;
+  content.className = "ai-opportunity-content";
+  chip.textContent = "Validation required";
+  chip.className = "status-chip warning";
+  const valueRow = node("div", "ai-opportunity-value-row");
+  const value = node("div");
+  value.append(node("span", "kicker", "Potential saving"));
+  value.append(node("strong", "ai-opportunity-value", formatPotentialSaving(potentialSavings)));
+  valueRow.append(value, node("span", `finding-severity ${finding.severity}`, finding.severity));
+  content.append(valueRow);
+  content.append(node("h3", "ai-opportunity-summary", finding.summary));
+  const action = node("div", "ai-recommendation");
+  action.append(node("span", "kicker", "Recommended review"));
+  action.append(node("p", "", recommendation.summary));
+  content.append(action);
+  const facts = node("div", "ai-opportunity-facts");
+  [
+    ["Workload", scope.serviceName],
+    ["Provider / region", `${scope.provider} · ${scope.region}`],
+    ["Confidence", `${(finding.confidenceBasisPoints / 100).toFixed(0)}%`],
+    ["Evidence", `${formatInteger(evidenceRefs.length)} immutable reference${evidenceRefs.length === 1 ? "" : "s"}`],
+  ].forEach(([label, text]) => {
+    const fact = node("div");
+    fact.append(node("span", "", label), node("strong", "", text));
+    facts.append(fact);
+  });
+  content.append(facts);
+  content.append(node("p", "delivery-note", `Rule ${rule.id} v${rule.version} · evaluated ${formatDate(findingDocument.metadata.evaluatedAt)} · advisory only. Evidence access and any action require separate authority.`));
+}
+
 async function refreshAiAllocationReport(announce = false) {
   if (!state.session) {
     state.aiAllocationReport = null;
     state.aiAllocationError = null;
+    state.aiSavingsPage = null;
+    state.aiSavingsError = null;
     renderAiAllocationReport();
+    renderAiSavingsFinding();
     return;
   }
   const button = $("#ai-report-refresh");
@@ -571,20 +794,47 @@ async function refreshAiAllocationReport(announce = false) {
   button.textContent = "Loading…";
   try {
     const scope = selectedAiScope();
-    const parameters = new URLSearchParams(scope);
-    const response = await api(`/v1/ai/economics/allocation?${parameters.toString()}`);
-    state.aiAllocationReport = validateAiAllocationReport(response, scope);
-    state.aiAllocationError = null;
-    if (announce) showNotice("AI economics report refreshed from protected source generations.");
-  } catch (error) {
-    state.aiAllocationReport = null;
-    state.aiAllocationError = error.message;
-    if (announce) showNotice(`AI economics report unavailable (${error.message}).`, "error");
+    const allocationParameters = new URLSearchParams(scope);
+    const savingsParameters = new URLSearchParams({ start: scope.start, end: scope.end, limit: "20" });
+    const [allocationResult, savingsResult] = await Promise.allSettled([
+      api(`/v1/ai/economics/allocation?${allocationParameters.toString()}`),
+      api(`/v1/ai/economics/savings-findings?${savingsParameters.toString()}`),
+    ]);
+    if (allocationResult.status === "fulfilled") {
+      try {
+        state.aiAllocationReport = validateAiAllocationReport(allocationResult.value, scope);
+        state.aiAllocationError = null;
+      } catch (error) {
+        state.aiAllocationReport = null;
+        state.aiAllocationError = error.message;
+      }
+    } else {
+      state.aiAllocationReport = null;
+      state.aiAllocationError = allocationResult.reason.message;
+    }
+    if (savingsResult.status === "fulfilled") {
+      try {
+        state.aiSavingsPage = validateAiSavingsFindingPage(savingsResult.value, scope);
+        state.aiSavingsError = null;
+      } catch (error) {
+        state.aiSavingsPage = null;
+        state.aiSavingsError = error.message;
+      }
+    } else {
+      state.aiSavingsPage = null;
+      state.aiSavingsError = savingsResult.reason.message;
+    }
+    if (announce) {
+      const failures = [state.aiAllocationError, state.aiSavingsError].filter(Boolean);
+      if (failures.length) showNotice(`AI economics data is partially unavailable (${failures.join(", ")}).`, "error");
+      else showNotice("AI economics report and evidence-backed savings refreshed.");
+    }
   } finally {
     button.disabled = false;
     button.textContent = "Load report";
   }
   renderAiAllocationReport();
+  renderAiSavingsFinding();
 }
 
 function clear(element) {
@@ -648,7 +898,7 @@ function switchView(name) {
   $("#page-eyebrow").textContent = target.dataset.eyebrow;
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (name === "actions" && state.token) refreshActions();
-  if (name === "ai-economics" && state.token && !state.aiAllocationReport) refreshAiAllocationReport();
+  if (name === "ai-economics" && state.token && (!state.aiAllocationReport || !state.aiSavingsPage)) refreshAiAllocationReport();
 }
 
 function updateIdentity() {
@@ -2097,6 +2347,7 @@ async function start() {
   renderInvestigationCompletionSlo();
   renderEvidenceRetention();
   renderAiAllocationReport();
+  renderAiSavingsFinding();
   renderPluginInvocationStatus();
   await Promise.all([checkHealth(), loadConsoleAuthentication()]);
   configureConnectionDialog();

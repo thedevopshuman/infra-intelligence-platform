@@ -48,7 +48,7 @@ transport is runtime-specific.
 `AiUsageRecord`, `AiAttributionPolicy`, `AiUsageAttributionRecord`,
 `AiPriceCatalog`, `AwsBedrockPriceCatalogImportPolicy`,
 `AiPriceCatalogImportReport`, `AiPriceCatalogQualificationPolicy`,
-`AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`, `AiModelSuitabilityReport`,
+`AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`, `AiSavingsFindingPage`, `AiModelSuitabilityReport`,
 and `AiAllocationReport`
 describe the
 metadata-only AI economics ledger. The SDK does not instrument or
@@ -88,6 +88,10 @@ instrumentation dependency.
 Version 0.56 adds protected price-catalog qualification policy and minimized
 report types without a provider pricing client, promotion method, or negotiated
 rate exposure.
+
+Version 0.62 adds `AiSavingsFindingPage` and `listAiSavingsFindings()` for
+newest-first, tenant- and interval-bound access to committed advisory findings.
+Evidence reads and action authority remain separate.
 
 Version 0.61 adds `ControlPlaneLoadQualificationReport` and its closed check,
 objective, environment, aggregate measurement, and limitation types. It adds

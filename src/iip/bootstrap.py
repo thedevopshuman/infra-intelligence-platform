@@ -143,6 +143,7 @@ from iip.application.query_ai_allocations import (
     AiAllocationProjectionService,
     AiAllocationReportService,
 )
+from iip.application.query_ai_savings import AiSavingsFindingQueryService
 from iip.application.query_event_delivery_health import EventDeliveryHealthService
 from iip.application.query_event_delivery_slo import (
     EventDeliverySloObjectives,
@@ -234,6 +235,7 @@ class Runtime:
     ai_attribution_resolution: AiAttributionService | None
     ai_cost_calculation: AiCostCalculationService | None
     ai_savings_evaluation: AiSavingsEvaluationService | None
+    ai_savings_findings: AiSavingsFindingQueryService
     ai_allocation_reports: AiAllocationReportService | None
     ai_allocation_projection: AiAllocationProjectionService | None
     investigations: DeterministicInvestigationService
@@ -692,6 +694,7 @@ def _compose_runtime(
             if ai_savings_profiles is not None
             else None
         ),
+        ai_savings_findings=AiSavingsFindingQueryService(store, policy, clock),
         ai_allocation_reports=(
             AiAllocationReportService(
                 store,

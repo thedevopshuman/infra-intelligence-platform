@@ -599,6 +599,25 @@
         }
       }
     },
+    "/v1/ai/economics/savings-findings": {
+      "get": {
+        "operationId": "listAiSavingsFindings",
+        "description": "List committed evidence-backed AI savings findings for the authenticated tenant in a bounded evaluatedAt interval. Results are newest first; recommendations remain advisory and calculated savings are not invoices.",
+        "parameters": [
+          {"name": "start", "in": "query", "required": true, "schema": {"type": "string", "format": "date-time"}, "description": "Inclusive canonical UTC evaluatedAt start. The interval may not exceed 31 days."},
+          {"name": "end", "in": "query", "required": true, "schema": {"type": "string", "format": "date-time"}, "description": "Exclusive canonical UTC evaluatedAt end."},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}},
+          {"name": "cursor", "in": "query", "schema": {"type": "string", "pattern": "^p1\\.[A-Za-z0-9_-]+$", "maxLength": 2048}, "description": "Opaque position bound to the authenticated tenant and exact interval."}
+        ],
+        "responses": {
+          "200": {"description": "Tenant-scoped AI savings finding page", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/ai-savings-finding-page.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
     "/v1/actions": {
       "get": {
         "operationId": "listActionWorkflows",
@@ -849,6 +868,7 @@
       "ActionWorkflow": {"$ref": "../../contracts/schemas/action-workflow.schema.json"},
       "ActionWorkflowPage": {"$ref": "../../contracts/schemas/action-workflow-page.schema.json"},
       "AiAllocationReport": {"$ref": "../../contracts/schemas/ai-allocation-report.schema.json"},
+      "AiSavingsFindingPage": {"$ref": "../../contracts/schemas/ai-savings-finding-page.schema.json"},
       "PluginSession": {"$ref": "../../contracts/schemas/plugin-session.schema.json"},
       "PluginManifest": {"$ref": "../../contracts/schemas/plugin-manifest.schema.json"},
       "PluginInvocation": {"$ref": "../../contracts/schemas/plugin-invocation.schema.json"},

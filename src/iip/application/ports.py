@@ -795,6 +795,17 @@ class AiAllocationLedgerQuery:
     limit: int
 
 
+@dataclass(frozen=True)
+class AiSavingsFindingLedgerQuery:
+    """Bounded newest-first finding interval with an optional exclusive position."""
+
+    start: str
+    end: str
+    before_evaluated_at: str | None
+    before_finding_id: str | None
+    limit: int
+
+
 class AiEconomicsLedger(AiAttributionLedger, Protocol):
     def register_price_catalog(
         self,
@@ -850,6 +861,13 @@ class AiEconomicsLedger(AiAttributionLedger, Protocol):
         ...,
     ]:
         """List bounded usage with exact attribution and cost generations."""
+
+    def list_ai_savings_findings(
+        self,
+        actor: ActorContext,
+        query: AiSavingsFindingLedgerQuery,
+    ) -> tuple[Mapping[str, object], ...]:
+        """List a bounded newest-first page of exact-tenant savings findings."""
 
     def commit_ai_savings_batch(
         self,

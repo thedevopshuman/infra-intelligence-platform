@@ -132,6 +132,10 @@ from iip.application.query_ai_allocations import (
     AiAllocationAuthorizationError,
     AiAllocationQueryError,
 )
+from iip.application.query_ai_savings import (
+    AiSavingsFindingAuthorizationError,
+    AiSavingsFindingQueryError,
+)
 from iip.application.query_event_delivery_health import (
     EventDeliveryHealthAuthorizationError,
     EventDeliveryHealthInputError,
@@ -364,6 +368,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path == "/v1/ai/economics/allocation":
             self._query_ai_allocation(actor, parsed.query)
             return
+        if path == "/v1/ai/economics/savings-findings":
+            self._query_ai_savings_findings(actor, parsed.query)
+            return
         if path == "/v1/actions":
             self._query_actions(actor, parsed.query)
             return
@@ -558,6 +565,55 @@ class ApiHandler(BaseHTTPRequestHandler):
                 else HTTPStatus.BAD_REQUEST
             )
             self._json(status, {"error": {"code": code}})
+        except PersistenceError:
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "storage.unavailable"}},
+            )
+
+    def _query_ai_savings_findings(
+        self, actor: ActorContext, query: str
+    ) -> None:
+        try:
+            parameters = parse_qs(query, keep_blank_values=True)
+            if (
+                not {"start", "end"}.issubset(parameters)
+                or set(parameters).difference({"start", "end", "limit", "cursor"})
+            ):
+                raise AiSavingsFindingQueryError("request.invalid")
+            start = self._single(parameters, "start")
+            end = self._single(parameters, "end")
+            limit_text = self._single(parameters, "limit", "20")
+            cursor = self._single(parameters, "cursor")
+            if start is None or end is None or limit_text is None:
+                raise AiSavingsFindingQueryError("request.invalid")
+            try:
+                limit = int(limit_text)
+            except ValueError:
+                raise AiSavingsFindingQueryError("request.invalid") from None
+            page = self.runtime.ai_savings_findings.list(
+                actor,
+                start=start,
+                end=end,
+                limit=limit,
+                cursor=cursor,
+            )
+            self._json(HTTPStatus.OK, dict(page))
+        except InvalidQueryError:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": "request.invalid"}},
+            )
+        except AiSavingsFindingQueryError as exc:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": str(exc)}},
+            )
+        except AiSavingsFindingAuthorizationError:
+            self._json(
+                HTTPStatus.FORBIDDEN,
+                {"error": {"code": "policy.denied"}},
+            )
         except PersistenceError:
             self._json(
                 HTTPStatus.SERVICE_UNAVAILABLE,
@@ -1804,6 +1860,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             ),
             "/v1/operations/evidence/retention": "evidence-retention",
             "/v1/ai/economics/allocation": "ai-allocation-report",
+            "/v1/ai/economics/savings-findings": "ai-savings-findings",
             "/v1/actions": "actions-list",
         }
         operation = exact.get(path)

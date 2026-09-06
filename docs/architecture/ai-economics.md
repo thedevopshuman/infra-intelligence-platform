@@ -35,6 +35,9 @@ flowchart LR
     Cost --> Facts["Calculated cost facts"]
     Facts --> Rules["Deterministic savings rules"]
     Rules --> Findings["Evidence-backed findings"]
+    Facts --> ReadAPI["Bounded tenant read API"]
+    Findings --> ReadAPI
+    ReadAPI --> Console["AI Economics console"]
     Facts --> Export["OTLP metrics and logs export"]
     Findings --> Export
     Export --> Backend["Customer-selected telemetry backend"]
@@ -54,6 +57,7 @@ wait for IIP, the Collector, or Grafana.
 | Provider adapter | Translate accepted provider attributes into the canonical usage input without granting authority. |
 | Application service | Enforce deduplication, usage invariants, tenant scope, protected effective-time attribution, pricing selection, and deterministic rule evaluation. |
 | PostgreSQL adapter | Atomically persist immutable usage/attribution/cost/finding records and their outbox events. |
+| Read API | Authorize bounded tenant allocation and newest-first finding reads, bind exact time scope, and revalidate stored results. |
 | OTLP exporter | Publish bounded aggregates and finding summaries without making serving readiness depend on delivery. |
 | Grafana | Query a configured telemetry backend; it is not an accounting store or query authority. |
 
@@ -207,6 +211,14 @@ invoice, quality claim, or permission to switch models. A missing, expired,
 scope-mismatched, or test-only-in-production suitability report produces no
 finding. Persistence reloads the stored report and every cited usage and cost
 fact before committing the recommendation.
+
+The console never recomputes these rules. It requests committed findings by a
+half-open `evaluatedAt` interval through `ai-economics:read`. The page is newest
+first, capped at 100 records, and uses an opaque cursor bound to the
+authenticated tenant and exact interval. Evidence identifiers stay opaque;
+their owning read surface performs a separate authorization decision. The
+console shows one current opportunity as advisory and preserves calculated,
+unpriced, and unresolved monetary states.
 
 After persistence, the same worker offers bounded current-window aggregates
 to the existing OTLP metrics runtime. It reports request/token volume, meter

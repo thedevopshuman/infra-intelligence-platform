@@ -17,6 +17,7 @@ from .models import (
     ActionWorkflow,
     ActionWorkflowPage,
     AiAllocationReport,
+    AiSavingsFindingPage,
     CollectorQueueLossReport,
     ConsoleAuthenticationConfiguration,
     ContextEvidenceRequest,
@@ -483,6 +484,23 @@ class Client:
         query = urlencode({"start": start, "end": end, "groupBy": group_by})
         return AiAllocationReport.from_dict(
             self._get(f"/v1/ai/economics/allocation?{query}")
+        )
+
+    def list_ai_savings_findings(
+        self,
+        *,
+        start: str,
+        end: str,
+        limit: int = 20,
+        cursor: Optional[str] = None,
+    ) -> AiSavingsFindingPage:
+        """List committed advisory AI savings findings in one bounded interval."""
+
+        query = {"start": start, "end": end, "limit": str(limit)}
+        if cursor is not None:
+            query["cursor"] = cursor
+        return AiSavingsFindingPage.from_dict(
+            self._get(f"/v1/ai/economics/savings-findings?{urlencode(query)}")
         )
 
     def open_plugin_session(self, command: Mapping[str, Any]) -> PluginSession:

@@ -263,6 +263,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "policy-engine-compatibility-report.json",
     ),
     "page-info.schema.json": ("page-info.json",),
+    "ai-savings-finding-page.schema.json": ("ai-savings-finding-page.json",),
     "resource-collection-request.schema.json": ("resource-collection-request.json",),
     "resource-collection-result.schema.json": ("resource-collection-result.json",),
     "resource-neighborhood.schema.json": ("resource-neighborhood.json",),

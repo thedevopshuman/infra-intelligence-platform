@@ -64,9 +64,11 @@ One dashboard must answer:
 The provisioned Grafana dashboard remains the V0 cross-window and saving view.
 The same API image now provides a read-only AI Economics console for bounded
 current-window usage, calculated cost, protected application/team allocation,
-generation provenance, and incomplete coverage. It intentionally does not
-invent a saving when no public evidence-backed finding contract is available
-to that surface.
+generation provenance, incomplete coverage, and one newest committed
+evidence-backed opportunity. Calculated, unpriced, and unresolved savings stay
+distinct; recommendations remain advisory and require validation. If no
+finding exists in the selected interval, the console says so instead of
+inventing one.
 
 The first supported profile is metadata-only Bedrock `Converse` and
 `ConverseStream` traffic using on-demand pricing for one explicitly configured

@@ -245,6 +245,23 @@ The PostgreSQL adapter reloads the complete exact-scope cohort, every cited
 usage and cost fact, and recalculates the formula before committing. A forged,
 partial, cross-tenant, stale-scope, or differently priced result fails closed.
 
+## Read committed findings
+
+Authenticated operators with `ai-economics:read` can list findings without
+triggering an evaluation:
+
+```text
+GET /v1/ai/economics/savings-findings?start=2026-09-05T00%3A00%3A00Z&end=2026-09-06T00%3A00%3A00Z&limit=20
+```
+
+The interval is half open over `metadata.evaluatedAt` and may not exceed 31
+days. Results are newest first. Follow `spec.page.nextCursor` with the exact
+same start and end values; the cursor is tenant- and interval-bound. The API
+returns complete immutable finding records, but does not dereference their
+opaque evidence IDs. A calculated amount remains an estimate, an unpriced or
+unresolved finding remains non-numeric, and every recommendation still
+requires validation.
+
 ## Helm enablement
 
 Store the profile wrapper in an existing Secret and reference only the Secret

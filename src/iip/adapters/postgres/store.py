@@ -45,6 +45,7 @@ from iip.application.ports import (
     ActorContext,
     AiAllocationLedgerQuery,
     AiSavingsCohortQuery,
+    AiSavingsFindingLedgerQuery,
     EventDeliverySloState,
     EventDeliveryState,
     OutboxMessage,
@@ -59,6 +60,9 @@ from iip.application.ports import (
     StoredEvent,
 )
 from iip.application.query_ai_allocations import validate_ai_allocation_ledger_query
+from iip.application.query_ai_savings import (
+    validate_ai_savings_finding_ledger_query,
+)
 from iip.domain.models import (
     ContractError,
     ObservationDisposition,
@@ -1255,6 +1259,49 @@ class PostgresResourceStore:
             )
             for row in rows
         )
+
+    @_translate_database_errors
+    def list_ai_savings_findings(
+        self,
+        actor: ActorContext,
+        query: AiSavingsFindingLedgerQuery,
+    ) -> tuple[Mapping[str, object], ...]:
+        """Read a bounded newest-first page of exact-tenant findings."""
+
+        validate_ai_savings_finding_ledger_query(actor, query)
+        parameters: tuple[object, ...] = (
+            actor.tenant_id,
+            query.start,
+            query.end,
+        )
+        cursor_clause = ""
+        if (
+            query.before_evaluated_at is not None
+            and query.before_finding_id is not None
+        ):
+            cursor_clause = (
+                "AND (evaluated_at, finding_id) < (%s::timestamptz, %s)"
+            )
+            parameters += (
+                query.before_evaluated_at,
+                query.before_finding_id,
+            )
+        parameters += (query.limit,)
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT document
+                FROM iip.ai_savings_findings
+                WHERE tenant_id = %s
+                  AND evaluated_at >= %s
+                  AND evaluated_at < %s
+                  {cursor_clause}
+                ORDER BY evaluated_at DESC, finding_id DESC
+                LIMIT %s
+                """,
+                parameters,
+            ).fetchall()
+        return tuple(row["document"] for row in rows)
 
     @_translate_database_errors
     def commit_ai_savings_batch(

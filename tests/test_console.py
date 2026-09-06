@@ -178,6 +178,8 @@ class ConsoleHttpTests(unittest.TestCase):
         self.assertIn("They are not provider invoices", console)
         self.assertIn("Unpriced", console)
         self.assertIn("Attribution pending", console)
+        self.assertIn("Evidence-backed opportunity", console)
+        self.assertIn("Recommendations appear only after", console)
 
         handler = object.__new__(ApiHandler)
         handler.path = "/console/app.js"
@@ -188,7 +190,9 @@ class ConsoleHttpTests(unittest.TestCase):
 
         script = handler.wfile.getvalue().decode("utf-8")
         self.assertIn("validateAiAllocationReport", script)
+        self.assertIn("validateAiSavingsFindingPage", script)
         self.assertIn("/v1/ai/economics/allocation?", script)
+        self.assertIn("/v1/ai/economics/savings-findings?", script)
         self.assertIn(
             'document.metadata.tenantId !== state.session?.metadata?.tenantId',
             script,
@@ -199,6 +203,7 @@ class ConsoleHttpTests(unittest.TestCase):
         self.assertIn('value.costBasis === "calculated-estimate"', script)
         self.assertIn("BigInt(money.totalSubunits)", script)
         self.assertIn("ai.allocation.not-configured", script)
+        self.assertIn("Evidence access and any action require separate authority", script)
         self.assertNotIn('api("/v1/traces', script)
 
     def test_session_requires_authentication(self) -> None:

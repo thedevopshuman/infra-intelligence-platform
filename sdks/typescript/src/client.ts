@@ -7,6 +7,7 @@ import type {
   ActionWorkflow,
   ActionWorkflowPage,
   AiAllocationReport,
+  AiSavingsFindingPage,
   ApiErrorBody,
   ContextEvidenceRequest,
   ConsoleAuthenticationConfiguration,
@@ -511,6 +512,23 @@ export class InfrastructureIntelligenceClient {
     });
     return this.get<AiAllocationReport>(
       `/v1/ai/economics/allocation?${query}`,
+    );
+  }
+
+  async listAiSavingsFindings(options: {
+    start: string;
+    end: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<AiSavingsFindingPage> {
+    const query = new URLSearchParams({
+      start: options.start,
+      end: options.end,
+      limit: String(options.limit ?? 20),
+    });
+    if (options.cursor) query.set("cursor", options.cursor);
+    return this.get<AiSavingsFindingPage>(
+      `/v1/ai/economics/savings-findings?${query}`,
     );
   }
 

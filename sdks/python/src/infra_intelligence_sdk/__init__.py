@@ -19,6 +19,7 @@ from .models import (
     AiPriceCatalogQualificationPolicy,
     AiPriceCatalogQualificationReport,
     AiSavingsFinding,
+    AiSavingsFindingPage,
     AiUsageRecord,
     AiUsageAttributionRecord,
     AwsBedrockPriceCatalogImportPolicy,
@@ -129,6 +130,7 @@ __all__ = [
     "AiPriceCatalogQualificationPolicy",
     "AiPriceCatalogQualificationReport",
     "AiSavingsFinding",
+    "AiSavingsFindingPage",
     "AiUsageRecord",
     "AiUsageAttributionRecord",
     "AwsBedrockPriceCatalogImportPolicy",
@@ -227,4 +229,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.61.0"
+__version__ = "0.62.0"

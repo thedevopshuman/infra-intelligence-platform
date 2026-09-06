@@ -673,7 +673,7 @@ export interface AiSavingsFinding {
       candidateModelId?: string;
       region: string;
       serviceName: string;
-      deploymentEnvironment?: string;
+      deploymentEnvironment: string;
     };
     finding: {
       category: AiSavingsRule;
@@ -692,6 +692,17 @@ export interface AiSavingsFinding {
       requiresValidation: true;
     };
     evidenceRefs: AiSavingsEvidenceRef[];
+  };
+}
+
+export interface AiSavingsFindingPage {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiSavingsFindingPage";
+  metadata: { tenantId: string; generatedAt: string };
+  spec: {
+    scope: { start: string; end: string };
+    items: AiSavingsFinding[];
+    page: PageInfo;
   };
 }
 

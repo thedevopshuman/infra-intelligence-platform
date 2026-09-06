@@ -129,3 +129,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0123](0123-customer-control-plane-continuity-qualification.md) | Accepted | Bind sustained external release probes to one explicit PDB-governed API pod Eviction |
 | [0124](0124-additive-customer-deployment-qualification.md) | Accepted | Bind live preflight, installed health, ingress, and continuity into one narrow customer-cluster report |
 | [0125](0125-bounded-fixed-rate-control-plane-load-qualification.md) | Accepted | Measure one exact external identity-read objective with bounded fixed-rate traffic and minimized evidence |
+| [0126](0126-bounded-ai-savings-finding-read-model.md) | Accepted | Expose committed AI savings findings through a bounded tenant and interval-scoped read model |

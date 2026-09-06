@@ -3,7 +3,7 @@ jsonschema[format-nongpl]==4.25.1
 # Runtime PostgreSQL adapter and integration-test driver.
 psycopg[binary]==3.3.4
 # Production OIDC/JWKS signature verification.
-cryptography==49.0.0
+cryptography==50.0.1
 PyJWT==2.13.0
 # Stable runtime OpenTelemetry metrics SDK, OTLP/HTTP exporter, and receiver protobufs.
 googleapis-common-protos==1.75.1

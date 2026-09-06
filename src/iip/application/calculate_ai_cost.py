@@ -14,7 +14,7 @@ from iip.application.ports import ActorContext, AiEconomicsLedger, Clock
 from iip.domain.models import PlatformEvent
 
 
-ENGINE_VERSION = "0.1.0"
+ENGINE_VERSION = "0.2.0"
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
 _MILLION = 1_000_000
 _TENANT_ID = re.compile(r"[A-Za-z0-9._-]{1,128}")
@@ -49,12 +49,18 @@ _RATE_FIELDS = (
     "nonReasoningOutputTokens",
     "reasoningOutputTokens",
 )
-_LINE_CATEGORIES = (
+_DETAILED_LINE_CATEGORIES = (
     "uncached-input-tokens",
     "cache-read-input-tokens",
     "cache-write-input-tokens",
     "non-reasoning-output-tokens",
     "reasoning-output-tokens",
+)
+_AGGREGATE_LINE_CATEGORIES = (
+    "uncached-input-tokens",
+    "cache-read-input-tokens",
+    "cache-write-input-tokens",
+    "aggregate-output-tokens",
 )
 _TIERS = frozenset({"default", "standard", "flex", "priority", "reserved", "unknown"})
 _ROUTING = frozenset({"in-region", "geographic", "global", "unknown"})
@@ -409,12 +415,15 @@ def calculate_ai_cost_record(
             "warnings": sorted(warnings + ["cost-unresolved"]),
         }
     elif usage["completeness"] != "complete" or usage["missing_fields"]:
-        result = {
-            "costStatus": "unpriced",
-            "coverage": "partial",
-            "reasonCode": "missing-usage",
-            "warnings": sorted(warnings + ["cost-unresolved"]),
-        }
+        if _aggregate_output_pricing_is_exact(matches[0], usage):
+            result = _priced_result(catalog, matches[0], usage, warnings)
+        else:
+            result = {
+                "costStatus": "unpriced",
+                "coverage": "partial",
+                "reasonCode": "missing-usage",
+                "warnings": sorted(warnings + ["cost-unresolved"]),
+            }
     else:
         result = _priced_result(catalog, matches[0], usage, warnings)
 
@@ -716,24 +725,47 @@ def _priced_result(
     reasoning = usage["reasoningOutputTokens"]
     assert all(
         isinstance(item, int)
-        for item in (input_tokens, output_tokens, cache_read, cache_write, reasoning)
+        for item in (input_tokens, output_tokens, cache_read, cache_write)
     )
     uncached = input_tokens - cache_read - cache_write  # type: ignore[operator]
-    non_reasoning = output_tokens - reasoning  # type: ignore[operator]
-    if uncached < 0 or non_reasoning < 0:
+    if uncached < 0:
         return {
             "costStatus": "unpriced",
             "coverage": "none",
             "reasonCode": "invalid-breakdown",
             "warnings": sorted(warnings + ["cost-unresolved"]),
         }
-    observed = (input_tokens, cache_read, cache_write, output_tokens, reasoning)
-    billable = (uncached, cache_read, cache_write, non_reasoning, reasoning)
+    if reasoning is None:
+        assert _aggregate_output_pricing_is_exact(entry, usage)
+        categories = _AGGREGATE_LINE_CATEGORIES
+        rate_names = (
+            "uncachedInputTokens",
+            "cacheReadInputTokens",
+            "cacheWriteInputTokens",
+            "nonReasoningOutputTokens",
+        )
+        observed = (input_tokens, cache_read, cache_write, output_tokens)
+        billable = (uncached, cache_read, cache_write, output_tokens)
+        warnings = warnings + ["aggregate-output-priced-at-equivalent-rates"]
+    else:
+        assert isinstance(reasoning, int)
+        non_reasoning = output_tokens - reasoning  # type: ignore[operator]
+        if non_reasoning < 0:
+            return {
+                "costStatus": "unpriced",
+                "coverage": "none",
+                "reasonCode": "invalid-breakdown",
+                "warnings": sorted(warnings + ["cost-unresolved"]),
+            }
+        categories = _DETAILED_LINE_CATEGORIES
+        rate_names = _RATE_FIELDS
+        observed = (input_tokens, cache_read, cache_write, output_tokens, reasoning)
+        billable = (uncached, cache_read, cache_write, non_reasoning, reasoning)
     lines: list[Mapping[str, object]] = []
     total = 0
     for category, rate_name, seen, quantity in zip(
-        _LINE_CATEGORIES,
-        _RATE_FIELDS,
+        categories,
+        rate_names,
         observed,
         billable,
     ):
@@ -768,6 +800,29 @@ def _priced_result(
     }
 
 
+def _aggregate_output_pricing_is_exact(
+    entry: AiPriceEntry,
+    usage: Mapping[str, object],
+) -> bool:
+    """Return true only when one absent output subset cannot change cost."""
+
+    return (
+        usage["completeness"] == "partial"
+        and usage["missing_fields"] == ("reasoningOutputTokens",)
+        and all(
+            isinstance(usage[name], int)
+            for name in (
+                "inputTokens",
+                "outputTokens",
+                "cacheReadInputTokens",
+                "cacheWriteInputTokens",
+            )
+        )
+        and entry.rates["nonReasoningOutputTokens"]
+        == entry.rates["reasoningOutputTokens"]
+    )
+
+
 def _validate_cost_result(value: object) -> None:
     if not isinstance(value, dict):
         raise ValueError
@@ -792,7 +847,7 @@ def _validate_cost_result(value: object) -> None:
             raise ValueError
         total = _safe_integer(result["totalSubunits"])
         lines = result["lines"]
-        if not isinstance(lines, list) or len(lines) != 5:
+        if not isinstance(lines, list) or len(lines) not in (4, 5):
             raise ValueError
         categories: list[str] = []
         amount_sum = 0
@@ -814,7 +869,11 @@ def _validate_cost_result(value: object) -> None:
             _matched(line["catalogEntryId"], _ENTRY_ID)
             _safe_integer(line["priceSubunitsPerMillionTokens"])
             amount_sum += _safe_integer(line["amountSubunits"])
-        if tuple(categories) != _LINE_CATEGORIES or amount_sum != total:
+        category_tuple = tuple(categories)
+        if category_tuple not in {
+            _DETAILED_LINE_CATEGORIES,
+            _AGGREGATE_LINE_CATEGORIES,
+        } or amount_sum != total:
             raise ValueError
     elif status in {"unpriced", "ambiguous"}:
         result = _closed(
@@ -847,6 +906,12 @@ def _validate_cost_result(value: object) -> None:
     if "calculated-cost-not-invoice" not in warning_set:
         raise ValueError
     if status == "priced" and "cost-unresolved" in warning_set:
+        raise ValueError
+    aggregate_warning = "aggregate-output-priced-at-equivalent-rates"
+    if status == "priced" and (
+        (tuple(categories) == _AGGREGATE_LINE_CATEGORIES)
+        != (aggregate_warning in warning_set)
+    ):
         raise ValueError
     if status != "priced" and "cost-unresolved" not in warning_set:
         raise ValueError

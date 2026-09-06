@@ -107,9 +107,10 @@ integer half-up rounding.
 One record references one usage record and one exact catalog version/source
 hash. `costBasis` is always `calculated-estimate`.
 
-`priced` means one catalog entry matched and every required meter was resolved.
-Each line retains observed quantity, non-overlapping billable quantity, rate,
-entry ID, and amount; `totalSubunits` equals the sum of line amounts.
+`priced` means one catalog entry matched and every charge was resolved without
+guessing a quantity or rate. Each line retains observed quantity,
+non-overlapping billable quantity, rate, entry ID, and amount;
+`totalSubunits` equals the sum of line amounts.
 
 `unpriced` means no trustworthy numeric calculation is possible. `ambiguous`
 means multiple applicable catalog entries or another unresolved choice exists.
@@ -132,6 +133,14 @@ uncachedInput = inputTokens - cacheReadInputTokens - cacheWriteInputTokens
 nonReasoningOutput = outputTokens - reasoningOutputTokens
 lineAmount = roundHalfUp(billableQuantity * rate / 1_000_000)
 ```
+
+Cost engine `0.2.0` also accepts one narrow partial shape: only
+`reasoningOutputTokens` is missing and the matched entry's reasoning and
+non-reasoning output rates are exactly equal. The record then uses one
+`aggregate-output-tokens` line for the observed output total instead of
+inventing a split, and carries
+`aggregate-output-priced-at-equivalent-rates`. Different output rates or any
+other missing meter remain `unpriced`. The source usage record remains partial.
 
 ## `AiSavingsFinding`
 

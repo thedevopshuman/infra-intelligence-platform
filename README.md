@@ -272,8 +272,10 @@ adapter; another
 exercises the real OpenAI Python client and official
 chat-completions instrumentation. Both prove receiver normalization and
 asynchronous exporter failure isolation without importing provider SDKs into
-the product image. Missing reasoning or provider cache meters remain unresolved
-rather than becoming zero. A protected, expiry-bound customer Bedrock workflow now
+the product image. Missing meters remain missing rather than becoming zero;
+cost engine `0.2.0` may price aggregate Bedrock output only when the exact
+catalog proves reasoning and non-reasoning rates are equal. A protected,
+expiry-bound customer Bedrock workflow now
 qualifies one explicitly selected live model/region/operation without retaining
 credentials, target identity, prompt, response, request ID, or token counts;
 executing that billable call remains customer-owned. Live OpenAI

@@ -46,7 +46,10 @@ provider attribute and service-specific scope. A separately installed,
 fail-open OpenTelemetry adapter now maps non-zero provider cache meters and
 converts Bedrock's uncached input into OTel total-input semantics without
 reading content or entering the inference path. Absent cache and reasoning
-meters remain unknown. A protected, expiry-bound customer workflow now
+meters remain unknown. Cost engine `0.2.0` can nevertheless price aggregate
+Bedrock output without inventing the reasoning split when the exact catalog
+proves both output rates are equal; differing rates remain unresolved. A
+protected, expiry-bound customer workflow now
 qualifies one explicitly selected live model/region/operation using a dedicated
 temporary-session credentials file and retains no target or content in its
 transportable report; executing the selected billable call remains external.

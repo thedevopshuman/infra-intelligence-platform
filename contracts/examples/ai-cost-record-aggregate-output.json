@@ -2,12 +2,12 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "AiCostRecord",
   "metadata": {
-    "id": "aic_74285ebd2a6ea884556679be5bb26a90",
+    "id": "aic_b51da5abb3858b4fafdbff0e2cf8b28e",
     "tenantId": "local",
     "calculatedAt": "2026-09-05T10:00:03Z"
   },
   "spec": {
-    "usageRecordId": "aiu_0123456789abcdef0123456789abcdef",
+    "usageRecordId": "aiu_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "calculation": {
       "engineVersion": "0.2.0",
       "costBasis": "calculated-estimate",
@@ -47,23 +47,16 @@
           "amountSubunits": 375000
         },
         {
-          "chargeCategory": "non-reasoning-output-tokens",
+          "chargeCategory": "aggregate-output-tokens",
           "observedQuantity": 600,
-          "billableQuantity": 450,
+          "billableQuantity": 600,
           "catalogEntryId": "aws-bedrock.example-foundation-model-v1.us-east-1.on-demand",
           "priceSubunitsPerMillionTokens": 15000000000,
-          "amountSubunits": 6750000
-        },
-        {
-          "chargeCategory": "reasoning-output-tokens",
-          "observedQuantity": 150,
-          "billableQuantity": 150,
-          "catalogEntryId": "aws-bedrock.example-foundation-model-v1.us-east-1.on-demand",
-          "priceSubunitsPerMillionTokens": 15000000000,
-          "amountSubunits": 2250000
+          "amountSubunits": 9000000
         }
       ],
       "warnings": [
+        "aggregate-output-priced-at-equivalent-rates",
         "calculated-cost-not-invoice",
         "test-fixture-pricing"
       ]

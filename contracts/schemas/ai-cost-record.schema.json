@@ -78,7 +78,8 @@
             "cache-read-input-tokens",
             "cache-write-input-tokens",
             "non-reasoning-output-tokens",
-            "reasoning-output-tokens"
+            "reasoning-output-tokens",
+            "aggregate-output-tokens"
           ]
         },
         "observedQuantity": {"$ref": "#/$defs/nonNegativeSafeInteger"},
@@ -108,10 +109,33 @@
         "totalSubunits": {"$ref": "#/$defs/nonNegativeSafeInteger"},
         "lines": {
           "type": "array",
-          "minItems": 5,
+          "minItems": 4,
           "maxItems": 5,
           "uniqueItems": true,
-          "items": {"$ref": "#/$defs/line"}
+          "items": {"$ref": "#/$defs/line"},
+          "oneOf": [
+            {
+              "minItems": 5,
+              "maxItems": 5,
+              "prefixItems": [
+                {"$ref": "#/$defs/line", "properties": {"chargeCategory": {"const": "uncached-input-tokens"}}},
+                {"$ref": "#/$defs/line", "properties": {"chargeCategory": {"const": "cache-read-input-tokens"}}},
+                {"$ref": "#/$defs/line", "properties": {"chargeCategory": {"const": "cache-write-input-tokens"}}},
+                {"$ref": "#/$defs/line", "properties": {"chargeCategory": {"const": "non-reasoning-output-tokens"}}},
+                {"$ref": "#/$defs/line", "properties": {"chargeCategory": {"const": "reasoning-output-tokens"}}}
+              ]
+            },
+            {
+              "minItems": 4,
+              "maxItems": 4,
+              "prefixItems": [
+                {"$ref": "#/$defs/line", "properties": {"chargeCategory": {"const": "uncached-input-tokens"}}},
+                {"$ref": "#/$defs/line", "properties": {"chargeCategory": {"const": "cache-read-input-tokens"}}},
+                {"$ref": "#/$defs/line", "properties": {"chargeCategory": {"const": "cache-write-input-tokens"}}},
+                {"$ref": "#/$defs/line", "properties": {"chargeCategory": {"const": "aggregate-output-tokens"}}}
+              ]
+            }
+          ]
         },
         "warnings": {
           "type": "array",
@@ -122,7 +146,31 @@
           "minContains": 1,
           "maxContains": 1
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "lines": {
+                "contains": {
+                  "required": ["chargeCategory"],
+                  "properties": {"chargeCategory": {"const": "aggregate-output-tokens"}}
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "warnings": {"contains": {"const": "aggregate-output-priced-at-equivalent-rates"}}
+            }
+          },
+          "else": {
+            "properties": {
+              "warnings": {"not": {"contains": {"const": "aggregate-output-priced-at-equivalent-rates"}}}
+            }
+          }
+        }
+      ]
     },
     "unresolvedResult": {
       "type": "object",

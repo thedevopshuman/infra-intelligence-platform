@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "AiSavingsFinding",
   "metadata": {
-    "id": "aif_a80f20ce53c6833a008c552e0e562f98",
+    "id": "aif_2d8b150ba08aff0d4e2c8ae94a9c1010",
     "tenantId": "local",
     "evaluatedAt": "2026-09-05T11:00:00Z"
   },
@@ -62,7 +62,7 @@
         "chargeCategory": "uncached-input-tokens",
         "priceSubunitsPerMillionTokens": 3000000000
       },
-      "costRecordRefs": ["aic_4ca516c7ef66bdad4deae447ae0290cd"]
+      "costRecordRefs": ["aic_74285ebd2a6ea884556679be5bb26a90"]
     },
     "recommendation": {
       "actionCode": "review-context-retention",
@@ -76,7 +76,7 @@
       },
       {
         "type": "ai-cost-record",
-        "id": "aic_4ca516c7ef66bdad4deae447ae0290cd"
+        "id": "aic_74285ebd2a6ea884556679be5bb26a90"
       }
     ]
   }

@@ -177,8 +177,8 @@ database-only; serving workloads never apply schema changes.
 
 The engine chooses `responseModel` when present, otherwise `requestModel`, and
 matches provider, model, region, service tier, routing mode, purchase mode, and
-invocation start time. It uses five non-overlapping token categories and
-integer half-up arithmetic:
+invocation start time. Complete usage uses five non-overlapping token
+categories and integer half-up arithmetic:
 
 ```text
 uncached input = input - cache read - cache write
@@ -186,10 +186,16 @@ non-reasoning output = output - reasoning output
 line amount = floor((quantity * rate + 500000) / 1000000)
 ```
 
-A unique match with complete meters produces `priced`. No match, incomplete
-meters, an invalid subset, or arithmetic beyond the contract's safe integer
-range produces `unpriced` with a reason. Multiple applicable entries produce
-`ambiguous`. Neither unresolved state is converted to numeric zero.
+A unique match with complete meters produces `priced`. Engine `0.2.0` also
+prices a record when only `reasoningOutputTokens` is missing and the exact
+matched catalog rates for reasoning and non-reasoning output are equal. That
+shape uses four lines, with `aggregate-output-tokens` as the output line, and
+carries `aggregate-output-priced-at-equivalent-rates`. It does not invent the
+missing split or change the source usage record. If the two rates differ, or
+another meter is missing, the result remains `unpriced` with partial coverage.
+No match, an invalid subset, or arithmetic beyond the contract's safe integer
+range also produces `unpriced` with a reason. Multiple applicable entries
+produce `ambiguous`. Neither unresolved state is converted to numeric zero.
 
 Exact retries return the existing result and emit no second event. A new
 catalog ID/version intentionally recalculates source usage into new immutable

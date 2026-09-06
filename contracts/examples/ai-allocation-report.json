@@ -23,7 +23,7 @@
         "id": "apc_11111111111111111111111111111111",
         "version": "2026-09-05.1",
         "sourceHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-        "engineVersion": "0.1.0",
+        "engineVersion": "0.2.0",
         "currency": "USD",
         "currencyScale": 9,
         "costBasis": "calculated-estimate"

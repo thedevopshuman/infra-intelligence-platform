@@ -87,6 +87,13 @@ def channel_configuration() -> Mapping[str, object]:
                         "deploymentEnvironment": "ai-finops-demo",
                         "resourceRefs": [],
                     },
+                    {
+                        "otlpName": "aggregate-pricing-probe",
+                        "serviceName": "aggregate-pricing-probe",
+                        "serviceNamespace": "platform-validation",
+                        "deploymentEnvironment": "ai-finops-demo",
+                        "resourceRefs": [],
+                    },
                 ],
                 "models": [CANDIDATE_MODEL, KNOWN_MODEL, UNKNOWN_MODEL],
                 "operations": ["chat"],
@@ -112,7 +119,6 @@ def channel_configuration() -> Mapping[str, object]:
                     "zeroWhenAbsent": [
                         "cacheReadInputTokens",
                         "cacheWriteInputTokens",
-                        "reasoningOutputTokens",
                     ],
                     "reportedBy": "provider",
                 },
@@ -308,7 +314,7 @@ def savings_profile_configuration(anchor: datetime) -> Mapping[str, object]:
             "ruleId": "context-growth",
             "tenantId": "local",
             "catalogId": CATALOG_ID,
-            "costEngineVersion": "0.1.0",
+            "costEngineVersion": "0.2.0",
             "scope": {
                 "provider": provider,
                 "modelId": model_id,
@@ -438,6 +444,7 @@ def _finished_spans(
     region: str = "us-east-1",
     instrumentation_scope: str = INSTRUMENTATION_SCOPE,
     explicit_usage_breakdowns: bool = False,
+    cache_usage_breakdowns: bool = False,
     content_attribute: bool = False,
     retry_counts: tuple[int, int, int, int] = (0, 0, 0, 0),
 ) -> tuple[object, ...]:
@@ -496,14 +503,15 @@ def _finished_spans(
             )
         else:
             attributes["gen_ai.provider.name"] = provider_name
-        if explicit_usage_breakdowns:
+        if explicit_usage_breakdowns or cache_usage_breakdowns:
             attributes.update(
                 {
                     "gen_ai.usage.cache_read.input_tokens": 0,
                     "gen_ai.usage.cache_creation.input_tokens": 0,
-                    "gen_ai.usage.reasoning.output_tokens": 0,
                 }
             )
+        if explicit_usage_breakdowns:
+            attributes["gen_ai.usage.reasoning.output_tokens"] = 0
         if content_attribute:
             attributes["gen_ai.prompt"] = "must-never-cross-iip-boundary"
         started_ns = int(started_at.timestamp() * 1_000_000_000)
@@ -545,6 +553,7 @@ def send_fixture(
         service_name="support-assistant",
         input_tokens=(1200, 1200, 2400, 2400),
         retry_counts=(0, 0, 2, 1),
+        explicit_usage_breakdowns=True,
     )
     unknown = _finished_spans(
         anchor,
@@ -557,7 +566,16 @@ def send_fixture(
         model_id=CANDIDATE_MODEL,
         service_name="support-assistant",
         input_tokens=(1200, 1200, 1200, 1200),
+        explicit_usage_breakdowns=True,
     )[:2]
+    aggregate = _finished_spans(
+        anchor,
+        model_id=KNOWN_MODEL,
+        service_name="aggregate-pricing-probe",
+        service_namespace="platform-validation",
+        input_tokens=(1200, 1200, 1200, 1200),
+        cache_usage_breakdowns=True,
+    )[:1]
     openai = _finished_spans(
         anchor,
         model_id=OPENAI_MODEL,
@@ -570,7 +588,7 @@ def send_fixture(
         explicit_usage_breakdowns=True,
     )
     try:
-        for batch in (known, candidate, unknown):
+        for batch in (known, candidate, unknown, aggregate):
             if exporter.export(batch) is not SpanExportResult.SUCCESS:
                 raise RuntimeError("ai-finops.fixture.export.failed")
         if openai_exporter.export(openai) is not SpanExportResult.SUCCESS:
@@ -746,13 +764,13 @@ def verify_fixture(
     while time.monotonic() < deadline:
         try:
             snapshot = _database_snapshot(database_url)
-            _assert_equal(len(snapshot["usage"]), 14, "usage ledger count")
+            _assert_equal(len(snapshot["usage"]), 15, "usage ledger count")
             _assert_equal(
                 len(snapshot["attributions"]),
-                14,
+                15,
                 "attribution ledger count",
             )
-            _assert_equal(len(snapshot["costs"]), 14, "cost ledger count")
+            _assert_equal(len(snapshot["costs"]), 15, "cost ledger count")
             _assert_equal(len(snapshot["findings"]), 3, "finding ledger count")
             _assert_equal(
                 len(snapshot["suitabilityReports"]),
@@ -777,15 +795,35 @@ def verify_fixture(
             )
             _assert_equal(
                 allocation_statuses.count("unallocated"),
-                4,
+                5,
                 "visible unallocated usage records",
             )
 
             costs = snapshot["costs"]
             assert isinstance(costs, tuple)
             statuses = [item["spec"]["result"]["costStatus"] for item in costs]
-            _assert_equal(statuses.count("priced"), 10, "priced records")
+            _assert_equal(statuses.count("priced"), 11, "priced records")
             _assert_equal(statuses.count("unpriced"), 4, "unpriced records")
+            aggregate_costs = [
+                item
+                for item in costs
+                if "aggregate-output-priced-at-equivalent-rates"
+                in item["spec"]["result"].get("warnings", [])
+            ]
+            _assert_equal(len(aggregate_costs), 1, "aggregate-output priced records")
+            _assert_equal(
+                [
+                    line["chargeCategory"]
+                    for line in aggregate_costs[0]["spec"]["result"]["lines"]
+                ],
+                [
+                    "uncached-input-tokens",
+                    "cache-read-input-tokens",
+                    "cache-write-input-tokens",
+                    "aggregate-output-tokens",
+                ],
+                "aggregate-output cost lines",
+            )
             findings = {
                 item["spec"]["rule"]["id"]: item
                 for item in snapshot["findings"]
@@ -910,7 +948,7 @@ def verify_fixture(
                         "sum(iip_ai_allocation_requests"
                         f'{{iip_ai_allocation_dimension="{dimension}"}})',
                     ),
-                    14.0,
+                    15.0,
                     f"{dimension} allocation coverage",
                 )
                 for protected_id in protected_ids:
@@ -975,9 +1013,9 @@ def verify_fixture(
                     headers={"Authorization": f"Bearer {CONTROL_TOKEN}"},
                 )
                 coverage = report.get("spec", {}).get("coverage", {})
-                _assert_equal(coverage.get("usageRecords"), 14, "API usage coverage")
+                _assert_equal(coverage.get("usageRecords"), 15, "API usage coverage")
                 _assert_equal(coverage.get("allocatedRecords"), 10, "API allocated coverage")
-                _assert_equal(coverage.get("unallocatedRecords"), 4, "API unallocated coverage")
+                _assert_equal(coverage.get("unallocatedRecords"), 5, "API unallocated coverage")
                 groups = report.get("spec", {}).get("groups", [])
                 allocated_ids = {
                     item.get("dimension", {}).get("id")

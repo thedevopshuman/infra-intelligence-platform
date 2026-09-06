@@ -85,12 +85,15 @@ make test-ai-finops PYTHON=.venv/bin/python
 ```
 
 It validates Collector and Prometheus configuration before startup, then
-asserts fourteen unique usage facts, ten priced and four unpriced cost facts,
+asserts fifteen unique usage facts, eleven priced and four unpriced cost facts,
 one immutable workload suitability report, two immutable application/team
 mappings, and three findings: context growth, retry amplification, and a
-qualified candidate/reference model-cost difference. It also verifies exact
-current-window, retry, model-cost, and allocation aggregates; Bedrock/OpenAI
-provider coverage; honest unresolved retry savings; visible
+qualified candidate/reference model-cost difference. One cache-explicit
+Bedrock-shaped record deliberately omits only reasoning output; its equal
+catalog output rates produce a four-line `aggregate-output-tokens` result and
+explicit rate-equivalence warning without manufacturing the missing split. The
+gate also verifies exact current-window, retry, model-cost, and allocation
+aggregates; Bedrock/OpenAI provider coverage; honest unresolved retry savings; visible
 unpriced/unallocated coverage; dashboard provisioning; Loki readiness; and
 privacy-safe labels.
 

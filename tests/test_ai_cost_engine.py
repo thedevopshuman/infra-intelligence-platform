@@ -30,6 +30,7 @@ from iip.application.calculate_ai_cost import (
     AiCostConfigurationError,
     InvalidAiCostInputError,
     calculate_ai_cost_record,
+    validate_ai_cost_record,
     validate_ai_price_catalog,
 )
 from iip.application.ports import ActorContext, PersistenceError
@@ -210,6 +211,44 @@ class AiCostCalculationTests(unittest.TestCase):
             partial,
             calculated_at="2026-09-05T10:00:03Z",
         )
+        result = record["spec"]["result"]
+        self.assertEqual(result["costStatus"], "priced")
+        self.assertEqual(result["coverage"], "complete")
+        self.assertEqual(result["totalSubunits"], 15_735_000)
+        self.assertEqual(
+            [line["chargeCategory"] for line in result["lines"]],
+            [
+                "uncached-input-tokens",
+                "cache-read-input-tokens",
+                "cache-write-input-tokens",
+                "aggregate-output-tokens",
+            ],
+        )
+        self.assertIn(
+            "aggregate-output-priced-at-equivalent-rates",
+            result["warnings"],
+        )
+        schema = json.loads(
+            (ROOT / "contracts" / "schemas" / "ai-cost-record.schema.json").read_text()
+        )
+        self.assertEqual(
+            validate_schemas.instance_validation_errors(
+                schema,
+                record,
+                label="aggregate-output cost",
+            ),
+            [],
+        )
+
+        unequal_rates = copy.deepcopy(self.catalog_document)
+        unequal_rates["spec"]["entries"][0]["rates"]["reasoningOutputTokens"][
+            "priceSubunitsPerMillionTokens"
+        ] += 1
+        record, _ = calculate_ai_cost_record(
+            validate_ai_price_catalog(unequal_rates),
+            partial,
+            calculated_at="2026-09-05T10:00:03Z",
+        )
         self.assertEqual(record["spec"]["result"]["reasonCode"], "missing-usage")
         self.assertEqual(record["spec"]["result"]["coverage"], "partial")
 
@@ -302,6 +341,28 @@ class AiCostCalculationTests(unittest.TestCase):
                 inconsistent,
                 calculated_at="2026-09-05T10:00:03Z",
             )
+
+    def test_aggregate_output_requires_its_equivalence_warning(self) -> None:
+        partial = copy.deepcopy(self.usage)
+        del partial["spec"]["usage"]["reasoningOutputTokens"]
+        partial["spec"]["usage"]["completeness"] = "partial"
+        partial["spec"]["usage"]["missingFields"] = ["reasoningOutputTokens"]
+        record, _ = calculate_ai_cost_record(
+            self.catalog,
+            partial,
+            calculated_at="2026-09-05T10:00:03Z",
+        )
+        validate_ai_cost_record(record)
+
+        altered = copy.deepcopy(record)
+        altered["spec"]["result"]["warnings"].remove(
+            "aggregate-output-priced-at-equivalent-rates"
+        )
+        with self.assertRaisesRegex(
+            InvalidAiCostInputError,
+            "ai.cost.record.invalid",
+        ):
+            validate_ai_cost_record(altered)
 
 
 class AiCostLedgerAndWorkerTests(unittest.TestCase):

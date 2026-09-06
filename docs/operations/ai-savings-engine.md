@@ -50,7 +50,7 @@ most 1,000 profiles, and each `(tenantId, profileId)` pair must be unique:
       "ruleId": "context-growth",
       "tenantId": "tenant-a",
       "catalogId": "apc_11111111111111111111111111111111",
-      "costEngineVersion": "0.1.0",
+      "costEngineVersion": "0.2.0",
       "scope": {
         "provider": "aws.bedrock",
         "modelId": "example.foundation-model-v1:0",

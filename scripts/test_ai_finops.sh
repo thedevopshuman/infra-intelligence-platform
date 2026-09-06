@@ -121,4 +121,4 @@ if ! PYTHONPATH=src:sdks/python/src "$IIP_TEST_PYTHON" \
     exit 1
 fi
 
-echo "Bedrock- and OpenAI-shaped OTLP usage, protected attribution, data-driven cost, visible unpriced/unallocated coverage, evidence-backed saving, and one provider-neutral Grafana dashboard passed"
+echo "Bedrock- and OpenAI-shaped OTLP usage, rate-equivalent aggregate-output cost, protected attribution, visible unpriced/unallocated coverage, evidence-backed saving, and one provider-neutral Grafana dashboard passed"

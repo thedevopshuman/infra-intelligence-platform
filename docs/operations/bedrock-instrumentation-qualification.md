@@ -65,8 +65,9 @@ Bedrock does not expose the provider-neutral reasoning-output subset in this
 profile. IIP therefore records the normalized usage as `partial` and does not
 claim that the usage fact alone is exact-cost eligible. The cost engine must
 leave it unresolved unless the exact selected catalog rates make the missing
-split mathematically irrelevant; that separate behavior is not part of this
-qualification.
+split mathematically irrelevant. Engine `0.2.0` represents that case with an
+explicit aggregate-output line and rate-equivalence warning; that separate
+cost result is not part of this instrumentation qualification.
 
 The synthetic AI FinOps demo uses an explicitly controlled fixture profile to
 exercise full cost arithmetic. That proof and this provider-interoperability

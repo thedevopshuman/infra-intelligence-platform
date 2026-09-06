@@ -114,6 +114,14 @@ data, does not include discounts or commitments unless represented by an exact
 catalog entry, and can be recomputed without altering the source usage record.
 Future reconciliation with provider billing creates separate variance facts.
 
+Cost engine `0.2.0` can close one otherwise partial calculation without
+inventing telemetry. When reasoning output is the only missing quantity and
+the exact matched catalog entry gives reasoning and non-reasoning output the
+same integer rate, it prices the observed output total as one aggregate line.
+Different output rates remain unresolved. The explicit aggregate category,
+warning, catalog source binding, and new engine lineage preserve how the
+estimate was obtained.
+
 Before production promotion, the offline catalog qualifier can bind one exact
 catalog to a protected required-scope policy and prove source freshness,
 publication order, non-overlapping effective prices, and unique required
@@ -257,7 +265,9 @@ proves the official span stays open until final metadata is consumed. The
 receiver normalizes the provider alias with conflict rejection; the separately
 installed pinned usage adapter adds non-zero cache meters and canonical total
 input without reading content. Reasoning remains missing, so neither usage
-profile alone is promoted to exact-cost eligibility. A separately enabled
+profile alone proves cost eligibility. Cost engine `0.2.0` may separately
+resolve the amount only when the matched catalog proves output-rate
+equivalence. A separately enabled
 customer gate now binds one reviewed live
 model/region/operation to a clean source and immutable release image, supplies
 temporary AWS session credentials through one protected read-only file, and

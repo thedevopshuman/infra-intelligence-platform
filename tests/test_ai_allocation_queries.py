@@ -275,7 +275,7 @@ class AiAllocationReportTests(unittest.TestCase):
                     policy_id=self.policy["metadata"]["id"],
                     attribution_engine_version="0.1.0",
                     catalog_id=self.catalog["metadata"]["id"],
-                    cost_engine_version="0.1.0",
+                    cost_engine_version="0.2.0",
                     limit=101,
                 ),
             )

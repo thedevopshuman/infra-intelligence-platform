@@ -532,7 +532,8 @@ export type AiChargeCategory =
   | "cache-read-input-tokens"
   | "cache-write-input-tokens"
   | "non-reasoning-output-tokens"
-  | "reasoning-output-tokens";
+  | "reasoning-output-tokens"
+  | "aggregate-output-tokens";
 
 export interface AiCostLine {
   chargeCategory: AiChargeCategory;

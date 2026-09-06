@@ -90,6 +90,22 @@ class AiEconomicsContractTests(unittest.TestCase):
                 self.assertEqual([], errors)
                 self.assertEqual(example, model_type.from_dict(example).to_dict())
 
+        aggregate_cost = load(EXAMPLES / "ai-cost-record-aggregate-output.json")
+        aggregate_schema = load(SCHEMAS / "ai-cost-record.schema.json")
+        self.assertEqual(
+            [],
+            list(
+                Draft202012Validator(
+                    aggregate_schema,
+                    format_checker=checker,
+                ).iter_errors(aggregate_cost)
+            ),
+        )
+        self.assertEqual(
+            aggregate_cost,
+            AiCostRecord.from_dict(aggregate_cost).to_dict(),
+        )
+
         errors: list[str] = []
         validate_ai_economics_examples(example_documents(), errors)
         self.assertEqual([], errors)

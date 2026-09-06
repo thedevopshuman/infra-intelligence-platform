@@ -236,7 +236,10 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "ai-price-catalog-qualification-report.schema.json": (
         "ai-price-catalog-qualification-report.json",
     ),
-    "ai-cost-record.schema.json": ("ai-cost-record.json",),
+    "ai-cost-record.schema.json": (
+        "ai-cost-record.json",
+        "ai-cost-record-aggregate-output.json",
+    ),
     "ai-savings-finding.schema.json": (
         "ai-savings-finding.json",
         "ai-retry-savings-finding.json",

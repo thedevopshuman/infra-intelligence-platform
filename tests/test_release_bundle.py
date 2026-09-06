@@ -117,6 +117,11 @@ def write_oci_fixture(
                     "size": empty_size,
                 },
                 "layers": layers,
+                "subject": {
+                    "mediaType": OCI_MANIFEST,
+                    "digest": image_digest,
+                    "size": image_size,
+                },
             }
         )
         descriptors.append(

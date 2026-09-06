@@ -451,6 +451,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0115-tenant-bound-additive-evidence-redaction.md",
     "docs/decisions/0116-executable-oidc-browser-pkce-evidence.md",
     "docs/decisions/0117-exact-release-index-publication.md",
+    "docs/decisions/0118-oci-subject-bound-buildkit-attestations.md",
     "scripts/release_publication.py",
     "scripts/run_release_publication_compatibility.py",
     "scripts/import_aws_bedrock_price_catalog.py",

@@ -191,6 +191,30 @@ class AiInvocationObservationTests(unittest.TestCase):
             complete["spec"]["cost"]["pricedCost"]["totalSubunits"],
             15_735_000,
         )
+        self.assertEqual(
+            complete["spec"]["sources"]["attribution"]["documentDigest"],
+            "sha256:"
+            + hashlib.sha256(
+                json.dumps(
+                    self.policy,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=True,
+                ).encode("utf-8")
+            ).hexdigest(),
+        )
+        self.assertEqual(
+            complete["spec"]["sources"]["pricing"]["documentDigest"],
+            "sha256:"
+            + hashlib.sha256(
+                json.dumps(
+                    self.catalog,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=True,
+                ).encode("utf-8")
+            ).hexdigest(),
+        )
         serialized = json.dumps(complete)
         self.assertNotIn(TRACE_ID, serialized)
         self.assertNotIn(SPAN_ID, serialized)

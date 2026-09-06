@@ -283,10 +283,20 @@ OTLP/HTTP endpoint and writes trace/span identity only to an ephemeral
 owner-only file. A privileged tenant-scoped POST operation then resolves that
 pair against the active usage, attribution, and cost generations. Its response
 replaces trace/span values with a digest and revalidates every immutable record
-and source binding. Prometheus and Grafana deliberately remain aggregate views;
-exact invocation identity never becomes a metric label. This makes the final
-customer-flow qualifier possible without converting the dashboard into an
-accounting or trace store.
+and source binding, including canonical active-policy and active-catalog
+document digests. Prometheus and Grafana deliberately remain aggregate views;
+exact invocation identity never becomes a metric label.
+
+The final customer-flow harness now composes those boundaries outside the
+serving workloads. It makes one explicitly enabled live call, consumes the
+owner-only correlation, polls exact ledger progress, requires the expected
+protected ownership and production-qualified catalog, observes one
+protected-application aggregate increment, and verifies the provisioned V0
+dashboard panels. Its transportable report replaces customer targets,
+attribution, tenant, trace/span, model, region, amount, and credential data with
+exact digests and bounded measurements. The executable mechanism does not
+upgrade repository fixtures into a customer claim; the selected customer must
+run the billable gate in its environment.
 
 The exact pinned Python botocore `Converse` and `ConverseStream` profiles now
 have separate source-bound no-network evidence. They exposed three upstream

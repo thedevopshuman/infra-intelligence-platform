@@ -108,15 +108,19 @@ evidence is not yet proof that one live invocation reached the deployed ledger,
 cost engine, and Grafana dashboard; see the [customer AI FinOps prerequisite
 runbook](docs/operations/customer-ai-finops-prerequisites.md).
 
-The supporting exact-correlation path is now executable. The pinned Bedrock
-qualifier can export its actual metadata-only span to a customer OTLP endpoint
-and create an ephemeral owner-only correlation file. A new platform-admin and
-policy-gated POST operation observes that exact tenant-bound invocation through
-the active usage, attribution, and calculated-cost generations while returning
-only a correlation digest and revalidated facts. Trace/span identity never
-enters URLs, responses, Prometheus labels, or Grafana. The final customer-flow
-orchestrator and retained minimized report remain release work; see the [AI
-invocation observation contract](docs/specifications/ai-invocation-observation-contract.md).
+The complete same-invocation customer gate is now executable. The pinned
+Bedrock qualifier exports its actual metadata-only span to the selected OTLP
+endpoint and creates an ephemeral owner-only correlation file. A platform-admin
+and policy-gated POST operation observes that exact tenant-bound invocation
+through the active usage, attribution, and calculated-cost generations. The
+host-side orchestrator additionally requires the protected-application
+Prometheus aggregate to advance and verifies the required Grafana dashboard
+panels. Its portable report retains only exact source/record/target digests,
+bounded counts, timing, and fixed limitations; trace/span identity never enters
+URLs, responses, Prometheus labels, Grafana, or that report. The mechanism is
+repository-verified; executing the selected billable customer call remains an
+external release gate. See the [customer AI FinOps flow qualification
+runbook](docs/operations/customer-ai-finops-flow-qualification.md).
 
 A separate continuity gate runs at least five
 minutes of direct verified-HTTPS liveness, readiness, authentication, and exact
@@ -316,6 +320,7 @@ streaming/private-endpoint behavior and invoice qualification remain. See the
 [customer Bedrock qualification](docs/operations/customer-bedrock-qualification.md),
 [customer AI FinOps prerequisites](docs/operations/customer-ai-finops-prerequisites.md),
 [exact AI invocation observation](docs/specifications/ai-invocation-observation-contract.md),
+[customer AI FinOps flow qualification](docs/operations/customer-ai-finops-flow-qualification.md),
 [OpenAI instrumentation qualification](docs/operations/openai-instrumentation-qualification.md),
 [telemetry contract](docs/specifications/ai-economics-telemetry-contract.md),
 [product direction](docs/product/ai-finops-vision.md),

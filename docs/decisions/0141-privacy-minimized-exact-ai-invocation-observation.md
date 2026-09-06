@@ -61,4 +61,5 @@ store.
 
 This decision does not establish invoice agreement, provider billing
 reconciliation, production availability, or a complete customer end-to-end
-qualification by itself.
+qualification by itself. [ADR 0142](0142-customer-ai-finops-same-invocation-qualification.md)
+composes this narrow serving operation into the external same-invocation gate.

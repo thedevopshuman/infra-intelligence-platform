@@ -161,6 +161,17 @@ REQUIRED_PATHS = (
     "docs/operations/customer-ai-finops-prerequisites.md",
     "scripts/qualify_customer_ai_finops.py",
     "tests/test_customer_ai_finops_prerequisites.py",
+    "docs/decisions/0142-customer-ai-finops-same-invocation-qualification.md",
+    "docs/specifications/customer-ai-finops-flow-qualification-contract.md",
+    "contracts/schemas/customer-ai-finops-flow-qualification-profile.schema.json",
+    "contracts/schemas/customer-ai-finops-flow-run-evidence.schema.json",
+    "contracts/schemas/customer-ai-finops-flow-qualification-report.schema.json",
+    "contracts/examples/customer-ai-finops-flow-qualification-profile.json",
+    "contracts/examples/customer-ai-finops-flow-run-evidence.json",
+    "contracts/examples/customer-ai-finops-flow-qualification-report.json",
+    "docs/operations/customer-ai-finops-flow-qualification.md",
+    "scripts/qualify_customer_ai_finops_flow.py",
+    "tests/test_customer_ai_finops_flow.py",
     "docs/decisions/0141-privacy-minimized-exact-ai-invocation-observation.md",
     "docs/specifications/ai-invocation-observation-contract.md",
     "contracts/schemas/ai-economics-invocation-observation-request.schema.json",
@@ -2485,6 +2496,155 @@ def validate_customer_ai_finops_prerequisite_examples(
             errors,
             "customer AI FinOps prerequisite examples must be semantically valid",
         )
+
+
+def validate_customer_ai_finops_flow_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check protected-input and minimized-output bindings for the live flow."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    profile_path = example_dir / "customer-ai-finops-flow-qualification-profile.json"
+    run_path = example_dir / "customer-ai-finops-flow-run-evidence.json"
+    report_path = example_dir / "customer-ai-finops-flow-qualification-report.json"
+    prerequisite_profile_path = (
+        example_dir / "customer-ai-finops-prerequisite-profile.json"
+    )
+    prerequisite_report_path = (
+        example_dir / "customer-ai-finops-prerequisite-report.json"
+    )
+    bedrock_profile_path = example_dir / "customer-bedrock-qualification-profile.json"
+    observation_path = example_dir / "ai-economics-invocation-observation.json"
+    profile = documents.get(profile_path)
+    run_evidence = documents.get(run_path)
+    report = documents.get(report_path)
+    prerequisite_profile = documents.get(prerequisite_profile_path)
+    bedrock_profile = documents.get(bedrock_profile_path)
+    observation = documents.get(observation_path)
+    try:
+        from qualify_customer_ai_finops_flow import (
+            CustomerAiFinopsFlowError,
+            _digest,
+            _raw_digest,
+            _validate_schema,
+            validate_profile,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "customer AI FinOps flow validator must be importable")
+        return
+    try:
+        if not all(
+            isinstance(item, dict)
+            for item in (
+                profile,
+                run_evidence,
+                report,
+                prerequisite_profile,
+                bedrock_profile,
+                observation,
+            )
+        ):
+            raise CustomerAiFinopsFlowError(
+                "customer-ai-finops-flow.example.invalid"
+            )
+        validate_profile(profile)
+        validate_report_document(report)
+        _validate_schema(
+            run_evidence,
+            "customer-ai-finops-flow-run-evidence.schema.json",
+            "customer-ai-finops-flow.example.invalid",
+        )
+        metadata = profile["metadata"]
+        profile_spec = profile["spec"]
+        targets = profile_spec["targets"]
+        run_spec = run_evidence["spec"]
+        observation_spec = observation["spec"]
+        observation_sources = observation_spec["sources"]
+        report_spec = report["spec"]
+        bindings = report_spec["bindings"]
+        expected_correlation = _digest(
+            {
+                "tenantId": observation["metadata"]["tenantId"],
+                "traceId": run_spec["traceId"],
+                "spanId": run_spec["spanId"],
+            }
+        )
+        expected_bindings = {
+            "profileDigest": _digest(profile),
+            "environmentBindingDigest": _digest(metadata["environmentId"]),
+            "prerequisiteProfileDigest": _digest(prerequisite_profile),
+            "prerequisiteReportDigest": _raw_digest(
+                prerequisite_report_path.read_bytes()
+            ),
+            "bedrockProfileDigest": _digest(bedrock_profile),
+            "controlPlaneTargetDigest": _digest(targets["controlPlaneBaseUrl"]),
+            "otlpTargetDigest": _digest(targets["otlpTracesEndpoint"]),
+            "prometheusTargetDigest": _digest(targets["prometheusBaseUrl"]),
+            "grafanaTargetDigest": _digest(targets["grafanaBaseUrl"]),
+            "runEvidenceDigest": _digest(run_evidence),
+            "liveCompatibilityReportDigest": run_spec[
+                "liveCompatibilityReportDigest"
+            ],
+            "invocationObservationDigest": run_spec[
+                "invocationObservationDigest"
+            ],
+            "correlationDigest": run_spec["correlationDigest"],
+            "usageRecordDigest": run_spec["usage"]["recordDigest"],
+            "attributionRecordDigest": run_spec["attribution"]["recordDigest"],
+            "activeAttributionPolicyDocumentDigest": run_spec["attribution"][
+                "sourceDocumentDigest"
+            ],
+            "costRecordDigest": run_spec["cost"]["recordDigest"],
+            "activePriceCatalogDocumentDigest": run_spec["cost"][
+                "sourceDocumentDigest"
+            ],
+        }
+        expected_measurements = {
+            "profileReviewedAt": metadata["reviewedAt"],
+            "startedAt": run_spec["timing"]["startedAt"],
+            "completedAt": run_spec["timing"]["completedAt"],
+            "endToEndLatencyMilliseconds": run_spec["timing"][
+                "endToEndLatencyMilliseconds"
+            ],
+            "observationPolls": run_spec["timing"]["observationPolls"],
+            "providerCallCount": 1,
+            "usageRecordCount": 1,
+            "attributionRecordCount": 1,
+            "costRecordCount": 1,
+            "prometheusRequestDelta": run_spec["telemetry"]["requestCountAfter"]
+            - run_spec["telemetry"]["requestCountBefore"],
+            "dashboardPanelCount": run_spec["telemetry"]["dashboardPanelCount"],
+        }
+        if (
+            profile_spec["prerequisites"]["profileDigest"]
+            != _digest(prerequisite_profile)
+            or profile_spec["prerequisites"]["reportDigest"]
+            != _raw_digest(prerequisite_report_path.read_bytes())
+            or profile_spec["bedrock"]["profileDigest"] != _digest(bedrock_profile)
+            or run_spec["deliveryEndpointDigest"]
+            != _raw_digest(targets["otlpTracesEndpoint"])
+            or run_spec["correlationDigest"] != expected_correlation
+            or observation_spec["correlationDigest"] != expected_correlation
+            or run_spec["invocationObservationDigest"] != _digest(observation)
+            or run_spec["usage"]["recordDigest"]
+            != observation_spec["usage"]["recordDigest"]
+            or run_spec["attribution"]["recordDigest"]
+            != observation_spec["attribution"]["recordDigest"]
+            or run_spec["attribution"]["sourceDocumentDigest"]
+            != observation_sources["attribution"]["documentDigest"]
+            or run_spec["cost"]["recordDigest"]
+            != observation_spec["cost"]["recordDigest"]
+            or run_spec["cost"]["sourceDocumentDigest"]
+            != observation_sources["pricing"]["documentDigest"]
+            or bindings != expected_bindings
+            or report_spec["measurements"] != expected_measurements
+        ):
+            raise CustomerAiFinopsFlowError(
+                "customer-ai-finops-flow.example.crossed"
+            )
+    except (CustomerAiFinopsFlowError, KeyError, TypeError, OSError):
+        fail(errors, "customer AI FinOps flow examples must be semantically valid")
 
 
 def validate_customer_deployment_qualification_example(
@@ -5469,6 +5629,18 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerAiFinopsPrerequisiteReport",
         ),
         (
+            "customer-ai-finops-flow-qualification-profile.json",
+            "CustomerAiFinopsFlowQualificationProfile",
+        ),
+        (
+            "customer-ai-finops-flow-run-evidence.json",
+            "CustomerAiFinopsFlowRunEvidence",
+        ),
+        (
+            "customer-ai-finops-flow-qualification-report.json",
+            "CustomerAiFinopsFlowQualificationReport",
+        ),
+        (
             "customer-otlp-receiver-qualification-profile.json",
             "CustomerOtlpReceiverQualificationProfile",
         ),
@@ -5578,6 +5750,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_customer_github_context_qualification_example(documents, errors)
     validate_customer_bedrock_qualification_example(documents, errors)
     validate_customer_ai_finops_prerequisite_examples(documents, errors)
+    validate_customer_ai_finops_flow_examples(documents, errors)
     validate_customer_otlp_receiver_qualification_example(documents, errors)
     validate_customer_deployment_qualification_example(documents, errors)
     validate_control_plane_load_qualification_example(documents, errors)

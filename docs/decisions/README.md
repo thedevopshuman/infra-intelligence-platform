@@ -145,3 +145,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0139](0139-source-bound-ai-finops-runtime-evidence.md) | Accepted | Bind the complete local AI FinOps Docker flow to one minimized exact-source compatibility report |
 | [0140](0140-minimized-customer-ai-finops-prerequisite-aggregation.md) | Accepted | Cross-bind current customer AI FinOps prerequisites without claiming one live end-to-end invocation |
 | [0141](0141-privacy-minimized-exact-ai-invocation-observation.md) | Accepted | Correlate one privileged tenant-bound AI invocation through active ledger generations without exposing trace identity in responses or metrics |
+| [0142](0142-customer-ai-finops-same-invocation-qualification.md) | Accepted | Qualify one exact live Bedrock-to-ledger-to-dashboard customer path with protected correlation and minimized evidence |

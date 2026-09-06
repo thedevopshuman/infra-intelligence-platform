@@ -7,18 +7,20 @@
   },
   "spec": {
     "status": "complete",
-    "correlationDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "correlationDigest": "sha256:28a27ae31216b91a0491972462ecb7ec9e870f3b2ba149c74d8a3690db70f5b8",
     "sources": {
       "attribution": {
         "id": "aap_22222222222222222222222222222222",
         "version": "2026-09-05.1",
         "sourceHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "documentDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
         "engineVersion": "0.1.0"
       },
       "pricing": {
         "id": "apc_11111111111111111111111111111111",
-        "version": "2026-09-05.1",
+        "version": "2026-09-08.1",
         "sourceHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "documentDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
         "engineVersion": "0.2.0",
         "currency": "USD",
         "currencyScale": 9,

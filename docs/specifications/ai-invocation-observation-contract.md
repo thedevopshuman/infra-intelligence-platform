@@ -30,7 +30,10 @@ SHA-256 digest of their canonical tenant-bound tuple. It is useful only for
 joining minimized qualification evidence; it grants no query authority.
 
 The service reports the exact active attribution and pricing sources selected
-by protected deployment configuration. Stage semantics are:
+by protected deployment configuration. Each source includes both its declared
+source hash and the canonical digest of the complete policy/catalog document,
+so offline qualification can bind the deployed generation to reviewed input.
+Stage semantics are:
 
 | Overall status | Meaning |
 | --- | --- |

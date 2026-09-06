@@ -1,0 +1,55 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerAiFinopsFlowRunEvidence",
+  "metadata": {
+    "generatedAt": "2026-09-08T10:05:30Z",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceDirty": false
+  },
+  "spec": {
+    "traceId": "0123456789abcdef0123456789abcdef",
+    "spanId": "0123456789abcdef",
+    "correlationDigest": "sha256:28a27ae31216b91a0491972462ecb7ec9e870f3b2ba149c74d8a3690db70f5b8",
+    "deliveryEndpointDigest": "sha256:77421568a2d6e2450afe07d5de601b0c22a740873aac13515666aa4e96d19af6",
+    "liveCompatibilityReportDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "invocationObservationDigest": "sha256:79d59dd6adabb90ba4dfa0fe2903bc614b1fc8595f67095167d3a6260fd243af",
+    "usage": {
+      "recordId": "aiu_11111111111111111111111111111111",
+      "recordDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "attribution": {
+      "recordId": "aia_22222222222222222222222222222222",
+      "recordDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "sourceDocumentDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "applicationId": "support-experience",
+      "teamId": "customer-experience"
+    },
+    "cost": {
+      "recordId": "aic_33333333333333333333333333333333",
+      "recordDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "sourceDocumentDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "currency": "USD",
+      "currencyScale": 9,
+      "totalSubunits": 21000,
+      "costBasis": "calculated-estimate"
+    },
+    "telemetry": {
+      "queryDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "requestCountBefore": 41,
+      "requestCountAfter": 42,
+      "dashboardDocumentDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "dashboardPanelCount": 9
+    },
+    "timing": {
+      "startedAt": "2026-09-08T10:05:00Z",
+      "completedAt": "2026-09-08T10:05:30Z",
+      "endToEndLatencyMilliseconds": 30000,
+      "observationPolls": 5
+    },
+    "privacy": {
+      "contentCaptured": false,
+      "rawPayloadPersisted": false,
+      "transportable": false
+    }
+  }
+}

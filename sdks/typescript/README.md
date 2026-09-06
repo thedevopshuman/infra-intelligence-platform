@@ -1,9 +1,8 @@
 # TypeScript SDK boundary
 
-Version 0.75 adds the privileged exact AI invocation observation request,
-response, and client method. Trace/span identity stays in the POST body; the
-response exposes only a tenant-bound digest and revalidated active-generation
-facts.
+Version 0.76 adds the protected customer AI FinOps flow profile and minimized
+qualification report. The temporary run evidence that contains trace/span
+identity is intentionally excluded from the SDK.
 
 The SDK exposes public contract types and a small fetch-based client. It has no dependency on server code or a framework runtime.
 
@@ -57,12 +56,19 @@ transport is runtime-specific.
 `AiSavingsFindingPage`, `AiModelSuitabilityReport`, `AiAllocationReport`,
 `AiEconomicsInvocationObservationRequest`,
 `AiEconomicsInvocationObservation`,
-`CustomerAiFinopsPrerequisiteProfile`, and
-`CustomerAiFinopsPrerequisiteReport`
+`CustomerAiFinopsPrerequisiteProfile`,
+`CustomerAiFinopsPrerequisiteReport`,
+`CustomerAiFinopsFlowQualificationProfile`, and
+`CustomerAiFinopsFlowQualificationReport`
 describe the
 metadata-only AI economics ledger. The SDK does not instrument or
 proxy model calls; applications continue using standard OpenTelemetry
 instrumentation and a customer-controlled Collector.
+
+Version 0.76 adds the customer flow profile/report types. A qualified report
+binds one live Bedrock invocation to the exact usage, active attribution,
+active pricing, Prometheus aggregate, and provisioned Grafana dashboard while
+retaining only digests and aggregate measurements.
 
 Version 0.75 adds `observeAiEconomicsInvocation`. It is a privileged
 qualification read, not a trace-search or billing interface. Version 0.74

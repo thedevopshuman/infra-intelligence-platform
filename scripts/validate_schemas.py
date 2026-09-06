@@ -148,6 +148,15 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "customer-ai-finops-prerequisite-report.schema.json": (
         "customer-ai-finops-prerequisite-report.json",
     ),
+    "customer-ai-finops-flow-qualification-profile.schema.json": (
+        "customer-ai-finops-flow-qualification-profile.json",
+    ),
+    "customer-ai-finops-flow-run-evidence.schema.json": (
+        "customer-ai-finops-flow-run-evidence.json",
+    ),
+    "customer-ai-finops-flow-qualification-report.schema.json": (
+        "customer-ai-finops-flow-qualification-report.json",
+    ),
     "customer-deployment-qualification-report.schema.json": (
         "customer-deployment-qualification-report.json",
     ),

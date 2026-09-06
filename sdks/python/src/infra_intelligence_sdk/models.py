@@ -925,6 +925,56 @@ class CustomerAiFinopsPrerequisiteReport:
 
 
 @dataclass(frozen=True)
+class CustomerAiFinopsFlowQualificationProfile:
+    """Protected selection for one customer Bedrock-to-dashboard flow."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerAiFinopsFlowQualificationProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerAiFinopsFlowQualificationProfile",
+                label="customer AI FinOps flow qualification profile",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerAiFinopsFlowQualificationReport:
+    """Minimized evidence for one exact customer AI FinOps invocation flow."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerAiFinopsFlowQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerAiFinopsFlowQualificationReport",
+                label="customer AI FinOps flow qualification report",
+            )
+        )
+
+    @property
+    def status(self) -> Optional[str]:
+        spec = self.payload.get("spec")
+        value = spec.get("status") if isinstance(spec, Mapping) else None
+        return value if isinstance(value, str) else None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerOtlpReceiverQualificationProfile:
     """Protected exact signal catalog for customer receiver qualification."""
 

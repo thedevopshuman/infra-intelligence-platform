@@ -301,12 +301,14 @@ export interface AiEconomicsInvocationObservation {
         id: AiAttributionPolicyId;
         version: string;
         sourceHash: Sha256Digest;
+        documentDigest: Sha256Digest;
         engineVersion: string;
       };
       pricing: {
         id: AiPriceCatalogId;
         version: string;
         sourceHash: Sha256Digest;
+        documentDigest: Sha256Digest;
         engineVersion: string;
         currency: string;
         currencyScale: AiCurrencyScale;
@@ -2353,6 +2355,174 @@ export interface CustomerAiFinopsPrerequisiteReport {
       passedChecks: number;
       failedChecks: number;
       overallStatus: "prerequisites-ready" | "not-ready";
+    };
+  };
+}
+
+export interface CustomerAiFinopsFlowQualificationProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerAiFinopsFlowQualificationProfile";
+  metadata: {
+    name: string;
+    environmentId: string;
+    reviewedAt: string;
+  };
+  spec: {
+    release: {
+      applicationVersion: string;
+      chartVersion: string;
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    prerequisites: {
+      profileDigest: Sha256Digest;
+      reportDigest: Sha256Digest;
+    };
+    bedrock: { profileDigest: Sha256Digest };
+    collection: {
+      provider: "aws.bedrock";
+      operation: "ConverseStream";
+      requestPath: "direct-to-provider";
+      telemetryPath: "asynchronous-otel";
+      contentPolicy: "metadata-only";
+      qualificationServiceName: "iip-bedrock-compatibility";
+    };
+    attribution: { applicationId: string; teamId: string };
+    targets: {
+      controlPlaneBaseUrl: string;
+      otlpTracesEndpoint: string;
+      prometheusBaseUrl: string;
+      grafanaBaseUrl: string;
+    };
+    presentation: {
+      telemetryBackend: "prometheus";
+      dashboard: "grafana";
+      dashboardUid: "iip-ai-finops";
+    };
+    objective: {
+      maximumProfileAgeSeconds: number;
+      maximumPrerequisiteAgeSeconds: number;
+      maximumClockSkewSeconds: number;
+      maximumEndToEndLatencyMilliseconds: number;
+      pollIntervalMilliseconds: number;
+      requestTimeoutSeconds: number;
+      reportValiditySeconds: number;
+    };
+  };
+}
+
+export type CustomerAiFinopsFlowQualificationCheckId =
+  | "source-binding"
+  | "profile-review"
+  | "prerequisite-binding"
+  | "bedrock-profile-binding"
+  | "protected-inputs"
+  | "metadata-only-direct-request-path"
+  | "live-provider-call"
+  | "otlp-delivery-correlation"
+  | "exact-usage-record"
+  | "active-attribution"
+  | "active-pricing"
+  | "bounded-processing-latency"
+  | "prometheus-aggregate-delta"
+  | "grafana-dashboard"
+  | "minimized-output";
+
+export interface CustomerAiFinopsFlowQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerAiFinopsFlowQualificationReport";
+  metadata: {
+    id: `caff_${string}`;
+    generatedAt: string;
+    validUntil: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualificationLevel: "customer-ai-finops-flow-v1";
+    qualificationBoundary: "same-invocation-customer-runtime";
+    subject: {
+      deploymentProfile: "production-ai-finops-v0";
+      applicationVersion: string;
+      chartVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      profileDigest: Sha256Digest;
+      environmentBindingDigest: Sha256Digest;
+      prerequisiteProfileDigest: Sha256Digest;
+      prerequisiteReportDigest: Sha256Digest;
+      bedrockProfileDigest: Sha256Digest;
+      controlPlaneTargetDigest: Sha256Digest;
+      otlpTargetDigest: Sha256Digest;
+      prometheusTargetDigest: Sha256Digest;
+      grafanaTargetDigest: Sha256Digest;
+      runEvidenceDigest: Sha256Digest;
+      liveCompatibilityReportDigest: Sha256Digest;
+      invocationObservationDigest: Sha256Digest;
+      correlationDigest: Sha256Digest;
+      usageRecordDigest: Sha256Digest;
+      attributionRecordDigest: Sha256Digest;
+      activeAttributionPolicyDocumentDigest: Sha256Digest;
+      costRecordDigest: Sha256Digest;
+      activePriceCatalogDocumentDigest: Sha256Digest;
+    };
+    profile: {
+      provider: "aws.bedrock";
+      operation: "ConverseStream";
+      requestPath: "direct-to-provider";
+      telemetryPath: "asynchronous-otel";
+      contentPolicy: "metadata-only";
+      costBasis: "calculated-estimate";
+      telemetryBackend: "prometheus";
+      dashboard: "grafana";
+      correlationMode: "protected-request-digest-response";
+    };
+    measurements: {
+      profileReviewedAt: string;
+      startedAt: string;
+      completedAt: string;
+      endToEndLatencyMilliseconds: number;
+      observationPolls: number;
+      providerCallCount: 1;
+      usageRecordCount: 1;
+      attributionRecordCount: 1;
+      costRecordCount: 1;
+      prometheusRequestDelta: number;
+      dashboardPanelCount: number;
+    };
+    results: {
+      providerCall: "completed";
+      otlpDelivery: "correlated";
+      usage: "recorded";
+      attribution: "allocated";
+      cost: "priced-calculated-estimate";
+      telemetryAggregate: "observed";
+      dashboard: "provisioned";
+    };
+    checks: Array<
+      | { id: CustomerAiFinopsFlowQualificationCheckId; status: "passed" }
+      | {
+          id: CustomerAiFinopsFlowQualificationCheckId;
+          status: "failed";
+          errorCode: `customer-ai-finops-flow.${string}`;
+        }
+    >;
+    limitations: [
+      "dashboard-proof-is-protected-dimension-aggregate-not-trace-labelled",
+      "invoice-private-rates-discounts-and-commitments-not-qualified",
+      "customer-long-running-collector-and-backend-lifecycle-not-qualified",
+      "sustained-load-node-zone-region-and-backend-ha-not-qualified",
+      "additional-models-regions-operations-providers-and-backends-not-qualified",
+    ];
+    summary: {
+      totalChecks: 15;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "qualified" | "not-qualified";
     };
   };
 }

@@ -68,11 +68,13 @@ candidate inventory, not a production promotion decision.
 Customer AI FinOps prerequisites also have a separate minimized aggregate. It
 binds the exact local candidate/runtime, customer deployment/receiver, live
 Bedrock streaming, and production catalog reports under one protected profile.
-The result remains `prerequisite-aggregation-only`: same-invocation Collector,
-ledger, cost, export, and dashboard evidence is still a Phase A release gate.
-The exact-invocation POST observation and protected Bedrock OTLP correlation
-needed by that gate are implemented; the customer-specific live orchestrator
-and retained minimized report remain.
+The result remains `prerequisite-aggregation-only`. A separate explicitly
+enabled orchestrator now makes one live Bedrock streaming call, exports its
+metadata-only span through the selected customer OTLP route, observes the exact
+usage/attribution/cost records, requires the protected-application Prometheus
+aggregate to advance, verifies the Grafana dashboard panels, and emits a
+minimized source-bound report. The repository mechanism is complete; executing
+that billable flow with customer credentials and endpoints remains external.
 
 One fail-closed local release command now composes the source, integration,
 recovery, multi-node availability, bundle, packaged N-1, vulnerability, and

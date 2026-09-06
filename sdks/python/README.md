@@ -1,9 +1,8 @@
 # Python SDK boundary
 
-Version 0.75 adds the privileged exact AI invocation observation request,
-response, and client method. Trace/span identity stays in the POST body; the
-response exposes only a tenant-bound digest and revalidated active-generation
-facts.
+Version 0.76 adds the protected customer AI FinOps flow profile and minimized
+qualification report. The temporary run evidence that contains trace/span
+identity is intentionally excluded from the SDK.
 
 This package contains public transport and model types only. It does not import the server kernel. The API will expand contract-first; unstable methods remain under the `v1alpha1` namespace in their paths and models.
 
@@ -62,11 +61,18 @@ host-created failures for plugin handling; it is not a control-plane HTTP client
 `AiEconomicsInvocationObservationRequest`,
 `AiEconomicsInvocationObservation`,
 `CustomerAiFinopsPrerequisiteProfile`, and
-`CustomerAiFinopsPrerequisiteReport`
+`CustomerAiFinopsPrerequisiteReport`,
+`CustomerAiFinopsFlowQualificationProfile`, and
+`CustomerAiFinopsFlowQualificationReport`
 expose the AI economics
 records as public metadata-only envelopes. They do not
 instrument provider calls, send OTLP, or import an AWS SDK. Standard
 OpenTelemetry instrumentation remains the collection boundary.
+
+Version 0.76 adds the customer flow profile/report envelopes. A qualified
+report binds one live Bedrock invocation to the exact usage, active
+attribution, active pricing, Prometheus aggregate, and provisioned Grafana
+dashboard while retaining only digests and aggregate measurements.
 
 Version 0.75 adds `observe_ai_economics_invocation`. It is a privileged
 qualification read, not a trace-search or billing interface. Version 0.74

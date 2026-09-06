@@ -1,0 +1,56 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerAiFinopsFlowQualificationProfile",
+  "metadata": {
+    "name": "customer-ai-finops-live-flow",
+    "environmentId": "customer-production-us-east-1",
+    "reviewedAt": "2026-09-08T09:00:00Z"
+  },
+  "spec": {
+    "release": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "prerequisites": {
+      "profileDigest": "sha256:392a664010f4c3cadec2bbef57110e59dba1e639a1657851858f2a4402295554",
+      "reportDigest": "sha256:641876d7222b05c87dc1ee9c8a1eccef0fb881b8cd16180f9b85fa84898dbdd3"
+    },
+    "bedrock": {
+      "profileDigest": "sha256:f2b8bd7fbe44cc952a8500d832408bf56c35b725bee647523f91f338ebba6f9d"
+    },
+    "collection": {
+      "provider": "aws.bedrock",
+      "operation": "ConverseStream",
+      "requestPath": "direct-to-provider",
+      "telemetryPath": "asynchronous-otel",
+      "contentPolicy": "metadata-only",
+      "qualificationServiceName": "iip-bedrock-compatibility"
+    },
+    "attribution": {
+      "applicationId": "support-experience",
+      "teamId": "customer-experience"
+    },
+    "targets": {
+      "controlPlaneBaseUrl": "https://iip.example.test",
+      "otlpTracesEndpoint": "https://otel.example.test/v1/traces",
+      "prometheusBaseUrl": "https://prometheus.example.test",
+      "grafanaBaseUrl": "https://grafana.example.test"
+    },
+    "presentation": {
+      "telemetryBackend": "prometheus",
+      "dashboard": "grafana",
+      "dashboardUid": "iip-ai-finops"
+    },
+    "objective": {
+      "maximumProfileAgeSeconds": 2592000,
+      "maximumPrerequisiteAgeSeconds": 86400,
+      "maximumClockSkewSeconds": 300,
+      "maximumEndToEndLatencyMilliseconds": 300000,
+      "pollIntervalMilliseconds": 1000,
+      "requestTimeoutSeconds": 5,
+      "reportValiditySeconds": 86400
+    }
+  }
+}

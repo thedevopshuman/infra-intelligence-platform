@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 import re
 from typing import Mapping
 
@@ -63,6 +65,8 @@ class AiAllocationAuthorizationError(PermissionError):
 class AiAllocationSources:
     policy: ValidatedAiAttributionPolicy
     catalog: ValidatedAiPriceCatalog
+    policy_document_digest: str
+    catalog_document_digest: str
 
 
 @dataclass(frozen=True)
@@ -323,6 +327,14 @@ def validate_ai_allocation_sources(
         )
         policy_by_tenant = {item.tenant_id: item for item in validated_policies}
         catalog_by_tenant = {item.tenant_id: item for item in validated_catalogs}
+        policy_document_by_tenant = {
+            validated.tenant_id: document
+            for validated, document in zip(validated_policies, policies)
+        }
+        catalog_document_by_tenant = {
+            validated.tenant_id: document
+            for validated, document in zip(validated_catalogs, catalogs)
+        }
         if (
             len(policy_by_tenant) != len(validated_policies)
             or len(catalog_by_tenant) != len(validated_catalogs)
@@ -344,6 +356,8 @@ def validate_ai_allocation_sources(
         tenant_id: AiAllocationSources(
             policy_by_tenant[tenant_id],
             catalog_by_tenant[tenant_id],
+            _document_digest(policy_document_by_tenant[tenant_id]),
+            _document_digest(catalog_document_by_tenant[tenant_id]),
         )
         for tenant_id in sorted(policy_by_tenant)
     }
@@ -667,6 +681,16 @@ def _safe_add(left: int, right: int) -> int:
     if left < 0 or right < 0 or result > MAX_SAFE_INTEGER:
         raise ValueError
     return result
+
+
+def _document_digest(document: Mapping[str, object]) -> str:
+    payload = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(payload).hexdigest()
 
 
 def canonical_ai_economics_timestamp(value: object) -> tuple[datetime, str]:

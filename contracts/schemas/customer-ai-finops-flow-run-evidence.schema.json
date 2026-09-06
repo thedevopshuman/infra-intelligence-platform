@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-ai-finops-flow-run-evidence:v1alpha1",
+  "title": "Customer AI FinOps Flow Run Evidence",
+  "description": "Protected temporary evidence for one exact customer AI FinOps flow. It contains trace correlation and is not transportable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerAiFinopsFlowRunEvidence"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["traceId", "spanId", "correlationDigest", "deliveryEndpointDigest", "liveCompatibilityReportDigest", "invocationObservationDigest", "usage", "attribution", "cost", "telemetry", "timing", "privacy"],
+      "properties": {
+        "traceId": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+        "spanId": {"type": "string", "pattern": "^[a-f0-9]{16}$"},
+        "correlationDigest": {"$ref": "#/$defs/digest"},
+        "deliveryEndpointDigest": {"$ref": "#/$defs/digest"},
+        "liveCompatibilityReportDigest": {"$ref": "#/$defs/digest"},
+        "invocationObservationDigest": {"$ref": "#/$defs/digest"},
+        "usage": {"$ref": "#/$defs/record"},
+        "attribution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["recordId", "recordDigest", "sourceDocumentDigest", "applicationId", "teamId"],
+          "properties": {
+            "recordId": {"type": "string", "pattern": "^aia_[a-f0-9]{32}$"},
+            "recordDigest": {"$ref": "#/$defs/digest"},
+            "sourceDocumentDigest": {"$ref": "#/$defs/digest"},
+            "applicationId": {"$ref": "#/$defs/safeId"},
+            "teamId": {"$ref": "#/$defs/safeId"}
+          }
+        },
+        "cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["recordId", "recordDigest", "sourceDocumentDigest", "currency", "currencyScale", "totalSubunits", "costBasis"],
+          "properties": {
+            "recordId": {"type": "string", "pattern": "^aic_[a-f0-9]{32}$"},
+            "recordDigest": {"$ref": "#/$defs/digest"},
+            "sourceDocumentDigest": {"$ref": "#/$defs/digest"},
+            "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+            "currencyScale": {"type": "integer", "enum": [6, 9, 12]},
+            "totalSubunits": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+            "costBasis": {"const": "calculated-estimate"}
+          }
+        },
+        "telemetry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["queryDigest", "requestCountBefore", "requestCountAfter", "dashboardDocumentDigest", "dashboardPanelCount"],
+          "properties": {
+            "queryDigest": {"$ref": "#/$defs/digest"},
+            "requestCountBefore": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+            "requestCountAfter": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+            "dashboardDocumentDigest": {"$ref": "#/$defs/digest"},
+            "dashboardPanelCount": {"type": "integer", "minimum": 5, "maximum": 1000}
+          }
+        },
+        "timing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["startedAt", "completedAt", "endToEndLatencyMilliseconds", "observationPolls"],
+          "properties": {
+            "startedAt": {"type": "string", "format": "date-time"},
+            "completedAt": {"type": "string", "format": "date-time"},
+            "endToEndLatencyMilliseconds": {"type": "integer", "minimum": 0, "maximum": 900000},
+            "observationPolls": {"type": "integer", "minimum": 1, "maximum": 3600}
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["contentCaptured", "rawPayloadPersisted", "transportable"],
+          "properties": {
+            "contentCaptured": {"const": false},
+            "rawPayloadPersisted": {"const": false},
+            "transportable": {"const": false}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "safeId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordId", "recordDigest"],
+      "properties": {
+        "recordId": {"type": "string", "pattern": "^aiu_[a-f0-9]{32}$"},
+        "recordDigest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

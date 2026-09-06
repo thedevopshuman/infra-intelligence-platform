@@ -1,0 +1,107 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerAiFinopsFlowQualificationReport",
+  "metadata": {
+    "id": "caff_3e42cee4e08125ddd6d1ed650829e43c",
+    "generatedAt": "2026-09-08T10:05:30Z",
+    "validUntil": "2026-09-09T10:05:30Z",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualificationLevel": "customer-ai-finops-flow-v1",
+    "qualificationBoundary": "same-invocation-customer-runtime",
+    "subject": {
+      "deploymentProfile": "production-ai-finops-v0",
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "profileDigest": "sha256:0ccf9ac66343bf63da617eca80de0fe585a630d80644ca5981b63a8bd9db0980",
+      "environmentBindingDigest": "sha256:ebbaf6050b9190c0b9688b96de6c442e6239a02cedd056974af01ff8286610a2",
+      "prerequisiteProfileDigest": "sha256:392a664010f4c3cadec2bbef57110e59dba1e639a1657851858f2a4402295554",
+      "prerequisiteReportDigest": "sha256:641876d7222b05c87dc1ee9c8a1eccef0fb881b8cd16180f9b85fa84898dbdd3",
+      "bedrockProfileDigest": "sha256:f2b8bd7fbe44cc952a8500d832408bf56c35b725bee647523f91f338ebba6f9d",
+      "controlPlaneTargetDigest": "sha256:67f7aaa3a40b5a2a295d84c806d41b6a1f226a432f8ebe6742019f464f6f4c1f",
+      "otlpTargetDigest": "sha256:b3956e5d002e9b854d61c4fa71e026e3106e55decfdcee6dfb01f8a777898679",
+      "prometheusTargetDigest": "sha256:b384c694b7821d68fb0844a94ef803bbb9540bc6bd600c11a93ed1dc1a98817f",
+      "grafanaTargetDigest": "sha256:6f95fa6b9b3c7a5d443f8e2390eaa7fd8c92fde89474e79e580117715936f113",
+      "runEvidenceDigest": "sha256:5af6e25ed094c6eae207ce70884667d0284134188d8eec0350c9f4deb21aa23d",
+      "liveCompatibilityReportDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "invocationObservationDigest": "sha256:79d59dd6adabb90ba4dfa0fe2903bc614b1fc8595f67095167d3a6260fd243af",
+      "correlationDigest": "sha256:28a27ae31216b91a0491972462ecb7ec9e870f3b2ba149c74d8a3690db70f5b8",
+      "usageRecordDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "attributionRecordDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "activeAttributionPolicyDocumentDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "costRecordDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "activePriceCatalogDocumentDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "profile": {
+      "provider": "aws.bedrock",
+      "operation": "ConverseStream",
+      "requestPath": "direct-to-provider",
+      "telemetryPath": "asynchronous-otel",
+      "contentPolicy": "metadata-only",
+      "costBasis": "calculated-estimate",
+      "telemetryBackend": "prometheus",
+      "dashboard": "grafana",
+      "correlationMode": "protected-request-digest-response"
+    },
+    "measurements": {
+      "profileReviewedAt": "2026-09-08T09:00:00Z",
+      "startedAt": "2026-09-08T10:05:00Z",
+      "completedAt": "2026-09-08T10:05:30Z",
+      "endToEndLatencyMilliseconds": 30000,
+      "observationPolls": 5,
+      "providerCallCount": 1,
+      "usageRecordCount": 1,
+      "attributionRecordCount": 1,
+      "costRecordCount": 1,
+      "prometheusRequestDelta": 1,
+      "dashboardPanelCount": 9
+    },
+    "results": {
+      "providerCall": "completed",
+      "otlpDelivery": "correlated",
+      "usage": "recorded",
+      "attribution": "allocated",
+      "cost": "priced-calculated-estimate",
+      "telemetryAggregate": "observed",
+      "dashboard": "provisioned"
+    },
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "profile-review", "status": "passed"},
+      {"id": "prerequisite-binding", "status": "passed"},
+      {"id": "bedrock-profile-binding", "status": "passed"},
+      {"id": "protected-inputs", "status": "passed"},
+      {"id": "metadata-only-direct-request-path", "status": "passed"},
+      {"id": "live-provider-call", "status": "passed"},
+      {"id": "otlp-delivery-correlation", "status": "passed"},
+      {"id": "exact-usage-record", "status": "passed"},
+      {"id": "active-attribution", "status": "passed"},
+      {"id": "active-pricing", "status": "passed"},
+      {"id": "bounded-processing-latency", "status": "passed"},
+      {"id": "prometheus-aggregate-delta", "status": "passed"},
+      {"id": "grafana-dashboard", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"}
+    ],
+    "limitations": [
+      "dashboard-proof-is-protected-dimension-aggregate-not-trace-labelled",
+      "invoice-private-rates-discounts-and-commitments-not-qualified",
+      "customer-long-running-collector-and-backend-lifecycle-not-qualified",
+      "sustained-load-node-zone-region-and-backend-ha-not-qualified",
+      "additional-models-regions-operations-providers-and-backends-not-qualified"
+    ],
+    "summary": {
+      "totalChecks": 15,
+      "passedChecks": 15,
+      "failedChecks": 0,
+      "overallStatus": "qualified"
+    }
+  }
+}

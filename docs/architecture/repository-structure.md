@@ -93,6 +93,14 @@ It calls no provider, Collector, deployment, ledger, or dashboard and therefore
 cannot be a serving use case or end-to-end qualification. The public SDKs expose
 only its offline envelope types.
 
+Customer AI FinOps same-invocation qualification remains host-side as well.
+`scripts/qualify_customer_ai_finops_flow.py` composes the pinned Bedrock
+compatibility harness, existing privileged observation use case, and direct
+Prometheus/Grafana reads. It retains trace/span and customer attribution only in
+owner-only temporary evidence and exports a minimized digest-bound report. It
+does not enter the serving process, inference request path, SDK transport,
+agent runtime, or plugin authority boundary.
+
 Exact AI invocation observation follows the normal serving boundaries.
 `src/iip/application/query_ai_invocation.py` owns authorization, active-source
 selection, privacy minimization, and record revalidation; the in-memory and

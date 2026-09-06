@@ -4,7 +4,29 @@
 
 ## Build from one revision
 
-The release builder refuses a dirty worktree. With Docker Desktop, Buildx, Helm, Node/npm, and Python available, run:
+The release builder refuses a dirty worktree. With Docker Desktop, Buildx,
+Kind, kubectl, Helm, Node/npm, Cosign, and Python available, the preferred
+entry point is one fail-closed command. Select the supported predecessor
+explicitly; the workflow never guesses compatibility from Git history:
+
+```bash
+IIP_UPGRADE_FROM_REVISION=<supported-ancestor> \
+  make qualify-local-release PYTHON=.venv/bin/python
+```
+
+It runs source quality, local integration/recovery/availability evidence,
+multi-platform packaging, packaged install, the selected N-1
+upgrade/rollback/re-upgrade, exact-SBOM vulnerability qualification, and the
+18-evidence readiness aggregate. The final paths include the candidate's
+12-character revision so evidence from different commits cannot silently
+share a release identity. It refuses an existing candidate directory rather
+than deleting or overwriting prior artifacts. It also removes inherited
+IIP/provider/credential variables before setting the exact local toolchain and
+report paths, so an unrelated shell credential cannot silently select a live
+profile or enter a child process.
+
+The equivalent individual commands remain available for diagnosis and
+selective development:
 
 ```bash
 make verify PYTHON=.venv/bin/python
@@ -25,6 +47,11 @@ make test-release-vulnerabilities PYTHON=.venv/bin/python
 make test-release-readiness PYTHON=.venv/bin/python
 make release-bundle PYTHON=.venv/bin/python
 ```
+
+The one-command workflow also runs the plugin compatibility and three-node
+Kubernetes planned-disruption gates required by the aggregate. Generated
+reports remain outside Git and outside the immutable bundle. See
+[ADR 0122](../decisions/0122-one-command-local-release-qualification.md).
 
 Retain the clean-revision capacity, credential-broker, OIDC-issuer,
 OIDC-browser, policy-engine, OTLP-receiver, Bedrock

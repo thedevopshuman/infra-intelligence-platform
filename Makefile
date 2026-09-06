@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -35,6 +35,7 @@ IIP_RELEASE_VULNERABILITY_POLICY ?= contracts/examples/release-vulnerability-pol
 IIP_RELEASE_VULNERABILITY_REPORT ?= dist/release-vulnerability-qualification-report.json
 IIP_RELEASE_EVIDENCE_DIR ?= dist
 IIP_RELEASE_READINESS_REPORT ?= dist/release-readiness-report.json
+IIP_UPGRADE_FROM_REVISION ?=
 IIP_AI_PRICE_CATALOG_FILE ?=
 IIP_AI_PRICE_QUALIFICATION_POLICY ?=
 IIP_AI_PRICE_QUALIFICATION_REPORT ?= dist/ai-price-catalog-qualification-report.json
@@ -114,6 +115,7 @@ help:
 	@echo "test-release-readiness Validate aggregate local release-readiness semantics"
 	@echo "assess-release-readiness Aggregate exact local candidate evidence"
 	@echo "verify-release-readiness-report Recompute and verify aggregate candidate evidence"
+	@echo "qualify-local-release Build and qualify one exact local candidate through every retained gate"
 	@echo "db-migrate    Apply PostgreSQL migrations using IIP_DATABASE_URL"
 	@echo "helm-lint     Lint and render the Helm chart"
 	@echo "verify        Run all local quality gates"
@@ -546,6 +548,16 @@ verify-release-readiness-report:
 		--evidence-dir "$(IIP_RELEASE_EVIDENCE_DIR)" \
 		--report "$(IIP_RELEASE_READINESS_REPORT)" \
 		--require-clean --require-locally-qualified
+
+qualify-local-release:
+	@test -n "$(IIP_UPGRADE_FROM_REVISION)" || \
+		(echo "IIP_UPGRADE_FROM_REVISION is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_local_release.py \
+		--upgrade-from-revision "$(IIP_UPGRADE_FROM_REVISION)" \
+		--make-bin "$(MAKE)" --python-bin "$(PYTHON)" \
+		--docker-bin "$(DOCKER)" --helm-bin "$(HELM)" \
+		--kubectl-bin "$(KUBECTL)" --kind-bin "$(KIND)" \
+		--npm-bin "$(NPM)" --cosign-bin "$(COSIGN)"
 
 db-migrate:
 	PYTHONPATH=src $(PYTHON) -m iip.adapters.postgres

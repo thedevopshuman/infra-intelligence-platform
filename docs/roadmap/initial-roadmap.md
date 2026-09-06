@@ -58,6 +58,13 @@ reports match and always keeps the eight customer, organizational, live
 provider, design-partner, and legal/brand gates explicit. It is a local
 candidate inventory, not a production promotion decision.
 
+One fail-closed local release command now composes the source, integration,
+recovery, multi-node availability, bundle, packaged N-1, vulnerability, and
+18-evidence readiness workflow while retaining each owning report and refusing
+dirty or pre-existing candidates. It does not collapse the eight external
+customer, organizational, provider, pilot, or governance gates into a local
+claim.
+
 Post-install first response now has a separate privacy-minimized
 `DeploymentDiagnosticReport`. An operator selects an exact context, namespace,
 release, and immutable image digest; the read-only tool retains only aggregate

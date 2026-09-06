@@ -26,6 +26,9 @@
           <button class="nav-item active" type="button" data-view="overview">
             <span aria-hidden="true">⌂</span> Overview
           </button>
+          <button class="nav-item" type="button" data-view="ai-economics">
+            <span aria-hidden="true">◫</span> AI Economics
+          </button>
           <button class="nav-item" type="button" data-view="resources">
             <span aria-hidden="true">◇</span> Resources
           </button>
@@ -209,6 +212,74 @@
               <div id="recent-investigations" class="stack-list empty-state"><p>No investigation has run in this tab.</p></div>
             </article>
           </div>
+        </section>
+
+        <section class="view" id="view-ai-economics" data-title="AI Economics" data-eyebrow="Vendor-neutral usage and calculated cost" hidden>
+          <div class="section-intro ai-intro">
+            <div>
+              <h2>Understand where AI usage and spend occur</h2>
+              <p>Tenant-scoped metadata from the normalized OpenTelemetry usage ledger. Prompts and responses are never shown or required.</p>
+            </div>
+            <span class="status-chip neutral" id="ai-report-state">Connect to inspect</span>
+          </div>
+
+          <form class="panel ai-filter-panel" id="ai-report-form">
+            <label>Time window
+              <select id="ai-report-window">
+                <option value="1">Last hour</option>
+                <option value="6">Last 6 hours</option>
+                <option value="24" selected>Last 24 hours</option>
+                <option value="168">Last 7 days</option>
+                <option value="720">Last 30 days</option>
+              </select>
+            </label>
+            <label>Group by
+              <select id="ai-report-group">
+                <option value="application" selected>Application</option>
+                <option value="team">Team</option>
+              </select>
+            </label>
+            <button class="button primary" id="ai-report-refresh" type="submit">Load report</button>
+            <p>Calculated estimates use the protected pricing generation shown below. They are not provider invoices.</p>
+          </form>
+
+          <div class="metric-grid ai-metric-grid" aria-label="AI economics summary">
+            <article class="metric-card"><span>AI requests</span><strong id="ai-metric-usage">—</strong><small>Normalized usage records</small></article>
+            <article class="metric-card"><span>Calculated cost</span><strong id="ai-metric-cost">—</strong><small>Priced records only · estimate</small></article>
+            <article class="metric-card"><span>Input tokens</span><strong id="ai-metric-input">—</strong><small id="ai-metric-input-note">Records with this meter: —</small></article>
+            <article class="metric-card"><span>Output tokens</span><strong id="ai-metric-output">—</strong><small id="ai-metric-output-note">Records with this meter: —</small></article>
+            <article class="metric-card"><span>Pricing coverage</span><strong id="ai-metric-pricing">—</strong><small id="ai-metric-pricing-note">Priced records: —</small></article>
+            <article class="metric-card"><span>Allocation coverage</span><strong id="ai-metric-allocation">—</strong><small id="ai-metric-allocation-note">Allocated records: —</small></article>
+          </div>
+
+          <article class="panel ai-coverage-panel" aria-labelledby="ai-coverage-heading">
+            <div class="panel-heading">
+              <div><span class="kicker">Coverage before totals</span><h2 id="ai-coverage-heading">What the estimate includes</h2></div>
+              <span id="ai-report-generated">No report loaded</span>
+            </div>
+            <div class="ai-coverage-grid" id="ai-coverage-grid" aria-live="polite">
+              <div><span>Unpriced</span><strong id="ai-coverage-unpriced">—</strong></div>
+              <div><span>Ambiguous price</span><strong id="ai-coverage-ambiguous">—</strong></div>
+              <div><span>Cost pending</span><strong id="ai-coverage-cost-pending">—</strong></div>
+              <div><span>Unallocated</span><strong id="ai-coverage-unallocated">—</strong></div>
+              <div><span>Attribution pending</span><strong id="ai-coverage-attribution-pending">—</strong></div>
+            </div>
+            <p class="delivery-note" id="ai-coverage-note">Missing price, token, or ownership facts remain visible instead of becoming zero.</p>
+          </article>
+
+          <article class="panel table-panel ai-allocation-panel">
+            <div class="panel-heading">
+              <div><span class="kicker">Protected attribution</span><h2 id="ai-allocation-heading">Usage by application</h2></div>
+              <span class="ai-source-binding" id="ai-source-binding">Source generations appear after loading</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Allocation</th><th>Status</th><th>Requests</th><th>Input tokens</th><th>Output tokens</th><th>Pricing coverage</th><th>Calculated cost</th></tr></thead>
+                <tbody id="ai-allocation-rows"></tbody>
+              </table>
+            </div>
+            <div id="ai-allocation-empty" class="empty-state"><div class="empty-icon">◫</div><h3>Connect to inspect AI economics</h3><p>Load a bounded report from the tenant's normalized usage and calculated-cost ledger.</p></div>
+          </article>
         </section>
 
         <section class="view" id="view-resources" data-title="Resources" data-eyebrow="Tenant resource graph" hidden>

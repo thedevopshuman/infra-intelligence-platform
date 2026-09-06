@@ -147,7 +147,13 @@ identity to immutable application/team facts, records unmatched usage explicitly
 and revalidates each decision against its exact usage and policy sources. A bounded
 authenticated API now joins those facts to the exact calculated-cost generation,
 and the worker exports protected application/team IDs to dedicated dashboard views
-without accepting workload-controlled ownership labels. A separate
+without accepting workload-controlled ownership labels. A read-only AI Economics
+console view queries the same bounded, generation-bound
+allocation contract for a selected one-hour through 30-day window. It presents
+exact calculated-cost subunits as estimates, shows unpriced, ambiguous, pending,
+and unallocated coverage before totals, verifies the authenticated tenant and
+requested scope in the response, and never fetches prompt or response content.
+A separate
 tenant-explicit deterministic service evaluates fixed context-growth,
 retry-amplification, and qualified model-cost windows, revalidates every cited
 source fact, and

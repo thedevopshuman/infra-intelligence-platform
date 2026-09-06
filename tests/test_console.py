@@ -163,6 +163,44 @@ class ConsoleHttpTests(unittest.TestCase):
         self.assertEqual(document["spec"]["roles"], ["developer", "platform-admin"])
         self.assertNotIn(TOKEN, json.dumps(document))
 
+    def test_ai_economics_view_uses_the_bounded_public_report(self) -> None:
+        handler = object.__new__(ApiHandler)
+        handler.path = "/console"
+        handler.headers = Message()
+        self._wire_response(handler)
+
+        handler.do_GET()
+
+        console = handler.wfile.getvalue().decode("utf-8")
+        self.assertIn('data-view="ai-economics"', console)
+        self.assertIn("Understand where AI usage and spend occur", console)
+        self.assertIn("Prompts and responses are never shown or required", console)
+        self.assertIn("They are not provider invoices", console)
+        self.assertIn("Unpriced", console)
+        self.assertIn("Attribution pending", console)
+
+        handler = object.__new__(ApiHandler)
+        handler.path = "/console/app.js"
+        handler.headers = Message()
+        self._wire_response(handler)
+
+        handler.do_GET()
+
+        script = handler.wfile.getvalue().decode("utf-8")
+        self.assertIn("validateAiAllocationReport", script)
+        self.assertIn("/v1/ai/economics/allocation?", script)
+        self.assertIn(
+            'document.metadata.tenantId !== state.session?.metadata?.tenantId',
+            script,
+        )
+        self.assertIn('scope.start !== expectedScope.start', script)
+        self.assertIn('scope.end !== expectedScope.end', script)
+        self.assertIn('toISOString().replace(".000Z", "Z")', script)
+        self.assertIn('value.costBasis === "calculated-estimate"', script)
+        self.assertIn("BigInt(money.totalSubunits)", script)
+        self.assertIn("ai.allocation.not-configured", script)
+        self.assertNotIn('api("/v1/traces', script)
+
     def test_session_requires_authentication(self) -> None:
         with patch.dict(
             os.environ,

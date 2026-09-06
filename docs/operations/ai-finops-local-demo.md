@@ -33,6 +33,13 @@ checks pass. Open:
 - Grafana: [http://127.0.0.1:13000/d/iip-ai-finops](http://127.0.0.1:13000/d/iip-ai-finops)
 - Prometheus: [http://127.0.0.1:19091](http://127.0.0.1:19091)
 - control API: [http://127.0.0.1:18082](http://127.0.0.1:18082)
+- web console: [http://127.0.0.1:18082/console](http://127.0.0.1:18082/console)
+
+For the disposable profile only, connect the console with the fixed fixture
+token printed by `make ai-finops-up`, then select **AI Economics**. The default
+24-hour application view reads the public tenant-scoped allocation contract;
+switch to team or another bounded window without changing collection or the
+protected pricing and attribution generations.
 
 The dashboard answers:
 
@@ -96,6 +103,7 @@ privacy-safe labels.
 | Prometheus | Reference aggregate metric store | Replace with any backend accepting the customer's chosen Collector exporter. |
 | Loki | Provisioned reference OTLP log destination | Optional; it is not an accounting source and the V0 finding panel uses bounded metrics. |
 | Grafana | Provisioned usage/cost/change/saving/coverage and application/team allocation visualization | Point equivalent queries at the selected telemetry backend. |
+| IIP web console | Read-only bounded usage, estimated cost, source generation, and incomplete-coverage view over the public allocation contract | Authenticate through the deployed console profile; no telemetry-backend or provider credential reaches the browser. |
 
 ## Security boundary
 

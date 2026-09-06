@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -85,6 +85,7 @@ help:
 	@echo "validate      Validate contracts, links, and package boundaries"
 	@echo "validate-schemas Validate contract examples against JSON Schemas"
 	@echo "test          Run the reference-kernel and SDK tests"
+	@echo "test-console-javascript Validate defensive AI Economics rendering inputs"
 	@echo "test-typescript Install locked TypeScript tooling and type-check the SDK"
 	@echo "test-evidence-redaction Validate additive tenant redaction policy and deployment wiring"
 	@echo "test-deployment-preflight Validate the sanitized core, GitHub-context, and AI profiles"
@@ -187,6 +188,9 @@ validate-schemas:
 
 test:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest discover -s tests -v
+
+test-console-javascript:
+	node scripts/test_console_ai_economics.mjs
 
 test-typescript:
 	cd sdks/typescript && $(NPM) ci --ignore-scripts --no-audit --no-fund
@@ -909,7 +913,7 @@ helm-lint:
 		echo "Helm validation accepted GitHub context without explicit provider egress" >&2; exit 1; \
 	fi
 
-verify: validate validate-schemas test test-typescript helm-lint test-deployment-preflight
+verify: validate validate-schemas test test-console-javascript test-typescript helm-lint test-deployment-preflight
 
 run:
 	PYTHONPATH=src $(PYTHON) -m iip.surfaces.http

@@ -154,6 +154,8 @@ def start() -> None:
     )
     print("IIP AI FinOps reference slice is ready in Docker Desktop.")
     print("Dashboard: http://127.0.0.1:13000/d/iip-ai-finops")
+    print("Console: http://127.0.0.1:18082/console")
+    print(f"Console token: {ai_finops_fixture.CONTROL_TOKEN}")
     print("Prometheus: http://127.0.0.1:19091")
     print(f"Protected fixture configuration: {ENV_PATH}")
 

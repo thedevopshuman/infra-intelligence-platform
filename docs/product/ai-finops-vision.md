@@ -61,6 +61,13 @@ One dashboard must answer:
 4. What changed against the preceding comparison window?
 5. What is one potential saving, and which facts support it?
 
+The provisioned Grafana dashboard remains the V0 cross-window and saving view.
+The same API image now provides a read-only AI Economics console for bounded
+current-window usage, calculated cost, protected application/team allocation,
+generation provenance, and incomplete coverage. It intentionally does not
+invent a saving when no public evidence-backed finding contract is available
+to that surface.
+
 The first supported profile is metadata-only Bedrock `Converse` and
 `ConverseStream` traffic using on-demand pricing for one explicitly configured
 region and model. Broader API, model, region, purchase-mode, and language

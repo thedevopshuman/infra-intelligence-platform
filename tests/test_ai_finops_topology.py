@@ -248,6 +248,14 @@ class AiFinOpsTopologyTests(unittest.TestCase):
         self.assertIn("IIP_AI_FINOPS_TEST_COLLECTOR_PORT", runner)
         self.assertIn("IIP_AI_FINOPS_TEST_OPENAI_COLLECTOR_PORT", runner)
 
+    def test_visible_stack_reports_the_console_and_fixture_credential(self) -> None:
+        lifecycle = (ROOT / "scripts" / "ai_finops_stack.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("http://127.0.0.1:18082/console", lifecycle)
+        self.assertIn("ai_finops_fixture.CONTROL_TOKEN", lifecycle)
+
 
 if __name__ == "__main__":
     unittest.main()

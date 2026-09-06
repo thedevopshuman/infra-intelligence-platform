@@ -13,6 +13,8 @@ const state = {
   eventDeliverySlo: null,
   investigationCompletionSlo: null,
   evidenceRetention: null,
+  aiAllocationReport: null,
+  aiAllocationError: null,
   resources: [],
   investigations: [],
   evidence: [],
@@ -290,6 +292,301 @@ function formatDate(value) {
   }).format(date);
 }
 
+function hasOnlyKeys(value, required, optional = []) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  const allowed = new Set([...required, ...optional]);
+  return required.every((key) => Object.hasOwn(value, key))
+    && keys.every((key) => allowed.has(key));
+}
+
+function isCount(value) {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
+function isCanonicalUtc(value) {
+  return typeof value === "string"
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[.]\d+)?Z$/.test(value)
+    && !Number.isNaN(new Date(value).valueOf());
+}
+
+function validMoney(value) {
+  return hasOnlyKeys(value, ["currency", "currencyScale", "totalSubunits", "costBasis"])
+    && /^[A-Z]{3}$/.test(value.currency)
+    && [6, 9, 12].includes(value.currencyScale)
+    && isCount(value.totalSubunits)
+    && value.costBasis === "calculated-estimate";
+}
+
+function validGeneration(value, kind) {
+  const pricing = kind === "pricing";
+  const required = pricing
+    ? ["id", "version", "sourceHash", "engineVersion", "currency", "currencyScale", "costBasis"]
+    : ["id", "version", "sourceHash", "engineVersion"];
+  const idPattern = pricing ? /^apc_[a-f0-9]{32}$/ : /^aap_[a-f0-9]{32}$/;
+  return hasOnlyKeys(value, required)
+    && idPattern.test(value.id)
+    && /^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][0-9]+$/.test(value.version)
+    && /^sha256:[a-f0-9]{64}$/.test(value.sourceHash)
+    && /^[0-9]+[.][0-9]+[.][0-9]+$/.test(value.engineVersion)
+    && (!pricing || (/^[A-Z]{3}$/.test(value.currency)
+      && [6, 9, 12].includes(value.currencyScale)
+      && value.costBasis === "calculated-estimate"));
+}
+
+function validateAiAllocationReport(document, expectedScope) {
+  const countFields = [
+    "usageRecords", "inputTokens", "inputTokenRecords", "outputTokens",
+    "outputTokenRecords", "pricedRecords", "unpricedRecords",
+    "ambiguousRecords", "pendingCostRecords",
+  ];
+  const coverageFields = [
+    "usageRecords", "allocatedRecords", "unallocatedRecords",
+    "pendingAttributionRecords", "pricedRecords", "unpricedRecords",
+    "ambiguousRecords", "pendingCostRecords",
+  ];
+  const totalsFields = ["inputTokens", "inputTokenRecords", "outputTokens", "outputTokenRecords"];
+  const invalid = () => { throw new Error("ai.allocation.response.invalid"); };
+  if (!hasOnlyKeys(document, ["apiVersion", "kind", "metadata", "spec"])
+      || document.apiVersion !== "iip.platform/v1alpha1"
+      || document.kind !== "AiAllocationReport"
+      || !hasOnlyKeys(document.metadata, ["tenantId", "generatedAt"])
+      || document.metadata.tenantId !== state.session?.metadata?.tenantId
+      || !isCanonicalUtc(document.metadata.generatedAt)
+      || !hasOnlyKeys(document.spec, ["scope", "sources", "coverage", "totals", "groups"])) invalid();
+
+  const { scope, sources, coverage, totals, groups } = document.spec;
+  if (!hasOnlyKeys(scope, ["start", "end", "groupBy", "sourceRecordLimit"])
+      || scope.start !== expectedScope.start || scope.end !== expectedScope.end
+      || scope.groupBy !== expectedScope.groupBy
+      || !Number.isInteger(scope.sourceRecordLimit)
+      || scope.sourceRecordLimit < 1 || scope.sourceRecordLimit > 10_000
+      || !hasOnlyKeys(sources, ["attribution", "pricing"])
+      || !validGeneration(sources.attribution, "attribution")
+      || !validGeneration(sources.pricing, "pricing")
+      || !hasOnlyKeys(coverage, coverageFields)
+      || !coverageFields.every((field) => isCount(coverage[field]))
+      || !hasOnlyKeys(totals, totalsFields, ["pricedCost"])
+      || !totalsFields.every((field) => isCount(totals[field]))
+      || (Object.hasOwn(totals, "pricedCost") && !validMoney(totals.pricedCost))
+      || !Array.isArray(groups) || groups.length > 1002) invalid();
+
+  if (coverage.usageRecords !== coverage.allocatedRecords + coverage.unallocatedRecords + coverage.pendingAttributionRecords
+      || coverage.usageRecords !== coverage.pricedRecords + coverage.unpricedRecords + coverage.ambiguousRecords + coverage.pendingCostRecords
+      || totals.inputTokenRecords > coverage.usageRecords
+      || totals.outputTokenRecords > coverage.usageRecords) invalid();
+
+  const aggregate = Object.fromEntries(countFields.map((field) => [field, 0]));
+  let allocatedRecords = 0;
+  let unallocatedRecords = 0;
+  let pendingAttributionRecords = 0;
+  let groupCost = 0n;
+  let groupsWithCost = 0;
+  groups.forEach((group) => {
+    if (!hasOnlyKeys(group, countFields, ["dimension", "reasonCode", "pricedCost", "allocationStatus"])
+        || !["allocated", "unallocated", "pending"].includes(group.allocationStatus)
+        || !countFields.every((field) => isCount(group[field]))
+        || group.usageRecords !== group.pricedRecords + group.unpricedRecords + group.ambiguousRecords + group.pendingCostRecords
+        || group.inputTokenRecords > group.usageRecords
+        || group.outputTokenRecords > group.usageRecords) invalid();
+    if (group.allocationStatus === "allocated") {
+      if (!hasOnlyKeys(group.dimension, ["id", "name"])
+          || !/^[a-z][a-z0-9._-]{2,127}$/.test(group.dimension.id)
+          || typeof group.dimension.name !== "string"
+          || group.dimension.name.length < 1 || group.dimension.name.length > 256
+          || Object.hasOwn(group, "reasonCode")) invalid();
+      allocatedRecords += group.usageRecords;
+    } else {
+      const expectedReason = group.allocationStatus === "unallocated" ? "no-matching-rule" : "not-yet-attributed";
+      if (group.reasonCode !== expectedReason || Object.hasOwn(group, "dimension")) invalid();
+      if (group.allocationStatus === "unallocated") unallocatedRecords += group.usageRecords;
+      else pendingAttributionRecords += group.usageRecords;
+    }
+    if (Object.hasOwn(group, "pricedCost")) {
+      if (!validMoney(group.pricedCost)
+          || group.pricedCost.currency !== sources.pricing.currency
+          || group.pricedCost.currencyScale !== sources.pricing.currencyScale) invalid();
+      groupCost += BigInt(group.pricedCost.totalSubunits);
+      groupsWithCost += 1;
+    }
+    countFields.forEach((field) => {
+      aggregate[field] += group[field];
+      if (!Number.isSafeInteger(aggregate[field])) invalid();
+    });
+  });
+  if (aggregate.usageRecords !== coverage.usageRecords
+      || aggregate.pricedRecords !== coverage.pricedRecords
+      || aggregate.unpricedRecords !== coverage.unpricedRecords
+      || aggregate.ambiguousRecords !== coverage.ambiguousRecords
+      || aggregate.pendingCostRecords !== coverage.pendingCostRecords
+      || allocatedRecords !== coverage.allocatedRecords
+      || unallocatedRecords !== coverage.unallocatedRecords
+      || pendingAttributionRecords !== coverage.pendingAttributionRecords
+      || aggregate.inputTokens !== totals.inputTokens
+      || aggregate.inputTokenRecords !== totals.inputTokenRecords
+      || aggregate.outputTokens !== totals.outputTokens
+      || aggregate.outputTokenRecords !== totals.outputTokenRecords) invalid();
+  if (Object.hasOwn(totals, "pricedCost")) {
+    if (totals.pricedCost.currency !== sources.pricing.currency
+        || totals.pricedCost.currencyScale !== sources.pricing.currencyScale
+        || groupCost !== BigInt(totals.pricedCost.totalSubunits)) invalid();
+  } else if (groupsWithCost > 0) invalid();
+  return document;
+}
+
+function formatInteger(value) {
+  return new Intl.NumberFormat().format(value);
+}
+
+function formatCoverage(covered, total) {
+  return total === 0 ? "—" : `${Math.round((covered / total) * 100)}%`;
+}
+
+function formatCalculatedCost(money) {
+  if (!money) return "Unresolved";
+  const divisor = 10n ** BigInt(money.currencyScale);
+  const subunits = BigInt(money.totalSubunits);
+  const whole = subunits / divisor;
+  const fraction = (subunits % divisor).toString().padStart(money.currencyScale, "0").replace(/0+$/, "");
+  return `${money.currency} ${whole}${fraction ? `.${fraction}` : ""} est.`;
+}
+
+function selectedAiScope() {
+  const hours = Number.parseInt($("#ai-report-window").value, 10);
+  const groupBy = $("#ai-report-group").value;
+  if (![1, 6, 24, 168, 720].includes(hours) || !["application", "team"].includes(groupBy)) {
+    throw new Error("ai.allocation.scope.invalid");
+  }
+  const end = new Date();
+  end.setMilliseconds(0);
+  const start = new Date(end.valueOf() - hours * 60 * 60 * 1000);
+  const canonicalUtc = (value) => value.toISOString().replace(".000Z", "Z");
+  return { start: canonicalUtc(start), end: canonicalUtc(end), groupBy };
+}
+
+function renderAiAllocationReport() {
+  const report = state.aiAllocationReport;
+  const error = state.aiAllocationError;
+  const chip = $("#ai-report-state");
+  const rows = $("#ai-allocation-rows");
+  const empty = $("#ai-allocation-empty");
+  clear(rows);
+  if (!report) {
+    ["usage", "cost", "input", "output", "pricing", "allocation"].forEach((field) => {
+      $(`#ai-metric-${field}`).textContent = "—";
+    });
+    ["unpriced", "ambiguous", "cost-pending", "unallocated", "attribution-pending"].forEach((field) => {
+      $(`#ai-coverage-${field}`).textContent = "—";
+    });
+    $("#ai-metric-input-note").textContent = "Records with this meter: —";
+    $("#ai-metric-output-note").textContent = "Records with this meter: —";
+    $("#ai-metric-pricing-note").textContent = "Priced records: —";
+    $("#ai-metric-allocation-note").textContent = "Allocated records: —";
+    $("#ai-report-generated").textContent = "No report loaded";
+    $("#ai-source-binding").textContent = "Source generations appear after loading";
+    empty.hidden = false;
+    const title = empty.querySelector("h3");
+    const copy = empty.querySelector("p");
+    if (!state.session) {
+      chip.textContent = "Connect to inspect";
+      title.textContent = "Connect to inspect AI economics";
+      copy.textContent = "Load a bounded report from the tenant's normalized usage and calculated-cost ledger.";
+    } else if (error === "ai.allocation.not-configured") {
+      chip.textContent = "Not configured";
+      title.textContent = "AI economics is not configured";
+      copy.textContent = "An administrator must configure protected attribution and pricing generations before reports are available.";
+    } else if (error === "policy.denied") {
+      chip.textContent = "Access restricted";
+      title.textContent = "AI economics access is restricted";
+      copy.textContent = "Your authenticated role does not have ai-economics:read authority for this tenant.";
+    } else {
+      chip.textContent = error ? "Unavailable" : "Ready to load";
+      title.textContent = error ? "The report is unavailable" : "No report loaded";
+      copy.textContent = error
+        ? "The control plane returned a stable error without exposing provider or storage details."
+        : "Choose a bounded window and load the report.";
+    }
+    chip.className = "status-chip neutral";
+    return;
+  }
+
+  const { coverage, totals, groups, sources, scope } = report.spec;
+  chip.textContent = coverage.usageRecords ? "Current" : "No usage";
+  chip.className = `status-chip ${coverage.usageRecords ? "success" : "neutral"}`;
+  $("#ai-metric-usage").textContent = formatInteger(coverage.usageRecords);
+  $("#ai-metric-cost").textContent = formatCalculatedCost(totals.pricedCost);
+  $("#ai-metric-input").textContent = formatInteger(totals.inputTokens);
+  $("#ai-metric-output").textContent = formatInteger(totals.outputTokens);
+  $("#ai-metric-pricing").textContent = formatCoverage(coverage.pricedRecords, coverage.usageRecords);
+  $("#ai-metric-allocation").textContent = formatCoverage(coverage.allocatedRecords, coverage.usageRecords);
+  $("#ai-metric-input-note").textContent = `Records with this meter: ${formatInteger(totals.inputTokenRecords)}/${formatInteger(coverage.usageRecords)}`;
+  $("#ai-metric-output-note").textContent = `Records with this meter: ${formatInteger(totals.outputTokenRecords)}/${formatInteger(coverage.usageRecords)}`;
+  $("#ai-metric-pricing-note").textContent = `Priced records: ${formatInteger(coverage.pricedRecords)}/${formatInteger(coverage.usageRecords)}`;
+  $("#ai-metric-allocation-note").textContent = `Allocated records: ${formatInteger(coverage.allocatedRecords)}/${formatInteger(coverage.usageRecords)}`;
+  $("#ai-coverage-unpriced").textContent = formatInteger(coverage.unpricedRecords);
+  $("#ai-coverage-ambiguous").textContent = formatInteger(coverage.ambiguousRecords);
+  $("#ai-coverage-cost-pending").textContent = formatInteger(coverage.pendingCostRecords);
+  $("#ai-coverage-unallocated").textContent = formatInteger(coverage.unallocatedRecords);
+  $("#ai-coverage-attribution-pending").textContent = formatInteger(coverage.pendingAttributionRecords);
+  $("#ai-report-generated").textContent = `Generated ${formatDate(report.metadata.generatedAt)}`;
+  $("#ai-coverage-note").textContent = `${formatDate(scope.start)} to ${formatDate(scope.end)} · half-open interval · ${formatInteger(scope.sourceRecordLimit)}-record ceiling. Missing facts remain visible instead of becoming zero.`;
+  $("#ai-allocation-heading").textContent = `Usage by ${scope.groupBy}`;
+  $("#ai-source-binding").textContent = `Attribution ${sources.attribution.version} · Pricing ${sources.pricing.version}`;
+
+  groups.forEach((group) => {
+    const row = node("tr");
+    const label = group.dimension?.name
+      || (group.allocationStatus === "unallocated" ? "Unallocated" : "Pending attribution");
+    const identity = group.dimension?.id || group.reasonCode;
+    const allocation = node("td");
+    allocation.append(node("strong", "ai-allocation-name", label));
+    allocation.append(node("small", "ai-allocation-id", identity));
+    row.append(allocation);
+    const statusCell = node("td");
+    statusCell.append(node("span", `allocation-badge ${group.allocationStatus}`, group.allocationStatus));
+    row.append(statusCell);
+    row.append(node("td", "number-cell", formatInteger(group.usageRecords)));
+    row.append(node("td", "number-cell", formatInteger(group.inputTokens)));
+    row.append(node("td", "number-cell", formatInteger(group.outputTokens)));
+    row.append(node("td", "number-cell", `${formatInteger(group.pricedRecords)}/${formatInteger(group.usageRecords)}`));
+    row.append(node("td", "number-cell cost-cell", formatCalculatedCost(group.pricedCost)));
+    rows.append(row);
+  });
+  empty.hidden = groups.length > 0;
+  if (!groups.length) {
+    empty.querySelector("h3").textContent = "No AI usage in this window";
+    empty.querySelector("p").textContent = "No normalized usage record matched the selected half-open interval.";
+  }
+}
+
+async function refreshAiAllocationReport(announce = false) {
+  if (!state.session) {
+    state.aiAllocationReport = null;
+    state.aiAllocationError = null;
+    renderAiAllocationReport();
+    return;
+  }
+  const button = $("#ai-report-refresh");
+  button.disabled = true;
+  button.textContent = "Loading…";
+  try {
+    const scope = selectedAiScope();
+    const parameters = new URLSearchParams(scope);
+    const response = await api(`/v1/ai/economics/allocation?${parameters.toString()}`);
+    state.aiAllocationReport = validateAiAllocationReport(response, scope);
+    state.aiAllocationError = null;
+    if (announce) showNotice("AI economics report refreshed from protected source generations.");
+  } catch (error) {
+    state.aiAllocationReport = null;
+    state.aiAllocationError = error.message;
+    if (announce) showNotice(`AI economics report unavailable (${error.message}).`, "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Load report";
+  }
+  renderAiAllocationReport();
+}
+
 function clear(element) {
   while (element.firstChild) element.removeChild(element.firstChild);
 }
@@ -351,6 +648,7 @@ function switchView(name) {
   $("#page-eyebrow").textContent = target.dataset.eyebrow;
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (name === "actions" && state.token) refreshActions();
+  if (name === "ai-economics" && state.token && !state.aiAllocationReport) refreshAiAllocationReport();
 }
 
 function updateIdentity() {
@@ -765,7 +1063,7 @@ async function connect(token, remember) {
     if (remember) sessionStorage.setItem(REMEMBERED_TOKEN_KEY, token);
     else sessionStorage.removeItem(REMEMBERED_TOKEN_KEY);
     updateIdentity();
-    await Promise.all([refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshTelemetryExportBurnRate(), refreshCollectorQueueLoss(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
+    await Promise.all([refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshTelemetryExportBurnRate(), refreshCollectorQueueLoss(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshAiAllocationReport(), refreshResources(), refreshActions()]);
     $("#connection-dialog").close();
     $("#connection-error").hidden = true;
     showNotice(`Connected as ${state.session.metadata.actorId} in tenant ${state.session.metadata.tenantId}.`);
@@ -1636,7 +1934,7 @@ function bindEvents() {
   $("#identity-button").addEventListener("click", () => $("#connection-dialog").showModal());
   $("#connection-close").addEventListener("click", () => $("#connection-dialog").close());
   $("#refresh-button").addEventListener("click", async () => {
-    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshTelemetryExportBurnRate(), refreshCollectorQueueLoss(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshResources(), refreshActions()]);
+    await Promise.all([checkHealth(), refreshRuntimeVersion(), refreshTelemetryDeploymentHealth(), refreshTelemetryExportSlo(), refreshTelemetryExportBurnRate(), refreshCollectorQueueLoss(), refreshEventDeliveryHealth(), refreshEventDeliverySlo(), refreshInvestigationCompletionSlo(), refreshEvidenceRetention(), refreshAiAllocationReport(), refreshResources(), refreshActions()]);
     showNotice("Live platform state refreshed.");
   });
   $("#connection-form").addEventListener("submit", async (event) => {
@@ -1676,6 +1974,10 @@ function bindEvents() {
     }
   });
   $("#demo-resource-button").addEventListener("click", addDemoResource);
+  $("#ai-report-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    refreshAiAllocationReport(true);
+  });
   $("#resource-search").addEventListener("input", renderResources);
   $("#health-filter").addEventListener("change", renderResources);
   $("#investigation-form").addEventListener("submit", runInvestigation);
@@ -1794,6 +2096,7 @@ async function start() {
   renderEventDeliverySlo();
   renderInvestigationCompletionSlo();
   renderEvidenceRetention();
+  renderAiAllocationReport();
   renderPluginInvocationStatus();
   await Promise.all([checkHealth(), loadConsoleAuthentication()]);
   configureConnectionDialog();

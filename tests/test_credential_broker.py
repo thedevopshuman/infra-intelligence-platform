@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.request import ProxyHandler
 
 from iip.adapters.auth import HashedBearerAuthenticator
 from iip.adapters.credential_broker import (
@@ -16,6 +18,7 @@ from iip.adapters.credential_broker import (
     ExternalCredentialBrokerConfiguration,
     ExternalHttpCredentialBroker,
     NoCredentialBrokerRedirectHandler,
+    UrllibCredentialBrokerHttpTransport,
     WorkloadIdentityTokenSource,
     build_external_credential_broker_from_environment,
 )
@@ -313,6 +316,71 @@ class ExternalHttpCredentialBrokerTests(unittest.TestCase):
                 object(), object(), 302, "redirect", {}, "https://other.example"
             )
         )
+
+    def test_https_transport_explicitly_disables_environment_proxies(self) -> None:
+        captured = []
+
+        class Opener:
+            def open(self, request, timeout):
+                del request, timeout
+                raise OSError
+
+        def build(*handlers):
+            captured.extend(handlers)
+            return Opener()
+
+        with patch(
+            "iip.adapters.credential_broker.build_opener", side_effect=build
+        ), self.assertRaises(CredentialBrokerUnavailableError):
+            UrllibCredentialBrokerHttpTransport().post(
+                "https://credential-broker.example/v1/credential-leases",
+                b"{}",
+                {},
+                ca_bundle_path=None,
+                timeout_seconds=1,
+                max_response_bytes=1024,
+            )
+
+        proxy_handlers = [item for item in captured if isinstance(item, ProxyHandler)]
+        self.assertEqual(len(proxy_handlers), 1)
+        self.assertEqual(proxy_handlers[0].proxies, {})
+
+    def test_transport_distinguishes_explicit_denial_from_upstream_failure(
+        self,
+    ) -> None:
+        class Opener:
+            def __init__(self, status: int) -> None:
+                self.status = status
+
+            def open(self, request, timeout):
+                del timeout
+                raise HTTPError(
+                    request.full_url,
+                    self.status,
+                    "protected upstream detail",
+                    {},
+                    None,
+                )
+
+        for status, expected in (
+            (403, "credential.broker.request.denied"),
+            (401, "credential.broker.upstream.unavailable"),
+            (500, "credential.broker.upstream.unavailable"),
+        ):
+            with self.subTest(status=status), patch(
+                "iip.adapters.credential_broker.build_opener",
+                return_value=Opener(status),
+            ), self.assertRaises(CredentialBrokerUnavailableError) as raised:
+                UrllibCredentialBrokerHttpTransport().post(
+                    "https://credential-broker.example/v1/credential-leases",
+                    b"{}",
+                    {},
+                    ca_bundle_path=None,
+                    timeout_seconds=1,
+                    max_response_bytes=1024,
+                )
+            self.assertEqual(str(raised.exception), expected)
+            self.assertNotIn("protected upstream detail", str(raised.exception))
 
 
 class CredentialBrokerCompositionTests(unittest.TestCase):

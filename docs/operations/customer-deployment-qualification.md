@@ -2,7 +2,8 @@
 
 **Status:** Executable customer-environment gate
 
-This workflow turns the separate live preflight, customer OIDC and policy
+This workflow turns the separate live preflight, customer OIDC, policy, and
+credential-broker
 prerequisites, sustained ingress/API-pod Eviction, worker/receiver processing
 continuity, post-install diagnostic, and PostgreSQL primary-promotion reports into one
 exact-release evidence chain. It does not install IIP and it
@@ -21,17 +22,20 @@ cluster.
 4. Run the customer policy qualification using the selected HTTPS endpoint,
    protected reviewed allow/deny profile, short-lived bearer credential, and
    immutable release image.
-5. Run the explicitly enabled customer continuity workflow. That workflow
+5. Run the customer credential-broker qualification using its protected
+   seven-case authority profile, projected workload identity, and selected CA
+   bundle.
+6. Run the explicitly enabled customer continuity workflow. That workflow
    performs the single API-pod Eviction and retains its nested ingress report.
-6. Run the separately enabled customer processing-continuity workflow. It
+7. Run the separately enabled customer processing-continuity workflow. It
    performs sequential worker and receiver pod Evictions while proving durable
    OTLP metric intake and investigation completion.
-7. Run the customer PostgreSQL continuity observer and have a separately
+8. Run the customer PostgreSQL continuity observer and have a separately
    authorized operator initiate the planned promotion only after its readiness
    message.
-8. Run deployment diagnostics after all workflows have completed, so health
+9. Run deployment diagnostics after all workflows have completed, so health
    is observed after every planned disruption.
-9. Aggregate the eight reports while their timestamps remain within the chosen
+10. Aggregate the nine reports while their timestamps remain within the chosen
    evidence-age objective.
 
 For a core deployment with one values file:
@@ -46,6 +50,9 @@ IIP_CUSTOMER_OIDC_PROFILE=/absolute/protected/customer-oidc-profile.json \
 IIP_CUSTOMER_OIDC_API_BASE_URL=https://iip.example.com \
 IIP_CUSTOMER_POLICY_PROFILE=/absolute/protected/customer-policy-profile.json \
 IIP_CUSTOMER_POLICY_ENDPOINT=https://policy.example.com/v1/data/iip/decision \
+IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE=/absolute/protected/customer-credential-broker-profile.json \
+IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT=https://credential-broker.example.com \
+IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE=/absolute/protected/credential-broker-ca.pem \
 IIP_PROCESSING_PROFILE=/absolute/protected/customer-processing-profile.json \
 IIP_PROCESSING_API_BASE_URL=https://iip.example.com \
 IIP_PROCESSING_OTLP_BASE_URL=https://otlp.example.com:4318 \
@@ -67,6 +74,7 @@ The defaults consume:
 - `dist/customer-continuity-ingress-report.json`;
 - `dist/customer-oidc-qualification-report.json`;
 - `dist/customer-policy-qualification-report.json`;
+- `dist/customer-credential-broker-qualification-report.json`;
 - `dist/customer-continuity-qualification-report.json`;
 - `dist/customer-processing-continuity-qualification-report.json`; and
 - `dist/customer-postgresql-continuity-qualification-report.json`.
@@ -92,6 +100,9 @@ IIP_CUSTOMER_OIDC_PROFILE=/absolute/protected/customer-oidc-profile.json \
 IIP_CUSTOMER_OIDC_API_BASE_URL=https://iip.example.com \
 IIP_CUSTOMER_POLICY_PROFILE=/absolute/protected/customer-policy-profile.json \
 IIP_CUSTOMER_POLICY_ENDPOINT=https://policy.example.com/v1/data/iip/decision \
+IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE=/absolute/protected/customer-credential-broker-profile.json \
+IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT=https://credential-broker.example.com \
+IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE=/absolute/protected/credential-broker-ca.pem \
 IIP_PROCESSING_PROFILE=/absolute/protected/customer-processing-profile.json \
 IIP_PROCESSING_API_BASE_URL=https://iip.example.com \
 IIP_PROCESSING_OTLP_BASE_URL=https://otlp.example.com:4318 \
@@ -116,7 +127,10 @@ and has no mutation authority. The OIDC prerequisite step uses its short-lived
 token before aggregation; aggregation never reads that token or calls the
 issuer. The policy prerequisite similarly uses its protected bearer credential
 before aggregation; aggregation never reads the credential or calls the
-policy endpoint. The separate API and processing-continuity steps perform the pod
+policy endpoint. The credential-broker prerequisite uses its projected
+workload token and observes two least-authority leases before aggregation;
+aggregation reads only its minimized report, protected profile, and CA bundle.
+The separate API and processing-continuity steps perform the pod
 Evictions. The database qualifier only observes; the separately authorized
 customer operator owns promotion. Each active workflow requires its own
 explicit enable flag.
@@ -133,7 +147,9 @@ automatic database failover, topology, fencing, zero-loss RPO, or regional
 disaster recovery; involuntary or simultaneous failures; representative
 sustained throughput; interactive OIDC login/MFA/session/logout/revocation,
 issuer rotation/HA, complete policy action coverage, policy credential/bundle
-lifecycle, engine/network HA or audit/SIEM delivery, customer broker/Collector
-or other integration interoperability; live AI providers or price authority;
+lifecycle, engine/network HA or audit/SIEM delivery, customer broker
+workload/provider credential lifecycle, HA, recovery, non-Bearer schemes, or
+audit delivery, customer Collector or other integration interoperability; live
+AI providers or price authority;
 regional capacity/SLOs; a design-partner outcome; or public legal/brand/
 governance approval. Those remain independent release gates.

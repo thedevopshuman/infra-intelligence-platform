@@ -15,6 +15,8 @@ from infra_intelligence_sdk import (
     ActionWorkflowPage,
     ConsoleAuthenticationConfiguration,
     ControlPlaneLoadQualificationReport,
+    CustomerCredentialBrokerQualificationProfile,
+    CustomerCredentialBrokerQualificationReport,
     CustomerContinuityQualificationReport,
     CustomerDeploymentQualificationReport,
     CustomerDeploymentPreflightReport,
@@ -219,6 +221,16 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         customer_oidc = CustomerOidcQualificationReport.from_dict(
             example("customer-oidc-qualification-report.json")
+        )
+        customer_credential_broker_profile = (
+            CustomerCredentialBrokerQualificationProfile.from_dict(
+                example("customer-credential-broker-qualification-profile.json")
+            )
+        )
+        customer_credential_broker = (
+            CustomerCredentialBrokerQualificationReport.from_dict(
+                example("customer-credential-broker-qualification-report.json")
+            )
         )
         customer_policy_profile = CustomerPolicyQualificationProfile.from_dict(
             example("customer-policy-qualification-profile.json")
@@ -500,7 +512,7 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         self.assertEqual(
             customer_deployment.to_dict()["spec"]["qualificationLevel"],
-            "single-cluster-database-identity-policy-prerequisites-v5",
+            "single-cluster-database-identity-policy-broker-prerequisites-v6",
         )
         self.assertEqual(
             customer_processing_profile.to_dict()["kind"],
@@ -525,6 +537,14 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             customer_oidc.to_dict()["spec"]["qualification"],
             "customer-oidc-verifier-browser-prerequisites-v1",
+        )
+        self.assertEqual(
+            customer_credential_broker_profile.to_dict()["kind"],
+            "CustomerCredentialBrokerQualificationProfile",
+        )
+        self.assertEqual(
+            customer_credential_broker.to_dict()["spec"]["qualification"],
+            "customer-credential-broker-authority-prerequisites-v1",
         )
         self.assertEqual(
             customer_policy_profile.to_dict()["kind"],

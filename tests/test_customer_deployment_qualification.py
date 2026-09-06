@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import deployment_diagnostics as diagnostics  # noqa: E402
 import deployment_preflight as preflight  # noqa: E402
 import qualify_customer_continuity as continuity  # noqa: E402
+import qualify_customer_credential_broker as customer_credential_broker  # noqa: E402
 import qualify_customer_deployment as qualification  # noqa: E402
 import qualify_customer_oidc as oidc  # noqa: E402
 import qualify_customer_policy as customer_policy  # noqa: E402
@@ -249,6 +250,29 @@ def policy_report() -> dict[str, object]:
     )
 
 
+def credential_broker_report() -> dict[str, object]:
+    profile = json.loads(
+        (
+            ROOT
+            / "contracts/examples/customer-credential-broker-qualification-profile.json"
+        ).read_text(encoding="utf-8")
+    )
+    profile["metadata"]["reviewedAt"] = "2026-09-06T11:00:00Z"
+    return customer_credential_broker.build_report(
+        revision=REVISION,
+        profile=profile,
+        image_digest=IMAGE_DIGEST,
+        ca_bundle_digest="sha256:" + "2" * 64,
+        started_at=datetime(2026, 9, 6, 12, 25, tzinfo=timezone.utc),
+        completed_at=datetime(2026, 9, 6, 12, 25, 1, tzinfo=timezone.utc),
+        maximum_latency_milliseconds=84,
+        minimum_remaining_lease_seconds=120,
+        observations={
+            identifier: True for identifier in customer_credential_broker.CHECK_IDS
+        },
+    )
+
+
 def processing_report(
     continuity_document: dict[str, object],
 ) -> dict[str, object]:
@@ -336,6 +360,7 @@ def inputs() -> tuple[dict[str, object], ...]:
         ingress_document,
         oidc_report(),
         policy_report(),
+        credential_broker_report(),
         continuity_document,
         processing_document,
         postgresql_report(processing_document),
@@ -349,6 +374,7 @@ def build(
     ingress_document: dict[str, object] | None = None,
     oidc_document: dict[str, object] | None = None,
     policy_document: dict[str, object] | None = None,
+    credential_broker_document: dict[str, object] | None = None,
     continuity_document: dict[str, object] | None = None,
     processing_document: dict[str, object] | None = None,
     postgresql_document: dict[str, object] | None = None,
@@ -360,9 +386,10 @@ def build(
         ingress_document or documents[2],
         oidc_document or documents[3],
         policy_document or documents[4],
-        continuity_document or documents[5],
-        processing_document or documents[6],
-        postgresql_document or documents[7],
+        credential_broker_document or documents[5],
+        continuity_document or documents[6],
+        processing_document or documents[7],
+        postgresql_document or documents[8],
     )
     return qualification.build_report(
         preflight_report=selected[0],
@@ -375,12 +402,14 @@ def build(
         oidc_digest=_digest(selected[3]),
         policy_report=selected[4],
         policy_digest=_digest(selected[4]),
-        continuity_report=selected[5],
-        continuity_digest=_digest(selected[5]),
-        processing_report=selected[6],
-        processing_digest=_digest(selected[6]),
-        postgresql_report=selected[7],
-        postgresql_digest=_digest(selected[7]),
+        credential_broker_report=selected[5],
+        credential_broker_digest=_digest(selected[5]),
+        continuity_report=selected[6],
+        continuity_digest=_digest(selected[6]),
+        processing_report=selected[7],
+        processing_digest=_digest(selected[7]),
+        postgresql_report=selected[8],
+        postgresql_digest=_digest(selected[8]),
         context=CONTEXT,
         namespace=NAMESPACE,
         release_name=RELEASE,
@@ -417,7 +446,7 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
     def test_exact_bound_inputs_produce_minimized_qualified_report(self) -> None:
         report = build()
         self.assertEqual(report["spec"]["status"], "qualified")
-        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 8)
+        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 9)
         serialized = json.dumps(report, sort_keys=True)
         for forbidden in (
             CONTEXT,
@@ -434,7 +463,7 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
 
     def test_crossed_processing_target_is_rejected(self) -> None:
         documents = inputs()
-        crossed = copy.deepcopy(documents[6])
+        crossed = copy.deepcopy(documents[7])
         crossed["spec"]["bindings"]["apiTargetBindingDigest"] = (
             "sha256:" + "f" * 64
         )
@@ -458,7 +487,7 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
 
     def test_crossed_database_target_is_rejected(self) -> None:
         documents = inputs()
-        crossed = copy.deepcopy(documents[7])
+        crossed = copy.deepcopy(documents[8])
         crossed["spec"]["bindings"]["otlpTargetBindingDigest"] = (
             "sha256:" + "f" * 64
         )
@@ -477,6 +506,16 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
             "customer-deployment-qualification.release.crossed",
         ):
             build(policy_document=crossed)
+
+    def test_crossed_credential_broker_subject_is_rejected(self) -> None:
+        documents = inputs()
+        crossed = copy.deepcopy(documents[5])
+        crossed["spec"]["subject"]["imageDigest"] = "sha256:" + "f" * 64
+        with self.assertRaisesRegex(
+            qualification.CustomerDeploymentQualificationError,
+            "customer-deployment-qualification.release.crossed",
+        ):
+            build(credential_broker_document=crossed)
 
     def test_crossed_source_and_current_cluster_are_rejected(self) -> None:
         crossed = healthy_diagnostic()
@@ -502,12 +541,14 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
                 oidc_digest=_digest(documents[3]),
                 policy_report=documents[4],
                 policy_digest=_digest(documents[4]),
-                continuity_report=documents[5],
-                continuity_digest=_digest(documents[5]),
-                processing_report=documents[6],
-                processing_digest=_digest(documents[6]),
-                postgresql_report=documents[7],
-                postgresql_digest=_digest(documents[7]),
+                credential_broker_report=documents[5],
+                credential_broker_digest=_digest(documents[5]),
+                continuity_report=documents[6],
+                continuity_digest=_digest(documents[6]),
+                processing_report=documents[7],
+                processing_digest=_digest(documents[7]),
+                postgresql_report=documents[8],
+                postgresql_digest=_digest(documents[8]),
                 context=CONTEXT,
                 namespace=NAMESPACE,
                 release_name=RELEASE,
@@ -588,6 +629,8 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
             _digest(documents[6]),
             documents[7],
             _digest(documents[7]),
+            documents[8],
+            _digest(documents[8]),
         )
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "report.json"
@@ -609,6 +652,10 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
                     policy_path=Path("policy.json"),
                     policy_profile_path=Path("policy-profile.json"),
                     policy_endpoint="https://policy.example.com/v1/data/iip/decision",
+                    credential_broker_path=Path("credential-broker.json"),
+                    credential_broker_profile_path=Path("credential-broker-profile.json"),
+                    credential_broker_endpoint="https://credential-broker.example.com",
+                    credential_broker_ca_bundle_path=Path("credential-broker-ca.pem"),
                     continuity_path=Path("continuity.json"),
                     processing_path=Path("processing.json"),
                     processing_profile_path=Path("processing-profile.json"),

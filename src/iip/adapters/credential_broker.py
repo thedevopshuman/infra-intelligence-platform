@@ -10,8 +10,15 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Callable, Mapping, Protocol
+from urllib.error import HTTPError
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
+from urllib.request import (
+    HTTPRedirectHandler,
+    HTTPSHandler,
+    ProxyHandler,
+    Request,
+    build_opener,
+)
 
 from iip.application.ports import (
     Clock,
@@ -180,6 +187,7 @@ class UrllibCredentialBrokerHttpTransport:
         try:
             context = ssl.create_default_context(cafile=ca_bundle_path)
             opener = build_opener(
+                ProxyHandler({}),
                 HTTPSHandler(context=context),
                 NoCredentialBrokerRedirectHandler(),
             )
@@ -194,6 +202,16 @@ class UrllibCredentialBrokerHttpTransport:
                         "credential.broker.response.invalid"
                     )
                 content = response.read(max_response_bytes + 1)
+        except HTTPError as error:
+            status = error.code
+            error.close()
+            if status == 403:
+                raise CredentialBrokerUnavailableError(
+                    "credential.broker.request.denied"
+                ) from None
+            raise CredentialBrokerUnavailableError(
+                "credential.broker.upstream.unavailable"
+            ) from None
         except CredentialBrokerUnavailableError:
             raise
         except Exception:

@@ -2,14 +2,14 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerDeploymentQualificationReport",
   "metadata": {
-    "id": "cdq_484a61af0f0411e33b8cdd904f376c21",
+    "id": "cdq_866d6569746e3bf52297280d3822a6ed",
     "generatedAt": "2026-09-06T12:38:00Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
   },
   "spec": {
     "status": "qualified",
-    "qualificationLevel": "single-cluster-database-identity-policy-prerequisites-v5",
+    "qualificationLevel": "single-cluster-database-identity-policy-broker-prerequisites-v6",
     "subject": {
       "profile": "production-core-v1",
       "applicationVersion": "0.84.0",
@@ -30,6 +30,10 @@
       "policyEndpointBindingDigest": "sha256:91249b4090633e9a2018a5b2fcdbcea74a9413be84e5a657237d39b2b2b5bb33",
       "policyProfileDigest": "sha256:ee30b006be5442bc49cf46a32acdb61b6e89816679b7a42f651ee49187f79174",
       "policySnapshotSetDigest": "sha256:d3857c4a685d020ce9527ff12d2bc1daac6121ef5da884783ee739a75081fabd",
+      "credentialBrokerEndpointBindingDigest": "sha256:13276b5061c20821725fccce452d5b54c16fb5be292f2853c3d3da0e51089ecb",
+      "credentialBrokerProfileDigest": "sha256:1fac4beb2ad8113e815709c33c4985132c421a126cdb04846c621d41a66d39fc",
+      "credentialBrokerAuthoritySetDigest": "sha256:82cdc43f692c3c40d92ad40d11e44e0fea88f4ec738a6eb941d620c49e00d5e1",
+      "credentialBrokerCaBundleDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
       "processingOtlpTargetBindingDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
       "processingProfileDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
       "workerDeploymentBindingDigest": "sha256:a119bf7efb51d7364093d7ff7d9f3be0f456dfe3219a6a4205e86480fdc30197",
@@ -48,6 +52,8 @@
       "oidcCompletedAt": "2026-09-06T12:10:04Z",
       "policyStartedAt": "2026-09-06T12:20:00Z",
       "policyCompletedAt": "2026-09-06T12:20:01Z",
+      "credentialBrokerStartedAt": "2026-09-06T12:25:00Z",
+      "credentialBrokerCompletedAt": "2026-09-06T12:25:01Z",
       "continuityStartedAt": "2026-09-06T12:30:00Z",
       "continuityCompletedAt": "2026-09-06T12:36:05Z",
       "processingStartedAt": "2026-09-06T12:36:10Z",
@@ -96,6 +102,14 @@
         "contractKind": "CustomerPolicyQualificationReport",
         "reportId": "cpq_fc380c96931353c7d3eb6ba64fe91eda",
         "reportDigest": "sha256:fa041117f0d548dbf8792a9bd7122a694f58ab2caa32214836e852a431fdc772",
+        "observedStatus": "qualified",
+        "status": "passed"
+      },
+      {
+        "id": "customer-credential-broker",
+        "contractKind": "CustomerCredentialBrokerQualificationReport",
+        "reportId": "ccbq_e6343ea43ec998f29c0bb68d3ddec8ab",
+        "reportDigest": "sha256:5597bbceae99f7539347fdd1e67f3a05edca8ab56efa4ab16ff9aa94dc68e3dd",
         "observedStatus": "qualified",
         "status": "passed"
       },
@@ -162,6 +176,10 @@
         "status": "passed"
       },
       {
+        "id": "customer-credential-broker",
+        "status": "passed"
+      },
+      {
         "id": "control-plane-continuity",
         "status": "passed"
       },
@@ -183,6 +201,10 @@
       },
       {
         "id": "policy-binding-chain",
+        "status": "passed"
+      },
+      {
+        "id": "credential-broker-binding-chain",
         "status": "passed"
       },
       {
@@ -218,11 +240,11 @@
       "design-partner-legal-brand-governance-not-qualified"
     ],
     "summary": {
-      "requiredEvidence": 8,
-      "passedEvidence": 8,
+      "requiredEvidence": 9,
+      "passedEvidence": 9,
       "rejectedEvidence": 0,
-      "totalChecks": 20,
-      "passedChecks": 20,
+      "totalChecks": 22,
+      "passedChecks": 22,
       "failedChecks": 0,
       "overallStatus": "qualified"
     }

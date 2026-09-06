@@ -25,7 +25,7 @@ The first version permits only Bearer leases. `issuedAt` and `expiresAt` are man
 
 ## Transport binding
 
-The reference client sends `POST /v1/credential-leases` with `application/json`, accepts only a direct `200 application/json` response, verifies TLS against system trust or an explicitly configured CA bundle, refuses redirects, and bounds time and response bytes. Stable local failures use the `credential.broker.*` namespace; upstream status, body, and exception text are never exposed.
+The reference client sends `POST /v1/credential-leases` with `application/json`, accepts a lease only from a direct `200 application/json` response, verifies TLS against system trust or an explicitly configured CA bundle, refuses redirects, disables environment proxies, and bounds time and response bytes. An explicit HTTP `403` becomes the stable `credential.broker.request.denied` authority result. Authentication failures, other upstream status codes, TLS failures, transport failures, and invalid responses remain indistinguishable fail-closed availability errors; upstream status, body, and exception text are never exposed.
 
 Authentication to the broker uses a token file path from protected runtime configuration. The file is read for each request so projected workload-identity rotation does not require restarting the control plane. The reference Helm profile uses an explicit Kubernetes `serviceAccountToken` projection while keeping ambient service-account-token automount disabled.
 

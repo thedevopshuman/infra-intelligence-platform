@@ -20,6 +20,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 import deployment_diagnostics as diagnostics
 import deployment_preflight as preflight
 import qualify_customer_continuity as continuity
+import qualify_customer_credential_broker as customer_credential_broker
 import qualify_customer_oidc as oidc
 import qualify_customer_policy as customer_policy
 import qualify_customer_processing_continuity as processing
@@ -31,7 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "contracts/schemas/customer-deployment-qualification-report.schema.json"
 API_VERSION = "iip.platform/v1alpha1"
 KIND = "CustomerDeploymentQualificationReport"
-QUALIFICATION_LEVEL = "single-cluster-database-identity-policy-prerequisites-v5"
+QUALIFICATION_LEVEL = "single-cluster-database-identity-policy-broker-prerequisites-v6"
 REPORT_ID = re.compile(r"^cdq_[a-f0-9]{32}$")
 DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 MAX_DOCUMENT_BYTES = 16 * 1024 * 1024
@@ -68,6 +69,12 @@ EVIDENCE_DEFINITIONS = (
         "customer-deployment-qualification.policy.not-qualified",
     ),
     (
+        "customer-credential-broker",
+        "CustomerCredentialBrokerQualificationReport",
+        "qualified",
+        "customer-deployment-qualification.credential-broker.not-qualified",
+    ),
+    (
         "control-plane-continuity",
         "CustomerContinuityQualificationReport",
         "qualified",
@@ -96,12 +103,14 @@ CHECK_IDS = (
     "customer-ingress",
     "customer-oidc",
     "customer-policy",
+    "customer-credential-broker",
     "control-plane-continuity",
     "worker-receiver-processing",
     "postgresql-primary-promotion",
     "continuity-ingress-chain",
     "oidc-target-chain",
     "policy-binding-chain",
+    "credential-broker-binding-chain",
     "processing-target-chain",
     "database-target-chain",
     "evidence-order",
@@ -295,6 +304,7 @@ def _subject_and_bindings(
     ingress_report: Mapping[str, Any],
     oidc_report: Mapping[str, Any],
     policy_report: Mapping[str, Any],
+    credential_broker_report: Mapping[str, Any],
     continuity_report: Mapping[str, Any],
     processing_report: Mapping[str, Any],
     postgresql_report: Mapping[str, Any],
@@ -375,6 +385,22 @@ def _subject_and_bindings(
         policy_spec.get("bindings"),
         "customer-deployment-qualification.policy.invalid",
     )
+    credential_broker_metadata = _mapping(
+        credential_broker_report.get("metadata"),
+        "customer-deployment-qualification.credential-broker.invalid",
+    )
+    credential_broker_spec = _mapping(
+        credential_broker_report.get("spec"),
+        "customer-deployment-qualification.credential-broker.invalid",
+    )
+    credential_broker_subject = _mapping(
+        credential_broker_spec.get("subject"),
+        "customer-deployment-qualification.credential-broker.invalid",
+    )
+    credential_broker_bindings = _mapping(
+        credential_broker_spec.get("bindings"),
+        "customer-deployment-qualification.credential-broker.invalid",
+    )
     continuity_metadata = _mapping(
         continuity_report.get("metadata"),
         "customer-deployment-qualification.continuity.invalid",
@@ -432,6 +458,8 @@ def _subject_and_bindings(
         oidc_subject.get("sourceRevision"),
         policy_metadata.get("sourceRevision"),
         policy_subject.get("sourceRevision"),
+        credential_broker_metadata.get("sourceRevision"),
+        credential_broker_subject.get("sourceRevision"),
         continuity_metadata.get("sourceRevision"),
         continuity_subject.get("sourceRevision"),
         processing_metadata.get("sourceRevision"),
@@ -457,6 +485,13 @@ def _subject_and_bindings(
         or continuity_subject.get("contractsApiVersion") != API_VERSION
         or oidc_subject != continuity_subject
         or policy_subject
+        != {
+            "applicationVersion": continuity_subject.get("applicationVersion"),
+            "contractsApiVersion": continuity_subject.get("contractsApiVersion"),
+            "sourceRevision": continuity_subject.get("sourceRevision"),
+            "imageDigest": continuity_subject.get("imageDigest"),
+        }
+        or credential_broker_subject
         != {
             "applicationVersion": continuity_subject.get("applicationVersion"),
             "contractsApiVersion": continuity_subject.get("contractsApiVersion"),
@@ -594,6 +629,18 @@ def _subject_and_bindings(
         "policySnapshotSetDigest": str(
             policy_bindings["snapshotSetDigest"]
         ),
+        "credentialBrokerEndpointBindingDigest": str(
+            credential_broker_bindings["endpointBindingDigest"]
+        ),
+        "credentialBrokerProfileDigest": str(
+            credential_broker_bindings["profileDigest"]
+        ),
+        "credentialBrokerAuthoritySetDigest": str(
+            credential_broker_bindings["authoritySetDigest"]
+        ),
+        "credentialBrokerCaBundleDigest": str(
+            credential_broker_bindings["caBundleDigest"]
+        ),
         "processingOtlpTargetBindingDigest": str(
             processing_bindings["otlpTargetBindingDigest"]
         ),
@@ -618,10 +665,13 @@ def _input_times(
     diagnostic_report: Mapping[str, Any],
     oidc_report: Mapping[str, Any],
     policy_report: Mapping[str, Any],
+    credential_broker_report: Mapping[str, Any],
     continuity_report: Mapping[str, Any],
     processing_report: Mapping[str, Any],
     postgresql_report: Mapping[str, Any],
 ) -> tuple[
+    datetime,
+    datetime,
     datetime,
     datetime,
     datetime,
@@ -661,6 +711,14 @@ def _input_times(
     )
     policy_measurements = _mapping(
         policy_spec.get("measurements"),
+        "customer-deployment-qualification.time.invalid",
+    )
+    credential_broker_spec = _mapping(
+        credential_broker_report.get("spec"),
+        "customer-deployment-qualification.time.invalid",
+    )
+    credential_broker_measurements = _mapping(
+        credential_broker_spec.get("measurements"),
         "customer-deployment-qualification.time.invalid",
     )
     continuity_spec = _mapping(
@@ -709,6 +767,14 @@ def _input_times(
             "customer-deployment-qualification.time.invalid",
         ),
         _parse_timestamp(
+            credential_broker_measurements.get("startedAt"),
+            "customer-deployment-qualification.time.invalid",
+        ),
+        _parse_timestamp(
+            credential_broker_measurements.get("completedAt"),
+            "customer-deployment-qualification.time.invalid",
+        ),
+        _parse_timestamp(
             continuity_measurements.get("startedAt"),
             "customer-deployment-qualification.time.invalid",
         ),
@@ -751,6 +817,8 @@ def build_report(
     oidc_digest: str,
     policy_report: Mapping[str, Any],
     policy_digest: str,
+    credential_broker_report: Mapping[str, Any],
+    credential_broker_digest: str,
     continuity_report: Mapping[str, Any],
     continuity_digest: str,
     processing_report: Mapping[str, Any],
@@ -786,6 +854,7 @@ def build_report(
         ingress_report=ingress_report,
         oidc_report=oidc_report,
         policy_report=policy_report,
+        credential_broker_report=credential_broker_report,
         continuity_report=continuity_report,
         processing_report=processing_report,
         postgresql_report=postgresql_report,
@@ -804,6 +873,8 @@ def build_report(
         oidc_completed,
         policy_started,
         policy_completed,
+        credential_broker_started,
+        credential_broker_completed,
         continuity_started,
         continuity_completed,
         processing_started,
@@ -816,6 +887,7 @@ def build_report(
         diagnostic_report=diagnostic_report,
         oidc_report=oidc_report,
         policy_report=policy_report,
+        credential_broker_report=credential_broker_report,
         continuity_report=continuity_report,
         processing_report=processing_report,
         postgresql_report=postgresql_report,
@@ -826,7 +898,9 @@ def build_report(
         and oidc_started <= oidc_completed
         and oidc_completed <= policy_started
         and policy_started <= policy_completed
-        and policy_completed <= continuity_started
+        and policy_completed <= credential_broker_started
+        and credential_broker_started <= credential_broker_completed
+        and credential_broker_completed <= continuity_started
         and continuity_started <= continuity_completed
         and continuity_completed <= processing_started
         and processing_started <= processing_completed
@@ -840,6 +914,8 @@ def build_report(
         oidc_completed,
         policy_started,
         policy_completed,
+        credential_broker_started,
+        credential_broker_completed,
         continuity_started,
         continuity_completed,
         processing_started,
@@ -873,6 +949,7 @@ def build_report(
                 ingress_report,
                 oidc_report,
                 policy_report,
+                credential_broker_report,
                 continuity_report,
                 processing_report,
                 postgresql_report,
@@ -883,6 +960,7 @@ def build_report(
                 ingress_digest,
                 oidc_digest,
                 policy_digest,
+                credential_broker_digest,
                 continuity_digest,
                 processing_digest,
                 postgresql_digest,
@@ -921,6 +999,11 @@ def build_report(
             "customer-deployment-qualification.policy.not-qualified",
         ),
         _check(
+            "customer-credential-broker",
+            evidence_by_id["customer-credential-broker"]["status"] == "passed",
+            "customer-deployment-qualification.credential-broker.not-qualified",
+        ),
+        _check(
             "control-plane-continuity",
             evidence_by_id["control-plane-continuity"]["status"] == "passed",
             "customer-deployment-qualification.continuity.not-qualified",
@@ -938,6 +1021,7 @@ def build_report(
         _check("continuity-ingress-chain", True, "customer-deployment-qualification.ingress.crossed"),
         _check("oidc-target-chain", True, "customer-deployment-qualification.oidc.crossed"),
         _check("policy-binding-chain", True, "customer-deployment-qualification.policy.crossed"),
+        _check("credential-broker-binding-chain", True, "customer-deployment-qualification.credential-broker.crossed"),
         _check("processing-target-chain", True, "customer-deployment-qualification.processing.crossed"),
         _check("database-target-chain", True, "customer-deployment-qualification.database.crossed"),
         _check("evidence-order", ordered, "customer-deployment-qualification.evidence.order-invalid"),
@@ -968,6 +1052,8 @@ def build_report(
             "oidcCompletedAt": _timestamp(oidc_completed),
             "policyStartedAt": _timestamp(policy_started),
             "policyCompletedAt": _timestamp(policy_completed),
+            "credentialBrokerStartedAt": _timestamp(credential_broker_started),
+            "credentialBrokerCompletedAt": _timestamp(credential_broker_completed),
             "continuityStartedAt": _timestamp(continuity_started),
             "continuityCompletedAt": _timestamp(continuity_completed),
             "processingStartedAt": _timestamp(processing_started),
@@ -1060,6 +1146,14 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         measurements.get("policyCompletedAt"),
         "customer-deployment-qualification.report.time-invalid",
     )
+    credential_broker_started = _parse_timestamp(
+        measurements.get("credentialBrokerStartedAt"),
+        "customer-deployment-qualification.report.time-invalid",
+    )
+    credential_broker_completed = _parse_timestamp(
+        measurements.get("credentialBrokerCompletedAt"),
+        "customer-deployment-qualification.report.time-invalid",
+    )
     continuity_started = _parse_timestamp(
         measurements.get("continuityStartedAt"),
         "customer-deployment-qualification.report.time-invalid",
@@ -1106,7 +1200,9 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         and oidc_started <= oidc_completed
         and oidc_completed <= policy_started
         and policy_started <= policy_completed
-        and policy_completed <= continuity_started
+        and policy_completed <= credential_broker_started
+        and credential_broker_started <= credential_broker_completed
+        and credential_broker_completed <= continuity_started
         and continuity_started <= continuity_completed
         and continuity_completed <= processing_started
         and processing_started <= processing_completed
@@ -1120,6 +1216,8 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         oidc_completed,
         policy_started,
         policy_completed,
+        credential_broker_started,
+        credential_broker_completed,
         continuity_started,
         continuity_completed,
         processing_started,
@@ -1168,6 +1266,12 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
             "customer-deployment-qualification.policy.not-qualified",
         ),
         _check(
+            "customer-credential-broker",
+            evidence_by_id.get("customer-credential-broker", {}).get("status")
+            == "passed",
+            "customer-deployment-qualification.credential-broker.not-qualified",
+        ),
+        _check(
             "control-plane-continuity",
             evidence_by_id.get("control-plane-continuity", {}).get("status") == "passed",
             "customer-deployment-qualification.continuity.not-qualified",
@@ -1187,6 +1291,7 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         _check("continuity-ingress-chain", True, "customer-deployment-qualification.ingress.crossed"),
         _check("oidc-target-chain", True, "customer-deployment-qualification.oidc.crossed"),
         _check("policy-binding-chain", True, "customer-deployment-qualification.policy.crossed"),
+        _check("credential-broker-binding-chain", True, "customer-deployment-qualification.credential-broker.crossed"),
         _check("processing-target-chain", True, "customer-deployment-qualification.processing.crossed"),
         _check("database-target-chain", True, "customer-deployment-qualification.database.crossed"),
         _check("evidence-order", ordered, "customer-deployment-qualification.evidence.order-invalid"),
@@ -1283,6 +1388,10 @@ def _validate_inputs(
     policy_path: Path,
     policy_profile_path: Path,
     policy_endpoint: str,
+    credential_broker_path: Path,
+    credential_broker_profile_path: Path,
+    credential_broker_endpoint: str,
+    credential_broker_ca_bundle_path: Path,
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
@@ -1318,6 +1427,8 @@ def _validate_inputs(
     str,
     Mapping[str, Any],
     str,
+    Mapping[str, Any],
+    str,
 ]:
     if not values or len(values) > MAX_VALUES_FILES:
         _fail("customer-deployment-qualification.values.invalid")
@@ -1335,6 +1446,10 @@ def _validate_inputs(
     )
     policy_report, policy_digest = _load_document(
         policy_path, "customer-deployment-qualification.policy.unreadable"
+    )
+    credential_broker_report, credential_broker_digest = _load_document(
+        credential_broker_path,
+        "customer-deployment-qualification.credential-broker.unreadable",
     )
     continuity_report, continuity_digest = _load_document(
         continuity_path, "customer-deployment-qualification.continuity.unreadable"
@@ -1379,6 +1494,14 @@ def _validate_inputs(
             image_digest=image_digest,
             require_qualified=False,
         )
+        customer_credential_broker.verify_report(
+            report_path=credential_broker_path,
+            profile_path=credential_broker_profile_path,
+            endpoint=credential_broker_endpoint,
+            ca_bundle_path=credential_broker_ca_bundle_path,
+            image_digest=image_digest,
+            require_qualified=False,
+        )
         continuity.verify_report(
             report_path=continuity_path,
             ingress_report_path=ingress_path,
@@ -1417,6 +1540,7 @@ def _validate_inputs(
         ingress.IngressQualificationError,
         oidc.CustomerOidcQualificationError,
         customer_policy.CustomerPolicyQualificationError,
+        customer_credential_broker.CustomerCredentialBrokerQualificationError,
         continuity.CustomerContinuityQualificationError,
         processing.CustomerProcessingContinuityError,
         postgresql.CustomerPostgreSQLContinuityError,
@@ -1428,6 +1552,7 @@ def _validate_inputs(
         (ingress_path, ingress_digest, "customer-deployment-qualification.ingress.changed"),
         (oidc_path, oidc_digest, "customer-deployment-qualification.oidc.changed"),
         (policy_path, policy_digest, "customer-deployment-qualification.policy.changed"),
+        (credential_broker_path, credential_broker_digest, "customer-deployment-qualification.credential-broker.changed"),
         (continuity_path, continuity_digest, "customer-deployment-qualification.continuity.changed"),
         (processing_path, processing_digest, "customer-deployment-qualification.processing.changed"),
         (postgresql_path, postgresql_digest, "customer-deployment-qualification.database.changed"),
@@ -1445,6 +1570,8 @@ def _validate_inputs(
         oidc_digest,
         policy_report,
         policy_digest,
+        credential_broker_report,
+        credential_broker_digest,
         continuity_report,
         continuity_digest,
         processing_report,
@@ -1465,6 +1592,10 @@ def qualify(
     policy_path: Path,
     policy_profile_path: Path,
     policy_endpoint: str,
+    credential_broker_path: Path,
+    credential_broker_profile_path: Path,
+    credential_broker_endpoint: str,
+    credential_broker_ca_bundle_path: Path,
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
@@ -1499,6 +1630,10 @@ def qualify(
         policy_path=policy_path,
         policy_profile_path=policy_profile_path,
         policy_endpoint=policy_endpoint,
+        credential_broker_path=credential_broker_path,
+        credential_broker_profile_path=credential_broker_profile_path,
+        credential_broker_endpoint=credential_broker_endpoint,
+        credential_broker_ca_bundle_path=credential_broker_ca_bundle_path,
         continuity_path=continuity_path,
         processing_path=processing_path,
         processing_profile_path=processing_profile_path,
@@ -1534,12 +1669,14 @@ def qualify(
         oidc_digest=inputs[7],
         policy_report=inputs[8],
         policy_digest=inputs[9],
-        continuity_report=inputs[10],
-        continuity_digest=inputs[11],
-        processing_report=inputs[12],
-        processing_digest=inputs[13],
-        postgresql_report=inputs[14],
-        postgresql_digest=inputs[15],
+        credential_broker_report=inputs[10],
+        credential_broker_digest=inputs[11],
+        continuity_report=inputs[12],
+        continuity_digest=inputs[13],
+        processing_report=inputs[14],
+        processing_digest=inputs[15],
+        postgresql_report=inputs[16],
+        postgresql_digest=inputs[17],
         context=context,
         namespace=namespace,
         release_name=release_name,
@@ -1568,6 +1705,10 @@ def verify_report(
     policy_path: Path,
     policy_profile_path: Path,
     policy_endpoint: str,
+    credential_broker_path: Path,
+    credential_broker_profile_path: Path,
+    credential_broker_endpoint: str,
+    credential_broker_ca_bundle_path: Path,
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
@@ -1604,6 +1745,10 @@ def verify_report(
         policy_path=policy_path,
         policy_profile_path=policy_profile_path,
         policy_endpoint=policy_endpoint,
+        credential_broker_path=credential_broker_path,
+        credential_broker_profile_path=credential_broker_profile_path,
+        credential_broker_endpoint=credential_broker_endpoint,
+        credential_broker_ca_bundle_path=credential_broker_ca_bundle_path,
         continuity_path=continuity_path,
         processing_path=processing_path,
         processing_profile_path=processing_profile_path,
@@ -1650,12 +1795,14 @@ def verify_report(
         oidc_digest=inputs[7],
         policy_report=inputs[8],
         policy_digest=inputs[9],
-        continuity_report=inputs[10],
-        continuity_digest=inputs[11],
-        processing_report=inputs[12],
-        processing_digest=inputs[13],
-        postgresql_report=inputs[14],
-        postgresql_digest=inputs[15],
+        credential_broker_report=inputs[10],
+        credential_broker_digest=inputs[11],
+        continuity_report=inputs[12],
+        continuity_digest=inputs[13],
+        processing_report=inputs[14],
+        processing_digest=inputs[15],
+        postgresql_report=inputs[16],
+        postgresql_digest=inputs[17],
         context=context,
         namespace=namespace,
         release_name=release_name,
@@ -1688,6 +1835,10 @@ def _common_inputs(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--policy-report", type=Path, required=True)
     parser.add_argument("--policy-profile", type=Path, required=True)
     parser.add_argument("--policy-endpoint", required=True)
+    parser.add_argument("--credential-broker-report", type=Path, required=True)
+    parser.add_argument("--credential-broker-profile", type=Path, required=True)
+    parser.add_argument("--credential-broker-endpoint", required=True)
+    parser.add_argument("--credential-broker-ca-file", type=Path, required=True)
     parser.add_argument("--continuity-report", type=Path, required=True)
     parser.add_argument("--processing-report", type=Path, required=True)
     parser.add_argument("--processing-profile", type=Path, required=True)
@@ -1741,6 +1892,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "policy_path": arguments.policy_report,
         "policy_profile_path": arguments.policy_profile,
         "policy_endpoint": arguments.policy_endpoint,
+        "credential_broker_path": arguments.credential_broker_report,
+        "credential_broker_profile_path": arguments.credential_broker_profile,
+        "credential_broker_endpoint": arguments.credential_broker_endpoint,
+        "credential_broker_ca_bundle_path": arguments.credential_broker_ca_file,
         "continuity_path": arguments.continuity_report,
         "processing_path": arguments.processing_report,
         "processing_profile_path": arguments.processing_profile,

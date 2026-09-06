@@ -217,11 +217,12 @@ provider, design-partner, and legal/brand gates that remain external. See the
 
 For a customer cluster, the separate [customer deployment qualification
 workflow](customer-deployment-qualification.md) binds the live preflight,
-post-continuity health, external ingress, and API-pod Eviction reports to the
-same exact release and current namespace UID/server. That additive report can
-support the customer installation/ingress gates, but its fixed limitations do
-not satisfy artifact trust, integration, database, provider, regional, pilot,
-or governance gates.
+post-continuity health, external ingress, customer OIDC, policy, and
+credential-broker prerequisites, API/worker/receiver Eviction evidence, and
+PostgreSQL promotion evidence to the same exact release and current namespace
+UID/server. That additive report can support its narrow customer prerequisite
+gates, but its fixed limitations do not satisfy artifact trust, lifecycle/HA,
+live provider, regional, pilot, or governance gates.
 
 ## Production promotion boundary
 

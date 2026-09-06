@@ -1632,6 +1632,144 @@ export interface CustomerOidcQualificationReport {
   };
 }
 
+export interface CustomerCredentialBrokerQualificationProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerCredentialBrokerQualificationProfile";
+  metadata: { name: string; reviewedAt: string };
+  spec: {
+    endpoint: string;
+    cases: [
+      {
+        id: "exact-authority";
+        tenantId: string;
+        actorId: string;
+        integrationId: string;
+        credentialRef: `credential://${string}`;
+        provider: string;
+        scopes: string[];
+        expectedOutcome: "issued";
+      },
+      ...Array<{
+        id:
+          | "cross-tenant-denial"
+          | "actor-binding-denial"
+          | "integration-binding-denial"
+          | "provider-binding-denial"
+          | "scope-escalation-denial"
+          | "credential-reference-denial";
+        tenantId: string;
+        actorId: string;
+        integrationId: string;
+        credentialRef: `credential://${string}`;
+        provider: string;
+        scopes: string[];
+        expectedOutcome: "denied";
+      }>,
+    ];
+    objective: {
+      requestTimeoutSeconds: number;
+      maximumResponseBytes: number;
+      maximumLeaseSeconds: number;
+      maximumClockSkewSeconds: number;
+      leaseRequestDeadlineSeconds: number;
+      maximumLeaseLatencyMilliseconds: number;
+      maximumProfileAgeSeconds: number;
+    };
+  };
+}
+
+export type CustomerCredentialBrokerQualificationCheckId =
+  | "profile-binding"
+  | "source-binding"
+  | "protected-input-files"
+  | "endpoint-binding"
+  | "ca-verified-tls"
+  | "workload-identity-accepted"
+  | "exact-authority-issued"
+  | "cross-tenant-denied"
+  | "actor-binding-denied"
+  | "integration-binding-denied"
+  | "provider-binding-denied"
+  | "scope-escalation-denied"
+  | "credential-reference-denied"
+  | "response-correlation"
+  | "lease-bounds"
+  | "repeat-consistency"
+  | "latency-objective"
+  | "minimized-output";
+
+export interface CustomerCredentialBrokerQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerCredentialBrokerQualificationReport";
+  metadata: {
+    id: `ccbq_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualification: "customer-credential-broker-authority-prerequisites-v1";
+    subject: {
+      applicationVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      endpointBindingDigest: Sha256Digest;
+      profileDigest: Sha256Digest;
+      authoritySetDigest: Sha256Digest;
+      caBundleDigest: Sha256Digest;
+    };
+    profile: {
+      name: "customer-external-http-credential-broker-v1";
+      brokerProtocol: "iip.broker/v1alpha1";
+      transport: "ca-verified-https-json";
+      identityMode: "protected-token-file-read-per-request";
+      leaseScheme: "bearer";
+      redirectMode: "denied";
+      proxyMode: "disabled";
+    };
+    objective: CustomerCredentialBrokerQualificationProfile["spec"]["objective"];
+    measurements: {
+      profileReviewedAt: string;
+      startedAt: string;
+      completedAt: string;
+      caseCount: 7;
+      issuedCaseCount: 1;
+      deniedCaseCount: 6;
+      requestCount: 8;
+      minimumRemainingLeaseSeconds: number;
+      maximumLeaseLatencyMilliseconds: number;
+    };
+    checks: Array<
+      | {
+          id: CustomerCredentialBrokerQualificationCheckId;
+          status: "passed";
+        }
+      | {
+          id: CustomerCredentialBrokerQualificationCheckId;
+          status: "failed";
+          errorCode: `customer-credential-broker-qualification.${string}`;
+        }
+    >;
+    limitations: [
+      "workload-identity-rotation-revocation-and-federation-not-qualified",
+      "provider-credential-rotation-revocation-and-emergency-access-not-qualified",
+      "broker-ha-network-certificate-rotation-and-recovery-not-qualified",
+      "audit-delivery-retention-and-siem-integration-not-qualified",
+      "non-bearer-provider-credentials-not-qualified",
+    ];
+    summary: {
+      totalChecks: 18;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export interface CustomerPolicyQualificationProfile {
   apiVersion: "iip.platform/v1alpha1";
   kind: "CustomerPolicyQualificationProfile";
@@ -1893,6 +2031,7 @@ export type CustomerDeploymentQualificationEvidenceId =
   | "customer-ingress"
   | "customer-oidc"
   | "customer-policy"
+  | "customer-credential-broker"
   | "control-plane-continuity"
   | "worker-receiver-processing"
   | "postgresql-primary-promotion";
@@ -1907,12 +2046,14 @@ export type CustomerDeploymentQualificationCheckId =
   | "customer-ingress"
   | "customer-oidc"
   | "customer-policy"
+  | "customer-credential-broker"
   | "control-plane-continuity"
   | "worker-receiver-processing"
   | "postgresql-primary-promotion"
   | "continuity-ingress-chain"
   | "oidc-target-chain"
   | "policy-binding-chain"
+  | "credential-broker-binding-chain"
   | "processing-target-chain"
   | "database-target-chain"
   | "evidence-order"
@@ -1930,7 +2071,7 @@ export interface CustomerDeploymentQualificationReport {
   };
   spec: {
     status: "qualified" | "not-qualified";
-    qualificationLevel: "single-cluster-database-identity-policy-prerequisites-v5";
+    qualificationLevel: "single-cluster-database-identity-policy-broker-prerequisites-v6";
     subject: {
       profile: "production-core-v1" | "production-ai-finops-v0";
       applicationVersion: string;
@@ -1951,6 +2092,10 @@ export interface CustomerDeploymentQualificationReport {
       policyEndpointBindingDigest: Sha256Digest;
       policyProfileDigest: Sha256Digest;
       policySnapshotSetDigest: Sha256Digest;
+      credentialBrokerEndpointBindingDigest: Sha256Digest;
+      credentialBrokerProfileDigest: Sha256Digest;
+      credentialBrokerAuthoritySetDigest: Sha256Digest;
+      credentialBrokerCaBundleDigest: Sha256Digest;
       processingOtlpTargetBindingDigest: Sha256Digest;
       processingProfileDigest: Sha256Digest;
       workerDeploymentBindingDigest: Sha256Digest;
@@ -1969,6 +2114,8 @@ export interface CustomerDeploymentQualificationReport {
       oidcCompletedAt: string;
       policyStartedAt: string;
       policyCompletedAt: string;
+      credentialBrokerStartedAt: string;
+      credentialBrokerCompletedAt: string;
       continuityStartedAt: string;
       continuityCompletedAt: string;
       processingStartedAt: string;
@@ -1987,6 +2134,7 @@ export interface CustomerDeploymentQualificationReport {
         | "IngressAvailabilityQualificationReport"
         | "CustomerOidcQualificationReport"
         | "CustomerPolicyQualificationReport"
+        | "CustomerCredentialBrokerQualificationReport"
         | "CustomerContinuityQualificationReport"
         | "CustomerProcessingContinuityQualificationReport"
         | "CustomerPostgreSQLContinuityQualificationReport";
@@ -2023,7 +2171,7 @@ export interface CustomerDeploymentQualificationReport {
       "design-partner-legal-brand-governance-not-qualified",
     ];
     summary: {
-      requiredEvidence: 8;
+      requiredEvidence: 9;
       passedEvidence: number;
       rejectedEvidence: number;
       totalChecks: 20;

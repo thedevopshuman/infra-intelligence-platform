@@ -48,6 +48,13 @@ and explicit limitations. It neither reads nor manages the customer bundle,
 and it grants no runtime authority. The customer deployment harness rebinds
 that minimized report without receiving the policy credential.
 
+Customer credential-broker qualification is also host-side:
+`scripts/qualify_customer_credential_broker.py` consumes a mode-`0600`
+authority profile and workload-token file plus a selected CA, then invokes the
+production external broker adapter. It retains no authority tuple, workload
+identity, or issued lease. The deployment aggregate rebinds its minimized
+report, profile, endpoint, and CA without calling the broker.
+
 The private `src/iip/surfaces/worker_health.py` listener consumes only the
 application-owned readiness port. It exposes no control-plane use case,
 identity, tenant data, or provider detail.

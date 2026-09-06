@@ -78,3 +78,12 @@ selected customer policy allow/deny report and binds its exact source, image,
 endpoint, protected profile, and immutable snapshot set. Complete policy
 coverage, lifecycle, HA, break-glass, and audit evidence remain outside the
 aggregate claim. All four earlier profiles remain historical.
+
+[ADR 0133](0133-customer-credential-broker-authority-qualification.md)
+upgrades the current aggregate to
+`single-cluster-database-identity-policy-broker-prerequisites-v6`. It adds one
+customer broker authority report and binds its exact source, image, endpoint,
+protected profile, authority set, and CA bundle. Workload/provider credential
+lifecycle, broker/PKI HA, recovery, non-Bearer schemes, and audit delivery
+remain outside the aggregate claim. All five earlier profiles remain
+historical.

@@ -123,6 +123,15 @@ REQUIRED_PATHS = (
     "docs/operations/customer-policy-qualification.md",
     "scripts/qualify_customer_policy.py",
     "tests/test_customer_policy_qualification.py",
+    "docs/decisions/0133-customer-credential-broker-authority-qualification.md",
+    "docs/specifications/customer-credential-broker-qualification-report-contract.md",
+    "contracts/schemas/customer-credential-broker-qualification-profile.schema.json",
+    "contracts/schemas/customer-credential-broker-qualification-report.schema.json",
+    "contracts/examples/customer-credential-broker-qualification-profile.json",
+    "contracts/examples/customer-credential-broker-qualification-report.json",
+    "docs/operations/customer-credential-broker-qualification.md",
+    "scripts/qualify_customer_credential_broker.py",
+    "tests/test_customer_credential_broker_qualification.py",
     "docs/specifications/worker-health-contract.md",
     "src/iip/surfaces/worker_health.py",
     "tests/test_worker_health.py",
@@ -2148,6 +2157,44 @@ def validate_customer_policy_qualification_example(
         validate_report_document(report)
     except CustomerPolicyQualificationError:
         fail(errors, "customer policy qualification examples must be semantically valid")
+
+
+def validate_customer_credential_broker_qualification_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check protected broker authority cases and minimized evidence."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    profile = documents.get(
+        example_dir / "customer-credential-broker-qualification-profile.json"
+    )
+    report = documents.get(
+        example_dir / "customer-credential-broker-qualification-report.json"
+    )
+    try:
+        from qualify_customer_credential_broker import (
+            CustomerCredentialBrokerQualificationError,
+            validate_profile,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(
+            errors,
+            "customer credential broker qualification validator must be importable",
+        )
+        return
+    try:
+        if not isinstance(profile, dict) or not isinstance(report, dict):
+            raise CustomerCredentialBrokerQualificationError(
+                "customer-credential-broker-qualification.example.invalid"
+            )
+        validate_profile(profile)
+        validate_report_document(report)
+    except CustomerCredentialBrokerQualificationError:
+        fail(
+            errors,
+            "customer credential broker qualification examples must be semantically valid",
+        )
 
 
 def validate_customer_deployment_qualification_example(
@@ -5091,6 +5138,14 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerPolicyQualificationReport",
         ),
         (
+            "customer-credential-broker-qualification-profile.json",
+            "CustomerCredentialBrokerQualificationProfile",
+        ),
+        (
+            "customer-credential-broker-qualification-report.json",
+            "CustomerCredentialBrokerQualificationReport",
+        ),
+        (
             "customer-deployment-preflight-report.json",
             "CustomerDeploymentPreflightReport",
         ),
@@ -5188,6 +5243,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_ingress_availability_qualification_example(documents, errors)
     validate_customer_continuity_qualification_example(documents, errors)
     validate_customer_policy_qualification_example(documents, errors)
+    validate_customer_credential_broker_qualification_example(documents, errors)
     validate_customer_deployment_qualification_example(documents, errors)
     validate_control_plane_load_qualification_example(documents, errors)
     validate_postgresql_recovery_qualification_example(documents, errors)

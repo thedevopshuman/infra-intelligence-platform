@@ -27,7 +27,7 @@ When external mode is selected, provider-specific static credential JSON is not 
 
 ## Broker HTTP behavior
 
-The client sends `POST /v1/credential-leases` with the exact protected request contract. It authenticates that call with `Authorization: Bearer <workload identity>`, read afresh from the configured file. It accepts only a direct `200 application/json` response and never follows redirects.
+The client sends `POST /v1/credential-leases` with the exact protected request contract. It authenticates that call with `Authorization: Bearer <workload identity>`, read afresh from the configured file. It accepts a lease only from a direct `200 application/json` response, treats only HTTP `403` as an explicit authority denial, never follows redirects, and ignores environment proxy configuration. HTTP `401`, other non-success statuses, TLS/transport errors, and invalid responses remain fail-closed availability errors and cannot satisfy a negative authority test.
 
 The broker response must:
 
@@ -80,6 +80,12 @@ make test-credential-broker
 The target generates an ephemeral CA/server certificate chain and signed test-only workload tokens, starts a non-root read-only broker fixture over HTTPS, and exercises the production external client. It proves issuer/audience/subject/expiry enforcement, exact-scope issuance, cross-tenant and scope-escalation denial, rotation without a client restart, previous-token revocation, untrusted-CA denial, value-minimized audit completeness, stable fail-closed outage behavior, recovery, and secret redaction. It writes source-bound aggregate evidence to `dist/credential-broker-compatibility-report.json`, then removes the isolated Compose project. The fixture has no product bootstrap path and is not a production credential issuer.
 
 Before production, repeat an environment-specific interoperability gate against the selected customer issuer, broker, identity system, audit sink, certificate lifecycle, and availability topology. Passing the local profile does not qualify those external systems.
+
+Use the [customer credential-broker qualification](customer-credential-broker-qualification.md)
+to prove the selected endpoint's basic protocol, CA trust, exact-authority
+issuance, and single-field authority denials through the production client.
+That prerequisite remains deliberately narrower than lifecycle, HA, audit, and
+recovery certification.
 
 ## Rollback
 

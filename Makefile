@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-oidc-qualification qualify-customer-oidc verify-customer-oidc-qualification-report test-customer-policy-qualification qualify-customer-policy verify-customer-policy-qualification-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-postgresql-continuity qualify-customer-postgresql-continuity verify-customer-postgresql-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-oidc-qualification qualify-customer-oidc verify-customer-oidc-qualification-report test-customer-policy-qualification qualify-customer-policy verify-customer-policy-qualification-report test-customer-credential-broker-qualification qualify-customer-credential-broker verify-customer-credential-broker-qualification-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-postgresql-continuity qualify-customer-postgresql-continuity verify-customer-postgresql-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -42,6 +42,13 @@ IIP_CUSTOMER_POLICY_BEARER_TOKEN_FILE ?=
 IIP_CUSTOMER_POLICY_CA_FILE ?=
 IIP_CUSTOMER_POLICY_IMAGE_DIGEST ?= $(IIP_CONTINUITY_IMAGE_DIGEST)
 IIP_CUSTOMER_POLICY_ALLOW_OBSERVATION ?= false
+IIP_CUSTOMER_CREDENTIAL_BROKER_REPORT ?= dist/customer-credential-broker-qualification-report.json
+IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE ?=
+IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT ?=
+IIP_CUSTOMER_CREDENTIAL_BROKER_WORKLOAD_TOKEN_FILE ?=
+IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE ?=
+IIP_CUSTOMER_CREDENTIAL_BROKER_IMAGE_DIGEST ?= $(IIP_CONTINUITY_IMAGE_DIGEST)
+IIP_CUSTOMER_CREDENTIAL_BROKER_ALLOW_OBSERVATION ?= false
 IIP_CONTINUITY_REPORT ?= dist/customer-continuity-qualification-report.json
 IIP_CONTINUITY_INGRESS_REPORT ?= dist/customer-continuity-ingress-report.json
 IIP_CONTINUITY_BASE_URL ?=
@@ -154,6 +161,9 @@ help:
 	@echo "test-customer-policy-qualification Validate external policy-bundle evidence"
 	@echo "qualify-customer-policy Qualify reviewed customer allow/deny policy cases"
 	@echo "verify-customer-policy-qualification-report Rebind retained customer policy evidence"
+	@echo "test-customer-credential-broker-qualification Validate customer broker authority evidence"
+	@echo "qualify-customer-credential-broker Qualify one customer broker and exact authority tuple"
+	@echo "verify-customer-credential-broker-qualification-report Rebind retained customer broker evidence"
 	@echo "test-customer-continuity Validate the customer continuity contract and safe orchestrator"
 	@echo "qualify-customer-continuity Probe HTTPS while evicting one explicitly selected API pod"
 	@echo "verify-customer-continuity-report Verify exact customer continuity and ingress evidence"
@@ -164,7 +174,7 @@ help:
 	@echo "qualify-customer-postgresql-continuity Observe an externally initiated primary promotion"
 	@echo "verify-customer-postgresql-continuity-report Recompute exact PostgreSQL target evidence"
 	@echo "test-customer-deployment-qualification Validate exact customer evidence aggregation"
-	@echo "qualify-customer-deployment Bind install, ingress, OIDC, policy, continuity, processing, database, and health evidence"
+	@echo "qualify-customer-deployment Bind install, ingress, OIDC, policy, broker, continuity, processing, database, and health evidence"
 	@echo "verify-customer-deployment-qualification-report Recompute the customer evidence chain"
 	@echo "test-control-plane-load Validate bounded fixed-rate load evidence semantics"
 	@echo "qualify-control-plane-load Run explicitly enabled external read load against one release"
@@ -451,6 +461,49 @@ verify-customer-policy-qualification-report:
 		--image-digest "$(IIP_CUSTOMER_POLICY_IMAGE_DIGEST)" \
 		--require-qualified
 
+test-customer-credential-broker-qualification:
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_customer_credential_broker_qualification tests.test_credential_broker -v
+
+qualify-customer-credential-broker:
+	@test "$(IIP_CUSTOMER_CREDENTIAL_BROKER_ALLOW_OBSERVATION)" = true || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_ALLOW_OBSERVATION must equal true" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_WORKLOAD_TOKEN_FILE)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_WORKLOAD_TOKEN_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_IMAGE_DIGEST)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_IMAGE_DIGEST is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_credential_broker.py qualify \
+		--profile "$(IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE)" \
+		--endpoint "$(IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT)" \
+		--workload-identity-token-file "$(IIP_CUSTOMER_CREDENTIAL_BROKER_WORKLOAD_TOKEN_FILE)" \
+		--ca-bundle-file "$(IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE)" \
+		--image-digest "$(IIP_CUSTOMER_CREDENTIAL_BROKER_IMAGE_DIGEST)" \
+		--output "$(IIP_CUSTOMER_CREDENTIAL_BROKER_REPORT)" \
+		--allow-credential-observation
+
+verify-customer-credential-broker-qualification-report:
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_IMAGE_DIGEST)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_IMAGE_DIGEST is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_credential_broker.py verify \
+		--report "$(IIP_CUSTOMER_CREDENTIAL_BROKER_REPORT)" \
+		--profile "$(IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE)" \
+		--endpoint "$(IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT)" \
+		--ca-bundle-file "$(IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE)" \
+		--image-digest "$(IIP_CUSTOMER_CREDENTIAL_BROKER_IMAGE_DIGEST)" \
+		--require-qualified
+
 test-customer-continuity:
 	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
 		tests.test_customer_continuity_qualification \
@@ -675,6 +728,12 @@ qualify-customer-deployment:
 		(echo "IIP_CUSTOMER_POLICY_PROFILE is required" >&2; exit 2)
 	@test -n "$(IIP_CUSTOMER_POLICY_ENDPOINT)" || \
 		(echo "IIP_CUSTOMER_POLICY_ENDPOINT is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE is required" >&2; exit 2)
 	@test -n "$(IIP_PROCESSING_OTLP_BASE_URL)" || \
 		(echo "IIP_PROCESSING_OTLP_BASE_URL is required" >&2; exit 2)
 	@test -n "$(IIP_CUSTOMER_POSTGRESQL_PROFILE)" || \
@@ -691,6 +750,10 @@ qualify-customer-deployment:
 		--policy-report "$(IIP_CUSTOMER_POLICY_REPORT)" \
 		--policy-profile "$(IIP_CUSTOMER_POLICY_PROFILE)" \
 		--policy-endpoint "$(IIP_CUSTOMER_POLICY_ENDPOINT)" \
+		--credential-broker-report "$(IIP_CUSTOMER_CREDENTIAL_BROKER_REPORT)" \
+		--credential-broker-profile "$(IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE)" \
+		--credential-broker-endpoint "$(IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT)" \
+		--credential-broker-ca-file "$(IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE)" \
 		--continuity-report "$(IIP_CONTINUITY_REPORT)" \
 		--processing-report "$(IIP_PROCESSING_REPORT)" \
 		--processing-profile "$(IIP_PROCESSING_PROFILE)" \
@@ -730,6 +793,12 @@ verify-customer-deployment-qualification-report:
 		(echo "IIP_CUSTOMER_POLICY_PROFILE is required" >&2; exit 2)
 	@test -n "$(IIP_CUSTOMER_POLICY_ENDPOINT)" || \
 		(echo "IIP_CUSTOMER_POLICY_ENDPOINT is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE)" || \
+		(echo "IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE is required" >&2; exit 2)
 	@test -n "$(IIP_PROCESSING_OTLP_BASE_URL)" || \
 		(echo "IIP_PROCESSING_OTLP_BASE_URL is required" >&2; exit 2)
 	@test -n "$(IIP_CUSTOMER_POSTGRESQL_PROFILE)" || \
@@ -747,6 +816,10 @@ verify-customer-deployment-qualification-report:
 		--policy-report "$(IIP_CUSTOMER_POLICY_REPORT)" \
 		--policy-profile "$(IIP_CUSTOMER_POLICY_PROFILE)" \
 		--policy-endpoint "$(IIP_CUSTOMER_POLICY_ENDPOINT)" \
+		--credential-broker-report "$(IIP_CUSTOMER_CREDENTIAL_BROKER_REPORT)" \
+		--credential-broker-profile "$(IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE)" \
+		--credential-broker-endpoint "$(IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT)" \
+		--credential-broker-ca-file "$(IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE)" \
 		--continuity-report "$(IIP_CONTINUITY_REPORT)" \
 		--processing-report "$(IIP_PROCESSING_REPORT)" \
 		--processing-profile "$(IIP_PROCESSING_PROFILE)" \

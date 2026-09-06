@@ -715,6 +715,50 @@ class CustomerOidcQualificationReport:
 
 
 @dataclass(frozen=True)
+class CustomerCredentialBrokerQualificationProfile:
+    """Protected reviewed customer credential-broker authority cases."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerCredentialBrokerQualificationProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerCredentialBrokerQualificationProfile",
+                label="customer credential broker qualification profile",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerCredentialBrokerQualificationReport:
+    """Minimized evidence for customer credential-broker authority behavior."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerCredentialBrokerQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerCredentialBrokerQualificationReport",
+                label="customer credential broker qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerPolicyQualificationProfile:
     """Protected reviewed customer policy endpoint and decision cases."""
 

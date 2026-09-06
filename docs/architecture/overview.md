@@ -167,8 +167,15 @@ failure behavior, regional capacity, or long-window SLO attainment.
 adds that report to the private-pilot evidence join. The host-side aggregator
 requires the exact sustained profile, release, API/OTLP targets, post-deployment
 window, and report expiry while retaining only pseudonymous bindings and
-aggregate timing. It imports no traffic or promotion authority and preserves
-representative workload, failure-overlap, and production-operation gates.
+aggregate timing. It imports no traffic or promotion authority.
+
+[ADR 0146](../decisions/0146-customer-reviewed-planned-failure-overlap.md)
+adds a separate traffic-free evidence join for the API, worker/receiver, and
+PostgreSQL continuity windows inside that sustained run. Its protected profile
+records customer approval of the workload as a private-pilot core proxy and
+binds the exact release, deployment, targets, and owning profiles. The ninth
+pilot input still preserves representative production traffic, automatic and
+involuntary failover, long-window SLO, and production-operation gates.
 
 The signed plugin runner claims each exact-tenant request against its persisted
 session and canonical invocation digest before a container starts. PostgreSQL

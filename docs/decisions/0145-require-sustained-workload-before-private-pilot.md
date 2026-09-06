@@ -4,6 +4,10 @@
 
 **Date:** 2026-09-07
 
+**Amendment:** [ADR 0146](0146-customer-reviewed-planned-failure-overlap.md)
+adds customer-reviewed planned-failure overlap as the ninth pilot-preflight
+input. The eight-input description below is historical context.
+
 ## Context
 
 ADR 0143 introduced a private design-partner preflight with seven exact

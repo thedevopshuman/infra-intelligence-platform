@@ -1,0 +1,261 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-failure-overlap-qualification-report:v1alpha1",
+  "title": "Customer Failure Overlap Qualification Report",
+  "description": "Privacy-minimized source-bound evidence that customer-approved private-pilot core traffic remained qualified while planned API, processing, and PostgreSQL continuity qualifications ran inside the same sustained window.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerFailureOverlapQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "validUntil", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^cfoq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "validUntil": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["qualificationLevel", "qualificationBoundary", "status", "subject", "environment", "bindings", "objective", "evidence", "measurements", "checks", "limitations", "summary"],
+      "properties": {
+        "qualificationLevel": {"const": "customer-private-pilot-failure-overlap-v1"},
+        "qualificationBoundary": {"const": "customer-environment-planned-failure-overlap"},
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "subject": {"$ref": "#/$defs/release"},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["correlationMode", "failureMode", "reviewAuthority"],
+          "properties": {
+            "correlationMode": {"const": "source-report-window-containment-v1"},
+            "failureMode": {"const": "operator-coordinated-planned"},
+            "reviewAuthority": {"const": "protected-customer-profile"}
+          }
+        },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profileDigest",
+            "approvalRecordDigest",
+            "deploymentReportDigest",
+            "sustainedWorkloadProfileDigest",
+            "sustainedWorkloadReportDigest",
+            "controlPlaneContinuityReportDigest",
+            "processingContinuityReportDigest",
+            "postgresqlContinuityReportDigest",
+            "clusterBindingDigest",
+            "kubernetesContextBindingDigest",
+            "namespaceBindingDigest",
+            "apiTargetBindingDigest",
+            "otlpTargetBindingDigest",
+            "databaseTargetBindingDigest",
+            "processingProfileDigest",
+            "postgresqlProfileDigest"
+          ],
+          "properties": {
+            "profileDigest": {"$ref": "#/$defs/digest"},
+            "approvalRecordDigest": {"$ref": "#/$defs/digest"},
+            "deploymentReportDigest": {"$ref": "#/$defs/digest"},
+            "sustainedWorkloadProfileDigest": {"$ref": "#/$defs/digest"},
+            "sustainedWorkloadReportDigest": {"$ref": "#/$defs/digest"},
+            "controlPlaneContinuityReportDigest": {"$ref": "#/$defs/digest"},
+            "processingContinuityReportDigest": {"$ref": "#/$defs/digest"},
+            "postgresqlContinuityReportDigest": {"$ref": "#/$defs/digest"},
+            "clusterBindingDigest": {"$ref": "#/$defs/digest"},
+            "kubernetesContextBindingDigest": {"$ref": "#/$defs/digest"},
+            "namespaceBindingDigest": {"$ref": "#/$defs/digest"},
+            "apiTargetBindingDigest": {"$ref": "#/$defs/digest"},
+            "otlpTargetBindingDigest": {"$ref": "#/$defs/digest"},
+            "databaseTargetBindingDigest": {"$ref": "#/$defs/digest"},
+            "processingProfileDigest": {"$ref": "#/$defs/digest"},
+            "postgresqlProfileDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "objective": {"$ref": "#/$defs/objective"},
+        "evidence": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "prefixItems": [
+            {"$ref": "#/$defs/deploymentEvidence"},
+            {"$ref": "#/$defs/sustainedEvidence"},
+            {"$ref": "#/$defs/controlPlaneEvidence"},
+            {"$ref": "#/$defs/processingEvidence"},
+            {"$ref": "#/$defs/postgresqlEvidence"}
+          ],
+          "items": false
+        },
+        "measurements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileReviewedAt", "sustainedStartedAt", "sustainedCompletedAt", "firstFailureQualificationStartedAt", "lastFailureQualificationCompletedAt", "preFailureLoadSeconds", "postFailureLoadSeconds", "qualificationWindows", "assessedAt", "oldestEvidenceAgeSeconds"],
+          "properties": {
+            "profileReviewedAt": {"type": "string", "format": "date-time"},
+            "sustainedStartedAt": {"type": "string", "format": "date-time"},
+            "sustainedCompletedAt": {"type": "string", "format": "date-time"},
+            "firstFailureQualificationStartedAt": {"type": "string", "format": "date-time"},
+            "lastFailureQualificationCompletedAt": {"type": "string", "format": "date-time"},
+            "preFailureLoadSeconds": {"type": "integer", "minimum": 0, "maximum": 14400},
+            "postFailureLoadSeconds": {"type": "integer", "minimum": 0, "maximum": 14400},
+            "qualificationWindows": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "prefixItems": [
+                {"$ref": "#/$defs/controlPlaneWindow"},
+                {"$ref": "#/$defs/processingWindow"},
+                {"$ref": "#/$defs/postgresqlWindow"}
+              ],
+              "items": false
+            },
+            "assessedAt": {"type": "string", "format": "date-time"},
+            "oldestEvidenceAgeSeconds": {"type": "integer", "minimum": 0, "maximum": 31536000}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 21,
+          "maxItems": 21,
+          "items": {"$ref": "#/$defs/check"}
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "prefixItems": [
+            {"const": "customer-approved-private-pilot-core-proxy"},
+            {"const": "operator-coordinated-planned-failures"},
+            {"const": "single-cluster-and-selected-targets"},
+            {"const": "automatic-failover-fencing-and-split-brain-not-proven"},
+            {"const": "node-zone-region-and-disaster-recovery-not-qualified"},
+            {"const": "production-volume-long-window-slo-and-partner-acceptance-not-qualified"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalEvidence", "passedEvidence", "failedEvidence", "totalChecks", "passedChecks", "failedChecks", "qualificationWindows", "overallStatus"],
+          "properties": {
+            "totalEvidence": {"const": 5},
+            "passedEvidence": {"type": "integer", "minimum": 0, "maximum": 5},
+            "failedEvidence": {"type": "integer", "minimum": 0, "maximum": 5},
+            "totalChecks": {"const": 21},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 21},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 21},
+            "qualificationWindows": {"const": 3},
+            "overallStatus": {"enum": ["qualified", "not-qualified"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "chartVersion", "contractsApiVersion", "requiredMigration", "sourceRevision", "imageDigest"],
+      "properties": {
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+        "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$", "maxLength": 128},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimumPreFailureLoadSeconds", "minimumPostFailureLoadSeconds", "maximumProfileAgeSeconds", "maximumEvidenceAgeSeconds", "maximumClockSkewSeconds", "reportValiditySeconds"],
+      "properties": {
+        "minimumPreFailureLoadSeconds": {"type": "integer", "minimum": 30, "maximum": 3600},
+        "minimumPostFailureLoadSeconds": {"type": "integer", "minimum": 30, "maximum": 3600},
+        "maximumProfileAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 7776000},
+        "maximumEvidenceAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 2592000},
+        "maximumClockSkewSeconds": {"type": "integer", "minimum": 0, "maximum": 60},
+        "reportValiditySeconds": {"type": "integer", "minimum": 300, "maximum": 604800}
+      }
+    },
+    "evidenceBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "contractKind", "qualificationBoundary", "reportId", "reportDigest", "generatedAt", "validUntil", "ageSeconds", "observedStatus", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "contractKind": {"type": "string"},
+        "qualificationBoundary": {"type": "string"},
+        "reportId": {"type": "string"},
+        "reportDigest": {"$ref": "#/$defs/digest"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "validUntil": {"type": ["string", "null"], "format": "date-time"},
+        "ageSeconds": {"type": "integer", "minimum": 0, "maximum": 31536000},
+        "observedStatus": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-failure-overlap\\.[a-z0-9.-]+$"}
+      }
+    },
+    "deploymentEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceBase"},
+        {"properties": {"id": {"const": "customer-deployment"}, "contractKind": {"const": "CustomerDeploymentQualificationReport"}, "qualificationBoundary": {"const": "customer-deployment"}, "reportId": {"type": "string", "pattern": "^cdq_[a-f0-9]{32}$"}, "observedStatus": {"enum": ["qualified", "not-qualified"]}}}
+      ]
+    },
+    "sustainedEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceBase"},
+        {"properties": {"id": {"const": "sustained-core-workload"}, "contractKind": {"const": "CustomerSustainedWorkloadQualificationReport"}, "qualificationBoundary": {"const": "customer-environment-sustained-workload"}, "reportId": {"type": "string", "pattern": "^cswq_[a-f0-9]{32}$"}, "observedStatus": {"enum": ["qualified", "not-qualified"]}}}
+      ]
+    },
+    "controlPlaneEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceBase"},
+        {"properties": {"id": {"const": "control-plane-continuity"}, "contractKind": {"const": "CustomerContinuityQualificationReport"}, "qualificationBoundary": {"const": "customer-control-plane-continuity"}, "reportId": {"type": "string", "pattern": "^ccq_[a-f0-9]{32}$"}, "observedStatus": {"enum": ["qualified", "not-qualified"]}}}
+      ]
+    },
+    "processingEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceBase"},
+        {"properties": {"id": {"const": "worker-receiver-continuity"}, "contractKind": {"const": "CustomerProcessingContinuityQualificationReport"}, "qualificationBoundary": {"const": "customer-worker-receiver-processing-continuity"}, "reportId": {"type": "string", "pattern": "^cpcq_[a-f0-9]{32}$"}, "observedStatus": {"enum": ["qualified", "not-qualified"]}}}
+      ]
+    },
+    "postgresqlEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceBase"},
+        {"properties": {"id": {"const": "postgresql-primary-promotion"}, "contractKind": {"const": "CustomerPostgreSQLContinuityQualificationReport"}, "qualificationBoundary": {"const": "customer-postgresql-primary-promotion"}, "reportId": {"type": "string", "pattern": "^cpgq_[a-f0-9]{32}$"}, "observedStatus": {"enum": ["qualified", "not-qualified"]}}}
+      ]
+    },
+    "windowBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "startedAt", "completedAt", "durationMilliseconds"],
+      "properties": {
+        "id": {"type": "string"},
+        "startedAt": {"type": "string", "format": "date-time"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "durationMilliseconds": {"type": "integer", "minimum": 0, "maximum": 14400000}
+      }
+    },
+    "controlPlaneWindow": {"allOf": [{"$ref": "#/$defs/windowBase"}, {"properties": {"id": {"const": "control-plane-continuity"}}}]},
+    "processingWindow": {"allOf": [{"$ref": "#/$defs/windowBase"}, {"properties": {"id": {"const": "worker-receiver-continuity"}}}]},
+    "postgresqlWindow": {"allOf": [{"$ref": "#/$defs/windowBase"}, {"properties": {"id": {"const": "postgresql-primary-promotion"}}}]},
+    "check": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["id", "status"], "properties": {"id": {"enum": ["source-binding", "profile-review", "customer-approval", "evidence-freshness", "exact-release-identity", "customer-deployment", "sustained-core-workload", "control-plane-continuity", "worker-receiver-continuity", "postgresql-primary-promotion", "deployment-source-binding", "sustained-profile-binding", "api-target-chain", "otlp-target-chain", "kubernetes-environment-chain", "database-target-chain", "post-deployment-window", "sustained-failure-enclosure", "pre-failure-load-window", "post-failure-load-window", "minimized-output"]}, "status": {"const": "passed"}}},
+        {"type": "object", "additionalProperties": false, "required": ["id", "status", "errorCode"], "properties": {"id": {"enum": ["source-binding", "profile-review", "customer-approval", "evidence-freshness", "exact-release-identity", "customer-deployment", "sustained-core-workload", "control-plane-continuity", "worker-receiver-continuity", "postgresql-primary-promotion", "deployment-source-binding", "sustained-profile-binding", "api-target-chain", "otlp-target-chain", "kubernetes-environment-chain", "database-target-chain", "post-deployment-window", "sustained-failure-enclosure", "pre-failure-load-window", "post-failure-load-window", "minimized-output"]}, "status": {"const": "failed"}, "errorCode": {"type": "string", "pattern": "^customer-failure-overlap\\.[a-z0-9.-]+$"}}}
+      ]
+    }
+  }
+}

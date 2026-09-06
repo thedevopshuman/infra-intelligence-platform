@@ -1,5 +1,10 @@
 # Python SDK boundary
 
+Version 0.80 adds offline `CustomerFailureOverlapProfile` and
+`CustomerFailureOverlapQualificationReport` envelopes. They expose the
+customer-reviewed, source-bound planned-failure overlap result without adding
+traffic generation, Kubernetes/database authority, or approval methods.
+
 Version 0.79 extends the private-pilot envelopes with the eighth sustained
 core-workload input, its protected profile and target bindings, and aggregate
 timing/check results. It adds no load-generation or promotion method.
@@ -80,6 +85,12 @@ OpenTelemetry instrumentation remains the collection boundary.
 customer capacity gate. The protected profile contains target and workload
 selection; the transportable report contains only pseudonymous digests,
 aggregate counts, percentiles, checks, and fixed limitations.
+
+`CustomerFailureOverlapProfile` and
+`CustomerFailureOverlapQualificationReport` expose the separate protected
+customer review and minimized correlation evidence. The SDK cannot coordinate
+load, evict pods, promote PostgreSQL, or turn a private-pilot proxy into a
+production representativeness claim.
 
 Version 0.78 adds those sustained-workload envelopes. The SDK deliberately has
 no method for initiating a load run and cannot turn bounded synthetic evidence

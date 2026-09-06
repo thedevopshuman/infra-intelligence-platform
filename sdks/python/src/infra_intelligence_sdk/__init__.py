@@ -37,6 +37,8 @@ from .models import (
     CustomerBedrockQualificationReport,
     CustomerCredentialBrokerQualificationProfile,
     CustomerCredentialBrokerQualificationReport,
+    CustomerFailureOverlapProfile,
+    CustomerFailureOverlapQualificationReport,
     CustomerGithubContextQualificationProfile,
     CustomerGithubContextQualificationReport,
     CustomerOtlpReceiverQualificationProfile,
@@ -177,6 +179,8 @@ __all__ = [
     "CustomerBedrockQualificationReport",
     "CustomerCredentialBrokerQualificationProfile",
     "CustomerCredentialBrokerQualificationReport",
+    "CustomerFailureOverlapProfile",
+    "CustomerFailureOverlapQualificationReport",
     "CustomerGithubContextQualificationProfile",
     "CustomerGithubContextQualificationReport",
     "CustomerOtlpReceiverQualificationProfile",
@@ -283,4 +287,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.79.0"
+__version__ = "0.80.0"

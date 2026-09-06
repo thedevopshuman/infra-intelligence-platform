@@ -91,7 +91,7 @@ non-zero. An unsafe setup or generator failure does not create a report.
   this minimized report.
 - `qualified` means all 22 checks passed for this exact selection and window.
   It does not mean the workload is representative without separate customer
-  review.
+  review and planned-failure overlap qualification.
 
 ## Verify retained evidence
 
@@ -113,5 +113,9 @@ destroy temporary credentials according to customer policy.
 This first profile excludes provider/inference calls, UI traffic, arbitrary
 queries, actions, failure injection, database promotion, Collector queue
 recovery, node/zone/region failure, and long-window SLOs. Customer workload
-representativeness, a failure-overlap profile, and production operating
-acceptance remain separate qualification work.
+representativeness and production operating acceptance remain separate
+qualification work. Use the [failure-overlap qualification
+workflow](customer-failure-overlap-qualification.md) to correlate the approved
+private-pilot proxy with the existing planned API, processing, and PostgreSQL
+continuity gates; it still does not qualify representative production traffic
+or involuntary failures.

@@ -1,0 +1,189 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerFailureOverlapQualificationReport",
+  "metadata": {
+    "generatedAt": "2026-09-10T12:00:00Z",
+    "validUntil": "2026-09-11T12:00:00Z",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceDirty": false,
+    "id": "cfoq_437041df1314e0b85a72ca4d65d8d7f6"
+  },
+  "spec": {
+    "qualificationLevel": "customer-private-pilot-failure-overlap-v1",
+    "qualificationBoundary": "customer-environment-planned-failure-overlap",
+    "status": "qualified",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "requiredMigration": "0023_ai_model_suitability.sql",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "environment": {
+      "correlationMode": "source-report-window-containment-v1",
+      "failureMode": "operator-coordinated-planned",
+      "reviewAuthority": "protected-customer-profile"
+    },
+    "bindings": {
+      "profileDigest": "sha256:73d7391da7950895585845b514d50dce90fddfff9490cf1483e7d3fa5529d3c5",
+      "approvalRecordDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "deploymentReportDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "sustainedWorkloadProfileDigest": "sha256:c57058e5fa0578817e0eeeb96ccf0128962858b2e9e7d1a15a6b7a2ff365c659",
+      "sustainedWorkloadReportDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "controlPlaneContinuityReportDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "processingContinuityReportDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "postgresqlContinuityReportDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "clusterBindingDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "kubernetesContextBindingDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "namespaceBindingDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "apiTargetBindingDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "otlpTargetBindingDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "databaseTargetBindingDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "processingProfileDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "postgresqlProfileDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    "objective": {
+      "minimumPreFailureLoadSeconds": 60,
+      "minimumPostFailureLoadSeconds": 60,
+      "maximumProfileAgeSeconds": 2592000,
+      "maximumEvidenceAgeSeconds": 604800,
+      "maximumClockSkewSeconds": 5,
+      "reportValiditySeconds": 86400
+    },
+    "evidence": [
+      {
+        "id": "customer-deployment",
+        "contractKind": "CustomerDeploymentQualificationReport",
+        "qualificationBoundary": "customer-deployment",
+        "reportId": "cdq_11111111111111111111111111111111",
+        "reportDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "generatedAt": "2026-09-10T10:00:00Z",
+        "validUntil": null,
+        "ageSeconds": 7200,
+        "observedStatus": "qualified",
+        "status": "passed"
+      },
+      {
+        "id": "sustained-core-workload",
+        "contractKind": "CustomerSustainedWorkloadQualificationReport",
+        "qualificationBoundary": "customer-environment-sustained-workload",
+        "reportId": "cswq_22222222222222222222222222222222",
+        "reportDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "generatedAt": "2026-09-10T11:50:00Z",
+        "validUntil": "2026-09-11T12:00:00Z",
+        "ageSeconds": 600,
+        "observedStatus": "qualified",
+        "status": "passed"
+      },
+      {
+        "id": "control-plane-continuity",
+        "contractKind": "CustomerContinuityQualificationReport",
+        "qualificationBoundary": "customer-control-plane-continuity",
+        "reportId": "ccq_33333333333333333333333333333333",
+        "reportDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "generatedAt": "2026-09-10T10:55:00Z",
+        "validUntil": null,
+        "ageSeconds": 3900,
+        "observedStatus": "qualified",
+        "status": "passed"
+      },
+      {
+        "id": "worker-receiver-continuity",
+        "contractKind": "CustomerProcessingContinuityQualificationReport",
+        "qualificationBoundary": "customer-worker-receiver-processing-continuity",
+        "reportId": "cpcq_44444444444444444444444444444444",
+        "reportDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "generatedAt": "2026-09-10T11:15:00Z",
+        "validUntil": null,
+        "ageSeconds": 2700,
+        "observedStatus": "qualified",
+        "status": "passed"
+      },
+      {
+        "id": "postgresql-primary-promotion",
+        "contractKind": "CustomerPostgreSQLContinuityQualificationReport",
+        "qualificationBoundary": "customer-postgresql-primary-promotion",
+        "reportId": "cpgq_55555555555555555555555555555555",
+        "reportDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "generatedAt": "2026-09-10T11:40:00Z",
+        "validUntil": null,
+        "ageSeconds": 1200,
+        "observedStatus": "qualified",
+        "status": "passed"
+      }
+    ],
+    "measurements": {
+      "profileReviewedAt": "2026-09-09T12:00:00Z",
+      "sustainedStartedAt": "2026-09-10T10:40:00Z",
+      "sustainedCompletedAt": "2026-09-10T11:50:00Z",
+      "firstFailureQualificationStartedAt": "2026-09-10T10:45:00Z",
+      "lastFailureQualificationCompletedAt": "2026-09-10T11:40:00Z",
+      "preFailureLoadSeconds": 300,
+      "postFailureLoadSeconds": 600,
+      "qualificationWindows": [
+        {
+          "id": "control-plane-continuity",
+          "startedAt": "2026-09-10T10:45:00Z",
+          "completedAt": "2026-09-10T10:55:00Z",
+          "durationMilliseconds": 600000
+        },
+        {
+          "id": "worker-receiver-continuity",
+          "startedAt": "2026-09-10T10:56:00Z",
+          "completedAt": "2026-09-10T11:15:00Z",
+          "durationMilliseconds": 1140000
+        },
+        {
+          "id": "postgresql-primary-promotion",
+          "startedAt": "2026-09-10T11:16:00Z",
+          "completedAt": "2026-09-10T11:40:00Z",
+          "durationMilliseconds": 1440000
+        }
+      ],
+      "assessedAt": "2026-09-10T12:00:00Z",
+      "oldestEvidenceAgeSeconds": 7200
+    },
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "profile-review", "status": "passed"},
+      {"id": "customer-approval", "status": "passed"},
+      {"id": "evidence-freshness", "status": "passed"},
+      {"id": "exact-release-identity", "status": "passed"},
+      {"id": "customer-deployment", "status": "passed"},
+      {"id": "sustained-core-workload", "status": "passed"},
+      {"id": "control-plane-continuity", "status": "passed"},
+      {"id": "worker-receiver-continuity", "status": "passed"},
+      {"id": "postgresql-primary-promotion", "status": "passed"},
+      {"id": "deployment-source-binding", "status": "passed"},
+      {"id": "sustained-profile-binding", "status": "passed"},
+      {"id": "api-target-chain", "status": "passed"},
+      {"id": "otlp-target-chain", "status": "passed"},
+      {"id": "kubernetes-environment-chain", "status": "passed"},
+      {"id": "database-target-chain", "status": "passed"},
+      {"id": "post-deployment-window", "status": "passed"},
+      {"id": "sustained-failure-enclosure", "status": "passed"},
+      {"id": "pre-failure-load-window", "status": "passed"},
+      {"id": "post-failure-load-window", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"}
+    ],
+    "limitations": [
+      "customer-approved-private-pilot-core-proxy",
+      "operator-coordinated-planned-failures",
+      "single-cluster-and-selected-targets",
+      "automatic-failover-fencing-and-split-brain-not-proven",
+      "node-zone-region-and-disaster-recovery-not-qualified",
+      "production-volume-long-window-slo-and-partner-acceptance-not-qualified"
+    ],
+    "summary": {
+      "totalEvidence": 5,
+      "passedEvidence": 5,
+      "failedEvidence": 0,
+      "totalChecks": 21,
+      "passedChecks": 21,
+      "failedChecks": 0,
+      "qualificationWindows": 3,
+      "overallStatus": "qualified"
+    }
+  }
+}

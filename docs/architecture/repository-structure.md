@@ -104,8 +104,8 @@ agent runtime, or plugin authority boundary.
 Customer pilot readiness is an additive host-side promotion preflight.
 `scripts/assess_customer_pilot_readiness.py` revalidates and cross-binds the
 existing publication, organizational signature, local readiness, customer
-deployment, bounded read load, sustained core-workload, AI prerequisite, and
-same-invocation reports. It
+deployment, bounded read load, sustained core-workload, customer-approved
+planned-failure overlap, AI prerequisite, and same-invocation reports. It
 does not repeat their external actions or import signing, registry, customer,
 provider, load-generation, installation, or mutation authority. Only the
 protected profile and minimized report shapes enter the public SDK boundary.
@@ -119,6 +119,14 @@ late slots instead of bursting, and emits only aggregate counts, percentiles,
 checks, limitations, and pseudonymous bindings. It is not an API, background
 service, SDK traffic method, agent tool, plugin capability, or claim that the
 synthetic mix represents customer traffic.
+
+Customer failure-overlap qualification is a traffic-free host-side evidence
+join. `scripts/assess_customer_failure_overlap.py` revalidates the exact
+deployment, sustained workload, API continuity, worker/receiver continuity,
+and PostgreSQL promotion reports, then proves the three planned-disruption
+windows fit within one customer-approved private-pilot core proxy. It receives
+no traffic credential or disruption authority, retains only minimized
+pseudonymous evidence, and exposes only offline profile/report shapes to SDKs.
 
 Exact AI invocation observation follows the normal serving boundaries.
 `src/iip/application/query_ai_invocation.py` owns authorization, active-source

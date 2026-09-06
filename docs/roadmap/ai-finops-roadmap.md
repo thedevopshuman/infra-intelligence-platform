@@ -96,9 +96,12 @@ remain external.
 An additive private-pilot preflight now binds that same-invocation report to
 the exact prerequisite file, customer deployment, post-deployment bounded load,
 post-deployment sustained core-workload evidence, local release evidence,
-registry publication, and organizational keyless signatures.
+registry publication, organizational keyless signatures, and a customer-
+approved report proving the planned API, worker/receiver, and PostgreSQL
+continuity windows fit inside the sustained core-workload run.
 `design-partner-candidate` closes the manual-correlation gap for
 one exact build and customer target; actual partner operation/acceptance,
+representative production traffic, automatic and involuntary failover,
 production operating qualification, and public license/legal/brand/governance
 remain external decisions.
 

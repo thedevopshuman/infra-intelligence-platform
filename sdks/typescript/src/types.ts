@@ -2527,6 +2527,187 @@ export interface CustomerAiFinopsFlowQualificationReport {
   };
 }
 
+export interface CustomerFailureOverlapProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerFailureOverlapProfile";
+  metadata: {
+    id: `cfop_${string}`;
+    reviewedAt: string;
+    validUntil: string;
+  };
+  spec: {
+    qualificationLevel: "customer-private-pilot-failure-overlap-v1";
+    release: CustomerSustainedWorkloadProfile["spec"]["release"];
+    bindings: {
+      deploymentReportDigest: Sha256Digest;
+      sustainedWorkloadProfileDigest: Sha256Digest;
+      clusterBindingDigest: Sha256Digest;
+      kubernetesContextBindingDigest: Sha256Digest;
+      namespaceBindingDigest: Sha256Digest;
+      apiTargetBindingDigest: Sha256Digest;
+      otlpTargetBindingDigest: Sha256Digest;
+      databaseTargetBindingDigest: Sha256Digest;
+      processingProfileDigest: Sha256Digest;
+      postgresqlProfileDigest: Sha256Digest;
+    };
+    review: {
+      basis: "customer-approved-private-pilot-core-proxy";
+      approvalRecordDigest: Sha256Digest;
+      approvedScenarios: [
+        "api-pod-eviction",
+        "workflow-worker-pod-eviction",
+        "otlp-receiver-pod-eviction",
+        "postgresql-primary-promotion",
+      ];
+      dataHandlingReviewed: true;
+      recoveryObjectivesReviewed: true;
+    };
+    objective: {
+      minimumPreFailureLoadSeconds: number;
+      minimumPostFailureLoadSeconds: number;
+      maximumProfileAgeSeconds: number;
+      maximumEvidenceAgeSeconds: number;
+      maximumClockSkewSeconds: number;
+      reportValiditySeconds: number;
+    };
+  };
+}
+
+export type CustomerFailureOverlapEvidenceId =
+  | "customer-deployment"
+  | "sustained-core-workload"
+  | "control-plane-continuity"
+  | "worker-receiver-continuity"
+  | "postgresql-primary-promotion";
+
+export type CustomerFailureOverlapCheckId =
+  | "source-binding"
+  | "profile-review"
+  | "customer-approval"
+  | "evidence-freshness"
+  | "exact-release-identity"
+  | "customer-deployment"
+  | "sustained-core-workload"
+  | "control-plane-continuity"
+  | "worker-receiver-continuity"
+  | "postgresql-primary-promotion"
+  | "deployment-source-binding"
+  | "sustained-profile-binding"
+  | "api-target-chain"
+  | "otlp-target-chain"
+  | "kubernetes-environment-chain"
+  | "database-target-chain"
+  | "post-deployment-window"
+  | "sustained-failure-enclosure"
+  | "pre-failure-load-window"
+  | "post-failure-load-window"
+  | "minimized-output";
+
+export interface CustomerFailureOverlapQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerFailureOverlapQualificationReport";
+  metadata: {
+    id: `cfoq_${string}`;
+    generatedAt: string;
+    validUntil: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    qualificationLevel: "customer-private-pilot-failure-overlap-v1";
+    qualificationBoundary: "customer-environment-planned-failure-overlap";
+    status: "qualified" | "not-qualified";
+    subject: CustomerFailureOverlapProfile["spec"]["release"];
+    environment: {
+      correlationMode: "source-report-window-containment-v1";
+      failureMode: "operator-coordinated-planned";
+      reviewAuthority: "protected-customer-profile";
+    };
+    bindings: CustomerFailureOverlapProfile["spec"]["bindings"] & {
+      profileDigest: Sha256Digest;
+      approvalRecordDigest: Sha256Digest;
+      sustainedWorkloadReportDigest: Sha256Digest;
+      controlPlaneContinuityReportDigest: Sha256Digest;
+      processingContinuityReportDigest: Sha256Digest;
+      postgresqlContinuityReportDigest: Sha256Digest;
+    };
+    objective: CustomerFailureOverlapProfile["spec"]["objective"];
+    evidence: Array<{
+      id: CustomerFailureOverlapEvidenceId;
+      contractKind:
+        | "CustomerDeploymentQualificationReport"
+        | "CustomerSustainedWorkloadQualificationReport"
+        | "CustomerContinuityQualificationReport"
+        | "CustomerProcessingContinuityQualificationReport"
+        | "CustomerPostgreSQLContinuityQualificationReport";
+      qualificationBoundary:
+        | "customer-deployment"
+        | "customer-environment-sustained-workload"
+        | "customer-control-plane-continuity"
+        | "customer-worker-receiver-processing-continuity"
+        | "customer-postgresql-primary-promotion";
+      reportId: string;
+      reportDigest: Sha256Digest;
+      generatedAt: string;
+      validUntil: string | null;
+      ageSeconds: number;
+      observedStatus: "qualified" | "not-qualified";
+    } & (
+      | { status: "passed"; errorCode?: never }
+      | {
+          status: "failed";
+          errorCode: `customer-failure-overlap.${string}`;
+        }
+    )>;
+    measurements: {
+      profileReviewedAt: string;
+      sustainedStartedAt: string;
+      sustainedCompletedAt: string;
+      firstFailureQualificationStartedAt: string;
+      lastFailureQualificationCompletedAt: string;
+      preFailureLoadSeconds: number;
+      postFailureLoadSeconds: number;
+      qualificationWindows: Array<{
+        id:
+          | "control-plane-continuity"
+          | "worker-receiver-continuity"
+          | "postgresql-primary-promotion";
+        startedAt: string;
+        completedAt: string;
+        durationMilliseconds: number;
+      }>;
+      assessedAt: string;
+      oldestEvidenceAgeSeconds: number;
+    };
+    checks: Array<
+      | { id: CustomerFailureOverlapCheckId; status: "passed" }
+      | {
+          id: CustomerFailureOverlapCheckId;
+          status: "failed";
+          errorCode: `customer-failure-overlap.${string}`;
+        }
+    >;
+    limitations: [
+      "customer-approved-private-pilot-core-proxy",
+      "operator-coordinated-planned-failures",
+      "single-cluster-and-selected-targets",
+      "automatic-failover-fencing-and-split-brain-not-proven",
+      "node-zone-region-and-disaster-recovery-not-qualified",
+      "production-volume-long-window-slo-and-partner-acceptance-not-qualified",
+    ];
+    summary: {
+      totalEvidence: 5;
+      passedEvidence: number;
+      failedEvidence: number;
+      totalChecks: 21;
+      passedChecks: number;
+      failedChecks: number;
+      qualificationWindows: 3;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export interface CustomerPilotReadinessProfile {
   apiVersion: "iip.platform/v1alpha1";
   kind: "CustomerPilotReadinessProfile";
@@ -2553,6 +2734,7 @@ export interface CustomerPilotReadinessProfile {
       controlPlaneTargetDigest: Sha256Digest;
       otlpTargetDigest: Sha256Digest;
       sustainedWorkloadProfileDigest: Sha256Digest;
+      failureOverlapProfileDigest: Sha256Digest;
     };
     objective: {
       maximumProfileAgeSeconds: number;
@@ -2571,6 +2753,7 @@ export type CustomerPilotReadinessEvidenceId =
   | "customer-deployment"
   | "control-plane-load"
   | "sustained-core-workload"
+  | "customer-failure-overlap"
   | "ai-finops-prerequisites"
   | "same-invocation-ai-finops";
 
@@ -2585,12 +2768,14 @@ export type CustomerPilotReadinessCheckId =
   | "customer-deployment"
   | "control-plane-load"
   | "sustained-core-workload"
+  | "customer-failure-overlap"
   | "ai-finops-prerequisites"
   | "same-invocation-ai-finops"
   | "publication-signature-chain"
   | "deployed-image-chain"
   | "customer-environment-chain"
   | "sustained-workload-environment-chain"
+  | "failure-overlap-environment-chain"
   | "post-deployment-load-window"
   | "post-deployment-sustained-workload-window"
   | "minimized-output";
@@ -2626,6 +2811,7 @@ export interface CustomerPilotReadinessReport {
       customerDeploymentReportDigest: Sha256Digest;
       controlPlaneLoadReportDigest: Sha256Digest;
       sustainedWorkloadReportDigest: Sha256Digest;
+      failureOverlapReportDigest: Sha256Digest;
       aiFinopsPrerequisiteReportDigest: Sha256Digest;
       aiFinopsFlowReportDigest: Sha256Digest;
       signaturePolicyDigest: Sha256Digest;
@@ -2649,6 +2835,7 @@ export interface CustomerPilotReadinessReport {
       controlPlaneLoadCompletedAt: string;
       sustainedWorkloadStartedAt: string;
       sustainedWorkloadCompletedAt: string;
+      failureOverlapQualifiedAt: string;
       aiFinopsFlowCompletedAt: string;
       assessedAt: string;
       oldestFoundationEvidenceAgeSeconds: number;
@@ -2663,6 +2850,7 @@ export interface CustomerPilotReadinessReport {
         | "CustomerDeploymentQualificationReport"
         | "ControlPlaneLoadQualificationReport"
         | "CustomerSustainedWorkloadQualificationReport"
+        | "CustomerFailureOverlapQualificationReport"
         | "CustomerAiFinopsPrerequisiteReport"
         | "CustomerAiFinopsFlowQualificationReport";
       qualificationBoundary:
@@ -2672,6 +2860,7 @@ export interface CustomerPilotReadinessReport {
         | "customer-deployment"
         | "customer-load"
         | "customer-environment-sustained-workload"
+        | "customer-environment-planned-failure-overlap"
         | "ai-finops-prerequisites"
         | "same-invocation-customer-runtime";
       reportId: string;
@@ -2697,7 +2886,7 @@ export interface CustomerPilotReadinessReport {
       "design-partner-operation-and-acceptance-not-qualified",
       "public-license-legal-brand-and-governance-not-qualified",
       "invoice-private-rates-discounts-and-commitments-not-qualified",
-      "customer-workload-representativeness-and-failure-overlap-not-qualified",
+      "customer-approved-private-pilot-core-proxy-not-production-representativeness",
       "node-zone-region-and-long-window-slo-not-qualified",
       "additional-integrations-models-providers-and-backends-not-qualified",
     ];
@@ -2719,10 +2908,10 @@ export interface CustomerPilotReadinessReport {
       },
     ];
     summary: {
-      requiredEvidence: 8;
+      requiredEvidence: 9;
       passedEvidence: number;
       rejectedEvidence: number;
-      totalChecks: 19;
+      totalChecks: 21;
       passedChecks: number;
       failedChecks: number;
       externalGateCount: 3;

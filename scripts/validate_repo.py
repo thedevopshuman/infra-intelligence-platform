@@ -191,6 +191,15 @@ REQUIRED_PATHS = (
     "scripts/qualify_customer_sustained_workload.py",
     "tests/test_customer_sustained_workload.py",
     "docs/decisions/0145-require-sustained-workload-before-private-pilot.md",
+    "docs/decisions/0146-customer-reviewed-planned-failure-overlap.md",
+    "docs/specifications/customer-failure-overlap-qualification-contract.md",
+    "contracts/schemas/customer-failure-overlap-profile.schema.json",
+    "contracts/schemas/customer-failure-overlap-qualification-report.schema.json",
+    "contracts/examples/customer-failure-overlap-profile.json",
+    "contracts/examples/customer-failure-overlap-qualification-report.json",
+    "docs/operations/customer-failure-overlap-qualification.md",
+    "scripts/assess_customer_failure_overlap.py",
+    "tests/test_customer_failure_overlap.py",
     "docs/decisions/0141-privacy-minimized-exact-ai-invocation-observation.md",
     "docs/specifications/ai-invocation-observation-contract.md",
     "contracts/schemas/ai-economics-invocation-observation-request.schema.json",
@@ -2710,6 +2719,7 @@ def validate_customer_pilot_readiness_examples(
                 "controlPlaneTargetDigest",
                 "otlpTargetDigest",
                 "sustainedWorkloadProfileDigest",
+                "failureOverlapProfileDigest",
             )
         }
         if (
@@ -2808,6 +2818,72 @@ def validate_customer_sustained_workload_examples(
             )
     except (CustomerSustainedWorkloadError, KeyError, TypeError):
         fail(errors, "customer sustained workload examples must be semantically valid")
+
+
+def validate_customer_failure_overlap_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check the protected overlap profile and minimized report together."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    profile = documents.get(example_dir / "customer-failure-overlap-profile.json")
+    report = documents.get(
+        example_dir / "customer-failure-overlap-qualification-report.json"
+    )
+    try:
+        from assess_customer_failure_overlap import (
+            CustomerFailureOverlapError,
+            _digest,
+            validate_profile,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "customer failure-overlap validator must be importable")
+        return
+    try:
+        if not isinstance(profile, dict) or not isinstance(report, dict):
+            raise CustomerFailureOverlapError(
+                "customer-failure-overlap.example.invalid"
+            )
+        validate_profile(profile)
+        validate_report_document(report)
+        profile_metadata = profile["metadata"]
+        profile_spec = profile["spec"]
+        profile_bindings = profile_spec["bindings"]
+        report_spec = report["spec"]
+        report_bindings = report_spec["bindings"]
+        shared_binding_keys = (
+            "deploymentReportDigest",
+            "sustainedWorkloadProfileDigest",
+            "clusterBindingDigest",
+            "kubernetesContextBindingDigest",
+            "namespaceBindingDigest",
+            "apiTargetBindingDigest",
+            "otlpTargetBindingDigest",
+            "databaseTargetBindingDigest",
+            "processingProfileDigest",
+            "postgresqlProfileDigest",
+        )
+        if (
+            report_spec["subject"] != profile_spec["release"]
+            or report_spec["objective"] != profile_spec["objective"]
+            or report_bindings["profileDigest"] != _digest(profile)
+            or report_bindings["approvalRecordDigest"]
+            != profile_spec["review"]["approvalRecordDigest"]
+            or any(
+                report_bindings[key] != profile_bindings[key]
+                for key in shared_binding_keys
+            )
+            or report_spec["measurements"]["profileReviewedAt"]
+            != profile_metadata["reviewedAt"]
+            or parse_timestamp(report["metadata"]["validUntil"])
+            > parse_timestamp(profile_metadata["validUntil"])
+        ):
+            raise CustomerFailureOverlapError(
+                "customer-failure-overlap.example.crossed"
+            )
+    except (CustomerFailureOverlapError, KeyError, TypeError):
+        fail(errors, "customer failure-overlap examples must be semantically valid")
 
 
 def validate_control_plane_load_qualification_example(
@@ -5790,6 +5866,14 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerSustainedWorkloadQualificationReport",
         ),
         (
+            "customer-failure-overlap-profile.json",
+            "CustomerFailureOverlapProfile",
+        ),
+        (
+            "customer-failure-overlap-qualification-report.json",
+            "CustomerFailureOverlapQualificationReport",
+        ),
+        (
             "customer-otlp-receiver-qualification-profile.json",
             "CustomerOtlpReceiverQualificationProfile",
         ),
@@ -5904,6 +5988,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_customer_otlp_receiver_qualification_example(documents, errors)
     validate_customer_deployment_qualification_example(documents, errors)
     validate_customer_sustained_workload_examples(documents, errors)
+    validate_customer_failure_overlap_examples(documents, errors)
     validate_control_plane_load_qualification_example(documents, errors)
     validate_postgresql_recovery_qualification_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)

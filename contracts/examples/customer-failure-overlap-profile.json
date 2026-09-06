@@ -1,0 +1,52 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerFailureOverlapProfile",
+  "metadata": {
+    "reviewedAt": "2026-09-09T12:00:00Z",
+    "validUntil": "2026-09-16T12:00:00Z",
+    "id": "cfop_0de60706b3da379a21bf66a655de40ed"
+  },
+  "spec": {
+    "qualificationLevel": "customer-private-pilot-failure-overlap-v1",
+    "release": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "requiredMigration": "0023_ai_model_suitability.sql",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "deploymentReportDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "sustainedWorkloadProfileDigest": "sha256:c57058e5fa0578817e0eeeb96ccf0128962858b2e9e7d1a15a6b7a2ff365c659",
+      "clusterBindingDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "kubernetesContextBindingDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "namespaceBindingDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "apiTargetBindingDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "otlpTargetBindingDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "databaseTargetBindingDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "processingProfileDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "postgresqlProfileDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    "review": {
+      "basis": "customer-approved-private-pilot-core-proxy",
+      "approvalRecordDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "approvedScenarios": [
+        "api-pod-eviction",
+        "workflow-worker-pod-eviction",
+        "otlp-receiver-pod-eviction",
+        "postgresql-primary-promotion"
+      ],
+      "dataHandlingReviewed": true,
+      "recoveryObjectivesReviewed": true
+    },
+    "objective": {
+      "minimumPreFailureLoadSeconds": 60,
+      "minimumPostFailureLoadSeconds": 60,
+      "maximumProfileAgeSeconds": 2592000,
+      "maximumEvidenceAgeSeconds": 604800,
+      "maximumClockSkewSeconds": 5,
+      "reportValiditySeconds": 86400
+    }
+  }
+}

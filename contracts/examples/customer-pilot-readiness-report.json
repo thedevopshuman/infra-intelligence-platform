@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerPilotReadinessReport",
   "metadata": {
-    "id": "cpr_7eab9a9ee86d19c80ad07d093ee8d159",
+    "id": "cpr_285b2ba0291f4cadc2b192db008de6a4",
     "generatedAt": "2026-09-08T12:00:00Z",
     "validUntil": "2026-09-09T09:00:00Z",
     "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -22,18 +22,19 @@
       "pluginMediationBridgeImageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     },
     "bindings": {
-      "profileDigest": "sha256:13d3cf55c14e387e6b0a48af3cf728d29d3ed989ffa48b1b16504c7148d76c59",
+      "profileDigest": "sha256:d0e570b6a8fc753fbb340066073b949fe69d7d9b71695f45ed90a737108a98a3",
       "releaseReadinessReportDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
       "releasePublicationReportDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
       "releaseSignatureReportDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
       "customerDeploymentReportDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
       "controlPlaneLoadReportDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
       "sustainedWorkloadReportDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "failureOverlapReportDigest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
       "aiFinopsPrerequisiteReportDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
       "aiFinopsFlowReportDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
       "signaturePolicyDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "publicationTargetSetDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "customerEnvironmentSetDigest": "sha256:4702410a0beb14db512e8ad87127844642bd777c9deab33916b1fb0cb684badc"
+      "customerEnvironmentSetDigest": "sha256:46b33e3b5828545e59f81ec1dc05fed9c2bf95d7a2aedfdca3a7e6f610b46990"
     },
     "objective": {
       "maximumProfileAgeSeconds": 2592000,
@@ -52,6 +53,7 @@
       "controlPlaneLoadCompletedAt": "2026-09-08T10:05:00Z",
       "sustainedWorkloadStartedAt": "2026-09-08T10:15:00Z",
       "sustainedWorkloadCompletedAt": "2026-09-08T10:30:00Z",
+      "failureOverlapQualifiedAt": "2026-09-08T10:45:00Z",
       "aiFinopsFlowCompletedAt": "2026-09-08T11:00:00Z",
       "assessedAt": "2026-09-08T12:00:00Z",
       "oldestFoundationEvidenceAgeSeconds": 86400,
@@ -64,6 +66,7 @@
       {"id": "customer-deployment", "contractKind": "CustomerDeploymentQualificationReport", "qualificationBoundary": "customer-deployment", "reportId": "cdq_44444444444444444444444444444444", "reportDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444", "observedStatus": "qualified", "status": "passed"},
       {"id": "control-plane-load", "contractKind": "ControlPlaneLoadQualificationReport", "qualificationBoundary": "customer-load", "reportId": "clq_55555555555555555555555555555555", "reportDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555", "observedStatus": "qualified", "status": "passed"},
       {"id": "sustained-core-workload", "contractKind": "CustomerSustainedWorkloadQualificationReport", "qualificationBoundary": "customer-environment-sustained-workload", "reportId": "cswq_88888888888888888888888888888888", "reportDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888", "observedStatus": "qualified", "status": "passed"},
+      {"id": "customer-failure-overlap", "contractKind": "CustomerFailureOverlapQualificationReport", "qualificationBoundary": "customer-environment-planned-failure-overlap", "reportId": "cfoq_cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd", "reportDigest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd", "observedStatus": "qualified", "status": "passed"},
       {"id": "ai-finops-prerequisites", "contractKind": "CustomerAiFinopsPrerequisiteReport", "qualificationBoundary": "ai-finops-prerequisites", "reportId": "cafp_66666666666666666666666666666666", "reportDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666", "observedStatus": "prerequisites-ready", "status": "passed"},
       {"id": "same-invocation-ai-finops", "contractKind": "CustomerAiFinopsFlowQualificationReport", "qualificationBoundary": "same-invocation-customer-runtime", "reportId": "caff_77777777777777777777777777777777", "reportDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777", "observedStatus": "qualified", "status": "passed"}
     ],
@@ -78,12 +81,14 @@
       {"id": "customer-deployment", "status": "passed"},
       {"id": "control-plane-load", "status": "passed"},
       {"id": "sustained-core-workload", "status": "passed"},
+      {"id": "customer-failure-overlap", "status": "passed"},
       {"id": "ai-finops-prerequisites", "status": "passed"},
       {"id": "same-invocation-ai-finops", "status": "passed"},
       {"id": "publication-signature-chain", "status": "passed"},
       {"id": "deployed-image-chain", "status": "passed"},
       {"id": "customer-environment-chain", "status": "passed"},
       {"id": "sustained-workload-environment-chain", "status": "passed"},
+      {"id": "failure-overlap-environment-chain", "status": "passed"},
       {"id": "post-deployment-load-window", "status": "passed"},
       {"id": "post-deployment-sustained-workload-window", "status": "passed"},
       {"id": "minimized-output", "status": "passed"}
@@ -93,7 +98,7 @@
       "design-partner-operation-and-acceptance-not-qualified",
       "public-license-legal-brand-and-governance-not-qualified",
       "invoice-private-rates-discounts-and-commitments-not-qualified",
-      "customer-workload-representativeness-and-failure-overlap-not-qualified",
+      "customer-approved-private-pilot-core-proxy-not-production-representativeness",
       "node-zone-region-and-long-window-slo-not-qualified",
       "additional-integrations-models-providers-and-backends-not-qualified"
     ],
@@ -103,11 +108,11 @@
       {"id": "public-license-legal-brand-and-governance", "status": "external-required", "reasonCode": "customer-pilot-readiness.external.public-governance"}
     ],
     "summary": {
-      "requiredEvidence": 8,
-      "passedEvidence": 8,
+      "requiredEvidence": 9,
+      "passedEvidence": 9,
       "rejectedEvidence": 0,
-      "totalChecks": 19,
-      "passedChecks": 19,
+      "totalChecks": 21,
+      "passedChecks": 21,
       "failedChecks": 0,
       "externalGateCount": 3,
       "overallStatus": "design-partner-candidate"

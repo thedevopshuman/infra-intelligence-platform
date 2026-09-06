@@ -28,6 +28,7 @@ import qualify_control_plane_load as control_plane_load  # noqa: E402
 import qualify_customer_ai_finops as ai_prerequisite  # noqa: E402
 import qualify_customer_ai_finops_flow as ai_flow  # noqa: E402
 import qualify_customer_deployment as customer_deployment  # noqa: E402
+import assess_customer_failure_overlap as failure_overlap  # noqa: E402
 import qualify_customer_sustained_workload as sustained_workload  # noqa: E402
 import release_publication  # noqa: E402
 import release_readiness  # noqa: E402
@@ -54,12 +55,14 @@ CHECK_IDS = (
     "customer-deployment",
     "control-plane-load",
     "sustained-core-workload",
+    "customer-failure-overlap",
     "ai-finops-prerequisites",
     "same-invocation-ai-finops",
     "publication-signature-chain",
     "deployed-image-chain",
     "customer-environment-chain",
     "sustained-workload-environment-chain",
+    "failure-overlap-environment-chain",
     "post-deployment-load-window",
     "post-deployment-sustained-workload-window",
     "minimized-output",
@@ -70,7 +73,7 @@ LIMITATIONS = (
     "design-partner-operation-and-acceptance-not-qualified",
     "public-license-legal-brand-and-governance-not-qualified",
     "invoice-private-rates-discounts-and-commitments-not-qualified",
-    "customer-workload-representativeness-and-failure-overlap-not-qualified",
+    "customer-approved-private-pilot-core-proxy-not-production-representativeness",
     "node-zone-region-and-long-window-slo-not-qualified",
     "additional-integrations-models-providers-and-backends-not-qualified",
 )
@@ -439,6 +442,18 @@ REQUIREMENTS = (
         ),
     ),
     Requirement(
+        "customer-failure-overlap",
+        "CustomerFailureOverlapQualificationReport",
+        "customer-environment-planned-failure-overlap",
+        "qualified",
+        "customer",
+        _wrap_validator(
+            failure_overlap.validate_report_document,
+            failure_overlap.CustomerFailureOverlapError,
+            "customer-pilot-readiness.failure-overlap.invalid",
+        ),
+    ),
+    Requirement(
         "ai-finops-prerequisites",
         "CustomerAiFinopsPrerequisiteReport",
         "ai-finops-prerequisites",
@@ -529,6 +544,7 @@ def _release_and_environment_bindings(
     deployment = sources["customer-deployment"].document
     load = sources["control-plane-load"].document
     sustained = sources["sustained-core-workload"].document
+    overlap = sources["customer-failure-overlap"].document
     prerequisites = sources["ai-finops-prerequisites"].document
     flow = sources["same-invocation-ai-finops"].document
 
@@ -540,6 +556,8 @@ def _release_and_environment_bindings(
     load_identity = _mapping(_path(load, ("spec", "targetIdentity")), code)
     sustained_subject = _mapping(_path(sustained, ("spec", "subject")), code)
     sustained_bindings = _mapping(_path(sustained, ("spec", "bindings")), code)
+    overlap_subject = _mapping(_path(overlap, ("spec", "subject")), code)
+    overlap_bindings = _mapping(_path(overlap, ("spec", "bindings")), code)
     prerequisite_subject = _mapping(_path(prerequisites, ("spec", "subject")), code)
     prerequisite_bindings = _mapping(_path(prerequisites, ("spec", "bindings")), code)
     flow_subject = _mapping(_path(flow, ("spec", "subject")), code)
@@ -624,6 +642,7 @@ def _release_and_environment_bindings(
         or prerequisite_subject != expected_customer_subject
         or flow_subject != expected_customer_subject
         or sustained_subject != expected_sustained_subject
+        or overlap_subject != expected_sustained_subject
         or any(
             metadata.get("sourceRevision") != exact_release["sourceRevision"]
             for metadata in source_metadata
@@ -652,6 +671,7 @@ def _release_and_environment_bindings(
         "controlPlaneTargetDigest": control_target_digest,
         "otlpTargetDigest": sustained_bindings.get("otlpTargetBindingDigest"),
         "sustainedWorkloadProfileDigest": sustained_bindings.get("profileDigest"),
+        "failureOverlapProfileDigest": overlap_bindings.get("profileDigest"),
     }
     if (
         expected_bindings.get("signaturePolicyDigest") != policy_digest
@@ -663,6 +683,8 @@ def _release_and_environment_bindings(
         != sustained_bindings.get("otlpTargetBindingDigest")
         or expected_bindings.get("sustainedWorkloadProfileDigest")
         != sustained_bindings.get("profileDigest")
+        or expected_bindings.get("failureOverlapProfileDigest")
+        != overlap_bindings.get("profileDigest")
         or _path(load, ("spec", "targetBindingDigest")) != control_target_digest
         or sustained_bindings.get("apiTargetBindingDigest")
         != control_target_digest
@@ -670,6 +692,25 @@ def _release_and_environment_bindings(
         != deployment_bindings.get("processingOtlpTargetBindingDigest")
         or sustained_bindings.get("otlpTargetBindingDigest")
         != deployment_bindings.get("otlpReceiverEndpointBindingDigest")
+        or overlap_bindings.get("deploymentReportDigest")
+        != sources["customer-deployment"].file_digest
+        or overlap_bindings.get("sustainedWorkloadReportDigest")
+        != sources["sustained-core-workload"].file_digest
+        or overlap_bindings.get("sustainedWorkloadProfileDigest")
+        != sustained_bindings.get("profileDigest")
+        or overlap_bindings.get("clusterBindingDigest") != cluster_digest
+        or overlap_bindings.get("namespaceBindingDigest")
+        != deployment_bindings.get("namespaceBindingDigest")
+        or overlap_bindings.get("apiTargetBindingDigest")
+        != control_target_digest
+        or overlap_bindings.get("otlpTargetBindingDigest")
+        != sustained_bindings.get("otlpTargetBindingDigest")
+        or overlap_bindings.get("databaseTargetBindingDigest")
+        != deployment_bindings.get("databaseTargetBindingDigest")
+        or overlap_bindings.get("processingProfileDigest")
+        != deployment_bindings.get("processingProfileDigest")
+        or overlap_bindings.get("postgresqlProfileDigest")
+        != deployment_bindings.get("databaseProfileDigest")
         or flow_bindings.get("controlPlaneTargetDigest") != control_target_digest
         or flow_bindings.get("environmentBindingDigest") != environment_digest
         or prerequisite_bindings.get("releaseReadinessReportDigest")
@@ -716,6 +757,7 @@ def _evidence_item(
         reason = "customer-pilot-readiness.evidence.stale"
     elif requirement.identifier in {
         "sustained-core-workload",
+        "customer-failure-overlap",
         "ai-finops-prerequisites",
         "same-invocation-ai-finops",
     }:
@@ -791,6 +833,10 @@ def _derived_checks(
             evidence_pass["sustained-core-workload"],
         ),
         _check(
+            "customer-failure-overlap",
+            evidence_pass["customer-failure-overlap"],
+        ),
+        _check(
             "ai-finops-prerequisites", evidence_pass["ai-finops-prerequisites"]
         ),
         _check(
@@ -801,6 +847,7 @@ def _derived_checks(
         _check("deployed-image-chain", True),
         _check("customer-environment-chain", True),
         _check("sustained-workload-environment-chain", True),
+        _check("failure-overlap-environment-chain", True),
         _check(
             "post-deployment-load-window",
             post_deployment_load,
@@ -908,6 +955,7 @@ def build_report(
         "customer-pilot-readiness.sustained-workload.invalid",
     )
     sustained_completed = sources["sustained-core-workload"].generated_at
+    overlap_completed = sources["customer-failure-overlap"].generated_at
     flow_completed = sources["same-invocation-ai-finops"].generated_at
     post_deployment_load = deployment_time <= load_started <= load_completed
     post_deployment_sustained_workload = (
@@ -945,6 +993,7 @@ def build_report(
         )
         if requirement.identifier in {
             "sustained-core-workload",
+            "customer-failure-overlap",
             "ai-finops-prerequisites",
             "same-invocation-ai-finops",
         }:
@@ -994,6 +1043,9 @@ def build_report(
             "sustainedWorkloadReportDigest": sources[
                 "sustained-core-workload"
             ].file_digest,
+            "failureOverlapReportDigest": sources[
+                "customer-failure-overlap"
+            ].file_digest,
             "aiFinopsPrerequisiteReportDigest": sources[
                 "ai-finops-prerequisites"
             ].file_digest,
@@ -1032,6 +1084,7 @@ def build_report(
             "controlPlaneLoadCompletedAt": _timestamp(load_completed),
             "sustainedWorkloadStartedAt": _timestamp(sustained_started),
             "sustainedWorkloadCompletedAt": _timestamp(sustained_completed),
+            "failureOverlapQualifiedAt": _timestamp(overlap_completed),
             "aiFinopsFlowCompletedAt": _timestamp(flow_completed),
             "assessedAt": _timestamp(current),
             "oldestFoundationEvidenceAgeSeconds": max(
@@ -1131,6 +1184,9 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
     sustained_completed = _parse_time(
         measurements.get("sustainedWorkloadCompletedAt"), code
     )
+    overlap_completed = _parse_time(
+        measurements.get("failureOverlapQualifiedAt"), code
+    )
     flow_completed = _parse_time(measurements.get("aiFinopsFlowCompletedAt"), code)
     expected_checks = _derived_checks(
         evidence,
@@ -1193,6 +1249,7 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
                 ("customerDeploymentReportDigest", "customer-deployment"),
                 ("controlPlaneLoadReportDigest", "control-plane-load"),
                 ("sustainedWorkloadReportDigest", "sustained-core-workload"),
+                ("failureOverlapReportDigest", "customer-failure-overlap"),
                 ("aiFinopsPrerequisiteReportDigest", "ai-finops-prerequisites"),
                 ("aiFinopsFlowReportDigest", "same-invocation-ai-finops"),
             )
@@ -1212,6 +1269,9 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
             seconds=int(objective["maximumClockSkewSeconds"])
         )
         or sustained_completed > generated + timedelta(
+            seconds=int(objective["maximumClockSkewSeconds"])
+        )
+        or overlap_completed > generated + timedelta(
             seconds=int(objective["maximumClockSkewSeconds"])
         )
         or measurements.get("oldestFoundationEvidenceAgeSeconds")
@@ -1326,6 +1386,7 @@ def _source_paths(arguments: argparse.Namespace) -> dict[str, Path]:
         "customer-deployment": arguments.customer_deployment,
         "control-plane-load": arguments.control_plane_load,
         "sustained-core-workload": arguments.sustained_workload,
+        "customer-failure-overlap": arguments.failure_overlap,
         "ai-finops-prerequisites": arguments.ai_finops_prerequisites,
         "same-invocation-ai-finops": arguments.ai_finops_flow,
     }
@@ -1339,6 +1400,7 @@ def _add_inputs(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--customer-deployment", type=Path, required=True)
     parser.add_argument("--control-plane-load", type=Path, required=True)
     parser.add_argument("--sustained-workload", type=Path, required=True)
+    parser.add_argument("--failure-overlap", type=Path, required=True)
     parser.add_argument("--ai-finops-prerequisites", type=Path, required=True)
     parser.add_argument("--ai-finops-flow", type=Path, required=True)
 

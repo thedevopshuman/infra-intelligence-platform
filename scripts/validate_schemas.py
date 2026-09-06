@@ -169,6 +169,12 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "customer-sustained-workload-qualification-report.schema.json": (
         "customer-sustained-workload-qualification-report.json",
     ),
+    "customer-failure-overlap-profile.schema.json": (
+        "customer-failure-overlap-profile.json",
+    ),
+    "customer-failure-overlap-qualification-report.schema.json": (
+        "customer-failure-overlap-qualification-report.json",
+    ),
     "customer-deployment-qualification-report.schema.json": (
         "customer-deployment-qualification-report.json",
     ),

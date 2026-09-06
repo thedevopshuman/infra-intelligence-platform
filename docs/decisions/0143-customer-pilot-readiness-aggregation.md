@@ -4,6 +4,7 @@
 **Date:** 2026-09-08
 
 **Amended by:** [ADR 0145](0145-require-sustained-workload-before-private-pilot.md)
+and [ADR 0146](0146-customer-reviewed-planned-failure-overlap.md)
 
 ## Context
 
@@ -31,7 +32,8 @@ private design-partner evaluation?
    organizational signature verification, customer deployment qualification,
    bounded control-plane load, AI FinOps prerequisites, and the exact
    same-invocation AI FinOps flow. ADR 0145 adds sustained core-workload
-   evidence as the eighth input.
+   evidence as the eighth input. ADR 0146 adds customer-reviewed planned-
+   failure overlap as the ninth input.
 3. Require registry index digests to equal the organizationally verified
    signatures and require the published control-plane digest to equal the
    installed, load-tested, and AI-qualified image. Rebind the prerequisite

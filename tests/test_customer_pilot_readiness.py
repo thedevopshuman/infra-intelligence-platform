@@ -25,6 +25,11 @@ ENVIRONMENT = "sha256:" + "e" * 64
 TARGET = "sha256:" + "f" * 64
 OTLP_TARGET = "sha256:" + "0" * 64
 SUSTAINED_PROFILE = "sha256:" + "9" * 64
+FAILURE_OVERLAP_PROFILE = "sha256:" + "8" * 64
+NAMESPACE = "sha256:" + "7" * 64
+DATABASE_TARGET = "sha256:" + "6" * 64
+PROCESSING_PROFILE = "sha256:" + "5" * 64
+POSTGRESQL_PROFILE = "sha256:" + "4" * 64
 
 
 def _stamp(value: datetime) -> str:
@@ -60,6 +65,7 @@ def _profile(now: datetime, targets: list[dict[str, str]]) -> dict:
             "controlPlaneTargetDigest": TARGET,
             "otlpTargetDigest": OTLP_TARGET,
             "sustainedWorkloadProfileDigest": SUSTAINED_PROFILE,
+            "failureOverlapProfileDigest": FAILURE_OVERLAP_PROFILE,
         },
         "objective": {
             "maximumProfileAgeSeconds": 604800,
@@ -85,6 +91,7 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
     load_completed = now - timedelta(minutes=45)
     sustained_started = now - timedelta(minutes=40)
     sustained_completed = now - timedelta(minutes=25)
+    overlap_at = now - timedelta(minutes=20)
     prerequisite_at = now - timedelta(minutes=30)
     flow_at = now - timedelta(minutes=5)
     targets = [
@@ -194,9 +201,13 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
                 "subject": deployment_subject,
                 "bindings": {
                     "clusterBindingDigest": CLUSTER,
+                    "namespaceBindingDigest": NAMESPACE,
                     "continuityTargetBindingDigest": TARGET,
                     "processingOtlpTargetBindingDigest": OTLP_TARGET,
                     "otlpReceiverEndpointBindingDigest": OTLP_TARGET,
+                    "databaseTargetBindingDigest": DATABASE_TARGET,
+                    "processingProfileDigest": PROCESSING_PROFILE,
+                    "databaseProfileDigest": POSTGRESQL_PROFILE,
                 },
             },
         },
@@ -254,6 +265,39 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
                 },
             },
         },
+        "customer-failure-overlap": {
+            "metadata": {
+                "id": "cfoq_" + "7" * 32,
+                "generatedAt": _stamp(overlap_at),
+                "validUntil": _stamp(now + timedelta(hours=19)),
+                "sourceRevision": REVISION,
+                "sourceDirty": False,
+            },
+            "spec": {
+                "status": "qualified",
+                "subject": {
+                    "applicationVersion": "0.84.0",
+                    "chartVersion": "0.87.0",
+                    "contractsApiVersion": pilot.API_VERSION,
+                    "requiredMigration": "0023_ai_model_suitability.sql",
+                    "sourceRevision": REVISION,
+                    "imageDigest": CONTROL_IMAGE,
+                },
+                "bindings": {
+                    "profileDigest": FAILURE_OVERLAP_PROFILE,
+                    "deploymentReportDigest": _digest("4"),
+                    "sustainedWorkloadReportDigest": _digest("6"),
+                    "sustainedWorkloadProfileDigest": SUSTAINED_PROFILE,
+                    "clusterBindingDigest": CLUSTER,
+                    "namespaceBindingDigest": NAMESPACE,
+                    "apiTargetBindingDigest": TARGET,
+                    "otlpTargetBindingDigest": OTLP_TARGET,
+                    "databaseTargetBindingDigest": DATABASE_TARGET,
+                    "processingProfileDigest": PROCESSING_PROFILE,
+                    "postgresqlProfileDigest": POSTGRESQL_PROFILE,
+                },
+            },
+        },
         "ai-finops-prerequisites": {
             "metadata": {
                 "id": "cafp_" + "7" * 32,
@@ -286,7 +330,7 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
                 "bindings": {
                     "environmentBindingDigest": ENVIRONMENT,
                     "controlPlaneTargetDigest": TARGET,
-                    "prerequisiteReportDigest": _digest("7"),
+                    "prerequisiteReportDigest": _digest("8"),
                 },
             },
         },
@@ -324,7 +368,7 @@ class CustomerPilotReadinessTests(unittest.TestCase):
             profile=self.profile, sources=self.sources, generated_at=self.now
         )
         self.assertEqual(report["spec"]["status"], "design-partner-candidate")
-        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 8)
+        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 9)
         self.assertEqual(len(report["spec"]["externalGates"]), 3)
         self.assertEqual(
             report["metadata"]["validUntil"],
@@ -430,6 +474,29 @@ class CustomerPilotReadinessTests(unittest.TestCase):
         )
         self.assertEqual(check["status"], "failed")
 
+    def test_unsuccessful_failure_overlap_rejects_the_candidate(self) -> None:
+        sources = dict(self.sources)
+        overlap = copy.deepcopy(sources["customer-failure-overlap"].document)
+        overlap["spec"]["status"] = "not-qualified"
+        sources["customer-failure-overlap"] = pilot.EvidenceDocument(
+            overlap,
+            sources["customer-failure-overlap"].file_digest,
+            sources["customer-failure-overlap"].generated_at,
+        )
+        report = pilot.build_report(
+            profile=self.profile, sources=sources, generated_at=self.now
+        )
+        evidence = next(
+            item
+            for item in report["spec"]["evidence"]
+            if item["id"] == "customer-failure-overlap"
+        )
+        self.assertEqual(report["spec"]["status"], "not-candidate")
+        self.assertEqual(
+            evidence["errorCode"],
+            "customer-pilot-readiness.evidence.status-not-qualified",
+        )
+
     def test_dirty_source_is_rejected_and_crossed_revision_fails_closed(self) -> None:
         sources = dict(self.sources)
         publication = copy.deepcopy(sources["registry-publication"].document)
@@ -472,6 +539,38 @@ class CustomerPilotReadinessTests(unittest.TestCase):
             signature,
             sources["organizational-signatures"].file_digest,
             sources["organizational-signatures"].generated_at,
+        )
+        with self.assertRaisesRegex(
+            pilot.CustomerPilotReadinessError,
+            "customer-pilot-readiness.evidence.crossed",
+        ):
+            pilot.build_report(
+                profile=self.profile, sources=sources, generated_at=self.now
+            )
+
+        sources = dict(self.sources)
+        overlap = copy.deepcopy(sources["customer-failure-overlap"].document)
+        overlap["spec"]["bindings"]["sustainedWorkloadReportDigest"] = _digest("0")
+        sources["customer-failure-overlap"] = pilot.EvidenceDocument(
+            overlap,
+            sources["customer-failure-overlap"].file_digest,
+            sources["customer-failure-overlap"].generated_at,
+        )
+        with self.assertRaisesRegex(
+            pilot.CustomerPilotReadinessError,
+            "customer-pilot-readiness.evidence.crossed",
+        ):
+            pilot.build_report(
+                profile=self.profile, sources=sources, generated_at=self.now
+            )
+
+        sources = dict(self.sources)
+        overlap = copy.deepcopy(sources["customer-failure-overlap"].document)
+        overlap["spec"]["bindings"]["databaseTargetBindingDigest"] = _digest("1")
+        sources["customer-failure-overlap"] = pilot.EvidenceDocument(
+            overlap,
+            sources["customer-failure-overlap"].file_digest,
+            sources["customer-failure-overlap"].generated_at,
         )
         with self.assertRaisesRegex(
             pilot.CustomerPilotReadinessError,

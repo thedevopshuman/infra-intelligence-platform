@@ -2108,6 +2108,185 @@ export interface CustomerBedrockQualificationReport {
   };
 }
 
+export interface CustomerAiFinopsPrerequisiteProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerAiFinopsPrerequisiteProfile";
+  metadata: {
+    name: string;
+    environmentId: string;
+    reviewedAt: string;
+  };
+  spec: {
+    release: {
+      applicationVersion: string;
+      chartVersion: string;
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    collection: {
+      provider: "aws.bedrock";
+      operation: "ConverseStream";
+      requestPath: "direct-to-provider";
+      telemetryPath: "asynchronous-otel";
+      contentPolicy: "metadata-only";
+    };
+    pricing: {
+      tenantId: string;
+      catalogId: AiPriceCatalogId;
+      catalogVersion: string;
+      catalogDocumentDigest: Sha256Digest;
+      qualificationPolicyId: AiPriceCatalogQualificationPolicyId;
+      qualificationPolicyVersion: string;
+      sourceClass: "provider-published" | "operator-managed";
+      costBasis: "calculated-estimate";
+    };
+    presentation: {
+      telemetryBackend: "prometheus";
+      dashboard: "grafana";
+    };
+    objective: {
+      maximumProfileAgeSeconds: number;
+      maximumEvidenceAgeSeconds: number;
+      maximumClockSkewSeconds: number;
+      reportValiditySeconds: number;
+    };
+  };
+}
+
+export type CustomerAiFinopsPrerequisiteEvidenceId =
+  | "release-readiness"
+  | "local-ai-finops-runtime"
+  | "customer-deployment"
+  | "customer-otlp-receiver"
+  | "customer-bedrock"
+  | "production-price-catalog";
+
+export type CustomerAiFinopsPrerequisiteCheckId =
+  | "source-binding"
+  | "profile-review"
+  | "exact-release-identity"
+  | "ai-finops-deployment-profile"
+  | "release-readiness"
+  | "local-ai-finops-runtime"
+  | "customer-deployment"
+  | "customer-otlp-receiver"
+  | "customer-bedrock-live"
+  | "production-price-catalog"
+  | "runtime-readiness-chain"
+  | "receiver-deployment-chain"
+  | "catalog-profile-binding"
+  | "metadata-only-direct-request-path"
+  | "evidence-freshness"
+  | "minimized-prerequisite-only-output";
+
+export interface CustomerAiFinopsPrerequisiteReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerAiFinopsPrerequisiteReport";
+  metadata: {
+    id: `cafp_${string}`;
+    generatedAt: string;
+    validUntil: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "prerequisites-ready" | "not-ready";
+    qualificationLevel: "customer-ai-finops-prerequisites-v1";
+    qualificationBoundary: "prerequisite-aggregation-only";
+    subject: {
+      deploymentProfile: "production-ai-finops-v0";
+      applicationVersion: string;
+      chartVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      profileDigest: Sha256Digest;
+      environmentBindingDigest: Sha256Digest;
+      priceTenantBindingDigest: Sha256Digest;
+      catalogBindingDigest: Sha256Digest;
+      releaseReadinessReportDigest: Sha256Digest;
+      aiFinopsRuntimeReportDigest: Sha256Digest;
+      customerDeploymentReportDigest: Sha256Digest;
+      customerOtlpReceiverReportDigest: Sha256Digest;
+      customerBedrockReportDigest: Sha256Digest;
+      priceCatalogQualificationReportDigest: Sha256Digest;
+    };
+    profile: {
+      provider: "aws.bedrock";
+      operation: "ConverseStream";
+      requestPath: "direct-to-provider";
+      telemetryPath: "asynchronous-otel";
+      contentPolicy: "metadata-only";
+      costBasis: "calculated-estimate";
+      pricingSourceClass: "provider-published" | "operator-managed";
+      telemetryBackend: "prometheus";
+      dashboard: "grafana";
+    };
+    objective: CustomerAiFinopsPrerequisiteProfile["spec"]["objective"];
+    measurements: {
+      profileReviewedAt: string;
+      qualifiedAt: string;
+      oldestEvidenceAgeSeconds: number;
+      productionCatalogEntryCount: number;
+      productionCatalogRequiredScopeCount: number;
+      customerReceiverDeliveredItemCount: number;
+      liveProviderCallCount: number;
+    };
+    evidence: Array<{
+      id: CustomerAiFinopsPrerequisiteEvidenceId;
+      contractKind:
+        | "ReleaseReadinessReport"
+        | "AiFinopsRuntimeCompatibilityReport"
+        | "CustomerDeploymentQualificationReport"
+        | "CustomerOtlpReceiverQualificationReport"
+        | "CustomerBedrockQualificationReport"
+        | "AiPriceCatalogQualificationReport";
+      qualificationBoundary:
+        | "local-candidate"
+        | "local-runtime"
+        | "customer-deployment"
+        | "customer-receiver"
+        | "live-provider"
+        | "production-pricing";
+      status: "passed" | "missing" | "rejected";
+      reportId?: string;
+      reportDigest?: Sha256Digest;
+      observedStatus?: string;
+      sourceRevision?: string;
+      errorCode?: `customer-ai-finops-prerequisite.${string}`;
+    }>;
+    checks: Array<
+      | { id: CustomerAiFinopsPrerequisiteCheckId; status: "passed" }
+      | {
+          id: CustomerAiFinopsPrerequisiteCheckId;
+          status: "failed";
+          errorCode: `customer-ai-finops-prerequisite.${string}`;
+        }
+    >;
+    limitations: [
+      "same-live-invocation-end-to-end-path-not-qualified",
+      "live-bedrock-to-customer-collector-delivery-not-qualified",
+      "deployed-price-catalog-secret-binding-not-qualified",
+      "customer-long-running-collector-configuration-not-qualified",
+      "non-prometheus-dashboard-query-portability-not-qualified",
+      "invoice-private-rates-discounts-and-commitments-not-qualified",
+      "sustained-load-node-zone-region-and-backend-ha-not-qualified",
+    ];
+    summary: {
+      requiredEvidence: 6;
+      passedEvidence: number;
+      missingEvidence: number;
+      rejectedEvidence: number;
+      totalChecks: 16;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "prerequisites-ready" | "not-ready";
+    };
+  };
+}
+
 export interface CustomerOtlpReceiverQualificationProfile {
   apiVersion: "iip.platform/v1alpha1";
   kind: "CustomerOtlpReceiverQualificationProfile";

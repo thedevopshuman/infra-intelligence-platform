@@ -1,0 +1,44 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerAiFinopsPrerequisiteProfile",
+  "metadata": {
+    "name": "customer-ai-finops-production",
+    "environmentId": "customer-production-us-east-1",
+    "reviewedAt": "2026-09-08T09:00:00Z"
+  },
+  "spec": {
+    "release": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "collection": {
+      "provider": "aws.bedrock",
+      "operation": "ConverseStream",
+      "requestPath": "direct-to-provider",
+      "telemetryPath": "asynchronous-otel",
+      "contentPolicy": "metadata-only"
+    },
+    "pricing": {
+      "tenantId": "tenant-example",
+      "catalogId": "apc_11111111111111111111111111111111",
+      "catalogVersion": "2026-09-08.1",
+      "catalogDocumentDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "qualificationPolicyId": "apqp_22222222222222222222222222222222",
+      "qualificationPolicyVersion": "2026-09-08.1",
+      "sourceClass": "provider-published",
+      "costBasis": "calculated-estimate"
+    },
+    "presentation": {
+      "telemetryBackend": "prometheus",
+      "dashboard": "grafana"
+    },
+    "objective": {
+      "maximumProfileAgeSeconds": 2592000,
+      "maximumEvidenceAgeSeconds": 86400,
+      "maximumClockSkewSeconds": 300,
+      "reportValiditySeconds": 86400
+    }
+  }
+}

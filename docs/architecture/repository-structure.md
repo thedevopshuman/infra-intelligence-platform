@@ -85,6 +85,14 @@ protected inputs and ephemeral queue do not enter the API, SDK transport,
 plugin runtime, or customer deployment aggregate; the aggregate rebinds only
 the minimized report, profile, public targets, trust files, and certificate.
 
+Customer AI FinOps prerequisite aggregation is another host-side harness.
+`scripts/qualify_customer_ai_finops.py` reads six independently owned reports
+and one protected reviewed profile, revalidates their schemas, freshness,
+release identities, and nested report digests, and emits a minimized aggregate.
+It calls no provider, Collector, deployment, ledger, or dashboard and therefore
+cannot be a serving use case or end-to-end qualification. The public SDKs expose
+only its offline envelope types.
+
 The private `src/iip/surfaces/worker_health.py` listener consumes only the
 application-owned readiness port. It exposes no control-plane use case,
 identity, tenant data, or provider detail.

@@ -142,6 +142,12 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "customer-bedrock-qualification-report.schema.json": (
         "customer-bedrock-qualification-report.json",
     ),
+    "customer-ai-finops-prerequisite-profile.schema.json": (
+        "customer-ai-finops-prerequisite-profile.json",
+    ),
+    "customer-ai-finops-prerequisite-report.schema.json": (
+        "customer-ai-finops-prerequisite-report.json",
+    ),
     "customer-deployment-qualification-report.schema.json": (
         "customer-deployment-qualification-report.json",
     ),

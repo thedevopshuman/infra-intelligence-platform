@@ -27,6 +27,8 @@ from .models import (
     CollectorQueueLossReport,
     ConsoleAuthenticationConfiguration,
     ControlPlaneLoadQualificationReport,
+    CustomerAiFinopsPrerequisiteProfile,
+    CustomerAiFinopsPrerequisiteReport,
     CustomerBedrockQualificationProfile,
     CustomerBedrockQualificationReport,
     CustomerCredentialBrokerQualificationProfile,
@@ -157,6 +159,8 @@ __all__ = [
     "CollectorQueueLossReport",
     "ConsoleAuthenticationConfiguration",
     "ControlPlaneLoadQualificationReport",
+    "CustomerAiFinopsPrerequisiteProfile",
+    "CustomerAiFinopsPrerequisiteReport",
     "CustomerBedrockQualificationProfile",
     "CustomerBedrockQualificationReport",
     "CustomerCredentialBrokerQualificationProfile",
@@ -263,4 +267,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.70.0"
+__version__ = "0.74.0"

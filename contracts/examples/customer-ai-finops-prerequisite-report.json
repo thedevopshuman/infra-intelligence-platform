@@ -1,0 +1,107 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerAiFinopsPrerequisiteReport",
+  "metadata": {
+    "id": "cafp_ad3d3fdcfdbf7e5b7c62bb5ef07ef69b",
+    "generatedAt": "2026-09-08T10:10:00Z",
+    "validUntil": "2026-09-09T10:10:00Z",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "prerequisites-ready",
+    "qualificationLevel": "customer-ai-finops-prerequisites-v1",
+    "qualificationBoundary": "prerequisite-aggregation-only",
+    "subject": {
+      "deploymentProfile": "production-ai-finops-v0",
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "profileDigest": "sha256:392a664010f4c3cadec2bbef57110e59dba1e639a1657851858f2a4402295554",
+      "environmentBindingDigest": "sha256:ebbaf6050b9190c0b9688b96de6c442e6239a02cedd056974af01ff8286610a2",
+      "priceTenantBindingDigest": "sha256:a76348a61bdfd71d7273e73fc1beb807d144119c30de5d2d81583c78a4c955e3",
+      "catalogBindingDigest": "sha256:4a133556a703b3ced5faddedb3ab8a0496533c00f84c4c8a98cc93fc54d4b38b",
+      "releaseReadinessReportDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "aiFinopsRuntimeReportDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "customerDeploymentReportDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "customerOtlpReceiverReportDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "customerBedrockReportDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "priceCatalogQualificationReportDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    "profile": {
+      "provider": "aws.bedrock",
+      "operation": "ConverseStream",
+      "requestPath": "direct-to-provider",
+      "telemetryPath": "asynchronous-otel",
+      "contentPolicy": "metadata-only",
+      "costBasis": "calculated-estimate",
+      "pricingSourceClass": "provider-published",
+      "telemetryBackend": "prometheus",
+      "dashboard": "grafana"
+    },
+    "objective": {
+      "maximumProfileAgeSeconds": 2592000,
+      "maximumEvidenceAgeSeconds": 86400,
+      "maximumClockSkewSeconds": 300,
+      "reportValiditySeconds": 86400
+    },
+    "measurements": {
+      "profileReviewedAt": "2026-09-08T09:00:00Z",
+      "qualifiedAt": "2026-09-08T10:10:00Z",
+      "oldestEvidenceAgeSeconds": 4200,
+      "productionCatalogEntryCount": 1,
+      "productionCatalogRequiredScopeCount": 1,
+      "customerReceiverDeliveredItemCount": 3,
+      "liveProviderCallCount": 1
+    },
+    "evidence": [
+      {"id": "release-readiness", "contractKind": "ReleaseReadinessReport", "qualificationBoundary": "local-candidate", "status": "passed", "reportId": "rrr_11111111111111111111111111111111", "reportDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333", "observedStatus": "locally-qualified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "local-ai-finops-runtime", "contractKind": "AiFinopsRuntimeCompatibilityReport", "qualificationBoundary": "local-runtime", "status": "passed", "reportId": "afc_22222222222222222222222222222222", "reportDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "customer-deployment", "contractKind": "CustomerDeploymentQualificationReport", "qualificationBoundary": "customer-deployment", "status": "passed", "reportId": "cdq_33333333333333333333333333333333", "reportDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555", "observedStatus": "qualified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "customer-otlp-receiver", "contractKind": "CustomerOtlpReceiverQualificationReport", "qualificationBoundary": "customer-receiver", "status": "passed", "reportId": "corq_44444444444444444444444444444444", "reportDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666", "observedStatus": "qualified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "customer-bedrock", "contractKind": "CustomerBedrockQualificationReport", "qualificationBoundary": "live-provider", "status": "passed", "reportId": "cbq_55555555555555555555555555555555", "reportDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777", "observedStatus": "qualified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "production-price-catalog", "contractKind": "AiPriceCatalogQualificationReport", "qualificationBoundary": "production-pricing", "status": "passed", "reportId": "apq_66666666666666666666666666666666", "reportDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888", "observedStatus": "qualified"}
+    ],
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "profile-review", "status": "passed"},
+      {"id": "exact-release-identity", "status": "passed"},
+      {"id": "ai-finops-deployment-profile", "status": "passed"},
+      {"id": "release-readiness", "status": "passed"},
+      {"id": "local-ai-finops-runtime", "status": "passed"},
+      {"id": "customer-deployment", "status": "passed"},
+      {"id": "customer-otlp-receiver", "status": "passed"},
+      {"id": "customer-bedrock-live", "status": "passed"},
+      {"id": "production-price-catalog", "status": "passed"},
+      {"id": "runtime-readiness-chain", "status": "passed"},
+      {"id": "receiver-deployment-chain", "status": "passed"},
+      {"id": "catalog-profile-binding", "status": "passed"},
+      {"id": "metadata-only-direct-request-path", "status": "passed"},
+      {"id": "evidence-freshness", "status": "passed"},
+      {"id": "minimized-prerequisite-only-output", "status": "passed"}
+    ],
+    "limitations": [
+      "same-live-invocation-end-to-end-path-not-qualified",
+      "live-bedrock-to-customer-collector-delivery-not-qualified",
+      "deployed-price-catalog-secret-binding-not-qualified",
+      "customer-long-running-collector-configuration-not-qualified",
+      "non-prometheus-dashboard-query-portability-not-qualified",
+      "invoice-private-rates-discounts-and-commitments-not-qualified",
+      "sustained-load-node-zone-region-and-backend-ha-not-qualified"
+    ],
+    "summary": {
+      "requiredEvidence": 6,
+      "passedEvidence": 6,
+      "missingEvidence": 0,
+      "rejectedEvidence": 0,
+      "totalChecks": 16,
+      "passedChecks": 16,
+      "failedChecks": 0,
+      "overallStatus": "prerequisites-ready"
+    }
+  }
+}

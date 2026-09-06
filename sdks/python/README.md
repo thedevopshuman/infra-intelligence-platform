@@ -1,10 +1,8 @@
 # Python SDK boundary
 
-Version 0.66 adds transport wrappers for the protected customer policy profile
-and privacy-minimized bundle-prerequisite report. Version 0.65 added the
-customer OIDC profile/report and upgraded the customer deployment evidence
-chain. These types convey evidence only; they expose no identity, policy,
-database, provider, or production authority.
+Version 0.74 adds transport wrappers for the protected customer AI FinOps
+prerequisite profile and privacy-minimized aggregate report. These offline
+types grant no provider, Collector, deployment, price, or promotion authority.
 
 This package contains public transport and model types only. It does not import the server kernel. The API will expand contract-first; unstable methods remain under the `v1alpha1` namespace in their paths and models.
 
@@ -59,11 +57,18 @@ host-created failures for plugin handling; it is not a control-plane HTTP client
 `AiPriceCatalog`, `AwsBedrockPriceCatalogImportPolicy`,
 `AiPriceCatalogImportReport`, `AiPriceCatalogQualificationPolicy`,
 `AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`,
-`AiSavingsFindingPage`, and `AiAllocationReport`
+`AiSavingsFindingPage`, `AiAllocationReport`,
+`CustomerAiFinopsPrerequisiteProfile`, and
+`CustomerAiFinopsPrerequisiteReport`
 expose the AI economics
 records as public metadata-only envelopes. They do not
 instrument provider calls, send OTLP, or import an AWS SDK. Standard
 OpenTelemetry instrumentation remains the collection boundary.
+
+Version 0.74 adds the customer AI FinOps prerequisite profile/report. A ready
+report means six independently generated artifacts are current and
+cross-bound; its fixed limitations explicitly exclude same-invocation live
+flow, invoice, and regional-availability claims.
 
 Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. Supply a Bearer credential; the authenticated server derives tenant, actor, and roles from that credential. The SDK never sends identity assertion headers.
 

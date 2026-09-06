@@ -65,6 +65,12 @@ reports match and always keeps the eight customer, organizational, live
 provider, design-partner, and legal/brand gates explicit. It is a local
 candidate inventory, not a production promotion decision.
 
+Customer AI FinOps prerequisites also have a separate minimized aggregate. It
+binds the exact local candidate/runtime, customer deployment/receiver, live
+Bedrock streaming, and production catalog reports under one protected profile.
+The result remains `prerequisite-aggregation-only`: same-invocation Collector,
+ledger, cost, export, and dashboard evidence is still a Phase A release gate.
+
 One fail-closed local release command now composes the source, integration,
 recovery, multi-node availability, bundle, packaged N-1, vulnerability, and
 19-evidence readiness workflow while retaining each owning report and refusing

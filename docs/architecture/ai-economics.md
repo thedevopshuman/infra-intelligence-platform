@@ -266,6 +266,17 @@ this report as a `local-runtime` input while keeping customer Collector/PKI,
 live provider, approved pricing, invoice, sustained-load, regional, and
 backend-lifecycle claims external.
 
+A separate customer prerequisite aggregate then binds that exact runtime and
+release evidence to one qualified customer deployment, its exact customer OTLP
+receiver report, one current live Bedrock `ConverseStream` report, and one
+current production catalog qualification. The protected profile carries the
+environment and tenant selections; the transportable report retains only
+digests, bounded counts, checks, and fixed limitations. A ready result proves
+that those six prerequisites are current and consistently chained. It does not
+join them by trace, span, invocation, usage record, or cost record and therefore
+cannot prove the V0 end-to-end path. That remains the next separately qualified
+runtime boundary.
+
 The exact pinned Python botocore `Converse` and `ConverseStream` profiles now
 have separate source-bound no-network evidence. They exposed three upstream
 facts hidden by the synthetic flow: the shipped scope is service-specific, the

@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-oidc-qualification qualify-customer-oidc verify-customer-oidc-qualification-report test-customer-policy-qualification qualify-customer-policy verify-customer-policy-qualification-report test-customer-credential-broker-qualification qualify-customer-credential-broker verify-customer-credential-broker-qualification-report test-customer-github-context-qualification qualify-customer-github-context verify-customer-github-context-qualification-report test-customer-bedrock-qualification qualify-customer-bedrock verify-customer-bedrock-qualification-report test-customer-otlp-receiver-qualification qualify-customer-otlp-receiver verify-customer-otlp-receiver-qualification-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-postgresql-continuity qualify-customer-postgresql-continuity verify-customer-postgresql-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops verify-ai-finops-runtime-report test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-oidc-qualification qualify-customer-oidc verify-customer-oidc-qualification-report test-customer-policy-qualification qualify-customer-policy verify-customer-policy-qualification-report test-customer-credential-broker-qualification qualify-customer-credential-broker verify-customer-credential-broker-qualification-report test-customer-github-context-qualification qualify-customer-github-context verify-customer-github-context-qualification-report test-customer-bedrock-qualification qualify-customer-bedrock verify-customer-bedrock-qualification-report test-customer-ai-finops-prerequisites qualify-customer-ai-finops-prerequisites verify-customer-ai-finops-prerequisite-report test-customer-otlp-receiver-qualification qualify-customer-otlp-receiver verify-customer-otlp-receiver-qualification-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-postgresql-continuity qualify-customer-postgresql-continuity verify-customer-postgresql-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops verify-ai-finops-runtime-report test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -67,6 +67,8 @@ IIP_CUSTOMER_BEDROCK_PROFILE ?=
 IIP_CUSTOMER_BEDROCK_AWS_CREDENTIALS_FILE ?=
 IIP_CUSTOMER_BEDROCK_IMAGE_DIGEST ?= $(IIP_CONTINUITY_IMAGE_DIGEST)
 IIP_CUSTOMER_BEDROCK_ALLOW_PROVIDER_CALL ?= false
+IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_PROFILE ?=
+IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_REPORT ?= dist/customer-ai-finops-prerequisite-report.json
 IIP_CUSTOMER_OTLP_REPORT ?= dist/customer-otlp-receiver-qualification-report.json
 IIP_CUSTOMER_OTLP_PROFILE ?=
 IIP_CUSTOMER_OTLP_API_BASE_URL ?=
@@ -202,6 +204,9 @@ help:
 	@echo "test-customer-bedrock-qualification Validate minimized live Bedrock evidence and credential isolation"
 	@echo "qualify-customer-bedrock Make one protected exact customer Bedrock call"
 	@echo "verify-customer-bedrock-qualification-report Rebind retained customer Bedrock evidence"
+	@echo "test-customer-ai-finops-prerequisites Validate minimized cross-bound AI FinOps prerequisites"
+	@echo "qualify-customer-ai-finops-prerequisites Bind current customer AI FinOps prerequisite reports"
+	@echo "verify-customer-ai-finops-prerequisite-report Rebind retained AI FinOps prerequisite evidence"
 	@echo "test-customer-otlp-receiver-qualification Validate pinned Collector-to-customer receiver evidence"
 	@echo "qualify-customer-otlp-receiver Deliver metrics, logs, and GenAI traces through a pinned Collector"
 	@echo "verify-customer-otlp-receiver-qualification-report Rebind retained customer receiver evidence"
@@ -624,6 +629,37 @@ verify-customer-bedrock-qualification-report:
 		--live-report "$(IIP_CUSTOMER_BEDROCK_LIVE_REPORT)" \
 		--image-digest "$(IIP_CUSTOMER_BEDROCK_IMAGE_DIGEST)" \
 		--require-qualified
+
+test-customer-ai-finops-prerequisites:
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_customer_ai_finops_prerequisites -v
+
+qualify-customer-ai-finops-prerequisites:
+	@test -n "$(IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_PROFILE)" || \
+		(echo "IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_PROFILE is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_ai_finops.py generate \
+		--profile "$(IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_PROFILE)" \
+		--release-readiness "$(IIP_RELEASE_READINESS_REPORT)" \
+		--ai-finops-runtime "$(IIP_AI_FINOPS_RUNTIME_REPORT)" \
+		--customer-deployment "$(IIP_CUSTOMER_DEPLOYMENT_QUALIFICATION_REPORT)" \
+		--customer-otlp-receiver "$(IIP_CUSTOMER_OTLP_REPORT)" \
+		--customer-bedrock "$(IIP_CUSTOMER_BEDROCK_REPORT)" \
+		--price-catalog-qualification "$(IIP_AI_PRICE_QUALIFICATION_REPORT)" \
+		--output "$(IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_REPORT)"
+
+verify-customer-ai-finops-prerequisite-report:
+	@test -n "$(IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_PROFILE)" || \
+		(echo "IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_PROFILE is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_ai_finops.py verify \
+		--report "$(IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_REPORT)" \
+		--profile "$(IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_PROFILE)" \
+		--release-readiness "$(IIP_RELEASE_READINESS_REPORT)" \
+		--ai-finops-runtime "$(IIP_AI_FINOPS_RUNTIME_REPORT)" \
+		--customer-deployment "$(IIP_CUSTOMER_DEPLOYMENT_QUALIFICATION_REPORT)" \
+		--customer-otlp-receiver "$(IIP_CUSTOMER_OTLP_REPORT)" \
+		--customer-bedrock "$(IIP_CUSTOMER_BEDROCK_REPORT)" \
+		--price-catalog-qualification "$(IIP_AI_PRICE_QUALIFICATION_REPORT)" \
+		--require-ready
 
 test-customer-otlp-receiver-qualification:
 	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \

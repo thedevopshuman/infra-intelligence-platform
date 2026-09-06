@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-ai-finops-prerequisite-report:v1alpha1",
+  "title": "Customer AI FinOps Prerequisite Report",
+  "description": "Privacy-minimized evidence that the separate release, deployment, receiver, live Bedrock, pricing, and local AI FinOps prerequisites are current and consistently bound without claiming one end-to-end live invocation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerAiFinopsPrerequisiteReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "validUntil", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^cafp_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "validUntil": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationLevel", "qualificationBoundary", "subject", "bindings", "profile", "objective", "measurements", "evidence", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["prerequisites-ready", "not-ready"]},
+        "qualificationLevel": {"const": "customer-ai-finops-prerequisites-v1"},
+        "qualificationBoundary": {"const": "prerequisite-aggregation-only"},
+        "subject": {"$ref": "#/$defs/subject"},
+        "bindings": {"$ref": "#/$defs/bindings"},
+        "profile": {"$ref": "#/$defs/profile"},
+        "objective": {"$ref": "#/$defs/objective"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "evidence": {"$ref": "#/$defs/evidenceList"},
+        "checks": {"$ref": "#/$defs/checks"},
+        "limitations": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "prefixItems": [
+            {"const": "same-live-invocation-end-to-end-path-not-qualified"},
+            {"const": "live-bedrock-to-customer-collector-delivery-not-qualified"},
+            {"const": "deployed-price-catalog-secret-binding-not-qualified"},
+            {"const": "customer-long-running-collector-configuration-not-qualified"},
+            {"const": "non-prometheus-dashboard-query-portability-not-qualified"},
+            {"const": "invoice-private-rates-discounts-and-commitments-not-qualified"},
+            {"const": "sustained-load-node-zone-region-and-backend-ha-not-qualified"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requiredEvidence", "passedEvidence", "missingEvidence", "rejectedEvidence", "totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "requiredEvidence": {"const": 6},
+            "passedEvidence": {"type": "integer", "minimum": 0, "maximum": 6},
+            "missingEvidence": {"type": "integer", "minimum": 0, "maximum": 6},
+            "rejectedEvidence": {"type": "integer", "minimum": 0, "maximum": 6},
+            "totalChecks": {"const": 16},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 16},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 16},
+            "overallStatus": {"enum": ["prerequisites-ready", "not-ready"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deploymentProfile", "applicationVersion", "chartVersion", "contractsApiVersion", "sourceRevision", "imageDigest"],
+      "properties": {
+        "deploymentProfile": {"const": "production-ai-finops-v0"},
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileDigest", "environmentBindingDigest", "priceTenantBindingDigest", "catalogBindingDigest", "releaseReadinessReportDigest", "aiFinopsRuntimeReportDigest", "customerDeploymentReportDigest", "customerOtlpReceiverReportDigest", "customerBedrockReportDigest", "priceCatalogQualificationReportDigest"],
+      "properties": {
+        "profileDigest": {"$ref": "#/$defs/digest"},
+        "environmentBindingDigest": {"$ref": "#/$defs/digest"},
+        "priceTenantBindingDigest": {"$ref": "#/$defs/digest"},
+        "catalogBindingDigest": {"$ref": "#/$defs/digest"},
+        "releaseReadinessReportDigest": {"$ref": "#/$defs/digest"},
+        "aiFinopsRuntimeReportDigest": {"$ref": "#/$defs/digest"},
+        "customerDeploymentReportDigest": {"$ref": "#/$defs/digest"},
+        "customerOtlpReceiverReportDigest": {"$ref": "#/$defs/digest"},
+        "customerBedrockReportDigest": {"$ref": "#/$defs/digest"},
+        "priceCatalogQualificationReportDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "operation", "requestPath", "telemetryPath", "contentPolicy", "costBasis", "pricingSourceClass", "telemetryBackend", "dashboard"],
+      "properties": {
+        "provider": {"const": "aws.bedrock"},
+        "operation": {"const": "ConverseStream"},
+        "requestPath": {"const": "direct-to-provider"},
+        "telemetryPath": {"const": "asynchronous-otel"},
+        "contentPolicy": {"const": "metadata-only"},
+        "costBasis": {"const": "calculated-estimate"},
+        "pricingSourceClass": {"enum": ["provider-published", "operator-managed"]},
+        "telemetryBackend": {"const": "prometheus"},
+        "dashboard": {"const": "grafana"}
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maximumProfileAgeSeconds", "maximumEvidenceAgeSeconds", "maximumClockSkewSeconds", "reportValiditySeconds"],
+      "properties": {
+        "maximumProfileAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 7776000},
+        "maximumEvidenceAgeSeconds": {"type": "integer", "minimum": 300, "maximum": 604800},
+        "maximumClockSkewSeconds": {"type": "integer", "minimum": 0, "maximum": 900},
+        "reportValiditySeconds": {"type": "integer", "minimum": 300, "maximum": 604800}
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileReviewedAt", "qualifiedAt", "oldestEvidenceAgeSeconds", "productionCatalogEntryCount", "productionCatalogRequiredScopeCount", "customerReceiverDeliveredItemCount", "liveProviderCallCount"],
+      "properties": {
+        "profileReviewedAt": {"type": "string", "format": "date-time"},
+        "qualifiedAt": {"type": "string", "format": "date-time"},
+        "oldestEvidenceAgeSeconds": {"type": "integer", "minimum": 0, "maximum": 10000000},
+        "productionCatalogEntryCount": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "productionCatalogRequiredScopeCount": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "customerReceiverDeliveredItemCount": {"type": "integer", "minimum": 0, "maximum": 3},
+        "liveProviderCallCount": {"type": "integer", "minimum": 0, "maximum": 1}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "contractKind", "qualificationBoundary", "status"],
+      "properties": {
+        "id": {"enum": ["release-readiness", "local-ai-finops-runtime", "customer-deployment", "customer-otlp-receiver", "customer-bedrock", "production-price-catalog"]},
+        "contractKind": {"enum": ["ReleaseReadinessReport", "AiFinopsRuntimeCompatibilityReport", "CustomerDeploymentQualificationReport", "CustomerOtlpReceiverQualificationReport", "CustomerBedrockQualificationReport", "AiPriceCatalogQualificationReport"]},
+        "qualificationBoundary": {"enum": ["local-candidate", "local-runtime", "customer-deployment", "customer-receiver", "live-provider", "production-pricing"]},
+        "status": {"enum": ["passed", "missing", "rejected"]},
+        "reportId": {"type": "string", "pattern": "^[a-z]{3,5}_[a-f0-9]{32}$"},
+        "reportDigest": {"$ref": "#/$defs/digest"},
+        "observedStatus": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "errorCode": {"type": "string", "pattern": "^customer-ai-finops-prerequisite\\.[a-z0-9.-]+$", "maxLength": 160}
+      },
+      "oneOf": [
+        {"required": ["reportId", "reportDigest", "observedStatus"], "properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "missing"}}, "not": {"anyOf": [{"required": ["reportId"]}, {"required": ["reportDigest"]}, {"required": ["observedStatus"]}, {"required": ["sourceRevision"]}]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "rejected"}}}
+      ]
+    },
+    "evidenceList": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "prefixItems": [
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "release-readiness"}, "contractKind": {"const": "ReleaseReadinessReport"}, "qualificationBoundary": {"const": "local-candidate"}}},
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "local-ai-finops-runtime"}, "contractKind": {"const": "AiFinopsRuntimeCompatibilityReport"}, "qualificationBoundary": {"const": "local-runtime"}}},
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "customer-deployment"}, "contractKind": {"const": "CustomerDeploymentQualificationReport"}, "qualificationBoundary": {"const": "customer-deployment"}}},
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "customer-otlp-receiver"}, "contractKind": {"const": "CustomerOtlpReceiverQualificationReport"}, "qualificationBoundary": {"const": "customer-receiver"}}},
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "customer-bedrock"}, "contractKind": {"const": "CustomerBedrockQualificationReport"}, "qualificationBoundary": {"const": "live-provider"}}},
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "production-price-catalog"}, "contractKind": {"const": "AiPriceCatalogQualificationReport"}, "qualificationBoundary": {"const": "production-pricing"}}}
+      ],
+      "items": false
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-ai-finops-prerequisite\\.[a-z0-9.-]+$", "maxLength": 160}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 16,
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-review"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "exact-release-identity"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-finops-deployment-profile"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "release-readiness"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "local-ai-finops-runtime"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "customer-deployment"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "customer-otlp-receiver"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "customer-bedrock-live"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "production-price-catalog"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "runtime-readiness-chain"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-deployment-chain"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "catalog-profile-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "metadata-only-direct-request-path"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "evidence-freshness"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-prerequisite-only-output"}}}
+      ],
+      "items": false
+    }
+  }
+}

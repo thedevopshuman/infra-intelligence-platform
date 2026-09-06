@@ -62,6 +62,17 @@ isolation. The full Docker flow now emits a separate minimized, source-bound
 runtime report and local release readiness requires it as an exact-candidate
 input. The explicitly enabled real-provider call remains.
 
+A customer prerequisite aggregation gate is now executable. It cross-binds the
+exact local release and AI FinOps runtime reports with one customer deployment,
+the receiver report already nested in that deployment, one current live
+Bedrock `ConverseStream` report, and one current production price-catalog
+report. Its protected profile retains the customer environment and price
+tenant; its transportable output retains only digests, bounded counts, checks,
+and seven mandatory limitations. This closes the separate-report correlation
+gap but deliberately does not close item 8: no existing artifact proves that
+the same live invocation crossed the selected customer Collector into the
+deployed ledger, cost worker, aggregate export, and dashboard.
+
 Two additional deterministic rules are delivered. Protected channel
 configuration maps provider retry attributes into `retryCount`, and the
 source-bound retry-amplification evaluator compares complete fixed-window

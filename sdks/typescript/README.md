@@ -1,9 +1,8 @@
 # TypeScript SDK boundary
 
-Version 0.66 adds customer policy profile/report types. Version 0.65 added the
-customer OIDC types and upgraded the customer deployment evidence chain. No
-client method receives identity, policy, promotion, provider, or production
-authority.
+Version 0.74 adds the protected customer AI FinOps prerequisite profile and
+privacy-minimized aggregate report types. No client method receives provider,
+Collector, deployment, price, or promotion authority.
 
 The SDK exposes public contract types and a small fetch-based client. It has no dependency on server code or a framework runtime.
 
@@ -53,12 +52,19 @@ transport is runtime-specific.
 `AiUsageRecord`, `AiAttributionPolicy`, `AiUsageAttributionRecord`,
 `AiPriceCatalog`, `AwsBedrockPriceCatalogImportPolicy`,
 `AiPriceCatalogImportReport`, `AiPriceCatalogQualificationPolicy`,
-`AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`, `AiSavingsFindingPage`, `AiModelSuitabilityReport`,
-and `AiAllocationReport`
+`AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`,
+`AiSavingsFindingPage`, `AiModelSuitabilityReport`, `AiAllocationReport`,
+`CustomerAiFinopsPrerequisiteProfile`, and
+`CustomerAiFinopsPrerequisiteReport`
 describe the
 metadata-only AI economics ledger. The SDK does not instrument or
 proxy model calls; applications continue using standard OpenTelemetry
 instrumentation and a customer-controlled Collector.
+
+Version 0.74 adds the customer AI FinOps prerequisite profile/report. A ready
+report means six independently generated artifacts are current and
+cross-bound; its fixed limitations explicitly exclude same-invocation live
+flow, invoice, and regional-availability claims.
 
 Version 0.3 adds collection ingestion, investigation, evidence, governed action, and plugin-session methods. The server derives tenant, actor, and roles after credential verification; the SDK does not send caller-controlled identity headers.
 

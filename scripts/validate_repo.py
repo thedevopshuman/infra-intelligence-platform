@@ -152,6 +152,15 @@ REQUIRED_PATHS = (
     "docs/operations/customer-bedrock-qualification.md",
     "scripts/qualify_customer_bedrock.py",
     "tests/test_customer_bedrock_qualification.py",
+    "docs/decisions/0140-minimized-customer-ai-finops-prerequisite-aggregation.md",
+    "docs/specifications/customer-ai-finops-prerequisite-contract.md",
+    "contracts/schemas/customer-ai-finops-prerequisite-profile.schema.json",
+    "contracts/schemas/customer-ai-finops-prerequisite-report.schema.json",
+    "contracts/examples/customer-ai-finops-prerequisite-profile.json",
+    "contracts/examples/customer-ai-finops-prerequisite-report.json",
+    "docs/operations/customer-ai-finops-prerequisites.md",
+    "scripts/qualify_customer_ai_finops.py",
+    "tests/test_customer_ai_finops_prerequisites.py",
     "docs/decisions/0134-customer-otlp-receiver-interoperability-qualification.md",
     "docs/specifications/customer-otlp-receiver-qualification-report-contract.md",
     "contracts/schemas/customer-otlp-receiver-qualification-profile.schema.json",
@@ -2352,6 +2361,116 @@ def validate_customer_bedrock_qualification_example(
         fail(
             errors,
             "customer Bedrock qualification examples must be semantically valid",
+        )
+
+
+def validate_customer_ai_finops_prerequisite_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check minimized AI FinOps prerequisite identity and profile bindings."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    profile = documents.get(
+        example_dir / "customer-ai-finops-prerequisite-profile.json"
+    )
+    report = documents.get(
+        example_dir / "customer-ai-finops-prerequisite-report.json"
+    )
+    try:
+        from qualify_customer_ai_finops import (
+            CustomerAiFinopsPrerequisiteError,
+            _catalog_binding,
+            _digest_value,
+            validate_profile,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "customer AI FinOps prerequisite validator must be importable")
+        return
+    try:
+        if not isinstance(profile, dict) or not isinstance(report, dict):
+            raise CustomerAiFinopsPrerequisiteError(
+                "customer-ai-finops-prerequisite.example.invalid"
+            )
+        validate_profile(profile)
+        validate_report_document(report)
+        profile_metadata = profile["metadata"]
+        profile_spec = profile["spec"]
+        release = profile_spec["release"]
+        pricing = profile_spec["pricing"]
+        presentation = profile_spec["presentation"]
+        collection = profile_spec["collection"]
+        report_metadata = report["metadata"]
+        report_spec = report["spec"]
+        subject = report_spec["subject"]
+        bindings = report_spec["bindings"]
+        retained_profile = report_spec["profile"]
+        evidence = {
+            item["id"]: item
+            for item in report_spec["evidence"]
+            if isinstance(item, dict)
+        }
+        evidence_bindings = {
+            "release-readiness": "releaseReadinessReportDigest",
+            "local-ai-finops-runtime": "aiFinopsRuntimeReportDigest",
+            "customer-deployment": "customerDeploymentReportDigest",
+            "customer-otlp-receiver": "customerOtlpReceiverReportDigest",
+            "customer-bedrock": "customerBedrockReportDigest",
+            "production-price-catalog": "priceCatalogQualificationReportDigest",
+        }
+        expected_profile = {
+            "provider": collection["provider"],
+            "operation": collection["operation"],
+            "requestPath": collection["requestPath"],
+            "telemetryPath": collection["telemetryPath"],
+            "contentPolicy": collection["contentPolicy"],
+            "costBasis": pricing["costBasis"],
+            "pricingSourceClass": pricing["sourceClass"],
+            "telemetryBackend": presentation["telemetryBackend"],
+            "dashboard": presentation["dashboard"],
+        }
+        source_bound_ids = tuple(evidence_bindings)[:-1]
+        if (
+            bindings["profileDigest"] != _digest_value(profile)
+            or bindings["environmentBindingDigest"]
+            != _digest_value(profile_metadata["environmentId"])
+            or bindings["priceTenantBindingDigest"]
+            != _digest_value(pricing["tenantId"])
+            or bindings["catalogBindingDigest"]
+            != _digest_value(_catalog_binding(pricing))
+            or subject
+            != {
+                "deploymentProfile": "production-ai-finops-v0",
+                "applicationVersion": release["applicationVersion"],
+                "chartVersion": release["chartVersion"],
+                "contractsApiVersion": "iip.platform/v1alpha1",
+                "sourceRevision": release["sourceRevision"],
+                "imageDigest": release["imageDigest"],
+            }
+            or retained_profile != expected_profile
+            or report_spec["objective"] != profile_spec["objective"]
+            or report_spec["measurements"]["profileReviewedAt"]
+            != profile_metadata["reviewedAt"]
+            or report_spec["measurements"]["qualifiedAt"]
+            != report_metadata["generatedAt"]
+            or any(
+                evidence[identifier].get("reportDigest")
+                != bindings[binding_name]
+                for identifier, binding_name in evidence_bindings.items()
+            )
+            or any(
+                evidence[identifier].get("sourceRevision")
+                != release["sourceRevision"]
+                for identifier in source_bound_ids
+            )
+        ):
+            raise CustomerAiFinopsPrerequisiteError(
+                "customer-ai-finops-prerequisite.example.crossed"
+            )
+    except (CustomerAiFinopsPrerequisiteError, KeyError, TypeError):
+        fail(
+            errors,
+            "customer AI FinOps prerequisite examples must be semantically valid",
         )
 
 
@@ -5324,6 +5443,14 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerBedrockQualificationReport",
         ),
         (
+            "customer-ai-finops-prerequisite-profile.json",
+            "CustomerAiFinopsPrerequisiteProfile",
+        ),
+        (
+            "customer-ai-finops-prerequisite-report.json",
+            "CustomerAiFinopsPrerequisiteReport",
+        ),
+        (
             "customer-otlp-receiver-qualification-profile.json",
             "CustomerOtlpReceiverQualificationProfile",
         ),
@@ -5432,6 +5559,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_customer_credential_broker_qualification_example(documents, errors)
     validate_customer_github_context_qualification_example(documents, errors)
     validate_customer_bedrock_qualification_example(documents, errors)
+    validate_customer_ai_finops_prerequisite_examples(documents, errors)
     validate_customer_otlp_receiver_qualification_example(documents, errors)
     validate_customer_deployment_qualification_example(documents, errors)
     validate_control_plane_load_qualification_example(documents, errors)

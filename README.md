@@ -99,6 +99,15 @@ queue/disk recovery, sustained traffic, and PKI lifecycle/HA remain
 customer-owned; see the [customer OTLP receiver qualification
 runbook](docs/operations/customer-otlp-receiver-qualification.md).
 
+A customer AI FinOps prerequisite aggregate now cross-binds the exact local
+release/runtime, customer deployment/receiver, live Bedrock streaming, and
+production price-catalog reports. It retains no customer target, tenant, model,
+region, rate, amount, token, content, endpoint, or credential values. Its fixed
+`prerequisite-aggregation-only` boundary makes clear that current separate
+evidence is not yet proof that one live invocation reached the deployed ledger,
+cost engine, and Grafana dashboard; see the [customer AI FinOps prerequisite
+runbook](docs/operations/customer-ai-finops-prerequisites.md).
+
 A separate continuity gate runs at least five
 minutes of direct verified-HTTPS liveness, readiness, authentication, and exact
 release-identity probes while evicting one ready API pod through an
@@ -295,6 +304,7 @@ streaming/private-endpoint behavior and invoice qualification remain. See the
 [local AI FinOps dashboard](docs/operations/ai-finops-local-demo.md),
 [Bedrock instrumentation qualification](docs/operations/bedrock-instrumentation-qualification.md),
 [customer Bedrock qualification](docs/operations/customer-bedrock-qualification.md),
+[customer AI FinOps prerequisites](docs/operations/customer-ai-finops-prerequisites.md),
 [OpenAI instrumentation qualification](docs/operations/openai-instrumentation-qualification.md),
 [telemetry contract](docs/specifications/ai-economics-telemetry-contract.md),
 [product direction](docs/product/ai-finops-vision.md),

@@ -881,6 +881,50 @@ class CustomerBedrockQualificationReport:
 
 
 @dataclass(frozen=True)
+class CustomerAiFinopsPrerequisiteProfile:
+    """Protected exact customer AI FinOps prerequisite selection."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerAiFinopsPrerequisiteProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerAiFinopsPrerequisiteProfile",
+                label="customer AI FinOps prerequisite profile",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerAiFinopsPrerequisiteReport:
+    """Minimized current customer AI FinOps prerequisite evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerAiFinopsPrerequisiteReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerAiFinopsPrerequisiteReport",
+                label="customer AI FinOps prerequisite report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerOtlpReceiverQualificationProfile:
     """Protected exact signal catalog for customer receiver qualification."""
 

@@ -239,6 +239,16 @@ dashboard path. Local release readiness requires that report while retaining
 live provider, customer telemetry, approved price, invoice, and production
 availability as separate qualification boundaries.
 
+The customer AI FinOps prerequisite gate keeps those boundaries separate while
+making their relationship verifiable. One protected profile selects the exact
+release, environment, streaming Bedrock path, production catalog, and
+Prometheus/Grafana presentation. A host-side qualifier cross-binds local
+release/runtime, customer deployment/receiver, live Bedrock, and catalog
+reports into a minimized `prerequisite-aggregation-only` artifact. It retains
+fixed limitations because the source reports do not prove that the same live
+invocation crossed the customer Collector into the deployed ledger, cost
+worker, aggregate export, and dashboard.
+
 Evidence providers cross a separate application-owned boundary. The [reference collection pipeline](evidence-collection-pipeline.md) authorizes an exact tenant, integration, evidence type, and resource scope before a provider runs, then validates and redacts provider output before hashing and atomic persistence. Providers do not receive ambient credentials through the application contract.
 
 Historical log evidence uses logical service names, normalized severities, exact attribute filters, and explicit record/time/byte budgets through `TelemetryLogsBackend`; the default adapter returns honest no-data. The first live adapter maps that closed selector to Loki range queries using protected tenant, endpoint, organization, label, service, severity, and credential configuration, and a second live adapter maps the same closed selector to OpenSearch document search using protected tenant, endpoint, index, field, service, severity, and credential configuration, proving the boundary against two structurally different backends. Investigations can select those queries under inherited authority and apply only a predeclared record-count rule to the committed artifact; log body prose remains untrusted and uninterpreted. A separately authenticated OTLP `/v1/logs` receiver binds each channel to one tenant, integration, resource, service catalog, attribute map, and handling policy before normalizing string bodies and optional trace context. Both paths redact bodies before persistence, and neither accepts payload tenancy or vendor query language as authority. [ADR 0025](../decisions/0025-loki-historical-log-evidence-adapter.md) records the Loki translation and trust boundary, and [ADR 0084](../decisions/0084-opensearch-historical-log-evidence-adapter.md) records the OpenSearch translation and trust boundary.

@@ -114,6 +114,15 @@ REQUIRED_PATHS = (
     "docs/operations/customer-oidc-qualification.md",
     "scripts/qualify_customer_oidc.py",
     "tests/test_customer_oidc_qualification.py",
+    "docs/decisions/0132-customer-policy-engine-bundle-qualification.md",
+    "docs/specifications/customer-policy-qualification-report-contract.md",
+    "contracts/schemas/customer-policy-qualification-profile.schema.json",
+    "contracts/schemas/customer-policy-qualification-report.schema.json",
+    "contracts/examples/customer-policy-qualification-profile.json",
+    "contracts/examples/customer-policy-qualification-report.json",
+    "docs/operations/customer-policy-qualification.md",
+    "scripts/qualify_customer_policy.py",
+    "tests/test_customer_policy_qualification.py",
     "docs/specifications/worker-health-contract.md",
     "src/iip/surfaces/worker_health.py",
     "tests/test_worker_health.py",
@@ -2107,6 +2116,38 @@ def validate_customer_continuity_qualification_example(
         validate_report_document(report)
     except CustomerContinuityQualificationError:
         fail(errors, "customer continuity example must be semantically valid")
+
+
+def validate_customer_policy_qualification_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check protected policy cases and minimized customer evidence."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    profile = documents.get(
+        example_dir / "customer-policy-qualification-profile.json"
+    )
+    report = documents.get(
+        example_dir / "customer-policy-qualification-report.json"
+    )
+    try:
+        from qualify_customer_policy import (
+            CustomerPolicyQualificationError,
+            validate_profile,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "customer policy qualification validator must be importable")
+        return
+    try:
+        if not isinstance(profile, dict) or not isinstance(report, dict):
+            raise CustomerPolicyQualificationError(
+                "customer-policy-qualification.example.invalid"
+            )
+        validate_profile(profile)
+        validate_report_document(report)
+    except CustomerPolicyQualificationError:
+        fail(errors, "customer policy qualification examples must be semantically valid")
 
 
 def validate_customer_deployment_qualification_example(
@@ -5042,6 +5083,14 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerOidcQualificationReport",
         ),
         (
+            "customer-policy-qualification-profile.json",
+            "CustomerPolicyQualificationProfile",
+        ),
+        (
+            "customer-policy-qualification-report.json",
+            "CustomerPolicyQualificationReport",
+        ),
+        (
             "customer-deployment-preflight-report.json",
             "CustomerDeploymentPreflightReport",
         ),
@@ -5138,6 +5187,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_customer_deployment_preflight_example(documents, errors)
     validate_ingress_availability_qualification_example(documents, errors)
     validate_customer_continuity_qualification_example(documents, errors)
+    validate_customer_policy_qualification_example(documents, errors)
     validate_customer_deployment_qualification_example(documents, errors)
     validate_control_plane_load_qualification_example(documents, errors)
     validate_postgresql_recovery_qualification_example(documents, errors)

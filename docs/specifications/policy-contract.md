@@ -23,4 +23,7 @@ snapshot.
 The operational [policy-engine compatibility report](policy-engine-compatibility-contract.md)
 proves this boundary over real local TLS without adding a control-plane endpoint
 or SDK type. It qualifies the shipped adapter and fixed local profile only;
-customer policy-bundle correctness remains a deployment gate.
+the separate [customer policy qualification
+contracts](customer-policy-qualification-report-contract.md) add minimized
+evidence for selected reviewed allow/deny cases. Complete policy coverage,
+lifecycle, availability, and audit delivery remain deployment gates.

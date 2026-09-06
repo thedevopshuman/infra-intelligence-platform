@@ -40,6 +40,14 @@ identity configuration and a short-lived credential, observes the issuer and
 deployed public HTTP contracts, and emits a minimized report. It is not a
 serving identity flow, SDK authenticator, adapter, or plugin capability.
 
+Customer policy qualification follows the same boundary:
+`scripts/qualify_customer_policy.py` consumes a protected reviewed case profile
+and separate credential/CA files, calls the existing production policy adapter,
+and emits only source/image identities, digests, counts, timing, stable checks,
+and explicit limitations. It neither reads nor manages the customer bundle,
+and it grants no runtime authority. The customer deployment harness rebinds
+that minimized report without receiving the policy credential.
+
 The private `src/iip/surfaces/worker_health.py` listener consumes only the
 application-owned readiness port. It exposes no control-plane use case,
 identity, tenant data, or provider detail.

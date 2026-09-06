@@ -12,7 +12,13 @@ from pathlib import Path
 from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
+from urllib.request import (
+    HTTPRedirectHandler,
+    HTTPSHandler,
+    ProxyHandler,
+    Request,
+    build_opener,
+)
 
 from iip.application.ports import (
     ActorContext,
@@ -125,7 +131,9 @@ class HttpsPolicyTransport:
         timeout_seconds: int,
         max_response_bytes: int,
     ) -> bytes:
-        opener = build_opener(HTTPSHandler(context=context), _NoRedirect())
+        opener = build_opener(
+            ProxyHandler({}), HTTPSHandler(context=context), _NoRedirect()
+        )
         request = Request(
             endpoint,
             data=body,

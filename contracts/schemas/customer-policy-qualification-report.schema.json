@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-policy-qualification-report:v1alpha1",
+  "title": "Customer Policy Qualification Report",
+  "description": "Privacy-minimized evidence that reviewed allow and deny cases reached one customer policy endpoint through the production adapter.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerPolicyQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^cpq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualification", "subject", "bindings", "profile", "objective", "measurements", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualification": {"const": "customer-policy-engine-bundle-prerequisites-v1"},
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["applicationVersion", "contractsApiVersion", "sourceRevision", "imageDigest"],
+          "properties": {
+            "applicationVersion": {"$ref": "#/$defs/semver"},
+            "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+            "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+            "imageDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["endpointBindingDigest", "profileDigest", "caseSetDigest", "snapshotSetDigest"],
+          "properties": {
+            "endpointBindingDigest": {"$ref": "#/$defs/digest"},
+            "profileDigest": {"$ref": "#/$defs/digest"},
+            "caseSetDigest": {"$ref": "#/$defs/digest"},
+            "snapshotSetDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "transport", "requestWrapper", "credentialMode", "redirectMode", "proxyMode"],
+          "properties": {
+            "name": {"const": "customer-external-http-policy-v1"},
+            "transport": {"const": "ca-verified-https-json"},
+            "requestWrapper": {"const": "opa-input"},
+            "credentialMode": {"const": "protected-bearer-file-read-per-request"},
+            "redirectMode": {"const": "denied"},
+            "proxyMode": {"const": "disabled"}
+          }
+        },
+        "objective": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requestTimeoutSeconds", "maximumResponseBytes", "maximumDecisionLatencyMilliseconds", "maximumProfileAgeSeconds"],
+          "properties": {
+            "requestTimeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 30},
+            "maximumResponseBytes": {"type": "integer", "minimum": 1024, "maximum": 1048576},
+            "maximumDecisionLatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 30000},
+            "maximumProfileAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 7776000}
+          }
+        },
+        "measurements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileReviewedAt", "startedAt", "completedAt", "caseCount", "allowCaseCount", "denyCaseCount", "requestCount", "maximumDecisionLatencyMilliseconds"],
+          "properties": {
+            "profileReviewedAt": {"type": "string", "format": "date-time"},
+            "startedAt": {"type": "string", "format": "date-time"},
+            "completedAt": {"type": "string", "format": "date-time"},
+            "caseCount": {"type": "integer", "minimum": 2, "maximum": 64},
+            "allowCaseCount": {"type": "integer", "minimum": 1, "maximum": 63},
+            "denyCaseCount": {"type": "integer", "minimum": 1, "maximum": 63},
+            "requestCount": {"type": "integer", "minimum": 3, "maximum": 65},
+            "maximumDecisionLatencyMilliseconds": {"type": "integer", "minimum": 0, "maximum": 60000}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 14,
+          "maxItems": 14,
+          "prefixItems": [
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "protected-input-files"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "endpoint-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "ca-verified-tls"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "credential-accepted"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "exact-input-digest-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "tenant-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "snapshot-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "allow-cases"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "deny-cases"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "repeat-consistency"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "latency-objective"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}}
+          ],
+          "items": false
+        },
+        "limitations": {
+          "type": "array",
+          "prefixItems": [
+            {"const": "policy-engine-ha-failover-and-network-path-not-qualified"},
+            {"const": "credential-rotation-revocation-and-emergency-access-not-qualified"},
+            {"const": "bundle-review-change-control-and-break-glass-not-qualified"},
+            {"const": "audit-delivery-retention-and-siem-integration-not-qualified"}
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 14},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 14},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 14},
+            "overallStatus": {"enum": ["qualified", "not-qualified"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-policy-qualification\\.[a-z0-9.-]+$", "maxLength": 160}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    }
+  }
+}

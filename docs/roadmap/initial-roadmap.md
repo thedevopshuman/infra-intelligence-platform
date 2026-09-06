@@ -194,19 +194,28 @@ Shared-database failure is addressed by the separately observed promotion gate
 below; involuntary node/zone/region loss, simultaneous failure, and sustained
 representative load remain external.
 
-Customer-deployment update: ADR 0124 now aggregates one exact cluster-mode
+Customer-deployment update: ADR 0124 aggregates one exact cluster-mode
 preflight, post-install diagnostic, customer ingress report, and the ADR 0123
-continuity chain. ADR 0129 upgrades that aggregate with a fifth
-worker/receiver processing report, rechecks the namespace UID/server and
-processing endpoint/profile/component bindings, requires health after both
-disruption workflows, and fails closed on crossed or stale evidence. ADR 0130
-adds a sixth, provider-neutral PostgreSQL timeline-promotion report, binds its
-API/OTLP/database/profile/environment targets, and requires final health after
-promotion recovery. This closes the manual correlation gap for the narrow
-installed database-continuity profile; artifact trust, database topology/
-fencing/zero-loss RPO and regional DR, integrations, live
-AI/pricing, regional capacity, sustained load, pilot, and public-governance
-gates remain independent.
+continuity chain. ADR 0129 adds a fifth worker/receiver processing report and
+ADR 0130 adds a sixth provider-neutral PostgreSQL timeline-promotion report.
+ADR 0131 adds a seventh customer OIDC prerequisite report. ADR 0132 adds an
+eighth customer policy report and binds its endpoint, protected profile, and
+immutable snapshot-set digests to the same exact source and image. The
+aggregate rechecks the namespace UID/server, requires health after every
+workflow, and fails closed on crossed or stale evidence. This closes the manual
+correlation gap for the narrow installed database, identity-prerequisite, and
+selected-policy-case profile; artifact trust, complete identity and policy
+lifecycle/HA, database topology/fencing/zero-loss RPO and regional DR, other
+integrations, live AI/pricing, regional capacity, sustained load, pilot, and
+public-governance gates remain independent.
+
+Customer-policy update: ADR 0132 adds a separately enabled, provider-neutral
+customer gate that runs protected reviewed allow and deny cases through the
+production external policy adapter. It requires exact tenant/input bindings
+and one immutable snapshot while retaining only digests, counts, timing, and
+stable checks. Complete action/role/resource coverage, credential and bundle
+lifecycle, break-glass, engine/network HA, and audit/SIEM delivery remain
+customer-owned gates.
 
 Customer-database update: ADR 0130 adds a separately enabled external observer
 that uses `sslmode=verify-full`, a default-read-only session, writable-primary
@@ -242,9 +251,9 @@ Deliverables:
 
 Exit gate: duplicate delivery cannot duplicate impact; policy, approval, execution, and verification are fully reconstructable.
 
-Reference slice delivered: versioned proposal/approval/result and execution-lifecycle contracts, investigation- and target-bound closed parameters, role separation, content-digested policy checks at proposal/approval/execution time, a durable one-shot pre-impact execution claim, concurrent duplicate rejection, fail-closed stale-lease recovery without replay, an exact-tenant background timer that atomically closes expired execution leases with one audit record, read-time expiry for unexecuted immutable proposals, atomic terminal result/state persistence, audit references, a default no-impact validator, an explicit Kubernetes API restart adapter with observed-UID and resource-version preconditions, server-side dry-run, brokered `resources:read` + `workloads:patch`, generation/readiness verification and prior-annotation rollback, a tenant-scoped paginated workflow read model and console controls for proposal, independent decision, one-shot execution, and verification review, production-configurable OIDC/JWKS authentication with executable local real-TLS compatibility profiles and a minimized external customer prerequisite gate, and an external HTTPS policy-decision adapter with executable local real-TLS evidence for exact input/digest/snapshot binding, credential rotation/revocation, fail-closed outage behavior, and recovery. Remaining: interactive customer identity/session/revocation/rotation/availability qualification, customer policy-bundle and credential-issuer interoperability, and production-environment mutation/rollback gates.
+Reference slice delivered: versioned proposal/approval/result and execution-lifecycle contracts, investigation- and target-bound closed parameters, role separation, content-digested policy checks at proposal/approval/execution time, a durable one-shot pre-impact execution claim, concurrent duplicate rejection, fail-closed stale-lease recovery without replay, an exact-tenant background timer that atomically closes expired execution leases with one audit record, read-time expiry for unexecuted immutable proposals, atomic terminal result/state persistence, audit references, a default no-impact validator, an explicit Kubernetes API restart adapter with observed-UID and resource-version preconditions, server-side dry-run, brokered `resources:read` + `workloads:patch`, generation/readiness verification and prior-annotation rollback, a tenant-scoped paginated workflow read model and console controls for proposal, independent decision, one-shot execution, and verification review, production-configurable OIDC/JWKS authentication with executable local real-TLS compatibility profiles and a minimized external customer prerequisite gate, and an external HTTPS policy-decision adapter with executable local real-TLS evidence for exact input/digest/snapshot binding, credential rotation/revocation, fail-closed outage behavior, recovery, and selected customer-bundle allow/deny cases. Remaining: interactive customer identity/session/revocation/rotation/availability qualification, complete customer policy coverage/lifecycle/HA/audit, credential-issuer interoperability, and production-environment mutation/rollback gates.
 
-Console onboarding update: the web surface now discovers a closed non-secret authentication profile and supports provider-neutral Authorization Code + `S256` PKCE while retaining local-token and issued-access-token fallbacks. Separate real-TLS local gates cover both the JWKS verifier and full browser exchange. The external customer prerequisite gate now covers one real issuer's discovery/JWKS/CORS, claim mapping, deployed session, and exact release binding. Production qualification still requires interactive redirect/login/MFA/consent, session/logout, disablement/revocation latency, issuer rotation/availability, and the customer policy bundle.
+Console onboarding update: the web surface now discovers a closed non-secret authentication profile and supports provider-neutral Authorization Code + `S256` PKCE while retaining local-token and issued-access-token fallbacks. Separate real-TLS local gates cover both the JWKS verifier and full browser exchange. The external customer prerequisite gate now covers one real issuer's discovery/JWKS/CORS, claim mapping, deployed session, and exact release binding. The policy prerequisite gate separately covers one reviewed allow/deny case set. Production qualification still requires interactive redirect/login/MFA/consent, session/logout, disablement/revocation latency, issuer rotation/availability, and complete policy lifecycle/HA/audit evidence.
 
 ## Phase 5 — plugin SDK and first design partner
 
@@ -290,7 +299,7 @@ All working material stays under `docs/research/brand/` until accepted.
 | Durable event transport | **Accepted: ADR 0004** | PostgreSQL event log and outbox initially; external broker remains replaceable |
 | Credential broker client | **Accepted: ADRs 0022 and 0077** | External HTTPS lease exchange with projected workload identity and a source-bound local real-TLS profile; customer issuer/product qualification remains open |
 | Workflow engine | Phase 3 end | Durable timers, approvals, retries, audit, self-hosting burden |
-| Policy engine | **Accepted profile: ADRs 0037 and 0079** | External engine remains customer-selectable; exact decisions require tenant-bound immutable snapshot references and executable local TLS evidence; customer bundle qualification remains open |
+| Policy engine | **Accepted profile: ADRs 0037, 0079, and 0132** | External engine remains customer-selectable; exact decisions require tenant-bound immutable snapshot references, executable local TLS evidence, and selected customer allow/deny evidence; complete coverage, lifecycle, HA, break-glass, and audit qualification remain open |
 | Console authentication | **Accepted profiles: ADRs 0063, 0078, 0116, and 0131** | Authorization Code + `S256` PKCE, local verifier/browser evidence, and a customer issuer prerequisite report; interactive identity/session/revocation/rotation/availability remain deployment gates |
 | Plugin runtime | **Accepted profiles: ADRs 0038, 0064–0070** | Signed no-network execution, durable ownership, mediated reads, proposal-only actions, and executable compatibility evidence; customer interoperability remains |
 | OTLP receiver identity and buffering | **Accepted profile: ADR 0080** | Mutual TLS with exact SPIFFE-to-channel binding, separate Bearer factor, PostgreSQL commit before success, and customer-Collector persistent queue; customer PKI and loss-objective qualification remain open |

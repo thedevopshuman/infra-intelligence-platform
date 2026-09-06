@@ -5,8 +5,8 @@
 **Machine contract:** `contracts/schemas/customer-deployment-qualification-report.schema.json`
 
 `CustomerDeploymentQualificationReport` is the additive customer-environment
-profile anticipated by ADR 0120 and extended by ADRs 0129, 0130, and 0131. It
-binds seven independently owned reports for
+profile anticipated by ADR 0120 and extended by ADRs 0129, 0130, 0131, and
+0132. It binds eight independently owned reports for
 one exact application, chart, source revision, immutable image digest, and
 explicitly selected Kubernetes cluster:
 
@@ -15,29 +15,33 @@ explicitly selected Kubernetes cluster:
 3. a customer-profile `IngressAvailabilityQualificationReport`;
 4. a `CustomerOidcQualificationReport` that binds one customer issuer's
    verifier and browser prerequisites to the same API target;
-5. the `CustomerContinuityQualificationReport` that already binds that ingress
+5. a `CustomerPolicyQualificationReport` that binds reviewed allow and deny
+   cases from one immutable customer policy snapshot to the same release;
+6. the `CustomerContinuityQualificationReport` that already binds that ingress
    probe to one PDB-governed API-pod Eviction; and
-6. a `CustomerProcessingContinuityQualificationReport` that proves durable
+7. a `CustomerProcessingContinuityQualificationReport` that proves durable
    metric intake and investigation completion across sequential worker and
    receiver pod Evictions; and
-7. a `CustomerPostgreSQLContinuityQualificationReport` that proves the stable
+8. a `CustomerPostgreSQLContinuityQualificationReport` that proves the stable
    writer endpoint advanced to a writable PostgreSQL timeline while the
    application recovered within its declared limits.
 
 The ordered `evidence` list retains each report ID, SHA-256 digest, observed
 status, and pass/reject result. Crossed release identities, sources, target
 bindings, the nested continuity-to-ingress digest chain, the OIDC report's
-API/profile/issuer-metadata bindings, the processing report's
+API/profile/issuer-metadata bindings, the policy report's exact source/image
+and endpoint/profile/snapshot-set bindings, the processing report's
 API/OTLP/profile/component bindings, or the database report's
 API/OTLP/context/namespace/profile/target bindings are invalid input; they do not
 become a partially successful report. A valid but blocked,
 unhealthy, stale, out-of-order, or unsuccessful input produces
 `not-qualified` evidence.
 
-The OIDC prerequisite window must complete before the control-plane continuity
-window, the control-plane window must complete before the processing window, the
+The OIDC prerequisite window must complete before the policy observation, the
+policy observation must complete before the control-plane continuity window,
+the control-plane window must complete before the processing window, the
 processing window must complete before database promotion observation, and the
-health observation must follow all continuity workflows. Every
+health observation must follow all workflows. Every
 observation must be within
 `maximumEvidenceAgeSeconds` when the aggregate is created. Generation also
 re-observes the namespace UID and Kubernetes server through the exact context
@@ -49,18 +53,20 @@ Deployment or Pod names, customer identifiers, URLs, repository locations,
 credentials, Secret values, or raw provider/Kubernetes errors. `cdq_` is a
 content-derived identifier over the complete metadata and specification.
 
-`qualified` means only `single-cluster-database-oidc-prerequisites-v4`: live
+`qualified` means only
+`single-cluster-database-identity-policy-prerequisites-v5`: live
 dependencies were present; one customer issuer's discovery, JWKS, CORS,
-claims, deployed session, and release prerequisites passed; the installed
+claims, deployed session, and release prerequisites passed; reviewed policy
+allow and deny cases remained bound to one immutable snapshot; the installed
 components were healthy after successful sequential API, worker, and receiver
 pod-disruption workflows; durable synthetic intake and investigation
 completion passed; a real PostgreSQL timeline promotion was observed; and every
 artifact described the same release and environment. The fixed `limitations`
-list keeps interactive OIDC/MFA/session/logout/revocation/rotation/HA,
-publication/signature/vulnerability, database topology/fencing/RPO and regional
-DR, representative load, other integrations, live AI/provider pricing,
-regional capacity/SLO, design-partner, legal, brand, and governance gates
-outside this claim.
+list keeps interactive OIDC/MFA/session/logout/revocation/rotation/HA, complete
+policy coverage and policy lifecycle/HA/audit, publication/signature/
+vulnerability, database topology/fencing/RPO and regional DR, representative
+load, other integrations, live AI/provider pricing, regional capacity/SLO,
+design-partner, legal, brand, and governance gates outside this claim.
 
 This operational evidence is not an API resource and is not added to the
 control-plane OpenAPI surface. Python and TypeScript SDKs expose its transport

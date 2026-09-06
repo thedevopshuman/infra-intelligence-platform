@@ -70,3 +70,11 @@ one real customer issuer/verifier/browser-prerequisite report, binds its API
 target to the continuity target, and keeps interactive login, MFA, session,
 logout, revocation, rotation, and issuer-availability evidence outside the
 aggregate claim. All three earlier profiles remain historical.
+
+[ADR 0132](0132-customer-policy-engine-bundle-qualification.md) upgrades the
+current aggregate to
+`single-cluster-database-identity-policy-prerequisites-v5`. It adds one
+selected customer policy allow/deny report and binds its exact source, image,
+endpoint, protected profile, and immutable snapshot set. Complete policy
+coverage, lifecycle, HA, break-glass, and audit evidence remain outside the
+aggregate claim. All four earlier profiles remain historical.

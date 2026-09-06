@@ -17,6 +17,7 @@ from iip.application.ports import ActorContext, PolicyConfigurationError
 from iip.adapters.auth import HashedBearerAuthenticator
 from iip.bootstrap import build_runtime_from_env
 from unittest.mock import patch
+from urllib.request import ProxyHandler
 
 
 class RecordingTransport:
@@ -216,6 +217,30 @@ class ExternalPolicyDecisionPointTests(unittest.TestCase):
         ):
             with self.assertRaises(PolicyConfigurationError):
                 ExternalPolicyConfiguration.from_json(json.dumps(invalid))
+
+    def test_https_transport_explicitly_disables_environment_proxies(self) -> None:
+        captured = []
+
+        class Opener:
+            def open(self, request, timeout):
+                del request, timeout
+                raise OSError
+
+        def build(*handlers):
+            captured.extend(handlers)
+            return Opener()
+
+        with patch("iip.adapters.policy.build_opener", side_effect=build):
+            decision = ExternalHttpPolicyDecisionPoint(self.configuration()).decide(
+                self.actor,
+                "resource:read",
+                {"tenantId": "tenant-a"},
+            )
+
+        self.assertEqual(decision.reason_code, "policy.unavailable")
+        proxy_handlers = [item for item in captured if isinstance(item, ProxyHandler)]
+        self.assertEqual(len(proxy_handlers), 1)
+        self.assertEqual(proxy_handlers[0].proxies, {})
 
     def test_runtime_composes_external_policy_only_when_explicitly_selected(self) -> None:
         token = "policy-composition-token-0123456789abcdef"

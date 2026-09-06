@@ -21,6 +21,7 @@ import deployment_diagnostics as diagnostics
 import deployment_preflight as preflight
 import qualify_customer_continuity as continuity
 import qualify_customer_oidc as oidc
+import qualify_customer_policy as customer_policy
 import qualify_customer_processing_continuity as processing
 import qualify_customer_postgresql_continuity as postgresql
 import qualify_ingress_availability as ingress
@@ -30,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "contracts/schemas/customer-deployment-qualification-report.schema.json"
 API_VERSION = "iip.platform/v1alpha1"
 KIND = "CustomerDeploymentQualificationReport"
-QUALIFICATION_LEVEL = "single-cluster-database-oidc-prerequisites-v4"
+QUALIFICATION_LEVEL = "single-cluster-database-identity-policy-prerequisites-v5"
 REPORT_ID = re.compile(r"^cdq_[a-f0-9]{32}$")
 DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 MAX_DOCUMENT_BYTES = 16 * 1024 * 1024
@@ -61,6 +62,12 @@ EVIDENCE_DEFINITIONS = (
         "customer-deployment-qualification.oidc.not-qualified",
     ),
     (
+        "customer-policy",
+        "CustomerPolicyQualificationReport",
+        "qualified",
+        "customer-deployment-qualification.policy.not-qualified",
+    ),
+    (
         "control-plane-continuity",
         "CustomerContinuityQualificationReport",
         "qualified",
@@ -88,11 +95,13 @@ CHECK_IDS = (
     "post-continuity-health",
     "customer-ingress",
     "customer-oidc",
+    "customer-policy",
     "control-plane-continuity",
     "worker-receiver-processing",
     "postgresql-primary-promotion",
     "continuity-ingress-chain",
     "oidc-target-chain",
+    "policy-binding-chain",
     "processing-target-chain",
     "database-target-chain",
     "evidence-order",
@@ -106,7 +115,7 @@ LIMITATIONS = (
     "artifact-publication-signatures-vulnerabilities-not-qualified",
     "database-topology-fencing-and-rpo-not-qualified",
     "regional-database-disaster-recovery-not-qualified",
-    "customer-oidc-interactive-lifecycle-other-integrations-and-live-ai-not-qualified",
+    "customer-oidc-interactive-policy-lifecycle-other-integrations-and-live-ai-not-qualified",
     "regional-slo-and-capacity-not-qualified",
     "design-partner-legal-brand-governance-not-qualified",
 )
@@ -285,6 +294,7 @@ def _subject_and_bindings(
     diagnostic_report: Mapping[str, Any],
     ingress_report: Mapping[str, Any],
     oidc_report: Mapping[str, Any],
+    policy_report: Mapping[str, Any],
     continuity_report: Mapping[str, Any],
     processing_report: Mapping[str, Any],
     postgresql_report: Mapping[str, Any],
@@ -349,6 +359,22 @@ def _subject_and_bindings(
         oidc_spec.get("bindings"),
         "customer-deployment-qualification.oidc.invalid",
     )
+    policy_metadata = _mapping(
+        policy_report.get("metadata"),
+        "customer-deployment-qualification.policy.invalid",
+    )
+    policy_spec = _mapping(
+        policy_report.get("spec"),
+        "customer-deployment-qualification.policy.invalid",
+    )
+    policy_subject = _mapping(
+        policy_spec.get("subject"),
+        "customer-deployment-qualification.policy.invalid",
+    )
+    policy_bindings = _mapping(
+        policy_spec.get("bindings"),
+        "customer-deployment-qualification.policy.invalid",
+    )
     continuity_metadata = _mapping(
         continuity_report.get("metadata"),
         "customer-deployment-qualification.continuity.invalid",
@@ -404,6 +430,8 @@ def _subject_and_bindings(
         ingress_metadata.get("sourceRevision"),
         oidc_metadata.get("sourceRevision"),
         oidc_subject.get("sourceRevision"),
+        policy_metadata.get("sourceRevision"),
+        policy_subject.get("sourceRevision"),
         continuity_metadata.get("sourceRevision"),
         continuity_subject.get("sourceRevision"),
         processing_metadata.get("sourceRevision"),
@@ -428,6 +456,13 @@ def _subject_and_bindings(
         or continuity_subject.get("imageDigest") != image_digest
         or continuity_subject.get("contractsApiVersion") != API_VERSION
         or oidc_subject != continuity_subject
+        or policy_subject
+        != {
+            "applicationVersion": continuity_subject.get("applicationVersion"),
+            "contractsApiVersion": continuity_subject.get("contractsApiVersion"),
+            "sourceRevision": continuity_subject.get("sourceRevision"),
+            "imageDigest": continuity_subject.get("imageDigest"),
+        }
         or processing_subject != continuity_subject
         or postgresql_subject != continuity_subject
         or ingress_spec.get("targetIdentity")
@@ -552,6 +587,13 @@ def _subject_and_bindings(
         "oidcIssuerMetadataDigest": str(
             oidc_bindings["issuerMetadataDigest"]
         ),
+        "policyEndpointBindingDigest": str(
+            policy_bindings["endpointBindingDigest"]
+        ),
+        "policyProfileDigest": str(policy_bindings["profileDigest"]),
+        "policySnapshotSetDigest": str(
+            policy_bindings["snapshotSetDigest"]
+        ),
         "processingOtlpTargetBindingDigest": str(
             processing_bindings["otlpTargetBindingDigest"]
         ),
@@ -575,10 +617,13 @@ def _input_times(
     preflight_report: Mapping[str, Any],
     diagnostic_report: Mapping[str, Any],
     oidc_report: Mapping[str, Any],
+    policy_report: Mapping[str, Any],
     continuity_report: Mapping[str, Any],
     processing_report: Mapping[str, Any],
     postgresql_report: Mapping[str, Any],
 ) -> tuple[
+    datetime,
+    datetime,
     datetime,
     datetime,
     datetime,
@@ -608,6 +653,14 @@ def _input_times(
     )
     oidc_measurements = _mapping(
         oidc_spec.get("measurements"),
+        "customer-deployment-qualification.time.invalid",
+    )
+    policy_spec = _mapping(
+        policy_report.get("spec"),
+        "customer-deployment-qualification.time.invalid",
+    )
+    policy_measurements = _mapping(
+        policy_spec.get("measurements"),
         "customer-deployment-qualification.time.invalid",
     )
     continuity_spec = _mapping(
@@ -645,6 +698,14 @@ def _input_times(
         ),
         _parse_timestamp(
             oidc_measurements.get("completedAt"),
+            "customer-deployment-qualification.time.invalid",
+        ),
+        _parse_timestamp(
+            policy_measurements.get("startedAt"),
+            "customer-deployment-qualification.time.invalid",
+        ),
+        _parse_timestamp(
+            policy_measurements.get("completedAt"),
             "customer-deployment-qualification.time.invalid",
         ),
         _parse_timestamp(
@@ -688,6 +749,8 @@ def build_report(
     ingress_digest: str,
     oidc_report: Mapping[str, Any],
     oidc_digest: str,
+    policy_report: Mapping[str, Any],
+    policy_digest: str,
     continuity_report: Mapping[str, Any],
     continuity_digest: str,
     processing_report: Mapping[str, Any],
@@ -722,6 +785,7 @@ def build_report(
         diagnostic_report=diagnostic_report,
         ingress_report=ingress_report,
         oidc_report=oidc_report,
+        policy_report=policy_report,
         continuity_report=continuity_report,
         processing_report=processing_report,
         postgresql_report=postgresql_report,
@@ -738,6 +802,8 @@ def build_report(
         preflight_at,
         oidc_started,
         oidc_completed,
+        policy_started,
+        policy_completed,
         continuity_started,
         continuity_completed,
         processing_started,
@@ -749,6 +815,7 @@ def build_report(
         preflight_report=preflight_report,
         diagnostic_report=diagnostic_report,
         oidc_report=oidc_report,
+        policy_report=policy_report,
         continuity_report=continuity_report,
         processing_report=processing_report,
         postgresql_report=postgresql_report,
@@ -757,7 +824,9 @@ def build_report(
     ordered = (
         preflight_at <= oidc_started
         and oidc_started <= oidc_completed
-        and oidc_completed <= continuity_started
+        and oidc_completed <= policy_started
+        and policy_started <= policy_completed
+        and policy_completed <= continuity_started
         and continuity_started <= continuity_completed
         and continuity_completed <= processing_started
         and processing_started <= processing_completed
@@ -769,6 +838,8 @@ def build_report(
         preflight_at,
         oidc_started,
         oidc_completed,
+        policy_started,
+        policy_completed,
         continuity_started,
         continuity_completed,
         processing_started,
@@ -801,6 +872,7 @@ def build_report(
                 diagnostic_report,
                 ingress_report,
                 oidc_report,
+                policy_report,
                 continuity_report,
                 processing_report,
                 postgresql_report,
@@ -810,6 +882,7 @@ def build_report(
                 diagnostic_digest,
                 ingress_digest,
                 oidc_digest,
+                policy_digest,
                 continuity_digest,
                 processing_digest,
                 postgresql_digest,
@@ -843,6 +916,11 @@ def build_report(
             "customer-deployment-qualification.oidc.not-qualified",
         ),
         _check(
+            "customer-policy",
+            evidence_by_id["customer-policy"]["status"] == "passed",
+            "customer-deployment-qualification.policy.not-qualified",
+        ),
+        _check(
             "control-plane-continuity",
             evidence_by_id["control-plane-continuity"]["status"] == "passed",
             "customer-deployment-qualification.continuity.not-qualified",
@@ -859,6 +937,7 @@ def build_report(
         ),
         _check("continuity-ingress-chain", True, "customer-deployment-qualification.ingress.crossed"),
         _check("oidc-target-chain", True, "customer-deployment-qualification.oidc.crossed"),
+        _check("policy-binding-chain", True, "customer-deployment-qualification.policy.crossed"),
         _check("processing-target-chain", True, "customer-deployment-qualification.processing.crossed"),
         _check("database-target-chain", True, "customer-deployment-qualification.database.crossed"),
         _check("evidence-order", ordered, "customer-deployment-qualification.evidence.order-invalid"),
@@ -887,6 +966,8 @@ def build_report(
             "preflightGeneratedAt": _timestamp(preflight_at),
             "oidcStartedAt": _timestamp(oidc_started),
             "oidcCompletedAt": _timestamp(oidc_completed),
+            "policyStartedAt": _timestamp(policy_started),
+            "policyCompletedAt": _timestamp(policy_completed),
             "continuityStartedAt": _timestamp(continuity_started),
             "continuityCompletedAt": _timestamp(continuity_completed),
             "processingStartedAt": _timestamp(processing_started),
@@ -971,6 +1052,14 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         measurements.get("oidcCompletedAt"),
         "customer-deployment-qualification.report.time-invalid",
     )
+    policy_started = _parse_timestamp(
+        measurements.get("policyStartedAt"),
+        "customer-deployment-qualification.report.time-invalid",
+    )
+    policy_completed = _parse_timestamp(
+        measurements.get("policyCompletedAt"),
+        "customer-deployment-qualification.report.time-invalid",
+    )
     continuity_started = _parse_timestamp(
         measurements.get("continuityStartedAt"),
         "customer-deployment-qualification.report.time-invalid",
@@ -1015,7 +1104,9 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
     ordered = (
         preflight_at <= oidc_started
         and oidc_started <= oidc_completed
-        and oidc_completed <= continuity_started
+        and oidc_completed <= policy_started
+        and policy_started <= policy_completed
+        and policy_completed <= continuity_started
         and continuity_started <= continuity_completed
         and continuity_completed <= processing_started
         and processing_started <= processing_completed
@@ -1027,6 +1118,8 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         preflight_at,
         oidc_started,
         oidc_completed,
+        policy_started,
+        policy_completed,
         continuity_started,
         continuity_completed,
         processing_started,
@@ -1070,6 +1163,11 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
             "customer-deployment-qualification.oidc.not-qualified",
         ),
         _check(
+            "customer-policy",
+            evidence_by_id.get("customer-policy", {}).get("status") == "passed",
+            "customer-deployment-qualification.policy.not-qualified",
+        ),
+        _check(
             "control-plane-continuity",
             evidence_by_id.get("control-plane-continuity", {}).get("status") == "passed",
             "customer-deployment-qualification.continuity.not-qualified",
@@ -1088,6 +1186,7 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         ),
         _check("continuity-ingress-chain", True, "customer-deployment-qualification.ingress.crossed"),
         _check("oidc-target-chain", True, "customer-deployment-qualification.oidc.crossed"),
+        _check("policy-binding-chain", True, "customer-deployment-qualification.policy.crossed"),
         _check("processing-target-chain", True, "customer-deployment-qualification.processing.crossed"),
         _check("database-target-chain", True, "customer-deployment-qualification.database.crossed"),
         _check("evidence-order", ordered, "customer-deployment-qualification.evidence.order-invalid"),
@@ -1181,6 +1280,9 @@ def _validate_inputs(
     oidc_path: Path,
     oidc_profile_path: Path,
     oidc_api_base_url: str,
+    policy_path: Path,
+    policy_profile_path: Path,
+    policy_endpoint: str,
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
@@ -1214,6 +1316,8 @@ def _validate_inputs(
     str,
     Mapping[str, Any],
     str,
+    Mapping[str, Any],
+    str,
 ]:
     if not values or len(values) > MAX_VALUES_FILES:
         _fail("customer-deployment-qualification.values.invalid")
@@ -1228,6 +1332,9 @@ def _validate_inputs(
     )
     oidc_report, oidc_digest = _load_document(
         oidc_path, "customer-deployment-qualification.oidc.unreadable"
+    )
+    policy_report, policy_digest = _load_document(
+        policy_path, "customer-deployment-qualification.policy.unreadable"
     )
     continuity_report, continuity_digest = _load_document(
         continuity_path, "customer-deployment-qualification.continuity.unreadable"
@@ -1262,6 +1369,13 @@ def _validate_inputs(
             report_path=oidc_path,
             profile_path=oidc_profile_path,
             api_base_url=oidc_api_base_url,
+            image_digest=image_digest,
+            require_qualified=False,
+        )
+        customer_policy.verify_report(
+            report_path=policy_path,
+            profile_path=policy_profile_path,
+            endpoint=policy_endpoint,
             image_digest=image_digest,
             require_qualified=False,
         )
@@ -1302,6 +1416,7 @@ def _validate_inputs(
         diagnostics.DeploymentDiagnosticError,
         ingress.IngressQualificationError,
         oidc.CustomerOidcQualificationError,
+        customer_policy.CustomerPolicyQualificationError,
         continuity.CustomerContinuityQualificationError,
         processing.CustomerProcessingContinuityError,
         postgresql.CustomerPostgreSQLContinuityError,
@@ -1312,6 +1427,7 @@ def _validate_inputs(
         (diagnostic_path, diagnostic_digest, "customer-deployment-qualification.diagnostic.changed"),
         (ingress_path, ingress_digest, "customer-deployment-qualification.ingress.changed"),
         (oidc_path, oidc_digest, "customer-deployment-qualification.oidc.changed"),
+        (policy_path, policy_digest, "customer-deployment-qualification.policy.changed"),
         (continuity_path, continuity_digest, "customer-deployment-qualification.continuity.changed"),
         (processing_path, processing_digest, "customer-deployment-qualification.processing.changed"),
         (postgresql_path, postgresql_digest, "customer-deployment-qualification.database.changed"),
@@ -1327,6 +1443,8 @@ def _validate_inputs(
         ingress_digest,
         oidc_report,
         oidc_digest,
+        policy_report,
+        policy_digest,
         continuity_report,
         continuity_digest,
         processing_report,
@@ -1344,6 +1462,9 @@ def qualify(
     oidc_path: Path,
     oidc_profile_path: Path,
     oidc_api_base_url: str,
+    policy_path: Path,
+    policy_profile_path: Path,
+    policy_endpoint: str,
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
@@ -1375,6 +1496,9 @@ def qualify(
         oidc_path=oidc_path,
         oidc_profile_path=oidc_profile_path,
         oidc_api_base_url=oidc_api_base_url,
+        policy_path=policy_path,
+        policy_profile_path=policy_profile_path,
+        policy_endpoint=policy_endpoint,
         continuity_path=continuity_path,
         processing_path=processing_path,
         processing_profile_path=processing_profile_path,
@@ -1408,12 +1532,14 @@ def qualify(
         ingress_digest=inputs[5],
         oidc_report=inputs[6],
         oidc_digest=inputs[7],
-        continuity_report=inputs[8],
-        continuity_digest=inputs[9],
-        processing_report=inputs[10],
-        processing_digest=inputs[11],
-        postgresql_report=inputs[12],
-        postgresql_digest=inputs[13],
+        policy_report=inputs[8],
+        policy_digest=inputs[9],
+        continuity_report=inputs[10],
+        continuity_digest=inputs[11],
+        processing_report=inputs[12],
+        processing_digest=inputs[13],
+        postgresql_report=inputs[14],
+        postgresql_digest=inputs[15],
         context=context,
         namespace=namespace,
         release_name=release_name,
@@ -1439,6 +1565,9 @@ def verify_report(
     oidc_path: Path,
     oidc_profile_path: Path,
     oidc_api_base_url: str,
+    policy_path: Path,
+    policy_profile_path: Path,
+    policy_endpoint: str,
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
@@ -1472,6 +1601,9 @@ def verify_report(
         oidc_path=oidc_path,
         oidc_profile_path=oidc_profile_path,
         oidc_api_base_url=oidc_api_base_url,
+        policy_path=policy_path,
+        policy_profile_path=policy_profile_path,
+        policy_endpoint=policy_endpoint,
         continuity_path=continuity_path,
         processing_path=processing_path,
         processing_profile_path=processing_profile_path,
@@ -1516,12 +1648,14 @@ def verify_report(
         ingress_digest=inputs[5],
         oidc_report=inputs[6],
         oidc_digest=inputs[7],
-        continuity_report=inputs[8],
-        continuity_digest=inputs[9],
-        processing_report=inputs[10],
-        processing_digest=inputs[11],
-        postgresql_report=inputs[12],
-        postgresql_digest=inputs[13],
+        policy_report=inputs[8],
+        policy_digest=inputs[9],
+        continuity_report=inputs[10],
+        continuity_digest=inputs[11],
+        processing_report=inputs[12],
+        processing_digest=inputs[13],
+        postgresql_report=inputs[14],
+        postgresql_digest=inputs[15],
         context=context,
         namespace=namespace,
         release_name=release_name,
@@ -1551,6 +1685,9 @@ def _common_inputs(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--oidc-report", type=Path, required=True)
     parser.add_argument("--oidc-profile", type=Path, required=True)
     parser.add_argument("--oidc-api-base-url", required=True)
+    parser.add_argument("--policy-report", type=Path, required=True)
+    parser.add_argument("--policy-profile", type=Path, required=True)
+    parser.add_argument("--policy-endpoint", required=True)
     parser.add_argument("--continuity-report", type=Path, required=True)
     parser.add_argument("--processing-report", type=Path, required=True)
     parser.add_argument("--processing-profile", type=Path, required=True)
@@ -1601,6 +1738,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "oidc_path": arguments.oidc_report,
         "oidc_profile_path": arguments.oidc_profile,
         "oidc_api_base_url": arguments.oidc_api_base_url,
+        "policy_path": arguments.policy_report,
+        "policy_profile_path": arguments.policy_profile,
+        "policy_endpoint": arguments.policy_endpoint,
         "continuity_path": arguments.continuity_report,
         "processing_path": arguments.processing_report,
         "processing_profile_path": arguments.processing_profile,

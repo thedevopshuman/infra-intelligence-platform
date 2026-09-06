@@ -715,8 +715,52 @@ class CustomerOidcQualificationReport:
 
 
 @dataclass(frozen=True)
+class CustomerPolicyQualificationProfile:
+    """Protected reviewed customer policy endpoint and decision cases."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerPolicyQualificationProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerPolicyQualificationProfile",
+                label="customer policy qualification profile",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerPolicyQualificationReport:
+    """Minimized evidence for reviewed customer policy decisions."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerPolicyQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerPolicyQualificationReport",
+                label="customer policy qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerDeploymentQualificationReport:
-    """Exact-release customer install, identity, continuity, and database chain."""
+    """Exact-release install, identity, policy, continuity, and database chain."""
 
     payload: Mapping[str, Any]
 

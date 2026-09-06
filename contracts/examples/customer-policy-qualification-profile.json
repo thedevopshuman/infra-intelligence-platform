@@ -1,0 +1,51 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerPolicyQualificationProfile",
+  "metadata": {
+    "name": "customer-policy-production",
+    "reviewedAt": "2026-09-07T09:00:00Z"
+  },
+  "spec": {
+    "endpoint": "https://policy.example.com/v1/data/iip/decision",
+    "identity": {
+      "tenantId": "tenant-a",
+      "actorId": "qualification-operator",
+      "roles": ["approver", "developer"]
+    },
+    "cases": [
+      {
+        "id": "allow-resource-read",
+        "action": "resource:read",
+        "resource": {
+          "tenantId": "tenant-a",
+          "resourceUid": "res_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "expected": {
+          "allowed": true,
+          "reasonCode": "policy.resource-read-allowed",
+          "policySnapshotRef": "policy://tenant-a/snapshots/bundle-2026-09-07"
+        }
+      },
+      {
+        "id": "deny-action-execute",
+        "action": "action:execute",
+        "resource": {
+          "tenantId": "tenant-a",
+          "actionKind": "kubernetes.restart",
+          "environment": "production"
+        },
+        "expected": {
+          "allowed": false,
+          "reasonCode": "policy.separation-of-duties-denied",
+          "policySnapshotRef": "policy://tenant-a/snapshots/bundle-2026-09-07"
+        }
+      }
+    ],
+    "objective": {
+      "requestTimeoutSeconds": 5,
+      "maximumResponseBytes": 65536,
+      "maximumDecisionLatencyMilliseconds": 2000,
+      "maximumProfileAgeSeconds": 2592000
+    }
+  }
+}

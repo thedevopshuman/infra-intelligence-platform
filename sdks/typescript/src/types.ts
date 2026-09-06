@@ -1632,6 +1632,114 @@ export interface CustomerOidcQualificationReport {
   };
 }
 
+export interface CustomerPolicyQualificationProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerPolicyQualificationProfile";
+  metadata: { name: string; reviewedAt: string };
+  spec: {
+    endpoint: string;
+    identity: { tenantId: string; actorId: string; roles: string[] };
+    cases: Array<{
+      id: string;
+      action: `${string}:${string}`;
+      resource: { tenantId: string } & Record<string, unknown>;
+      expected: {
+        allowed: boolean;
+        reasonCode: string;
+        policySnapshotRef: `policy://${string}/snapshots/${string}`;
+      };
+    }>;
+    objective: {
+      requestTimeoutSeconds: number;
+      maximumResponseBytes: number;
+      maximumDecisionLatencyMilliseconds: number;
+      maximumProfileAgeSeconds: number;
+    };
+  };
+}
+
+export type CustomerPolicyQualificationCheckId =
+  | "profile-binding"
+  | "source-binding"
+  | "protected-input-files"
+  | "endpoint-binding"
+  | "ca-verified-tls"
+  | "credential-accepted"
+  | "exact-input-digest-binding"
+  | "tenant-binding"
+  | "snapshot-binding"
+  | "allow-cases"
+  | "deny-cases"
+  | "repeat-consistency"
+  | "latency-objective"
+  | "minimized-output";
+
+export interface CustomerPolicyQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerPolicyQualificationReport";
+  metadata: {
+    id: `cpq_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualification: "customer-policy-engine-bundle-prerequisites-v1";
+    subject: {
+      applicationVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      endpointBindingDigest: Sha256Digest;
+      profileDigest: Sha256Digest;
+      caseSetDigest: Sha256Digest;
+      snapshotSetDigest: Sha256Digest;
+    };
+    profile: {
+      name: "customer-external-http-policy-v1";
+      transport: "ca-verified-https-json";
+      requestWrapper: "opa-input";
+      credentialMode: "protected-bearer-file-read-per-request";
+      redirectMode: "denied";
+      proxyMode: "disabled";
+    };
+    objective: CustomerPolicyQualificationProfile["spec"]["objective"];
+    measurements: {
+      profileReviewedAt: string;
+      startedAt: string;
+      completedAt: string;
+      caseCount: number;
+      allowCaseCount: number;
+      denyCaseCount: number;
+      requestCount: number;
+      maximumDecisionLatencyMilliseconds: number;
+    };
+    checks: Array<
+      | { id: CustomerPolicyQualificationCheckId; status: "passed" }
+      | {
+          id: CustomerPolicyQualificationCheckId;
+          status: "failed";
+          errorCode: `customer-policy-qualification.${string}`;
+        }
+    >;
+    limitations: [
+      "policy-engine-ha-failover-and-network-path-not-qualified",
+      "credential-rotation-revocation-and-emergency-access-not-qualified",
+      "bundle-review-change-control-and-break-glass-not-qualified",
+      "audit-delivery-retention-and-siem-integration-not-qualified",
+    ];
+    summary: {
+      totalChecks: 14;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export type CustomerProcessingContinuityCheckId =
   | "source-binding"
   | "minimized-output"
@@ -1784,6 +1892,7 @@ export type CustomerDeploymentQualificationEvidenceId =
   | "post-install-health"
   | "customer-ingress"
   | "customer-oidc"
+  | "customer-policy"
   | "control-plane-continuity"
   | "worker-receiver-processing"
   | "postgresql-primary-promotion";
@@ -1797,11 +1906,13 @@ export type CustomerDeploymentQualificationCheckId =
   | "post-continuity-health"
   | "customer-ingress"
   | "customer-oidc"
+  | "customer-policy"
   | "control-plane-continuity"
   | "worker-receiver-processing"
   | "postgresql-primary-promotion"
   | "continuity-ingress-chain"
   | "oidc-target-chain"
+  | "policy-binding-chain"
   | "processing-target-chain"
   | "database-target-chain"
   | "evidence-order"
@@ -1819,7 +1930,7 @@ export interface CustomerDeploymentQualificationReport {
   };
   spec: {
     status: "qualified" | "not-qualified";
-    qualificationLevel: "single-cluster-database-oidc-prerequisites-v4";
+    qualificationLevel: "single-cluster-database-identity-policy-prerequisites-v5";
     subject: {
       profile: "production-core-v1" | "production-ai-finops-v0";
       applicationVersion: string;
@@ -1837,6 +1948,9 @@ export interface CustomerDeploymentQualificationReport {
       continuityTargetBindingDigest: Sha256Digest;
       oidcProfileDigest: Sha256Digest;
       oidcIssuerMetadataDigest: Sha256Digest;
+      policyEndpointBindingDigest: Sha256Digest;
+      policyProfileDigest: Sha256Digest;
+      policySnapshotSetDigest: Sha256Digest;
       processingOtlpTargetBindingDigest: Sha256Digest;
       processingProfileDigest: Sha256Digest;
       workerDeploymentBindingDigest: Sha256Digest;
@@ -1853,6 +1967,8 @@ export interface CustomerDeploymentQualificationReport {
       preflightGeneratedAt: string;
       oidcStartedAt: string;
       oidcCompletedAt: string;
+      policyStartedAt: string;
+      policyCompletedAt: string;
       continuityStartedAt: string;
       continuityCompletedAt: string;
       processingStartedAt: string;
@@ -1870,6 +1986,7 @@ export interface CustomerDeploymentQualificationReport {
         | "DeploymentDiagnosticReport"
         | "IngressAvailabilityQualificationReport"
         | "CustomerOidcQualificationReport"
+        | "CustomerPolicyQualificationReport"
         | "CustomerContinuityQualificationReport"
         | "CustomerProcessingContinuityQualificationReport"
         | "CustomerPostgreSQLContinuityQualificationReport";
@@ -1901,15 +2018,15 @@ export interface CustomerDeploymentQualificationReport {
       "artifact-publication-signatures-vulnerabilities-not-qualified",
       "database-topology-fencing-and-rpo-not-qualified",
       "regional-database-disaster-recovery-not-qualified",
-      "customer-oidc-interactive-lifecycle-other-integrations-and-live-ai-not-qualified",
+      "customer-oidc-interactive-policy-lifecycle-other-integrations-and-live-ai-not-qualified",
       "regional-slo-and-capacity-not-qualified",
       "design-partner-legal-brand-governance-not-qualified",
     ];
     summary: {
-      requiredEvidence: 7;
+      requiredEvidence: 8;
       passedEvidence: number;
       rejectedEvidence: number;
-      totalChecks: 18;
+      totalChecks: 20;
       passedChecks: number;
       failedChecks: number;
       overallStatus: "qualified" | "not-qualified";

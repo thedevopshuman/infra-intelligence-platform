@@ -1,0 +1,78 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerPolicyQualificationReport",
+  "metadata": {
+    "id": "cpq_8b972ca71f07cee97b5fd878e60b6efc",
+    "generatedAt": "2026-09-08T10:00:01Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualification": "customer-policy-engine-bundle-prerequisites-v1",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "endpointBindingDigest": "sha256:91249b4090633e9a2018a5b2fcdbcea74a9413be84e5a657237d39b2b2b5bb33",
+      "profileDigest": "sha256:97695cef572324658f32203bf1892ecc8ede14fef321e7971744a6ad35c58093",
+      "caseSetDigest": "sha256:4ae7553655634c43346efc46610b37df738f559aea8ac69113986609885bb097",
+      "snapshotSetDigest": "sha256:d3857c4a685d020ce9527ff12d2bc1daac6121ef5da884783ee739a75081fabd"
+    },
+    "profile": {
+      "name": "customer-external-http-policy-v1",
+      "transport": "ca-verified-https-json",
+      "requestWrapper": "opa-input",
+      "credentialMode": "protected-bearer-file-read-per-request",
+      "redirectMode": "denied",
+      "proxyMode": "disabled"
+    },
+    "objective": {
+      "requestTimeoutSeconds": 5,
+      "maximumResponseBytes": 65536,
+      "maximumDecisionLatencyMilliseconds": 2000,
+      "maximumProfileAgeSeconds": 2592000
+    },
+    "measurements": {
+      "profileReviewedAt": "2026-09-07T09:00:00Z",
+      "startedAt": "2026-09-08T10:00:00Z",
+      "completedAt": "2026-09-08T10:00:01Z",
+      "caseCount": 2,
+      "allowCaseCount": 1,
+      "denyCaseCount": 1,
+      "requestCount": 3,
+      "maximumDecisionLatencyMilliseconds": 84
+    },
+    "checks": [
+      {"id": "profile-binding", "status": "passed"},
+      {"id": "source-binding", "status": "passed"},
+      {"id": "protected-input-files", "status": "passed"},
+      {"id": "endpoint-binding", "status": "passed"},
+      {"id": "ca-verified-tls", "status": "passed"},
+      {"id": "credential-accepted", "status": "passed"},
+      {"id": "exact-input-digest-binding", "status": "passed"},
+      {"id": "tenant-binding", "status": "passed"},
+      {"id": "snapshot-binding", "status": "passed"},
+      {"id": "allow-cases", "status": "passed"},
+      {"id": "deny-cases", "status": "passed"},
+      {"id": "repeat-consistency", "status": "passed"},
+      {"id": "latency-objective", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"}
+    ],
+    "limitations": [
+      "policy-engine-ha-failover-and-network-path-not-qualified",
+      "credential-rotation-revocation-and-emergency-access-not-qualified",
+      "bundle-review-change-control-and-break-glass-not-qualified",
+      "audit-delivery-retention-and-siem-integration-not-qualified"
+    ],
+    "summary": {
+      "totalChecks": 14,
+      "passedChecks": 14,
+      "failedChecks": 0,
+      "overallStatus": "qualified"
+    }
+  }
+}

@@ -21,13 +21,15 @@ removed after the test. The generated
 `dist/policy-engine-compatibility-report.json` must identify the intended source
 revision and set `sourceDirty` to `false` for release evidence.
 
-For a customer engine, repeat the profile using its real certificate chain,
-projected bearer credential, policy bundle, tenant mapping, and immutable bundle
-identifier. Verify allow and deny cases for every closed application action,
-credential rotation and revocation, response-size and timeout limits, network
-policy, audit delivery, failover, and recovery. Never put bearer credentials,
-raw requests, actor or tenant identifiers, resource details, or provider error
-text into the compatibility report.
+For a customer engine, use the separate [customer policy qualification
+runbook](customer-policy-qualification.md) with its real certificate chain,
+protected bearer credential, tenant mapping, reviewed cases, and immutable
+bundle identifier. That gate proves selected allow/deny behavior through this
+production adapter. Independently verify complete action coverage, credential
+rotation and revocation, response-size and timeout limits, network policy,
+audit delivery, failover, and recovery. Never put bearer credentials, raw
+requests, actor or tenant identifiers, resource details, or provider error text
+into retained evidence.
 
 Rollback is fail-closed: restore the last reviewed endpoint, CA bundle,
 credential projection, and policy snapshot together. If the service or its

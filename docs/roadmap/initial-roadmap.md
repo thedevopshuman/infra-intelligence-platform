@@ -76,6 +76,13 @@ aggregate to advance, verifies the Grafana dashboard panels, and emits a
 minimized source-bound report. The repository mechanism is complete; executing
 that billable flow with customer credentials and endpoints remains external.
 
+A separate customer pilot readiness aggregate now joins the exact local
+candidate, registry publication, organizational signatures, qualified customer
+deployment, post-deployment bounded read load, AI prerequisites, and
+same-invocation result. Its `design-partner-candidate` status is deliberately a
+private preflight rather than pilot acceptance, production certification, or
+public-launch approval.
+
 One fail-closed local release command now composes the source, integration,
 recovery, multi-node availability, bundle, packaged N-1, vulnerability, and
 19-evidence readiness workflow while retaining each owning report and refusing

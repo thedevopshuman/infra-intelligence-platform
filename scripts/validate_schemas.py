@@ -157,6 +157,12 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "customer-ai-finops-flow-qualification-report.schema.json": (
         "customer-ai-finops-flow-qualification-report.json",
     ),
+    "customer-pilot-readiness-profile.schema.json": (
+        "customer-pilot-readiness-profile.json",
+    ),
+    "customer-pilot-readiness-report.schema.json": (
+        "customer-pilot-readiness-report.json",
+    ),
     "customer-deployment-qualification-report.schema.json": (
         "customer-deployment-qualification-report.json",
     ),

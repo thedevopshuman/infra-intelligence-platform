@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-pilot-readiness-profile:v1alpha1",
+  "title": "Customer Pilot Readiness Profile",
+  "description": "Protected reviewed selection binding one published and organizationally signed IIP release to one customer deployment, bounded load target, and same-invocation AI FinOps environment before a private design-partner trial.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerPilotReadinessProfile"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "reviewedAt", "validUntil"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^cprp_[a-f0-9]{32}$"},
+        "reviewedAt": {"type": "string", "format": "date-time"},
+        "validUntil": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["qualificationLevel", "release", "bindings", "objective"],
+      "properties": {
+        "qualificationLevel": {"const": "customer-ai-finops-design-partner-v1"},
+        "release": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["applicationVersion", "chartVersion", "sourceRevision", "manifestDigest", "controlPlaneImageDigest", "pluginMediationBridgeImageDigest"],
+          "properties": {
+            "applicationVersion": {"$ref": "#/$defs/semver"},
+            "chartVersion": {"$ref": "#/$defs/semver"},
+            "sourceRevision": {"$ref": "#/$defs/revision"},
+            "manifestDigest": {"$ref": "#/$defs/digest"},
+            "controlPlaneImageDigest": {"$ref": "#/$defs/digest"},
+            "pluginMediationBridgeImageDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["signaturePolicyDigest", "publicationTargetSetDigest", "clusterBindingDigest", "environmentBindingDigest", "controlPlaneTargetDigest"],
+          "properties": {
+            "signaturePolicyDigest": {"$ref": "#/$defs/digest"},
+            "publicationTargetSetDigest": {"$ref": "#/$defs/digest"},
+            "clusterBindingDigest": {"$ref": "#/$defs/digest"},
+            "environmentBindingDigest": {"$ref": "#/$defs/digest"},
+            "controlPlaneTargetDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "objective": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maximumProfileAgeSeconds", "maximumFoundationEvidenceAgeSeconds", "maximumCustomerEvidenceAgeSeconds", "maximumClockSkewSeconds", "reportValiditySeconds"],
+          "properties": {
+            "maximumProfileAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 7776000},
+            "maximumFoundationEvidenceAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 2592000},
+            "maximumCustomerEvidenceAgeSeconds": {"type": "integer", "minimum": 300, "maximum": 604800},
+            "maximumClockSkewSeconds": {"type": "integer", "minimum": 0, "maximum": 900},
+            "reportValiditySeconds": {"type": "integer", "minimum": 300, "maximum": 604800}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"}
+  }
+}

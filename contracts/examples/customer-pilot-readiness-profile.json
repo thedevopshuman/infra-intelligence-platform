@@ -1,0 +1,34 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerPilotReadinessProfile",
+  "metadata": {
+    "id": "cprp_a525f64325da66041ad5bed4ce8553be",
+    "reviewedAt": "2026-09-08T08:00:00Z",
+    "validUntil": "2026-09-15T08:00:00Z"
+  },
+  "spec": {
+    "qualificationLevel": "customer-ai-finops-design-partner-v1",
+    "release": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "controlPlaneImageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pluginMediationBridgeImageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "bindings": {
+      "signaturePolicyDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "publicationTargetSetDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "clusterBindingDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "environmentBindingDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "controlPlaneTargetDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+    },
+    "objective": {
+      "maximumProfileAgeSeconds": 2592000,
+      "maximumFoundationEvidenceAgeSeconds": 2592000,
+      "maximumCustomerEvidenceAgeSeconds": 86400,
+      "maximumClockSkewSeconds": 300,
+      "reportValiditySeconds": 86400
+    }
+  }
+}

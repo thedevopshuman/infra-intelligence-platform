@@ -101,6 +101,14 @@ owner-only temporary evidence and exports a minimized digest-bound report. It
 does not enter the serving process, inference request path, SDK transport,
 agent runtime, or plugin authority boundary.
 
+Customer pilot readiness is an additive host-side promotion preflight.
+`scripts/assess_customer_pilot_readiness.py` revalidates and cross-binds the
+existing publication, organizational signature, local readiness, customer
+deployment, bounded load, AI prerequisite, and same-invocation reports. It
+does not repeat their external actions or import signing, registry, customer,
+provider, load-generation, installation, or mutation authority. Only the
+protected profile and minimized report shapes enter the public SDK boundary.
+
 Exact AI invocation observation follows the normal serving boundaries.
 `src/iip/application/query_ai_invocation.py` owns authorization, active-source
 selection, privacy minimization, and record revalidation; the in-memory and

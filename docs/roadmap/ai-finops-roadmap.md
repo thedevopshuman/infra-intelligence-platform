@@ -86,6 +86,14 @@ matching without content. Executing the selected billable request against the
 customer endpoints remains the final external Phase A gate; invoice agreement,
 sustained load, and customer backend lifecycle remain explicitly excluded.
 
+An additive private-pilot preflight now binds that same-invocation report to
+the exact prerequisite file, customer deployment, post-deployment bounded load,
+local release evidence, registry publication, and organizational keyless
+signatures. `design-partner-candidate` closes the manual-correlation gap for
+one exact build and customer target; actual partner operation/acceptance,
+production operating qualification, and public license/legal/brand/governance
+remain external decisions.
+
 Two additional deterministic rules are delivered. Protected channel
 configuration maps provider retry attributes into `retryCount`, and the
 source-bound retry-amplification evaluator compares complete fixed-window

@@ -122,6 +122,13 @@ repository-verified; executing the selected billable customer call remains an
 external release gate. See the [customer AI FinOps flow qualification
 runbook](docs/operations/customer-ai-finops-flow-qualification.md).
 
+The private-pilot preflight now binds that live flow to the exact local release
+evidence, registry publication, organizational signatures, customer deployment,
+and a post-deployment bounded load report. It emits a minimized
+`design-partner-candidate` artifact without authorizing a pilot or overstating
+production/public-launch readiness; see the [customer pilot readiness
+runbook](docs/operations/customer-pilot-readiness.md).
+
 A separate continuity gate runs at least five
 minutes of direct verified-HTTPS liveness, readiness, authentication, and exact
 release-identity probes while evicting one ready API pod through an
@@ -321,6 +328,7 @@ streaming/private-endpoint behavior and invoice qualification remain. See the
 [customer AI FinOps prerequisites](docs/operations/customer-ai-finops-prerequisites.md),
 [exact AI invocation observation](docs/specifications/ai-invocation-observation-contract.md),
 [customer AI FinOps flow qualification](docs/operations/customer-ai-finops-flow-qualification.md),
+[customer pilot readiness](docs/operations/customer-pilot-readiness.md),
 [OpenAI instrumentation qualification](docs/operations/openai-instrumentation-qualification.md),
 [telemetry contract](docs/specifications/ai-economics-telemetry-contract.md),
 [product direction](docs/product/ai-finops-vision.md),

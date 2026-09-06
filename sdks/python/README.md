@@ -1,8 +1,9 @@
 # Python SDK boundary
 
-Version 0.76 adds the protected customer AI FinOps flow profile and minimized
-qualification report. The temporary run evidence that contains trace/span
-identity is intentionally excluded from the SDK.
+Version 0.77 adds the protected customer pilot-readiness profile and minimized
+design-partner-candidate report. It cross-binds existing release and customer
+evidence but grants no publication, signing, installation, provider, load, or
+promotion authority.
 
 This package contains public transport and model types only. It does not import the server kernel. The API will expand contract-first; unstable methods remain under the `v1alpha1` namespace in their paths and models.
 
@@ -62,12 +63,19 @@ host-created failures for plugin handling; it is not a control-plane HTTP client
 `AiEconomicsInvocationObservation`,
 `CustomerAiFinopsPrerequisiteProfile`, and
 `CustomerAiFinopsPrerequisiteReport`,
-`CustomerAiFinopsFlowQualificationProfile`, and
-`CustomerAiFinopsFlowQualificationReport`
+`CustomerAiFinopsFlowQualificationProfile`,
+`CustomerAiFinopsFlowQualificationReport`,
+`CustomerPilotReadinessProfile`, and `CustomerPilotReadinessReport`
 expose the AI economics
 records as public metadata-only envelopes. They do not
 instrument provider calls, send OTLP, or import an AWS SDK. Standard
 OpenTelemetry instrumentation remains the collection boundary.
+
+Version 0.77 adds the customer pilot preflight transport types. A candidate
+report binds one published and organizationally signed release to current local
+readiness, customer deployment, post-deployment load, AI prerequisites, and an
+exact same-invocation flow while leaving actual partner acceptance and public
+governance external.
 
 Version 0.76 adds the customer flow profile/report envelopes. A qualified
 report binds one live Bedrock invocation to the exact usage, active

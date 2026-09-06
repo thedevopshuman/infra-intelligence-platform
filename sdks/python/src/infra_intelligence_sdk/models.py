@@ -975,6 +975,58 @@ class CustomerAiFinopsFlowQualificationReport:
 
 
 @dataclass(frozen=True)
+class CustomerPilotReadinessProfile:
+    """Protected exact release and customer-environment pilot selection."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "CustomerPilotReadinessProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerPilotReadinessProfile",
+                label="customer pilot readiness profile",
+            )
+        )
+
+    @property
+    def release(self) -> Mapping[str, Any]:
+        spec = self.payload.get("spec")
+        value = spec.get("release") if isinstance(spec, Mapping) else None
+        return value if isinstance(value, Mapping) else {}
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerPilotReadinessReport:
+    """Minimized preflight evidence for one private design-partner candidate."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "CustomerPilotReadinessReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerPilotReadinessReport",
+                label="customer pilot readiness report",
+            )
+        )
+
+    @property
+    def status(self) -> Optional[str]:
+        spec = self.payload.get("spec")
+        value = spec.get("status") if isinstance(spec, Mapping) else None
+        return value if isinstance(value, str) else None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerOtlpReceiverQualificationProfile:
     """Protected exact signal catalog for customer receiver qualification."""
 

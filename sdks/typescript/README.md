@@ -1,8 +1,9 @@
 # TypeScript SDK boundary
 
-Version 0.76 adds the protected customer AI FinOps flow profile and minimized
-qualification report. The temporary run evidence that contains trace/span
-identity is intentionally excluded from the SDK.
+Version 0.77 adds the protected customer pilot-readiness profile and minimized
+design-partner-candidate report. It cross-binds existing release and customer
+evidence but grants no publication, signing, installation, provider, load, or
+promotion authority.
 
 The SDK exposes public contract types and a small fetch-based client. It has no dependency on server code or a framework runtime.
 
@@ -58,12 +59,19 @@ transport is runtime-specific.
 `AiEconomicsInvocationObservation`,
 `CustomerAiFinopsPrerequisiteProfile`,
 `CustomerAiFinopsPrerequisiteReport`,
-`CustomerAiFinopsFlowQualificationProfile`, and
-`CustomerAiFinopsFlowQualificationReport`
+`CustomerAiFinopsFlowQualificationProfile`,
+`CustomerAiFinopsFlowQualificationReport`,
+`CustomerPilotReadinessProfile`, and `CustomerPilotReadinessReport`
 describe the
 metadata-only AI economics ledger. The SDK does not instrument or
 proxy model calls; applications continue using standard OpenTelemetry
 instrumentation and a customer-controlled Collector.
+
+Version 0.77 adds the customer pilot preflight types. A candidate report binds
+one published and organizationally signed release to current local readiness,
+customer deployment, post-deployment load, AI prerequisites, and an exact
+same-invocation flow while leaving actual partner acceptance and public
+governance external.
 
 Version 0.76 adds the customer flow profile/report types. A qualified report
 binds one live Bedrock invocation to the exact usage, active attribution,

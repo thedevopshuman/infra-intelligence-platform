@@ -172,6 +172,15 @@ REQUIRED_PATHS = (
     "docs/operations/customer-ai-finops-flow-qualification.md",
     "scripts/qualify_customer_ai_finops_flow.py",
     "tests/test_customer_ai_finops_flow.py",
+    "docs/decisions/0143-customer-pilot-readiness-aggregation.md",
+    "docs/specifications/customer-pilot-readiness-contract.md",
+    "contracts/schemas/customer-pilot-readiness-profile.schema.json",
+    "contracts/schemas/customer-pilot-readiness-report.schema.json",
+    "contracts/examples/customer-pilot-readiness-profile.json",
+    "contracts/examples/customer-pilot-readiness-report.json",
+    "docs/operations/customer-pilot-readiness.md",
+    "scripts/assess_customer_pilot_readiness.py",
+    "tests/test_customer_pilot_readiness.py",
     "docs/decisions/0141-privacy-minimized-exact-ai-invocation-observation.md",
     "docs/specifications/ai-invocation-observation-contract.md",
     "contracts/schemas/ai-economics-invocation-observation-request.schema.json",
@@ -2645,6 +2654,72 @@ def validate_customer_ai_finops_flow_examples(
             )
     except (CustomerAiFinopsFlowError, KeyError, TypeError, OSError):
         fail(errors, "customer AI FinOps flow examples must be semantically valid")
+
+
+def validate_customer_pilot_readiness_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check private-pilot profile/report semantics and their shared bindings."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    profile = documents.get(example_dir / "customer-pilot-readiness-profile.json")
+    report = documents.get(example_dir / "customer-pilot-readiness-report.json")
+    try:
+        from assess_customer_pilot_readiness import (
+            API_VERSION,
+            CustomerPilotReadinessError,
+            _digest,
+            validate_profile,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "customer pilot readiness validator must be importable")
+        return
+    try:
+        if not isinstance(profile, dict) or not isinstance(report, dict):
+            raise CustomerPilotReadinessError(
+                "customer-pilot-readiness.example.invalid"
+            )
+        validate_profile(profile)
+        validate_report_document(report)
+        profile_metadata = profile["metadata"]
+        profile_spec = profile["spec"]
+        profile_release = profile_spec["release"]
+        profile_bindings = profile_spec["bindings"]
+        report_spec = report["spec"]
+        report_bindings = report_spec["bindings"]
+        expected_subject = {
+            **profile_release,
+            "contractsApiVersion": API_VERSION,
+        }
+        expected_environment = {
+            key: profile_bindings[key]
+            for key in (
+                "clusterBindingDigest",
+                "environmentBindingDigest",
+                "controlPlaneTargetDigest",
+            )
+        }
+        if (
+            report_spec["subject"] != expected_subject
+            or report_bindings["profileDigest"] != canonical_digest(profile)
+            or report_bindings["signaturePolicyDigest"]
+            != profile_bindings["signaturePolicyDigest"]
+            or report_bindings["publicationTargetSetDigest"]
+            != profile_bindings["publicationTargetSetDigest"]
+            or report_bindings["customerEnvironmentSetDigest"]
+            != _digest(expected_environment)
+            or report_spec["objective"] != profile_spec["objective"]
+            or report_spec["measurements"]["profileReviewedAt"]
+            != profile_metadata["reviewedAt"]
+            or parse_timestamp(report["metadata"]["validUntil"])
+            > parse_timestamp(profile_metadata["validUntil"])
+        ):
+            raise CustomerPilotReadinessError(
+                "customer-pilot-readiness.example.crossed"
+            )
+    except (CustomerPilotReadinessError, KeyError, TypeError):
+        fail(errors, "customer pilot readiness examples must be semantically valid")
 
 
 def validate_customer_deployment_qualification_example(
@@ -5641,6 +5716,14 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerAiFinopsFlowQualificationReport",
         ),
         (
+            "customer-pilot-readiness-profile.json",
+            "CustomerPilotReadinessProfile",
+        ),
+        (
+            "customer-pilot-readiness-report.json",
+            "CustomerPilotReadinessReport",
+        ),
+        (
             "customer-otlp-receiver-qualification-profile.json",
             "CustomerOtlpReceiverQualificationProfile",
         ),
@@ -5751,6 +5834,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_customer_bedrock_qualification_example(documents, errors)
     validate_customer_ai_finops_prerequisite_examples(documents, errors)
     validate_customer_ai_finops_flow_examples(documents, errors)
+    validate_customer_pilot_readiness_examples(documents, errors)
     validate_customer_otlp_receiver_qualification_example(documents, errors)
     validate_customer_deployment_qualification_example(documents, errors)
     validate_control_plane_load_qualification_example(documents, errors)

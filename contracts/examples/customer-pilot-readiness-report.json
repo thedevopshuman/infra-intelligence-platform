@@ -1,0 +1,109 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerPilotReadinessReport",
+  "metadata": {
+    "id": "cpr_f33bcdee6436edd4148afd879bb58487",
+    "generatedAt": "2026-09-08T12:00:00Z",
+    "validUntil": "2026-09-09T09:00:00Z",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "design-partner-candidate",
+    "qualificationLevel": "customer-ai-finops-design-partner-v1",
+    "qualificationBoundary": "private-design-partner-preflight",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "controlPlaneImageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pluginMediationBridgeImageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "bindings": {
+      "profileDigest": "sha256:5e8a64397a6ae380ac27a2c15f9cdabcc271a7396f80f4111c9832ba128602d3",
+      "releaseReadinessReportDigest": "sha256:0202020202020202020202020202020202020202020202020202020202020202",
+      "releasePublicationReportDigest": "sha256:0303030303030303030303030303030303030303030303030303030303030303",
+      "releaseSignatureReportDigest": "sha256:0404040404040404040404040404040404040404040404040404040404040404",
+      "customerDeploymentReportDigest": "sha256:0505050505050505050505050505050505050505050505050505050505050505",
+      "controlPlaneLoadReportDigest": "sha256:0606060606060606060606060606060606060606060606060606060606060606",
+      "aiFinopsPrerequisiteReportDigest": "sha256:0707070707070707070707070707070707070707070707070707070707070707",
+      "aiFinopsFlowReportDigest": "sha256:0808080808080808080808080808080808080808080808080808080808080808",
+      "signaturePolicyDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "publicationTargetSetDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "customerEnvironmentSetDigest": "sha256:5be98e81f51504c0c0864c9864dd71b6db4ccc1bdb3494eb73af7c4846a66885"
+    },
+    "objective": {
+      "maximumProfileAgeSeconds": 2592000,
+      "maximumFoundationEvidenceAgeSeconds": 2592000,
+      "maximumCustomerEvidenceAgeSeconds": 86400,
+      "maximumClockSkewSeconds": 300,
+      "reportValiditySeconds": 86400
+    },
+    "measurements": {
+      "profileReviewedAt": "2026-09-08T08:00:00Z",
+      "oldestFoundationEvidenceAt": "2026-09-07T12:00:00Z",
+      "newestFoundationEvidenceAt": "2026-09-08T08:00:00Z",
+      "oldestCustomerEvidenceAt": "2026-09-08T09:00:00Z",
+      "customerDeploymentQualifiedAt": "2026-09-08T09:00:00Z",
+      "controlPlaneLoadStartedAt": "2026-09-08T10:00:00Z",
+      "controlPlaneLoadCompletedAt": "2026-09-08T10:05:00Z",
+      "aiFinopsFlowCompletedAt": "2026-09-08T11:00:00Z",
+      "assessedAt": "2026-09-08T12:00:00Z",
+      "oldestFoundationEvidenceAgeSeconds": 86400,
+      "oldestCustomerEvidenceAgeSeconds": 10800
+    },
+    "evidence": [
+      {"id": "release-readiness", "contractKind": "ReleaseReadinessReport", "qualificationBoundary": "local-candidate", "reportId": "rrr_11111111111111111111111111111111", "reportDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111", "observedStatus": "locally-qualified", "status": "passed"},
+      {"id": "registry-publication", "contractKind": "ReleasePublicationReport", "qualificationBoundary": "registry-publication", "reportId": "rpr_22222222222222222222222222222222", "reportDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222", "observedStatus": "published-unsigned", "status": "passed"},
+      {"id": "organizational-signatures", "contractKind": "ReleaseSignatureVerificationReport", "qualificationBoundary": "organizational-trust", "reportId": "rsv_33333333333333333333333333333333", "reportDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333", "observedStatus": "verified", "status": "passed"},
+      {"id": "customer-deployment", "contractKind": "CustomerDeploymentQualificationReport", "qualificationBoundary": "customer-deployment", "reportId": "cdq_44444444444444444444444444444444", "reportDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444", "observedStatus": "qualified", "status": "passed"},
+      {"id": "control-plane-load", "contractKind": "ControlPlaneLoadQualificationReport", "qualificationBoundary": "customer-load", "reportId": "clq_55555555555555555555555555555555", "reportDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555", "observedStatus": "qualified", "status": "passed"},
+      {"id": "ai-finops-prerequisites", "contractKind": "CustomerAiFinopsPrerequisiteReport", "qualificationBoundary": "ai-finops-prerequisites", "reportId": "cafp_66666666666666666666666666666666", "reportDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666", "observedStatus": "prerequisites-ready", "status": "passed"},
+      {"id": "same-invocation-ai-finops", "contractKind": "CustomerAiFinopsFlowQualificationReport", "qualificationBoundary": "same-invocation-customer-runtime", "reportId": "caff_77777777777777777777777777777777", "reportDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777", "observedStatus": "qualified", "status": "passed"}
+    ],
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "profile-review", "status": "passed"},
+      {"id": "evidence-freshness", "status": "passed"},
+      {"id": "exact-release-identity", "status": "passed"},
+      {"id": "local-release-readiness", "status": "passed"},
+      {"id": "registry-publication", "status": "passed"},
+      {"id": "organizational-signatures", "status": "passed"},
+      {"id": "customer-deployment", "status": "passed"},
+      {"id": "control-plane-load", "status": "passed"},
+      {"id": "ai-finops-prerequisites", "status": "passed"},
+      {"id": "same-invocation-ai-finops", "status": "passed"},
+      {"id": "publication-signature-chain", "status": "passed"},
+      {"id": "deployed-image-chain", "status": "passed"},
+      {"id": "customer-environment-chain", "status": "passed"},
+      {"id": "post-deployment-load-window", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"}
+    ],
+    "limitations": [
+      "private-design-partner-evaluation-only",
+      "design-partner-operation-and-acceptance-not-qualified",
+      "public-license-legal-brand-and-governance-not-qualified",
+      "invoice-private-rates-discounts-and-commitments-not-qualified",
+      "sustained-representative-write-worker-receiver-load-not-qualified",
+      "node-zone-region-and-long-window-slo-not-qualified",
+      "additional-integrations-models-providers-and-backends-not-qualified"
+    ],
+    "externalGates": [
+      {"id": "design-partner-operation-and-acceptance", "status": "external-required", "reasonCode": "customer-pilot-readiness.external.design-partner"},
+      {"id": "customer-production-operating-qualification", "status": "external-required", "reasonCode": "customer-pilot-readiness.external.production-operations"},
+      {"id": "public-license-legal-brand-and-governance", "status": "external-required", "reasonCode": "customer-pilot-readiness.external.public-governance"}
+    ],
+    "summary": {
+      "requiredEvidence": 7,
+      "passedEvidence": 7,
+      "rejectedEvidence": 0,
+      "totalChecks": 16,
+      "passedChecks": 16,
+      "failedChecks": 0,
+      "externalGateCount": 3,
+      "overallStatus": "design-partner-candidate"
+    }
+  }
+}

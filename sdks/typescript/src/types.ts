@@ -2527,6 +2527,199 @@ export interface CustomerAiFinopsFlowQualificationReport {
   };
 }
 
+export interface CustomerPilotReadinessProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerPilotReadinessProfile";
+  metadata: {
+    id: `cprp_${string}`;
+    reviewedAt: string;
+    validUntil: string;
+  };
+  spec: {
+    qualificationLevel: "customer-ai-finops-design-partner-v1";
+    release: {
+      applicationVersion: string;
+      chartVersion: string;
+      sourceRevision: string;
+      manifestDigest: Sha256Digest;
+      controlPlaneImageDigest: Sha256Digest;
+      pluginMediationBridgeImageDigest: Sha256Digest;
+    };
+    bindings: {
+      signaturePolicyDigest: Sha256Digest;
+      publicationTargetSetDigest: Sha256Digest;
+      clusterBindingDigest: Sha256Digest;
+      environmentBindingDigest: Sha256Digest;
+      controlPlaneTargetDigest: Sha256Digest;
+    };
+    objective: {
+      maximumProfileAgeSeconds: number;
+      maximumFoundationEvidenceAgeSeconds: number;
+      maximumCustomerEvidenceAgeSeconds: number;
+      maximumClockSkewSeconds: number;
+      reportValiditySeconds: number;
+    };
+  };
+}
+
+export type CustomerPilotReadinessEvidenceId =
+  | "release-readiness"
+  | "registry-publication"
+  | "organizational-signatures"
+  | "customer-deployment"
+  | "control-plane-load"
+  | "ai-finops-prerequisites"
+  | "same-invocation-ai-finops";
+
+export type CustomerPilotReadinessCheckId =
+  | "source-binding"
+  | "profile-review"
+  | "evidence-freshness"
+  | "exact-release-identity"
+  | "local-release-readiness"
+  | "registry-publication"
+  | "organizational-signatures"
+  | "customer-deployment"
+  | "control-plane-load"
+  | "ai-finops-prerequisites"
+  | "same-invocation-ai-finops"
+  | "publication-signature-chain"
+  | "deployed-image-chain"
+  | "customer-environment-chain"
+  | "post-deployment-load-window"
+  | "minimized-output";
+
+export interface CustomerPilotReadinessReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerPilotReadinessReport";
+  metadata: {
+    id: `cpr_${string}`;
+    generatedAt: string;
+    validUntil: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "design-partner-candidate" | "not-candidate";
+    qualificationLevel: "customer-ai-finops-design-partner-v1";
+    qualificationBoundary: "private-design-partner-preflight";
+    subject: {
+      applicationVersion: string;
+      chartVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      sourceRevision: string;
+      manifestDigest: Sha256Digest;
+      controlPlaneImageDigest: Sha256Digest;
+      pluginMediationBridgeImageDigest: Sha256Digest;
+    };
+    bindings: {
+      profileDigest: Sha256Digest;
+      releaseReadinessReportDigest: Sha256Digest;
+      releasePublicationReportDigest: Sha256Digest;
+      releaseSignatureReportDigest: Sha256Digest;
+      customerDeploymentReportDigest: Sha256Digest;
+      controlPlaneLoadReportDigest: Sha256Digest;
+      aiFinopsPrerequisiteReportDigest: Sha256Digest;
+      aiFinopsFlowReportDigest: Sha256Digest;
+      signaturePolicyDigest: Sha256Digest;
+      publicationTargetSetDigest: Sha256Digest;
+      customerEnvironmentSetDigest: Sha256Digest;
+    };
+    objective: {
+      maximumProfileAgeSeconds: number;
+      maximumFoundationEvidenceAgeSeconds: number;
+      maximumCustomerEvidenceAgeSeconds: number;
+      maximumClockSkewSeconds: number;
+      reportValiditySeconds: number;
+    };
+    measurements: {
+      profileReviewedAt: string;
+      oldestFoundationEvidenceAt: string;
+      newestFoundationEvidenceAt: string;
+      oldestCustomerEvidenceAt: string;
+      customerDeploymentQualifiedAt: string;
+      controlPlaneLoadStartedAt: string;
+      controlPlaneLoadCompletedAt: string;
+      aiFinopsFlowCompletedAt: string;
+      assessedAt: string;
+      oldestFoundationEvidenceAgeSeconds: number;
+      oldestCustomerEvidenceAgeSeconds: number;
+    };
+    evidence: Array<{
+      id: CustomerPilotReadinessEvidenceId;
+      contractKind:
+        | "ReleaseReadinessReport"
+        | "ReleasePublicationReport"
+        | "ReleaseSignatureVerificationReport"
+        | "CustomerDeploymentQualificationReport"
+        | "ControlPlaneLoadQualificationReport"
+        | "CustomerAiFinopsPrerequisiteReport"
+        | "CustomerAiFinopsFlowQualificationReport";
+      qualificationBoundary:
+        | "local-candidate"
+        | "registry-publication"
+        | "organizational-trust"
+        | "customer-deployment"
+        | "customer-load"
+        | "ai-finops-prerequisites"
+        | "same-invocation-customer-runtime";
+      reportId: string;
+      reportDigest: Sha256Digest;
+      observedStatus: string;
+    } & (
+      | { status: "passed"; errorCode?: never }
+      | {
+          status: "rejected";
+          errorCode: `customer-pilot-readiness.${string}`;
+        }
+    )>;
+    checks: Array<
+      | { id: CustomerPilotReadinessCheckId; status: "passed" }
+      | {
+          id: CustomerPilotReadinessCheckId;
+          status: "failed";
+          errorCode: `customer-pilot-readiness.${string}`;
+        }
+    >;
+    limitations: [
+      "private-design-partner-evaluation-only",
+      "design-partner-operation-and-acceptance-not-qualified",
+      "public-license-legal-brand-and-governance-not-qualified",
+      "invoice-private-rates-discounts-and-commitments-not-qualified",
+      "sustained-representative-write-worker-receiver-load-not-qualified",
+      "node-zone-region-and-long-window-slo-not-qualified",
+      "additional-integrations-models-providers-and-backends-not-qualified",
+    ];
+    externalGates: [
+      {
+        id: "design-partner-operation-and-acceptance";
+        status: "external-required";
+        reasonCode: "customer-pilot-readiness.external.design-partner";
+      },
+      {
+        id: "customer-production-operating-qualification";
+        status: "external-required";
+        reasonCode: "customer-pilot-readiness.external.production-operations";
+      },
+      {
+        id: "public-license-legal-brand-and-governance";
+        status: "external-required";
+        reasonCode: "customer-pilot-readiness.external.public-governance";
+      },
+    ];
+    summary: {
+      requiredEvidence: 7;
+      passedEvidence: number;
+      rejectedEvidence: number;
+      totalChecks: 16;
+      passedChecks: number;
+      failedChecks: number;
+      externalGateCount: 3;
+      overallStatus: "design-partner-candidate" | "not-candidate";
+    };
+  };
+}
+
 export interface CustomerOtlpReceiverQualificationProfile {
   apiVersion: "iip.platform/v1alpha1";
   kind: "CustomerOtlpReceiverQualificationProfile";

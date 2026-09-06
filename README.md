@@ -78,6 +78,14 @@ interoperability and resilience evidence cannot be promoted from a local or
 static pass. See the
 [customer deployment preflight](docs/operations/customer-deployment-preflight.md).
 
+After installation, an exact-context deployment diagnostic summarizes API,
+worker, and receiver rollout state, immutable image identity, readiness,
+restarts, unschedulable Pods, and crash-loop signals without collecting logs,
+object names, customer identifiers, provider messages, or Secret values. Its
+`healthy` result is explicitly point-in-time support evidence rather than a
+production or availability claim. See the
+[post-install diagnostic runbook](docs/operations/deployment-diagnostics.md).
+
 The exact-host plugin matrix has separate offline observer, host-mediated read,
 and proposal-only action-provider rows. The action row runs in Docker's
 no-network sandbox, reaches the real governed proposal service through the SDK

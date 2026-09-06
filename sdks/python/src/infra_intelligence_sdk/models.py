@@ -519,6 +519,26 @@ class ReleaseReadinessReport:
 
 
 @dataclass(frozen=True)
+class DeploymentDiagnosticReport:
+    """Privacy-minimized point-in-time Kubernetes support evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "DeploymentDiagnosticReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="DeploymentDiagnosticReport",
+                label="deployment diagnostic report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerDeploymentPreflightReport:
     """Source- and configuration-bound pre-install customer evidence."""
 

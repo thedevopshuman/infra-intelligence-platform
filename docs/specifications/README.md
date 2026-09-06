@@ -105,6 +105,7 @@ The authenticated control plane and the independently authenticated OTLP intake 
 | Action result | [action-contract.md](action-contract.md) | `contracts/schemas/action-result.schema.json` | `contracts/examples/action-result.json` |
 | Action workflow | [action-contract.md](action-contract.md) | `contracts/schemas/action-workflow.schema.json` | `contracts/examples/action-workflow.json`, `contracts/examples/action-workflow-expired.json` |
 | Action workflow page | [action-contract.md](action-contract.md) | `contracts/schemas/action-workflow-page.schema.json` | `contracts/examples/action-workflow-page.json` |
+| Deployment diagnostic report | [deployment-diagnostic-report-contract.md](deployment-diagnostic-report-contract.md) | `contracts/schemas/deployment-diagnostic-report.schema.json` | `contracts/examples/deployment-diagnostic-report.json` |
 | Plugin session | [plugin-session-contract.md](plugin-session-contract.md) | `contracts/schemas/plugin-session.schema.json` | `contracts/examples/plugin-session.json` |
 | Policy decision request | [policy-contract.md](policy-contract.md) | `contracts/schemas/policy-decision-request.schema.json` | `contracts/examples/policy-decision-request.json` |
 | Policy decision | [policy-contract.md](policy-contract.md) | `contracts/schemas/policy-decision.schema.json` | `contracts/examples/policy-decision.json` |

@@ -794,6 +794,128 @@ export interface RuntimeVersionReport {
   };
 }
 
+export type DeploymentDiagnosticComponentId =
+  | "control-plane-api"
+  | "workflow-worker"
+  | "otlp-receiver";
+
+export type DeploymentDiagnosticCheckId =
+  | "source-bound-tooling"
+  | "explicit-target"
+  | "minimized-output"
+  | "kubernetes-api-access"
+  | "release-selection"
+  | "control-plane-availability"
+  | "workload-rollouts"
+  | "immutable-image-identity"
+  | "pod-health-signals";
+
+export interface DeploymentDiagnosticIdentity {
+  applicationVersion: string;
+  chartVersion: string;
+  imageDigest: Sha256Digest;
+}
+
+export type DeploymentDiagnosticComponent =
+  | {
+      id: DeploymentDiagnosticComponentId;
+      state: "not-observed";
+    }
+  | {
+      id: DeploymentDiagnosticComponentId;
+      state: "healthy" | "progressing" | "unavailable";
+      identityStatus: "match" | "mismatch";
+      identity: DeploymentDiagnosticIdentity;
+      rollout: {
+        desiredReplicas: number;
+        currentReplicas: number;
+        updatedReplicas: number;
+        readyReplicas: number;
+        availableReplicas: number;
+      };
+      pods: {
+        observed: number;
+        ready: number;
+        restarts: number;
+        unschedulable: number;
+        crashLoopingContainers: number;
+      };
+    }
+  | {
+      id: DeploymentDiagnosticComponentId;
+      state: "healthy" | "progressing" | "unavailable";
+      identityStatus: "invalid";
+      rollout: {
+        desiredReplicas: number;
+        currentReplicas: number;
+        updatedReplicas: number;
+        readyReplicas: number;
+        availableReplicas: number;
+      };
+      pods: {
+        observed: number;
+        ready: number;
+        restarts: number;
+        unschedulable: number;
+        crashLoopingContainers: number;
+      };
+    };
+
+export interface DeploymentDiagnosticReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "DeploymentDiagnosticReport";
+  metadata: {
+    id: `ddr_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: boolean;
+  };
+  spec: {
+    status: "healthy" | "attention-required" | "blocked";
+    diagnosticBoundary: "point-in-time-support-only";
+    targetBindingDigest: Sha256Digest;
+    expectedIdentity: DeploymentDiagnosticIdentity;
+    environment: {
+      observedAt: string;
+      platform: `${string}/${string}`;
+      pythonVersion: string;
+      kubectlVersion: string;
+      clusterAccess: "observed" | "unavailable";
+      kubernetesVersion: string | null;
+    };
+    selection: {
+      selectedDeployments: number;
+      selectedPods: number;
+      unrecognizedDeployments: number;
+      duplicateComponents: number;
+    };
+    components: DeploymentDiagnosticComponent[];
+    checks: Array<
+      | { id: DeploymentDiagnosticCheckId; status: "passed" }
+      | {
+          id: DeploymentDiagnosticCheckId;
+          status: "warning" | "failed";
+          errorCode: `deployment-diagnostic.${string}`;
+        }
+    >;
+    summary: {
+      observedComponents: number;
+      healthyComponents: number;
+      progressingComponents: number;
+      unavailableComponents: number;
+      notObservedComponents: number;
+      totalRestarts: number;
+      unschedulablePods: number;
+      crashLoopingContainers: number;
+      totalChecks: 9;
+      passedChecks: number;
+      warningChecks: number;
+      failedChecks: number;
+      overallStatus: "healthy" | "attention-required" | "blocked";
+    };
+  };
+}
+
 export type CustomerDeploymentPreflightCoreCheckId =
   | "helm-render"
   | "immutable-image"

@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:deployment-diagnostic-report:v1alpha1",
+  "title": "Deployment Diagnostic Report",
+  "description": "Privacy-minimized, point-in-time support evidence for one explicitly selected Kubernetes release.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "DeploymentDiagnosticReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^ddr_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "diagnosticBoundary", "targetBindingDigest", "expectedIdentity", "environment", "selection", "components", "checks", "summary"],
+      "properties": {
+        "status": {"enum": ["healthy", "attention-required", "blocked"]},
+        "diagnosticBoundary": {"const": "point-in-time-support-only"},
+        "targetBindingDigest": {"$ref": "#/$defs/digest"},
+        "expectedIdentity": {"$ref": "#/$defs/identity"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "selection": {"$ref": "#/$defs/selection"},
+        "components": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {"$ref": "#/$defs/component", "properties": {"id": {"const": "control-plane-api"}}},
+            {"$ref": "#/$defs/component", "properties": {"id": {"const": "workflow-worker"}}},
+            {"$ref": "#/$defs/component", "properties": {"id": {"const": "otlp-receiver"}}}
+          ],
+          "items": false
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "prefixItems": [
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-bound-tooling"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "explicit-target"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "kubernetes-api-access"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "release-selection"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "control-plane-availability"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "workload-rollouts"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "immutable-image-identity"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "pod-health-signals"}}}
+          ],
+          "items": false
+        },
+        "summary": {"$ref": "#/$defs/summary"}
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "chartVersion", "imageDigest"],
+      "properties": {
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observedAt", "platform", "pythonVersion", "kubectlVersion", "clusterAccess", "kubernetesVersion"],
+      "properties": {
+        "observedAt": {"type": "string", "format": "date-time"},
+        "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-z0-9_.-]+$", "maxLength": 128},
+        "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "kubectlVersion": {
+          "oneOf": [
+            {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+            {"const": "unavailable"}
+          ]
+        },
+        "clusterAccess": {"enum": ["observed", "unavailable"]},
+        "kubernetesVersion": {
+          "oneOf": [
+            {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "rollout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["desiredReplicas", "currentReplicas", "updatedReplicas", "readyReplicas", "availableReplicas"],
+      "properties": {
+        "desiredReplicas": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "currentReplicas": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "updatedReplicas": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "readyReplicas": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "availableReplicas": {"type": "integer", "minimum": 0, "maximum": 100000}
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selectedDeployments", "selectedPods", "unrecognizedDeployments", "duplicateComponents"],
+      "properties": {
+        "selectedDeployments": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "selectedPods": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "unrecognizedDeployments": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "duplicateComponents": {"type": "integer", "minimum": 0, "maximum": 3}
+      }
+    },
+    "pods": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observed", "ready", "restarts", "unschedulable", "crashLoopingContainers"],
+      "properties": {
+        "observed": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "ready": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "restarts": {"type": "integer", "minimum": 0, "maximum": 1000000000},
+        "unschedulable": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "crashLoopingContainers": {"type": "integer", "minimum": 0, "maximum": 100000}
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "state"],
+      "properties": {
+        "id": {"enum": ["control-plane-api", "workflow-worker", "otlp-receiver"]},
+        "state": {"enum": ["healthy", "progressing", "unavailable", "not-observed"]},
+        "identityStatus": {"enum": ["match", "mismatch", "invalid"]},
+        "identity": {"$ref": "#/$defs/identity"},
+        "rollout": {"$ref": "#/$defs/rollout"},
+        "pods": {"$ref": "#/$defs/pods"}
+      },
+      "oneOf": [
+        {
+          "required": ["identityStatus", "rollout", "pods"],
+          "properties": {"state": {"enum": ["healthy", "progressing", "unavailable"]}},
+          "oneOf": [
+            {
+              "required": ["identity"],
+              "properties": {"identityStatus": {"enum": ["match", "mismatch"]}}
+            },
+            {
+              "properties": {"identityStatus": {"const": "invalid"}},
+              "not": {"required": ["identity"]}
+            }
+          ]
+        },
+        {
+          "properties": {"state": {"const": "not-observed"}},
+          "not": {"anyOf": [{"required": ["identityStatus"]}, {"required": ["identity"]}, {"required": ["rollout"]}, {"required": ["pods"]}]}
+        }
+      ]
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "status": {"enum": ["passed", "warning", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^deployment-diagnostic\\.[a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"enum": ["warning", "failed"]}}}
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observedComponents", "healthyComponents", "progressingComponents", "unavailableComponents", "notObservedComponents", "totalRestarts", "unschedulablePods", "crashLoopingContainers", "totalChecks", "passedChecks", "warningChecks", "failedChecks", "overallStatus"],
+      "properties": {
+        "observedComponents": {"type": "integer", "minimum": 0, "maximum": 3},
+        "healthyComponents": {"type": "integer", "minimum": 0, "maximum": 3},
+        "progressingComponents": {"type": "integer", "minimum": 0, "maximum": 3},
+        "unavailableComponents": {"type": "integer", "minimum": 0, "maximum": 3},
+        "notObservedComponents": {"type": "integer", "minimum": 0, "maximum": 3},
+        "totalRestarts": {"type": "integer", "minimum": 0, "maximum": 1000000000},
+        "unschedulablePods": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "crashLoopingContainers": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "totalChecks": {"const": 9},
+        "passedChecks": {"type": "integer", "minimum": 0, "maximum": 9},
+        "warningChecks": {"type": "integer", "minimum": 0, "maximum": 9},
+        "failedChecks": {"type": "integer", "minimum": 0, "maximum": 9},
+        "overallStatus": {"enum": ["healthy", "attention-required", "blocked"]}
+      }
+    }
+  }
+}

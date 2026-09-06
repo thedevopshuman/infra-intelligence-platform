@@ -420,6 +420,26 @@ if [ "$IIP_DEPLOYED_IMAGE" != "$IIP_TEST_IMAGE_REPOSITORY@$IIP_TEST_IMAGE_DIGEST
     exit 1
 fi
 
+IIP_DEPLOYMENT_DIAGNOSTIC_REPORT="$IIP_TEST_TEMP_DIR/deployment-diagnostic-report.json"
+PYTHONPATH=scripts:src:sdks/python/src "$IIP_TEST_PYTHON" \
+    scripts/deployment_diagnostics.py generate \
+    --context "$IIP_KUBE_CONTEXT" \
+    --namespace "$IIP_TEST_NAMESPACE" \
+    --release-name iip \
+    --image-digest "$IIP_TEST_IMAGE_DIGEST" \
+    --kubectl "$IIP_KUBECTL_BIN" \
+    --output "$IIP_DEPLOYMENT_DIAGNOSTIC_REPORT"
+PYTHONPATH=scripts:src:sdks/python/src "$IIP_TEST_PYTHON" \
+    scripts/deployment_diagnostics.py verify \
+    --context "$IIP_KUBE_CONTEXT" \
+    --namespace "$IIP_TEST_NAMESPACE" \
+    --release-name iip \
+    --image-digest "$IIP_TEST_IMAGE_DIGEST" \
+    --report "$IIP_DEPLOYMENT_DIAGNOSTIC_REPORT"
+"$IIP_TEST_PYTHON" -c \
+    'import json,sys; report=json.load(open(sys.argv[1])); spec=report["spec"]; assert spec["status"] in ("healthy", "attention-required"); assert [item["state"] for item in spec["components"]] == ["healthy", "not-observed", "not-observed"]; assert all(item["status"] == "passed" for item in spec["checks"][1:])' \
+    "$IIP_DEPLOYMENT_DIAGNOSTIC_REPORT"
+
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
     create job --from=cronjob/iip-infra-intelligence-backup \
     iip-backup-conformance >/dev/null

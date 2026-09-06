@@ -58,6 +58,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Transactional outbox event delivery](operations/event-delivery.md)
 - [Helm deployment and schema migration](operations/helm-deployment.md)
 - [Customer deployment preflight](operations/customer-deployment-preflight.md)
+- [Post-install deployment diagnostics](operations/deployment-diagnostics.md)
 - [Kubernetes planned-disruption availability qualification](operations/kubernetes-availability-qualification.md)
 - [Release artifacts and supply-chain evidence](operations/release-artifacts.md)
 - [OpenTelemetry metrics export](operations/opentelemetry-export.md)

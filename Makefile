@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -14,6 +14,9 @@ IIP_DEPLOYMENT_PROFILE ?= production-core-v1
 IIP_DEPLOYMENT_VALUES ?= deploy/helm/infra-intelligence/examples/production-core.values.yaml
 IIP_DEPLOYMENT_NAMESPACE ?= iip-system
 IIP_KUBERNETES_CONTEXT ?=
+IIP_DEPLOYMENT_DIAGNOSTIC_REPORT ?= dist/deployment-diagnostic-report.json
+IIP_DIAGNOSTIC_RELEASE_NAME ?= iip
+IIP_DIAGNOSTIC_IMAGE_DIGEST ?=
 IIP_INGRESS_QUALIFICATION_REPORT ?= dist/ingress-availability-qualification-report.json
 IIP_INGRESS_BASE_URL ?=
 IIP_INGRESS_TOKEN_FILE ?=
@@ -50,6 +53,9 @@ help:
 	@echo "test-deployment-preflight Validate the sanitized core, GitHub-context, and AI profiles"
 	@echo "preflight-deployment-live Check a customer values file and explicit Kubernetes context"
 	@echo "verify-deployment-preflight-report Verify current source/configuration-bound preflight evidence"
+	@echo "test-deployment-diagnostics Validate minimized post-install diagnostic semantics"
+	@echo "diagnose-deployment Inspect one exact Kubernetes release without logs or secrets"
+	@echo "verify-deployment-diagnostic-report Verify retained point-in-time diagnostic evidence"
 	@echo "test-ingress-availability Exercise the minimized external probe against real local routes"
 	@echo "qualify-ingress-availability Qualify one HTTPS customer ingress and exact release identity"
 	@echo "verify-ingress-availability-report Verify clean current ingress qualification evidence"
@@ -122,7 +128,6 @@ help:
 	@echo "package-chart Package the Helm chart under dist/"
 	@echo "release-bundle Build an unsigned multi-platform release bundle with SBOM/provenance"
 	@echo "verify-release-bundle Verify IIP_RELEASE_BUNDLE checksums and OCI attestations"
-	@echo "verify-release-qualification Verify the complete environment-scoped release report"
 
 install-verify-deps:
 	$(PYTHON) -m pip install --requirement requirements/verify.txt
@@ -189,6 +194,37 @@ verify-deployment-preflight-report:
 		--values "$(IIP_DEPLOYMENT_VALUES)" \
 		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
 		--require-clean --require-install-ready
+
+test-deployment-diagnostics:
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_deployment_diagnostics -v
+
+diagnose-deployment:
+	@test -n "$(IIP_KUBERNETES_CONTEXT)" || \
+		(echo "IIP_KUBERNETES_CONTEXT is required" >&2; exit 2)
+	@test -n "$(IIP_DIAGNOSTIC_IMAGE_DIGEST)" || \
+		(echo "IIP_DIAGNOSTIC_IMAGE_DIGEST is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/deployment_diagnostics.py generate \
+		--context "$(IIP_KUBERNETES_CONTEXT)" \
+		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
+		--release-name "$(IIP_DIAGNOSTIC_RELEASE_NAME)" \
+		--image-digest "$(IIP_DIAGNOSTIC_IMAGE_DIGEST)" \
+		--kubectl "$(KUBECTL)" \
+		--output "$(IIP_DEPLOYMENT_DIAGNOSTIC_REPORT)" \
+		--require-clean --require-healthy
+
+verify-deployment-diagnostic-report:
+	@test -n "$(IIP_KUBERNETES_CONTEXT)" || \
+		(echo "IIP_KUBERNETES_CONTEXT is required" >&2; exit 2)
+	@test -n "$(IIP_DIAGNOSTIC_IMAGE_DIGEST)" || \
+		(echo "IIP_DIAGNOSTIC_IMAGE_DIGEST is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/deployment_diagnostics.py verify \
+		--context "$(IIP_KUBERNETES_CONTEXT)" \
+		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
+		--release-name "$(IIP_DIAGNOSTIC_RELEASE_NAME)" \
+		--image-digest "$(IIP_DIAGNOSTIC_IMAGE_DIGEST)" \
+		--report "$(IIP_DEPLOYMENT_DIAGNOSTIC_REPORT)" \
+		--require-clean --require-healthy
 
 test-ingress-availability:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \

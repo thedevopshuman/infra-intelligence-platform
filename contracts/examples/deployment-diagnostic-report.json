@@ -1,0 +1,86 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "DeploymentDiagnosticReport",
+  "metadata": {
+    "id": "ddr_4302b2e339fc4d54b01075a57454566e",
+    "generatedAt": "2026-09-06T13:30:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "healthy",
+    "diagnosticBoundary": "point-in-time-support-only",
+    "targetBindingDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expectedIdentity": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "environment": {
+      "observedAt": "2026-09-06T13:30:00Z",
+      "platform": "linux/amd64",
+      "pythonVersion": "3.12.10",
+      "kubectlVersion": "v1.36.1",
+      "clusterAccess": "observed",
+      "kubernetesVersion": "v1.36.1"
+    },
+    "selection": {
+      "selectedDeployments": 3,
+      "selectedPods": 6,
+      "unrecognizedDeployments": 0,
+      "duplicateComponents": 0
+    },
+    "components": [
+      {
+        "id": "control-plane-api",
+        "state": "healthy",
+        "identityStatus": "match",
+        "identity": {"applicationVersion": "0.84.0", "chartVersion": "0.87.0", "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+        "rollout": {"desiredReplicas": 2, "currentReplicas": 2, "updatedReplicas": 2, "readyReplicas": 2, "availableReplicas": 2},
+        "pods": {"observed": 2, "ready": 2, "restarts": 0, "unschedulable": 0, "crashLoopingContainers": 0}
+      },
+      {
+        "id": "workflow-worker",
+        "state": "healthy",
+        "identityStatus": "match",
+        "identity": {"applicationVersion": "0.84.0", "chartVersion": "0.87.0", "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+        "rollout": {"desiredReplicas": 2, "currentReplicas": 2, "updatedReplicas": 2, "readyReplicas": 2, "availableReplicas": 2},
+        "pods": {"observed": 2, "ready": 2, "restarts": 0, "unschedulable": 0, "crashLoopingContainers": 0}
+      },
+      {
+        "id": "otlp-receiver",
+        "state": "healthy",
+        "identityStatus": "match",
+        "identity": {"applicationVersion": "0.84.0", "chartVersion": "0.87.0", "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+        "rollout": {"desiredReplicas": 2, "currentReplicas": 2, "updatedReplicas": 2, "readyReplicas": 2, "availableReplicas": 2},
+        "pods": {"observed": 2, "ready": 2, "restarts": 0, "unschedulable": 0, "crashLoopingContainers": 0}
+      }
+    ],
+    "checks": [
+      {"id": "source-bound-tooling", "status": "passed"},
+      {"id": "explicit-target", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"},
+      {"id": "kubernetes-api-access", "status": "passed"},
+      {"id": "release-selection", "status": "passed"},
+      {"id": "control-plane-availability", "status": "passed"},
+      {"id": "workload-rollouts", "status": "passed"},
+      {"id": "immutable-image-identity", "status": "passed"},
+      {"id": "pod-health-signals", "status": "passed"}
+    ],
+    "summary": {
+      "observedComponents": 3,
+      "healthyComponents": 3,
+      "progressingComponents": 0,
+      "unavailableComponents": 0,
+      "notObservedComponents": 0,
+      "totalRestarts": 0,
+      "unschedulablePods": 0,
+      "crashLoopingContainers": 0,
+      "totalChecks": 9,
+      "passedChecks": 9,
+      "warningChecks": 0,
+      "failedChecks": 0,
+      "overallStatus": "healthy"
+    }
+  }
+}

@@ -124,3 +124,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0118](0118-oci-subject-bound-buildkit-attestations.md) | Accepted | Bind BuildKit predicates through the exact OCI subject graph |
 | [0119](0119-distribution-libpq-production-runtime.md) | Accepted | Use distribution-managed libpq instead of a bundled binary wheel in release images |
 | [0120](0120-aggregate-local-release-readiness-evidence.md) | Accepted | Aggregate exact local candidate evidence while keeping customer and public-promotion gates explicit |
+| [0121](0121-privacy-minimized-deployment-diagnostics.md) | Accepted | Summarize one exact Kubernetes release for support without collecting customer names, logs, or Secret values |

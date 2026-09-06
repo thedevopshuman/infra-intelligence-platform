@@ -58,6 +58,12 @@ reports match and always keeps the eight customer, organizational, live
 provider, design-partner, and legal/brand gates explicit. It is a local
 candidate inventory, not a production promotion decision.
 
+Post-install first response now has a separate privacy-minimized
+`DeploymentDiagnosticReport`. An operator selects an exact context, namespace,
+release, and immutable image digest; the read-only tool retains only aggregate
+rollout, pod-health, and identity evidence. Raw object names, logs, messages,
+URLs, customer identifiers, and Secret values remain outside the artifact.
+
 Exit gate: `make verify` passes and a new contributor can trace resource ingress through authorization, storage, and event emission.
 
 ## Phase 1 — resource and event substrate

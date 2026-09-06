@@ -92,10 +92,11 @@ guidance. It establishes no customer contact, staffed channel, response
 objective, approval, or production claim.
 
 The handoff also carries an optional privacy-bounded Prometheus Operator rule
-profile for backend-observed availability, freshness, local recording, and AI
-coverage signals. Customer rule selection, missing-telemetry detection,
-notification routes, contacts, escalation, and long-window/regional operation
-remain external deployment gates.
+profile for component telemetry absence, backend-observed availability,
+freshness, local recording, and AI coverage signals. Customer rule selection,
+independent Collector/backend monitoring, notification routes, contacts,
+escalation, and long-window/regional operation remain external deployment
+gates.
 Both production preflight profiles now require the closed policy, and cluster
 mode proves exact PrometheusRule discovery plus the target namespace before
 installation. Prometheus selection and notification delivery are still not
@@ -197,7 +198,10 @@ with aggregate-only source/target-bound availability and latency evidence. This
 closes the portable bounded external qualification harness described above;
 continuous multi-region probing, long-term aggregation, and customer
 notification operation remain open. ADR 0148 supplies an optional bounded
-Prometheus rule profile without claiming those customer-owned outcomes.
+Prometheus rule profile without claiming those customer-owned outcomes. ADR
+0150 adds a traffic-independent OTel component heartbeat and missing-series
+rules while leaving independent backend monitoring and notification delivery
+external.
 
 Deployment update: ADR 0109 adds zero-unavailable worker and receiver rollouts,
 component-specific disruption budgets, chart-generated hard topology spread,

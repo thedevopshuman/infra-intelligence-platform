@@ -1057,6 +1057,11 @@ class TelemetryExportHealthReader(Protocol):
         """Return bounded process-local delivery state without provider details."""
 
 
+class ComponentTelemetryHeartbeatSink(Protocol):
+    def record_component_heartbeat(self, component: str) -> None:
+        """Record one static component heartbeat without carrying customer identity."""
+
+
 class TelemetryExportHealthRepository(Protocol):
     def record_telemetry_export_health(
         self,

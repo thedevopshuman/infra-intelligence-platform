@@ -32,6 +32,8 @@ class OtlpCollectorIntegrationTests(unittest.TestCase):
             )
         )
         try:
+            self.assertIsNotNone(runtime.heartbeat_sink)
+            runtime.record_component_heartbeat("api")
             runtime.sink.record_ingestion_freshness(measurement())
             self.assertIsNotNone(runtime.query_sink)
             runtime.query_sink.record_query_availability(
@@ -53,6 +55,7 @@ class OtlpCollectorIntegrationTests(unittest.TestCase):
             self.assertEqual(runtime.sink.record_failures, 0)
             self.assertEqual(runtime.query_sink.record_failures, 0)
             self.assertEqual(runtime.ai_economics_sink.record_failures, 0)
+            self.assertEqual(runtime.heartbeat_sink.record_failures, 0)
             metrics = runtime.read_export_health()[0]
             self.assertEqual(metrics.status, "healthy")
             self.assertGreaterEqual(metrics.successes, 1)

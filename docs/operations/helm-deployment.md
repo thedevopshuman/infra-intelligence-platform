@@ -67,10 +67,11 @@ database handoff example, inventories all optional Secret names and keys, and
 defines the local exact-key/rotation compatibility gate.
 
 The optional `operationalAlerts` profile renders a Prometheus Operator rule
-resource for privacy-bounded IIP signals. It does not install the CRD,
+resource for privacy-bounded IIP signals, including an always-on OTel component
+heartbeat and missing-series rules. It does not install the CRD,
 Prometheus, Alertmanager, contacts, or routing, and it requires metric export
 to be enabled. Qualify the selected rule labels, metric-name translation,
-missing-data observation, and notification route with the
+heartbeat evaluation, and notification route with the
 [operational alert-policy handoff](operational-alerts.md). The production
 preflight requires the policy and, in cluster mode, verifies the exact
 PrometheusRule discovery endpoint and target namespace without making changes.

@@ -779,6 +779,8 @@
         "namespace",
         "labels",
         "evaluationIntervalSeconds",
+        "telemetryHeartbeatWindowSeconds",
+        "telemetryHeartbeatForSeconds",
         "availabilityForSeconds",
         "ingestionFreshnessForSeconds",
         "telemetryRecordingFailureWindowSeconds",
@@ -803,6 +805,16 @@
           "type": "integer",
           "minimum": 15,
           "maximum": 300
+        },
+        "telemetryHeartbeatWindowSeconds": {
+          "type": "integer",
+          "minimum": 120,
+          "maximum": 86400
+        },
+        "telemetryHeartbeatForSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
         },
         "availabilityForSeconds": {
           "type": "integer",

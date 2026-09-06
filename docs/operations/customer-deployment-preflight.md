@@ -17,7 +17,8 @@ The chart ships four composable examples:
   boundaries, live evidence adapters, telemetry, TLS ingress, retention,
   backup, component disruption budgets, hard node spreading, and
   least-authority network settings. It also selects the bounded operational
-  alert profile and its example Prometheus rule labels.
+  alert profile, traffic-independent component-heartbeat windows, and its
+  example Prometheus rule labels.
 - [`production-ai-finops.values.yaml`](../../deploy/helm/infra-intelligence/examples/production-ai-finops.values.yaml)
   is an overlay that adds metadata-only AI usage intake, mutual-SPIFFE TLS and
   CRL references, redundant receiver replicas with their own disruption
@@ -133,9 +134,9 @@ Preflight intentionally leaves the following gates explicit:
 - workload-specific capacity plus clean, exact-release external ingress
   availability and latency evidence; use the
   [ingress qualification profile](ingress-availability-qualification.md);
-- Prometheus rule selection/evaluation, missing-signal monitoring, continuous
-  regional SLO aggregation, Alertmanager routing, contact delivery, recovery,
-  and escalation;
+- Prometheus rule selection/evaluation, independent Collector/backend
+  monitoring, continuous regional SLO aggregation, Alertmanager routing,
+  contact delivery, recovery, and escalation;
 - for AI FinOps, live Bedrock model/region/streaming behavior, authoritative
   prices, and workload-quality validation of any proposed saving.
 

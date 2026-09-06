@@ -96,8 +96,11 @@ The [ingestion freshness boundary](ingestion-freshness-telemetry.md) evaluates t
 
 [ADR 0148](../decisions/0148-customer-owned-operational-alert-policy-handoff.md)
 adds an optional privacy-bounded Prometheus rule translation over those
-backend-observed signals. Missing-telemetry detection, regional aggregation,
-rule selection, routing, contacts, and escalation remain customer-owned.
+backend-observed signals. [ADR 0150](../decisions/0150-otel-component-heartbeat-and-missing-signal-alerts.md)
+adds a metadata-only OTel heartbeat and missing-series rules for enabled API,
+worker, and receiver services. Independent Collector/backend observation,
+regional aggregation, rule selection/evaluation, routing, contacts, and
+escalation remain customer-owned.
 
 [ADR 0123](../decisions/0123-customer-control-plane-continuity-qualification.md)
 composes the read-only external probe with one separately enabled,

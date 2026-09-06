@@ -5,10 +5,10 @@
 **Date:** 2026-09-06
 
 IIP can render an optional Prometheus Operator `PrometheusRule` from its Helm
-chart. The rules cover backend-observed platform availability, ingestion
-freshness, local metric-recording failure, and—when enabled—AI usage and cost
-coverage. They are a portable starting policy, not a monitoring service or an
-SLA.
+chart. The rules cover missing component telemetry, backend-observed platform
+availability, ingestion freshness, local metric-recording failure, and—when
+enabled—AI usage and cost coverage. They are a portable starting policy, not a
+monitoring service or an SLA.
 
 OpenTelemetry remains the source signal contract. Prometheus is only the first
 rule adapter. The chart installs no CRD, Prometheus server, rule selector,
@@ -67,10 +67,25 @@ also discovers the exact namespaced PrometheusRule API and confirms the target
 namespace exists. That pass still does not prove selector, evaluation, or
 notification delivery.
 
+Before publishing a release, validate both rendered production profiles with
+the same Prometheus parser used by the reference backend:
+
+```bash
+make test-operational-alerts
+```
+
+This Docker Desktop gate runs Prometheus `promtool` against the rendered core
+and AI FinOps rule groups. It proves syntax for the selected documented
+metric-name profile only; it does not prove a customer's Collector translation
+or contact or configure a customer monitoring system.
+
 ## Rule inventory
 
 | Rule | Enabled when | Condition |
 | --- | --- | --- |
+| `IIPApiTelemetryAbsent` | alert profile | no API heartbeat reached the backend during the configured lookback |
+| `IIPWorkflowWorkerTelemetryAbsent` | workflow worker | no worker heartbeat reached the backend during the configured lookback |
+| `IIPOtlpReceiverTelemetryAbsent` | any OTLP receiver | no receiver heartbeat reached the backend during the configured lookback |
 | `IIPQueryAvailabilityBelowObjective` | alert profile | eligible query availability is below the chart objective after its sample floor |
 | `IIPOtlpReceiverAvailabilityBelowObjective` | any OTLP receiver | eligible receiver availability is below the chart objective after its sample floor |
 | `IIPIngestionFreshnessObjectiveViolated` | alert profile | at least one emitted source evaluation is outside its freshness objective |
@@ -80,14 +95,34 @@ notification delivery.
 
 Availability objectives and sample floors come from `queryAvailabilitySlo`
 and `otlpIngest.availabilitySlo`. Alert durations and AI coverage thresholds
-come from `operationalAlerts`. A missing series does not fire these rules.
-Use independent HTTPS probes, Collector queue/loss and health monitoring, and
-backend self-monitoring to detect absent telemetry or broken delivery.
+come from `operationalAlerts`. Component heartbeat lookback and pending
+duration come from `telemetryHeartbeatWindowSeconds` and
+`telemetryHeartbeatForSeconds`; the chart requires the lookback to span at
+least two export intervals and two health cycles. Missing ordinary workload
+series do not fire availability, freshness, or AI rules. Use independent HTTPS
+probes, Collector queue/loss and health monitoring, and backend self-monitoring
+alongside the component heartbeat rules.
 
 Expressions aggregate dynamic identities before evaluation, and emitted alert
 labels contain only static severity and scope. Do not add tenant IDs, source
 IDs, resource names, profile IDs, prompts, responses, provider messages, or
 credentials to alert labels or notification templates.
+
+## Component telemetry absence
+
+Each enabled process records `iip.telemetry.heartbeat=1` during its existing
+failure-isolated exporter-health cycle. The only metric attribute is the closed
+component type; the configured OTel resource `service.name` selects API,
+workflow-worker, or receiver in the Prometheus translation. No traffic is
+required, so an idle deployment remains observable.
+
+An alert means that the customer backend has not received that service's
+heartbeat for the complete lookback and pending duration. It does not identify
+whether the process, SDK exporter, network, Collector, backend ingestion, or
+rule evaluator failed. Check the independent HTTPS probe and Kubernetes
+readiness first, then exporter health, Collector queue/loss, backend ingestion,
+and rule evaluation. Do not silence this alert merely because workload traffic
+is intentionally idle.
 
 ## Query availability
 

@@ -15,7 +15,8 @@ IIP_UPGRADE_FROM_REVISION=<supported-ancestor> \
 ```
 
 It runs source quality, local integration/recovery/availability evidence,
-multi-platform packaging, packaged install, the selected N-1
+Prometheus parsing of both operational-alert profiles, multi-platform
+packaging, packaged install, the selected N-1
 upgrade/rollback/re-upgrade, exact-SBOM vulnerability qualification, and the
 19-evidence readiness aggregate. The final paths include the candidate's
 12-character revision so evidence from different commits cannot silently
@@ -35,6 +36,7 @@ make test-credential-broker PYTHON=.venv/bin/python
 make test-oidc PYTHON=.venv/bin/python
 make test-policy-engine PYTHON=.venv/bin/python
 make test-external-secrets PYTHON=.venv/bin/python
+make test-operational-alerts
 make test-otlp-receiver PYTHON=.venv/bin/python
 make test-bedrock-instrumentation PYTHON=.venv/bin/python
 make test-openai-instrumentation PYTHON=.venv/bin/python

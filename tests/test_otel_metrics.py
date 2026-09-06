@@ -11,6 +11,7 @@ from iip.adapters.otel import (
     OpenTelemetryAiAllocationSink,
     OpenTelemetryConfigurationError,
     OpenTelemetryAiEconomicsSink,
+    OpenTelemetryComponentHeartbeatSink,
     OpenTelemetryIngestionSink,
     OpenTelemetryQueryAvailabilitySink,
     OtlpMetricsConfiguration,
@@ -324,6 +325,43 @@ class OpenTelemetryIngestionSinkTests(unittest.TestCase):
         self.assertEqual(
             meter.instruments["iip.telemetry.record.failures"].records,
             [(1, {"iip.telemetry.signal": "metrics"})],
+        )
+
+
+class OpenTelemetryComponentHeartbeatSinkTests(unittest.TestCase):
+    def test_records_only_one_static_component_dimension(self) -> None:
+        meter = RecordingMeter()
+        sink = OpenTelemetryComponentHeartbeatSink(meter)
+
+        sink.record_component_heartbeat("workflow-worker")
+
+        self.assertEqual(
+            meter.instruments["iip.telemetry.heartbeat"].records,
+            [(1, {"iip.component": "workflow-worker"})],
+        )
+        with self.assertRaisesRegex(
+            OpenTelemetryConfigurationError, "telemetry.component.invalid"
+        ):
+            sink.record_component_heartbeat("tenant-a")
+
+    def test_instrument_failure_is_counted_and_fail_open(self) -> None:
+        meter = RecordingMeter(failing_name="iip.telemetry.heartbeat")
+        sink = OpenTelemetryComponentHeartbeatSink(meter)
+
+        sink.record_component_heartbeat("api")
+
+        self.assertEqual(sink.record_failures, 1)
+        self.assertEqual(
+            meter.instruments["iip.telemetry.record.failures"].records,
+            [
+                (
+                    1,
+                    {
+                        "iip.telemetry.signal": "metrics",
+                        "iip.telemetry.instrument": "component-heartbeat",
+                    },
+                )
+            ],
         )
 
 

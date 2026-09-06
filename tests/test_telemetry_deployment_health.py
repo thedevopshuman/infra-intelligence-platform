@@ -113,6 +113,76 @@ class TelemetryDeploymentHealthServiceTests(unittest.TestCase):
         self.assertEqual(retired["spec"]["status"], "disabled")
         self.assertEqual(retired["spec"]["instances"], [])
 
+    def test_health_cycle_emits_fail_open_component_telemetry(self) -> None:
+        class Heartbeat:
+            def __init__(self) -> None:
+                self.components: list[str] = []
+
+            def record_component_heartbeat(self, component: str) -> None:
+                self.components.append(component)
+
+        heartbeat = Heartbeat()
+        reporter = TelemetryExportHealthReporter(
+            self.health,
+            self.store,
+            self.clock,
+            self.configuration,
+            heartbeat_sink=heartbeat,
+        )
+
+        reporter.report_once()
+
+        self.assertEqual(heartbeat.components, ["api"])
+
+        class FailingHeartbeat:
+            def record_component_heartbeat(self, component: str) -> None:
+                del component
+                raise RuntimeError("must not affect health persistence")
+
+        TelemetryExportHealthReporter(
+            self.health,
+            self.store,
+            self.clock,
+            self.configuration,
+            heartbeat_sink=FailingHeartbeat(),
+        ).report_once()
+        self.assertEqual(
+            len(
+                self.store.list_telemetry_export_health(
+                    reported_since="2026-08-17T11:59:59Z", limit=1001
+                )
+            ),
+            1,
+        )
+
+    def test_runtime_composes_component_heartbeat_with_health_cycle(self) -> None:
+        class RuntimeTelemetry:
+            def __init__(self) -> None:
+                self.components: list[str] = []
+
+            def read_export_health(self):
+                return self_health.read_export_health()
+
+            def record_component_heartbeat(self, component: str) -> None:
+                self.components.append(component)
+
+            def force_flush(self, timeout_millis: int) -> bool:
+                del timeout_millis
+                return True
+
+            def shutdown(self, timeout_millis: int = 30_000) -> None:
+                del timeout_millis
+
+        self_health = self.health
+        telemetry = RuntimeTelemetry()
+        runtime = build_local_runtime(
+            telemetry_runtime=telemetry,
+            telemetry_health_reporting=self.configuration,
+        )
+        self.addCleanup(runtime.close)
+
+        self.assertEqual(telemetry.components, ["api"])
+
     def test_report_is_role_bound_and_configuration_is_bounded(self) -> None:
         with self.assertRaises(TelemetryExportHealthAuthorizationError):
             self.service.get(

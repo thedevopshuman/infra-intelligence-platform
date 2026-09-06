@@ -58,6 +58,8 @@ telemetry:
 operationalAlerts:
   enabled: true
   namespace: observability
+  telemetryHeartbeatWindowSeconds: 300
+  telemetryHeartbeatForSeconds: 300
   labels:
     prometheus: platform
     role: alert-rules

@@ -45,6 +45,20 @@ PYTHONPATH=src:sdks/python/src \
 attempt=0
 until "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
     -f "$IIP_COMPOSE_FILE" logs --no-color collector 2>&1 \
+    | rg -q "iip.telemetry.heartbeat"; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 15 ]; then
+        "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
+            -f "$IIP_COMPOSE_FILE" logs --no-color collector >&2
+        echo "Collector did not receive the expected IIP component heartbeat" >&2
+        exit 1
+    fi
+    sleep 1
+done
+
+attempt=0
+until "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
+    -f "$IIP_COMPOSE_FILE" logs --no-color collector 2>&1 \
     | rg -q "iip.ingestion.checkpoint.age"; do
     attempt=$((attempt + 1))
     if [ "$attempt" -ge 15 ]; then
@@ -103,4 +117,4 @@ IIP_OTEL_TEST_PORT="$IIP_OTEL_TEST_PORT" \
 PYTHONPATH=.:src:sdks/python/src \
     "$IIP_TEST_PYTHON" scripts/test_otel_export_health.py
 
-echo "OTLP integration test received IIP signals and proved delivery-health recovery"
+echo "OTLP integration test received the component heartbeat and IIP signals and proved delivery-health recovery"

@@ -82,6 +82,8 @@ def rendered_profile() -> dict[str, object]:
             "metricNameProfile": "otel-prometheus-underscore-no-suffix-v1",
             "namespace": "observability",
             "selectorLabelCount": 2,
+            "telemetryHeartbeatWindowSeconds": 300,
+            "telemetryHeartbeatForSeconds": 300,
         },
         "networkPolicy": {
             "enabled": True,

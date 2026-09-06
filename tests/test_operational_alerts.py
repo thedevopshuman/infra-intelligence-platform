@@ -19,6 +19,9 @@ class OperationalAlertContractTests(unittest.TestCase):
             / "examples"
             / "production-operational-alerts.values.yaml"
         ).read_text(encoding="utf-8")
+        cls.compatibility_script = (
+            ROOT / "scripts" / "test_operational_alerts.sh"
+        ).read_text(encoding="utf-8")
 
     def test_rule_profile_is_optional_and_selectable(self) -> None:
         self.assertIn("{{- if .Values.operationalAlerts.enabled }}", self.template)
@@ -33,6 +36,9 @@ class OperationalAlertContractTests(unittest.TestCase):
 
     def test_expected_rules_and_metrics_are_bound(self) -> None:
         for alert in (
+            "IIPApiTelemetryAbsent",
+            "IIPWorkflowWorkerTelemetryAbsent",
+            "IIPOtlpReceiverTelemetryAbsent",
             "IIPQueryAvailabilityBelowObjective",
             "IIPOtlpReceiverAvailabilityBelowObjective",
             "IIPIngestionFreshnessObjectiveViolated",
@@ -44,6 +50,7 @@ class OperationalAlertContractTests(unittest.TestCase):
                 self.assertEqual(self.template.count(f"alert: {alert}"), 1)
 
         for metric in (
+            "iip_telemetry_heartbeat",
             "iip_query_requests",
             "iip_otlp_receiver_requests",
             "iip_ingestion_within_objective",
@@ -61,8 +68,26 @@ class OperationalAlertContractTests(unittest.TestCase):
         )
         self.assertIn("if .Values.aiUsageReceiver.enabled", self.template)
         self.assertIn("if .Values.aiCostEngine.enabled", self.template)
-        self.assertGreaterEqual(self.template.count("| toJson"), 6)
+        self.assertGreaterEqual(self.template.count("| toJson"), 9)
         self.assertGreaterEqual(self.template.count("regexQuoteMeta"), 5)
+
+    def test_missing_component_telemetry_is_explicit_and_bounded(self) -> None:
+        self.assertEqual(self.template.count("absent_over_time("), 3)
+        self.assertEqual(self.template.count("sum(absent_over_time("), 3)
+        self.assertEqual(
+            self.template.count(
+                ".Values.operationalAlerts.telemetryHeartbeatWindowSeconds"
+            ),
+            3,
+        )
+        self.assertEqual(
+            self.template.count(
+                ".Values.operationalAlerts.telemetryHeartbeatForSeconds"
+            ),
+            3,
+        )
+        self.assertIn("if .Values.worker.enabled", self.template)
+        self.assertIn("iip_alert_scope: telemetry", self.template)
 
     def test_alert_labels_do_not_export_dynamic_identity(self) -> None:
         labels = self.template.split("labels:", 2)[-1]
@@ -81,6 +106,7 @@ class OperationalAlertContractTests(unittest.TestCase):
         self.assertIn("severity: critical", self.template)
         self.assertIn("severity: warning", self.template)
         self.assertIn("iip_alert_scope: platform", self.template)
+        self.assertIn("iip_alert_scope: telemetry", self.template)
         self.assertIn("iip_alert_scope: ai-economics", self.template)
 
     def test_recording_failure_rule_does_not_claim_export_delivery(self) -> None:
@@ -89,6 +115,13 @@ class OperationalAlertContractTests(unittest.TestCase):
             self.template,
         )
         self.assertNotIn("iip_telemetry_export", self.template)
+
+    def test_prometheus_compatibility_gate_is_digest_pinned(self) -> None:
+        self.assertIn("prom/prometheus@sha256:", self.compatibility_script)
+        self.assertNotIn("prom/prometheus:v", self.compatibility_script)
+        self.assertIn("check rules", self.compatibility_script)
+        self.assertIn("core-rules.yaml", self.compatibility_script)
+        self.assertIn("ai-finops-rules.yaml", self.compatibility_script)
 
 
 if __name__ == "__main__":

@@ -29,6 +29,7 @@ Each newly committed terminal report can emit one `iip.investigation.execute` sp
 | `iip.otlp.receiver.requests` | dimensionless | One increment per completed metrics, logs, or metadata-only GenAI trace intake request, classified as available, unavailable, or excluded |
 | `iip.otlp.receiver.duration` | seconds | Monotonic serving time for the same intake request |
 | `iip.ai.*` | contract-specific | Bounded AI usage, coverage, calculated cost, comparison, and potential-saving gauges |
+| `iip.telemetry.heartbeat` | dimensionless | `1` for each API, workflow-worker, or receiver exporter-health cycle; only the closed component attribute is attached |
 | `iip.telemetry.record.failures` | dimensionless | Local instrument-recording failures; not network delivery failures |
 
 Every measurement has `iip.ingestion.status`. `IIP_OTEL_INGESTION_ATTRIBUTE_MODE` selects `none`, `source`, or `tenant-source` for identity attributes. The default `source` mode adds `iip.source.id`; choose `none` when source names are sensitive or the source count exceeds the deployment's cardinality budget. `tenant-source` must be an explicit privacy and cost decision.
@@ -40,7 +41,8 @@ Receiver metrics use only signal, closed outcome, availability, and objective at
 The Helm chart can optionally translate a bounded subset of these semantic
 conditions into a Prometheus Operator rule resource. That adapter assumes the
 documented underscore/no-suffix metric-name profile, deliberately removes
-dynamic identities from alert labels, and does not own routing or contacts.
+dynamic identities from alert labels, and uses the component heartbeat for
+traffic-independent missing-series detection. It does not own routing or contacts.
 See the [operational alert-policy handoff](operational-alerts.md). Other
 backends should translate the same OpenTelemetry semantics rather than import
 PromQL into the application.
@@ -60,8 +62,8 @@ Run the isolated real-Collector gate:
 make test-otel
 ```
 
-The target starts OpenTelemetry Collector `0.158.0`, sends reference freshness,
-query, and AI economics metrics plus an investigation trace through the
+The target starts OpenTelemetry Collector `0.158.0`, sends a component
+heartbeat, reference freshness, query, and AI economics metrics plus an investigation trace through the
 official Python SDK, verifies that the Collector debug exporter received them,
 and removes the container afterward.
 
@@ -118,7 +120,7 @@ The API and worker use the Collector through the Compose service network and app
 | `OTEL_BSP_EXPORT_TIMEOUT` | `10000` | Trace batch export timeout in milliseconds |
 | `OTEL_BSP_MAX_QUEUE_SIZE` | `2048` | Bounded in-memory trace queue |
 | `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | `512` | Maximum trace export batch, no larger than the queue |
-| `IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS` | `30` | Internal API/worker exporter-health heartbeat interval |
+| `IIP_TELEMETRY_HEALTH_INTERVAL_SECONDS` | `30` | API/worker/receiver exporter-health and OTel component-heartbeat interval |
 | `IIP_TELEMETRY_HEALTH_STALE_AFTER_SECONDS` | `120` | Age at which a missed internal heartbeat degrades deployment health |
 | `IIP_TELEMETRY_HEALTH_RETENTION_SECONDS` | `600` | Bounded crashed-instance visibility and cleanup window |
 | `IIP_TELEMETRY_EXPORT_SLO_WINDOW_SECONDS` | `3600` | Rolling sampled exporter-attempt window, 300–2,592,000 seconds |

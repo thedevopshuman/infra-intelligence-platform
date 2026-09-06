@@ -538,6 +538,17 @@ def _compose_runtime(
                 operational,
                 clock,
                 telemetry_health_reporting,
+                heartbeat_sink=(
+                    telemetry_runtime
+                    if callable(
+                        getattr(
+                            telemetry_runtime,
+                            "record_component_heartbeat",
+                            None,
+                        )
+                    )
+                    else None
+                ),
             )
         )
         if telemetry_runtime is not None and telemetry_health_reporting is not None

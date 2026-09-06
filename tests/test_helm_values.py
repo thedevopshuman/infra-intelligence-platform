@@ -118,6 +118,8 @@ class HelmValuesContractTests(unittest.TestCase):
             "telemetry.traceMaxExportBatchSize must not exceed",
             "telemetry.otlpEndpoint is required",
             "telemetry.metricsEnabled must be true when operationalAlerts.enabled=true",
+            "operationalAlerts.telemetryHeartbeatWindowSeconds must cover at least two telemetry export intervals",
+            "operationalAlerts.telemetryHeartbeatWindowSeconds must cover at least two telemetry health-report intervals",
             "auth.existingSecret is required",
             "policy.externalHttp.configJson is required",
             "credentialBroker.externalHttp.configJson is required",
@@ -198,6 +200,12 @@ class HelmValuesContractTests(unittest.TestCase):
             0,
         )
         self.assertEqual(
+            operational_alerts["properties"]["telemetryHeartbeatWindowSeconds"][
+                "minimum"
+            ],
+            120,
+        )
+        self.assertEqual(
             operational_alerts["properties"]["namespace"]["pattern"],
             "^$|^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$",
         )
@@ -213,6 +221,8 @@ class HelmValuesContractTests(unittest.TestCase):
         self.assertTrue(list(label_validator.iter_errors({"bad\nkey": "value"})))
         self.assertTrue(list(label_validator.iter_errors({"role": "bad:value"})))
         self.assertIn("operationalAlerts:\n  enabled: false", self.values)
+        self.assertIn("telemetryHeartbeatWindowSeconds: 300", self.values)
+        self.assertIn("telemetryHeartbeatForSeconds: 300", self.values)
 
         termination = self.schema["properties"]["apiTermination"]
         self.assertFalse(termination["additionalProperties"])

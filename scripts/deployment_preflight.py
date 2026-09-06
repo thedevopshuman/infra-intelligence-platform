@@ -424,6 +424,8 @@ def _validate_rendered_profile(profile: Mapping[str, Any]) -> None:
         "metricNameProfile",
         "namespace",
         "selectorLabelCount",
+        "telemetryHeartbeatWindowSeconds",
+        "telemetryHeartbeatForSeconds",
     }:
         _fail("preflight.profile.invalid")
     _boolean(operational_alerts, "enabled")
@@ -431,11 +433,17 @@ def _validate_rendered_profile(profile: Mapping[str, Any]) -> None:
     _string(operational_alerts, "metricNameProfile")
     alert_namespace = _string(operational_alerts, "namespace")
     selector_label_count = _integer(operational_alerts, "selectorLabelCount")
+    heartbeat_window = _integer(
+        operational_alerts, "telemetryHeartbeatWindowSeconds"
+    )
+    heartbeat_for = _integer(operational_alerts, "telemetryHeartbeatForSeconds")
     if (
         len(alert_namespace) > 63
         or NAMESPACE.fullmatch(alert_namespace) is None
         or selector_label_count < 0
         or selector_label_count > 32
+        or not 120 <= heartbeat_window <= 86_400
+        or not 60 <= heartbeat_for <= 86_400
     ):
         _fail("preflight.profile.invalid")
     pdb = _object(profile, "podDisruptionBudget")

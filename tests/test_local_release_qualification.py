@@ -31,6 +31,7 @@ class LocalReleaseQualificationTests(unittest.TestCase):
             "test-oidc",
             "test-policy-engine",
             "test-external-secrets",
+            "test-operational-alerts",
             "test-otlp-receiver",
             "test-bedrock-instrumentation",
             "test-openai-instrumentation",

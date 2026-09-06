@@ -37,21 +37,27 @@ The `IngestionFreshnessReport` remains the authoritative point-in-time product r
 
 The adapters use the [standard exporter endpoint configuration](https://opentelemetry.io/docs/specs/otel/protocol/exporter/), including `OTEL_EXPORTER_OTLP_ENDPOINT` and signal-specific variables. The recommended target is a customer-controlled [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/), which can route to a different open-source or commercial backend without an IIP code change. [ADR 0013](../decisions/0013-otlp-http-ingestion-metrics-export.md) records the metrics selection, [ADR 0031](../decisions/0031-otlp-investigation-trace-export.md) records the trace privacy/cardinality boundary, [ADR 0081](../decisions/0081-backend-neutral-otlp-receiver-availability.md) records receiver request availability, and the [operations guide](../operations/opentelemetry-export.md) lists the signals and configuration.
 
-Export is disabled by default, asynchronous, and observational. Endpoint unavailability does not roll back ingestion, block an investigation, or change report results. The reference adapter has bounded timeouts, SDK retry behavior, local recording-failure counting, controlled dimensions, recent deployment-wide API/worker/receiver delivery health through a failure-isolated shared-store heartbeat, rolling per-signal export-attempt attainment from bounded counter samples, and a two-window burn rate calculated from the same samples. Receiver request counter/histogram observations use the same exporter but never include customer identity or payload data. It does not provide a durable queue itself; the customer-Collector's own queue depth and send-loss are a separate, opt-in report (ADR 0087) sourced from the Collector's self-metrics, not automatic discovery, and regional aggregation of it is still required before production enablement.
+Export is disabled by default, asynchronous, and observational. Endpoint unavailability does not roll back ingestion, block an investigation, or change report results. The reference adapter has bounded timeouts, SDK retry behavior, local recording-failure counting, controlled dimensions, recent deployment-wide API/worker/receiver delivery health through a failure-isolated shared-store heartbeat, rolling per-signal export-attempt attainment from bounded counter samples, and a two-window burn rate calculated from the same samples. The same cycle emits `iip.telemetry.heartbeat=1` with only a closed component attribute, allowing the customer backend to observe a missing process/export path even when ordinary traffic is idle. Receiver request counter/histogram observations use the same exporter but never include customer identity or payload data. It does not provide a durable queue itself; the customer-Collector's own queue depth and send-loss are a separate, opt-in report (ADR 0087) sourced from the Collector's self-metrics, not automatic discovery, and regional aggregation of it is still required before production enablement.
 
 [ADR 0148](../decisions/0148-customer-owned-operational-alert-policy-handoff.md)
 adds an optional Prometheus Operator translation for a bounded set of those
 signals. The adapter stays in Helm, assumes one explicit Collector metric-name
 profile, aggregates protected identities out of notification labels, and
-leaves rule selection, delivery, contacts, escalation, and missing-telemetry
-observation with the customer. It does not make Prometheus part of the core
-portability contract.
+leaves rule selection, delivery, contacts, and escalation with the customer.
+ADR 0150 adds a component heartbeat and first missing-series rule translation;
+it does not make Prometheus part of the core portability contract.
 
 [ADR 0149](../decisions/0149-preinstall-operational-alert-prerequisite-evidence.md)
 binds that optional adapter into both production preflight profiles. Static
 evidence requires the closed policy; live evidence adds read-only exact-API and
 target-namespace discovery while retaining no namespace or discovery payload.
 Evaluation and notification delivery remain outside the preflight claim.
+
+[ADR 0150](../decisions/0150-otel-component-heartbeat-and-missing-signal-alerts.md)
+adds one fail-open, privacy-safe component heartbeat through the same metrics
+exporter and separate missing-series rules for enabled API, worker, and receiver
+services. The customer still owns independent observation of the Collector and
+backend, rule evaluation, routing, contacts, escalation, and regional coverage.
 
 ## Customer telemetry evidence
 

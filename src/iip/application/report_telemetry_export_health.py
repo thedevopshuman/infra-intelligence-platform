@@ -8,6 +8,7 @@ import re
 
 from iip.application.ports import (
     Clock,
+    ComponentTelemetryHeartbeatSink,
     TelemetryExportHealthReader,
     TelemetryExportHealthRepository,
     TelemetryExportInstanceState,
@@ -62,15 +63,25 @@ class TelemetryExportHealthReporter:
         repository: TelemetryExportHealthRepository,
         clock: Clock,
         configuration: TelemetryExportHealthReportingConfiguration,
+        heartbeat_sink: ComponentTelemetryHeartbeatSink | None = None,
     ) -> None:
         configuration.validate()
         self._reader = reader
         self._repository = repository
         self._clock = clock
+        self._heartbeat_sink = heartbeat_sink
         self.configuration = configuration
         self._started_at = self._normalized_now()
 
     def report_once(self) -> None:
+        if self._heartbeat_sink is not None:
+            try:
+                self._heartbeat_sink.record_component_heartbeat(
+                    self.configuration.component
+                )
+            except Exception:
+                # Telemetry must never become serving or health-store authority.
+                pass
         states = tuple(self._reader.read_export_health())
         TelemetryExportHealthService.validate_states(states)
         reported_at = self._normalized_now()

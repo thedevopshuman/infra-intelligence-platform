@@ -281,6 +281,8 @@ operationalAlerts:
   namespace: ""
   labels: {}
   evaluationIntervalSeconds: 60
+  telemetryHeartbeatWindowSeconds: 300
+  telemetryHeartbeatForSeconds: 300
   availabilityForSeconds: 600
   ingestionFreshnessForSeconds: 600
   telemetryRecordingFailureWindowSeconds: 900

@@ -14,6 +14,43 @@ spec:
     - name: iip.platform.availability
       interval: {{ printf "%ds" (int .Values.operationalAlerts.evaluationIntervalSeconds) }}
       rules:
+        - alert: IIPApiTelemetryAbsent
+          expr: |-
+            sum(absent_over_time(iip_telemetry_heartbeat{job={{ .Values.telemetry.serviceName | toJson }}}[{{ int .Values.operationalAlerts.telemetryHeartbeatWindowSeconds }}s])) == 1
+          for: {{ printf "%ds" (int .Values.operationalAlerts.telemetryHeartbeatForSeconds) }}
+          labels:
+            severity: critical
+            iip_alert_scope: telemetry
+          annotations:
+            summary: IIP API telemetry heartbeat is absent
+            description: The customer backend received no API heartbeat in the configured window; verify the process, exporter, Collector, and backend path independently.
+            runbook: docs/operations/operational-alerts.md#component-telemetry-absence
+        {{- if .Values.worker.enabled }}
+        - alert: IIPWorkflowWorkerTelemetryAbsent
+          expr: |-
+            sum(absent_over_time(iip_telemetry_heartbeat{job={{ .Values.telemetry.workerServiceName | toJson }}}[{{ int .Values.operationalAlerts.telemetryHeartbeatWindowSeconds }}s])) == 1
+          for: {{ printf "%ds" (int .Values.operationalAlerts.telemetryHeartbeatForSeconds) }}
+          labels:
+            severity: critical
+            iip_alert_scope: telemetry
+          annotations:
+            summary: IIP workflow-worker telemetry heartbeat is absent
+            description: The customer backend received no worker heartbeat in the configured window; verify the process, exporter, Collector, and backend path independently.
+            runbook: docs/operations/operational-alerts.md#component-telemetry-absence
+        {{- end }}
+        {{- if or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled .Values.aiUsageReceiver.enabled }}
+        - alert: IIPOtlpReceiverTelemetryAbsent
+          expr: |-
+            sum(absent_over_time(iip_telemetry_heartbeat{job={{ .Values.telemetry.receiverServiceName | toJson }}}[{{ int .Values.operationalAlerts.telemetryHeartbeatWindowSeconds }}s])) == 1
+          for: {{ printf "%ds" (int .Values.operationalAlerts.telemetryHeartbeatForSeconds) }}
+          labels:
+            severity: critical
+            iip_alert_scope: telemetry
+          annotations:
+            summary: IIP OTLP receiver telemetry heartbeat is absent
+            description: The customer backend received no receiver heartbeat in the configured window; verify the process, exporter, Collector, and backend path independently.
+            runbook: docs/operations/operational-alerts.md#component-telemetry-absence
+        {{- end }}
         - alert: IIPQueryAvailabilityBelowObjective
           expr: |-
             (

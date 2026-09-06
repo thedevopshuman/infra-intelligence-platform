@@ -45,6 +45,7 @@ _MAX_ENDPOINT_LENGTH = 2048
 _MAX_COUNTER = 9_007_199_254_740_991
 _SAFE_AI_DIMENSION_ID = re.compile(r"[a-z][a-z0-9._-]{2,127}")
 _SIGNALS = ("metrics", "traces")
+_COMPONENTS = frozenset({"api", "workflow-worker", "otlp-receiver"})
 
 
 class OpenTelemetryConfigurationError(RuntimeError):
@@ -159,6 +160,48 @@ class DisabledTelemetryExportHealthReader(TelemetryExportHealthState):
 
     def __init__(self) -> None:
         super().__init__()
+
+
+class OpenTelemetryComponentHeartbeatSink:
+    """Emit an always-on, static component signal for missing-series detection."""
+
+    def __init__(self, meter: Any) -> None:
+        self._heartbeat = meter.create_gauge(
+            "iip.telemetry.heartbeat",
+            unit="1",
+            description="One for a live IIP component telemetry reporting cycle.",
+        )
+        self._record_failure = meter.create_counter(
+            "iip.telemetry.record.failures",
+            unit="1",
+            description="Measurements rejected before reaching an exporter.",
+        )
+        self._failures = 0
+        self._failure_lock = Lock()
+
+    @property
+    def record_failures(self) -> int:
+        with self._failure_lock:
+            return self._failures
+
+    def record_component_heartbeat(self, component: str) -> None:
+        if component not in _COMPONENTS:
+            raise OpenTelemetryConfigurationError("telemetry.component.invalid")
+        try:
+            self._heartbeat.set(1, {"iip.component": component})
+        except Exception:
+            with self._failure_lock:
+                self._failures += 1
+            try:
+                self._record_failure.add(
+                    1,
+                    {
+                        "iip.telemetry.signal": "metrics",
+                        "iip.telemetry.instrument": "component-heartbeat",
+                    },
+                )
+            except Exception:
+                pass
 
 
 class TrackingMetricExporter:
@@ -1748,6 +1791,7 @@ class OtlpMetricsRuntime:
     sink: OpenTelemetryIngestionSink
     provider: Any
     health: TelemetryExportHealthState | None = None
+    heartbeat_sink: OpenTelemetryComponentHeartbeatSink | None = None
     query_sink: OpenTelemetryQueryAvailabilitySink | None = None
     receiver_sink: OpenTelemetryOtlpReceiverSink | None = None
     ai_economics_sink: OpenTelemetryAiEconomicsSink | None = None
@@ -1762,6 +1806,10 @@ class OtlpMetricsRuntime:
     def read_export_health(self) -> tuple[TelemetryExportSignalState, ...]:
         health = self.health or TelemetryExportHealthState(("metrics",))
         return health.read_export_health()
+
+    def record_component_heartbeat(self, component: str) -> None:
+        if self.heartbeat_sink is not None:
+            self.heartbeat_sink.record_component_heartbeat(component)
 
 
 @dataclass(frozen=True)
@@ -1815,6 +1863,12 @@ class CompositeTelemetryRuntime:
                     selected[state.signal] = state
         return tuple(selected[signal] for signal in _SIGNALS)
 
+    def record_component_heartbeat(self, component: str) -> None:
+        for part in self.parts:
+            recorder = getattr(part, "record_component_heartbeat", None)
+            if callable(recorder):
+                recorder(component)
+
 
 def build_otlp_metrics_runtime(
     configuration: OtlpMetricsConfiguration,
@@ -1854,6 +1908,7 @@ def build_otlp_metrics_runtime(
         query_meter = provider.get_meter("iip.query", "0.84.0")
         receiver_meter = provider.get_meter("iip.otlp.receiver", "0.84.0")
         ai_economics_meter = provider.get_meter("iip.ai.economics", "0.84.0")
+        heartbeat_meter = provider.get_meter("iip.telemetry.heartbeat", "0.84.0")
         sink = OpenTelemetryIngestionSink(
             ingestion_meter,
             attribute_mode=configuration.attribute_mode,
@@ -1862,6 +1917,7 @@ def build_otlp_metrics_runtime(
             sink=sink,
             provider=provider,
             health=export_health,
+            heartbeat_sink=OpenTelemetryComponentHeartbeatSink(heartbeat_meter),
             query_sink=OpenTelemetryQueryAvailabilitySink(query_meter),
             receiver_sink=OpenTelemetryOtlpReceiverSink(receiver_meter),
             ai_economics_sink=OpenTelemetryAiEconomicsSink(

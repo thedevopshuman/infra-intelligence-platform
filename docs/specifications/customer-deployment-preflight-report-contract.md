@@ -48,7 +48,10 @@ a new profile name and decision record.
 `operational-alert-policy` requires metric export plus the fixed
 `monitoring.coreos.com/v1` and
 `otel-prometheus-underscore-no-suffix-v1` profiles, a resolved valid namespace,
-and at least one rule-selector label. The live `operational-alert-api` and
+at least one rule-selector label, and bounded component-heartbeat lookback and
+pending durations. Helm additionally rejects a heartbeat lookback shorter than
+two metric-export intervals or two exporter-health cycles. The live
+`operational-alert-api` and
 `operational-alert-namespace` checks use Kubernetes discovery and exact-name
 lookup only. They do not prove that a Prometheus instance selects or evaluates
 the rules.
@@ -76,8 +79,9 @@ the separate clean-release external
 [ingress availability qualification](ingress-availability-qualification-report-contract.md);
 preflight cannot satisfy it from chart values or cluster objects.
 `customer-operational-alert-routing` separately preserves Prometheus rule
-selection, missing-signal monitoring, Alertmanager routing, contact delivery,
-recovery, and escalation as customer-owned live evidence.
+selection/evaluation, independent Collector/backend monitoring, Alertmanager
+routing, contact delivery, recovery, and escalation as customer-owned live
+evidence.
 
 ## Dependency minimization
 

@@ -115,6 +115,12 @@
 {{- if and .Values.operationalAlerts.enabled (not .Values.telemetry.metricsEnabled) }}
 {{- fail "telemetry.metricsEnabled must be true when operationalAlerts.enabled=true" }}
 {{- end }}
+{{- if and .Values.operationalAlerts.enabled (lt (mul (int .Values.operationalAlerts.telemetryHeartbeatWindowSeconds) 1000) (mul (int .Values.telemetry.exportIntervalMillis) 2)) }}
+{{- fail "operationalAlerts.telemetryHeartbeatWindowSeconds must cover at least two telemetry export intervals" }}
+{{- end }}
+{{- if and .Values.operationalAlerts.enabled (lt (int .Values.operationalAlerts.telemetryHeartbeatWindowSeconds) (mul (int .Values.telemetry.healthReportIntervalSeconds) 2)) }}
+{{- fail "operationalAlerts.telemetryHeartbeatWindowSeconds must cover at least two telemetry health-report intervals" }}
+{{- end }}
 {{- if and (or .Values.otlpReceiver.enabled .Values.otlpLogsReceiver.enabled .Values.aiUsageReceiver.enabled) .Values.telemetry.metricsEnabled .Values.networkPolicy.enabled (not .Values.networkPolicy.otlpEgress.enabled) }}
 {{- fail "networkPolicy.otlpEgress.enabled is required for OTLP receiver telemetry export" }}
 {{- end }}

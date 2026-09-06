@@ -319,6 +319,8 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
             '"metricNameProfile" .Values.operationalAlerts.metricNameProfile',
             '"namespace" (default .Release.Namespace',
             '"selectorLabelCount" (len .Values.operationalAlerts.labels)',
+            '"telemetryHeartbeatWindowSeconds" .Values.operationalAlerts.telemetryHeartbeatWindowSeconds',
+            '"telemetryHeartbeatForSeconds" .Values.operationalAlerts.telemetryHeartbeatForSeconds',
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, profile)

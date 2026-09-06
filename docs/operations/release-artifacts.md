@@ -214,6 +214,14 @@ provider, design-partner, and legal/brand gates that remain external. See the
 [contract](../specifications/release-readiness-report-contract.md) and
 [ADR 0120](../decisions/0120-aggregate-local-release-readiness-evidence.md).
 
+For a customer cluster, the separate [customer deployment qualification
+workflow](customer-deployment-qualification.md) binds the live preflight,
+post-continuity health, external ingress, and API-pod Eviction reports to the
+same exact release and current namespace UID/server. That additive report can
+support the customer installation/ingress gates, but its fixed limitations do
+not satisfy artifact trust, integration, database, provider, regional, pilot,
+or governance gates.
+
 ## Production promotion boundary
 
 The local bundle is explicitly unsigned. It proves artifact integrity and build evidence, not who published it. Once repository hosting and organizational release identity are accepted, production promotion must:

@@ -42,6 +42,15 @@ pseudonymous bindings. The disruptive path is never part of `make verify` and
 requires an explicit enable flag; see the [customer continuity qualification
 runbook](docs/operations/customer-continuity-qualification.md).
 
+After that disruption, an additive customer deployment gate binds the live
+dependency preflight, exact installed health, nested ingress evidence, and
+continuity report to one clean release and current namespace UID/server. It
+requires a fresh post-continuity health observation and retains only report
+digests and hashed target bindings. Its fixed limitations prevent this narrow
+single-cluster result from becoming a publication, database, integration,
+regional, pilot, or governance claim; see the [customer deployment
+qualification runbook](docs/operations/customer-deployment-qualification.md).
+
 After registry publication, a separate promotion verifier derives both OCI
 index digests from that verified manifest and checks exact Cosign signer
 identity, issuer, version, and transparency evidence under a reviewed policy.

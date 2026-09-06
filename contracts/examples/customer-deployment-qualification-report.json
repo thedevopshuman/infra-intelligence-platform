@@ -1,0 +1,111 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerDeploymentQualificationReport",
+  "metadata": {
+    "id": "cdq_44a9d7e3fff458347dbe0ec17310e000",
+    "generatedAt": "2026-09-06T12:38:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualificationLevel": "single-cluster-control-plane-v1",
+    "subject": {
+      "profile": "production-ai-finops-v0",
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "requiredMigration": "0023_ai_model_suitability.sql",
+      "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "clusterBindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "namespaceBindingDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "releaseBindingDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "deploymentBindingDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "continuityTargetBindingDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "objective": {
+      "maximumEvidenceAgeSeconds": 86400,
+      "maximumClockSkewSeconds": 300,
+      "requirePostContinuityHealth": true
+    },
+    "measurements": {
+      "preflightGeneratedAt": "2026-09-06T12:00:00Z",
+      "continuityStartedAt": "2026-09-06T12:30:00Z",
+      "continuityCompletedAt": "2026-09-06T12:36:05Z",
+      "postContinuityHealthObservedAt": "2026-09-06T12:37:00Z",
+      "qualifiedAt": "2026-09-06T12:38:00Z",
+      "oldestEvidenceAgeSeconds": 2280
+    },
+    "evidence": [
+      {
+        "id": "live-install-preflight",
+        "contractKind": "CustomerDeploymentPreflightReport",
+        "reportId": "cdp_11111111111111111111111111111111",
+        "reportDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "observedStatus": "install-ready",
+        "status": "passed"
+      },
+      {
+        "id": "post-install-health",
+        "contractKind": "DeploymentDiagnosticReport",
+        "reportId": "ddr_22222222222222222222222222222222",
+        "reportDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "observedStatus": "healthy",
+        "status": "passed"
+      },
+      {
+        "id": "customer-ingress",
+        "contractKind": "IngressAvailabilityQualificationReport",
+        "reportId": "iaq_33333333333333333333333333333333",
+        "reportDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "observedStatus": "qualified",
+        "status": "passed"
+      },
+      {
+        "id": "control-plane-continuity",
+        "contractKind": "CustomerContinuityQualificationReport",
+        "reportId": "ccq_44444444444444444444444444444444",
+        "reportDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "observedStatus": "qualified",
+        "status": "passed"
+      }
+    ],
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "profile-binding", "status": "passed"},
+      {"id": "exact-release-identity", "status": "passed"},
+      {"id": "explicit-current-cluster", "status": "passed"},
+      {"id": "live-install-preflight", "status": "passed"},
+      {"id": "post-continuity-health", "status": "passed"},
+      {"id": "customer-ingress", "status": "passed"},
+      {"id": "control-plane-continuity", "status": "passed"},
+      {"id": "continuity-ingress-chain", "status": "passed"},
+      {"id": "evidence-order", "status": "passed"},
+      {"id": "evidence-freshness", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"}
+    ],
+    "limitations": [
+      "single-customer-cluster",
+      "planned-single-api-pod-disruption",
+      "point-in-time-dependency-observation",
+      "artifact-publication-signatures-vulnerabilities-not-qualified",
+      "database-ha-dr-not-qualified",
+      "worker-receiver-continuity-not-qualified",
+      "customer-integrations-and-live-ai-not-qualified",
+      "regional-slo-and-capacity-not-qualified",
+      "design-partner-legal-brand-governance-not-qualified"
+    ],
+    "summary": {
+      "requiredEvidence": 4,
+      "passedEvidence": 4,
+      "rejectedEvidence": 0,
+      "totalChecks": 12,
+      "passedChecks": 12,
+      "failedChecks": 0,
+      "overallStatus": "qualified"
+    }
+  }
+}

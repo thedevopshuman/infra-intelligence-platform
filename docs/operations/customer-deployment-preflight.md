@@ -129,6 +129,12 @@ Use the specialized compatibility and recovery reports for those boundaries.
 Do not interpret `install-ready` as proof that an external service or customer
 workload is production-ready.
 
+After installation and the explicitly enabled continuity workflow, run the
+[customer deployment qualification](customer-deployment-qualification.md) to
+bind this live preflight to exact installed health, nested customer-ingress
+evidence, and one protected API-pod disruption. That additive report preserves
+all broader production gaps.
+
 ## Failure and rollback
 
 Preflight makes no cluster changes. Correct the protected values or create the

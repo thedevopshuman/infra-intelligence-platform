@@ -113,6 +113,13 @@ REQUIRED_PATHS = (
     "contracts/examples/customer-continuity-qualification-report.json",
     "scripts/qualify_customer_continuity.py",
     "tests/test_customer_continuity_qualification.py",
+    "docs/operations/customer-deployment-qualification.md",
+    "docs/specifications/customer-deployment-qualification-report-contract.md",
+    "docs/decisions/0124-additive-customer-deployment-qualification.md",
+    "contracts/schemas/customer-deployment-qualification-report.schema.json",
+    "contracts/examples/customer-deployment-qualification-report.json",
+    "scripts/qualify_customer_deployment.py",
+    "tests/test_customer_deployment_qualification.py",
     "docs/operations/kubernetes-availability-qualification.md",
     "docs/specifications/kubernetes-availability-qualification-report-contract.md",
     "contracts/schemas/kubernetes-availability-qualification-report.schema.json",
@@ -2027,6 +2034,36 @@ def validate_customer_continuity_qualification_example(
         validate_report_document(report)
     except CustomerContinuityQualificationError:
         fail(errors, "customer continuity example must be semantically valid")
+
+
+def validate_customer_deployment_qualification_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check the additive customer deployment evidence profile."""
+
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "customer-deployment-qualification-report.json"
+    )
+    report = documents.get(path)
+    try:
+        from qualify_customer_deployment import (
+            CustomerDeploymentQualificationError,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "customer deployment qualification example must be semantically valid")
+        return
+    try:
+        if not isinstance(report, dict):
+            raise CustomerDeploymentQualificationError(
+                "customer-deployment-qualification.report.invalid"
+            )
+        validate_report_document(report)
+    except CustomerDeploymentQualificationError:
+        fail(errors, "customer deployment qualification example must be semantically valid")
 
 
 def validate_postgresql_recovery_qualification_example(
@@ -4891,6 +4928,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerContinuityQualificationReport",
         ),
         (
+            "customer-deployment-qualification-report.json",
+            "CustomerDeploymentQualificationReport",
+        ),
+        (
             "credential-broker-compatibility-report.json",
             "CredentialBrokerCompatibilityReport",
         ),
@@ -4967,6 +5008,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_customer_deployment_preflight_example(documents, errors)
     validate_ingress_availability_qualification_example(documents, errors)
     validate_customer_continuity_qualification_example(documents, errors)
+    validate_customer_deployment_qualification_example(documents, errors)
     validate_postgresql_recovery_qualification_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
     validate_ai_economics_examples(documents, errors)

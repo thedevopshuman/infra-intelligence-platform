@@ -162,6 +162,15 @@ recovery, availability, and latency evidence without customer identifiers.
 Worker, receiver, database, node, zone, sustained customer-traffic capacity,
 and long-window regional certification remain external.
 
+Customer-deployment update: ADR 0124 now aggregates one exact cluster-mode
+preflight, post-install diagnostic, customer ingress report, and the ADR 0123
+continuity chain. It rechecks the namespace UID/server binding, requires a
+post-continuity health observation, and fails closed on crossed or stale
+evidence. This closes the manual correlation gap for the narrow installed
+control-plane profile; artifact trust, database/worker/receiver continuity,
+integrations, live AI/pricing, regional capacity, pilot, and public-governance
+gates remain independent.
+
 Update: ADR 0058 adds a deployment-configured rolling useful-completion SLO over durable asynchronous jobs, including explicit late, failed, cancelled, and unfinished misses. ADR 0059 adds a privacy-bounded query availability counter and duration histogram with explicit objective values over the replaceable OTLP metrics boundary. Bounded external ingress qualification is delivered by ADR 0105; continuous regional coverage and notification routing remain open.
 
 ## Phase 4 — governed actions and workflows

@@ -583,6 +583,28 @@ class CustomerContinuityQualificationReport:
 
 
 @dataclass(frozen=True)
+class CustomerDeploymentQualificationReport:
+    """Exact-release customer install, health, ingress, and continuity evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerDeploymentQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerDeploymentQualificationReport",
+                label="customer deployment qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class KubernetesAvailabilityQualificationReport:
     """Source-bound planned worker-drain availability evidence."""
 

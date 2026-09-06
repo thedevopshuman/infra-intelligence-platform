@@ -25,6 +25,7 @@ from .models import (
     CollectorQueueLossReport,
     ConsoleAuthenticationConfiguration,
     CustomerContinuityQualificationReport,
+    CustomerDeploymentQualificationReport,
     CustomerDeploymentPreflightReport,
     DeploymentDiagnosticReport,
     ContextEvidenceRequest,
@@ -135,6 +136,7 @@ __all__ = [
     "CollectorQueueLossReport",
     "ConsoleAuthenticationConfiguration",
     "CustomerContinuityQualificationReport",
+    "CustomerDeploymentQualificationReport",
     "CustomerDeploymentPreflightReport",
     "DeploymentDiagnosticReport",
     "ContextEvidenceRequest",
@@ -223,4 +225,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.59.0"
+__version__ = "0.60.0"

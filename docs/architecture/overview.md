@@ -101,6 +101,13 @@ ready capacity, active PDB protection, a sustained observation window,
 replacement recovery, and closed availability and latency objectives while
 retaining only aggregates and pseudonymous bindings.
 
+[ADR 0124](../decisions/0124-additive-customer-deployment-qualification.md)
+then joins the exact live preflight, installed-health snapshot, nested ingress
+report, and continuity evidence. The operational harness rechecks the current
+namespace UID/server binding and requires health after the disruption; it
+retains only public release identity, timestamps, report digests, and hashed
+targets, and it cannot authorize publication or production use.
+
 The signed plugin runner claims each exact-tenant request against its persisted
 session and canonical invocation digest before a container starts. PostgreSQL
 serializes the session request limit across replicas, retains host-created

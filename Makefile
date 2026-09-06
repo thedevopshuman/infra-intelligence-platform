@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -44,6 +44,10 @@ IIP_CONTINUITY_MINIMUM_AVAILABILITY_BASIS_POINTS ?= 9990
 IIP_CONTINUITY_MAXIMUM_P95_LATENCY_MILLISECONDS ?= 2000
 IIP_CONTINUITY_REQUEST_TIMEOUT_MILLISECONDS ?= 2000
 IIP_CONTINUITY_MAXIMUM_RECOVERY_SECONDS ?= 120
+IIP_CUSTOMER_DEPLOYMENT_QUALIFICATION_REPORT ?= dist/customer-deployment-qualification-report.json
+IIP_CUSTOMER_QUALIFICATION_VALUES ?= $(IIP_DEPLOYMENT_VALUES)
+IIP_CUSTOMER_QUALIFICATION_MAXIMUM_EVIDENCE_AGE_SECONDS ?= 86400
+IIP_CUSTOMER_QUALIFICATION_MAXIMUM_CLOCK_SKEW_SECONDS ?= 300
 IIP_KUBERNETES_AVAILABILITY_REPORT ?= dist/kubernetes-availability-qualification-report.json
 IIP_GITHUB_CONTEXT_COMPATIBILITY_REPORT ?= dist/github-context-compatibility-report.json
 IIP_RELEASE_SIGNATURE_POLICY ?=
@@ -80,6 +84,9 @@ help:
 	@echo "test-customer-continuity Validate the customer continuity contract and safe orchestrator"
 	@echo "qualify-customer-continuity Probe HTTPS while evicting one explicitly selected API pod"
 	@echo "verify-customer-continuity-report Verify exact customer continuity and ingress evidence"
+	@echo "test-customer-deployment-qualification Validate exact customer evidence aggregation"
+	@echo "qualify-customer-deployment Bind live preflight, health, ingress, and continuity evidence"
+	@echo "verify-customer-deployment-qualification-report Recompute the customer evidence chain"
 	@echo "test-kubernetes-availability Validate the planned-disruption report and harness"
 	@echo "qualify-kubernetes-availability Prove API/OTLP availability during an owned Kind worker drain"
 	@echo "verify-kubernetes-availability-report Verify clean current planned-disruption evidence"
@@ -319,6 +326,53 @@ verify-customer-continuity-report:
 		--report "$(IIP_CONTINUITY_REPORT)" \
 		--ingress-report "$(IIP_CONTINUITY_INGRESS_REPORT)" \
 		--require-clean --require-qualified
+
+test-customer-deployment-qualification:
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_customer_deployment_qualification -v
+
+qualify-customer-deployment:
+	@test -n "$(IIP_KUBERNETES_CONTEXT)" || \
+		(echo "IIP_KUBERNETES_CONTEXT is required" >&2; exit 2)
+	@test -n "$(IIP_CONTINUITY_IMAGE_DIGEST)" || \
+		(echo "IIP_CONTINUITY_IMAGE_DIGEST is required" >&2; exit 2)
+	@test -n "$(strip $(IIP_CUSTOMER_QUALIFICATION_VALUES))" || \
+		(echo "IIP_CUSTOMER_QUALIFICATION_VALUES is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_deployment.py generate \
+		--preflight-report "$(IIP_DEPLOYMENT_PREFLIGHT_REPORT)" \
+		--diagnostic-report "$(IIP_DEPLOYMENT_DIAGNOSTIC_REPORT)" \
+		--ingress-report "$(IIP_CONTINUITY_INGRESS_REPORT)" \
+		--continuity-report "$(IIP_CONTINUITY_REPORT)" \
+		$(foreach value,$(IIP_CUSTOMER_QUALIFICATION_VALUES),--values "$(value)") \
+		--context "$(IIP_KUBERNETES_CONTEXT)" \
+		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
+		--release-name "$(IIP_DIAGNOSTIC_RELEASE_NAME)" \
+		--deployment "$(IIP_CONTINUITY_DEPLOYMENT)" \
+		--image-digest "$(IIP_CONTINUITY_IMAGE_DIGEST)" \
+		--helm "$(HELM)" --kubectl "$(KUBECTL)" \
+		--maximum-evidence-age-seconds "$(IIP_CUSTOMER_QUALIFICATION_MAXIMUM_EVIDENCE_AGE_SECONDS)" \
+		--maximum-clock-skew-seconds "$(IIP_CUSTOMER_QUALIFICATION_MAXIMUM_CLOCK_SKEW_SECONDS)" \
+		--output "$(IIP_CUSTOMER_DEPLOYMENT_QUALIFICATION_REPORT)"
+
+verify-customer-deployment-qualification-report:
+	@test -n "$(IIP_KUBERNETES_CONTEXT)" || \
+		(echo "IIP_KUBERNETES_CONTEXT is required" >&2; exit 2)
+	@test -n "$(IIP_CONTINUITY_IMAGE_DIGEST)" || \
+		(echo "IIP_CONTINUITY_IMAGE_DIGEST is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_deployment.py verify \
+		--report "$(IIP_CUSTOMER_DEPLOYMENT_QUALIFICATION_REPORT)" \
+		--preflight-report "$(IIP_DEPLOYMENT_PREFLIGHT_REPORT)" \
+		--diagnostic-report "$(IIP_DEPLOYMENT_DIAGNOSTIC_REPORT)" \
+		--ingress-report "$(IIP_CONTINUITY_INGRESS_REPORT)" \
+		--continuity-report "$(IIP_CONTINUITY_REPORT)" \
+		$(foreach value,$(IIP_CUSTOMER_QUALIFICATION_VALUES),--values "$(value)") \
+		--context "$(IIP_KUBERNETES_CONTEXT)" \
+		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
+		--release-name "$(IIP_DIAGNOSTIC_RELEASE_NAME)" \
+		--deployment "$(IIP_CONTINUITY_DEPLOYMENT)" \
+		--image-digest "$(IIP_CONTINUITY_IMAGE_DIGEST)" \
+		--helm "$(HELM)" --kubectl "$(KUBECTL)" \
+		--require-current-cluster --require-qualified
 
 test-kubernetes-availability:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \

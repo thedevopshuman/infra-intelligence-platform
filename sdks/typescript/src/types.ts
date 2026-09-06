@@ -1270,6 +1270,118 @@ export interface CustomerContinuityQualificationReport {
   };
 }
 
+export type CustomerDeploymentQualificationEvidenceId =
+  | "live-install-preflight"
+  | "post-install-health"
+  | "customer-ingress"
+  | "control-plane-continuity";
+
+export type CustomerDeploymentQualificationCheckId =
+  | "source-binding"
+  | "profile-binding"
+  | "exact-release-identity"
+  | "explicit-current-cluster"
+  | "live-install-preflight"
+  | "post-continuity-health"
+  | "customer-ingress"
+  | "control-plane-continuity"
+  | "continuity-ingress-chain"
+  | "evidence-order"
+  | "evidence-freshness"
+  | "minimized-output";
+
+export interface CustomerDeploymentQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerDeploymentQualificationReport";
+  metadata: {
+    id: `cdq_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualificationLevel: "single-cluster-control-plane-v1";
+    subject: {
+      profile: "production-core-v1" | "production-ai-finops-v0";
+      applicationVersion: string;
+      chartVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      requiredMigration: `${number}_${string}.sql`;
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      clusterBindingDigest: Sha256Digest;
+      namespaceBindingDigest: Sha256Digest;
+      releaseBindingDigest: Sha256Digest;
+      deploymentBindingDigest: Sha256Digest;
+      continuityTargetBindingDigest: Sha256Digest;
+    };
+    objective: {
+      maximumEvidenceAgeSeconds: number;
+      maximumClockSkewSeconds: number;
+      requirePostContinuityHealth: true;
+    };
+    measurements: {
+      preflightGeneratedAt: string;
+      continuityStartedAt: string;
+      continuityCompletedAt: string;
+      postContinuityHealthObservedAt: string;
+      qualifiedAt: string;
+      oldestEvidenceAgeSeconds: number;
+    };
+    evidence: Array<{
+      id: CustomerDeploymentQualificationEvidenceId;
+      contractKind:
+        | "CustomerDeploymentPreflightReport"
+        | "DeploymentDiagnosticReport"
+        | "IngressAvailabilityQualificationReport"
+        | "CustomerContinuityQualificationReport";
+      reportId: string;
+      reportDigest: Sha256Digest;
+      observedStatus:
+        | "blocked"
+        | "configuration-ready"
+        | "install-ready"
+        | "healthy"
+        | "attention-required"
+        | "qualified"
+        | "not-qualified";
+      status: "passed" | "rejected";
+      errorCode?: `customer-deployment-qualification.${string}`;
+    }>;
+    checks: Array<
+      | { id: CustomerDeploymentQualificationCheckId; status: "passed" }
+      | {
+          id: CustomerDeploymentQualificationCheckId;
+          status: "failed";
+          errorCode: `customer-deployment-qualification.${string}`;
+        }
+    >;
+    limitations: [
+      "single-customer-cluster",
+      "planned-single-api-pod-disruption",
+      "point-in-time-dependency-observation",
+      "artifact-publication-signatures-vulnerabilities-not-qualified",
+      "database-ha-dr-not-qualified",
+      "worker-receiver-continuity-not-qualified",
+      "customer-integrations-and-live-ai-not-qualified",
+      "regional-slo-and-capacity-not-qualified",
+      "design-partner-legal-brand-governance-not-qualified",
+    ];
+    summary: {
+      requiredEvidence: 4;
+      passedEvidence: number;
+      rejectedEvidence: number;
+      totalChecks: 12;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export type ReleaseQualificationInstallCheckId =
   | "bundle-integrity"
   | "source-identity"

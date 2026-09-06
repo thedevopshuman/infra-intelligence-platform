@@ -15,6 +15,7 @@ from infra_intelligence_sdk import (
     ActionWorkflowPage,
     ConsoleAuthenticationConfiguration,
     CustomerContinuityQualificationReport,
+    CustomerDeploymentQualificationReport,
     CustomerDeploymentPreflightReport,
     ContextEvidenceRequest,
     ContextEvidenceResult,
@@ -191,6 +192,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         customer_continuity = CustomerContinuityQualificationReport.from_dict(
             example("customer-continuity-qualification-report.json")
+        )
+        customer_deployment = CustomerDeploymentQualificationReport.from_dict(
+            example("customer-deployment-qualification-report.json")
         )
         kubernetes_availability = KubernetesAvailabilityQualificationReport.from_dict(
             example("kubernetes-availability-qualification-report.json")

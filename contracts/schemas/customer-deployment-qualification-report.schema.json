@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-deployment-qualification-report:v1alpha1",
+  "title": "Customer Deployment Qualification Report",
+  "description": "Privacy-minimized evidence that one exact IIP release passed live dependency preflight, post-install health, external ingress, and planned API-pod disruption checks in one bound customer cluster.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerDeploymentQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^cdq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationLevel", "subject", "bindings", "objective", "measurements", "evidence", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualificationLevel": {"const": "single-cluster-control-plane-v1"},
+        "subject": {"$ref": "#/$defs/subject"},
+        "bindings": {"$ref": "#/$defs/bindings"},
+        "objective": {"$ref": "#/$defs/objective"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "evidence": {"$ref": "#/$defs/evidenceList"},
+        "checks": {"$ref": "#/$defs/checks"},
+        "limitations": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "prefixItems": [
+            {"const": "single-customer-cluster"},
+            {"const": "planned-single-api-pod-disruption"},
+            {"const": "point-in-time-dependency-observation"},
+            {"const": "artifact-publication-signatures-vulnerabilities-not-qualified"},
+            {"const": "database-ha-dr-not-qualified"},
+            {"const": "worker-receiver-continuity-not-qualified"},
+            {"const": "customer-integrations-and-live-ai-not-qualified"},
+            {"const": "regional-slo-and-capacity-not-qualified"},
+            {"const": "design-partner-legal-brand-governance-not-qualified"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requiredEvidence", "passedEvidence", "rejectedEvidence", "totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "requiredEvidence": {"const": 4},
+            "passedEvidence": {"type": "integer", "minimum": 0, "maximum": 4},
+            "rejectedEvidence": {"type": "integer", "minimum": 0, "maximum": 4},
+            "totalChecks": {"const": 12},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 12},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 12},
+            "overallStatus": {"enum": ["qualified", "not-qualified"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "applicationVersion", "chartVersion", "contractsApiVersion", "requiredMigration", "sourceRevision", "imageDigest"],
+      "properties": {
+        "profile": {"enum": ["production-core-v1", "production-ai-finops-v0"]},
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+        "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clusterBindingDigest", "namespaceBindingDigest", "releaseBindingDigest", "deploymentBindingDigest", "continuityTargetBindingDigest"],
+      "properties": {
+        "clusterBindingDigest": {"$ref": "#/$defs/digest"},
+        "namespaceBindingDigest": {"$ref": "#/$defs/digest"},
+        "releaseBindingDigest": {"$ref": "#/$defs/digest"},
+        "deploymentBindingDigest": {"$ref": "#/$defs/digest"},
+        "continuityTargetBindingDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maximumEvidenceAgeSeconds", "maximumClockSkewSeconds", "requirePostContinuityHealth"],
+      "properties": {
+        "maximumEvidenceAgeSeconds": {"type": "integer", "minimum": 300, "maximum": 604800},
+        "maximumClockSkewSeconds": {"type": "integer", "minimum": 0, "maximum": 900},
+        "requirePostContinuityHealth": {"const": true}
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preflightGeneratedAt", "continuityStartedAt", "continuityCompletedAt", "postContinuityHealthObservedAt", "qualifiedAt", "oldestEvidenceAgeSeconds"],
+      "properties": {
+        "preflightGeneratedAt": {"type": "string", "format": "date-time"},
+        "continuityStartedAt": {"type": "string", "format": "date-time"},
+        "continuityCompletedAt": {"type": "string", "format": "date-time"},
+        "postContinuityHealthObservedAt": {"type": "string", "format": "date-time"},
+        "qualifiedAt": {"type": "string", "format": "date-time"},
+        "oldestEvidenceAgeSeconds": {"type": "integer", "minimum": 0, "maximum": 10000000}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "contractKind", "reportId", "reportDigest", "observedStatus", "status"],
+      "properties": {
+        "id": {"enum": ["live-install-preflight", "post-install-health", "customer-ingress", "control-plane-continuity"]},
+        "contractKind": {"enum": ["CustomerDeploymentPreflightReport", "DeploymentDiagnosticReport", "IngressAvailabilityQualificationReport", "CustomerContinuityQualificationReport"]},
+        "reportId": {"type": "string", "pattern": "^[a-z]{3}_[a-f0-9]{32}$"},
+        "reportDigest": {"$ref": "#/$defs/digest"},
+        "observedStatus": {"enum": ["blocked", "configuration-ready", "install-ready", "healthy", "attention-required", "qualified", "not-qualified"]},
+        "status": {"enum": ["passed", "rejected"]},
+        "errorCode": {"type": "string", "pattern": "^customer-deployment-qualification\\.[a-z0-9.-]+$", "maxLength": 160}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "rejected"}}}
+      ]
+    },
+    "evidenceList": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "prefixItems": [
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "live-install-preflight"}, "contractKind": {"const": "CustomerDeploymentPreflightReport"}}},
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "post-install-health"}, "contractKind": {"const": "DeploymentDiagnosticReport"}}},
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "customer-ingress"}, "contractKind": {"const": "IngressAvailabilityQualificationReport"}}},
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "control-plane-continuity"}, "contractKind": {"const": "CustomerContinuityQualificationReport"}}}
+      ],
+      "items": false
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-deployment-qualification\\.[a-z0-9.-]+$", "maxLength": 160}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "exact-release-identity"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "explicit-current-cluster"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "live-install-preflight"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "post-continuity-health"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "customer-ingress"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "control-plane-continuity"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "continuity-ingress-chain"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "evidence-order"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "evidence-freshness"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}}
+      ],
+      "items": false
+    }
+  }
+}

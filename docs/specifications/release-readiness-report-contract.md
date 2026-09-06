@@ -58,6 +58,11 @@ provider and price authority, design-partner acceptance, and legal/brand/
 governance decisions. These entries are scope boundaries, not failed local
 tests, and are never caller-overridable acknowledgements.
 
+The additive `CustomerDeploymentQualificationReport` can now provide a
+machine-verifiable chain for the narrow live-install and customer-ingress
+portion of those external gates. It does not mutate this local readiness
+report or satisfy the other customer and organizational gates.
+
 The aggregate report does not replace the owning report verifiers, create a
 release approval, publish an artifact, sign an image, access a customer
 cluster, or broaden any integration credential. It remains outside the

@@ -1,0 +1,59 @@
+{
+  "apiVersion": "iip.dev/v1alpha1",
+  "kind": "ReleaseReadinessReport",
+  "metadata": {
+    "id": "rrr_8ad3a3317456415f8268760b84488f1c",
+    "generatedAt": "2026-09-06T15:00:00Z",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "locally-qualified",
+    "qualificationBoundary": "local-candidate-only",
+    "release": {
+      "version": "0.84.0",
+      "chartVersion": "0.87.0",
+      "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "manifestDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "signatureStatus": "unsigned"
+    },
+    "evidence": [
+      {"id": "packaged-release", "contractKind": "ReleaseQualificationReport", "qualificationBoundary": "packaged-local", "status": "passed", "reportDigest": "sha256:0101010101010101010101010101010101010101010101010101010101010101", "observedStatus": "qualified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "sbom-vulnerabilities", "contractKind": "ReleaseVulnerabilityQualificationReport", "qualificationBoundary": "security-local", "status": "passed", "reportDigest": "sha256:0202020202020202020202020202020202020202020202020202020202020202", "observedStatus": "qualified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "investigation-capacity", "contractKind": "InvestigationCapacityReport", "qualificationBoundary": "local-runtime", "status": "passed", "reportDigest": "sha256:0303030303030303030303030303030303030303030303030303030303030303", "observedStatus": "certified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "credential-broker", "contractKind": "CredentialBrokerCompatibilityReport", "qualificationBoundary": "local-integration", "status": "passed", "reportDigest": "sha256:0404040404040404040404040404040404040404040404040404040404040404", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "oidc-issuer", "contractKind": "OidcIssuerCompatibilityReport", "qualificationBoundary": "local-integration", "status": "passed", "reportDigest": "sha256:0505050505050505050505050505050505050505050505050505050505050505", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "oidc-browser", "contractKind": "OidcBrowserCompatibilityReport", "qualificationBoundary": "local-integration", "status": "passed", "reportDigest": "sha256:0606060606060606060606060606060606060606060606060606060606060606", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "policy-engine", "contractKind": "PolicyEngineCompatibilityReport", "qualificationBoundary": "local-integration", "status": "passed", "reportDigest": "sha256:0707070707070707070707070707070707070707070707070707070707070707", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "otlp-receiver", "contractKind": "OtlpReceiverCompatibilityReport", "qualificationBoundary": "local-integration", "status": "passed", "reportDigest": "sha256:0808080808080808080808080808080808080808080808080808080808080808", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "bedrock-converse", "contractKind": "BedrockInstrumentationCompatibilityReport", "qualificationBoundary": "offline-provider", "status": "passed", "reportDigest": "sha256:0909090909090909090909090909090909090909090909090909090909090909", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "bedrock-converse-stream", "contractKind": "BedrockInstrumentationCompatibilityReport", "qualificationBoundary": "offline-provider", "status": "passed", "reportDigest": "sha256:1010101010101010101010101010101010101010101010101010101010101010", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "openai-chat-completions", "contractKind": "OpenAIInstrumentationCompatibilityReport", "qualificationBoundary": "offline-provider", "status": "passed", "reportDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "postgresql-logical-recovery", "contractKind": "PostgreSQLRecoveryQualificationReport", "qualificationBoundary": "local-recovery", "status": "passed", "reportDigest": "sha256:1212121212121212121212121212121212121212121212121212121212121212", "observedStatus": "qualified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "postgresql-continuity", "contractKind": "PostgreSQLContinuityQualificationReport", "qualificationBoundary": "local-recovery", "status": "passed", "reportDigest": "sha256:1313131313131313131313131313131313131313131313131313131313131313", "observedStatus": "qualified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "kubernetes-planned-disruption", "contractKind": "KubernetesAvailabilityQualificationReport", "qualificationBoundary": "local-availability", "status": "passed", "reportDigest": "sha256:1414141414141414141414141414141414141414141414141414141414141414", "observedStatus": "qualified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "github-context", "contractKind": "GithubContextCompatibilityReport", "qualificationBoundary": "local-integration", "status": "passed", "reportDigest": "sha256:1515151515151515151515151515151515151515151515151515151515151515", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "plugin-runtime", "contractKind": "PluginCompatibilityReport", "qualificationBoundary": "local-integration", "status": "passed", "reportDigest": "sha256:1616161616161616161616161616161616161616161616161616161616161616", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "production-core-configuration", "contractKind": "CustomerDeploymentPreflightReport", "qualificationBoundary": "configuration-only", "status": "passed", "reportDigest": "sha256:1717171717171717171717171717171717171717171717171717171717171717", "observedStatus": "configuration-ready", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "production-ai-finops-configuration", "contractKind": "CustomerDeploymentPreflightReport", "qualificationBoundary": "configuration-only", "status": "passed", "reportDigest": "sha256:1818181818181818181818181818181818181818181818181818181818181818", "observedStatus": "configuration-ready", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+    ],
+    "externalGates": [
+      {"id": "approved-registry-publication", "status": "external-required", "reasonCode": "release-readiness.external.registry-publication"},
+      {"id": "organizational-release-signatures", "status": "external-required", "reasonCode": "release-readiness.external.organizational-signatures"},
+      {"id": "customer-install-preflight", "status": "external-required", "reasonCode": "release-readiness.external.customer-install-preflight"},
+      {"id": "customer-ingress-availability", "status": "external-required", "reasonCode": "release-readiness.external.customer-ingress-availability"},
+      {"id": "customer-integration-interoperability", "status": "external-required", "reasonCode": "release-readiness.external.customer-integrations"},
+      {"id": "live-ai-provider-and-price-authority", "status": "external-required", "reasonCode": "release-readiness.external.live-ai-and-price"},
+      {"id": "design-partner-acceptance", "status": "external-required", "reasonCode": "release-readiness.external.design-partner"},
+      {"id": "legal-brand-and-governance", "status": "external-required", "reasonCode": "release-readiness.external.legal-brand-governance"}
+    ],
+    "summary": {
+      "requiredEvidence": 18,
+      "passedEvidence": 18,
+      "missingEvidence": 0,
+      "rejectedEvidence": 0,
+      "externalGateCount": 8,
+      "overallStatus": "locally-qualified"
+    }
+  }
+}

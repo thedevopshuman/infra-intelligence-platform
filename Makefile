@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -30,6 +30,8 @@ IIP_RELEASE_SIGNATURE_POLICY ?=
 IIP_RELEASE_SIGNATURE_REPORT ?= dist/release-signature-verification-report.json
 IIP_RELEASE_VULNERABILITY_POLICY ?= contracts/examples/release-vulnerability-policy.json
 IIP_RELEASE_VULNERABILITY_REPORT ?= dist/release-vulnerability-qualification-report.json
+IIP_RELEASE_EVIDENCE_DIR ?= dist
+IIP_RELEASE_READINESS_REPORT ?= dist/release-readiness-report.json
 IIP_AI_PRICE_CATALOG_FILE ?=
 IIP_AI_PRICE_QUALIFICATION_POLICY ?=
 IIP_AI_PRICE_QUALIFICATION_REPORT ?= dist/ai-price-catalog-qualification-report.json
@@ -103,6 +105,9 @@ help:
 	@echo "test-release-vulnerabilities Exercise the pinned scanner and offline SBOM path"
 	@echo "qualify-release-vulnerabilities Qualify every release SBOM under protected policy"
 	@echo "verify-release-vulnerability-report Validate retained minimized vulnerability evidence"
+	@echo "test-release-readiness Validate aggregate local release-readiness semantics"
+	@echo "assess-release-readiness Aggregate exact local candidate evidence"
+	@echo "verify-release-readiness-report Recompute and verify aggregate candidate evidence"
 	@echo "db-migrate    Apply PostgreSQL migrations using IIP_DATABASE_URL"
 	@echo "helm-lint     Lint and render the Helm chart"
 	@echo "verify        Run all local quality gates"
@@ -471,6 +476,40 @@ verify-release-vulnerability-report:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/release_vulnerability_qualification.py verify \
 		--report "$(IIP_RELEASE_VULNERABILITY_REPORT)" \
 		--require-clean --require-qualified
+
+test-release-readiness:
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_release_readiness -v
+
+assess-release-readiness:
+	@test -n "$(IIP_RELEASE_BUNDLE)" || \
+		(echo "IIP_RELEASE_BUNDLE is required" >&2; exit 2)
+	@test -n "$(IIP_RELEASE_QUALIFICATION_REPORT)" || \
+		(echo "IIP_RELEASE_QUALIFICATION_REPORT is required" >&2; exit 2)
+	@test -n "$(IIP_RELEASE_VULNERABILITY_REPORT)" || \
+		(echo "IIP_RELEASE_VULNERABILITY_REPORT is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/release_readiness.py generate \
+		--bundle "$(IIP_RELEASE_BUNDLE)" \
+		--release-qualification "$(IIP_RELEASE_QUALIFICATION_REPORT)" \
+		--vulnerability-qualification "$(IIP_RELEASE_VULNERABILITY_REPORT)" \
+		--evidence-dir "$(IIP_RELEASE_EVIDENCE_DIR)" \
+		--output "$(IIP_RELEASE_READINESS_REPORT)" \
+		--require-clean --require-locally-qualified
+
+verify-release-readiness-report:
+	@test -n "$(IIP_RELEASE_BUNDLE)" || \
+		(echo "IIP_RELEASE_BUNDLE is required" >&2; exit 2)
+	@test -n "$(IIP_RELEASE_QUALIFICATION_REPORT)" || \
+		(echo "IIP_RELEASE_QUALIFICATION_REPORT is required" >&2; exit 2)
+	@test -n "$(IIP_RELEASE_VULNERABILITY_REPORT)" || \
+		(echo "IIP_RELEASE_VULNERABILITY_REPORT is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/release_readiness.py verify \
+		--bundle "$(IIP_RELEASE_BUNDLE)" \
+		--release-qualification "$(IIP_RELEASE_QUALIFICATION_REPORT)" \
+		--vulnerability-qualification "$(IIP_RELEASE_VULNERABILITY_REPORT)" \
+		--evidence-dir "$(IIP_RELEASE_EVIDENCE_DIR)" \
+		--report "$(IIP_RELEASE_READINESS_REPORT)" \
+		--require-clean --require-locally-qualified
 
 db-migrate:
 	PYTHONPATH=src $(PYTHON) -m iip.adapters.postgres

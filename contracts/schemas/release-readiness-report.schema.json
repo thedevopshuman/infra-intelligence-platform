@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:release-readiness-report:v1alpha1",
+  "title": "Release Readiness Report",
+  "description": "Minimized aggregate evidence for one locally qualified release candidate and an explicit list of external promotion gates.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.dev/v1alpha1"},
+    "kind": {"const": "ReleaseReadinessReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^rrr_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationBoundary", "release", "evidence", "externalGates", "summary"],
+      "properties": {
+        "status": {"enum": ["incomplete", "locally-qualified"]},
+        "qualificationBoundary": {"const": "local-candidate-only"},
+        "release": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "chartVersion", "revision", "manifestDigest", "signatureStatus"],
+          "properties": {
+            "version": {"$ref": "#/$defs/semver"},
+            "chartVersion": {"$ref": "#/$defs/semver"},
+            "revision": {"$ref": "#/$defs/revision"},
+            "manifestDigest": {"$ref": "#/$defs/digest"},
+            "signatureStatus": {"enum": ["unsigned", "signed"]}
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 18,
+          "maxItems": 18,
+          "items": {"$ref": "#/$defs/evidence"}
+        },
+        "externalGates": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "prefixItems": [
+            {"$ref": "#/$defs/externalGate", "properties": {"id": {"const": "approved-registry-publication"}}},
+            {"$ref": "#/$defs/externalGate", "properties": {"id": {"const": "organizational-release-signatures"}}},
+            {"$ref": "#/$defs/externalGate", "properties": {"id": {"const": "customer-install-preflight"}}},
+            {"$ref": "#/$defs/externalGate", "properties": {"id": {"const": "customer-ingress-availability"}}},
+            {"$ref": "#/$defs/externalGate", "properties": {"id": {"const": "customer-integration-interoperability"}}},
+            {"$ref": "#/$defs/externalGate", "properties": {"id": {"const": "live-ai-provider-and-price-authority"}}},
+            {"$ref": "#/$defs/externalGate", "properties": {"id": {"const": "design-partner-acceptance"}}},
+            {"$ref": "#/$defs/externalGate", "properties": {"id": {"const": "legal-brand-and-governance"}}}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requiredEvidence", "passedEvidence", "missingEvidence", "rejectedEvidence", "externalGateCount", "overallStatus"],
+          "properties": {
+            "requiredEvidence": {"const": 18},
+            "passedEvidence": {"type": "integer", "minimum": 0, "maximum": 18},
+            "missingEvidence": {"type": "integer", "minimum": 0, "maximum": 18},
+            "rejectedEvidence": {"type": "integer", "minimum": 0, "maximum": 18},
+            "externalGateCount": {"const": 8},
+            "overallStatus": {"enum": ["incomplete", "locally-qualified"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "contractKind", "qualificationBoundary", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "contractKind": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]{2,95}$"},
+        "qualificationBoundary": {"enum": ["packaged-local", "security-local", "local-runtime", "local-integration", "offline-provider", "local-recovery", "local-availability", "configuration-only"]},
+        "status": {"enum": ["passed", "missing", "rejected"]},
+        "reportDigest": {"$ref": "#/$defs/digest"},
+        "observedStatus": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "errorCode": {"type": "string", "pattern": "^release-readiness\\.[a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {
+          "required": ["reportDigest", "observedStatus", "sourceRevision"],
+          "properties": {"status": {"const": "passed"}},
+          "not": {"required": ["errorCode"]}
+        },
+        {
+          "required": ["errorCode"],
+          "properties": {"status": {"const": "missing"}},
+          "not": {"anyOf": [{"required": ["reportDigest"]}, {"required": ["observedStatus"]}, {"required": ["sourceRevision"]}]}
+        },
+        {
+          "required": ["errorCode"],
+          "properties": {"status": {"const": "rejected"}}
+        }
+      ]
+    },
+    "externalGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "reasonCode"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"const": "external-required"},
+        "reasonCode": {"type": "string", "pattern": "^release-readiness\\.external\\.[a-z0-9.-]+$", "maxLength": 128}
+      }
+    }
+  }
+}

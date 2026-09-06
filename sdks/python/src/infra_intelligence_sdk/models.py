@@ -495,6 +495,30 @@ class ReleaseQualificationReport:
 
 
 @dataclass(frozen=True)
+class ReleaseReadinessReport:
+    """Aggregate local candidate evidence with explicit external gates."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ReleaseReadinessReport":
+        if payload.get("apiVersion") != "iip.dev/v1alpha1":
+            raise ValueError("unsupported release readiness report apiVersion")
+        if payload.get("kind") != "ReleaseReadinessReport":
+            raise ValueError(
+                "release readiness report kind must be ReleaseReadinessReport"
+            )
+        if not isinstance(payload.get("metadata"), Mapping):
+            raise ValueError("release readiness report metadata must be an object")
+        if not isinstance(payload.get("spec"), Mapping):
+            raise ValueError("release readiness report spec must be an object")
+        return cls(dict(payload))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerDeploymentPreflightReport:
     """Source- and configuration-bound pre-install customer evidence."""
 

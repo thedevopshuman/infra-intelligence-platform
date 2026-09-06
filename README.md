@@ -17,6 +17,12 @@ retains a separate manifest-bound, environment-scoped qualification report;
 incomplete or internally inconsistent evidence cannot be promoted by the
 repository verifier.
 
+An aggregate `ReleaseReadinessReport` verifies the exact bundle and all 18
+repository-controlled evidence documents, while permanently labeling the
+result `local-candidate-only` and enumerating the eight external customer and
+public-launch gates. This gives release owners one fail-closed inventory
+without converting local Docker/Kind evidence into a production claim.
+
 A separate owned three-node Kind gate now turns those availability declarations
 into live evidence. It spreads two replicas of the API, worker, and receiver
 across two workers, commits one real OTLP metric, continuously probes exact

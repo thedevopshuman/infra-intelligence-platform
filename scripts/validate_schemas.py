@@ -265,6 +265,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "release-qualification-report.schema.json": (
         "release-qualification-report.json",
     ),
+    "release-readiness-report.schema.json": (
+        "release-readiness-report.json",
+    ),
     "release-publication-report.schema.json": (
         "release-publication-report.json",
     ),

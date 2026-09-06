@@ -52,6 +52,12 @@ Delivered:
 - Python and TypeScript SDK boundaries;
 - Helm/Kubernetes deployment skeleton, strict customer values contract, immutable application image selection, controlled schema-migration hook, guarded existing-certificate TLS Ingress, a controller-neutral value-free external-secret handoff with exact-key/rotation/least-authority local conformance, least-authority scheduled logical backups, surge-first zero-unavailable API/worker/receiver rollouts, component-specific disruption budgets, hard topology spread, bounded API/receiver endpoint and request draining, immutable bounded CI dependencies, source and packaged install/upgrade/recovery quality gates, data-preserving packaged N-1 application rollback/re-upgrade conformance with sustained zero-failure authenticated Service reads and a blocked in-flight read, a manifest-bound environment-scoped qualification report, closed non-secret production core and AI FinOps values examples plus a minimized static/explicit-context customer deployment preflight, an attested unsigned release bundle, digest-preserving exact-index registry publication with retained unsigned evidence, a tag-triggered protected GitHub release workflow, an exact-digest organizational signature-verification boundary with explicit non-promotable local evidence, and exact-SBOM vulnerability qualification under pinned scanner, fresh database, closed threshold, and expiring-exception policy. Activating the workflow still requires an accepted repository namespace, protected release environment, tag rules, GHCR package policy, and organizational ownership.
 
+The local release evidence is also aggregated into one exact-bundle
+`ReleaseReadinessReport`. It fails closed unless all 18 repository-controlled
+reports match and always keeps the eight customer, organizational, live
+provider, design-partner, and legal/brand gates explicit. It is a local
+candidate inventory, not a production promotion decision.
+
 Exit gate: `make verify` passes and a new contributor can trace resource ingress through authorization, storage, and event emission.
 
 ## Phase 1 — resource and event substrate

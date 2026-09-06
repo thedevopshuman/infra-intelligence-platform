@@ -1135,6 +1135,71 @@ export interface ReleaseQualificationReport {
   };
 }
 
+export type ReleaseReadinessEvidenceStatus = "passed" | "missing" | "rejected";
+
+export type ReleaseReadinessExternalGateId =
+  | "approved-registry-publication"
+  | "organizational-release-signatures"
+  | "customer-install-preflight"
+  | "customer-ingress-availability"
+  | "customer-integration-interoperability"
+  | "live-ai-provider-and-price-authority"
+  | "design-partner-acceptance"
+  | "legal-brand-and-governance";
+
+export interface ReleaseReadinessReport {
+  apiVersion: "iip.dev/v1alpha1";
+  kind: "ReleaseReadinessReport";
+  metadata: {
+    id: `rrr_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "incomplete" | "locally-qualified";
+    qualificationBoundary: "local-candidate-only";
+    release: {
+      version: string;
+      chartVersion: string;
+      revision: string;
+      manifestDigest: Sha256Digest;
+      signatureStatus: "unsigned" | "signed";
+    };
+    evidence: Array<{
+      id: string;
+      contractKind: string;
+      qualificationBoundary:
+        | "packaged-local"
+        | "security-local"
+        | "local-runtime"
+        | "local-integration"
+        | "offline-provider"
+        | "local-recovery"
+        | "local-availability"
+        | "configuration-only";
+      status: ReleaseReadinessEvidenceStatus;
+      reportDigest?: Sha256Digest;
+      observedStatus?: string;
+      sourceRevision?: string;
+      errorCode?: `release-readiness.${string}`;
+    }>;
+    externalGates: Array<{
+      id: ReleaseReadinessExternalGateId;
+      status: "external-required";
+      reasonCode: `release-readiness.external.${string}`;
+    }>;
+    summary: {
+      requiredEvidence: 18;
+      passedEvidence: number;
+      missingEvidence: number;
+      rejectedEvidence: number;
+      externalGateCount: 8;
+      overallStatus: "incomplete" | "locally-qualified";
+    };
+  };
+}
+
 export type PostgreSQLRecoveryQualificationCheckId =
   | "representative-state"
   | "complete-schema-backup"

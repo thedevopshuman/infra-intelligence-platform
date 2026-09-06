@@ -22,6 +22,7 @@ make test-deployment-preflight PYTHON=.venv/bin/python
 make test-github-context PYTHON=.venv/bin/python
 make test-release-signatures PYTHON=.venv/bin/python
 make test-release-vulnerabilities PYTHON=.venv/bin/python
+make test-release-readiness PYTHON=.venv/bin/python
 make release-bundle PYTHON=.venv/bin/python
 ```
 
@@ -162,6 +163,29 @@ stays outside the bundle so recording an environment observation cannot mutate
 the finalized artifacts or `SHA256SUMS`. See the [qualification
 contract](../specifications/release-qualification-report-contract.md) and
 [ADR 0100](../decisions/0100-environment-scoped-release-qualification-evidence.md).
+
+## Aggregate the local candidate evidence
+
+After generating the complete clean-revision evidence set listed at the start
+of this runbook, create one minimized readiness inventory:
+
+```bash
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.0-0123456789ab \
+IIP_RELEASE_QUALIFICATION_REPORT=/absolute/path/to/release-qualification.json \
+IIP_RELEASE_VULNERABILITY_REPORT=/absolute/path/to/release-vulnerabilities.json \
+IIP_RELEASE_EVIDENCE_DIR=/absolute/path/to/evidence \
+IIP_RELEASE_READINESS_REPORT=/absolute/path/to/release-readiness.json \
+  make assess-release-readiness PYTHON=.venv/bin/python
+```
+
+The command verifies the bundle and requires all 18 source-bound local reports
+to match its exact revision and successful profile. Recompute the inventory
+after transport with `make verify-release-readiness-report` and the same five
+paths. A successful result is `locally-qualified`, never production-ready or
+promotable. The report always lists the eight customer, organizational, live
+provider, design-partner, and legal/brand gates that remain external. See the
+[contract](../specifications/release-readiness-report-contract.md) and
+[ADR 0120](../decisions/0120-aggregate-local-release-readiness-evidence.md).
 
 ## Production promotion boundary
 

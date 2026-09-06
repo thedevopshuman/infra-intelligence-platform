@@ -8,12 +8,14 @@ import hashlib
 import json
 import os
 import platform
+import stat
 import sys
 import time
 from datetime import datetime, timezone
 from importlib.metadata import version
 from pathlib import Path
 from typing import Mapping, Sequence
+from urllib.parse import urlsplit
 
 import boto3
 from botocore.config import Config
@@ -21,6 +23,7 @@ from botocore.eventstream import EventStream
 from botocore.stub import Stubber
 from jsonschema import Draft202012Validator, FormatChecker
 from opentelemetry.exporter.otlp.proto.common.trace_encoder import encode_spans
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.botocore import BotocoreInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
@@ -268,6 +271,7 @@ def instrumented_call(
     model_id: str,
     region: str,
     maximum_call_milliseconds: int,
+    delivery_exporter: SpanExporter | None = None,
 ) -> tuple[Mapping[str, object], ReadableSpan, int, int]:
     os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "false"
     capture = InMemorySpanExporter()
@@ -290,6 +294,14 @@ def instrumented_call(
             export_timeout_millis=1_000,
         )
     )
+    if delivery_exporter is not None:
+        provider.add_span_processor(
+            BatchSpanProcessor(
+                delivery_exporter,
+                schedule_delay_millis=1_000,
+                export_timeout_millis=10_000,
+            )
+        )
     instrumentor = BotocoreInstrumentor()
     client = provider_client(mode, region, maximum_call_milliseconds)
     parameters = request_parameters(model_id)
@@ -545,6 +557,9 @@ def compatibility_report(
     model_id: str,
     region: str,
     maximum_call_milliseconds: int = 120_000,
+    delivery_exporter: SpanExporter | None = None,
+    correlation_path: Path | None = None,
+    delivery_endpoint: str | None = None,
 ) -> dict[str, object]:
     usage, span, failed_export_calls, call_latency_milliseconds = instrumented_call(
         mode=mode,
@@ -552,9 +567,17 @@ def compatibility_report(
         model_id=model_id,
         region=region,
         maximum_call_milliseconds=maximum_call_milliseconds,
+        delivery_exporter=delivery_exporter,
     )
     normalize_span(span, usage=usage, model_id=model_id, region=region)
     require(failed_export_calls >= 1, "async-export.not-attempted")
+    if correlation_path is not None:
+        require(delivery_endpoint is not None, "delivery.endpoint-required")
+        _write_correlation(
+            correlation_path,
+            span,
+            delivery_endpoint=delivery_endpoint,
+        )
 
     source_revision = os.environ.get("IIP_SOURCE_REVISION", "")
     source_dirty_value = os.environ.get("IIP_SOURCE_DIRTY", "")
@@ -744,7 +767,126 @@ def parse_args() -> argparse.Namespace:
         default="converse",
     )
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--correlation-output", type=Path)
     return parser.parse_args()
+
+
+def _protected_headers(path: Path) -> dict[str, str]:
+    try:
+        if path.is_symlink():
+            raise ValueError
+        information = path.stat()
+        if (
+            not stat.S_ISREG(information.st_mode)
+            or not 1 <= information.st_size <= 16_384
+            or stat.S_IMODE(information.st_mode) != 0o600
+            or information.st_uid != os.getuid()
+        ):
+            raise ValueError
+        value = json.loads(path.read_text(encoding="utf-8"))
+        if (
+            not isinstance(value, dict)
+            or len(value) > 16
+            or any(
+                not isinstance(name, str)
+                or not 1 <= len(name) <= 128
+                or not all(character.isalnum() or character in "-_" for character in name)
+                or not isinstance(header_value, str)
+                or not 1 <= len(header_value) <= 4_096
+                or "\r" in header_value
+                or "\n" in header_value
+                for name, header_value in value.items()
+            )
+        ):
+            raise ValueError
+        return value
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+        raise CompatibilityFailure("delivery.headers-invalid") from None
+
+
+def _delivery_exporter() -> tuple[OTLPSpanExporter | None, str | None]:
+    endpoint = os.environ.get("IIP_BEDROCK_OTLP_TRACES_ENDPOINT")
+    if endpoint is None:
+        return None, None
+    try:
+        parsed = urlsplit(endpoint)
+        allowed_scheme = parsed.scheme == "https" or (
+            os.environ.get("IIP_BEDROCK_OTLP_ALLOW_INSECURE") == "true"
+            and parsed.scheme == "http"
+        )
+        require(
+            allowed_scheme
+            and 1 <= len(endpoint) <= 2_048
+            and parsed.hostname is not None
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.path == "/v1/traces"
+            and not parsed.query
+            and not parsed.fragment,
+            "delivery.endpoint-invalid",
+        )
+        parsed.port
+    except ValueError:
+        raise CompatibilityFailure("delivery.endpoint-invalid") from None
+    headers_path = os.environ.get("IIP_BEDROCK_OTLP_HEADERS_FILE")
+    headers = _protected_headers(Path(headers_path)) if headers_path else None
+    certificate_file = os.environ.get("IIP_BEDROCK_OTLP_CA_FILE")
+    client_certificate_file = os.environ.get("IIP_BEDROCK_OTLP_CLIENT_CERT_FILE")
+    client_key_file = os.environ.get("IIP_BEDROCK_OTLP_CLIENT_KEY_FILE")
+    require(
+        (client_certificate_file is None) == (client_key_file is None),
+        "delivery.client-certificate-incomplete",
+    )
+    return (
+        OTLPSpanExporter(
+            endpoint=endpoint,
+            certificate_file=certificate_file,
+            client_certificate_file=client_certificate_file,
+            client_key_file=client_key_file,
+            headers=headers,
+            timeout=10.0,
+        ),
+        endpoint,
+    )
+
+
+def _write_correlation(
+    path: Path,
+    span: ReadableSpan,
+    *,
+    delivery_endpoint: str,
+) -> None:
+    context = span.get_span_context()
+    require(context.is_valid, "delivery.correlation-invalid")
+    document = {
+        "apiVersion": "iip.platform/v1alpha1",
+        "kind": "BedrockInvocationCorrelation",
+        "metadata": {
+            "generatedAt": timestamp(),
+            "sourceRevision": os.environ.get("IIP_SOURCE_REVISION", ""),
+            "sourceDirty": os.environ.get("IIP_SOURCE_DIRTY") == "true",
+        },
+        "spec": {
+            "traceId": f"{context.trace_id:032x}",
+            "spanId": f"{context.span_id:016x}",
+            "deliveryEndpointDigest": "sha256:"
+            + hashlib.sha256(delivery_endpoint.encode("utf-8")).hexdigest(),
+            "contentCaptured": False,
+        },
+    }
+    descriptor = -1
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        os.write(
+            descriptor,
+            (json.dumps(document, indent=2, sort_keys=False) + "\n").encode("utf-8"),
+        )
+    except OSError:
+        raise CompatibilityFailure("delivery.correlation-write-failed") from None
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
 
 
 def main() -> int:
@@ -775,12 +917,20 @@ def main() -> int:
             model_id = OFFLINE_MODEL
             region = "us-east-1"
             maximum_call_milliseconds = 30_000
+        delivery_exporter, delivery_endpoint = _delivery_exporter()
+        require(
+            (delivery_exporter is None) == (arguments.correlation_output is None),
+            "delivery.configuration-incomplete",
+        )
         report = compatibility_report(
             mode=arguments.mode,
             operation=arguments.operation,
             model_id=model_id,
             region=region,
             maximum_call_milliseconds=maximum_call_milliseconds,
+            delivery_exporter=delivery_exporter,
+            correlation_path=arguments.correlation_output,
+            delivery_endpoint=delivery_endpoint,
         )
         validate_report(report)
         arguments.report.parent.mkdir(parents=True, exist_ok=True)

@@ -11,6 +11,8 @@ from .models import (
     ActionWorkflow,
     ActionWorkflowPage,
     AiAllocationReport,
+    AiEconomicsInvocationObservation,
+    AiEconomicsInvocationObservationRequest,
     AiAttributionPolicy,
     AiCostRecord,
     AiFinopsRuntimeCompatibilityReport,
@@ -141,6 +143,8 @@ __all__ = [
     "ActionWorkflow",
     "ActionWorkflowPage",
     "AiAllocationReport",
+    "AiEconomicsInvocationObservation",
+    "AiEconomicsInvocationObservationRequest",
     "AiAttributionPolicy",
     "AiCostRecord",
     "AiFinopsRuntimeCompatibilityReport",
@@ -267,4 +271,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.74.0"
+__version__ = "0.75.0"

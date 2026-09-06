@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-economics-invocation-observation:v1alpha1",
+  "title": "AI Economics Invocation Observation",
+  "description": "A privileged tenant-scoped observation of one correlated AI usage, attribution, and calculated-cost pipeline state. Raw trace and span identifiers are replaced by a digest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "AiEconomicsInvocationObservation"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId", "generatedAt"],
+      "properties": {
+        "tenantId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+        "generatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "correlationDigest", "sources", "usage", "attribution", "cost"],
+      "properties": {
+        "status": {"enum": ["not-observed", "processing", "complete"]},
+        "correlationDigest": {"$ref": "#/$defs/digest"},
+        "sources": {"$ref": "#/$defs/sources"},
+        "usage": {"$ref": "#/$defs/usage"},
+        "attribution": {"$ref": "#/$defs/attribution"},
+        "cost": {"$ref": "#/$defs/cost"}
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "recordDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "safeId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+    "attributionSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "sourceHash", "engineVersion"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^aap_[a-f0-9]{32}$"},
+        "version": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][0-9]+$"},
+        "sourceHash": {"$ref": "#/$defs/digest"},
+        "engineVersion": {"type": "string", "pattern": "^[0-9]+[.][0-9]+[.][0-9]+$"}
+      }
+    },
+    "pricingSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "sourceHash", "engineVersion", "currency", "currencyScale", "costBasis"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^apc_[a-f0-9]{32}$"},
+        "version": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[.][0-9]+$"},
+        "sourceHash": {"$ref": "#/$defs/digest"},
+        "engineVersion": {"type": "string", "pattern": "^[0-9]+[.][0-9]+[.][0-9]+$"},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "currencyScale": {"type": "integer", "enum": [6, 9, 12]},
+        "costBasis": {"const": "calculated-estimate"}
+      }
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribution", "pricing"],
+      "properties": {
+        "attribution": {"$ref": "#/$defs/attributionSource"},
+        "pricing": {"$ref": "#/$defs/pricingSource"}
+      }
+    },
+    "usage": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {"status": {"const": "not-observed"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "recordId", "recordDigest", "startedAt"],
+          "properties": {
+            "status": {"const": "recorded"},
+            "recordId": {"type": "string", "pattern": "^aiu_[a-f0-9]{32}$"},
+            "recordDigest": {"$ref": "#/$defs/recordDigest"},
+            "startedAt": {"type": "string", "format": "date-time"}
+          }
+        }
+      ]
+    },
+    "attribution": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {"status": {"const": "pending"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "recordId", "recordDigest", "applicationId", "teamId"],
+          "properties": {
+            "status": {"const": "allocated"},
+            "recordId": {"type": "string", "pattern": "^aia_[a-f0-9]{32}$"},
+            "recordDigest": {"$ref": "#/$defs/recordDigest"},
+            "applicationId": {"$ref": "#/$defs/safeId"},
+            "teamId": {"$ref": "#/$defs/safeId"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "recordId", "recordDigest", "reasonCode"],
+          "properties": {
+            "status": {"const": "unallocated"},
+            "recordId": {"type": "string", "pattern": "^aia_[a-f0-9]{32}$"},
+            "recordDigest": {"$ref": "#/$defs/recordDigest"},
+            "reasonCode": {"const": "no-matching-rule"}
+          }
+        }
+      ]
+    },
+    "money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "currencyScale", "totalSubunits", "costBasis"],
+      "properties": {
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "currencyScale": {"type": "integer", "enum": [6, 9, 12]},
+        "totalSubunits": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "costBasis": {"const": "calculated-estimate"}
+      }
+    },
+    "cost": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {"status": {"const": "pending"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "recordId", "recordDigest", "pricedCost"],
+          "properties": {
+            "status": {"const": "priced"},
+            "recordId": {"type": "string", "pattern": "^aic_[a-f0-9]{32}$"},
+            "recordDigest": {"$ref": "#/$defs/recordDigest"},
+            "pricedCost": {"$ref": "#/$defs/money"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "recordId", "recordDigest", "reasonCode"],
+          "properties": {
+            "status": {"enum": ["unpriced", "ambiguous"]},
+            "recordId": {"type": "string", "pattern": "^aic_[a-f0-9]{32}$"},
+            "recordDigest": {"$ref": "#/$defs/recordDigest"},
+            "reasonCode": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"}
+          }
+        }
+      ]
+    }
+  }
+}

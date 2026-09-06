@@ -93,6 +93,14 @@ It calls no provider, Collector, deployment, ledger, or dashboard and therefore
 cannot be a serving use case or end-to-end qualification. The public SDKs expose
 only its offline envelope types.
 
+Exact AI invocation observation follows the normal serving boundaries.
+`src/iip/application/query_ai_invocation.py` owns authorization, active-source
+selection, privacy minimization, and record revalidation; the in-memory and
+PostgreSQL adapters own exact tenant lookup; the HTTP surface owns only the
+closed POST protocol. The optional Bedrock OTLP delivery hook remains in its
+isolated provider-compatibility harness. Its owner-only trace/span artifact is
+operational input, never an SDK authority or a dashboard dimension.
+
 The private `src/iip/surfaces/worker_health.py` listener consumes only the
 application-owned readiness port. It exposes no control-plane use case,
 identity, tenant data, or provider detail.

@@ -73,5 +73,7 @@ profile and any provider credentials are not.
 consistent. It does **not** prove that the live Bedrock request observed by the
 provider qualifier entered the selected customer Collector or the deployed IIP
 usage and cost ledgers. Do not present this report as an end-to-end, invoice,
-availability, or backend-portability certification. The next release unit must
-produce same-invocation evidence across the live collection and economic path.
+availability, or backend-portability certification. The exact correlation
+mechanism is defined by the [AI invocation observation
+contract](../specifications/ai-invocation-observation-contract.md); a separate
+customer-flow report must still execute and bind the selected live path.

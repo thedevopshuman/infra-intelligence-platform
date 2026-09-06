@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-economics-invocation-observation-request:v1alpha1",
+  "title": "AI Economics Invocation Observation Request",
+  "description": "A protected exact-correlation request used to observe one tenant-bound AI invocation without placing trace identifiers in a URL.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "AiEconomicsInvocationObservationRequest"},
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["traceId", "spanId"],
+      "properties": {
+        "traceId": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+        "spanId": {"type": "string", "pattern": "^[a-f0-9]{16}$"}
+      }
+    }
+  }
+}

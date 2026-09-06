@@ -1,0 +1,8 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiEconomicsInvocationObservationRequest",
+  "spec": {
+    "traceId": "0123456789abcdef0123456789abcdef",
+    "spanId": "0123456789abcdef"
+  }
+}

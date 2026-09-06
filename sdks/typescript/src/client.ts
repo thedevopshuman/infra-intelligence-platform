@@ -7,6 +7,8 @@ import type {
   ActionWorkflow,
   ActionWorkflowPage,
   AiAllocationReport,
+  AiEconomicsInvocationObservation,
+  AiEconomicsInvocationObservationRequest,
   AiSavingsFindingPage,
   ApiErrorBody,
   ContextEvidenceRequest,
@@ -529,6 +531,15 @@ export class InfrastructureIntelligenceClient {
     if (options.cursor) query.set("cursor", options.cursor);
     return this.get<AiSavingsFindingPage>(
       `/v1/ai/economics/savings-findings?${query}`,
+    );
+  }
+
+  async observeAiEconomicsInvocation(
+    request: AiEconomicsInvocationObservationRequest,
+  ): Promise<AiEconomicsInvocationObservation> {
+    return this.post<AiEconomicsInvocationObservation>(
+      "/v1/operations/ai-economics/invocation-observations",
+      request,
     );
   }
 

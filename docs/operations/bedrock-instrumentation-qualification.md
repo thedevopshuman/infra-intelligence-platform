@@ -124,12 +124,37 @@ provider-call latency and writes
 operation, model, and region because compatibility evidence cannot be
 generalized across untested profiles.
 
-The live gate sends the captured span through the real in-process IIP adapter
-and ingestion service. It does not qualify a customer Collector, PKI, receiver
-network path, price catalog, invoice agreement, or sustained load. A streaming
-live report proves only its exact selected operation; a non-streaming report
-cannot be reused. Run `make test-otlp-receiver` separately for isolated
-Collector-to-IIP transport evidence.
+For a same-invocation customer-flow qualification, the same container can also
+export its actual span to a selected OTLP/HTTP trace endpoint:
+
+```bash
+export IIP_BEDROCK_OTLP_TRACES_ENDPOINT='https://collector.example/v1/traces'
+export IIP_BEDROCK_OTLP_HEADERS_FILE='/secure/iip/bedrock-otlp-headers.json'
+export IIP_BEDROCK_OTLP_CA_FILE='/secure/iip/customer-collector-ca.pem'
+export IIP_BEDROCK_CORRELATION_BASENAME='bedrock-invocation-correlation.json'
+IIP_BEDROCK_OPERATION=converse-stream make test-bedrock-live
+```
+
+The headers JSON must be an owner-only mode-`0600` regular file. For mTLS, set
+`IIP_BEDROCK_OTLP_CLIENT_CERT_FILE` and
+`IIP_BEDROCK_OTLP_CLIENT_KEY_FILE` together. Plain HTTP requires the explicit
+`IIP_BEDROCK_OTLP_ALLOW_INSECURE=true` local-test override. Endpoint userinfo,
+query strings, fragments, and paths other than `/v1/traces` are rejected.
+
+The correlation file is created once with mode `0600`. It contains trace/span
+identity and is therefore protected ephemeral input, not transportable
+evidence. Pass its values only in the body of the privileged
+`POST /v1/operations/ai-economics/invocation-observations` request, retain the
+returned digest, and delete the file after qualification. See the [AI
+invocation observation contract](../specifications/ai-invocation-observation-contract.md).
+
+Without the optional exporter, the live gate sends the captured span only
+through the real in-process IIP adapter and ingestion service. Enabling export
+proves an OTLP client attempted delivery, but only the exact deployed ledger
+observation proves downstream acceptance and processing. Neither mode alone
+qualifies customer PKI lifecycle, invoice agreement, sustained load, aggregate
+export, or dashboard visibility. A streaming live report proves only its exact
+selected operation; a non-streaming report cannot be reused.
 
 For customer evidence, use the [customer Bedrock qualification
 workflow](customer-bedrock-qualification.md). It adds a protected reviewed

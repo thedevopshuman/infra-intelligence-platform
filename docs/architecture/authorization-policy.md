@@ -63,6 +63,12 @@ bundle content, change review, emergency access, availability objectives, and
 the chosen customer's policy service remain deployment and operating-model
 decisions.
 
+AI invocation qualification uses the closed `ai-economics:qualify` action,
+separate from the ordinary `ai-economics:read` allocation/finding permission.
+Its resource contains only the authenticated tenant and tenant-bound
+correlation digest. Production policy bundles should grant it only to the
+platform-admin principals running reviewed end-to-end qualifications.
+
 The Docker-backed gate in [ADR 0079](../decisions/0079-executable-policy-engine-compatibility-evidence.md)
 uses this production adapter against a real TLS fixture and emits source-bound
 evidence for exact input, digest and snapshot binding, bearer rotation and

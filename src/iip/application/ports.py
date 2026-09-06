@@ -796,6 +796,18 @@ class AiAllocationLedgerQuery:
 
 
 @dataclass(frozen=True)
+class AiInvocationEconomicsQuery:
+    """Exact active generations used to observe one trace/span invocation."""
+
+    trace_id: str
+    span_id: str
+    policy_id: str
+    attribution_engine_version: str
+    catalog_id: str
+    cost_engine_version: str
+
+
+@dataclass(frozen=True)
 class AiSavingsFindingLedgerQuery:
     """Bounded newest-first finding interval with an optional exclusive position."""
 
@@ -861,6 +873,17 @@ class AiEconomicsLedger(AiAttributionLedger, Protocol):
         ...,
     ]:
         """List bounded usage with exact attribution and cost generations."""
+
+    def find_ai_invocation_economics(
+        self,
+        actor: ActorContext,
+        query: AiInvocationEconomicsQuery,
+    ) -> tuple[
+        Mapping[str, object],
+        Mapping[str, object] | None,
+        Mapping[str, object] | None,
+    ] | None:
+        """Find one exact-tenant trace/span and its active attribution/cost facts."""
 
     def list_ai_savings_findings(
         self,

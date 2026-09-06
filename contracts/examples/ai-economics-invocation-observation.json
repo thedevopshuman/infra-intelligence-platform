@@ -1,0 +1,53 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiEconomicsInvocationObservation",
+  "metadata": {
+    "tenantId": "local",
+    "generatedAt": "2026-09-07T08:00:05Z"
+  },
+  "spec": {
+    "status": "complete",
+    "correlationDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sources": {
+      "attribution": {
+        "id": "aap_22222222222222222222222222222222",
+        "version": "2026-09-05.1",
+        "sourceHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "engineVersion": "0.1.0"
+      },
+      "pricing": {
+        "id": "apc_11111111111111111111111111111111",
+        "version": "2026-09-05.1",
+        "sourceHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "engineVersion": "0.2.0",
+        "currency": "USD",
+        "currencyScale": 9,
+        "costBasis": "calculated-estimate"
+      }
+    },
+    "usage": {
+      "status": "recorded",
+      "recordId": "aiu_11111111111111111111111111111111",
+      "recordDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "startedAt": "2026-09-07T08:00:00Z"
+    },
+    "attribution": {
+      "status": "allocated",
+      "recordId": "aia_22222222222222222222222222222222",
+      "recordDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "applicationId": "support-experience",
+      "teamId": "customer-experience"
+    },
+    "cost": {
+      "status": "priced",
+      "recordId": "aic_33333333333333333333333333333333",
+      "recordDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "pricedCost": {
+        "currency": "USD",
+        "currencyScale": 9,
+        "totalSubunits": 21000,
+        "costBasis": "calculated-estimate"
+      }
+    }
+  }
+}

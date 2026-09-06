@@ -108,6 +108,16 @@ evidence is not yet proof that one live invocation reached the deployed ledger,
 cost engine, and Grafana dashboard; see the [customer AI FinOps prerequisite
 runbook](docs/operations/customer-ai-finops-prerequisites.md).
 
+The supporting exact-correlation path is now executable. The pinned Bedrock
+qualifier can export its actual metadata-only span to a customer OTLP endpoint
+and create an ephemeral owner-only correlation file. A new platform-admin and
+policy-gated POST operation observes that exact tenant-bound invocation through
+the active usage, attribution, and calculated-cost generations while returning
+only a correlation digest and revalidated facts. Trace/span identity never
+enters URLs, responses, Prometheus labels, or Grafana. The final customer-flow
+orchestrator and retained minimized report remain release work; see the [AI
+invocation observation contract](docs/specifications/ai-invocation-observation-contract.md).
+
 A separate continuity gate runs at least five
 minutes of direct verified-HTTPS liveness, readiness, authentication, and exact
 release-identity probes while evicting one ready API pod through an
@@ -305,6 +315,7 @@ streaming/private-endpoint behavior and invoice qualification remain. See the
 [Bedrock instrumentation qualification](docs/operations/bedrock-instrumentation-qualification.md),
 [customer Bedrock qualification](docs/operations/customer-bedrock-qualification.md),
 [customer AI FinOps prerequisites](docs/operations/customer-ai-finops-prerequisites.md),
+[exact AI invocation observation](docs/specifications/ai-invocation-observation-contract.md),
 [OpenAI instrumentation qualification](docs/operations/openai-instrumentation-qualification.md),
 [telemetry contract](docs/specifications/ai-economics-telemetry-contract.md),
 [product direction](docs/product/ai-finops-vision.md),

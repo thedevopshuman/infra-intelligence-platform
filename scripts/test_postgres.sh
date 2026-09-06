@@ -37,4 +37,8 @@ IIP_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/iip_test \
 IIP_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/iip_test \
     PYTHONPATH=src:sdks/python/src \
     "$IIP_TEST_PYTHON" -m unittest \
+    tests.test_ai_invocation_observation.AiInvocationObservationPostgresTests -v
+IIP_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/iip_test \
+    PYTHONPATH=src:sdks/python/src \
+    "$IIP_TEST_PYTHON" -m unittest \
     tests.test_ai_savings_queries.AiSavingsFindingPostgresTests -v

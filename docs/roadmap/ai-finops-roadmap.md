@@ -73,6 +73,16 @@ gap but deliberately does not close item 8: no existing artifact proves that
 the same live invocation crossed the selected customer Collector into the
 deployed ledger, cost worker, aggregate export, and dashboard.
 
+The supporting same-invocation mechanism is now delivered. The pinned Bedrock
+profile can send its actual span through OTLP/HTTP while producing a protected
+ephemeral trace/span correlation. A privileged tenant-scoped control-plane
+operation observes that pair through the active usage, attribution, and cost
+generations and returns only a correlation digest plus revalidated record and
+source facts. The Docker gate proves real protobuf delivery and exact span
+matching without content. Executing and aggregating this mechanism against the
+selected customer Collector, deployed workers, Prometheus, and Grafana remains
+the final customer Phase A runtime report.
+
 Two additional deterministic rules are delivered. Protected channel
 configuration maps provider retry attributes into `retryCount`, and the
 source-bound retry-amplification evaluator compares complete fixed-window

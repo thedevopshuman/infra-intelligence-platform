@@ -59,7 +59,7 @@ wait for IIP, the Collector, or Grafana.
 | Provider adapter | Translate accepted provider attributes into the canonical usage input without granting authority. |
 | Application service | Enforce deduplication, usage invariants, tenant scope, protected effective-time attribution, pricing selection, and deterministic rule evaluation. |
 | PostgreSQL adapter | Atomically persist immutable usage/attribution/cost/finding records and their outbox events. |
-| Read API | Authorize bounded tenant allocation and newest-first finding reads, bind exact time scope, and revalidate stored results. |
+| Read API | Authorize bounded tenant allocation and newest-first finding reads, plus privileged exact-invocation qualification; bind scope and revalidate stored results. |
 | OTLP exporter | Publish bounded aggregates and finding summaries without making serving readiness depend on delivery. |
 | Grafana | Query a configured telemetry backend; it is not an accounting store or query authority. |
 
@@ -277,6 +277,17 @@ join them by trace, span, invocation, usage record, or cost record and therefore
 cannot prove the V0 end-to-end path. That remains the next separately qualified
 runtime boundary.
 
+The first exact-correlation boundary is now executable. An optional exporter on
+the pinned Bedrock qualifier sends its actual metadata-only span to a selected
+OTLP/HTTP endpoint and writes trace/span identity only to an ephemeral
+owner-only file. A privileged tenant-scoped POST operation then resolves that
+pair against the active usage, attribution, and cost generations. Its response
+replaces trace/span values with a digest and revalidates every immutable record
+and source binding. Prometheus and Grafana deliberately remain aggregate views;
+exact invocation identity never becomes a metric label. This makes the final
+customer-flow qualifier possible without converting the dashboard into an
+accounting or trace store.
+
 The exact pinned Python botocore `Converse` and `ConverseStream` profiles now
 have separate source-bound no-network evidence. They exposed three upstream
 facts hidden by the synthetic flow: the shipped scope is service-specific, the
@@ -312,7 +323,9 @@ separate evidence.
 - The accepted usage contract fixes `contentCaptured` and
   `rawPayloadPersisted` to `false`.
 - Trace IDs and span IDs support correlation; provider request IDs are hashed
-  before persistence.
+  before persistence. Exact qualification accepts trace/span only in a
+  protected POST body and returns a tenant-bound digest instead of either raw
+  identifier.
 - High-cardinality values never become metric labels. Per-invocation identity
   remains in the ledger and bounded log/finding records.
 - Receiver authorization, rate limits, payload limits, mTLS/SPIFFE identity,

@@ -144,3 +144,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0138](0138-rate-equivalent-aggregate-output-cost.md) | Accepted | Price an aggregate output meter only when the exact catalog proves reasoning and non-reasoning rate equivalence |
 | [0139](0139-source-bound-ai-finops-runtime-evidence.md) | Accepted | Bind the complete local AI FinOps Docker flow to one minimized exact-source compatibility report |
 | [0140](0140-minimized-customer-ai-finops-prerequisite-aggregation.md) | Accepted | Cross-bind current customer AI FinOps prerequisites without claiming one live end-to-end invocation |
+| [0141](0141-privacy-minimized-exact-ai-invocation-observation.md) | Accepted | Correlate one privileged tenant-bound AI invocation through active ledger generations without exposing trace identity in responses or metrics |

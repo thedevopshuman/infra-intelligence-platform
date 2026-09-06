@@ -1,8 +1,9 @@
 # TypeScript SDK boundary
 
-Version 0.74 adds the protected customer AI FinOps prerequisite profile and
-privacy-minimized aggregate report types. No client method receives provider,
-Collector, deployment, price, or promotion authority.
+Version 0.75 adds the privileged exact AI invocation observation request,
+response, and client method. Trace/span identity stays in the POST body; the
+response exposes only a tenant-bound digest and revalidated active-generation
+facts.
 
 The SDK exposes public contract types and a small fetch-based client. It has no dependency on server code or a framework runtime.
 
@@ -54,6 +55,8 @@ transport is runtime-specific.
 `AiPriceCatalogImportReport`, `AiPriceCatalogQualificationPolicy`,
 `AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`,
 `AiSavingsFindingPage`, `AiModelSuitabilityReport`, `AiAllocationReport`,
+`AiEconomicsInvocationObservationRequest`,
+`AiEconomicsInvocationObservation`,
 `CustomerAiFinopsPrerequisiteProfile`, and
 `CustomerAiFinopsPrerequisiteReport`
 describe the
@@ -61,7 +64,9 @@ metadata-only AI economics ledger. The SDK does not instrument or
 proxy model calls; applications continue using standard OpenTelemetry
 instrumentation and a customer-controlled Collector.
 
-Version 0.74 adds the customer AI FinOps prerequisite profile/report. A ready
+Version 0.75 adds `observeAiEconomicsInvocation`. It is a privileged
+qualification read, not a trace-search or billing interface. Version 0.74
+added the customer AI FinOps prerequisite profile/report. A ready
 report means six independently generated artifacts are current and
 cross-bound; its fixed limitations explicitly exclude same-invocation live
 flow, invoice, and regional-availability claims.

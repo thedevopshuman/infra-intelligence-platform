@@ -19,6 +19,7 @@ RUN addgroup --system --gid 10001 iip \
 
 COPY contracts ./contracts
 COPY scripts/run_bedrock_instrumentation_compatibility.py ./scripts/run_bedrock_instrumentation_compatibility.py
+COPY scripts/run_bedrock_delivery_self_test.py ./scripts/run_bedrock_delivery_self_test.py
 
 USER 10001:10001
 ENTRYPOINT ["python", "scripts/run_bedrock_instrumentation_compatibility.py"]

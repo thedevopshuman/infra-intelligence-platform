@@ -15,6 +15,12 @@ Evidence artifact retention is tenant-explicit and disabled by default. Observat
 
 Cross-tenant operations are a separate privileged use case with explicit policy and audit; they are not implemented by omitting the tenant predicate.
 
+Exact AI invocation observation is tenant-scoped at both application and
+persistence ports. It requires `platform-admin` plus
+`ai-economics:qualify`, accepts trace/span identity only in a closed POST body,
+and returns a digest instead of either raw identifier. Access logging must omit
+this request body, and the correlation must never become a metric label.
+
 Asynchronous investigation admission is tenant-local and bounded twice: non-terminal backlog at enqueue and unexpired live leases at worker claim. Both PostgreSQL checks serialize only the exact tenant, preserve idempotent submission, and return value-minimized stable errors. Capacity configuration never grants scope or reveals another tenant's demand.
 
 The HTTP surface follows the [authentication boundary](authentication-boundary.md): a replaceable authenticator verifies a Bearer credential and derives actor, tenant, and roles before any protected use case runs. Caller-controlled identity headers are ignored. The hashed opaque-token adapter is restricted to local development and tests; deployed profiles can verify issuer- and audience-bound OIDC JWTs against an explicitly trusted HTTPS JWKS endpoint. Disposable real-TLS profiles prove local cache, rotation/removal, outage/recovery, exact-claim, redirect, browser PKCE, and trust behavior without persisting signing keys or identity values. A host-side customer prerequisite gate separately binds protected expected identity and issuer configuration to the deployed session and release while retaining only content digests and aggregate measurements. It does not retain the token or replace customer-owned interactive login, MFA, session/logout, revocation, rotation, or availability qualification.

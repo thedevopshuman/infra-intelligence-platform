@@ -284,7 +284,7 @@ aiSavingsEngine:
   intervalSeconds: 60
 ```
 
-Apply packaged migrations through `0023_ai_model_suitability.sql` before
+Apply packaged migrations through `0024_ai_invocation_correlation.sql` before
 enabling the worker. Chart validation rejects savings without the worker, cost
 engine, tenant enrollment, and profile Secret. The profile is mounted only
 into the worker.

@@ -580,6 +580,20 @@
         }
       }
     },
+    "/v1/operations/ai-economics/invocation-observations": {
+      "post": {
+        "operationId": "observeAiEconomicsInvocation",
+        "description": "Privileged polling observation for one exact tenant-bound trace/span pair. Identifiers are accepted only in the request body and replaced by a correlation digest in the response; active attribution and pricing generations come from deployment configuration.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/ai-economics-invocation-observation-request.schema.json"}}}},
+        "responses": {
+          "200": {"description": "Exact invocation is absent, processing, or source-bound through attribution and cost", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/ai-economics-invocation-observation.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
     "/v1/ai/economics/allocation": {
       "get": {
         "operationId": "getAiAllocationReport",
@@ -868,6 +882,8 @@
       "ActionWorkflow": {"$ref": "../../contracts/schemas/action-workflow.schema.json"},
       "ActionWorkflowPage": {"$ref": "../../contracts/schemas/action-workflow-page.schema.json"},
       "AiAllocationReport": {"$ref": "../../contracts/schemas/ai-allocation-report.schema.json"},
+      "AiEconomicsInvocationObservationRequest": {"$ref": "../../contracts/schemas/ai-economics-invocation-observation-request.schema.json"},
+      "AiEconomicsInvocationObservation": {"$ref": "../../contracts/schemas/ai-economics-invocation-observation.schema.json"},
       "AiSavingsFindingPage": {"$ref": "../../contracts/schemas/ai-savings-finding-page.schema.json"},
       "PluginSession": {"$ref": "../../contracts/schemas/plugin-session.schema.json"},
       "PluginManifest": {"$ref": "../../contracts/schemas/plugin-manifest.schema.json"},

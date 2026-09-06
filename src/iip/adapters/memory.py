@@ -12,6 +12,7 @@ from typing import Dict, Iterable, Mapping, Optional
 from iip.application.ports import (
     ActorContext,
     AiAllocationLedgerQuery,
+    AiInvocationEconomicsQuery,
     AiSavingsCohortQuery,
     AiSavingsFindingLedgerQuery,
     EventDeliverySloState,
@@ -28,6 +29,7 @@ from iip.application.ports import (
     StoredEvent,
 )
 from iip.application.query_ai_allocations import validate_ai_allocation_ledger_query
+from iip.application.query_ai_invocation import validate_ai_invocation_query
 from iip.application.query_ai_savings import (
     validate_ai_savings_finding_ledger_query,
 )
@@ -841,6 +843,74 @@ class InMemoryResourceStore:
                 for _started, _usage_id, usage, attribution, cost in candidates[
                     : query.limit
                 ]
+            )
+
+    def find_ai_invocation_economics(
+        self,
+        actor: ActorContext,
+        query: AiInvocationEconomicsQuery,
+    ) -> tuple[
+        Mapping[str, object],
+        Mapping[str, object] | None,
+        Mapping[str, object] | None,
+    ] | None:
+        """Find one exact trace/span under the selected economics generations."""
+
+        validate_ai_invocation_query(actor, query)
+        with self._lock:
+            matches: list[Mapping[str, object]] = []
+            for (tenant_id, _deduplication), (_digest, usage) in self._ai_usage.items():
+                if tenant_id != actor.tenant_id:
+                    continue
+                spec = usage.get("spec")
+                invocation = spec.get("invocation") if isinstance(spec, Mapping) else None
+                if (
+                    isinstance(invocation, Mapping)
+                    and invocation.get("traceId") == query.trace_id
+                    and invocation.get("spanId") == query.span_id
+                ):
+                    matches.append(usage)
+            if len(matches) > 1:
+                raise PersistenceError("storage.state.invalid")
+            if not matches:
+                return None
+            usage = matches[0]
+            metadata = usage.get("metadata")
+            if not isinstance(metadata, Mapping) or not isinstance(
+                metadata.get("id"), str
+            ):
+                raise PersistenceError("storage.state.invalid")
+            usage_id = str(metadata["id"])
+            attribution_id = self._ai_attribution_identities.get(
+                (
+                    actor.tenant_id,
+                    usage_id,
+                    query.policy_id,
+                    query.attribution_engine_version,
+                )
+            )
+            cost_id = self._ai_cost_identities.get(
+                (
+                    actor.tenant_id,
+                    usage_id,
+                    query.catalog_id,
+                    query.cost_engine_version,
+                )
+            )
+            attribution = (
+                self._ai_attributions.get((actor.tenant_id, attribution_id))
+                if attribution_id is not None
+                else None
+            )
+            cost = (
+                self._ai_costs.get((actor.tenant_id, cost_id))
+                if cost_id is not None
+                else None
+            )
+            return (
+                self._json_copy(usage),
+                self._json_copy(attribution[1]) if attribution is not None else None,
+                self._json_copy(cost[1]) if cost is not None else None,
             )
 
     def list_ai_savings_findings(
@@ -1658,6 +1728,7 @@ class AllowTenantPolicy:
             "action:execute",
             "action:propose",
             "action:read",
+            "ai-economics:qualify",
             "ai-economics:read",
             "evidence:collect",
             "evidence-retention:expire",

@@ -136,6 +136,11 @@ from iip.application.query_ai_savings import (
     AiSavingsFindingAuthorizationError,
     AiSavingsFindingQueryError,
 )
+from iip.application.query_ai_invocation import (
+    AiInvocationObservationAuthorizationError,
+    AiInvocationObservationConfigurationError,
+    AiInvocationObservationQueryError,
+)
 from iip.application.query_event_delivery_health import (
     EventDeliveryHealthAuthorizationError,
     EventDeliveryHealthInputError,
@@ -928,6 +933,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "/v1/investigation-jobs",
                 "/v1/actions/proposals",
                 "/v1/plugin-sessions",
+                "/v1/operations/ai-economics/invocation-observations",
             )
             or (len(segments) == 4 and segments[:2] == ["v1", "actions"] and segments[3] in ("decision", "execute"))
             or (
@@ -1011,6 +1017,14 @@ class ApiHandler(BaseHTTPRequestHandler):
                     SubmitInvestigationJobCommand(actor, payload)
                 )
                 status = HTTPStatus.ACCEPTED
+            elif path == "/v1/operations/ai-economics/invocation-observations":
+                service = self.runtime.ai_invocation_observation
+                if service is None:
+                    raise AiInvocationObservationConfigurationError(
+                        "ai.invocation-observation.not-configured"
+                    )
+                document = service.observe(actor, payload)
+                status = HTTPStatus.OK
             elif (
                 len(segments) == 4
                 and segments[:2] == ["v1", "investigation-jobs"]
@@ -1234,6 +1248,18 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.NOT_FOUND, {"error": {"code": str(exc)}})
         except PluginInvocationConflictError as exc:
             self._json(HTTPStatus.CONFLICT, {"error": {"code": str(exc)}})
+        except AiInvocationObservationQueryError:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": {"code": "ai.invocation-observation.request.invalid"}},
+            )
+        except AiInvocationObservationAuthorizationError:
+            self._json(HTTPStatus.FORBIDDEN, {"error": {"code": "policy.denied"}})
+        except AiInvocationObservationConfigurationError:
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": {"code": "ai.invocation-observation.not-configured"}},
+            )
         except PersistenceError:
             self._json(
                 HTTPStatus.SERVICE_UNAVAILABLE,

@@ -226,6 +226,12 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "ai-usage-attribution-record.json",
     ),
     "ai-allocation-report.schema.json": ("ai-allocation-report.json",),
+    "ai-economics-invocation-observation-request.schema.json": (
+        "ai-economics-invocation-observation-request.json",
+    ),
+    "ai-economics-invocation-observation.schema.json": (
+        "ai-economics-invocation-observation.json",
+    ),
     "ai-price-catalog.schema.json": (
         "ai-price-catalog.json",
         "ai-price-catalog-provider-published.json",
@@ -274,6 +280,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "bedrock-instrumentation-compatibility-report.schema.json": (
         "bedrock-instrumentation-compatibility-report.json",
         "bedrock-converse-stream-instrumentation-compatibility-report.json",
+    ),
+    "bedrock-invocation-correlation.schema.json": (
+        "bedrock-invocation-correlation.json",
     ),
     "openai-instrumentation-compatibility-report.schema.json": (
         "openai-instrumentation-compatibility-report.json",

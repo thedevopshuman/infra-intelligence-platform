@@ -4217,6 +4217,67 @@ class AiAllocationReport:
 
 
 @dataclass(frozen=True)
+class AiEconomicsInvocationObservationRequest:
+    """Protected trace/span request for one exact AI economics observation."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "AiEconomicsInvocationObservationRequest":
+        if (
+            set(payload) != {"apiVersion", "kind", "spec"}
+            or payload.get("apiVersion") != API_VERSION
+            or payload.get("kind") != "AiEconomicsInvocationObservationRequest"
+            or not isinstance(payload.get("spec"), Mapping)
+        ):
+            raise ValueError("AI economics invocation observation request is invalid")
+        spec = payload["spec"]
+        assert isinstance(spec, Mapping)
+        if (
+            set(spec) != {"traceId", "spanId"}
+            or not isinstance(spec.get("traceId"), str)
+            or re.fullmatch(r"[a-f0-9]{32}", spec["traceId"]) is None
+            or not isinstance(spec.get("spanId"), str)
+            or re.fullmatch(r"[a-f0-9]{16}", spec["spanId"]) is None
+        ):
+            raise ValueError("AI economics invocation observation request is invalid")
+        return cls(dict(payload))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class AiEconomicsInvocationObservation:
+    """Digest-correlated usage, attribution, and calculated-cost progress."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "AiEconomicsInvocationObservation":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiEconomicsInvocationObservation",
+                label="AI economics invocation observation",
+            )
+        )
+
+    @property
+    def status(self) -> Optional[str]:
+        spec = self.payload.get("spec")
+        value = spec.get("status") if isinstance(spec, Mapping) else None
+        return value if isinstance(value, str) else None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class AiPriceCatalog:
     """Versioned data-driven token prices used for calculated cost."""
 

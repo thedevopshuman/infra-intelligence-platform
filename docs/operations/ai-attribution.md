@@ -76,7 +76,7 @@ tenants must exactly equal `worker.tenants`.
 
 ## Rollout and recovery
 
-Apply database migrations through `0023_ai_model_suitability.sql` before
+Apply database migrations through `0024_ai_invocation_correlation.sql` before
 enabling the worker. Start with a policy that intentionally covers known
 production services and monitor unallocated results. Publish ownership changes
 as a new immutable policy ID/version; do not edit existing rows or policies.

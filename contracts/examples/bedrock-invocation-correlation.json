@@ -1,0 +1,15 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "BedrockInvocationCorrelation",
+  "metadata": {
+    "generatedAt": "2026-09-07T08:00:01Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "traceId": "0123456789abcdef0123456789abcdef",
+    "spanId": "0123456789abcdef",
+    "deliveryEndpointDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "contentCaptured": false
+  }
+}

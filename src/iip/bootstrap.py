@@ -144,6 +144,7 @@ from iip.application.query_ai_allocations import (
     AiAllocationReportService,
 )
 from iip.application.query_ai_savings import AiSavingsFindingQueryService
+from iip.application.query_ai_invocation import AiInvocationObservationService
 from iip.application.query_event_delivery_health import EventDeliveryHealthService
 from iip.application.query_event_delivery_slo import (
     EventDeliverySloObjectives,
@@ -237,6 +238,7 @@ class Runtime:
     ai_savings_evaluation: AiSavingsEvaluationService | None
     ai_savings_findings: AiSavingsFindingQueryService
     ai_allocation_reports: AiAllocationReportService | None
+    ai_invocation_observation: AiInvocationObservationService | None
     ai_allocation_projection: AiAllocationProjectionService | None
     investigations: DeterministicInvestigationService
     investigation_lifecycle: InvestigationLifecycleService
@@ -704,6 +706,19 @@ def _compose_runtime(
                 ai_allocation_catalogs,
                 allow_test_fixtures=ai_allocation_allow_test_fixtures,
                 source_record_limit=ai_allocation_source_record_limit,
+            )
+            if ai_allocation_policies is not None
+            and ai_allocation_catalogs is not None
+            else None
+        ),
+        ai_invocation_observation=(
+            AiInvocationObservationService(
+                store,
+                policy,
+                clock,
+                ai_allocation_policies,
+                ai_allocation_catalogs,
+                allow_test_fixtures=ai_allocation_allow_test_fixtures,
             )
             if ai_allocation_policies is not None
             and ai_allocation_catalogs is not None

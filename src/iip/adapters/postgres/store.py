@@ -44,6 +44,7 @@ from iip.application.attribute_ai_usage import (
 from iip.application.ports import (
     ActorContext,
     AiAllocationLedgerQuery,
+    AiInvocationEconomicsQuery,
     AiSavingsCohortQuery,
     AiSavingsFindingLedgerQuery,
     EventDeliverySloState,
@@ -60,6 +61,7 @@ from iip.application.ports import (
     StoredEvent,
 )
 from iip.application.query_ai_allocations import validate_ai_allocation_ledger_query
+from iip.application.query_ai_invocation import validate_ai_invocation_query
 from iip.application.query_ai_savings import (
     validate_ai_savings_finding_ledger_query,
 )
@@ -98,6 +100,7 @@ SCHEMA_MIGRATIONS = (
     "0021_ai_attribution_ledger.sql",
     "0022_ai_retry_savings_rule.sql",
     "0023_ai_model_suitability.sql",
+    "0024_ai_invocation_correlation.sql",
 )
 
 
@@ -1258,6 +1261,62 @@ class PostgresResourceStore:
                 row["cost_document"],
             )
             for row in rows
+        )
+
+    @_translate_database_errors
+    def find_ai_invocation_economics(
+        self,
+        actor: ActorContext,
+        query: AiInvocationEconomicsQuery,
+    ) -> tuple[
+        Mapping[str, object],
+        Mapping[str, object] | None,
+        Mapping[str, object] | None,
+    ] | None:
+        """Find one exact trace/span under the selected economics generations."""
+
+        validate_ai_invocation_query(actor, query)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT usage.document AS usage_document,
+                       attribution.document AS attribution_document,
+                       cost.document AS cost_document
+                FROM iip.ai_usage_records AS usage
+                LEFT JOIN iip.ai_usage_attributions AS attribution
+                  ON attribution.tenant_id = usage.tenant_id
+                 AND attribution.usage_record_id = usage.usage_record_id
+                 AND attribution.policy_id = %s
+                 AND attribution.engine_version = %s
+                LEFT JOIN iip.ai_cost_records AS cost
+                  ON cost.tenant_id = usage.tenant_id
+                 AND cost.usage_record_id = usage.usage_record_id
+                 AND cost.catalog_id = %s
+                 AND cost.engine_version = %s
+                WHERE usage.tenant_id = %s
+                  AND usage.document->'spec'->'invocation'->>'traceId' = %s
+                  AND usage.document->'spec'->'invocation'->>'spanId' = %s
+                LIMIT 2
+                """,
+                (
+                    query.policy_id,
+                    query.attribution_engine_version,
+                    query.catalog_id,
+                    query.cost_engine_version,
+                    actor.tenant_id,
+                    query.trace_id,
+                    query.span_id,
+                ),
+            ).fetchall()
+        if len(rows) > 1:
+            raise PersistenceError("storage.state.invalid")
+        if not rows:
+            return None
+        row = rows[0]
+        return (
+            row["usage_document"],
+            row["attribution_document"],
+            row["cost_document"],
         )
 
     @_translate_database_errors

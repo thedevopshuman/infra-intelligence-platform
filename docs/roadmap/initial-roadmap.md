@@ -70,6 +70,9 @@ binds the exact local candidate/runtime, customer deployment/receiver, live
 Bedrock streaming, and production catalog reports under one protected profile.
 The result remains `prerequisite-aggregation-only`: same-invocation Collector,
 ledger, cost, export, and dashboard evidence is still a Phase A release gate.
+The exact-invocation POST observation and protected Bedrock OTLP correlation
+needed by that gate are implemented; the customer-specific live orchestrator
+and retained minimized report remain.
 
 One fail-closed local release command now composes the source, integration,
 recovery, multi-node availability, bundle, packaged N-1, vulnerability, and

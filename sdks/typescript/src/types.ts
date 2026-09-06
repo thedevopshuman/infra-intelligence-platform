@@ -283,6 +283,76 @@ export interface AiAllocationReport {
   };
 }
 
+export interface AiEconomicsInvocationObservationRequest {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiEconomicsInvocationObservationRequest";
+  spec: { traceId: string; spanId: string };
+}
+
+export interface AiEconomicsInvocationObservation {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiEconomicsInvocationObservation";
+  metadata: { tenantId: string; generatedAt: string };
+  spec: {
+    status: "not-observed" | "processing" | "complete";
+    correlationDigest: Sha256Digest;
+    sources: {
+      attribution: {
+        id: AiAttributionPolicyId;
+        version: string;
+        sourceHash: Sha256Digest;
+        engineVersion: string;
+      };
+      pricing: {
+        id: AiPriceCatalogId;
+        version: string;
+        sourceHash: Sha256Digest;
+        engineVersion: string;
+        currency: string;
+        currencyScale: AiCurrencyScale;
+        costBasis: "calculated-estimate";
+      };
+    };
+    usage:
+      | { status: "not-observed" }
+      | {
+          status: "recorded";
+          recordId: AiUsageRecordId;
+          recordDigest: Sha256Digest;
+          startedAt: string;
+        };
+    attribution:
+      | { status: "pending" }
+      | {
+          status: "allocated";
+          recordId: AiUsageAttributionRecordId;
+          recordDigest: Sha256Digest;
+          applicationId: string;
+          teamId: string;
+        }
+      | {
+          status: "unallocated";
+          recordId: AiUsageAttributionRecordId;
+          recordDigest: Sha256Digest;
+          reasonCode: "no-matching-rule";
+        };
+    cost:
+      | { status: "pending" }
+      | {
+          status: "priced";
+          recordId: AiCostRecordId;
+          recordDigest: Sha256Digest;
+          pricedCost: AiAllocationMoney;
+        }
+      | {
+          status: "unpriced" | "ambiguous";
+          recordId: AiCostRecordId;
+          recordDigest: Sha256Digest;
+          reasonCode: string;
+        };
+  };
+}
+
 export interface AiTokenPrice {
   priceSubunitsPerMillionTokens: number;
 }

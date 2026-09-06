@@ -100,7 +100,7 @@ class AiAllocationProjectionService:
             )
         self._ledger = ledger
         self._clock = clock
-        self._sources = _validated_sources(
+        self._sources = validate_ai_allocation_sources(
             attribution_policies,
             price_catalogs,
             allow_test_fixtures=allow_test_fixtures,
@@ -119,7 +119,7 @@ class AiAllocationProjectionService:
             raise AiAllocationConfigurationError(
                 "ai.allocation.configuration.invalid"
             )
-        now, end = _timestamp(self._clock.now())
+        now, end = canonical_ai_economics_timestamp(self._clock.now())
         start = _format_time(now - self._window)
         actor = ActorContext(
             actor_id=f"ai-allocation-worker:{worker_id}",
@@ -226,7 +226,7 @@ class AiAllocationReportService:
             raise AiAllocationConfigurationError(
                 "ai.allocation.configuration.invalid"
             )
-        sources = _validated_sources(
+        sources = validate_ai_allocation_sources(
             attribution_policies,
             price_catalogs,
             allow_test_fixtures=allow_test_fixtures,
@@ -251,8 +251,8 @@ class AiAllocationReportService:
         group_by: str,
     ) -> Mapping[str, object]:
         _validate_actor(actor)
-        start_value, start_text = _timestamp(start)
-        end_value, end_text = _timestamp(end)
+        start_value, start_text = canonical_ai_economics_timestamp(start)
+        end_value, end_text = canonical_ai_economics_timestamp(end)
         if (
             end_value <= start_value
             or end_value - start_value > self._max_interval
@@ -286,7 +286,7 @@ class AiAllocationReportService:
         rows = self._ledger.list_ai_allocation_rows(actor, query)
         if not isinstance(rows, tuple) or len(rows) > self._source_record_limit:
             raise AiAllocationQueryError("ai.allocation.source-limit-exceeded")
-        generated_at = _timestamp(self._clock.now())[1]
+        generated_at = canonical_ai_economics_timestamp(self._clock.now())[1]
         return build_ai_allocation_report(
             actor.tenant_id,
             start_text,
@@ -299,7 +299,7 @@ class AiAllocationReportService:
         )
 
 
-def _validated_sources(
+def validate_ai_allocation_sources(
     policies: tuple[Mapping[str, object], ...],
     catalogs: tuple[Mapping[str, object], ...],
     *,
@@ -357,8 +357,8 @@ def validate_ai_allocation_ledger_query(
 
     try:
         _validate_actor(actor)
-        start, start_text = _timestamp(query.start)
-        end, end_text = _timestamp(query.end)
+        start, start_text = canonical_ai_economics_timestamp(query.start)
+        end, end_text = canonical_ai_economics_timestamp(query.end)
         if (
             start_text != query.start
             or end_text != query.end
@@ -542,11 +542,14 @@ def build_ai_allocation_report(
     return {
         "apiVersion": "iip.platform/v1alpha1",
         "kind": "AiAllocationReport",
-        "metadata": {"tenantId": tenant_id, "generatedAt": _timestamp(generated_at)[1]},
+        "metadata": {
+            "tenantId": tenant_id,
+            "generatedAt": canonical_ai_economics_timestamp(generated_at)[1],
+        },
         "spec": {
             "scope": {
-                "start": _timestamp(start)[1],
-                "end": _timestamp(end)[1],
+                "start": canonical_ai_economics_timestamp(start)[1],
+                "end": canonical_ai_economics_timestamp(end)[1],
                 "groupBy": group_by,
                 "sourceRecordLimit": source_record_limit,
             },
@@ -666,7 +669,7 @@ def _safe_add(left: int, right: int) -> int:
     return result
 
 
-def _timestamp(value: object) -> tuple[datetime, str]:
+def canonical_ai_economics_timestamp(value: object) -> tuple[datetime, str]:
     if not isinstance(value, str) or not value.endswith("Z"):
         raise AiAllocationQueryError("request.invalid")
     try:
@@ -696,5 +699,7 @@ __all__ = [
     "AiAllocationReportService",
     "AiAllocationSources",
     "build_ai_allocation_report",
+    "canonical_ai_economics_timestamp",
+    "validate_ai_allocation_sources",
     "validate_ai_allocation_ledger_query",
 ]

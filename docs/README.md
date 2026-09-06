@@ -32,6 +32,7 @@ The documentation tree is the product and engineering system of record. A change
 - [AI savings finding read contract](specifications/ai-savings-finding-page-contract.md)
 - [AI price-catalog qualification contracts](specifications/ai-price-catalog-qualification-contract.md)
 - [Customer AI FinOps prerequisite contracts](specifications/customer-ai-finops-prerequisite-contract.md)
+- [AI invocation observation contracts](specifications/ai-invocation-observation-contract.md)
 - [AI model suitability report contract](specifications/ai-model-suitability-report-contract.md)
 - [AI attribution contracts](specifications/ai-attribution-contracts.md)
 - [AI economics telemetry contract](specifications/ai-economics-telemetry-contract.md)

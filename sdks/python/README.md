@@ -1,8 +1,9 @@
 # Python SDK boundary
 
-Version 0.74 adds transport wrappers for the protected customer AI FinOps
-prerequisite profile and privacy-minimized aggregate report. These offline
-types grant no provider, Collector, deployment, price, or promotion authority.
+Version 0.75 adds the privileged exact AI invocation observation request,
+response, and client method. Trace/span identity stays in the POST body; the
+response exposes only a tenant-bound digest and revalidated active-generation
+facts.
 
 This package contains public transport and model types only. It does not import the server kernel. The API will expand contract-first; unstable methods remain under the `v1alpha1` namespace in their paths and models.
 
@@ -58,6 +59,8 @@ host-created failures for plugin handling; it is not a control-plane HTTP client
 `AiPriceCatalogImportReport`, `AiPriceCatalogQualificationPolicy`,
 `AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`,
 `AiSavingsFindingPage`, `AiAllocationReport`,
+`AiEconomicsInvocationObservationRequest`,
+`AiEconomicsInvocationObservation`,
 `CustomerAiFinopsPrerequisiteProfile`, and
 `CustomerAiFinopsPrerequisiteReport`
 expose the AI economics
@@ -65,7 +68,9 @@ records as public metadata-only envelopes. They do not
 instrument provider calls, send OTLP, or import an AWS SDK. Standard
 OpenTelemetry instrumentation remains the collection boundary.
 
-Version 0.74 adds the customer AI FinOps prerequisite profile/report. A ready
+Version 0.75 adds `observe_ai_economics_invocation`. It is a privileged
+qualification read, not a trace-search or billing interface. Version 0.74
+added the customer AI FinOps prerequisite profile/report. A ready
 report means six independently generated artifacts are current and
 cross-bound; its fixed limitations explicitly exclude same-invocation live
 flow, invoice, and regional-availability claims.

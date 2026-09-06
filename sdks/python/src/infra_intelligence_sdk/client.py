@@ -17,6 +17,8 @@ from .models import (
     ActionWorkflow,
     ActionWorkflowPage,
     AiAllocationReport,
+    AiEconomicsInvocationObservation,
+    AiEconomicsInvocationObservationRequest,
     AiSavingsFindingPage,
     CollectorQueueLossReport,
     ConsoleAuthenticationConfiguration,
@@ -501,6 +503,19 @@ class Client:
             query["cursor"] = cursor
         return AiSavingsFindingPage.from_dict(
             self._get(f"/v1/ai/economics/savings-findings?{urlencode(query)}")
+        )
+
+    def observe_ai_economics_invocation(
+        self,
+        request: AiEconomicsInvocationObservationRequest,
+    ) -> AiEconomicsInvocationObservation:
+        """Observe one exact trace/span through the configured economics pipeline."""
+
+        return AiEconomicsInvocationObservation.from_dict(
+            self._post(
+                "/v1/operations/ai-economics/invocation-observations",
+                request.to_dict(),
+            )
         )
 
     def open_plugin_session(self, command: Mapping[str, Any]) -> PluginSession:

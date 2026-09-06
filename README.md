@@ -51,6 +51,15 @@ single-cluster result from becoming a publication, database, integration,
 regional, pilot, or governance claim; see the [customer deployment
 qualification runbook](docs/operations/customer-deployment-qualification.md).
 
+A separately enabled fixed-rate load gate exercises only authenticated runtime
+identity reads through that same verified HTTPS boundary. It uses one global
+monotonic schedule, counts late slots instead of issuing catch-up bursts,
+enforces a 250,000-request ceiling, and retains aggregate latency, success,
+scheduler, and closed failure-category measurements. It intentionally does not
+claim mixed-endpoint, write, database, worker, receiver, failover, regional, or
+long-window capacity; see the [control-plane load qualification
+runbook](docs/operations/control-plane-load-qualification.md).
+
 After registry publication, a separate promotion verifier derives both OCI
 index digests from that verified manifest and checks exact Cosign signer
 identity, issuer, version, and transparency evidence under a reviewed policy.

@@ -1,0 +1,99 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "ControlPlaneLoadQualificationReport",
+  "metadata": {
+    "id": "clq_bd6fea017f25207fbbff46ed5674d729",
+    "generatedAt": "2026-09-06T12:05:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualificationLevel": "customer-control-plane-read-load-v1",
+    "targetBindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "targetIdentity": {
+      "applicationVersion": "0.84.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "requiredMigration": "0023_ai_model_suitability.sql",
+      "buildMode": "release",
+      "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+      "chartVersion": "0.87.0",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "objective": {
+      "durationSeconds": 300,
+      "targetRequestsPerSecond": 10,
+      "concurrency": 8,
+      "minimumSuccessfulRequestBasisPoints": 9990,
+      "maximumSchedulerMissBasisPoints": 10,
+      "maximumP95LatencyMilliseconds": 2000,
+      "maximumP99LatencyMilliseconds": 5000,
+      "requestTimeoutMilliseconds": 2000,
+      "maximumSchedulerLagMilliseconds": 1000
+    },
+    "environment": {
+      "platform": "linux/amd64",
+      "pythonVersion": "3.12.10",
+      "transport": "verified-https",
+      "caSource": "system",
+      "proxyMode": "disabled",
+      "redirectMode": "deny",
+      "connectionMode": "close-per-request",
+      "scheduler": "bounded-fixed-rate-v1"
+    },
+    "measurements": {
+      "startedAt": "2026-09-06T12:00:00Z",
+      "completedAt": "2026-09-06T12:05:00Z",
+      "actualDurationMilliseconds": 300000,
+      "targetRequestCount": 3000,
+      "attemptedRequests": 3000,
+      "successfulRequests": 3000,
+      "failedRequests": 0,
+      "schedulerMissedRequests": 0,
+      "successfulRequestBasisPoints": 10000,
+      "schedulerMissBasisPoints": 0,
+      "achievedSuccessfulMilliRequestsPerSecond": 10000,
+      "schedulerLagP95Milliseconds": 4,
+      "requestLatency": {
+        "p50Milliseconds": 35,
+        "p95Milliseconds": 80,
+        "p99Milliseconds": 120,
+        "maximumMilliseconds": 250
+      },
+      "failureCategories": {
+        "transport": 0,
+        "http-status": 0,
+        "contract": 0,
+        "identity": 0
+      }
+    },
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"},
+      {"id": "explicit-traffic-enable", "status": "passed"},
+      {"id": "direct-no-redirect-client", "status": "passed"},
+      {"id": "verified-https", "status": "passed"},
+      {"id": "exact-release-identity", "status": "passed"},
+      {"id": "bounded-request-volume", "status": "passed"},
+      {"id": "observation-window", "status": "passed"},
+      {"id": "scheduler-attainment", "status": "passed"},
+      {"id": "successful-request-attainment", "status": "passed"},
+      {"id": "p95-latency-objective", "status": "passed"},
+      {"id": "p99-latency-objective", "status": "passed"}
+    ],
+    "limitations": [
+      "authenticated-runtime-identity-read-only",
+      "single-endpoint",
+      "fixed-rate-synthetic-traffic",
+      "single-ingress-path",
+      "write-database-worker-receiver-capacity-not-qualified",
+      "failure-regional-and-long-window-slo-not-qualified"
+    ],
+    "summary": {
+      "totalChecks": 12,
+      "passedChecks": 12,
+      "failedChecks": 0,
+      "overallStatus": "qualified"
+    }
+  }
+}

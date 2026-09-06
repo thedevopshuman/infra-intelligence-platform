@@ -4,8 +4,8 @@
   "metadata": {
     "version": "0.84.0",
     "chartVersion": "0.87.0",
-    "pythonSdkVersion": "0.60.0",
-    "typescriptSdkVersion": "0.60.0",
+    "pythonSdkVersion": "0.61.0",
+    "typescriptSdkVersion": "0.61.0",
     "revision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDate": "2026-08-17T04:45:00Z",
     "signatureStatus": "unsigned"
@@ -41,14 +41,14 @@
         "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
       },
       {
-        "path": "infra-intelligence-sdk-0.60.0.tar.gz",
+        "path": "infra-intelligence-sdk-0.61.0.tar.gz",
         "role": "python-sdk-source",
         "mediaType": "application/gzip",
         "sizeBytes": 16384,
         "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
       },
       {
-        "path": "iip-sdk-0.60.0.tgz",
+        "path": "iip-sdk-0.61.0.tgz",
         "role": "typescript-sdk",
         "mediaType": "application/vnd.npm.package+gzip",
         "sizeBytes": 16384,

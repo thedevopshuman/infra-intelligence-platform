@@ -24,6 +24,7 @@ from .models import (
     AwsBedrockPriceCatalogImportPolicy,
     CollectorQueueLossReport,
     ConsoleAuthenticationConfiguration,
+    ControlPlaneLoadQualificationReport,
     CustomerContinuityQualificationReport,
     CustomerDeploymentQualificationReport,
     CustomerDeploymentPreflightReport,
@@ -135,6 +136,7 @@ __all__ = [
     "Client",
     "CollectorQueueLossReport",
     "ConsoleAuthenticationConfiguration",
+    "ControlPlaneLoadQualificationReport",
     "CustomerContinuityQualificationReport",
     "CustomerDeploymentQualificationReport",
     "CustomerDeploymentPreflightReport",
@@ -225,4 +227,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.60.0"
+__version__ = "0.61.0"

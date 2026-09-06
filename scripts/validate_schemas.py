@@ -96,6 +96,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "customer-deployment-qualification-report.schema.json": (
         "customer-deployment-qualification-report.json",
     ),
+    "control-plane-load-qualification-report.schema.json": (
+        "control-plane-load-qualification-report.json",
+    ),
     "deployment-diagnostic-report.schema.json": (
         "deployment-diagnostic-report.json",
     ),

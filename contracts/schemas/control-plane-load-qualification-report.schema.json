@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:control-plane-load-qualification-report:v1alpha1",
+  "title": "Control Plane Load Qualification Report",
+  "description": "Privacy-minimized evidence that one exact release served a bounded fixed-rate authenticated runtime-identity workload through verified customer HTTPS ingress.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "ControlPlaneLoadQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^clq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationLevel", "targetBindingDigest", "targetIdentity", "objective", "environment", "measurements", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualificationLevel": {"const": "customer-control-plane-read-load-v1"},
+        "targetBindingDigest": {"$ref": "#/$defs/digest"},
+        "targetIdentity": {"$ref": "#/$defs/identity"},
+        "objective": {"$ref": "#/$defs/objective"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "checks": {"$ref": "#/$defs/checks"},
+        "limitations": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "prefixItems": [
+            {"const": "authenticated-runtime-identity-read-only"},
+            {"const": "single-endpoint"},
+            {"const": "fixed-rate-synthetic-traffic"},
+            {"const": "single-ingress-path"},
+            {"const": "write-database-worker-receiver-capacity-not-qualified"},
+            {"const": "failure-regional-and-long-window-slo-not-qualified"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 12},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 12},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 12},
+            "overallStatus": {"enum": ["qualified", "not-qualified"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "contractsApiVersion", "requiredMigration", "buildMode", "sourceRevision", "chartVersion", "imageDigest"],
+      "properties": {
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+        "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"},
+        "buildMode": {"const": "release"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["durationSeconds", "targetRequestsPerSecond", "concurrency", "minimumSuccessfulRequestBasisPoints", "maximumSchedulerMissBasisPoints", "maximumP95LatencyMilliseconds", "maximumP99LatencyMilliseconds", "requestTimeoutMilliseconds", "maximumSchedulerLagMilliseconds"],
+      "properties": {
+        "durationSeconds": {"type": "integer", "minimum": 300, "maximum": 3600},
+        "targetRequestsPerSecond": {"type": "integer", "minimum": 1, "maximum": 250},
+        "concurrency": {"type": "integer", "minimum": 1, "maximum": 128},
+        "minimumSuccessfulRequestBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "maximumSchedulerMissBasisPoints": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "maximumP95LatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 60000},
+        "maximumP99LatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 120000},
+        "requestTimeoutMilliseconds": {"type": "integer", "minimum": 100, "maximum": 30000},
+        "maximumSchedulerLagMilliseconds": {"type": "integer", "minimum": 10, "maximum": 5000}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "pythonVersion", "transport", "caSource", "proxyMode", "redirectMode", "connectionMode", "scheduler"],
+      "properties": {
+        "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-z0-9_.-]+$", "maxLength": 128},
+        "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "transport": {"const": "verified-https"},
+        "caSource": {"enum": ["system", "custom"]},
+        "proxyMode": {"const": "disabled"},
+        "redirectMode": {"const": "deny"},
+        "connectionMode": {"const": "close-per-request"},
+        "scheduler": {"const": "bounded-fixed-rate-v1"}
+      }
+    },
+    "failureCategories": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transport", "http-status", "contract", "identity"],
+      "properties": {
+        "transport": {"type": "integer", "minimum": 0, "maximum": 250000},
+        "http-status": {"type": "integer", "minimum": 0, "maximum": 250000},
+        "contract": {"type": "integer", "minimum": 0, "maximum": 250000},
+        "identity": {"type": "integer", "minimum": 0, "maximum": 250000}
+      }
+    },
+    "latencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p50Milliseconds", "p95Milliseconds", "p99Milliseconds", "maximumMilliseconds"],
+      "properties": {
+        "p50Milliseconds": {"oneOf": [{"type": "integer", "minimum": 0, "maximum": 120000}, {"type": "null"}]},
+        "p95Milliseconds": {"oneOf": [{"type": "integer", "minimum": 0, "maximum": 120000}, {"type": "null"}]},
+        "p99Milliseconds": {"oneOf": [{"type": "integer", "minimum": 0, "maximum": 120000}, {"type": "null"}]},
+        "maximumMilliseconds": {"oneOf": [{"type": "integer", "minimum": 0, "maximum": 120000}, {"type": "null"}]}
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startedAt", "completedAt", "actualDurationMilliseconds", "targetRequestCount", "attemptedRequests", "successfulRequests", "failedRequests", "schedulerMissedRequests", "successfulRequestBasisPoints", "schedulerMissBasisPoints", "achievedSuccessfulMilliRequestsPerSecond", "schedulerLagP95Milliseconds", "requestLatency", "failureCategories"],
+      "properties": {
+        "startedAt": {"type": "string", "format": "date-time"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "actualDurationMilliseconds": {"type": "integer", "minimum": 1, "maximum": 4000000},
+        "targetRequestCount": {"type": "integer", "minimum": 300, "maximum": 250000},
+        "attemptedRequests": {"type": "integer", "minimum": 0, "maximum": 250000},
+        "successfulRequests": {"type": "integer", "minimum": 0, "maximum": 250000},
+        "failedRequests": {"type": "integer", "minimum": 0, "maximum": 250000},
+        "schedulerMissedRequests": {"type": "integer", "minimum": 0, "maximum": 250000},
+        "successfulRequestBasisPoints": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "schedulerMissBasisPoints": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "achievedSuccessfulMilliRequestsPerSecond": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "schedulerLagP95Milliseconds": {"oneOf": [{"type": "integer", "minimum": 0, "maximum": 120000}, {"type": "null"}]},
+        "requestLatency": {"$ref": "#/$defs/latencies"},
+        "failureCategories": {"$ref": "#/$defs/failureCategories"}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^control-plane-load\\.[a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "explicit-traffic-enable"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "direct-no-redirect-client"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "verified-https"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "exact-release-identity"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "bounded-request-volume"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "observation-window"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "scheduler-attainment"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "successful-request-attainment"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "p95-latency-objective"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "p99-latency-objective"}}}
+      ],
+      "items": false
+    }
+  }
+}

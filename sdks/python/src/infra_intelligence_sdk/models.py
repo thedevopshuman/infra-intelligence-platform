@@ -605,6 +605,28 @@ class CustomerDeploymentQualificationReport:
 
 
 @dataclass(frozen=True)
+class ControlPlaneLoadQualificationReport:
+    """Bounded fixed-rate customer control-plane read-load evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "ControlPlaneLoadQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="ControlPlaneLoadQualificationReport",
+                label="control-plane load qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class KubernetesAvailabilityQualificationReport:
     """Source-bound planned worker-drain availability evidence."""
 

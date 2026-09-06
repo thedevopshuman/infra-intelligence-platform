@@ -49,6 +49,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Customer deployment preflight report](specifications/customer-deployment-preflight-report-contract.md)
 - [Customer continuity qualification report](specifications/customer-continuity-qualification-report-contract.md)
 - [Customer deployment qualification report](specifications/customer-deployment-qualification-report-contract.md)
+- [Control-plane load qualification report](specifications/control-plane-load-qualification-report-contract.md)
 - [Kubernetes availability qualification report](specifications/kubernetes-availability-qualification-report-contract.md)
 
 ## Decisions and delivery
@@ -63,6 +64,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Post-install deployment diagnostics](operations/deployment-diagnostics.md)
 - [Customer control-plane continuity qualification](operations/customer-continuity-qualification.md)
 - [Customer deployment qualification](operations/customer-deployment-qualification.md)
+- [Customer control-plane load qualification](operations/control-plane-load-qualification.md)
 - [Kubernetes planned-disruption availability qualification](operations/kubernetes-availability-qualification.md)
 - [Release artifacts and supply-chain evidence](operations/release-artifacts.md)
 - [OpenTelemetry metrics export](operations/opentelemetry-export.md)

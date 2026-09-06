@@ -171,6 +171,14 @@ control-plane profile; artifact trust, database/worker/receiver continuity,
 integrations, live AI/pricing, regional capacity, pilot, and public-governance
 gates remain independent.
 
+Load-qualification update: ADR 0125 adds a separately enabled, fixed-rate
+external identity-read workload with exact release binding, explicit scheduler
+attainment, closed success and latency objectives, a hard request ceiling, and
+aggregate-only evidence. This closes the narrow single-endpoint external read
+load gap; representative mixed traffic, writes, database, worker, receiver,
+failure-injected, regional, and long-window capacity certification remain
+external.
+
 Update: ADR 0058 adds a deployment-configured rolling useful-completion SLO over durable asynchronous jobs, including explicit late, failed, cancelled, and unfinished misses. ADR 0059 adds a privacy-bounded query availability counter and duration histogram with explicit objective values over the replaceable OTLP metrics boundary. Bounded external ingress qualification is delivered by ADR 0105; continuous regional coverage and notification routing remain open.
 
 ## Phase 4 — governed actions and workflows

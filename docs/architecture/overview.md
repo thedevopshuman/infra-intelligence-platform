@@ -108,6 +108,13 @@ namespace UID/server binding and requires health after the disruption; it
 retains only public release identity, timestamps, report digests, and hashed
 targets, and it cannot authorize publication or production use.
 
+[ADR 0125](../decisions/0125-bounded-fixed-rate-control-plane-load-qualification.md)
+keeps external read-load evidence separate from availability and disruption
+evidence. Its operator-run harness uses the existing direct verified-HTTPS
+identity boundary, a bounded global fixed-rate schedule, explicit traffic
+enablement, and aggregate-only output. It remains an operational client with no
+runtime, SDK, plugin, or production-approval authority.
+
 The signed plugin runner claims each exact-tenant request against its persisted
 session and canonical invocation digest before a container starts. PostgreSQL
 serializes the session request limit across replicas, retains host-created

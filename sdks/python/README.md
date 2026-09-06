@@ -95,6 +95,10 @@ Version 0.56 adds protected AI price-catalog qualification policy and minimized
 report envelopes. These types add no provider pricing client, promotion API, or
 access to negotiated rates.
 
+Version 0.61 adds `ControlPlaneLoadQualificationReport` for aggregate,
+source-bound fixed-rate identity-read evidence. It adds no traffic generator,
+credential handling, control-plane method, or production-approval authority.
+
 Version 0.60 adds `CustomerDeploymentQualificationReport` for the exact
 customer-cluster preflight, installed-health, ingress, and continuity evidence
 chain. It grants no cluster, publication, or production-approval authority.

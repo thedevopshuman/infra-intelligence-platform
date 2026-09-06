@@ -1382,6 +1382,114 @@ export interface CustomerDeploymentQualificationReport {
   };
 }
 
+export type ControlPlaneLoadQualificationCheckId =
+  | "source-binding"
+  | "minimized-output"
+  | "explicit-traffic-enable"
+  | "direct-no-redirect-client"
+  | "verified-https"
+  | "exact-release-identity"
+  | "bounded-request-volume"
+  | "observation-window"
+  | "scheduler-attainment"
+  | "successful-request-attainment"
+  | "p95-latency-objective"
+  | "p99-latency-objective";
+
+export interface ControlPlaneLoadQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "ControlPlaneLoadQualificationReport";
+  metadata: {
+    id: `clq_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualificationLevel: "customer-control-plane-read-load-v1";
+    targetBindingDigest: Sha256Digest;
+    targetIdentity: {
+      applicationVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      requiredMigration: `${number}_${string}.sql`;
+      buildMode: "release";
+      sourceRevision: string;
+      chartVersion: string;
+      imageDigest: Sha256Digest;
+    };
+    objective: {
+      durationSeconds: number;
+      targetRequestsPerSecond: number;
+      concurrency: number;
+      minimumSuccessfulRequestBasisPoints: number;
+      maximumSchedulerMissBasisPoints: number;
+      maximumP95LatencyMilliseconds: number;
+      maximumP99LatencyMilliseconds: number;
+      requestTimeoutMilliseconds: number;
+      maximumSchedulerLagMilliseconds: number;
+    };
+    environment: {
+      platform: `${string}/${string}`;
+      pythonVersion: string;
+      transport: "verified-https";
+      caSource: "system" | "custom";
+      proxyMode: "disabled";
+      redirectMode: "deny";
+      connectionMode: "close-per-request";
+      scheduler: "bounded-fixed-rate-v1";
+    };
+    measurements: {
+      startedAt: string;
+      completedAt: string;
+      actualDurationMilliseconds: number;
+      targetRequestCount: number;
+      attemptedRequests: number;
+      successfulRequests: number;
+      failedRequests: number;
+      schedulerMissedRequests: number;
+      successfulRequestBasisPoints: number;
+      schedulerMissBasisPoints: number;
+      achievedSuccessfulMilliRequestsPerSecond: number;
+      schedulerLagP95Milliseconds: number | null;
+      requestLatency: {
+        p50Milliseconds: number | null;
+        p95Milliseconds: number | null;
+        p99Milliseconds: number | null;
+        maximumMilliseconds: number | null;
+      };
+      failureCategories: {
+        transport: number;
+        "http-status": number;
+        contract: number;
+        identity: number;
+      };
+    };
+    checks: Array<
+      | { id: ControlPlaneLoadQualificationCheckId; status: "passed" }
+      | {
+          id: ControlPlaneLoadQualificationCheckId;
+          status: "failed";
+          errorCode: `control-plane-load.${string}`;
+        }
+    >;
+    limitations: [
+      "authenticated-runtime-identity-read-only",
+      "single-endpoint",
+      "fixed-rate-synthetic-traffic",
+      "single-ingress-path",
+      "write-database-worker-receiver-capacity-not-qualified",
+      "failure-regional-and-long-window-slo-not-qualified",
+    ];
+    summary: {
+      totalChecks: 12;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export type ReleaseQualificationInstallCheckId =
   | "bundle-integrity"
   | "source-identity"

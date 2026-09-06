@@ -120,6 +120,13 @@ REQUIRED_PATHS = (
     "contracts/examples/customer-deployment-qualification-report.json",
     "scripts/qualify_customer_deployment.py",
     "tests/test_customer_deployment_qualification.py",
+    "docs/operations/control-plane-load-qualification.md",
+    "docs/specifications/control-plane-load-qualification-report-contract.md",
+    "docs/decisions/0125-bounded-fixed-rate-control-plane-load-qualification.md",
+    "contracts/schemas/control-plane-load-qualification-report.schema.json",
+    "contracts/examples/control-plane-load-qualification-report.json",
+    "scripts/qualify_control_plane_load.py",
+    "tests/test_control_plane_load_qualification.py",
     "docs/operations/kubernetes-availability-qualification.md",
     "docs/specifications/kubernetes-availability-qualification-report-contract.md",
     "contracts/schemas/kubernetes-availability-qualification-report.schema.json",
@@ -2064,6 +2071,42 @@ def validate_customer_deployment_qualification_example(
         validate_report_document(report)
     except CustomerDeploymentQualificationError:
         fail(errors, "customer deployment qualification example must be semantically valid")
+
+
+def validate_control_plane_load_qualification_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check bounded load accounting, derived checks, and minimized semantics."""
+
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "control-plane-load-qualification-report.json"
+    )
+    report = documents.get(path)
+    try:
+        from qualify_control_plane_load import (
+            ControlPlaneLoadQualificationError,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(
+            errors,
+            "control-plane load qualification example must be semantically valid",
+        )
+        return
+    try:
+        if not isinstance(report, dict):
+            raise ControlPlaneLoadQualificationError(
+                "control-plane-load.report.invalid"
+            )
+        validate_report_document(report)
+    except ControlPlaneLoadQualificationError:
+        fail(
+            errors,
+            "control-plane load qualification example must be semantically valid",
+        )
 
 
 def validate_postgresql_recovery_qualification_example(
@@ -4932,6 +4975,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerDeploymentQualificationReport",
         ),
         (
+            "control-plane-load-qualification-report.json",
+            "ControlPlaneLoadQualificationReport",
+        ),
+        (
             "credential-broker-compatibility-report.json",
             "CredentialBrokerCompatibilityReport",
         ),
@@ -5009,6 +5056,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_ingress_availability_qualification_example(documents, errors)
     validate_customer_continuity_qualification_example(documents, errors)
     validate_customer_deployment_qualification_example(documents, errors)
+    validate_control_plane_load_qualification_example(documents, errors)
     validate_postgresql_recovery_qualification_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
     validate_ai_economics_examples(documents, errors)

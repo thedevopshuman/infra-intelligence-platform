@@ -2,14 +2,14 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "KubernetesAvailabilityQualificationReport",
   "metadata": {
-    "id": "kaq_6d397e089359ca07033365a7d4128c02",
+    "id": "kaq_90241262502ecd89218d675c2e6aa8ef",
     "generatedAt": "2026-09-06T12:30:00Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
   },
   "spec": {
     "status": "qualified",
-    "qualificationLevel": "local-multi-node-kind-v1",
+    "qualificationLevel": "local-multi-node-kind-v2",
     "subject": {
       "applicationVersion": "0.84.0",
       "chartVersion": "0.87.0",
@@ -61,6 +61,19 @@
       }
     ],
     "intakeSeed": {"resourceAccepted": true, "metricAccepted": true},
+    "receiverIntake": {
+      "signal": "metric",
+      "payload": "non-empty-otlp-protobuf",
+      "successBoundary": "postgresql-commit-before-http-200"
+    },
+    "workflowProcessing": {
+      "operation": "durable-investigation",
+      "phases": [
+        {"id": "baseline", "submitted": 1, "completed": 1, "failures": 0, "pollAttempts": 2, "completionMilliseconds": 240},
+        {"id": "disruption", "submitted": 1, "completed": 1, "failures": 0, "pollAttempts": 3, "completionMilliseconds": 330},
+        {"id": "recovery", "submitted": 1, "completed": 1, "failures": 0, "pollAttempts": 2, "completionMilliseconds": 220}
+      ]
+    },
     "disruption": {
       "method": "kubectl-drain",
       "targetNodeDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
@@ -92,11 +105,15 @@
       }
     ],
     "summary": {
-      "totalChecks": 14,
-      "passedChecks": 14,
+      "totalChecks": 18,
+      "passedChecks": 18,
       "failedChecks": 0,
       "totalProbeAttempts": 128,
       "failedProbeAttempts": 0,
+      "totalWorkflowSubmissions": 3,
+      "completedWorkflows": 3,
+      "failedWorkflows": 0,
+      "maximumWorkflowCompletionMilliseconds": 330,
       "overallStatus": "qualified"
     },
     "checks": [
@@ -112,6 +129,10 @@
       {"id": "disruption-capacity", "status": "passed"},
       {"id": "api-zero-failure", "status": "passed"},
       {"id": "receiver-zero-failure", "status": "passed"},
+      {"id": "receiver-durable-intake", "status": "passed"},
+      {"id": "worker-baseline-completion", "status": "passed"},
+      {"id": "worker-disruption-completion", "status": "passed"},
+      {"id": "worker-recovery-completion", "status": "passed"},
       {"id": "component-recovery", "status": "passed"},
       {"id": "output-minimization", "status": "passed"}
     ],

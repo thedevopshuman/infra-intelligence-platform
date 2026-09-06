@@ -144,6 +144,11 @@ Version 0.54 adds the offline
 check identifiers. It adds no API method, Kubernetes credential, mutation
 authority, or production availability claim.
 
+The current `local-multi-node-kind-v2` shape adds closed receiver durable-intake
+semantics and aggregate workflow completion measurements for baseline,
+drained-node, and recovered states. It still carries no cluster or workflow
+identifier and grants no runtime authority.
+
 Version 0.55 adds `AiModelSuitabilityReport` plus the qualified-model saving
 calculation and evidence-reference types. These types cannot attest gate
 results, install protected profiles, switch models, or grant action authority.

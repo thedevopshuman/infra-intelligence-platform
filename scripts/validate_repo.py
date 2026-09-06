@@ -86,6 +86,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0109-component-aware-kubernetes-availability.md",
     "docs/decisions/0110-source-bound-multi-node-kubernetes-availability.md",
     "docs/decisions/0127-private-dependency-aware-worker-health.md",
+    "docs/decisions/0128-source-bound-worker-receiver-processing-continuity.md",
     "docs/specifications/worker-health-contract.md",
     "src/iip/surfaces/worker_health.py",
     "tests/test_worker_health.py",

@@ -476,7 +476,7 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         self.assertEqual(
             kubernetes_availability.to_dict()["spec"]["qualificationLevel"],
-            "local-multi-node-kind-v1",
+            "local-multi-node-kind-v2",
         )
         self.assertEqual(
             postgresql_recovery.to_dict()["spec"]["profile"]["name"],

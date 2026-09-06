@@ -107,7 +107,7 @@ help:
 	@echo "qualify-control-plane-load Run explicitly enabled external read load against one release"
 	@echo "verify-control-plane-load-report Verify retained load evidence and exact target identity"
 	@echo "test-kubernetes-availability Validate the planned-disruption report and harness"
-	@echo "qualify-kubernetes-availability Prove API/OTLP availability during an owned Kind worker drain"
+	@echo "qualify-kubernetes-availability Prove API, durable OTLP intake, and worker completion during an owned Kind drain"
 	@echo "verify-kubernetes-availability-report Verify clean current planned-disruption evidence"
 	@echo "test-postgres Run PostgreSQL integration tests with Docker Desktop"
 	@echo "test-capacity Certify large-tenant investigation dispatch capacity with PostgreSQL"

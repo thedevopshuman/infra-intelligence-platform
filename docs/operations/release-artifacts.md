@@ -49,8 +49,9 @@ make release-bundle PYTHON=.venv/bin/python
 ```
 
 The one-command workflow also runs the plugin compatibility and three-node
-Kubernetes planned-disruption gates required by the aggregate. Generated
-reports remain outside Git and outside the immutable bundle. See
+Kubernetes planned-disruption gate required by the aggregate. Its v2 profile
+proves API access, durable non-empty receiver intake, and worker completion in
+the fully drained state. Generated reports remain outside Git and outside the immutable bundle. See
 [ADR 0122](../decisions/0122-one-command-local-release-qualification.md).
 
 Retain the clean-revision capacity, credential-broker, OIDC-issuer,

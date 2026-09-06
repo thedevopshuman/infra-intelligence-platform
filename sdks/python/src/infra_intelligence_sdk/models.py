@@ -628,7 +628,7 @@ class ControlPlaneLoadQualificationReport:
 
 @dataclass(frozen=True)
 class KubernetesAvailabilityQualificationReport:
-    """Source-bound planned worker-drain availability evidence."""
+    """Source-bound API, receiver, and worker drain-continuity evidence."""
 
     payload: Mapping[str, Any]
 

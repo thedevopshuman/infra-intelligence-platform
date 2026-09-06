@@ -39,7 +39,7 @@ were present, the installed components were healthy after a successful
 external API-pod disruption window, and every artifact described the same
 release and cluster. The fixed `limitations` list keeps publication/signature/
 vulnerability,
-database HA/DR, worker/receiver continuity, integrations, live AI/provider
+database HA/DR, customer-environment worker/receiver continuity, integrations, live AI/provider
 pricing, regional capacity/SLO, design-partner, legal, brand, and governance
 gates outside this claim.
 

@@ -131,3 +131,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0125](0125-bounded-fixed-rate-control-plane-load-qualification.md) | Accepted | Measure one exact external identity-read objective with bounded fixed-rate traffic and minimized evidence |
 | [0126](0126-bounded-ai-savings-finding-read-model.md) | Accepted | Expose committed AI savings findings through a bounded tenant and interval-scoped read model |
 | [0127](0127-private-dependency-aware-worker-health.md) | Accepted | Use a private dependency-aware worker readiness signal without adding control-plane authority |
+| [0128](0128-source-bound-worker-receiver-processing-continuity.md) | Accepted | Prove durable receiver intake and workflow completion during one planned worker-node drain |

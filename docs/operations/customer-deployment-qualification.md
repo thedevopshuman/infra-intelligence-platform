@@ -88,7 +88,9 @@ values separately for reproducible verification.
 ## Non-claims
 
 This profile does not qualify artifact publication/signatures/vulnerabilities,
-automatic database failover or disaster recovery, worker/receiver continuity, customer
-identity/policy/broker/Collector interoperability, live AI providers or price
-authority, regional capacity/SLOs, a design-partner outcome, or public
-legal/brand/governance approval. Those remain independent release gates.
+automatic database failover or disaster recovery, customer-environment worker/
+receiver processing continuity, customer identity/policy/broker/Collector
+interoperability, live AI providers or price authority, regional capacity/SLOs,
+a design-partner outcome, or public legal/brand/governance approval. Those
+remain independent release gates. The repository-owned Kind v2 gate provides
+local processing evidence only and cannot substitute for this customer proof.

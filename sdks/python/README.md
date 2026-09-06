@@ -155,6 +155,11 @@ Version 0.54 adds `KubernetesAvailabilityQualificationReport` for minimized,
 source-bound planned worker-drain evidence. It adds no API method, cluster
 credential, mutation authority, or customer availability claim.
 
+The current `local-multi-node-kind-v2` report additionally exposes minimized
+receiver commit and worker completion evidence for baseline, drained-node, and
+recovered states. The Python model remains an offline envelope and grants no
+cluster or workflow authority.
+
 Version 0.55 adds `AiModelSuitabilityReport`, the protected immutable input
 required before an expensive-model saving can be calculated. The SDK exposes
 the validated envelope only; it cannot attest gate results, install profiles,

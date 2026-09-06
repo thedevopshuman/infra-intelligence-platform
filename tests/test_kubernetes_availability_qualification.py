@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import copy
+import io
 import json
 import sys
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from jsonschema import Draft202012Validator, FormatChecker
@@ -15,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import kubernetes_availability_qualification as qualification  # noqa: E402
+import kubernetes_availability_probe as probe  # noqa: E402
 from infra_intelligence_sdk import (  # noqa: E402
     KubernetesAvailabilityQualificationReport,
 )
@@ -159,6 +163,22 @@ def probe_state(*, failures: int = 0) -> dict[str, object]:
     }
 
 
+def workflow_state(*, failed_phase: str | None = None) -> dict[str, object]:
+    return {
+        "phases": {
+            phase: {
+                "phase": phase,
+                "submitted": 1,
+                "completed": 0 if phase == failed_phase else 1,
+                "failures": 1 if phase == failed_phase else 0,
+                "pollAttempts": 2,
+                "completionMilliseconds": 250,
+            }
+            for phase in qualification.PHASES
+        }
+    }
+
+
 class KubernetesAvailabilityQualificationTests(unittest.TestCase):
     def report(self) -> dict[str, object]:
         with (
@@ -182,6 +202,7 @@ class KubernetesAvailabilityQualificationTests(unittest.TestCase):
                 disruption_snapshot=snapshot("disruption"),
                 recovery_snapshot=snapshot("recovery"),
                 probe_state=probe_state(),
+                workflow_state=workflow_state(),
                 cluster_name="iip-availability-test",
                 namespace="iip-availability",
                 target_node="qualification-worker-a",
@@ -197,6 +218,11 @@ class KubernetesAvailabilityQualificationTests(unittest.TestCase):
         report = self.report()
         self.assertEqual(report["spec"]["status"], "qualified")
         self.assertEqual(report["spec"]["summary"]["totalProbeAttempts"], 120)
+        self.assertEqual(report["spec"]["summary"]["completedWorkflows"], 3)
+        self.assertEqual(
+            report["spec"]["receiverIntake"]["successBoundary"],
+            "postgresql-commit-before-http-200",
+        )
         self.assertEqual(
             [item["id"] for item in report["spec"]["components"]],
             [item[0] for item in qualification.COMPONENTS],
@@ -228,6 +254,7 @@ class KubernetesAvailabilityQualificationTests(unittest.TestCase):
                     disruption_snapshot=snapshot("disruption"),
                     recovery_snapshot=snapshot("recovery"),
                     probe_state=probe_state(failures=1),
+                    workflow_state=workflow_state(),
                     cluster_name="iip-availability-test",
                     namespace="iip-availability",
                     target_node="qualification-worker-a",
@@ -255,6 +282,7 @@ class KubernetesAvailabilityQualificationTests(unittest.TestCase):
                     disruption_snapshot=disrupted,
                     recovery_snapshot=snapshot("recovery"),
                     probe_state=probe_state(),
+                    workflow_state=workflow_state(),
                     cluster_name="iip-availability-test",
                     namespace="iip-availability",
                     target_node="qualification-worker-a",
@@ -275,6 +303,58 @@ class KubernetesAvailabilityQualificationTests(unittest.TestCase):
             "kubernetes-availability.report.components-invalid",
         ):
             qualification.validate_report(tampered)
+
+    def test_rejects_disruption_workflow_failure(self) -> None:
+        with self.assertRaisesRegex(
+            qualification.KubernetesAvailabilityQualificationError,
+            "kubernetes-availability.workflows.disruption-failed",
+        ):
+            with patch.object(qualification, "_git_state", return_value=(REVISION, False)):
+                qualification.build_report(
+                    baseline_nodes=nodes(target_unschedulable=False),
+                    disruption_nodes=nodes(target_unschedulable=True),
+                    recovery_nodes=nodes(target_unschedulable=False),
+                    baseline_snapshot=snapshot("baseline"),
+                    disruption_snapshot=snapshot("disruption"),
+                    recovery_snapshot=snapshot("recovery"),
+                    probe_state=probe_state(),
+                    workflow_state=workflow_state(failed_phase="disruption"),
+                    cluster_name="iip-availability-test",
+                    namespace="iip-availability",
+                    target_node="qualification-worker-a",
+                    image_digest=IMAGE_DIGEST,
+                    kubernetes_version="v1.36.1",
+                    kind_version="v0.32.0",
+                    docker_version="29.7.2",
+                    containerd_version="v2.2.1",
+                )
+
+    def test_rejects_boolean_workflow_counters(self) -> None:
+        state = workflow_state()
+        state["phases"]["baseline"]["submitted"] = True
+        with self.assertRaisesRegex(
+            qualification.KubernetesAvailabilityQualificationError,
+            "kubernetes-availability.workflows.baseline-failed",
+        ):
+            with patch.object(qualification, "_git_state", return_value=(REVISION, False)):
+                qualification.build_report(
+                    baseline_nodes=nodes(target_unschedulable=False),
+                    disruption_nodes=nodes(target_unschedulable=True),
+                    recovery_nodes=nodes(target_unschedulable=False),
+                    baseline_snapshot=snapshot("baseline"),
+                    disruption_snapshot=snapshot("disruption"),
+                    recovery_snapshot=snapshot("recovery"),
+                    probe_state=probe_state(),
+                    workflow_state=state,
+                    cluster_name="iip-availability-test",
+                    namespace="iip-availability",
+                    target_node="qualification-worker-a",
+                    image_digest=IMAGE_DIGEST,
+                    kubernetes_version="v1.36.1",
+                    kind_version="v0.32.0",
+                    docker_version="29.7.2",
+                    containerd_version="v2.2.1",
+                )
 
     def test_contract_example_is_schema_and_semantically_valid(self) -> None:
         schema = json.loads(
@@ -310,6 +390,135 @@ class KubernetesAvailabilityQualificationTests(unittest.TestCase):
         )
         self.assertNotIn("kind-iip-dev", source)
         self.assertNotIn("--force --grace-period=0", source)
+        self.assertIn("run_workflow_phase disruption", source)
+        self.assertIn("body=_metric_payload()", (ROOT / "scripts/kubernetes_availability_probe.py").read_text(encoding="utf-8"))
+
+    def test_receiver_probe_sends_a_real_metric_on_every_attempt(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        def request(**kwargs):
+            calls.append(kwargs)
+            return 200, "application/x-protobuf", b""
+
+        with patch.object(probe, "_request", side_effect=request):
+            self.assertTrue(
+                probe._otlp_probe(
+                    SimpleNamespace(otlp_url="http://receiver"), "secret-token"
+                )
+            )
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["method"], "POST")
+        self.assertGreater(len(calls[0]["body"]), 0)
+
+    def test_workflow_probe_requires_completed_report_and_minimizes_output(self) -> None:
+        investigation_id = "inv_" + "d" * 32
+        responses = iter(
+            (
+                (
+                    202,
+                    "application/json",
+                    json.dumps(
+                        {
+                            "apiVersion": "iip.platform/v1alpha1",
+                            "kind": "InvestigationJobStatus",
+                            "metadata": {
+                                "id": investigation_id,
+                                "tenantId": "availability",
+                            },
+                            "spec": {"state": "queued"},
+                        }
+                    ).encode(),
+                ),
+                (
+                    200,
+                    "application/json",
+                    json.dumps(
+                        {
+                            "apiVersion": "iip.platform/v1alpha1",
+                            "kind": "InvestigationJobStatus",
+                            "metadata": {
+                                "id": investigation_id,
+                                "tenantId": "availability",
+                            },
+                            "spec": {"state": "queued"},
+                        }
+                    ).encode(),
+                ),
+                (
+                    200,
+                    "application/json",
+                    json.dumps(
+                        {
+                            "apiVersion": "iip.platform/v1alpha1",
+                            "kind": "InvestigationJobStatus",
+                            "metadata": {
+                                "id": investigation_id,
+                                "tenantId": "availability",
+                            },
+                            "spec": {"state": "completed"},
+                        }
+                    ).encode(),
+                ),
+                (
+                    200,
+                    "application/json",
+                    json.dumps(
+                        {
+                            "apiVersion": "iip.platform/v1alpha1",
+                            "kind": "InvestigationReport",
+                            "metadata": {
+                                "id": investigation_id,
+                                "tenantId": "availability",
+                            },
+                            "spec": {"outcome": "inconclusive"},
+                        }
+                    ).encode(),
+                ),
+            )
+        )
+        output = io.StringIO()
+        args = SimpleNamespace(
+            api_url="http://api",
+            control_token_file=Path("unused"),
+            tenant="availability",
+            actor_id="availability-probe",
+            phase="disruption",
+            timeout_seconds=60,
+        )
+        with (
+            patch.object(probe, "_token", return_value="secret-token"),
+            patch.object(probe.secrets, "token_hex", return_value="d" * 32),
+            patch.object(probe, "_request", side_effect=lambda **_kwargs: next(responses)),
+            patch.object(probe.time, "monotonic", side_effect=(10, 10, 10.2, 10.25)),
+            patch.object(probe.time, "sleep"),
+            redirect_stdout(output),
+        ):
+            probe.workflow(args)
+        result = json.loads(output.getvalue())
+        self.assertEqual(result["phase"], "disruption")
+        self.assertEqual(result["completed"], 1)
+        self.assertEqual(result["failures"], 0)
+        self.assertNotIn(investigation_id, output.getvalue())
+
+    def test_probe_main_emits_only_a_stable_failure(self) -> None:
+        output = io.StringIO()
+        with (
+            patch.object(probe, "workflow", side_effect=RuntimeError("secret detail")),
+            redirect_stderr(output),
+        ):
+            result = probe.main(
+                [
+                    "workflow",
+                    "--api-url",
+                    "http://api",
+                    "--control-token-file",
+                    "unused",
+                    "--phase",
+                    "baseline",
+                ]
+            )
+        self.assertEqual(result, 1)
+        self.assertEqual(output.getvalue(), "availability probe failed\n")
 
 
 if __name__ == "__main__":

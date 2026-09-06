@@ -20,7 +20,7 @@ from typing import Any, Mapping, Sequence
 ROOT = Path(__file__).resolve().parents[1]
 API_VERSION = "iip.platform/v1alpha1"
 KIND = "KubernetesAvailabilityQualificationReport"
-PROFILE = "local-multi-node-kind-v1"
+PROFILE = "local-multi-node-kind-v2"
 COMPONENTS = (
     ("control-plane-api", "iip-infra-intelligence", "iip-infra-intelligence"),
     ("workflow-worker", "iip-infra-intelligence-worker", "iip-infra-intelligence-worker"),
@@ -44,6 +44,10 @@ CHECK_IDS = (
     "disruption-capacity",
     "api-zero-failure",
     "receiver-zero-failure",
+    "receiver-durable-intake",
+    "worker-baseline-completion",
+    "worker-disruption-completion",
+    "worker-recovery-completion",
     "component-recovery",
     "output-minimization",
 )
@@ -397,6 +401,69 @@ def _probe_measurements(
     return dict(seed), probes, total
 
 
+def _workflow_measurements(document: object) -> tuple[list[dict[str, Any]], int]:
+    root = _mapping(document, "kubernetes-availability.workflows.invalid")
+    raw_phases = root.get("phases")
+    if set(root) != {"phases"} or not isinstance(raw_phases, Mapping):
+        _fail("kubernetes-availability.workflows.invalid")
+    if set(raw_phases) != set(PHASES):
+        _fail("kubernetes-availability.workflows.invalid")
+    phases: list[dict[str, Any]] = []
+    maximum_completion_milliseconds = 0
+    expected_keys = {
+        "phase",
+        "submitted",
+        "completed",
+        "failures",
+        "pollAttempts",
+        "completionMilliseconds",
+    }
+    for phase in PHASES:
+        value = _mapping(
+            raw_phases.get(phase),
+            f"kubernetes-availability.workflows.{phase}-failed",
+        )
+        polls = value.get("pollAttempts")
+        duration = value.get("completionMilliseconds")
+        submitted = value.get("submitted")
+        completed = value.get("completed")
+        failures = value.get("failures")
+        if (
+            set(value) != expected_keys
+            or value.get("phase") != phase
+            or isinstance(submitted, bool)
+            or not isinstance(submitted, int)
+            or submitted != 1
+            or isinstance(completed, bool)
+            or not isinstance(completed, int)
+            or completed != 1
+            or isinstance(failures, bool)
+            or not isinstance(failures, int)
+            or failures != 0
+            or isinstance(polls, bool)
+            or not isinstance(polls, int)
+            or not 1 <= polls <= 1000
+            or isinstance(duration, bool)
+            or not isinstance(duration, int)
+            or not 0 <= duration <= 120_000
+        ):
+            _fail(f"kubernetes-availability.workflows.{phase}-failed")
+        maximum_completion_milliseconds = max(
+            maximum_completion_milliseconds, duration
+        )
+        phases.append(
+            {
+                "id": phase,
+                "submitted": 1,
+                "completed": 1,
+                "failures": 0,
+                "pollAttempts": polls,
+                "completionMilliseconds": duration,
+            }
+        )
+    return phases, maximum_completion_milliseconds
+
+
 def _platform_name() -> str:
     machine = platform.machine().lower()
     architecture = {"x86_64": "amd64", "aarch64": "arm64"}.get(machine, machine)
@@ -419,6 +486,7 @@ def build_report(
     disruption_snapshot: object,
     recovery_snapshot: object,
     probe_state: object,
+    workflow_state: object,
     cluster_name: str,
     namespace: str,
     target_node: str,
@@ -478,6 +546,9 @@ def build_report(
             }
         )
     intake_seed, probes, total_probe_attempts = _probe_measurements(probe_state)
+    workflow_phases, maximum_workflow_completion_milliseconds = (
+        _workflow_measurements(workflow_state)
+    )
     subject = {
         **identity,
         "sourceRevision": revision,
@@ -525,6 +596,15 @@ def build_report(
         },
         "components": components,
         "intakeSeed": intake_seed,
+        "receiverIntake": {
+            "signal": "metric",
+            "payload": "non-empty-otlp-protobuf",
+            "successBoundary": "postgresql-commit-before-http-200",
+        },
+        "workflowProcessing": {
+            "operation": "durable-investigation",
+            "phases": workflow_phases,
+        },
         "disruption": {
             "method": "kubectl-drain",
             "targetNodeDigest": _digest(target_node),
@@ -540,6 +620,12 @@ def build_report(
             "failedChecks": 0,
             "totalProbeAttempts": total_probe_attempts,
             "failedProbeAttempts": 0,
+            "totalWorkflowSubmissions": len(PHASES),
+            "completedWorkflows": len(PHASES),
+            "failedWorkflows": 0,
+            "maximumWorkflowCompletionMilliseconds": (
+                maximum_workflow_completion_milliseconds
+            ),
             "overallStatus": "qualified",
         },
         "checks": [{"id": check_id, "status": "passed"} for check_id in CHECK_IDS],
@@ -657,6 +743,59 @@ def validate_report(
         "metricAccepted": True,
     }:
         _fail("kubernetes-availability.report.intake-seed-invalid")
+    if spec.get("receiverIntake") != {
+        "signal": "metric",
+        "payload": "non-empty-otlp-protobuf",
+        "successBoundary": "postgresql-commit-before-http-200",
+    }:
+        _fail("kubernetes-availability.report.receiver-intake-invalid")
+    workflow_processing = _mapping(
+        spec.get("workflowProcessing"),
+        "kubernetes-availability.report.workflows-invalid",
+    )
+    workflow_phases = workflow_processing.get("phases")
+    if (
+        workflow_processing.get("operation") != "durable-investigation"
+        or not isinstance(workflow_phases, list)
+        or [
+            phase.get("id")
+            for phase in workflow_phases
+            if isinstance(phase, Mapping)
+        ]
+        != list(PHASES)
+    ):
+        _fail("kubernetes-availability.report.workflows-invalid")
+    maximum_workflow_completion_milliseconds = 0
+    for phase in workflow_phases:
+        phase = _mapping(
+            phase, "kubernetes-availability.report.workflows-invalid"
+        )
+        polls = phase.get("pollAttempts")
+        duration = phase.get("completionMilliseconds")
+        submitted = phase.get("submitted")
+        completed = phase.get("completed")
+        failures = phase.get("failures")
+        if (
+            isinstance(submitted, bool)
+            or not isinstance(submitted, int)
+            or submitted != 1
+            or isinstance(completed, bool)
+            or not isinstance(completed, int)
+            or completed != 1
+            or isinstance(failures, bool)
+            or not isinstance(failures, int)
+            or failures != 0
+            or isinstance(polls, bool)
+            or not isinstance(polls, int)
+            or not 1 <= polls <= 1000
+            or isinstance(duration, bool)
+            or not isinstance(duration, int)
+            or not 0 <= duration <= 120_000
+        ):
+            _fail("kubernetes-availability.report.workflows-invalid")
+        maximum_workflow_completion_milliseconds = max(
+            maximum_workflow_completion_milliseconds, duration
+        )
     probes = spec.get("probes")
     if not isinstance(probes, list) or len(probes) != len(PROBES):
         _fail("kubernetes-availability.report.probes-invalid")
@@ -671,12 +810,18 @@ def validate_report(
         for phase in phases:
             phase = _mapping(phase, "kubernetes-availability.report.probes-invalid")
             attempts = phase.get("attempts")
+            successes = phase.get("successes")
+            failures = phase.get("failures")
             if (
                 not isinstance(attempts, int)
                 or isinstance(attempts, bool)
                 or attempts < 20
-                or phase.get("successes") != attempts
-                or phase.get("failures") != 0
+                or not isinstance(successes, int)
+                or isinstance(successes, bool)
+                or successes != attempts
+                or not isinstance(failures, int)
+                or isinstance(failures, bool)
+                or failures != 0
             ):
                 _fail("kubernetes-availability.report.probes-invalid")
             total += attempts
@@ -692,6 +837,12 @@ def validate_report(
         "failedChecks": 0,
         "totalProbeAttempts": total,
         "failedProbeAttempts": 0,
+        "totalWorkflowSubmissions": len(PHASES),
+        "completedWorkflows": len(PHASES),
+        "failedWorkflows": 0,
+        "maximumWorkflowCompletionMilliseconds": (
+            maximum_workflow_completion_milliseconds
+        ),
         "overallStatus": "qualified",
     } or spec.get("limitations") != list(LIMITATIONS):
         _fail("kubernetes-availability.report.summary-invalid")
@@ -735,6 +886,7 @@ def _parser() -> argparse.ArgumentParser:
         "disruption-snapshot",
         "recovery-snapshot",
         "probe-state",
+        "workflow-state",
     ):
         build.add_argument(f"--{argument}", required=True, type=Path)
     for argument in (
@@ -769,6 +921,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 disruption_snapshot=_load(args.disruption_snapshot, "kubernetes-availability.snapshot.unavailable"),
                 recovery_snapshot=_load(args.recovery_snapshot, "kubernetes-availability.snapshot.unavailable"),
                 probe_state=_load(args.probe_state, "kubernetes-availability.probes.unavailable"),
+                workflow_state=_load(
+                    args.workflow_state,
+                    "kubernetes-availability.workflows.unavailable",
+                ),
                 cluster_name=args.cluster_name,
                 namespace=args.namespace,
                 target_node=args.target_node,

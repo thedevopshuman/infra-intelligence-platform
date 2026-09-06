@@ -4,8 +4,9 @@
 
 This gate creates a fresh three-node Kind cluster, installs the current clean
 source with one immutable image digest, drains one worker using the Kubernetes
-Eviction API, continuously probes the API and OTLP Services, verifies recovery,
-retains minimized evidence, and deletes only the cluster it created.
+Eviction API, continuously probes the API and commits OTLP metrics, completes a
+durable investigation after each topology state, verifies recovery, retains
+minimized evidence, and deletes only the cluster it created.
 
 ## Prerequisites
 
@@ -33,6 +34,14 @@ with two API, two worker, and two receiver replicas. PostgreSQL and the probe
 stay on the tainted control-plane node, so the selected worker disruption
 targets all three application components without disrupting the measurement
 process or its shared database.
+
+The v2 processing profile sends a real allowlisted metric on every receiver
+probe; receiver success therefore crosses the existing PostgreSQL
+commit-before-HTTP-200 boundary. It also submits one bounded investigation
+after baseline is stable, a second after the target node is fully drained, and
+a third after all components recover. Each request must be claimed by a worker,
+complete without failure or cancellation, and return its immutable report.
+Service probes keep running while these jobs are processed.
 
 The probe's two random 256-bit Bearer credentials are generated into a
 mode-`0600` temporary directory. Only their SHA-256 verifiers enter the API and
@@ -71,6 +80,7 @@ failure, a blocked eviction, an unexpected replica/PDB/domain state, missing
 recovery, source drift, or malformed evidence fails the gate.
 
 This qualification covers one planned worker drain in a local single-region
-topology. Production still requires customer-cluster ingress qualification,
+topology with a shared PostgreSQL instance outside the disrupted node.
+Production still requires the equivalent customer-cluster processing profile,
 sustained workload and failure injection, database failover, storage and
 regional recovery, and customer SLO evidence.

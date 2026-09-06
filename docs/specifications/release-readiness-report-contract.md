@@ -33,7 +33,8 @@ The `local-candidate-only` profile has 18 ordered requirements:
 11. OpenAI chat-completions offline instrumentation compatibility;
 12. PostgreSQL logical recovery;
 13. PostgreSQL physical continuity and PITR;
-14. multi-node Kubernetes planned-disruption availability;
+14. multi-node Kubernetes planned-disruption API availability, durable receiver
+    intake, and workflow completion;
 15. protected GitHub context compatibility;
 16. plugin runtime compatibility;
 17. production-core static configuration preflight; and

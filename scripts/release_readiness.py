@@ -213,7 +213,7 @@ REQUIREMENTS = (
         "local-availability",
         ("spec", "status"),
         "qualified",
-        ((("spec", "qualificationLevel"), "local-multi-node-kind-v1"),),
+        ((("spec", "qualificationLevel"), "local-multi-node-kind-v2"),),
     ),
     EvidenceRequirement(
         "github-context",

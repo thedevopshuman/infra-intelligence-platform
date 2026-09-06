@@ -3,6 +3,10 @@
 **Status:** Accepted
 **Date:** 2026-09-06
 
+**Extended by:** [ADR 0128](0128-source-bound-worker-receiver-processing-continuity.md),
+which replaces this v1 profile in current release qualification while retaining
+its narrower historical claim.
+
 ## Context
 
 ADR 0109 defines zero-unavailable rollout, component-specific disruption

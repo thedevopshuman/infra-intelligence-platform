@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:iip:contracts:kubernetes-availability-qualification-report:v1alpha1",
   "title": "Kubernetes Availability Qualification Report",
-  "description": "Minimized, source-bound evidence that redundant IIP workloads preserve API and OTLP service during one planned worker-node drain.",
+  "description": "Minimized, source-bound evidence that redundant IIP workloads preserve API service, durable OTLP metric intake, and workflow processing during one planned worker-node drain.",
   "type": "object",
   "additionalProperties": false,
   "required": ["apiVersion", "kind", "metadata", "spec"],
@@ -23,10 +23,10 @@
     "spec": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "qualificationLevel", "subject", "environment", "policy", "components", "intakeSeed", "disruption", "probes", "summary", "checks", "limitations"],
+      "required": ["status", "qualificationLevel", "subject", "environment", "policy", "components", "intakeSeed", "receiverIntake", "workflowProcessing", "disruption", "probes", "summary", "checks", "limitations"],
       "properties": {
         "status": {"const": "qualified"},
-        "qualificationLevel": {"const": "local-multi-node-kind-v1"},
+        "qualificationLevel": {"const": "local-multi-node-kind-v2"},
         "subject": {"$ref": "#/$defs/subject"},
         "environment": {"$ref": "#/$defs/environment"},
         "policy": {"$ref": "#/$defs/policy"},
@@ -40,6 +40,8 @@
             "metricAccepted": {"const": true}
           }
         },
+        "receiverIntake": {"$ref": "#/$defs/receiverIntake"},
+        "workflowProcessing": {"$ref": "#/$defs/workflowProcessing"},
         "disruption": {"$ref": "#/$defs/disruption"},
         "probes": {"$ref": "#/$defs/probes"},
         "summary": {"$ref": "#/$defs/summary"},
@@ -168,6 +170,48 @@
         "evictedComponentCount": {"const": 3}
       }
     },
+    "receiverIntake": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal", "payload", "successBoundary"],
+      "properties": {
+        "signal": {"const": "metric"},
+        "payload": {"const": "non-empty-otlp-protobuf"},
+        "successBoundary": {"const": "postgresql-commit-before-http-200"}
+      }
+    },
+    "workflowPhase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "submitted", "completed", "failures", "pollAttempts", "completionMilliseconds"],
+      "properties": {
+        "id": {"enum": ["baseline", "disruption", "recovery"]},
+        "submitted": {"const": 1},
+        "completed": {"const": 1},
+        "failures": {"const": 0},
+        "pollAttempts": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "completionMilliseconds": {"type": "integer", "minimum": 0, "maximum": 120000}
+      }
+    },
+    "workflowProcessing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "phases"],
+      "properties": {
+        "operation": {"const": "durable-investigation"},
+        "phases": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {"$ref": "#/$defs/workflowPhase", "properties": {"id": {"const": "baseline"}}},
+            {"$ref": "#/$defs/workflowPhase", "properties": {"id": {"const": "disruption"}}},
+            {"$ref": "#/$defs/workflowPhase", "properties": {"id": {"const": "recovery"}}}
+          ],
+          "items": false
+        }
+      }
+    },
     "probePhase": {
       "type": "object",
       "additionalProperties": false,
@@ -214,13 +258,17 @@
     "summary": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["totalChecks", "passedChecks", "failedChecks", "totalProbeAttempts", "failedProbeAttempts", "overallStatus"],
+      "required": ["totalChecks", "passedChecks", "failedChecks", "totalProbeAttempts", "failedProbeAttempts", "totalWorkflowSubmissions", "completedWorkflows", "failedWorkflows", "maximumWorkflowCompletionMilliseconds", "overallStatus"],
       "properties": {
-        "totalChecks": {"const": 14},
-        "passedChecks": {"const": 14},
+        "totalChecks": {"const": 18},
+        "passedChecks": {"const": 18},
         "failedChecks": {"const": 0},
         "totalProbeAttempts": {"type": "integer", "minimum": 120, "maximum": 60000},
         "failedProbeAttempts": {"const": 0},
+        "totalWorkflowSubmissions": {"const": 3},
+        "completedWorkflows": {"const": 3},
+        "failedWorkflows": {"const": 0},
+        "maximumWorkflowCompletionMilliseconds": {"type": "integer", "minimum": 0, "maximum": 120000},
         "overallStatus": {"const": "qualified"}
       }
     },
@@ -232,8 +280,8 @@
     },
     "checks": {
       "type": "array",
-      "minItems": 14,
-      "maxItems": 14,
+      "minItems": 18,
+      "maxItems": 18,
       "prefixItems": [
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "isolated-cluster"}}},
@@ -247,6 +295,10 @@
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "disruption-capacity"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-zero-failure"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-zero-failure"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-durable-intake"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "worker-baseline-completion"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "worker-disruption-completion"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "worker-recovery-completion"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "component-recovery"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "output-minimization"}}}
       ],

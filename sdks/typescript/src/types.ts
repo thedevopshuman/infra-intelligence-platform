@@ -1059,6 +1059,10 @@ export type KubernetesAvailabilityCheckId =
   | "disruption-capacity"
   | "api-zero-failure"
   | "receiver-zero-failure"
+  | "receiver-durable-intake"
+  | "worker-baseline-completion"
+  | "worker-disruption-completion"
+  | "worker-recovery-completion"
   | "component-recovery"
   | "output-minimization";
 
@@ -1080,7 +1084,7 @@ export interface KubernetesAvailabilityQualificationReport {
   };
   spec: {
     status: "qualified";
-    qualificationLevel: "local-multi-node-kind-v1";
+    qualificationLevel: "local-multi-node-kind-v2";
     subject: {
       applicationVersion: string;
       chartVersion: string;
@@ -1116,6 +1120,22 @@ export interface KubernetesAvailabilityQualificationReport {
       recovery: KubernetesAvailabilityComponentState;
     }>;
     intakeSeed: { resourceAccepted: true; metricAccepted: true };
+    receiverIntake: {
+      signal: "metric";
+      payload: "non-empty-otlp-protobuf";
+      successBoundary: "postgresql-commit-before-http-200";
+    };
+    workflowProcessing: {
+      operation: "durable-investigation";
+      phases: Array<{
+        id: "baseline" | "disruption" | "recovery";
+        submitted: 1;
+        completed: 1;
+        failures: 0;
+        pollAttempts: number;
+        completionMilliseconds: number;
+      }>;
+    };
     disruption: {
       method: "kubectl-drain";
       targetNodeDigest: Sha256Digest;
@@ -1136,11 +1156,15 @@ export interface KubernetesAvailabilityQualificationReport {
       }>;
     }>;
     summary: {
-      totalChecks: 14;
-      passedChecks: 14;
+      totalChecks: 18;
+      passedChecks: 18;
       failedChecks: 0;
       totalProbeAttempts: number;
       failedProbeAttempts: 0;
+      totalWorkflowSubmissions: 3;
+      completedWorkflows: 3;
+      failedWorkflows: 0;
+      maximumWorkflowCompletionMilliseconds: number;
       overallStatus: "qualified";
     };
     checks: Array<{ id: KubernetesAvailabilityCheckId; status: "passed" }>;

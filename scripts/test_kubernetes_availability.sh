@@ -416,6 +416,18 @@ snapshot_nodes() {
     "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" get nodes -o json > "$output"
 }
 
+run_workflow_phase() {
+    phase=$1
+    output=$2
+    "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_AVAILABILITY_NAMESPACE" exec iip-availability-probe \
+        -c probe -- python /probe/probe.py workflow \
+        --api-url http://iip-infra-intelligence \
+        --control-token-file /credentials/control-token \
+        --phase "$phase" \
+        --timeout-seconds 60 > "$output"
+}
+
 wait_for_disruption_state() {
     attempt=0
     while [ "$attempt" -lt 240 ]; do
@@ -444,6 +456,10 @@ IIP_BASELINE_SNAPSHOT="$IIP_AVAILABILITY_TEMP_DIR/baseline-snapshot.json"
 IIP_DISRUPTION_SNAPSHOT="$IIP_AVAILABILITY_TEMP_DIR/disruption-snapshot.json"
 IIP_RECOVERY_SNAPSHOT="$IIP_AVAILABILITY_TEMP_DIR/recovery-snapshot.json"
 IIP_PROBE_STATE="$IIP_AVAILABILITY_TEMP_DIR/probe-state.json"
+IIP_BASELINE_WORKFLOW="$IIP_AVAILABILITY_TEMP_DIR/baseline-workflow.json"
+IIP_DISRUPTION_WORKFLOW="$IIP_AVAILABILITY_TEMP_DIR/disruption-workflow.json"
+IIP_RECOVERY_WORKFLOW="$IIP_AVAILABILITY_TEMP_DIR/recovery-workflow.json"
+IIP_WORKFLOW_STATE="$IIP_AVAILABILITY_TEMP_DIR/workflow-state.json"
 
 wait_for_phase baseline 20
 snapshot_nodes "$IIP_BASELINE_NODES"
@@ -457,6 +473,7 @@ if [ -z "$IIP_TARGET_NODE" ]; then
     echo "Could not select a worker containing one ready pod per component" >&2
     exit 1
 fi
+run_workflow_phase baseline "$IIP_BASELINE_WORKFLOW"
 
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
     --namespace "$IIP_AVAILABILITY_NAMESPACE" exec iip-availability-probe \
@@ -468,6 +485,7 @@ wait_for_disruption_state
 wait_for_phase disruption 20
 snapshot_nodes "$IIP_DISRUPTION_NODES"
 snapshot_objects "$IIP_DISRUPTION_SNAPSHOT"
+run_workflow_phase disruption "$IIP_DISRUPTION_WORKFLOW"
 
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
     --namespace "$IIP_AVAILABILITY_NAMESPACE" exec iip-availability-probe \
@@ -485,6 +503,7 @@ done
 wait_for_phase recovery 20
 snapshot_nodes "$IIP_RECOVERY_NODES"
 snapshot_objects "$IIP_RECOVERY_SNAPSHOT"
+run_workflow_phase recovery "$IIP_RECOVERY_WORKFLOW"
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
     --namespace "$IIP_AVAILABILITY_NAMESPACE" exec iip-availability-probe \
     -c probe -- \
@@ -493,6 +512,11 @@ snapshot_objects "$IIP_RECOVERY_SNAPSHOT"
     --namespace "$IIP_AVAILABILITY_NAMESPACE" exec iip-availability-probe \
     -c probe -- \
     touch /state/stop
+
+"$IIP_TEST_PYTHON" -c \
+    'import json,sys; documents=[json.load(open(path, encoding="utf-8")) for path in sys.argv[1:]]; print(json.dumps({"phases": {item["phase"]: item for item in documents}}, separators=(",", ":"), sort_keys=True))' \
+    "$IIP_BASELINE_WORKFLOW" "$IIP_DISRUPTION_WORKFLOW" \
+    "$IIP_RECOVERY_WORKFLOW" > "$IIP_WORKFLOW_STATE"
 
 IIP_KUBERNETES_VERSION=$(
     "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" version -o json | \
@@ -518,6 +542,7 @@ PYTHONPATH=src:sdks/python/src "$IIP_TEST_PYTHON" \
     --disruption-snapshot "$IIP_DISRUPTION_SNAPSHOT" \
     --recovery-snapshot "$IIP_RECOVERY_SNAPSHOT" \
     --probe-state "$IIP_PROBE_STATE" \
+    --workflow-state "$IIP_WORKFLOW_STATE" \
     --cluster-name "$IIP_AVAILABILITY_CLUSTER" \
     --namespace "$IIP_AVAILABILITY_NAMESPACE" \
     --target-node "$IIP_TARGET_NODE" \

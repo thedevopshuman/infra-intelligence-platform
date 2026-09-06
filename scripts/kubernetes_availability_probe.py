@@ -7,6 +7,8 @@ import argparse
 import hashlib
 import json
 import os
+import secrets
+import sys
 import time
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -205,7 +207,7 @@ def _otlp_probe(args: argparse.Namespace, token: str) -> bool:
             url=args.otlp_url + "/v1/metrics",
             token=token,
             method="POST",
-            body=b"",
+            body=_metric_payload(),
             content_type="application/x-protobuf",
         )
         return (
@@ -215,6 +217,178 @@ def _otlp_probe(args: argparse.Namespace, token: str) -> bool:
         )
     except Exception:
         return False
+
+
+def _instant(epoch_seconds: float) -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(epoch_seconds))
+
+
+def _investigation_request(args: argparse.Namespace, investigation_id: str) -> dict:
+    now = time.time()
+    resource_uid = _resource_uid(
+        args.tenant,
+        "qualification",
+        "synthetic/probe",
+        "kubernetes-availability",
+    )
+    question = "Can the surviving workflow worker complete bounded queued work?"
+    return {
+        "apiVersion": "iip.platform/v1alpha1",
+        "kind": "InvestigationRequest",
+        "metadata": {
+            "id": investigation_id,
+            "tenantId": args.tenant,
+            "actorId": args.actor_id,
+            "requestedAt": _instant(now),
+            "correlationId": f"kubernetes-availability-{args.phase}",
+        },
+        "spec": {
+            "question": question,
+            "trigger": {
+                "type": "scheduled",
+                "source": "urn:iip:qualification:kubernetes-availability",
+                "summary": question,
+            },
+            "scope": {
+                "resourceUids": [resource_uid],
+                "timeRange": {
+                    "start": _instant(now - 3600),
+                    "end": _instant(now),
+                },
+            },
+            "agentSelector": {
+                "id": "incident-investigator",
+                "version": "0.1.0",
+            },
+            "evidenceTypes": ["resource.change"],
+            "allowedTools": ["resources/query", "evidence/fetch"],
+            "budgets": {
+                "maxToolCalls": 8,
+                "maxWallTimeSeconds": 60,
+                "maxModelTokens": 0,
+                "maxCostUsd": 0,
+                "maxEvidenceItems": 16,
+                "maxIterations": 8,
+            },
+            "maxAuthority": "propose",
+            "priority": "normal",
+        },
+    }
+
+
+def workflow(args: argparse.Namespace) -> None:
+    """Submit and observe one durable job after a declared topology state."""
+
+    token = _token(args.control_token_file)
+    investigation_id = "inv_" + secrets.token_hex(16)
+    request = _investigation_request(args, investigation_id)
+    started = time.monotonic()
+    status, content_type, body = _request(
+        url=args.api_url + "/v1/investigation-jobs",
+        token=token,
+        method="POST",
+        body=json.dumps(request, separators=(",", ":")).encode("utf-8"),
+        content_type="application/json",
+    )
+    try:
+        submitted = json.loads(body)
+    except json.JSONDecodeError:
+        raise RuntimeError("workflow processing submission was invalid") from None
+    submitted_metadata = (
+        submitted.get("metadata") if isinstance(submitted, Mapping) else None
+    )
+    if (
+        status != 202
+        or content_type != "application/json"
+        or not isinstance(submitted, Mapping)
+        or submitted.get("apiVersion") != "iip.platform/v1alpha1"
+        or submitted.get("kind") != "InvestigationJobStatus"
+        or not isinstance(submitted_metadata, Mapping)
+        or submitted_metadata.get("id") != investigation_id
+        or submitted_metadata.get("tenantId") != args.tenant
+    ):
+        raise RuntimeError("workflow processing submission was not accepted")
+
+    polls = 0
+    deadline = started + args.timeout_seconds
+    while time.monotonic() < deadline:
+        polls += 1
+        status, content_type, body = _request(
+            url=args.api_url + f"/v1/investigation-jobs/{investigation_id}",
+            token=token,
+            method="GET",
+            body=None,
+            content_type="application/json",
+        )
+        try:
+            job = json.loads(body)
+        except json.JSONDecodeError:
+            raise RuntimeError("workflow processing status was invalid") from None
+        job_metadata = job.get("metadata") if isinstance(job, Mapping) else None
+        spec = job.get("spec") if isinstance(job, Mapping) else None
+        state = spec.get("state") if isinstance(spec, Mapping) else None
+        if (
+            status != 200
+            or content_type != "application/json"
+            or not isinstance(job, Mapping)
+            or job.get("apiVersion") != "iip.platform/v1alpha1"
+            or job.get("kind") != "InvestigationJobStatus"
+            or not isinstance(job_metadata, Mapping)
+            or job_metadata.get("id") != investigation_id
+            or job_metadata.get("tenantId") != args.tenant
+            or not isinstance(spec, Mapping)
+            or state not in {"queued", "running", "completed", "failed", "cancelled"}
+        ):
+            raise RuntimeError("workflow processing status was unavailable")
+        if state in {"failed", "cancelled"}:
+            raise RuntimeError("workflow processing did not complete")
+        if state == "completed":
+            status, content_type, body = _request(
+                url=args.api_url + f"/v1/investigations/{investigation_id}",
+                token=token,
+                method="GET",
+                body=None,
+                content_type="application/json",
+            )
+            try:
+                report = json.loads(body)
+            except json.JSONDecodeError:
+                raise RuntimeError("workflow processing report was invalid") from None
+            report_spec = report.get("spec") if isinstance(report, Mapping) else None
+            report_metadata = (
+                report.get("metadata") if isinstance(report, Mapping) else None
+            )
+            if (
+                status != 200
+                or content_type != "application/json"
+                or not isinstance(report, Mapping)
+                or report.get("apiVersion") != "iip.platform/v1alpha1"
+                or report.get("kind") != "InvestigationReport"
+                or not isinstance(report_metadata, Mapping)
+                or report_metadata.get("id") != investigation_id
+                or report_metadata.get("tenantId") != args.tenant
+                or not isinstance(report_spec, Mapping)
+                or report_spec.get("outcome") not in {"conclusive", "inconclusive"}
+            ):
+                raise RuntimeError("workflow processing report was invalid")
+            elapsed = max(0, int((time.monotonic() - started) * 1000))
+            print(
+                json.dumps(
+                    {
+                        "phase": args.phase,
+                        "submitted": 1,
+                        "completed": 1,
+                        "failures": 0,
+                        "pollAttempts": polls,
+                        "completionMilliseconds": elapsed,
+                    },
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
+            )
+            return
+        time.sleep(0.2)
+    raise RuntimeError("workflow processing completion timed out")
 
 
 def run(args: argparse.Namespace) -> None:
@@ -259,15 +433,30 @@ def _parser() -> argparse.ArgumentParser:
             current.add_argument(
                 "--interval-milliseconds", type=int, default=250, choices=range(100, 5001)
             )
+    workflow_parser = subparsers.add_parser("workflow")
+    workflow_parser.add_argument("--api-url", required=True)
+    workflow_parser.add_argument("--control-token-file", required=True, type=Path)
+    workflow_parser.add_argument("--tenant", default="availability")
+    workflow_parser.add_argument("--actor-id", default="availability-probe")
+    workflow_parser.add_argument("--phase", required=True, choices=PHASES)
+    workflow_parser.add_argument(
+        "--timeout-seconds", type=int, default=60, choices=range(10, 121)
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    if args.command == "seed":
-        seed(args)
-    else:
-        run(args)
+    try:
+        if args.command == "seed":
+            seed(args)
+        elif args.command == "run":
+            run(args)
+        else:
+            workflow(args)
+    except Exception:
+        print("availability probe failed", file=sys.stderr)
+        return 1
     return 0
 
 

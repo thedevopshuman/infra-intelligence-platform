@@ -161,21 +161,30 @@ observes zero failed API or OTLP Service probes through recovery. This closes
 the local planned-disruption evidence gap; involuntary loss, shared database,
 customer-cluster, sustained-load, and regional availability remain external.
 
+Processing-continuity update: ADR 0128 upgrades that source-bound gate to the
+`local-multi-node-kind-v2` profile. Every OTLP probe now commits a non-empty
+normalized metric, and a durable investigation must complete after baseline,
+after the target node is fully drained, and after recovery. This closes the
+local worker/receiver processing-continuity gap; the equivalent customer
+environment, shared-database failure, sustained throughput, and regional
+profiles remain external qualification work.
+
 Customer-continuity update: ADR 0123 adds a separately enabled customer
 profile that overlaps a sustained direct verified-HTTPS probe with one
 UID-preconditioned, PDB-governed API pod Eviction. It retains exact-release
 recovery, availability, and latency evidence without customer identifiers.
-Worker, receiver, database, node, zone, sustained customer-traffic capacity,
-and long-window regional certification remain external.
+Customer-environment worker, receiver, database, node, zone, sustained
+customer-traffic capacity, and long-window regional certification remain
+external.
 
 Customer-deployment update: ADR 0124 now aggregates one exact cluster-mode
 preflight, post-install diagnostic, customer ingress report, and the ADR 0123
 continuity chain. It rechecks the namespace UID/server binding, requires a
 post-continuity health observation, and fails closed on crossed or stale
 evidence. This closes the manual correlation gap for the narrow installed
-control-plane profile; artifact trust, database/worker/receiver continuity,
-integrations, live AI/pricing, regional capacity, pilot, and public-governance
-gates remain independent.
+control-plane profile; artifact trust, customer-environment database/worker/
+receiver continuity, integrations, live AI/pricing, regional capacity, pilot,
+and public-governance gates remain independent.
 
 Load-qualification update: ADR 0125 adds a separately enabled, fixed-rate
 external identity-read workload with exact release binding, explicit scheduler

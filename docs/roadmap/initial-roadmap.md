@@ -84,6 +84,13 @@ same-invocation result. Its `design-partner-candidate` status is deliberately a
 private preflight rather than pilot acceptance, production certification, or
 public-launch approval.
 
+The first private-pilot technical scope and ordered operating handoff are now
+explicit. Current release bundles include a checksum-bound documentation
+archive with support/security policies, onboarding, minimized diagnostics,
+qualification order, privacy-first feedback, rollback, and decommissioning
+guidance. It establishes no customer contact, staffed channel, response
+objective, approval, or production claim.
+
 One fail-closed local release command now composes the source, integration,
 recovery, multi-node availability, bundle, packaged N-1, vulnerability, and
 19-evidence readiness workflow while retaining each owning report and refusing
@@ -314,6 +321,13 @@ Deliverables:
 Exit gate: a plugin built only from public docs/SDK passes conformance and runs in a pilot without elevated control-plane credentials.
 
 Reference slice delivered: session, invocation/result, status, cancellation, reconciliation, read mediation, proposal-only action mediation, and executable compatibility-report contracts; declared-capability subset enforcement; token reference/digest handling; expiry and limit framing; authenticated status/cancel/reconcile APIs and SDKs; live observer transport; Ed25519 publisher trust; digest-pinned pre-pulled OCI artifacts; a real out-of-process Docker conformance runner with no general network or container credentials, read-only non-root execution, bounded CPU/memory/swap/PIDs/files/tmpfs/time/input/output; exact-tenant PostgreSQL request claims that bind canonical content, serialize session limits across replicas, survive restarts, retain terminal results, replay only completed results, propagate durable cooperative cancellation, and allow policy-approved platform administrators to close post-deadline ambiguity without replay; request-scoped host-mediated JSON reads through a fresh Unix socket, protected destination/credential bindings, exact path/query limits, per-read policy and pre-egress audit, brokered host-only leases, direct no-redirect TLS, and bounded header-free JSON responses; proposal-only action grants bound to manifest type, target, dry-run policy, derived idempotency/expiry, current policy, pre-proposal audit, and the standard investigation-scoped governed action queue; a separately attested multi-platform bridge image in the verified release bundle; a protected customer credential-broker prerequisite covering exact authority issuance and single-field denials; plus a Docker-enabled CI matrix that binds exact source, host, SDK, protocol, plugin, relay, offline, and mediated-read outcomes. Remaining: customer broker lifecycle/HA/audit and live provider qualification, customer action-provider interoperability, cancellation propagation into future owning integration workflows, multi-host customer certification, design-partner deployment, and public governance/legal decisions.
+
+Pilot operating update: an accepted technical scope, ordered onboarding and
+exit runbook, root support/security policies, customer-owned feedback
+scorecard, and versioned release-bundle handoff are delivered. Actual
+design-partner operation and acceptance, named staffed support/security
+channels and response objectives, customer-approved feedback sharing, and
+public governance/legal decisions remain external.
 
 The local compatibility matrix now also includes a separately signed
 `host-mediated-action-proposal` row. It exercises an isolated SDK-only action

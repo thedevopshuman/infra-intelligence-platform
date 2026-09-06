@@ -5,7 +5,9 @@
 The release manifest binds one committed source revision to the
 customer-installable control-plane image, trusted plugin-mediation bridge
 image, Helm chart, public contract bundle, Python and TypeScript SDK packages,
-and the separately versioned Bedrock OpenTelemetry instrumentation source.
+the separately versioned Bedrock OpenTelemetry instrumentation source, and a
+private-pilot operating handoff containing the exact revision's documentation
+plus support and security policies.
 Every artifact records its exact filename, role, media type, byte length, and
 SHA-256 digest. `SHA256SUMS` separately covers all artifacts and the manifest
 itself so transport corruption or substitution fails verification.
@@ -20,6 +22,21 @@ The `image` and `pluginMediationBridgeImage` entries independently record each O
 internal package version. The archive is not installed in the IIP control-plane
 image; it is an optional exact-version dependency for customer Python
 applications using the qualified Bedrock path.
+
+`private-pilot-operating-handoff` is an additive portable artifact role. The
+current builder archives `SECURITY.md`, `SUPPORT.md`, and the complete `docs/`
+tree under one versioned prefix. Finalization and transport verification reject
+an oversized archive, path traversal, duplicate entries, links or special
+files, a wrong prefix, or omission of the pilot scope, onboarding, feedback,
+diagnostic, readiness, release, Helm, support, or security documents. The role
+is optional at the `v1alpha1` schema level so manifests before application
+`0.84.0` remain schema-valid. The repository verifier requires it for `0.84.0`
+and later, and current builds always include and checksum it.
+
+The handoff describes the technical process but does not establish a staffed
+support/security channel, customer approval, response objective, or production
+claim. Those values remain environment-specific and must not be embedded in a
+portable bundle.
 
 The reference bundle is deliberately marked `unsigned`. Checksums, SBOM, and provenance describe integrity and construction but do not authenticate a publisher. A production release must publish and sign both OCI indexes using the organization's accepted release identity, verify each signature and its transparency evidence, and distribute the verified digests through a trusted channel. The neutral repository cannot select or claim that external identity before hosting and governance decisions are accepted.
 

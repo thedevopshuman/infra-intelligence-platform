@@ -177,6 +177,12 @@ binds the exact release, deployment, targets, and owning profiles. The ninth
 pilot input still preserves representative production traffic, automatic and
 involuntary failover, long-window SLO, and production-operation gates.
 
+[ADR 0147](../decisions/0147-versioned-private-pilot-operating-handoff.md)
+adds a versioned, checksum-bound documentation artifact to the release bundle.
+It orders onboarding, operation, feedback, rollback, and decommissioning while
+leaving customer identities, private channels, response promises, protected
+profiles, live reports, and approval outside the platform authority boundary.
+
 The signed plugin runner claims each exact-tenant request against its persisted
 session and canonical invocation digest before a container starts. PostgreSQL
 serializes the session request limit across replicas, retains host-created

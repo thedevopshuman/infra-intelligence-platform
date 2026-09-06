@@ -61,6 +61,13 @@
         "mediaType": "application/gzip",
         "sizeBytes": 8192,
         "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      {
+        "path": "infra-intelligence-pilot-handoff-0.84.0.tar.gz",
+        "role": "private-pilot-operating-handoff",
+        "mediaType": "application/gzip",
+        "sizeBytes": 131072,
+        "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
       }
     ],
     "image": {

@@ -8,6 +8,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Vision and scope](product/vision-and-scope.md)
 - [Open-source and commercial boundary](product/open-source-boundary.md)
 - [AI FinOps and generative-AI observability vision](product/ai-finops-vision.md)
+- [First usable private-pilot release](product/private-pilot-v1.md)
 
 ## Architecture
 
@@ -79,6 +80,8 @@ The documentation tree is the product and engineering system of record. A change
 - [Customer sustained core-workload qualification](operations/customer-sustained-workload-qualification.md)
 - [Customer planned failure-overlap qualification](operations/customer-failure-overlap-qualification.md)
 - [Customer private-pilot readiness](operations/customer-pilot-readiness.md)
+- [Private-pilot onboarding and handoff](operations/private-pilot-onboarding.md)
+- [Private-pilot feedback and telemetry](operations/private-pilot-feedback.md)
 - [Kubernetes planned-disruption availability qualification](operations/kubernetes-availability-qualification.md)
 - [Release artifacts and supply-chain evidence](operations/release-artifacts.md)
 - [OpenTelemetry metrics export](operations/opentelemetry-export.md)
@@ -99,6 +102,11 @@ The documentation tree is the product and engineering system of record. A change
 - [PostgreSQL physical continuity qualification](operations/postgresql-continuity.md)
 - [Customer PostgreSQL primary-promotion qualification](operations/customer-postgresql-continuity-qualification.md)
 - [Glossary](glossary.md)
+
+Repository-level [support](../SUPPORT.md) and
+[security](../SECURITY.md) policies define the public/private reporting
+boundary. A customer pilot still requires separately established accountable
+owners and private channels.
 
 ## Research
 

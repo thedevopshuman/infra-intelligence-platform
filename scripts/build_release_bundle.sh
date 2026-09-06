@@ -70,6 +70,10 @@ git archive --format=tar.gz \
     --output="$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-contracts-$IIP_RELEASE_VERSION.tar.gz" \
     HEAD contracts api/openapi docs/specifications
 git archive --format=tar.gz \
+    --prefix="infra-intelligence-pilot-handoff-$IIP_RELEASE_VERSION/" \
+    --output="$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-pilot-handoff-$IIP_RELEASE_VERSION.tar.gz" \
+    HEAD SECURITY.md SUPPORT.md docs
+git archive --format=tar.gz \
     --prefix="infra-intelligence-sdk-$IIP_RELEASE_PYTHON_SDK_VERSION/" \
     --output="$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-sdk-$IIP_RELEASE_PYTHON_SDK_VERSION.tar.gz" \
     HEAD:sdks/python

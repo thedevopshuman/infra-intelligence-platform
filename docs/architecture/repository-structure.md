@@ -128,6 +128,13 @@ windows fit within one customer-approved private-pilot core proxy. It receives
 no traffic credential or disruption authority, retains only minimized
 pseudonymous evidence, and exposes only offline profile/report shapes to SDKs.
 
+Private-pilot onboarding remains documentation and release packaging, not a
+serving package. `scripts/release_bundle.py` treats the exact-version operating
+handoff as an inspected, checksum-bound artifact and rejects unsafe or
+incomplete archive structure. Customer contacts, support/security channels,
+response objectives, protected profiles, feedback records, and live evidence
+remain outside source control and the portable bundle.
+
 Exact AI invocation observation follows the normal serving boundaries.
 `src/iip/application/query_ai_invocation.py` owns authorization, active-source
 selection, privacy minimization, and record revalidation; the in-memory and

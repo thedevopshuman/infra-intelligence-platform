@@ -13,6 +13,7 @@ from scripts.release_bundle import (
     IN_TOTO,
     OCI_INDEX,
     OCI_MANIFEST,
+    REQUIRED_PILOT_HANDOFF_PATHS,
     REQUIRED_PREDICATES,
     ReleaseBundleError,
     finalize_bundle,
@@ -169,6 +170,28 @@ def write_oci_fixture(
             archive.addfile(member, io.BytesIO(content))
 
 
+def write_pilot_handoff_fixture(
+    path: Path,
+    *,
+    paths: set[str] | None = None,
+    add_symlink: bool = False,
+) -> None:
+    selected = paths if paths is not None else set(REQUIRED_PILOT_HANDOFF_PATHS)
+    prefix = f"infra-intelligence-pilot-handoff-{VERSION}"
+    with tarfile.open(path, mode="w:gz") as archive:
+        for relative in sorted(selected):
+            content = f"fixture:{relative}\n".encode()
+            member = tarfile.TarInfo(f"{prefix}/{relative}")
+            member.size = len(content)
+            member.mode = 0o644
+            archive.addfile(member, io.BytesIO(content))
+        if add_symlink:
+            member = tarfile.TarInfo(f"{prefix}/docs/latest")
+            member.type = tarfile.SYMTYPE
+            member.linkname = "operations/private-pilot-onboarding.md"
+            archive.addfile(member)
+
+
 class ReleaseBundleTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -189,6 +212,9 @@ class ReleaseBundleTests(unittest.TestCase):
             f"{BEDROCK_INSTRUMENTATION_VERSION}.tar.gz",
         ):
             (self.bundle / filename).write_bytes(f"fixture:{filename}".encode())
+        write_pilot_handoff_fixture(
+            self.bundle / f"infra-intelligence-pilot-handoff-{VERSION}.tar.gz"
+        )
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -225,7 +251,11 @@ class ReleaseBundleTests(unittest.TestCase):
             ],
             list(PLATFORMS),
         )
-        self.assertEqual(len(manifest["spec"]["artifacts"]), 7)
+        self.assertEqual(len(manifest["spec"]["artifacts"]), 8)
+        self.assertIn(
+            "private-pilot-operating-handoff",
+            [item["role"] for item in manifest["spec"]["artifacts"]],
+        )
         self.assertEqual(
             manifest["metadata"]["bedrockInstrumentationVersion"],
             BEDROCK_INSTRUMENTATION_VERSION,
@@ -236,6 +266,20 @@ class ReleaseBundleTests(unittest.TestCase):
         manifest_path = self.bundle / "release-manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest["spec"].pop("pluginMediationBridgeImage")
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        with self.assertRaisesRegex(ReleaseBundleError, "release.manifest.invalid"):
+            verify_bundle(self.bundle)
+
+    def test_current_release_requires_pilot_handoff(self) -> None:
+        self.finalize()
+        manifest_path = self.bundle / "release-manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["spec"]["artifacts"] = [
+            artifact
+            for artifact in manifest["spec"]["artifacts"]
+            if artifact["role"] != "private-pilot-operating-handoff"
+        ]
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
         with self.assertRaisesRegex(ReleaseBundleError, "release.manifest.invalid"):
@@ -269,6 +313,32 @@ class ReleaseBundleTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             ReleaseBundleError, "release.image.attestation.required"
+        ):
+            self.finalize()
+
+    def test_pilot_handoff_requires_every_operating_document(self) -> None:
+        handoff = (
+            self.bundle / f"infra-intelligence-pilot-handoff-{VERSION}.tar.gz"
+        )
+        write_pilot_handoff_fixture(
+            handoff,
+            paths=set(REQUIRED_PILOT_HANDOFF_PATHS)
+            - {"docs/operations/private-pilot-onboarding.md"},
+        )
+
+        with self.assertRaisesRegex(
+            ReleaseBundleError, "release.pilot-handoff.required-file-missing"
+        ):
+            self.finalize()
+
+    def test_pilot_handoff_rejects_links(self) -> None:
+        handoff = (
+            self.bundle / f"infra-intelligence-pilot-handoff-{VERSION}.tar.gz"
+        )
+        write_pilot_handoff_fixture(handoff, add_symlink=True)
+
+        with self.assertRaisesRegex(
+            ReleaseBundleError, "release.pilot-handoff.invalid"
         ):
             self.finalize()
 

@@ -97,6 +97,8 @@ The directory under `dist/iip-<version>-<revision>/` contains:
 - public JSON Schemas, examples, specifications, and OpenAPI documents;
 - a Python SDK source package and a compiled npm package;
 - the separately versioned Bedrock OpenTelemetry usage-adapter source package;
+- a versioned private-pilot operating handoff containing `SECURITY.md`,
+  `SUPPORT.md`, and the exact revision's complete documentation tree;
 - `release-manifest.json` with revision, size, digest, platform, SBOM, and provenance evidence;
 - `SHA256SUMS`, covering every artifact and the manifest.
 
@@ -111,7 +113,21 @@ IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.0-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 
-Verification does not trust the manifest by itself. It recalculates each byte length and SHA-256 digest, compares the exact checksum file, traverses both content-addressed OCI descriptor graphs, matches declared platform digests, requires the same platform set, and requires both accepted attestation predicates per platform. A current bundle with a missing bridge, modified artifact, omitted platform, missing SBOM, missing provenance statement, or rewritten manifest fails closed with a stable release error.
+Verification does not trust the manifest by itself. It recalculates each byte
+length and SHA-256 digest, compares the exact checksum file, traverses both
+content-addressed OCI descriptor graphs, matches declared platform digests,
+requires the same platform set, and requires both accepted attestation
+predicates per platform. It also inspects the declared pilot handoff without
+extracting it and rejects missing required operating documents, a wrong
+version prefix, traversal, duplicate entries, links, special files, or
+unbounded content. A current bundle with a missing bridge or handoff, modified
+artifact, omitted platform, missing SBOM, missing provenance statement, or
+rewritten manifest fails closed with a stable release error.
+
+The handoff is portable product guidance, not customer evidence. Named owners,
+private support/security channels, response objectives, protected profiles,
+live reports, and customer acceptance remain outside the immutable bundle; see
+the [private-pilot onboarding guide](private-pilot-onboarding.md).
 
 ## Install the packaged candidate locally
 

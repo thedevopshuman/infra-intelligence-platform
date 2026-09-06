@@ -105,6 +105,12 @@ representative production traffic, automatic and involuntary failover,
 production operating qualification, and public license/legal/brand/governance
 remain external decisions.
 
+The release now carries an exact-version private-pilot operating handoff. It
+defines the Bedrock-to-dashboard pilot scope, ordered external qualifications,
+customer-controlled OTel scorecard, support/security boundary, rollback, and
+decommissioning. It does not create a feedback export, staffed channel,
+customer approval, or production claim; those remain external.
+
 Two additional deterministic rules are delivered. Protected channel
 configuration maps provider retry attributes into `retryCount`, and the
 source-bound retry-amplification evaluator compares complete fixed-window

@@ -40,7 +40,7 @@
         "artifacts": {
           "type": "array",
           "minItems": 6,
-          "maxItems": 7,
+          "maxItems": 8,
           "items": { "$ref": "#/$defs/artifact" }
         },
         "image": { "$ref": "#/$defs/image" },
@@ -116,7 +116,8 @@
             "public-contracts",
             "python-sdk-source",
             "typescript-sdk",
-            "bedrock-otel-instrumentation-source"
+            "bedrock-otel-instrumentation-source",
+            "private-pilot-operating-handoff"
           ]
         },
         "mediaType": {

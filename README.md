@@ -168,6 +168,15 @@ production traffic, automatic failover, or involuntary failure; see the
 [customer failure-overlap qualification
 runbook](docs/operations/customer-failure-overlap-qualification.md).
 
+The first private-pilot operating boundary is now explicit and travels with
+the candidate. The release manifest and checksums bind a versioned handoff
+containing the technical pilot scope, ordered onboarding/qualification,
+privacy-first feedback, diagnostic, rollback, decommissioning, support, and
+security guidance. The archive verifier rejects missing required documents and
+unsafe archive structure. It does not invent customer contacts, staffed
+channels, response objectives, acceptance, or a production claim; see the
+[private-pilot onboarding guide](docs/operations/private-pilot-onboarding.md).
+
 An external PostgreSQL gate then uses a verified-TLS, default-read-only observer
 to prove that the stable writer endpoint advanced to a new writable WAL
 timeline while API, non-empty OTLP, and durable investigation workflows

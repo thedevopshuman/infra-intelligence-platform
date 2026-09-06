@@ -13,7 +13,7 @@ from unittest.mock import patch
 from scripts import release_publication as publication
 from scripts import release_signature_verification as signatures
 from scripts.release_bundle import finalize_bundle
-from tests.test_release_bundle import write_oci_fixture
+from tests.test_release_bundle import write_oci_fixture, write_pilot_handoff_fixture
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -78,6 +78,9 @@ class ReleasePublicationTests(unittest.TestCase):
             f"{BEDROCK_INSTRUMENTATION_VERSION}.tar.gz",
         ):
             (self.bundle / filename).write_bytes(filename.encode("ascii"))
+        write_pilot_handoff_fixture(
+            self.bundle / f"infra-intelligence-pilot-handoff-{VERSION}.tar.gz"
+        )
         finalize_bundle(
             self.bundle,
             version=VERSION,

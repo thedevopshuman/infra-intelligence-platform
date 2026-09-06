@@ -9,7 +9,7 @@ import json
 import re
 import tarfile
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping, Sequence
 
 
@@ -23,6 +23,22 @@ HEX_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$")
 REVISION = re.compile(r"^[0-9a-f]{40,64}$")
 MAX_METADATA_BYTES = 64 * 1024 * 1024
+MAX_PILOT_HANDOFF_ARCHIVE_BYTES = 16 * 1024 * 1024
+MAX_PILOT_HANDOFF_CONTENT_BYTES = 64 * 1024 * 1024
+MAX_PILOT_HANDOFF_MEMBERS = 4096
+REQUIRED_PILOT_HANDOFF_PATHS = frozenset(
+    {
+        "SECURITY.md",
+        "SUPPORT.md",
+        "docs/product/private-pilot-v1.md",
+        "docs/operations/private-pilot-onboarding.md",
+        "docs/operations/private-pilot-feedback.md",
+        "docs/operations/deployment-diagnostics.md",
+        "docs/operations/customer-pilot-readiness.md",
+        "docs/operations/release-artifacts.md",
+        "docs/operations/helm-deployment.md",
+    }
+)
 
 
 class ReleaseBundleError(RuntimeError):
@@ -172,6 +188,61 @@ def inspect_oci_image(path: Path) -> Mapping[str, Any]:
     }
 
 
+def inspect_pilot_handoff(path: Path, version: str) -> Mapping[str, int]:
+    """Require a bounded, link-free operating-document archive for one release."""
+
+    if (
+        not path.is_file()
+        or path.stat().st_size < 1
+        or path.stat().st_size > MAX_PILOT_HANDOFF_ARCHIVE_BYTES
+    ):
+        raise ReleaseBundleError("release.pilot-handoff.invalid")
+    try:
+        archive = tarfile.open(path, mode="r:gz")
+    except (OSError, tarfile.TarError):
+        raise ReleaseBundleError("release.pilot-handoff.invalid") from None
+
+    prefix = f"infra-intelligence-pilot-handoff-{version}"
+    files: set[str] = set()
+    seen: set[str] = set()
+    total_bytes = 0
+    with archive:
+        try:
+            members = archive.getmembers()
+        except (OSError, tarfile.TarError):
+            raise ReleaseBundleError("release.pilot-handoff.invalid") from None
+        if not members or len(members) > MAX_PILOT_HANDOFF_MEMBERS:
+            raise ReleaseBundleError("release.pilot-handoff.invalid")
+        for member in members:
+            raw_name = member.name.rstrip("/")
+            parts = raw_name.split("/")
+            if (
+                not raw_name
+                or raw_name.startswith("/")
+                or "\\" in raw_name
+                or any(part in {"", ".", ".."} for part in parts)
+                or PurePosixPath(raw_name).parts[0] != prefix
+                or raw_name in seen
+                or not (member.isdir() or member.isfile())
+            ):
+                raise ReleaseBundleError("release.pilot-handoff.invalid")
+            seen.add(raw_name)
+            if member.isfile():
+                total_bytes += member.size
+                if total_bytes > MAX_PILOT_HANDOFF_CONTENT_BYTES:
+                    raise ReleaseBundleError("release.pilot-handoff.invalid")
+                relative = "/".join(parts[1:])
+                if not relative:
+                    raise ReleaseBundleError("release.pilot-handoff.invalid")
+                if relative in REQUIRED_PILOT_HANDOFF_PATHS and member.size < 1:
+                    raise ReleaseBundleError("release.pilot-handoff.invalid")
+                files.add(relative)
+
+    if not REQUIRED_PILOT_HANDOFF_PATHS.issubset(files):
+        raise ReleaseBundleError("release.pilot-handoff.required-file-missing")
+    return {"fileCount": len(files), "contentBytes": total_bytes}
+
+
 def _validate_release_identity(
     *,
     version: str,
@@ -217,6 +288,7 @@ def _artifact_specs(
     bedrock_instrumentation_version: str,
     *,
     include_mediation_bridge: bool = True,
+    include_pilot_handoff: bool = True,
 ) -> tuple[tuple[str, str, str], ...]:
     image_specs = [
         (
@@ -233,7 +305,7 @@ def _artifact_specs(
                 "application/vnd.oci.image.layout.v1.tar",
             )
         )
-    return tuple(image_specs) + (
+    portable_specs = (
         (
             f"infra-intelligence-{chart_version}.tgz",
             "helm-chart",
@@ -261,6 +333,15 @@ def _artifact_specs(
             "application/gzip",
         ),
     )
+    if include_pilot_handoff:
+        portable_specs += (
+            (
+                f"infra-intelligence-pilot-handoff-{version}.tar.gz",
+                "private-pilot-operating-handoff",
+                "application/gzip",
+            ),
+        )
+    return tuple(image_specs) + portable_specs
 
 
 def finalize_bundle(
@@ -299,6 +380,8 @@ def finalize_bundle(
         path = bundle / filename
         if not path.is_file() or path.stat().st_size < 1:
             raise ReleaseBundleError("release.artifact.missing")
+        if role == "private-pilot-operating-handoff":
+            inspect_pilot_handoff(path, version)
         artifacts.append(
             {
                 "path": filename,
@@ -438,12 +521,20 @@ def verify_bundle(bundle: Path) -> Mapping[str, Any]:
         raise ReleaseBundleError("release.manifest.invalid")
     bridge_image = spec.get("pluginMediationBridgeImage")
     bridge_declared = "pluginMediationBridgeImage" in spec
+    handoff_declared = any(
+        isinstance(artifact, dict)
+        and artifact.get("role") == "private-pilot-operating-handoff"
+        for artifact in artifacts
+    )
     version_match = re.match(
         r"^([0-9]+)\.([0-9]+)\.([0-9]+)", metadata["version"]
     )
     assert version_match is not None
     bridge_required = tuple(int(part) for part in version_match.groups()) >= (0, 41, 0)
+    handoff_required = tuple(int(part) for part in version_match.groups()) >= (0, 84, 0)
     if bridge_required and not bridge_declared:
+        raise ReleaseBundleError("release.manifest.invalid")
+    if handoff_required and not handoff_declared:
         raise ReleaseBundleError("release.manifest.invalid")
     if bridge_declared and (
         not isinstance(bridge_image, dict)
@@ -458,6 +549,7 @@ def verify_bundle(bundle: Path) -> Mapping[str, Any]:
         metadata["typescriptSdkVersion"],
         metadata["bedrockInstrumentationVersion"],
         include_mediation_bridge=bridge_declared,
+        include_pilot_handoff=handoff_declared,
     )
     expected_artifacts = {
         filename: (role, media_type)
@@ -491,6 +583,12 @@ def verify_bundle(bundle: Path) -> Mapping[str, Any]:
             != [item["name"] for item in declared_platforms]
         ):
             raise ReleaseBundleError("release.image.platform.mismatch")
+    if handoff_declared:
+        inspect_pilot_handoff(
+            bundle
+            / f"infra-intelligence-pilot-handoff-{metadata['version']}.tar.gz",
+            metadata["version"],
+        )
     expected_lines = _expected_checksum_lines(bundle, manifest)
     if checksum_lines != expected_lines:
         raise ReleaseBundleError("release.checksums.invalid")

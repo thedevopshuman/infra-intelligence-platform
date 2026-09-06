@@ -51,3 +51,10 @@ or public release. It cannot replace the remaining external gates and it is
 not served by the control-plane API. A future production promotion profile may
 consume it alongside separately authorized signature, integration, provider,
 pilot, and governance evidence.
+
+## Subsequent extension
+
+[ADR 0129](0129-customer-worker-receiver-processing-continuity.md) upgrades
+the aggregate to `single-cluster-processing-v2` by adding exact worker and
+receiver processing-continuity evidence. The original control-plane profile
+remains historical and is not accepted by the current aggregate schema.

@@ -583,8 +583,52 @@ class CustomerContinuityQualificationReport:
 
 
 @dataclass(frozen=True)
+class CustomerProcessingContinuityQualificationReport:
+    """Customer worker and receiver pod-Eviction processing evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerProcessingContinuityQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerProcessingContinuityQualificationReport",
+                label="customer processing continuity qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerProcessingQualificationProfile:
+    """Protected input for one customer processing-continuity run."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerProcessingQualificationProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerProcessingQualificationProfile",
+                label="customer processing qualification profile",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerDeploymentQualificationReport:
-    """Exact-release customer install, health, ingress, and continuity evidence."""
+    """Exact-release customer install, ingress, and processing evidence chain."""
 
     payload: Mapping[str, Any]
 

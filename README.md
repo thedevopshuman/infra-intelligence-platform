@@ -42,14 +42,23 @@ pseudonymous bindings. The disruptive path is never part of `make verify` and
 requires an explicit enable flag; see the [customer continuity qualification
 runbook](docs/operations/customer-continuity-qualification.md).
 
-After that disruption, an additive customer deployment gate binds the live
-dependency preflight, exact installed health, nested ingress evidence, and
-continuity report to one clean release and current namespace UID/server. It
-requires a fresh post-continuity health observation and retains only report
-digests and hashed target bindings. Its fixed limitations prevent this narrow
-single-cluster result from becoming a publication, database, integration,
-regional, pilot, or governance claim; see the [customer deployment
-qualification runbook](docs/operations/customer-deployment-qualification.md).
+A second, independently enabled customer gate sends direct HTTPS identity and
+mutual-TLS OTLP metric traffic while sequentially evicting one worker and one
+receiver pod. It submits one durable investigation only after each reduced-
+capacity state is observed and requires replacement recovery before moving to
+the next component. The report proves bounded disruption overlap—not sustained
+capacity, database failover, or regional availability; see the [customer
+processing-continuity runbook](docs/operations/customer-processing-continuity-qualification.md).
+
+After those disruptions, the customer deployment gate binds the live
+dependency preflight, exact installed health, nested ingress/API continuity,
+and worker/receiver processing report to one clean release and current
+namespace UID/server. It requires a fresh health observation after both
+workflows and retains only report digests and hashed target bindings. Its fixed
+limitations prevent this narrow single-cluster result from becoming a
+publication, database, integration, regional, pilot, or governance claim; see
+the [customer deployment qualification
+runbook](docs/operations/customer-deployment-qualification.md).
 
 A separately enabled fixed-rate load gate exercises only authenticated runtime
 identity reads through that same verified HTTPS boundary. It uses one global
@@ -243,6 +252,7 @@ make test-external-secrets
 make test-backup-restore
 make test-postgres-continuity
 make test-deployment-preflight
+make test-customer-processing-continuity
 make test-otel
 make test-otlp-receiver
 make test-ai-finops

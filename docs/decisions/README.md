@@ -132,3 +132,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0126](0126-bounded-ai-savings-finding-read-model.md) | Accepted | Expose committed AI savings findings through a bounded tenant and interval-scoped read model |
 | [0127](0127-private-dependency-aware-worker-health.md) | Accepted | Use a private dependency-aware worker readiness signal without adding control-plane authority |
 | [0128](0128-source-bound-worker-receiver-processing-continuity.md) | Accepted | Prove durable receiver intake and workflow completion during one planned worker-node drain |
+| [0129](0129-customer-worker-receiver-processing-continuity.md) | Accepted | Prove customer worker and receiver continuity with bounded UID-preconditioned pod Evictions |

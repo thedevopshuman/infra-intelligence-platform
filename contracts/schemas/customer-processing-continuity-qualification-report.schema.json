@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-processing-continuity-qualification-report:v1alpha1",
+  "title": "Customer Processing Continuity Qualification Report",
+  "description": "Privacy-minimized, source- and target-bound evidence for sequential worker and OTLP receiver pod Evictions in one customer cluster.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerProcessingContinuityQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^cpcq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationLevel", "subject", "bindings", "objective", "environment", "receiverIntake", "measurements", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualificationLevel": {"const": "customer-worker-receiver-pod-eviction-v1"},
+        "subject": {"$ref": "#/$defs/subject"},
+        "bindings": {"$ref": "#/$defs/bindings"},
+        "objective": {"$ref": "#/$defs/objective"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "receiverIntake": {"$ref": "#/$defs/receiverIntake"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "checks": {"$ref": "#/$defs/checks"},
+        "limitations": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "prefixItems": [
+            {"const": "single-cluster"},
+            {"const": "sequential-single-pod-evictions"},
+            {"const": "synthetic-qualification-traffic"},
+            {"const": "shared-database-failure-not-qualified"},
+            {"const": "node-zone-region-failure-not-qualified"},
+            {"const": "sustained-customer-load-not-qualified"}
+          ],
+          "items": false
+        },
+        "summary": {"$ref": "#/$defs/summary"}
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "chartVersion", "contractsApiVersion", "requiredMigration", "sourceRevision", "imageDigest"],
+      "properties": {
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+        "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "componentBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "deploymentBindingDigest", "evictedPodBindingDigest"],
+      "properties": {
+        "id": {"enum": ["workflow-worker", "otlp-receiver"]},
+        "deploymentBindingDigest": {"$ref": "#/$defs/digest"},
+        "evictedPodBindingDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["apiTargetBindingDigest", "otlpTargetBindingDigest", "kubernetesContextBindingDigest", "namespaceBindingDigest", "profileDigest", "components"],
+      "properties": {
+        "apiTargetBindingDigest": {"$ref": "#/$defs/digest"},
+        "otlpTargetBindingDigest": {"$ref": "#/$defs/digest"},
+        "kubernetesContextBindingDigest": {"$ref": "#/$defs/digest"},
+        "namespaceBindingDigest": {"$ref": "#/$defs/digest"},
+        "profileDigest": {"$ref": "#/$defs/digest"},
+        "components": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {"$ref": "#/$defs/componentBinding", "properties": {"id": {"const": "workflow-worker"}}},
+            {"$ref": "#/$defs/componentBinding", "properties": {"id": {"const": "otlp-receiver"}}}
+          ],
+          "items": false
+        }
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimumProbeAttemptsPerPhase", "probeIntervalMilliseconds", "maximumWorkflowCompletionMilliseconds", "maximumRecoveryMilliseconds", "requestTimeoutMilliseconds"],
+      "properties": {
+        "minimumProbeAttemptsPerPhase": {"type": "integer", "minimum": 5, "maximum": 1000},
+        "probeIntervalMilliseconds": {"type": "integer", "minimum": 50, "maximum": 5000},
+        "maximumWorkflowCompletionMilliseconds": {"type": "integer", "minimum": 1000, "maximum": 120000},
+        "maximumRecoveryMilliseconds": {"type": "integer", "minimum": 10000, "maximum": 600000},
+        "requestTimeoutMilliseconds": {"type": "integer", "minimum": 100, "maximum": 30000}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "pythonVersion", "kubernetesVersion", "apiTransport", "otlpTransport", "apiCaSource", "otlpCaSource", "proxyMode", "redirectMode", "evictionApi"],
+      "properties": {
+        "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-z0-9_.-]+$", "maxLength": 128},
+        "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "kubernetesVersion": {"type": "string", "pattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$", "maxLength": 64},
+        "apiTransport": {"const": "verified-https"},
+        "otlpTransport": {"const": "mutual-tls-https"},
+        "apiCaSource": {"enum": ["system", "custom"]},
+        "otlpCaSource": {"enum": ["system", "custom"]},
+        "proxyMode": {"const": "disabled"},
+        "redirectMode": {"const": "deny"},
+        "evictionApi": {"const": "policy/v1"}
+      }
+    },
+    "receiverIntake": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal", "payload", "successBoundary"],
+      "properties": {
+        "signal": {"const": "metric"},
+        "payload": {"const": "non-empty-otlp-protobuf"},
+        "successBoundary": {"const": "postgresql-commit-before-http-200"}
+      }
+    },
+    "phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "apiAttempts", "apiSuccesses", "apiFailures", "receiverAttempts", "receiverSuccesses", "receiverFailures", "workflowSubmitted", "workflowCompleted", "workflowFailures", "workflowPollAttempts", "workflowCompletionMilliseconds", "submittedDuringReducedCapacity"],
+      "properties": {
+        "id": {"enum": ["baseline", "worker-disruption", "receiver-disruption", "recovery"]},
+        "apiAttempts": {"type": "integer", "minimum": 5, "maximum": 1000},
+        "apiSuccesses": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "apiFailures": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "receiverAttempts": {"type": "integer", "minimum": 5, "maximum": 1000},
+        "receiverSuccesses": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "receiverFailures": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "workflowSubmitted": {"const": 1},
+        "workflowCompleted": {"type": "integer", "minimum": 0, "maximum": 1},
+        "workflowFailures": {"type": "integer", "minimum": 0, "maximum": 1},
+        "workflowPollAttempts": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "workflowCompletionMilliseconds": {"type": "integer", "minimum": 0, "maximum": 120000},
+        "submittedDuringReducedCapacity": {"type": "boolean"}
+      }
+    },
+    "componentMeasurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "desiredReplicas", "readyReplicasBefore", "readyReplicasDuring", "readyReplicasAfter", "maxUnavailable", "pdbMinAvailable", "pdbDisruptionsAllowedBefore", "evictionAccepted", "reducedCapacityObserved", "originalPodReplaced", "recoveryMilliseconds"],
+      "properties": {
+        "id": {"enum": ["workflow-worker", "otlp-receiver"]},
+        "desiredReplicas": {"type": "integer", "minimum": 2, "maximum": 100},
+        "readyReplicasBefore": {"type": "integer", "minimum": 2, "maximum": 100},
+        "readyReplicasDuring": {"type": "integer", "minimum": 1, "maximum": 99},
+        "readyReplicasAfter": {"type": "integer", "minimum": 2, "maximum": 100},
+        "maxUnavailable": {"const": 0},
+        "pdbMinAvailable": {"type": "integer", "minimum": 1, "maximum": 99},
+        "pdbDisruptionsAllowedBefore": {"type": "integer", "minimum": 1, "maximum": 99},
+        "evictionAccepted": {"const": true},
+        "reducedCapacityObserved": {"const": true},
+        "originalPodReplaced": {"const": true},
+        "recoveryMilliseconds": {"type": "integer", "minimum": 0, "maximum": 600000}
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startedAt", "completedAt", "phases", "components"],
+      "properties": {
+        "startedAt": {"type": "string", "format": "date-time"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "phases": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {"$ref": "#/$defs/phase", "properties": {"id": {"const": "baseline"}, "submittedDuringReducedCapacity": {"const": false}}},
+            {"$ref": "#/$defs/phase", "properties": {"id": {"const": "worker-disruption"}, "submittedDuringReducedCapacity": {"const": true}}},
+            {"$ref": "#/$defs/phase", "properties": {"id": {"const": "receiver-disruption"}, "submittedDuringReducedCapacity": {"const": true}}},
+            {"$ref": "#/$defs/phase", "properties": {"id": {"const": "recovery"}, "submittedDuringReducedCapacity": {"const": false}}}
+          ],
+          "items": false
+        },
+        "components": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {"$ref": "#/$defs/componentMeasurement", "properties": {"id": {"const": "workflow-worker"}}},
+            {"$ref": "#/$defs/componentMeasurement", "properties": {"id": {"const": "otlp-receiver"}}}
+          ],
+          "items": false
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 64},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-processing-continuity\\.[a-z0-9.-]+$", "maxLength": 160}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 22,
+      "maxItems": 22,
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "explicit-context"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "immutable-image"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-verified-https"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-mutual-tls"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "direct-no-proxy-no-redirect"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "worker-redundant-capacity"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-redundant-capacity"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "zero-unavailable-rollouts"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "component-pdbs"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "uid-preconditioned-evictions"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "worker-reduced-capacity-observed"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-reduced-capacity-observed"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-zero-failure"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-zero-failure"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-durable-intake"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workflow-baseline-completion"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workflow-worker-disruption-overlap"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workflow-receiver-disruption-overlap"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workflow-recovery-completion"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "component-recovery"}}}
+      ],
+      "items": false
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalChecks", "passedChecks", "failedChecks", "totalApiAttempts", "failedApiAttempts", "totalReceiverAttempts", "failedReceiverAttempts", "totalWorkflowSubmissions", "completedWorkflows", "failedWorkflows", "maximumWorkflowCompletionMilliseconds", "maximumRecoveryMilliseconds", "overallStatus"],
+      "properties": {
+        "totalChecks": {"const": 22},
+        "passedChecks": {"type": "integer", "minimum": 0, "maximum": 22},
+        "failedChecks": {"type": "integer", "minimum": 0, "maximum": 22},
+        "totalApiAttempts": {"type": "integer", "minimum": 20, "maximum": 4000},
+        "failedApiAttempts": {"type": "integer", "minimum": 0, "maximum": 4000},
+        "totalReceiverAttempts": {"type": "integer", "minimum": 20, "maximum": 4000},
+        "failedReceiverAttempts": {"type": "integer", "minimum": 0, "maximum": 4000},
+        "totalWorkflowSubmissions": {"const": 4},
+        "completedWorkflows": {"type": "integer", "minimum": 0, "maximum": 4},
+        "failedWorkflows": {"type": "integer", "minimum": 0, "maximum": 4},
+        "maximumWorkflowCompletionMilliseconds": {"type": "integer", "minimum": 0, "maximum": 120000},
+        "maximumRecoveryMilliseconds": {"type": "integer", "minimum": 0, "maximum": 600000},
+        "overallStatus": {"enum": ["qualified", "not-qualified"]}
+      }
+    }
+  }
+}

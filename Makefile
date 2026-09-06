@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -44,6 +44,25 @@ IIP_CONTINUITY_MINIMUM_AVAILABILITY_BASIS_POINTS ?= 9990
 IIP_CONTINUITY_MAXIMUM_P95_LATENCY_MILLISECONDS ?= 2000
 IIP_CONTINUITY_REQUEST_TIMEOUT_MILLISECONDS ?= 2000
 IIP_CONTINUITY_MAXIMUM_RECOVERY_SECONDS ?= 120
+IIP_PROCESSING_REPORT ?= dist/customer-processing-continuity-qualification-report.json
+IIP_PROCESSING_API_BASE_URL ?=
+IIP_PROCESSING_API_TOKEN_FILE ?=
+IIP_PROCESSING_OTLP_BASE_URL ?=
+IIP_PROCESSING_OTLP_TOKEN_FILE ?=
+IIP_PROCESSING_OTLP_CLIENT_CERT_FILE ?=
+IIP_PROCESSING_OTLP_CLIENT_KEY_FILE ?=
+IIP_PROCESSING_API_CA_FILE ?=
+IIP_PROCESSING_OTLP_CA_FILE ?=
+IIP_PROCESSING_PROFILE ?=
+IIP_PROCESSING_IMAGE_DIGEST ?=
+IIP_PROCESSING_WORKER_DEPLOYMENT ?= iip-infra-intelligence-worker
+IIP_PROCESSING_RECEIVER_DEPLOYMENT ?= iip-infra-intelligence-otlp-receiver
+IIP_PROCESSING_ALLOW_DISRUPTION ?= false
+IIP_PROCESSING_ATTEMPTS_PER_PHASE ?= 20
+IIP_PROCESSING_PROBE_INTERVAL_MILLISECONDS ?= 250
+IIP_PROCESSING_MAXIMUM_WORKFLOW_MILLISECONDS ?= 60000
+IIP_PROCESSING_MAXIMUM_RECOVERY_MILLISECONDS ?= 120000
+IIP_PROCESSING_REQUEST_TIMEOUT_MILLISECONDS ?= 2000
 IIP_CUSTOMER_DEPLOYMENT_QUALIFICATION_REPORT ?= dist/customer-deployment-qualification-report.json
 IIP_CUSTOMER_QUALIFICATION_VALUES ?= $(IIP_DEPLOYMENT_VALUES)
 IIP_CUSTOMER_QUALIFICATION_MAXIMUM_EVIDENCE_AGE_SECONDS ?= 86400
@@ -100,8 +119,11 @@ help:
 	@echo "test-customer-continuity Validate the customer continuity contract and safe orchestrator"
 	@echo "qualify-customer-continuity Probe HTTPS while evicting one explicitly selected API pod"
 	@echo "verify-customer-continuity-report Verify exact customer continuity and ingress evidence"
+	@echo "test-customer-processing-continuity Validate worker/receiver processing evidence"
+	@echo "qualify-customer-processing-continuity Evict worker and receiver pods under live processing"
+	@echo "verify-customer-processing-continuity-report Recompute exact processing evidence bindings"
 	@echo "test-customer-deployment-qualification Validate exact customer evidence aggregation"
-	@echo "qualify-customer-deployment Bind live preflight, health, ingress, and continuity evidence"
+	@echo "qualify-customer-deployment Bind preflight, ingress, processing, and health evidence"
 	@echo "verify-customer-deployment-qualification-report Recompute the customer evidence chain"
 	@echo "test-control-plane-load Validate bounded fixed-rate load evidence semantics"
 	@echo "qualify-control-plane-load Run explicitly enabled external read load against one release"
@@ -349,6 +371,78 @@ verify-customer-continuity-report:
 		--ingress-report "$(IIP_CONTINUITY_INGRESS_REPORT)" \
 		--require-clean --require-qualified
 
+test-customer-processing-continuity:
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_customer_processing_continuity \
+		tests.test_customer_continuity_qualification -v
+
+qualify-customer-processing-continuity:
+	@test "$(IIP_PROCESSING_ALLOW_DISRUPTION)" = true || \
+		(echo "IIP_PROCESSING_ALLOW_DISRUPTION must equal true" >&2; exit 2)
+	@test -n "$(IIP_KUBERNETES_CONTEXT)" || \
+		(echo "IIP_KUBERNETES_CONTEXT is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_API_BASE_URL)" || \
+		(echo "IIP_PROCESSING_API_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_API_TOKEN_FILE)" || \
+		(echo "IIP_PROCESSING_API_TOKEN_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_OTLP_BASE_URL)" || \
+		(echo "IIP_PROCESSING_OTLP_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_OTLP_TOKEN_FILE)" || \
+		(echo "IIP_PROCESSING_OTLP_TOKEN_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_OTLP_CLIENT_CERT_FILE)" || \
+		(echo "IIP_PROCESSING_OTLP_CLIENT_CERT_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_OTLP_CLIENT_KEY_FILE)" || \
+		(echo "IIP_PROCESSING_OTLP_CLIENT_KEY_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_PROFILE)" || \
+		(echo "IIP_PROCESSING_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_IMAGE_DIGEST)" || \
+		(echo "IIP_PROCESSING_IMAGE_DIGEST is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_processing_continuity.py run \
+		--api-base-url "$(IIP_PROCESSING_API_BASE_URL)" \
+		--api-token-file "$(IIP_PROCESSING_API_TOKEN_FILE)" \
+		--otlp-base-url "$(IIP_PROCESSING_OTLP_BASE_URL)" \
+		--otlp-token-file "$(IIP_PROCESSING_OTLP_TOKEN_FILE)" \
+		--otlp-client-cert-file "$(IIP_PROCESSING_OTLP_CLIENT_CERT_FILE)" \
+		--otlp-client-key-file "$(IIP_PROCESSING_OTLP_CLIENT_KEY_FILE)" \
+		$(if $(IIP_PROCESSING_API_CA_FILE),--api-ca-file "$(IIP_PROCESSING_API_CA_FILE)",) \
+		$(if $(IIP_PROCESSING_OTLP_CA_FILE),--otlp-ca-file "$(IIP_PROCESSING_OTLP_CA_FILE)",) \
+		--profile "$(IIP_PROCESSING_PROFILE)" \
+		--image-digest "$(IIP_PROCESSING_IMAGE_DIGEST)" \
+		--context "$(IIP_KUBERNETES_CONTEXT)" \
+		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
+		--worker-deployment "$(IIP_PROCESSING_WORKER_DEPLOYMENT)" \
+		--receiver-deployment "$(IIP_PROCESSING_RECEIVER_DEPLOYMENT)" \
+		--attempts-per-phase "$(IIP_PROCESSING_ATTEMPTS_PER_PHASE)" \
+		--probe-interval-milliseconds "$(IIP_PROCESSING_PROBE_INTERVAL_MILLISECONDS)" \
+		--maximum-workflow-milliseconds "$(IIP_PROCESSING_MAXIMUM_WORKFLOW_MILLISECONDS)" \
+		--maximum-recovery-milliseconds "$(IIP_PROCESSING_MAXIMUM_RECOVERY_MILLISECONDS)" \
+		--request-timeout-milliseconds "$(IIP_PROCESSING_REQUEST_TIMEOUT_MILLISECONDS)" \
+		--kubectl "$(KUBECTL)" --output "$(IIP_PROCESSING_REPORT)" \
+		--allow-disruption
+
+verify-customer-processing-continuity-report:
+	@test -n "$(IIP_KUBERNETES_CONTEXT)" || \
+		(echo "IIP_KUBERNETES_CONTEXT is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_API_BASE_URL)" || \
+		(echo "IIP_PROCESSING_API_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_OTLP_BASE_URL)" || \
+		(echo "IIP_PROCESSING_OTLP_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_PROFILE)" || \
+		(echo "IIP_PROCESSING_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_IMAGE_DIGEST)" || \
+		(echo "IIP_PROCESSING_IMAGE_DIGEST is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_processing_continuity.py verify \
+		--report "$(IIP_PROCESSING_REPORT)" \
+		--api-base-url "$(IIP_PROCESSING_API_BASE_URL)" \
+		--otlp-base-url "$(IIP_PROCESSING_OTLP_BASE_URL)" \
+		--profile "$(IIP_PROCESSING_PROFILE)" \
+		--image-digest "$(IIP_PROCESSING_IMAGE_DIGEST)" \
+		--context "$(IIP_KUBERNETES_CONTEXT)" \
+		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
+		--worker-deployment "$(IIP_PROCESSING_WORKER_DEPLOYMENT)" \
+		--receiver-deployment "$(IIP_PROCESSING_RECEIVER_DEPLOYMENT)" \
+		--require-clean --require-qualified
+
 test-customer-deployment-qualification:
 	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
 		tests.test_customer_deployment_qualification -v
@@ -360,16 +454,28 @@ qualify-customer-deployment:
 		(echo "IIP_CONTINUITY_IMAGE_DIGEST is required" >&2; exit 2)
 	@test -n "$(strip $(IIP_CUSTOMER_QUALIFICATION_VALUES))" || \
 		(echo "IIP_CUSTOMER_QUALIFICATION_VALUES is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_PROFILE)" || \
+		(echo "IIP_PROCESSING_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_API_BASE_URL)" || \
+		(echo "IIP_PROCESSING_API_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_OTLP_BASE_URL)" || \
+		(echo "IIP_PROCESSING_OTLP_BASE_URL is required" >&2; exit 2)
 	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_deployment.py generate \
 		--preflight-report "$(IIP_DEPLOYMENT_PREFLIGHT_REPORT)" \
 		--diagnostic-report "$(IIP_DEPLOYMENT_DIAGNOSTIC_REPORT)" \
 		--ingress-report "$(IIP_CONTINUITY_INGRESS_REPORT)" \
 		--continuity-report "$(IIP_CONTINUITY_REPORT)" \
+		--processing-report "$(IIP_PROCESSING_REPORT)" \
+		--processing-profile "$(IIP_PROCESSING_PROFILE)" \
+		--processing-api-base-url "$(IIP_PROCESSING_API_BASE_URL)" \
+		--processing-otlp-base-url "$(IIP_PROCESSING_OTLP_BASE_URL)" \
 		$(foreach value,$(IIP_CUSTOMER_QUALIFICATION_VALUES),--values "$(value)") \
 		--context "$(IIP_KUBERNETES_CONTEXT)" \
 		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
 		--release-name "$(IIP_DIAGNOSTIC_RELEASE_NAME)" \
 		--deployment "$(IIP_CONTINUITY_DEPLOYMENT)" \
+		--worker-deployment "$(IIP_PROCESSING_WORKER_DEPLOYMENT)" \
+		--receiver-deployment "$(IIP_PROCESSING_RECEIVER_DEPLOYMENT)" \
 		--image-digest "$(IIP_CONTINUITY_IMAGE_DIGEST)" \
 		--helm "$(HELM)" --kubectl "$(KUBECTL)" \
 		--maximum-evidence-age-seconds "$(IIP_CUSTOMER_QUALIFICATION_MAXIMUM_EVIDENCE_AGE_SECONDS)" \
@@ -381,17 +487,29 @@ verify-customer-deployment-qualification-report:
 		(echo "IIP_KUBERNETES_CONTEXT is required" >&2; exit 2)
 	@test -n "$(IIP_CONTINUITY_IMAGE_DIGEST)" || \
 		(echo "IIP_CONTINUITY_IMAGE_DIGEST is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_PROFILE)" || \
+		(echo "IIP_PROCESSING_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_API_BASE_URL)" || \
+		(echo "IIP_PROCESSING_API_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_PROCESSING_OTLP_BASE_URL)" || \
+		(echo "IIP_PROCESSING_OTLP_BASE_URL is required" >&2; exit 2)
 	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_deployment.py verify \
 		--report "$(IIP_CUSTOMER_DEPLOYMENT_QUALIFICATION_REPORT)" \
 		--preflight-report "$(IIP_DEPLOYMENT_PREFLIGHT_REPORT)" \
 		--diagnostic-report "$(IIP_DEPLOYMENT_DIAGNOSTIC_REPORT)" \
 		--ingress-report "$(IIP_CONTINUITY_INGRESS_REPORT)" \
 		--continuity-report "$(IIP_CONTINUITY_REPORT)" \
+		--processing-report "$(IIP_PROCESSING_REPORT)" \
+		--processing-profile "$(IIP_PROCESSING_PROFILE)" \
+		--processing-api-base-url "$(IIP_PROCESSING_API_BASE_URL)" \
+		--processing-otlp-base-url "$(IIP_PROCESSING_OTLP_BASE_URL)" \
 		$(foreach value,$(IIP_CUSTOMER_QUALIFICATION_VALUES),--values "$(value)") \
 		--context "$(IIP_KUBERNETES_CONTEXT)" \
 		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
 		--release-name "$(IIP_DIAGNOSTIC_RELEASE_NAME)" \
 		--deployment "$(IIP_CONTINUITY_DEPLOYMENT)" \
+		--worker-deployment "$(IIP_PROCESSING_WORKER_DEPLOYMENT)" \
+		--receiver-deployment "$(IIP_PROCESSING_RECEIVER_DEPLOYMENT)" \
 		--image-digest "$(IIP_CONTINUITY_IMAGE_DIGEST)" \
 		--helm "$(HELM)" --kubectl "$(KUBECTL)" \
 		--require-current-cluster --require-qualified

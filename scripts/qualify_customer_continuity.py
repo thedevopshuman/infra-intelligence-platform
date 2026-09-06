@@ -322,6 +322,8 @@ class KubectlClient:
         namespace: str,
         deployment: str,
         expected_image_digest: str,
+        container: str = "api",
+        pod_disruption_budget: str | None = None,
         timeout_seconds: int = 30,
     ) -> None:
         self.binary = binary
@@ -331,6 +333,13 @@ class KubectlClient:
         )
         self.deployment = _dns_label(
             deployment, "customer-continuity.kubernetes.deployment-invalid"
+        )
+        self.container = _dns_label(
+            container, "customer-continuity.kubernetes.container-invalid"
+        )
+        self.pod_disruption_budget = _dns_label(
+            pod_disruption_budget or deployment,
+            "customer-continuity.kubernetes.pdb-invalid",
         )
         if DIGEST.fullmatch(expected_image_digest) is None:
             _fail("customer-continuity.image.invalid")
@@ -386,7 +395,14 @@ class KubectlClient:
             _fail("customer-continuity.kubernetes.version-invalid")
         return version
 
-    def observe(self, *, original_pod_uid: str | None = None) -> DeploymentObservation:
+    def observe(
+        self,
+        *,
+        original_pod_uid: str | None = None,
+        require_reduced_capacity: bool = False,
+    ) -> DeploymentObservation:
+        if require_reduced_capacity and original_pod_uid is None:
+            _fail("customer-continuity.kubernetes.reduced-capacity-invalid")
         deployment = self._json(
             ("get", "deployment", self.deployment, "-o", "json"),
             "customer-continuity.kubernetes.deployment-invalid",
@@ -438,29 +454,35 @@ class KubectlClient:
             template.get("spec"), "customer-continuity.kubernetes.image-invalid"
         )
         containers = pod_spec.get("containers")
-        api_images = [
+        component_images = [
             item.get("image")
             for item in containers
             if isinstance(containers, list)
             and isinstance(item, Mapping)
-            and item.get("name") == "api"
+            and item.get("name") == self.container
         ] if isinstance(containers, list) else []
         expected_suffix = "@" + self.expected_image_digest
         if (
-            len(api_images) != 1
-            or not isinstance(api_images[0], str)
-            or not api_images[0].endswith(expected_suffix)
+            len(component_images) != 1
+            or not isinstance(component_images[0], str)
+            or not component_images[0].endswith(expected_suffix)
         ):
             _fail("customer-continuity.kubernetes.image-invalid")
 
         pdb = self._json(
-            ("get", "poddisruptionbudget", self.deployment, "-o", "json"),
+            (
+                "get",
+                "poddisruptionbudget",
+                self.pod_disruption_budget,
+                "-o",
+                "json",
+            ),
             "customer-continuity.kubernetes.pdb-invalid",
         )
         pdb_metadata = _mapping(
             pdb.get("metadata"), "customer-continuity.kubernetes.pdb-invalid"
         )
-        if pdb_metadata.get("name") != self.deployment:
+        if pdb_metadata.get("name") != self.pod_disruption_budget:
             _fail("customer-continuity.kubernetes.pdb-invalid")
         pdb_spec = _mapping(
             pdb.get("spec"), "customer-continuity.kubernetes.pdb-invalid"
@@ -529,19 +551,31 @@ class KubectlClient:
             ):
                 ready_pods.append((name, uid))
         ready_pods.sort(key=lambda item: (item[1], item[0]))
-        if (
-            observed_generation != generation
-            or ready != desired
-            or available != desired
-            or updated != desired
-            or len(ready_pods) < desired
-        ):
-            _fail("customer-continuity.kubernetes.capacity-not-ready")
-        if original_pod_uid is not None:
+        if require_reduced_capacity:
+            if (
+                observed_generation != generation
+                or not 1 <= ready < desired
+                or not 1 <= available <= ready
+                or not 1 <= updated <= desired
+                or len(ready_pods) != ready
+                or any(uid == original_pod_uid for _, uid in ready_pods)
+            ):
+                _fail("customer-continuity.kubernetes.reduced-capacity-not-observed")
+            pod_name, pod_uid = ready_pods[0]
+        else:
+            if (
+                observed_generation != generation
+                or ready != desired
+                or available != desired
+                or updated != desired
+                or len(ready_pods) < desired
+            ):
+                _fail("customer-continuity.kubernetes.capacity-not-ready")
+        if original_pod_uid is not None and not require_reduced_capacity:
             if any(uid == original_pod_uid for _, uid in ready_pods):
                 _fail("customer-continuity.kubernetes.original-pod-present")
             pod_name, pod_uid = ready_pods[0]
-        else:
+        elif original_pod_uid is None:
             if disruptions_allowed < 1:
                 _fail("customer-continuity.kubernetes.disruption-not-allowed")
             pod_name, pod_uid = ready_pods[0]

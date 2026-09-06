@@ -101,6 +101,12 @@ Version 0.60 adds `CustomerDeploymentQualificationReport` and the closed
 evidence/check/limitation types for one exact customer-cluster chain. It adds
 no API method, credential, mutation, publication, or production authority.
 
+Version 0.63 adds `CustomerProcessingQualificationProfile` and
+`CustomerProcessingContinuityQualificationReport`, then extends the customer
+deployment report with the same-release worker/receiver processing evidence
+and post-disruption health ordering. The types add no client method,
+credential handling, or Kubernetes mutation authority.
+
 Version 0.59 adds `CustomerContinuityQualificationReport` and its closed check,
 objective, environment, aggregate probe, and replacement types. It adds no
 client method, credential, or Kubernetes mutation authority.

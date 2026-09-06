@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate exact customer-cluster install, health, ingress, and continuity evidence."""
+"""Aggregate exact customer install, ingress, and processing-continuity evidence."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 import deployment_diagnostics as diagnostics
 import deployment_preflight as preflight
 import qualify_customer_continuity as continuity
+import qualify_customer_processing_continuity as processing
 import qualify_ingress_availability as ingress
 
 
@@ -27,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "contracts/schemas/customer-deployment-qualification-report.schema.json"
 API_VERSION = "iip.platform/v1alpha1"
 KIND = "CustomerDeploymentQualificationReport"
-QUALIFICATION_LEVEL = "single-cluster-control-plane-v1"
+QUALIFICATION_LEVEL = "single-cluster-processing-v2"
 REPORT_ID = re.compile(r"^cdq_[a-f0-9]{32}$")
 DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 MAX_DOCUMENT_BYTES = 16 * 1024 * 1024
@@ -57,6 +58,12 @@ EVIDENCE_DEFINITIONS = (
         "qualified",
         "customer-deployment-qualification.continuity.not-qualified",
     ),
+    (
+        "worker-receiver-processing",
+        "CustomerProcessingContinuityQualificationReport",
+        "qualified",
+        "customer-deployment-qualification.processing.not-qualified",
+    ),
 )
 CHECK_IDS = (
     "source-binding",
@@ -67,18 +74,20 @@ CHECK_IDS = (
     "post-continuity-health",
     "customer-ingress",
     "control-plane-continuity",
+    "worker-receiver-processing",
     "continuity-ingress-chain",
+    "processing-target-chain",
     "evidence-order",
     "evidence-freshness",
     "minimized-output",
 )
 LIMITATIONS = (
     "single-customer-cluster",
-    "planned-single-api-pod-disruption",
+    "planned-sequential-api-worker-receiver-pod-disruptions",
     "point-in-time-dependency-observation",
     "artifact-publication-signatures-vulnerabilities-not-qualified",
     "database-ha-dr-not-qualified",
-    "worker-receiver-continuity-not-qualified",
+    "shared-database-failure-not-qualified",
     "customer-integrations-and-live-ai-not-qualified",
     "regional-slo-and-capacity-not-qualified",
     "design-partner-legal-brand-governance-not-qualified",
@@ -258,10 +267,13 @@ def _subject_and_bindings(
     diagnostic_report: Mapping[str, Any],
     ingress_report: Mapping[str, Any],
     continuity_report: Mapping[str, Any],
+    processing_report: Mapping[str, Any],
     context: str,
     namespace: str,
     release_name: str,
     deployment_name: str,
+    worker_deployment_name: str,
+    receiver_deployment_name: str,
     image_digest: str,
     current_cluster_environment: Mapping[str, str] | None,
 ) -> tuple[dict[str, str], dict[str, str]]:
@@ -317,6 +329,22 @@ def _subject_and_bindings(
         continuity_spec.get("bindings"),
         "customer-deployment-qualification.continuity.invalid",
     )
+    processing_metadata = _mapping(
+        processing_report.get("metadata"),
+        "customer-deployment-qualification.processing.invalid",
+    )
+    processing_spec = _mapping(
+        processing_report.get("spec"),
+        "customer-deployment-qualification.processing.invalid",
+    )
+    processing_subject = _mapping(
+        processing_spec.get("subject"),
+        "customer-deployment-qualification.processing.invalid",
+    )
+    processing_bindings = _mapping(
+        processing_spec.get("bindings"),
+        "customer-deployment-qualification.processing.invalid",
+    )
 
     revisions = {
         preflight_metadata.get("sourceRevision"),
@@ -324,6 +352,8 @@ def _subject_and_bindings(
         ingress_metadata.get("sourceRevision"),
         continuity_metadata.get("sourceRevision"),
         continuity_subject.get("sourceRevision"),
+        processing_metadata.get("sourceRevision"),
+        processing_subject.get("sourceRevision"),
     }
     if len(revisions) != 1 or None in revisions:
         _fail("customer-deployment-qualification.source.crossed")
@@ -341,6 +371,7 @@ def _subject_and_bindings(
         or diagnostic_identity != expected_identity
         or continuity_subject.get("imageDigest") != image_digest
         or continuity_subject.get("contractsApiVersion") != API_VERSION
+        or processing_subject != continuity_subject
         or ingress_spec.get("targetIdentity")
         != {
             **{key: continuity_subject.get(key) for key in (
@@ -377,6 +408,34 @@ def _subject_and_bindings(
         != preflight._digest(namespace)
     ):
         _fail("customer-deployment-qualification.target.crossed")
+    processing_components = processing_bindings.get("components")
+    if not isinstance(processing_components, list):
+        _fail("customer-deployment-qualification.processing.invalid")
+    expected_processing_components = (
+        ("workflow-worker", worker_deployment_name),
+        ("otlp-receiver", receiver_deployment_name),
+    )
+    if (
+        processing_bindings.get("apiTargetBindingDigest")
+        != continuity_bindings.get("targetBindingDigest")
+        or processing_bindings.get("kubernetesContextBindingDigest")
+        != processing._digest_value(context)
+        or processing_bindings.get("namespaceBindingDigest")
+        != processing._digest_value(namespace)
+        or [
+            (
+                item.get("id"),
+                item.get("deploymentBindingDigest"),
+            )
+            for item in processing_components
+            if isinstance(item, Mapping)
+        ]
+        != [
+            (identifier, processing._digest_value(deployment))
+            for identifier, deployment in expected_processing_components
+        ]
+    ):
+        _fail("customer-deployment-qualification.processing.crossed")
     diagnostic_binding, _ = diagnostics._target(
         context=context,
         namespace=namespace,
@@ -415,6 +474,16 @@ def _subject_and_bindings(
         "continuityTargetBindingDigest": str(
             continuity_bindings["targetBindingDigest"]
         ),
+        "processingOtlpTargetBindingDigest": str(
+            processing_bindings["otlpTargetBindingDigest"]
+        ),
+        "processingProfileDigest": str(processing_bindings["profileDigest"]),
+        "workerDeploymentBindingDigest": str(
+            processing_components[0]["deploymentBindingDigest"]
+        ),
+        "receiverDeploymentBindingDigest": str(
+            processing_components[1]["deploymentBindingDigest"]
+        ),
     }
     return subject, bindings
 
@@ -424,7 +493,8 @@ def _input_times(
     preflight_report: Mapping[str, Any],
     diagnostic_report: Mapping[str, Any],
     continuity_report: Mapping[str, Any],
-) -> tuple[datetime, datetime, datetime, datetime]:
+    processing_report: Mapping[str, Any],
+) -> tuple[datetime, datetime, datetime, datetime, datetime, datetime]:
     preflight_metadata = _mapping(
         preflight_report.get("metadata"),
         "customer-deployment-qualification.time.invalid",
@@ -445,6 +515,14 @@ def _input_times(
         continuity_spec.get("measurements"),
         "customer-deployment-qualification.time.invalid",
     )
+    processing_spec = _mapping(
+        processing_report.get("spec"),
+        "customer-deployment-qualification.time.invalid",
+    )
+    processing_measurements = _mapping(
+        processing_spec.get("measurements"),
+        "customer-deployment-qualification.time.invalid",
+    )
     return (
         _parse_timestamp(
             preflight_metadata.get("generatedAt"),
@@ -456,6 +534,14 @@ def _input_times(
         ),
         _parse_timestamp(
             continuity_measurements.get("completedAt"),
+            "customer-deployment-qualification.time.invalid",
+        ),
+        _parse_timestamp(
+            processing_measurements.get("startedAt"),
+            "customer-deployment-qualification.time.invalid",
+        ),
+        _parse_timestamp(
+            processing_measurements.get("completedAt"),
             "customer-deployment-qualification.time.invalid",
         ),
         _parse_timestamp(
@@ -475,10 +561,14 @@ def build_report(
     ingress_digest: str,
     continuity_report: Mapping[str, Any],
     continuity_digest: str,
+    processing_report: Mapping[str, Any],
+    processing_digest: str,
     context: str,
     namespace: str,
     release_name: str,
     deployment_name: str,
+    worker_deployment_name: str,
+    receiver_deployment_name: str,
     image_digest: str,
     current_cluster_environment: Mapping[str, str] | None,
     maximum_evidence_age_seconds: int = 86400,
@@ -501,27 +591,45 @@ def build_report(
         diagnostic_report=diagnostic_report,
         ingress_report=ingress_report,
         continuity_report=continuity_report,
+        processing_report=processing_report,
         context=context,
         namespace=namespace,
         release_name=release_name,
         deployment_name=deployment_name,
+        worker_deployment_name=worker_deployment_name,
+        receiver_deployment_name=receiver_deployment_name,
         image_digest=image_digest,
         current_cluster_environment=current_cluster_environment,
     )
-    preflight_at, continuity_started, continuity_completed, health_observed = (
-        _input_times(
-            preflight_report=preflight_report,
-            diagnostic_report=diagnostic_report,
-            continuity_report=continuity_report,
-        )
+    (
+        preflight_at,
+        continuity_started,
+        continuity_completed,
+        processing_started,
+        processing_completed,
+        health_observed,
+    ) = _input_times(
+        preflight_report=preflight_report,
+        diagnostic_report=diagnostic_report,
+        continuity_report=continuity_report,
+        processing_report=processing_report,
     )
     skew = maximum_clock_skew_seconds
     ordered = (
         preflight_at <= continuity_started
         and continuity_started <= continuity_completed
-        and continuity_completed <= health_observed
+        and continuity_completed <= processing_started
+        and processing_started <= processing_completed
+        and processing_completed <= health_observed
     )
-    times = (preflight_at, continuity_started, continuity_completed, health_observed)
+    times = (
+        preflight_at,
+        continuity_started,
+        continuity_completed,
+        processing_started,
+        processing_completed,
+        health_observed,
+    )
     fresh = all(
         instant.timestamp() - maximum_evidence_age_seconds
         <= value.timestamp()
@@ -546,12 +654,14 @@ def build_report(
                 diagnostic_report,
                 ingress_report,
                 continuity_report,
+                processing_report,
             ),
             (
                 preflight_digest,
                 diagnostic_digest,
                 ingress_digest,
                 continuity_digest,
+                processing_digest,
             ),
         )
     ]
@@ -581,7 +691,13 @@ def build_report(
             evidence_by_id["control-plane-continuity"]["status"] == "passed",
             "customer-deployment-qualification.continuity.not-qualified",
         ),
+        _check(
+            "worker-receiver-processing",
+            evidence_by_id["worker-receiver-processing"]["status"] == "passed",
+            "customer-deployment-qualification.processing.not-qualified",
+        ),
         _check("continuity-ingress-chain", True, "customer-deployment-qualification.ingress.crossed"),
+        _check("processing-target-chain", True, "customer-deployment-qualification.processing.crossed"),
         _check("evidence-order", ordered, "customer-deployment-qualification.evidence.order-invalid"),
         _check("evidence-freshness", fresh, "customer-deployment-qualification.evidence.stale"),
         _check("minimized-output", True, "customer-deployment-qualification.output.not-minimized"),
@@ -608,6 +724,8 @@ def build_report(
             "preflightGeneratedAt": _timestamp(preflight_at),
             "continuityStartedAt": _timestamp(continuity_started),
             "continuityCompletedAt": _timestamp(continuity_completed),
+            "processingStartedAt": _timestamp(processing_started),
+            "processingCompletedAt": _timestamp(processing_completed),
             "postContinuityHealthObservedAt": _timestamp(health_observed),
             "qualifiedAt": generated_at,
             "oldestEvidenceAgeSeconds": oldest_age,
@@ -666,7 +784,7 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
     objective = _mapping(
         spec.get("objective"), "customer-deployment-qualification.report.invalid"
     )
-    if not isinstance(evidence, list) or len(evidence) != 4:
+    if not isinstance(evidence, list) or len(evidence) != len(EVIDENCE_DEFINITIONS):
         _fail("customer-deployment-qualification.report.invalid")
     evidence_by_id = {
         str(_mapping(item, "customer-deployment-qualification.report.invalid").get("id")): _mapping(
@@ -684,6 +802,14 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
     )
     continuity_completed = _parse_timestamp(
         measurements.get("continuityCompletedAt"),
+        "customer-deployment-qualification.report.time-invalid",
+    )
+    processing_started = _parse_timestamp(
+        measurements.get("processingStartedAt"),
+        "customer-deployment-qualification.report.time-invalid",
+    )
+    processing_completed = _parse_timestamp(
+        measurements.get("processingCompletedAt"),
         "customer-deployment-qualification.report.time-invalid",
     )
     health_observed = _parse_timestamp(
@@ -706,9 +832,18 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
     ordered = (
         preflight_at <= continuity_started
         and continuity_started <= continuity_completed
-        and continuity_completed <= health_observed
+        and continuity_completed <= processing_started
+        and processing_started <= processing_completed
+        and processing_completed <= health_observed
     )
-    values = (preflight_at, continuity_started, continuity_completed, health_observed)
+    values = (
+        preflight_at,
+        continuity_started,
+        continuity_completed,
+        processing_started,
+        processing_completed,
+        health_observed,
+    )
     fresh = all(
         qualified_at.timestamp() - maximum_age
         <= value.timestamp()
@@ -743,7 +878,14 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
             evidence_by_id.get("control-plane-continuity", {}).get("status") == "passed",
             "customer-deployment-qualification.continuity.not-qualified",
         ),
+        _check(
+            "worker-receiver-processing",
+            evidence_by_id.get("worker-receiver-processing", {}).get("status")
+            == "passed",
+            "customer-deployment-qualification.processing.not-qualified",
+        ),
         _check("continuity-ingress-chain", True, "customer-deployment-qualification.ingress.crossed"),
+        _check("processing-target-chain", True, "customer-deployment-qualification.processing.crossed"),
         _check("evidence-order", ordered, "customer-deployment-qualification.evidence.order-invalid"),
         _check("evidence-freshness", fresh, "customer-deployment-qualification.evidence.stale"),
         _check(
@@ -807,11 +949,11 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
     failed = sum(item["status"] == "failed" for item in expected_checks)
     status = "qualified" if rejected == 0 and failed == 0 else "not-qualified"
     expected_summary = {
-        "requiredEvidence": 4,
-        "passedEvidence": 4 - rejected,
+        "requiredEvidence": len(EVIDENCE_DEFINITIONS),
+        "passedEvidence": len(EVIDENCE_DEFINITIONS) - rejected,
         "rejectedEvidence": rejected,
-        "totalChecks": 12,
-        "passedChecks": 12 - failed,
+        "totalChecks": len(CHECK_IDS),
+        "passedChecks": len(CHECK_IDS) - failed,
         "failedChecks": failed,
         "overallStatus": status,
     }
@@ -833,14 +975,22 @@ def _validate_inputs(
     diagnostic_path: Path,
     ingress_path: Path,
     continuity_path: Path,
+    processing_path: Path,
+    processing_profile_path: Path,
+    processing_api_base_url: str,
+    processing_otlp_base_url: str,
     values: Sequence[Path],
     context: str,
     namespace: str,
     release_name: str,
     deployment_name: str,
+    worker_deployment_name: str,
+    receiver_deployment_name: str,
     image_digest: str,
     helm: str,
 ) -> tuple[
+    Mapping[str, Any],
+    str,
     Mapping[str, Any],
     str,
     Mapping[str, Any],
@@ -863,6 +1013,9 @@ def _validate_inputs(
     )
     continuity_report, continuity_digest = _load_document(
         continuity_path, "customer-deployment-qualification.continuity.unreadable"
+    )
+    processing_report, processing_digest = _load_document(
+        processing_path, "customer-deployment-qualification.processing.unreadable"
     )
     try:
         preflight.verify_report(
@@ -890,11 +1043,25 @@ def _validate_inputs(
             require_clean=True,
             require_qualified=False,
         )
+        processing.verify_report(
+            report_path=processing_path,
+            profile_path=processing_profile_path,
+            api_base_url=processing_api_base_url,
+            otlp_base_url=processing_otlp_base_url,
+            image_digest=image_digest,
+            context=context,
+            namespace=namespace,
+            worker_deployment=worker_deployment_name,
+            receiver_deployment=receiver_deployment_name,
+            require_clean=True,
+            require_qualified=False,
+        )
     except (
         preflight.DeploymentPreflightError,
         diagnostics.DeploymentDiagnosticError,
         ingress.IngressQualificationError,
         continuity.CustomerContinuityQualificationError,
+        processing.CustomerProcessingContinuityError,
     ):
         _fail("customer-deployment-qualification.input.verification-failed")
     for path, expected, code in (
@@ -902,6 +1069,7 @@ def _validate_inputs(
         (diagnostic_path, diagnostic_digest, "customer-deployment-qualification.diagnostic.changed"),
         (ingress_path, ingress_digest, "customer-deployment-qualification.ingress.changed"),
         (continuity_path, continuity_digest, "customer-deployment-qualification.continuity.changed"),
+        (processing_path, processing_digest, "customer-deployment-qualification.processing.changed"),
     ):
         if _file_digest(path, code) != expected:
             _fail(code)
@@ -914,6 +1082,8 @@ def _validate_inputs(
         ingress_digest,
         continuity_report,
         continuity_digest,
+        processing_report,
+        processing_digest,
     )
 
 
@@ -923,11 +1093,17 @@ def qualify(
     diagnostic_path: Path,
     ingress_path: Path,
     continuity_path: Path,
+    processing_path: Path,
+    processing_profile_path: Path,
+    processing_api_base_url: str,
+    processing_otlp_base_url: str,
     values: Sequence[Path],
     context: str,
     namespace: str,
     release_name: str,
     deployment_name: str,
+    worker_deployment_name: str,
+    receiver_deployment_name: str,
     image_digest: str,
     output: Path,
     helm: str = "helm",
@@ -941,11 +1117,17 @@ def qualify(
         diagnostic_path=diagnostic_path,
         ingress_path=ingress_path,
         continuity_path=continuity_path,
+        processing_path=processing_path,
+        processing_profile_path=processing_profile_path,
+        processing_api_base_url=processing_api_base_url,
+        processing_otlp_base_url=processing_otlp_base_url,
         values=values,
         context=context,
         namespace=namespace,
         release_name=release_name,
         deployment_name=deployment_name,
+        worker_deployment_name=worker_deployment_name,
+        receiver_deployment_name=receiver_deployment_name,
         image_digest=image_digest,
         helm=helm,
     )
@@ -963,10 +1145,14 @@ def qualify(
         ingress_digest=inputs[5],
         continuity_report=inputs[6],
         continuity_digest=inputs[7],
+        processing_report=inputs[8],
+        processing_digest=inputs[9],
         context=context,
         namespace=namespace,
         release_name=release_name,
         deployment_name=deployment_name,
+        worker_deployment_name=worker_deployment_name,
+        receiver_deployment_name=receiver_deployment_name,
         image_digest=image_digest,
         current_cluster_environment=cluster_environment,
         maximum_evidence_age_seconds=maximum_evidence_age_seconds,
@@ -984,11 +1170,17 @@ def verify_report(
     diagnostic_path: Path,
     ingress_path: Path,
     continuity_path: Path,
+    processing_path: Path,
+    processing_profile_path: Path,
+    processing_api_base_url: str,
+    processing_otlp_base_url: str,
     values: Sequence[Path],
     context: str,
     namespace: str,
     release_name: str,
     deployment_name: str,
+    worker_deployment_name: str,
+    receiver_deployment_name: str,
     image_digest: str,
     helm: str = "helm",
     kubectl: str = "kubectl",
@@ -1004,11 +1196,17 @@ def verify_report(
         diagnostic_path=diagnostic_path,
         ingress_path=ingress_path,
         continuity_path=continuity_path,
+        processing_path=processing_path,
+        processing_profile_path=processing_profile_path,
+        processing_api_base_url=processing_api_base_url,
+        processing_otlp_base_url=processing_otlp_base_url,
         values=values,
         context=context,
         namespace=namespace,
         release_name=release_name,
         deployment_name=deployment_name,
+        worker_deployment_name=worker_deployment_name,
+        receiver_deployment_name=receiver_deployment_name,
         image_digest=image_digest,
         helm=helm,
     )
@@ -1037,10 +1235,14 @@ def verify_report(
         ingress_digest=inputs[5],
         continuity_report=inputs[6],
         continuity_digest=inputs[7],
+        processing_report=inputs[8],
+        processing_digest=inputs[9],
         context=context,
         namespace=namespace,
         release_name=release_name,
         deployment_name=deployment_name,
+        worker_deployment_name=worker_deployment_name,
+        receiver_deployment_name=receiver_deployment_name,
         image_digest=image_digest,
         current_cluster_environment=current_cluster_environment,
         maximum_evidence_age_seconds=int(objective["maximumEvidenceAgeSeconds"]),
@@ -1062,11 +1264,21 @@ def _common_inputs(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--diagnostic-report", type=Path, required=True)
     parser.add_argument("--ingress-report", type=Path, required=True)
     parser.add_argument("--continuity-report", type=Path, required=True)
+    parser.add_argument("--processing-report", type=Path, required=True)
+    parser.add_argument("--processing-profile", type=Path, required=True)
+    parser.add_argument("--processing-api-base-url", required=True)
+    parser.add_argument("--processing-otlp-base-url", required=True)
     parser.add_argument("--values", type=Path, action="append", required=True)
     parser.add_argument("--context", required=True)
     parser.add_argument("--namespace", default="iip-system")
     parser.add_argument("--release-name", default="iip")
     parser.add_argument("--deployment", default="iip-infra-intelligence")
+    parser.add_argument(
+        "--worker-deployment", default="iip-infra-intelligence-worker"
+    )
+    parser.add_argument(
+        "--receiver-deployment", default="iip-infra-intelligence-otlp-receiver"
+    )
     parser.add_argument("--image-digest", required=True)
     parser.add_argument("--helm", default=os.environ.get("IIP_HELM_BIN", "helm"))
     parser.add_argument("--kubectl", default=os.environ.get("IIP_KUBECTL_BIN", "kubectl"))
@@ -1095,11 +1307,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         "diagnostic_path": arguments.diagnostic_report,
         "ingress_path": arguments.ingress_report,
         "continuity_path": arguments.continuity_report,
+        "processing_path": arguments.processing_report,
+        "processing_profile_path": arguments.processing_profile,
+        "processing_api_base_url": arguments.processing_api_base_url,
+        "processing_otlp_base_url": arguments.processing_otlp_base_url,
         "values": arguments.values,
         "context": arguments.context,
         "namespace": arguments.namespace,
         "release_name": arguments.release_name,
         "deployment_name": arguments.deployment,
+        "worker_deployment_name": arguments.worker_deployment,
+        "receiver_deployment_name": arguments.receiver_deployment,
         "image_digest": arguments.image_digest,
         "helm": arguments.helm,
         "kubectl": arguments.kubectl,

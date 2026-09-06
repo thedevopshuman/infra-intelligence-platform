@@ -1,0 +1,208 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerProcessingContinuityQualificationReport",
+  "metadata": {
+    "id": "cpcq_fb21d139d568ed14700a1d6e97fc49a2",
+    "generatedAt": "2026-09-06T13:10:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualificationLevel": "customer-worker-receiver-pod-eviction-v1",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "requiredMigration": "0023_ai_model_suitability.sql",
+      "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "apiTargetBindingDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "otlpTargetBindingDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "kubernetesContextBindingDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "namespaceBindingDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "profileDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "components": [
+        {
+          "id": "workflow-worker",
+          "deploymentBindingDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "evictedPodBindingDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        {
+          "id": "otlp-receiver",
+          "deploymentBindingDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "evictedPodBindingDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+        }
+      ]
+    },
+    "objective": {
+      "minimumProbeAttemptsPerPhase": 20,
+      "probeIntervalMilliseconds": 250,
+      "maximumWorkflowCompletionMilliseconds": 60000,
+      "maximumRecoveryMilliseconds": 120000,
+      "requestTimeoutMilliseconds": 2000
+    },
+    "environment": {
+      "platform": "darwin/arm64",
+      "pythonVersion": "3.12.11",
+      "kubernetesVersion": "v1.36.1",
+      "apiTransport": "verified-https",
+      "otlpTransport": "mutual-tls-https",
+      "apiCaSource": "custom",
+      "otlpCaSource": "custom",
+      "proxyMode": "disabled",
+      "redirectMode": "deny",
+      "evictionApi": "policy/v1"
+    },
+    "receiverIntake": {
+      "signal": "metric",
+      "payload": "non-empty-otlp-protobuf",
+      "successBoundary": "postgresql-commit-before-http-200"
+    },
+    "measurements": {
+      "startedAt": "2026-09-06T13:00:00Z",
+      "completedAt": "2026-09-06T13:10:00Z",
+      "phases": [
+        {
+          "id": "baseline",
+          "apiAttempts": 20,
+          "apiSuccesses": 20,
+          "apiFailures": 0,
+          "receiverAttempts": 20,
+          "receiverSuccesses": 20,
+          "receiverFailures": 0,
+          "workflowSubmitted": 1,
+          "workflowCompleted": 1,
+          "workflowFailures": 0,
+          "workflowPollAttempts": 3,
+          "workflowCompletionMilliseconds": 510,
+          "submittedDuringReducedCapacity": false
+        },
+        {
+          "id": "worker-disruption",
+          "apiAttempts": 20,
+          "apiSuccesses": 20,
+          "apiFailures": 0,
+          "receiverAttempts": 20,
+          "receiverSuccesses": 20,
+          "receiverFailures": 0,
+          "workflowSubmitted": 1,
+          "workflowCompleted": 1,
+          "workflowFailures": 0,
+          "workflowPollAttempts": 4,
+          "workflowCompletionMilliseconds": 720,
+          "submittedDuringReducedCapacity": true
+        },
+        {
+          "id": "receiver-disruption",
+          "apiAttempts": 20,
+          "apiSuccesses": 20,
+          "apiFailures": 0,
+          "receiverAttempts": 20,
+          "receiverSuccesses": 20,
+          "receiverFailures": 0,
+          "workflowSubmitted": 1,
+          "workflowCompleted": 1,
+          "workflowFailures": 0,
+          "workflowPollAttempts": 3,
+          "workflowCompletionMilliseconds": 505,
+          "submittedDuringReducedCapacity": true
+        },
+        {
+          "id": "recovery",
+          "apiAttempts": 20,
+          "apiSuccesses": 20,
+          "apiFailures": 0,
+          "receiverAttempts": 20,
+          "receiverSuccesses": 20,
+          "receiverFailures": 0,
+          "workflowSubmitted": 1,
+          "workflowCompleted": 1,
+          "workflowFailures": 0,
+          "workflowPollAttempts": 3,
+          "workflowCompletionMilliseconds": 480,
+          "submittedDuringReducedCapacity": false
+        }
+      ],
+      "components": [
+        {
+          "id": "workflow-worker",
+          "desiredReplicas": 2,
+          "readyReplicasBefore": 2,
+          "readyReplicasDuring": 1,
+          "readyReplicasAfter": 2,
+          "maxUnavailable": 0,
+          "pdbMinAvailable": 1,
+          "pdbDisruptionsAllowedBefore": 1,
+          "evictionAccepted": true,
+          "reducedCapacityObserved": true,
+          "originalPodReplaced": true,
+          "recoveryMilliseconds": 4210
+        },
+        {
+          "id": "otlp-receiver",
+          "desiredReplicas": 2,
+          "readyReplicasBefore": 2,
+          "readyReplicasDuring": 1,
+          "readyReplicasAfter": 2,
+          "maxUnavailable": 0,
+          "pdbMinAvailable": 1,
+          "pdbDisruptionsAllowedBefore": 1,
+          "evictionAccepted": true,
+          "reducedCapacityObserved": true,
+          "originalPodReplaced": true,
+          "recoveryMilliseconds": 3850
+        }
+      ]
+    },
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"},
+      {"id": "explicit-context", "status": "passed"},
+      {"id": "immutable-image", "status": "passed"},
+      {"id": "api-verified-https", "status": "passed"},
+      {"id": "receiver-mutual-tls", "status": "passed"},
+      {"id": "direct-no-proxy-no-redirect", "status": "passed"},
+      {"id": "worker-redundant-capacity", "status": "passed"},
+      {"id": "receiver-redundant-capacity", "status": "passed"},
+      {"id": "zero-unavailable-rollouts", "status": "passed"},
+      {"id": "component-pdbs", "status": "passed"},
+      {"id": "uid-preconditioned-evictions", "status": "passed"},
+      {"id": "worker-reduced-capacity-observed", "status": "passed"},
+      {"id": "receiver-reduced-capacity-observed", "status": "passed"},
+      {"id": "api-zero-failure", "status": "passed"},
+      {"id": "receiver-zero-failure", "status": "passed"},
+      {"id": "receiver-durable-intake", "status": "passed"},
+      {"id": "workflow-baseline-completion", "status": "passed"},
+      {"id": "workflow-worker-disruption-overlap", "status": "passed"},
+      {"id": "workflow-receiver-disruption-overlap", "status": "passed"},
+      {"id": "workflow-recovery-completion", "status": "passed"},
+      {"id": "component-recovery", "status": "passed"}
+    ],
+    "limitations": [
+      "single-cluster",
+      "sequential-single-pod-evictions",
+      "synthetic-qualification-traffic",
+      "shared-database-failure-not-qualified",
+      "node-zone-region-failure-not-qualified",
+      "sustained-customer-load-not-qualified"
+    ],
+    "summary": {
+      "totalChecks": 22,
+      "passedChecks": 22,
+      "failedChecks": 0,
+      "totalApiAttempts": 80,
+      "failedApiAttempts": 0,
+      "totalReceiverAttempts": 80,
+      "failedReceiverAttempts": 0,
+      "totalWorkflowSubmissions": 4,
+      "completedWorkflows": 4,
+      "failedWorkflows": 0,
+      "maximumWorkflowCompletionMilliseconds": 720,
+      "maximumRecoveryMilliseconds": 4210,
+      "overallStatus": "qualified"
+    }
+  }
+}

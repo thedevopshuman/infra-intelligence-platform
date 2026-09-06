@@ -18,6 +18,8 @@ from infra_intelligence_sdk import (
     CustomerContinuityQualificationReport,
     CustomerDeploymentQualificationReport,
     CustomerDeploymentPreflightReport,
+    CustomerProcessingContinuityQualificationReport,
+    CustomerProcessingQualificationProfile,
     ContextEvidenceRequest,
     ContextEvidenceResult,
     Evidence,
@@ -193,6 +195,12 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         customer_continuity = CustomerContinuityQualificationReport.from_dict(
             example("customer-continuity-qualification-report.json")
+        )
+        customer_processing_profile = CustomerProcessingQualificationProfile.from_dict(
+            example("customer-processing-qualification-profile.json")
+        )
+        customer_processing = CustomerProcessingContinuityQualificationReport.from_dict(
+            example("customer-processing-continuity-qualification-report.json")
         )
         customer_deployment = CustomerDeploymentQualificationReport.from_dict(
             example("customer-deployment-qualification-report.json")
@@ -468,7 +476,15 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         self.assertEqual(
             customer_deployment.to_dict()["spec"]["qualificationLevel"],
-            "single-cluster-control-plane-v1",
+            "single-cluster-processing-v2",
+        )
+        self.assertEqual(
+            customer_processing_profile.to_dict()["kind"],
+            "CustomerProcessingQualificationProfile",
+        )
+        self.assertEqual(
+            customer_processing.to_dict()["spec"]["qualificationLevel"],
+            "customer-worker-receiver-pod-eviction-v1",
         )
         self.assertEqual(
             control_plane_load.to_dict()["spec"]["qualificationLevel"],

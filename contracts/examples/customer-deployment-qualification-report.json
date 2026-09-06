@@ -2,14 +2,14 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerDeploymentQualificationReport",
   "metadata": {
-    "id": "cdq_44a9d7e3fff458347dbe0ec17310e000",
+    "id": "cdq_e3332d61d41fe4695016801e94d32331",
     "generatedAt": "2026-09-06T12:38:00Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
   },
   "spec": {
     "status": "qualified",
-    "qualificationLevel": "single-cluster-control-plane-v1",
+    "qualificationLevel": "single-cluster-processing-v2",
     "subject": {
       "profile": "production-ai-finops-v0",
       "applicationVersion": "0.84.0",
@@ -24,7 +24,11 @@
       "namespaceBindingDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "releaseBindingDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "deploymentBindingDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "continuityTargetBindingDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      "continuityTargetBindingDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "processingOtlpTargetBindingDigest": "sha256:abababababababababababababababababababababababababababababababab",
+      "processingProfileDigest": "sha256:acacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacac",
+      "workerDeploymentBindingDigest": "sha256:adadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadad",
+      "receiverDeploymentBindingDigest": "sha256:aeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeae"
     },
     "objective": {
       "maximumEvidenceAgeSeconds": 86400,
@@ -35,6 +39,8 @@
       "preflightGeneratedAt": "2026-09-06T12:00:00Z",
       "continuityStartedAt": "2026-09-06T12:30:00Z",
       "continuityCompletedAt": "2026-09-06T12:36:05Z",
+      "processingStartedAt": "2026-09-06T12:36:10Z",
+      "processingCompletedAt": "2026-09-06T12:36:50Z",
       "postContinuityHealthObservedAt": "2026-09-06T12:37:00Z",
       "qualifiedAt": "2026-09-06T12:38:00Z",
       "oldestEvidenceAgeSeconds": 2280
@@ -71,6 +77,14 @@
         "reportDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
         "observedStatus": "qualified",
         "status": "passed"
+      },
+      {
+        "id": "worker-receiver-processing",
+        "contractKind": "CustomerProcessingContinuityQualificationReport",
+        "reportId": "cpcq_55555555555555555555555555555555",
+        "reportDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "observedStatus": "qualified",
+        "status": "passed"
       }
     ],
     "checks": [
@@ -82,28 +96,30 @@
       {"id": "post-continuity-health", "status": "passed"},
       {"id": "customer-ingress", "status": "passed"},
       {"id": "control-plane-continuity", "status": "passed"},
+      {"id": "worker-receiver-processing", "status": "passed"},
       {"id": "continuity-ingress-chain", "status": "passed"},
+      {"id": "processing-target-chain", "status": "passed"},
       {"id": "evidence-order", "status": "passed"},
       {"id": "evidence-freshness", "status": "passed"},
       {"id": "minimized-output", "status": "passed"}
     ],
     "limitations": [
       "single-customer-cluster",
-      "planned-single-api-pod-disruption",
+      "planned-sequential-api-worker-receiver-pod-disruptions",
       "point-in-time-dependency-observation",
       "artifact-publication-signatures-vulnerabilities-not-qualified",
       "database-ha-dr-not-qualified",
-      "worker-receiver-continuity-not-qualified",
+      "shared-database-failure-not-qualified",
       "customer-integrations-and-live-ai-not-qualified",
       "regional-slo-and-capacity-not-qualified",
       "design-partner-legal-brand-governance-not-qualified"
     ],
     "summary": {
-      "requiredEvidence": 4,
-      "passedEvidence": 4,
+      "requiredEvidence": 5,
+      "passedEvidence": 5,
       "rejectedEvidence": 0,
-      "totalChecks": 12,
-      "passedChecks": 12,
+      "totalChecks": 14,
+      "passedChecks": 14,
       "failedChecks": 0,
       "overallStatus": "qualified"
     }

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:iip:contracts:customer-deployment-qualification-report:v1alpha1",
   "title": "Customer Deployment Qualification Report",
-  "description": "Privacy-minimized evidence that one exact IIP release passed live dependency preflight, post-install health, external ingress, and planned API-pod disruption checks in one bound customer cluster.",
+  "description": "Privacy-minimized evidence that one exact IIP release passed live dependency preflight, post-disruption health, external ingress, and planned API, worker, and receiver pod disruption checks in one bound customer cluster.",
   "type": "object",
   "additionalProperties": false,
   "required": ["apiVersion", "kind", "metadata", "spec"],
@@ -26,7 +26,7 @@
       "required": ["status", "qualificationLevel", "subject", "bindings", "objective", "measurements", "evidence", "checks", "limitations", "summary"],
       "properties": {
         "status": {"enum": ["qualified", "not-qualified"]},
-        "qualificationLevel": {"const": "single-cluster-control-plane-v1"},
+        "qualificationLevel": {"const": "single-cluster-processing-v2"},
         "subject": {"$ref": "#/$defs/subject"},
         "bindings": {"$ref": "#/$defs/bindings"},
         "objective": {"$ref": "#/$defs/objective"},
@@ -39,11 +39,11 @@
           "maxItems": 9,
           "prefixItems": [
             {"const": "single-customer-cluster"},
-            {"const": "planned-single-api-pod-disruption"},
+            {"const": "planned-sequential-api-worker-receiver-pod-disruptions"},
             {"const": "point-in-time-dependency-observation"},
             {"const": "artifact-publication-signatures-vulnerabilities-not-qualified"},
             {"const": "database-ha-dr-not-qualified"},
-            {"const": "worker-receiver-continuity-not-qualified"},
+            {"const": "shared-database-failure-not-qualified"},
             {"const": "customer-integrations-and-live-ai-not-qualified"},
             {"const": "regional-slo-and-capacity-not-qualified"},
             {"const": "design-partner-legal-brand-governance-not-qualified"}
@@ -55,12 +55,12 @@
           "additionalProperties": false,
           "required": ["requiredEvidence", "passedEvidence", "rejectedEvidence", "totalChecks", "passedChecks", "failedChecks", "overallStatus"],
           "properties": {
-            "requiredEvidence": {"const": 4},
-            "passedEvidence": {"type": "integer", "minimum": 0, "maximum": 4},
-            "rejectedEvidence": {"type": "integer", "minimum": 0, "maximum": 4},
-            "totalChecks": {"const": 12},
-            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 12},
-            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 12},
+            "requiredEvidence": {"const": 5},
+            "passedEvidence": {"type": "integer", "minimum": 0, "maximum": 5},
+            "rejectedEvidence": {"type": "integer", "minimum": 0, "maximum": 5},
+            "totalChecks": {"const": 14},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 14},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 14},
             "overallStatus": {"enum": ["qualified", "not-qualified"]}
           }
         }
@@ -88,13 +88,17 @@
     "bindings": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["clusterBindingDigest", "namespaceBindingDigest", "releaseBindingDigest", "deploymentBindingDigest", "continuityTargetBindingDigest"],
+      "required": ["clusterBindingDigest", "namespaceBindingDigest", "releaseBindingDigest", "deploymentBindingDigest", "continuityTargetBindingDigest", "processingOtlpTargetBindingDigest", "processingProfileDigest", "workerDeploymentBindingDigest", "receiverDeploymentBindingDigest"],
       "properties": {
         "clusterBindingDigest": {"$ref": "#/$defs/digest"},
         "namespaceBindingDigest": {"$ref": "#/$defs/digest"},
         "releaseBindingDigest": {"$ref": "#/$defs/digest"},
         "deploymentBindingDigest": {"$ref": "#/$defs/digest"},
-        "continuityTargetBindingDigest": {"$ref": "#/$defs/digest"}
+        "continuityTargetBindingDigest": {"$ref": "#/$defs/digest"},
+        "processingOtlpTargetBindingDigest": {"$ref": "#/$defs/digest"},
+        "processingProfileDigest": {"$ref": "#/$defs/digest"},
+        "workerDeploymentBindingDigest": {"$ref": "#/$defs/digest"},
+        "receiverDeploymentBindingDigest": {"$ref": "#/$defs/digest"}
       }
     },
     "objective": {
@@ -110,11 +114,13 @@
     "measurements": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["preflightGeneratedAt", "continuityStartedAt", "continuityCompletedAt", "postContinuityHealthObservedAt", "qualifiedAt", "oldestEvidenceAgeSeconds"],
+      "required": ["preflightGeneratedAt", "continuityStartedAt", "continuityCompletedAt", "processingStartedAt", "processingCompletedAt", "postContinuityHealthObservedAt", "qualifiedAt", "oldestEvidenceAgeSeconds"],
       "properties": {
         "preflightGeneratedAt": {"type": "string", "format": "date-time"},
         "continuityStartedAt": {"type": "string", "format": "date-time"},
         "continuityCompletedAt": {"type": "string", "format": "date-time"},
+        "processingStartedAt": {"type": "string", "format": "date-time"},
+        "processingCompletedAt": {"type": "string", "format": "date-time"},
         "postContinuityHealthObservedAt": {"type": "string", "format": "date-time"},
         "qualifiedAt": {"type": "string", "format": "date-time"},
         "oldestEvidenceAgeSeconds": {"type": "integer", "minimum": 0, "maximum": 10000000}
@@ -125,9 +131,9 @@
       "additionalProperties": false,
       "required": ["id", "contractKind", "reportId", "reportDigest", "observedStatus", "status"],
       "properties": {
-        "id": {"enum": ["live-install-preflight", "post-install-health", "customer-ingress", "control-plane-continuity"]},
-        "contractKind": {"enum": ["CustomerDeploymentPreflightReport", "DeploymentDiagnosticReport", "IngressAvailabilityQualificationReport", "CustomerContinuityQualificationReport"]},
-        "reportId": {"type": "string", "pattern": "^[a-z]{3}_[a-f0-9]{32}$"},
+        "id": {"enum": ["live-install-preflight", "post-install-health", "customer-ingress", "control-plane-continuity", "worker-receiver-processing"]},
+        "contractKind": {"enum": ["CustomerDeploymentPreflightReport", "DeploymentDiagnosticReport", "IngressAvailabilityQualificationReport", "CustomerContinuityQualificationReport", "CustomerProcessingContinuityQualificationReport"]},
+        "reportId": {"type": "string", "pattern": "^[a-z]{3,4}_[a-f0-9]{32}$"},
         "reportDigest": {"$ref": "#/$defs/digest"},
         "observedStatus": {"enum": ["blocked", "configuration-ready", "install-ready", "healthy", "attention-required", "qualified", "not-qualified"]},
         "status": {"enum": ["passed", "rejected"]},
@@ -140,13 +146,14 @@
     },
     "evidenceList": {
       "type": "array",
-      "minItems": 4,
-      "maxItems": 4,
+      "minItems": 5,
+      "maxItems": 5,
       "prefixItems": [
         {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "live-install-preflight"}, "contractKind": {"const": "CustomerDeploymentPreflightReport"}}},
         {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "post-install-health"}, "contractKind": {"const": "DeploymentDiagnosticReport"}}},
         {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "customer-ingress"}, "contractKind": {"const": "IngressAvailabilityQualificationReport"}}},
-        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "control-plane-continuity"}, "contractKind": {"const": "CustomerContinuityQualificationReport"}}}
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "control-plane-continuity"}, "contractKind": {"const": "CustomerContinuityQualificationReport"}}},
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "worker-receiver-processing"}, "contractKind": {"const": "CustomerProcessingContinuityQualificationReport"}}}
       ],
       "items": false
     },
@@ -166,8 +173,8 @@
     },
     "checks": {
       "type": "array",
-      "minItems": 12,
-      "maxItems": 12,
+      "minItems": 14,
+      "maxItems": 14,
       "prefixItems": [
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-binding"}}},
@@ -177,7 +184,9 @@
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "post-continuity-health"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "customer-ingress"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "control-plane-continuity"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "worker-receiver-processing"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "continuity-ingress-chain"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "processing-target-chain"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "evidence-order"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "evidence-freshness"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}}

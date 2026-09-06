@@ -177,14 +177,24 @@ Customer-environment worker, receiver, database, node, zone, sustained
 customer-traffic capacity, and long-window regional certification remain
 external.
 
+Customer-processing update: ADR 0129 adds a separately enabled customer gate
+that sends direct verified-HTTPS identity probes and non-empty mutual-TLS OTLP
+metrics while sequentially evicting one worker and one receiver pod. One
+durable investigation is submitted only after each reduced-capacity state is
+observed, and both components must recover under the declared objective.
+Shared-database failure, involuntary node/zone/region loss, simultaneous
+failure, and sustained representative load remain external.
+
 Customer-deployment update: ADR 0124 now aggregates one exact cluster-mode
 preflight, post-install diagnostic, customer ingress report, and the ADR 0123
-continuity chain. It rechecks the namespace UID/server binding, requires a
-post-continuity health observation, and fails closed on crossed or stale
-evidence. This closes the manual correlation gap for the narrow installed
-control-plane profile; artifact trust, customer-environment database/worker/
-receiver continuity, integrations, live AI/pricing, regional capacity, pilot,
-and public-governance gates remain independent.
+continuity chain. ADR 0129 upgrades that aggregate with a fifth
+worker/receiver processing report, rechecks the namespace UID/server and
+processing endpoint/profile/component bindings, requires health after both
+disruption workflows, and fails closed on crossed or stale evidence. This
+closes the manual correlation gap for the narrow installed processing profile;
+artifact trust, customer-environment database continuity, integrations, live
+AI/pricing, regional capacity, sustained load, pilot, and public-governance
+gates remain independent.
 
 Load-qualification update: ADR 0125 adds a separately enabled, fixed-rate
 external identity-read workload with exact release binding, explicit scheduler

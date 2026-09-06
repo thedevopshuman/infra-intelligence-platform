@@ -20,6 +20,7 @@ import deployment_diagnostics as diagnostics  # noqa: E402
 import deployment_preflight as preflight  # noqa: E402
 import qualify_customer_continuity as continuity  # noqa: E402
 import qualify_customer_deployment as qualification  # noqa: E402
+import qualify_customer_processing_continuity as processing  # noqa: E402
 from infra_intelligence_sdk import CustomerDeploymentQualificationReport  # noqa: E402
 from tests.test_customer_continuity_qualification import (  # noqa: E402
     COMPLETED,
@@ -32,12 +33,18 @@ from tests.test_customer_continuity_qualification import (  # noqa: E402
     ingress_report,
     observation,
 )
+from tests.test_customer_processing_continuity import (  # noqa: E402
+    observation as processing_observation,
+    phase as processing_phase,
+)
 
 
 CONTEXT = "customer-context"
 NAMESPACE = "iip-system"
 RELEASE = "iip"
 DEPLOYMENT = "iip-infra-intelligence"
+WORKER_DEPLOYMENT = "iip-infra-intelligence-worker"
+RECEIVER_DEPLOYMENT = "iip-infra-intelligence-otlp-receiver"
 PREFLIGHT_AT = datetime(2026, 9, 6, 12, 0, tzinfo=timezone.utc)
 HEALTH_AT = datetime(2026, 9, 6, 12, 37, tzinfo=timezone.utc)
 QUALIFIED_AT = datetime(2026, 9, 6, 12, 38, tzinfo=timezone.utc)
@@ -174,6 +181,51 @@ def continuity_inputs() -> tuple[dict[str, object], dict[str, object]]:
     return ingress_document, continuity_document
 
 
+def processing_report(
+    continuity_document: dict[str, object],
+) -> dict[str, object]:
+    return processing.build_report(
+        revision=REVISION,
+        repository=REPOSITORY,
+        image_digest=IMAGE_DIGEST,
+        api_target_digest=continuity_document["spec"]["bindings"][
+            "targetBindingDigest"
+        ],
+        otlp_target_digest="sha256:" + "6" * 64,
+        context=CONTEXT,
+        namespace=NAMESPACE,
+        profile_digest="sha256:" + "5" * 64,
+        worker_deployment=WORKER_DEPLOYMENT,
+        receiver_deployment=RECEIVER_DEPLOYMENT,
+        kubernetes_version="v1.36.1",
+        api_ca_source="custom",
+        otlp_ca_source="custom",
+        objective={
+            "minimumProbeAttemptsPerPhase": 20,
+            "probeIntervalMilliseconds": 250,
+            "maximumWorkflowCompletionMilliseconds": 60_000,
+            "maximumRecoveryMilliseconds": 120_000,
+            "requestTimeoutMilliseconds": 2_000,
+        },
+        phases=[
+            processing_phase("baseline", reduced=False),
+            processing_phase("worker-disruption", reduced=True),
+            processing_phase("receiver-disruption", reduced=True),
+            processing_phase("recovery", reduced=False),
+        ],
+        worker_before=processing_observation("worker-old"),
+        worker_during=processing_observation("worker-survivor", ready=1),
+        worker_after=processing_observation("worker-new"),
+        worker_recovery_milliseconds=4_000,
+        receiver_before=processing_observation("receiver-old"),
+        receiver_during=processing_observation("receiver-survivor", ready=1),
+        receiver_after=processing_observation("receiver-new"),
+        receiver_recovery_milliseconds=3_500,
+        started_at=datetime(2026, 9, 6, 12, 36, 10, tzinfo=timezone.utc),
+        completed_at=datetime(2026, 9, 6, 12, 36, 50, tzinfo=timezone.utc),
+    )
+
+
 def inputs() -> tuple[dict[str, object], ...]:
     ingress_document, continuity_document = continuity_inputs()
     return (
@@ -181,6 +233,7 @@ def inputs() -> tuple[dict[str, object], ...]:
         healthy_diagnostic(),
         ingress_document,
         continuity_document,
+        processing_report(continuity_document),
     )
 
 
@@ -190,6 +243,7 @@ def build(
     diagnostic_document: dict[str, object] | None = None,
     ingress_document: dict[str, object] | None = None,
     continuity_document: dict[str, object] | None = None,
+    processing_document: dict[str, object] | None = None,
 ) -> dict[str, object]:
     documents = inputs()
     selected = (
@@ -197,6 +251,7 @@ def build(
         diagnostic_document or documents[1],
         ingress_document or documents[2],
         continuity_document or documents[3],
+        processing_document or documents[4],
     )
     return qualification.build_report(
         preflight_report=selected[0],
@@ -207,10 +262,14 @@ def build(
         ingress_digest=_digest(selected[2]),
         continuity_report=selected[3],
         continuity_digest=_digest(selected[3]),
+        processing_report=selected[4],
+        processing_digest=_digest(selected[4]),
         context=CONTEXT,
         namespace=NAMESPACE,
         release_name=RELEASE,
         deployment_name=DEPLOYMENT,
+        worker_deployment_name=WORKER_DEPLOYMENT,
+        receiver_deployment_name=RECEIVER_DEPLOYMENT,
         image_digest=IMAGE_DIGEST,
         current_cluster_environment=CLUSTER,
         now=QUALIFIED_AT,
@@ -241,10 +300,32 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
     def test_exact_bound_inputs_produce_minimized_qualified_report(self) -> None:
         report = build()
         self.assertEqual(report["spec"]["status"], "qualified")
-        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 4)
+        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 5)
         serialized = json.dumps(report, sort_keys=True)
-        for forbidden in (CONTEXT, NAMESPACE, DEPLOYMENT, "old-uid", "new-uid"):
+        for forbidden in (
+            CONTEXT,
+            NAMESPACE,
+            DEPLOYMENT,
+            WORKER_DEPLOYMENT,
+            RECEIVER_DEPLOYMENT,
+            "old-uid",
+            "new-uid",
+            "worker-old",
+            "receiver-old",
+        ):
             self.assertNotIn(forbidden, serialized)
+
+    def test_crossed_processing_target_is_rejected(self) -> None:
+        documents = inputs()
+        crossed = copy.deepcopy(documents[4])
+        crossed["spec"]["bindings"]["apiTargetBindingDigest"] = (
+            "sha256:" + "f" * 64
+        )
+        with self.assertRaisesRegex(
+            qualification.CustomerDeploymentQualificationError,
+            "customer-deployment-qualification.processing.crossed",
+        ):
+            build(processing_document=crossed)
 
     def test_crossed_source_and_current_cluster_are_rejected(self) -> None:
         crossed = healthy_diagnostic()
@@ -268,10 +349,14 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
                 ingress_digest=_digest(documents[2]),
                 continuity_report=documents[3],
                 continuity_digest=_digest(documents[3]),
+                processing_report=documents[4],
+                processing_digest=_digest(documents[4]),
                 context=CONTEXT,
                 namespace=NAMESPACE,
                 release_name=RELEASE,
                 deployment_name=DEPLOYMENT,
+                worker_deployment_name=WORKER_DEPLOYMENT,
+                receiver_deployment_name=RECEIVER_DEPLOYMENT,
                 image_digest=IMAGE_DIGEST,
                 current_cluster_environment={**CLUSTER, "clusterBindingDigest": "sha256:" + "6" * 64},
                 now=QUALIFIED_AT,
@@ -288,7 +373,7 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
         stale["spec"]["status"] = "not-qualified"
         stale["spec"]["summary"].update(
             {
-                "passedChecks": 12 - failed,
+                "passedChecks": len(qualification.CHECK_IDS) - failed,
                 "failedChecks": failed,
                 "overallStatus": "not-qualified",
             }
@@ -313,7 +398,7 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
     def test_rehashed_arithmetic_or_status_tampering_is_rejected(self) -> None:
         report = build()
         tampered = copy.deepcopy(report)
-        tampered["spec"]["summary"]["passedChecks"] = 11
+        tampered["spec"]["summary"]["passedChecks"] = 13
         metadata = dict(tampered["metadata"])
         metadata.pop("id")
         tampered["metadata"]["id"] = qualification._report_identifier(
@@ -338,6 +423,8 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
             _digest(documents[2]),
             documents[3],
             _digest(documents[3]),
+            documents[4],
+            _digest(documents[4]),
         )
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "report.json"
@@ -354,11 +441,17 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
                     diagnostic_path=Path("diagnostic.json"),
                     ingress_path=Path("ingress.json"),
                     continuity_path=Path("continuity.json"),
+                    processing_path=Path("processing.json"),
+                    processing_profile_path=Path("processing-profile.json"),
+                    processing_api_base_url="https://api.example.test",
+                    processing_otlp_base_url="https://otlp.example.test:4318",
                     values=[Path("values.yaml")],
                     context=CONTEXT,
                     namespace=NAMESPACE,
                     release_name=RELEASE,
                     deployment_name=DEPLOYMENT,
+                    worker_deployment_name=WORKER_DEPLOYMENT,
+                    receiver_deployment_name=RECEIVER_DEPLOYMENT,
                     image_digest=IMAGE_DIGEST,
                     output=output,
                     now=lambda: QUALIFIED_AT,

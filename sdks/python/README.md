@@ -109,6 +109,12 @@ Version 0.60 adds `CustomerDeploymentQualificationReport` for the exact
 customer-cluster preflight, installed-health, ingress, and continuity evidence
 chain. It grants no cluster, publication, or production-approval authority.
 
+Version 0.63 adds the protected `CustomerProcessingQualificationProfile` and
+minimized `CustomerProcessingContinuityQualificationReport`, and upgrades the
+customer deployment report to bind that worker/receiver evidence into the
+same release, target, and post-disruption health chain. These offline types
+carry no credential, API method, or Kubernetes mutation authority.
+
 Version 0.59 adds `CustomerContinuityQualificationReport` for minimized
 external-probe and API-pod-Eviction evidence. It adds no client method,
 credential, or Kubernetes mutation authority; the separately enabled

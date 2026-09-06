@@ -108,6 +108,15 @@ namespace UID/server binding and requires health after the disruption; it
 retains only public release identity, timestamps, report digests, and hashed
 targets, and it cannot authorize publication or production use.
 
+[ADR 0129](../decisions/0129-customer-worker-receiver-processing-continuity.md)
+adds a separately enabled customer gate for sequential worker and receiver pod
+Evictions. Direct verified HTTPS identity probes, mutual-TLS OTLP metrics, and
+one durable investigation per phase prove processing overlap without exposing
+customer identities or granting mutation authority to the runtime. The same
+decision upgrades the deployment aggregate to bind this fifth report, its
+protected profile and component targets, and a health observation after all
+three planned pod disruptions.
+
 [ADR 0125](../decisions/0125-bounded-fixed-rate-control-plane-load-qualification.md)
 keeps external read-load evidence separate from availability and disruption
 evidence. Its operator-run harness uses the existing direct verified-HTTPS

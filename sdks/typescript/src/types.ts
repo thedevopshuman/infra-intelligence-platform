@@ -1305,11 +1305,188 @@ export interface CustomerContinuityQualificationReport {
   };
 }
 
+export interface CustomerProcessingQualificationProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerProcessingQualificationProfile";
+  metadata: { tenantId: string; actorId: string };
+  spec: {
+    resourceUid: `res_${string}`;
+    metric: { name: string; unit: string; serviceName: string };
+    investigation: {
+      evidenceTypes: Array<
+        | "resource.change"
+        | "kubernetes.event"
+        | "telemetry.metric"
+        | "telemetry.log"
+      >;
+      allowedTools: Array<
+        | "resources/query"
+        | "evidence/fetch"
+        | "events/query"
+        | "metrics/query"
+        | "logs/query"
+      >;
+      maxToolCalls: number;
+      maxWallTimeSeconds: number;
+      maxEvidenceItems: number;
+      maxIterations: number;
+    };
+  };
+}
+
+export type CustomerProcessingContinuityCheckId =
+  | "source-binding"
+  | "minimized-output"
+  | "explicit-context"
+  | "immutable-image"
+  | "api-verified-https"
+  | "receiver-mutual-tls"
+  | "direct-no-proxy-no-redirect"
+  | "worker-redundant-capacity"
+  | "receiver-redundant-capacity"
+  | "zero-unavailable-rollouts"
+  | "component-pdbs"
+  | "uid-preconditioned-evictions"
+  | "worker-reduced-capacity-observed"
+  | "receiver-reduced-capacity-observed"
+  | "api-zero-failure"
+  | "receiver-zero-failure"
+  | "receiver-durable-intake"
+  | "workflow-baseline-completion"
+  | "workflow-worker-disruption-overlap"
+  | "workflow-receiver-disruption-overlap"
+  | "workflow-recovery-completion"
+  | "component-recovery";
+
+export interface CustomerProcessingContinuityQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerProcessingContinuityQualificationReport";
+  metadata: {
+    id: `cpcq_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualificationLevel: "customer-worker-receiver-pod-eviction-v1";
+    subject: {
+      applicationVersion: string;
+      chartVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      requiredMigration: `${number}_${string}.sql`;
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      apiTargetBindingDigest: Sha256Digest;
+      otlpTargetBindingDigest: Sha256Digest;
+      kubernetesContextBindingDigest: Sha256Digest;
+      namespaceBindingDigest: Sha256Digest;
+      profileDigest: Sha256Digest;
+      components: Array<{
+        id: "workflow-worker" | "otlp-receiver";
+        deploymentBindingDigest: Sha256Digest;
+        evictedPodBindingDigest: Sha256Digest;
+      }>;
+    };
+    objective: {
+      minimumProbeAttemptsPerPhase: number;
+      probeIntervalMilliseconds: number;
+      maximumWorkflowCompletionMilliseconds: number;
+      maximumRecoveryMilliseconds: number;
+      requestTimeoutMilliseconds: number;
+    };
+    environment: {
+      platform: `${string}/${string}`;
+      pythonVersion: string;
+      kubernetesVersion: string;
+      apiTransport: "verified-https";
+      otlpTransport: "mutual-tls-https";
+      apiCaSource: "system" | "custom";
+      otlpCaSource: "system" | "custom";
+      proxyMode: "disabled";
+      redirectMode: "deny";
+      evictionApi: "policy/v1";
+    };
+    receiverIntake: {
+      signal: "metric";
+      payload: "non-empty-otlp-protobuf";
+      successBoundary: "postgresql-commit-before-http-200";
+    };
+    measurements: {
+      startedAt: string;
+      completedAt: string;
+      phases: Array<{
+        id: "baseline" | "worker-disruption" | "receiver-disruption" | "recovery";
+        apiAttempts: number;
+        apiSuccesses: number;
+        apiFailures: number;
+        receiverAttempts: number;
+        receiverSuccesses: number;
+        receiverFailures: number;
+        workflowSubmitted: 1;
+        workflowCompleted: 0 | 1;
+        workflowFailures: 0 | 1;
+        workflowPollAttempts: number;
+        workflowCompletionMilliseconds: number;
+        submittedDuringReducedCapacity: boolean;
+      }>;
+      components: Array<{
+        id: "workflow-worker" | "otlp-receiver";
+        desiredReplicas: number;
+        readyReplicasBefore: number;
+        readyReplicasDuring: number;
+        readyReplicasAfter: number;
+        maxUnavailable: 0;
+        pdbMinAvailable: number;
+        pdbDisruptionsAllowedBefore: number;
+        evictionAccepted: true;
+        reducedCapacityObserved: true;
+        originalPodReplaced: true;
+        recoveryMilliseconds: number;
+      }>;
+    };
+    checks: Array<
+      | { id: CustomerProcessingContinuityCheckId; status: "passed" }
+      | {
+          id: CustomerProcessingContinuityCheckId;
+          status: "failed";
+          errorCode: `customer-processing-continuity.${string}`;
+        }
+    >;
+    limitations: [
+      "single-cluster",
+      "sequential-single-pod-evictions",
+      "synthetic-qualification-traffic",
+      "shared-database-failure-not-qualified",
+      "node-zone-region-failure-not-qualified",
+      "sustained-customer-load-not-qualified",
+    ];
+    summary: {
+      totalChecks: 22;
+      passedChecks: number;
+      failedChecks: number;
+      totalApiAttempts: number;
+      failedApiAttempts: number;
+      totalReceiverAttempts: number;
+      failedReceiverAttempts: number;
+      totalWorkflowSubmissions: 4;
+      completedWorkflows: number;
+      failedWorkflows: number;
+      maximumWorkflowCompletionMilliseconds: number;
+      maximumRecoveryMilliseconds: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export type CustomerDeploymentQualificationEvidenceId =
   | "live-install-preflight"
   | "post-install-health"
   | "customer-ingress"
-  | "control-plane-continuity";
+  | "control-plane-continuity"
+  | "worker-receiver-processing";
 
 export type CustomerDeploymentQualificationCheckId =
   | "source-binding"
@@ -1320,7 +1497,9 @@ export type CustomerDeploymentQualificationCheckId =
   | "post-continuity-health"
   | "customer-ingress"
   | "control-plane-continuity"
+  | "worker-receiver-processing"
   | "continuity-ingress-chain"
+  | "processing-target-chain"
   | "evidence-order"
   | "evidence-freshness"
   | "minimized-output";
@@ -1336,7 +1515,7 @@ export interface CustomerDeploymentQualificationReport {
   };
   spec: {
     status: "qualified" | "not-qualified";
-    qualificationLevel: "single-cluster-control-plane-v1";
+    qualificationLevel: "single-cluster-processing-v2";
     subject: {
       profile: "production-core-v1" | "production-ai-finops-v0";
       applicationVersion: string;
@@ -1352,6 +1531,10 @@ export interface CustomerDeploymentQualificationReport {
       releaseBindingDigest: Sha256Digest;
       deploymentBindingDigest: Sha256Digest;
       continuityTargetBindingDigest: Sha256Digest;
+      processingOtlpTargetBindingDigest: Sha256Digest;
+      processingProfileDigest: Sha256Digest;
+      workerDeploymentBindingDigest: Sha256Digest;
+      receiverDeploymentBindingDigest: Sha256Digest;
     };
     objective: {
       maximumEvidenceAgeSeconds: number;
@@ -1362,6 +1545,8 @@ export interface CustomerDeploymentQualificationReport {
       preflightGeneratedAt: string;
       continuityStartedAt: string;
       continuityCompletedAt: string;
+      processingStartedAt: string;
+      processingCompletedAt: string;
       postContinuityHealthObservedAt: string;
       qualifiedAt: string;
       oldestEvidenceAgeSeconds: number;
@@ -1372,7 +1557,8 @@ export interface CustomerDeploymentQualificationReport {
         | "CustomerDeploymentPreflightReport"
         | "DeploymentDiagnosticReport"
         | "IngressAvailabilityQualificationReport"
-        | "CustomerContinuityQualificationReport";
+        | "CustomerContinuityQualificationReport"
+        | "CustomerProcessingContinuityQualificationReport";
       reportId: string;
       reportDigest: Sha256Digest;
       observedStatus:
@@ -1396,20 +1582,20 @@ export interface CustomerDeploymentQualificationReport {
     >;
     limitations: [
       "single-customer-cluster",
-      "planned-single-api-pod-disruption",
+      "planned-sequential-api-worker-receiver-pod-disruptions",
       "point-in-time-dependency-observation",
       "artifact-publication-signatures-vulnerabilities-not-qualified",
       "database-ha-dr-not-qualified",
-      "worker-receiver-continuity-not-qualified",
+      "shared-database-failure-not-qualified",
       "customer-integrations-and-live-ai-not-qualified",
       "regional-slo-and-capacity-not-qualified",
       "design-partner-legal-brand-governance-not-qualified",
     ];
     summary: {
-      requiredEvidence: 4;
+      requiredEvidence: 5;
       passedEvidence: number;
       rejectedEvidence: number;
-      totalChecks: 12;
+      totalChecks: 14;
       passedChecks: number;
       failedChecks: number;
       overallStatus: "qualified" | "not-qualified";

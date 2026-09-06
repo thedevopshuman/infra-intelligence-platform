@@ -123,6 +123,12 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "customer-credential-broker-qualification-report.schema.json": (
         "customer-credential-broker-qualification-report.json",
     ),
+    "customer-otlp-receiver-qualification-profile.schema.json": (
+        "customer-otlp-receiver-qualification-profile.json",
+    ),
+    "customer-otlp-receiver-qualification-report.schema.json": (
+        "customer-otlp-receiver-qualification-report.json",
+    ),
     "customer-deployment-qualification-report.schema.json": (
         "customer-deployment-qualification-report.json",
     ),

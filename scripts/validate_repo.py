@@ -132,6 +132,15 @@ REQUIRED_PATHS = (
     "docs/operations/customer-credential-broker-qualification.md",
     "scripts/qualify_customer_credential_broker.py",
     "tests/test_customer_credential_broker_qualification.py",
+    "docs/decisions/0134-customer-otlp-receiver-interoperability-qualification.md",
+    "docs/specifications/customer-otlp-receiver-qualification-report-contract.md",
+    "contracts/schemas/customer-otlp-receiver-qualification-profile.schema.json",
+    "contracts/schemas/customer-otlp-receiver-qualification-report.schema.json",
+    "contracts/examples/customer-otlp-receiver-qualification-profile.json",
+    "contracts/examples/customer-otlp-receiver-qualification-report.json",
+    "docs/operations/customer-otlp-receiver-qualification.md",
+    "scripts/qualify_customer_otlp_receiver.py",
+    "tests/test_customer_otlp_receiver_qualification.py",
     "docs/specifications/worker-health-contract.md",
     "src/iip/surfaces/worker_health.py",
     "tests/test_worker_health.py",
@@ -2194,6 +2203,41 @@ def validate_customer_credential_broker_qualification_example(
         fail(
             errors,
             "customer credential broker qualification examples must be semantically valid",
+        )
+
+
+def validate_customer_otlp_receiver_qualification_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check protected signal selection and minimized receiver evidence."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    profile = documents.get(
+        example_dir / "customer-otlp-receiver-qualification-profile.json"
+    )
+    report = documents.get(
+        example_dir / "customer-otlp-receiver-qualification-report.json"
+    )
+    try:
+        from qualify_customer_otlp_receiver import (
+            CustomerOtlpReceiverQualificationError,
+            validate_profile,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "customer OTLP receiver qualification validator must be importable")
+        return
+    try:
+        if not isinstance(profile, dict) or not isinstance(report, dict):
+            raise CustomerOtlpReceiverQualificationError(
+                "customer-otlp-receiver-qualification.example.invalid"
+            )
+        validate_profile(profile)
+        validate_report_document(report)
+    except CustomerOtlpReceiverQualificationError:
+        fail(
+            errors,
+            "customer OTLP receiver qualification examples must be semantically valid",
         )
 
 
@@ -5146,6 +5190,14 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerCredentialBrokerQualificationReport",
         ),
         (
+            "customer-otlp-receiver-qualification-profile.json",
+            "CustomerOtlpReceiverQualificationProfile",
+        ),
+        (
+            "customer-otlp-receiver-qualification-report.json",
+            "CustomerOtlpReceiverQualificationReport",
+        ),
+        (
             "customer-deployment-preflight-report.json",
             "CustomerDeploymentPreflightReport",
         ),
@@ -5244,6 +5296,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_customer_continuity_qualification_example(documents, errors)
     validate_customer_policy_qualification_example(documents, errors)
     validate_customer_credential_broker_qualification_example(documents, errors)
+    validate_customer_otlp_receiver_qualification_example(documents, errors)
     validate_customer_deployment_qualification_example(documents, errors)
     validate_control_plane_load_qualification_example(documents, errors)
     validate_postgresql_recovery_qualification_example(documents, errors)

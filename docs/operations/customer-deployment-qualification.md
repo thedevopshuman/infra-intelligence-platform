@@ -2,8 +2,8 @@
 
 **Status:** Executable customer-environment gate
 
-This workflow turns the separate live preflight, customer OIDC, policy, and
-credential-broker
+This workflow turns the separate live preflight, customer OIDC, policy,
+credential-broker, and pinned-Collector receiver
 prerequisites, sustained ingress/API-pod Eviction, worker/receiver processing
 continuity, post-install diagnostic, and PostgreSQL primary-promotion reports into one
 exact-release evidence chain. It does not install IIP and it
@@ -25,17 +25,20 @@ cluster.
 5. Run the customer credential-broker qualification using its protected
    seven-case authority profile, projected workload identity, and selected CA
    bundle.
-6. Run the explicitly enabled customer continuity workflow. That workflow
+6. Run the customer OTLP receiver qualification with the protected signal
+   profile, four distinct credentials, selected trust material, and public
+   client certificate retained for later rebinding.
+7. Run the explicitly enabled customer continuity workflow. That workflow
    performs the single API-pod Eviction and retains its nested ingress report.
-7. Run the separately enabled customer processing-continuity workflow. It
+8. Run the separately enabled customer processing-continuity workflow. It
    performs sequential worker and receiver pod Evictions while proving durable
    OTLP metric intake and investigation completion.
-8. Run the customer PostgreSQL continuity observer and have a separately
+9. Run the customer PostgreSQL continuity observer and have a separately
    authorized operator initiate the planned promotion only after its readiness
    message.
-9. Run deployment diagnostics after all workflows have completed, so health
+10. Run deployment diagnostics after all workflows have completed, so health
    is observed after every planned disruption.
-10. Aggregate the nine reports while their timestamps remain within the chosen
+11. Aggregate the ten reports while their timestamps remain within the chosen
    evidence-age objective.
 
 For a core deployment with one values file:
@@ -53,6 +56,12 @@ IIP_CUSTOMER_POLICY_ENDPOINT=https://policy.example.com/v1/data/iip/decision \
 IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE=/absolute/protected/customer-credential-broker-profile.json \
 IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT=https://credential-broker.example.com \
 IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE=/absolute/protected/credential-broker-ca.pem \
+IIP_CUSTOMER_OTLP_PROFILE=/absolute/protected/customer-otlp-profile.json \
+IIP_CUSTOMER_OTLP_API_BASE_URL=https://iip.example.com \
+IIP_CUSTOMER_OTLP_RECEIVER_ENDPOINT=https://otlp.example.com:4318 \
+IIP_CUSTOMER_OTLP_API_CA_FILE=/absolute/protected/api-ca.pem \
+IIP_CUSTOMER_OTLP_RECEIVER_CA_FILE=/absolute/protected/receiver-ca.pem \
+IIP_CUSTOMER_OTLP_CLIENT_CERTIFICATE_FILE=/absolute/protected/collector.crt \
 IIP_PROCESSING_PROFILE=/absolute/protected/customer-processing-profile.json \
 IIP_PROCESSING_API_BASE_URL=https://iip.example.com \
 IIP_PROCESSING_OTLP_BASE_URL=https://otlp.example.com:4318 \
@@ -75,6 +84,7 @@ The defaults consume:
 - `dist/customer-oidc-qualification-report.json`;
 - `dist/customer-policy-qualification-report.json`;
 - `dist/customer-credential-broker-qualification-report.json`;
+- `dist/customer-otlp-receiver-qualification-report.json`;
 - `dist/customer-continuity-qualification-report.json`;
 - `dist/customer-processing-continuity-qualification-report.json`; and
 - `dist/customer-postgresql-continuity-qualification-report.json`.
@@ -103,6 +113,12 @@ IIP_CUSTOMER_POLICY_ENDPOINT=https://policy.example.com/v1/data/iip/decision \
 IIP_CUSTOMER_CREDENTIAL_BROKER_PROFILE=/absolute/protected/customer-credential-broker-profile.json \
 IIP_CUSTOMER_CREDENTIAL_BROKER_ENDPOINT=https://credential-broker.example.com \
 IIP_CUSTOMER_CREDENTIAL_BROKER_CA_FILE=/absolute/protected/credential-broker-ca.pem \
+IIP_CUSTOMER_OTLP_PROFILE=/absolute/protected/customer-otlp-profile.json \
+IIP_CUSTOMER_OTLP_API_BASE_URL=https://iip.example.com \
+IIP_CUSTOMER_OTLP_RECEIVER_ENDPOINT=https://otlp.example.com:4318 \
+IIP_CUSTOMER_OTLP_API_CA_FILE=/absolute/protected/api-ca.pem \
+IIP_CUSTOMER_OTLP_RECEIVER_CA_FILE=/absolute/protected/receiver-ca.pem \
+IIP_CUSTOMER_OTLP_CLIENT_CERTIFICATE_FILE=/absolute/protected/collector.crt \
 IIP_PROCESSING_PROFILE=/absolute/protected/customer-processing-profile.json \
 IIP_PROCESSING_API_BASE_URL=https://iip.example.com \
 IIP_PROCESSING_OTLP_BASE_URL=https://otlp.example.com:4318 \
@@ -128,8 +144,13 @@ token before aggregation; aggregation never reads that token or calls the
 issuer. The policy prerequisite similarly uses its protected bearer credential
 before aggregation; aggregation never reads the credential or calls the
 policy endpoint. The credential-broker prerequisite uses its projected
-workload token and observes two least-authority leases before aggregation;
+workload token and observes one exact-authority lease plus six single-field
+denials before aggregation;
 aggregation reads only its minimized report, protected profile, and CA bundle.
+The receiver prerequisite sends its telemetry before aggregation; aggregation
+reads only its minimized report, protected profile, non-secret targets, CA
+files, and public client certificate. It never reads the four credentials or
+client private key and does not start another Collector.
 The separate API and processing-continuity steps perform the pod
 Evictions. The database qualifier only observes; the separately authorized
 customer operator owns promotion. Each active workflow requires its own
@@ -149,7 +170,8 @@ sustained throughput; interactive OIDC login/MFA/session/logout/revocation,
 issuer rotation/HA, complete policy action coverage, policy credential/bundle
 lifecycle, engine/network HA or audit/SIEM delivery, customer broker
 workload/provider credential lifecycle, HA, recovery, non-Bearer schemes, or
-audit delivery, customer Collector or other integration interoperability; live
+audit delivery, permanent customer Collector configuration, queue/disk
+recovery, PKI lifecycle/HA/OCSP, or other integration interoperability; live
 AI providers or price authority;
 regional capacity/SLOs; a design-partner outcome; or public legal/brand/
 governance approval. Those remain independent release gates.

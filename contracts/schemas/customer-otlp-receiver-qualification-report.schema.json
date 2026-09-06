@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-otlp-receiver-qualification-report:v1alpha1",
+  "title": "Customer OTLP Receiver Qualification Report",
+  "description": "Minimized source-bound evidence that a pinned official Collector delivered all supported signals to one exact customer IIP receiver.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerOtlpReceiverQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^corq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualification", "subject", "bindings", "profile", "objective", "measurements", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualification": {"const": "customer-pinned-collector-to-iip-receiver-v1"},
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["applicationVersion", "contractsApiVersion", "sourceRevision", "chartVersion", "requiredMigration", "imageDigest"],
+          "properties": {
+            "applicationVersion": {"$ref": "#/$defs/semver"},
+            "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+            "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+            "chartVersion": {"$ref": "#/$defs/semver"},
+            "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"},
+            "imageDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["apiTargetBindingDigest", "receiverEndpointBindingDigest", "profileDigest", "signalSetDigest", "apiCaBundleDigest", "receiverCaBundleDigest", "clientCertificateDigest"],
+          "properties": {
+            "apiTargetBindingDigest": {"$ref": "#/$defs/digest"},
+            "receiverEndpointBindingDigest": {"$ref": "#/$defs/digest"},
+            "profileDigest": {"$ref": "#/$defs/digest"},
+            "signalSetDigest": {"$ref": "#/$defs/digest"},
+            "apiCaBundleDigest": {"$ref": "#/$defs/digest"},
+            "receiverCaBundleDigest": {"$ref": "#/$defs/digest"},
+            "clientCertificateDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "collectorDistribution", "collectorVersion", "collectorImageDigest", "inputTransport", "outputTransport", "workloadIdentity", "channelCredential", "queueMode", "redirectMode", "proxyMode"],
+          "properties": {
+            "name": {"const": "customer-pinned-collector-to-iip-receiver-v1"},
+            "collectorDistribution": {"const": "opentelemetry-collector-contrib"},
+            "collectorVersion": {"const": "0.158.0"},
+            "collectorImageDigest": {"const": "sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5"},
+            "inputTransport": {"const": "loopback-otlp-http-protobuf"},
+            "outputTransport": {"const": "ca-verified-https-otlp-http-protobuf"},
+            "workloadIdentity": {"const": "x509-client-certificate"},
+            "channelCredential": {"const": "separate-per-signal-bearer"},
+            "queueMode": {"const": "file-storage-persistent-sending-queue"},
+            "redirectMode": {"const": "denied"},
+            "proxyMode": {"const": "disabled"}
+          }
+        },
+        "objective": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requestTimeoutSeconds", "deliveryTimeoutSeconds", "pollIntervalMilliseconds", "maximumDeliveryLatencyMilliseconds", "maximumProfileAgeSeconds"],
+          "properties": {
+            "requestTimeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 30},
+            "deliveryTimeoutSeconds": {"type": "integer", "minimum": 10, "maximum": 300},
+            "pollIntervalMilliseconds": {"type": "integer", "minimum": 100, "maximum": 5000},
+            "maximumDeliveryLatencyMilliseconds": {"type": "integer", "minimum": 1000, "maximum": 300000},
+            "maximumProfileAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 7776000}
+          }
+        },
+        "measurements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileReviewedAt", "startedAt", "completedAt", "signalCount", "collectorSubmittedItemCount", "directReceiverAcceptedPathCount", "collectorAcceptedItemCount", "receiverDeliveredItemCount", "collectorSendFailureCount", "finalQueueItemCount", "maximumDeliveryLatencyMilliseconds"],
+          "properties": {
+            "profileReviewedAt": {"type": "string", "format": "date-time"},
+            "startedAt": {"type": "string", "format": "date-time"},
+            "completedAt": {"type": "string", "format": "date-time"},
+            "signalCount": {"const": 3},
+            "collectorSubmittedItemCount": {"const": 3},
+            "directReceiverAcceptedPathCount": {"type": "integer", "minimum": 0, "maximum": 3},
+            "collectorAcceptedItemCount": {"type": "integer", "minimum": 0, "maximum": 3},
+            "receiverDeliveredItemCount": {"type": "integer", "minimum": 0, "maximum": 3},
+            "collectorSendFailureCount": {"type": "integer", "minimum": 0, "maximum": 1000000},
+            "finalQueueItemCount": {"type": "integer", "minimum": 0, "maximum": 1000000},
+            "maximumDeliveryLatencyMilliseconds": {"type": "integer", "minimum": 0, "maximum": 300000}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 20,
+          "maxItems": 20,
+          "prefixItems": [
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "immutable-release"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-runtime-identity"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-endpoint-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "protected-input-files"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "collector-image-pinned"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "collector-config-validation"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "verified-tls"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "client-certificate-authentication"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "separate-channel-credentials"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "direct-no-proxy-no-redirect"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "metrics-delivery"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "logs-delivery"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "metadata-only-genai-delivery"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-durable-acknowledgement"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "collector-zero-send-failure"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "collector-queue-drained"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "delivery-latency-objective"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}}
+          ],
+          "items": false
+        },
+        "limitations": {
+          "type": "array",
+          "prefixItems": [
+            {"const": "customer-long-running-collector-configuration-not-qualified"},
+            {"const": "application-telemetry-fail-open-behavior-not-qualified"},
+            {"const": "sustained-throughput-queue-capacity-and-disk-recovery-not-qualified"},
+            {"const": "customer-pki-rotation-revocation-crl-distribution-and-ocsp-not-qualified"},
+            {"const": "node-zone-region-and-multi-collector-failure-not-qualified"}
+          ],
+          "items": false,
+          "minItems": 5,
+          "maxItems": 5
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 20},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 20},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 20},
+            "overallStatus": {"enum": ["qualified", "not-qualified"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-otlp-receiver-qualification\\.[a-z0-9.-]+$", "maxLength": 180}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    }
+  }
+}

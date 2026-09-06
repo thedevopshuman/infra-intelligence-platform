@@ -1,0 +1,46 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerOtlpReceiverQualificationProfile",
+  "metadata": {
+    "name": "customer-otlp-production",
+    "reviewedAt": "2026-09-08T09:00:00Z"
+  },
+  "spec": {
+    "receiverEndpoint": "https://otlp.iip.example.com:4318",
+    "collector": {
+      "distribution": "opentelemetry-collector-contrib",
+      "version": "0.158.0",
+      "image": "otel/opentelemetry-collector-contrib@sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5"
+    },
+    "signals": {
+      "metrics": {
+        "serviceName": "customer-qualification-probe",
+        "metricName": "iip.qualification.request.count",
+        "unit": "{request}"
+      },
+      "logs": {
+        "serviceName": "customer-qualification-probe",
+        "deploymentEnvironment": "qualification"
+      },
+      "genAiTraces": {
+        "serviceName": "customer-qualification-ai",
+        "serviceNamespace": "platform-qualification",
+        "deploymentEnvironment": "qualification",
+        "provider": "aws.bedrock",
+        "operation": "chat",
+        "requestModel": "example.foundation-model-v1:0",
+        "responseModel": "example.foundation-model-v1:0",
+        "region": "us-east-1",
+        "instrumentationScope": "opentelemetry.instrumentation.botocore.bedrock-runtime",
+        "semanticConventionVersion": "1.37.0-development"
+      }
+    },
+    "objective": {
+      "requestTimeoutSeconds": 5,
+      "deliveryTimeoutSeconds": 60,
+      "pollIntervalMilliseconds": 500,
+      "maximumDeliveryLatencyMilliseconds": 30000,
+      "maximumProfileAgeSeconds": 2592000
+    }
+  }
+}

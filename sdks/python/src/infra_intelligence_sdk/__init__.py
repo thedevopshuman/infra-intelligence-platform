@@ -28,6 +28,8 @@ from .models import (
     ControlPlaneLoadQualificationReport,
     CustomerCredentialBrokerQualificationProfile,
     CustomerCredentialBrokerQualificationReport,
+    CustomerOtlpReceiverQualificationProfile,
+    CustomerOtlpReceiverQualificationReport,
     CustomerContinuityQualificationReport,
     CustomerDeploymentQualificationReport,
     CustomerOidcQualificationProfile,
@@ -151,6 +153,8 @@ __all__ = [
     "ControlPlaneLoadQualificationReport",
     "CustomerCredentialBrokerQualificationProfile",
     "CustomerCredentialBrokerQualificationReport",
+    "CustomerOtlpReceiverQualificationProfile",
+    "CustomerOtlpReceiverQualificationReport",
     "CustomerContinuityQualificationReport",
     "CustomerDeploymentQualificationReport",
     "CustomerOidcQualificationProfile",
@@ -249,4 +253,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.67.0"
+__version__ = "0.68.0"

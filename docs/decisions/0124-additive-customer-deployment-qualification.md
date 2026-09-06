@@ -87,3 +87,12 @@ protected profile, authority set, and CA bundle. Workload/provider credential
 lifecycle, broker/PKI HA, recovery, non-Bearer schemes, and audit delivery
 remain outside the aggregate claim. All five earlier profiles remain
 historical.
+
+[ADR 0134](0134-customer-otlp-receiver-interoperability-qualification.md)
+upgrades the current aggregate to
+`single-cluster-database-identity-policy-broker-receiver-prerequisites-v7`.
+It adds one digest-pinned official Collector report and binds the selected
+receiver API, OTLP endpoint, signal set, protected profile, client trust
+material, and current release. Permanent Collector configuration, sustained
+traffic, queue/disk recovery, and customer PKI lifecycle/HA remain outside the
+aggregate claim. All six earlier profiles remain historical.

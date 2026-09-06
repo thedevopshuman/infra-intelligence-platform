@@ -1770,6 +1770,145 @@ export interface CustomerCredentialBrokerQualificationReport {
   };
 }
 
+export interface CustomerOtlpReceiverQualificationProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerOtlpReceiverQualificationProfile";
+  metadata: { name: string; reviewedAt: string };
+  spec: {
+    receiverEndpoint: string;
+    collector: {
+      distribution: "opentelemetry-collector-contrib";
+      version: "0.158.0";
+      image: "otel/opentelemetry-collector-contrib@sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5";
+    };
+    signals: {
+      metrics: { serviceName: string; metricName: string; unit: string };
+      logs: { serviceName: string; deploymentEnvironment: string };
+      genAiTraces: {
+        serviceName: string;
+        serviceNamespace: string;
+        deploymentEnvironment: string;
+        provider: "aws.bedrock" | "openai";
+        operation: "chat" | "text_completion";
+        requestModel: string;
+        responseModel: string;
+        region: string;
+        instrumentationScope: string;
+        semanticConventionVersion: string;
+      };
+    };
+    objective: {
+      requestTimeoutSeconds: number;
+      deliveryTimeoutSeconds: number;
+      pollIntervalMilliseconds: number;
+      maximumDeliveryLatencyMilliseconds: number;
+      maximumProfileAgeSeconds: number;
+    };
+  };
+}
+
+export type CustomerOtlpReceiverQualificationCheckId =
+  | "profile-binding"
+  | "source-binding"
+  | "immutable-release"
+  | "api-runtime-identity"
+  | "receiver-endpoint-binding"
+  | "protected-input-files"
+  | "collector-image-pinned"
+  | "collector-config-validation"
+  | "verified-tls"
+  | "client-certificate-authentication"
+  | "separate-channel-credentials"
+  | "direct-no-proxy-no-redirect"
+  | "metrics-delivery"
+  | "logs-delivery"
+  | "metadata-only-genai-delivery"
+  | "receiver-durable-acknowledgement"
+  | "collector-zero-send-failure"
+  | "collector-queue-drained"
+  | "delivery-latency-objective"
+  | "minimized-output";
+
+export interface CustomerOtlpReceiverQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerOtlpReceiverQualificationReport";
+  metadata: {
+    id: `corq_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualification: "customer-pinned-collector-to-iip-receiver-v1";
+    subject: {
+      applicationVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      sourceRevision: string;
+      chartVersion: string;
+      requiredMigration: `${number}_${string}.sql`;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      apiTargetBindingDigest: Sha256Digest;
+      receiverEndpointBindingDigest: Sha256Digest;
+      profileDigest: Sha256Digest;
+      signalSetDigest: Sha256Digest;
+      apiCaBundleDigest: Sha256Digest;
+      receiverCaBundleDigest: Sha256Digest;
+      clientCertificateDigest: Sha256Digest;
+    };
+    profile: {
+      name: "customer-pinned-collector-to-iip-receiver-v1";
+      collectorDistribution: "opentelemetry-collector-contrib";
+      collectorVersion: "0.158.0";
+      collectorImageDigest: "sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5";
+      inputTransport: "loopback-otlp-http-protobuf";
+      outputTransport: "ca-verified-https-otlp-http-protobuf";
+      workloadIdentity: "x509-client-certificate";
+      channelCredential: "separate-per-signal-bearer";
+      queueMode: "file-storage-persistent-sending-queue";
+      redirectMode: "denied";
+      proxyMode: "disabled";
+    };
+    objective: CustomerOtlpReceiverQualificationProfile["spec"]["objective"];
+    measurements: {
+      profileReviewedAt: string;
+      startedAt: string;
+      completedAt: string;
+      signalCount: 3;
+      collectorSubmittedItemCount: 3;
+      directReceiverAcceptedPathCount: number;
+      collectorAcceptedItemCount: number;
+      receiverDeliveredItemCount: number;
+      collectorSendFailureCount: number;
+      finalQueueItemCount: number;
+      maximumDeliveryLatencyMilliseconds: number;
+    };
+    checks: Array<
+      | { id: CustomerOtlpReceiverQualificationCheckId; status: "passed" }
+      | {
+          id: CustomerOtlpReceiverQualificationCheckId;
+          status: "failed";
+          errorCode: `customer-otlp-receiver-qualification.${string}`;
+        }
+    >;
+    limitations: [
+      "customer-long-running-collector-configuration-not-qualified",
+      "application-telemetry-fail-open-behavior-not-qualified",
+      "sustained-throughput-queue-capacity-and-disk-recovery-not-qualified",
+      "customer-pki-rotation-revocation-crl-distribution-and-ocsp-not-qualified",
+      "node-zone-region-and-multi-collector-failure-not-qualified",
+    ];
+    summary: {
+      totalChecks: 20;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export interface CustomerPolicyQualificationProfile {
   apiVersion: "iip.platform/v1alpha1";
   kind: "CustomerPolicyQualificationProfile";
@@ -2032,6 +2171,7 @@ export type CustomerDeploymentQualificationEvidenceId =
   | "customer-oidc"
   | "customer-policy"
   | "customer-credential-broker"
+  | "customer-otlp-receiver"
   | "control-plane-continuity"
   | "worker-receiver-processing"
   | "postgresql-primary-promotion";
@@ -2047,6 +2187,7 @@ export type CustomerDeploymentQualificationCheckId =
   | "customer-oidc"
   | "customer-policy"
   | "customer-credential-broker"
+  | "customer-otlp-receiver"
   | "control-plane-continuity"
   | "worker-receiver-processing"
   | "postgresql-primary-promotion"
@@ -2054,6 +2195,7 @@ export type CustomerDeploymentQualificationCheckId =
   | "oidc-target-chain"
   | "policy-binding-chain"
   | "credential-broker-binding-chain"
+  | "otlp-receiver-binding-chain"
   | "processing-target-chain"
   | "database-target-chain"
   | "evidence-order"
@@ -2071,7 +2213,7 @@ export interface CustomerDeploymentQualificationReport {
   };
   spec: {
     status: "qualified" | "not-qualified";
-    qualificationLevel: "single-cluster-database-identity-policy-broker-prerequisites-v6";
+    qualificationLevel: "single-cluster-database-identity-policy-broker-receiver-prerequisites-v7";
     subject: {
       profile: "production-core-v1" | "production-ai-finops-v0";
       applicationVersion: string;
@@ -2096,6 +2238,13 @@ export interface CustomerDeploymentQualificationReport {
       credentialBrokerProfileDigest: Sha256Digest;
       credentialBrokerAuthoritySetDigest: Sha256Digest;
       credentialBrokerCaBundleDigest: Sha256Digest;
+      otlpReceiverApiTargetBindingDigest: Sha256Digest;
+      otlpReceiverEndpointBindingDigest: Sha256Digest;
+      otlpReceiverProfileDigest: Sha256Digest;
+      otlpReceiverSignalSetDigest: Sha256Digest;
+      otlpReceiverApiCaBundleDigest: Sha256Digest;
+      otlpReceiverCaBundleDigest: Sha256Digest;
+      otlpReceiverClientCertificateDigest: Sha256Digest;
       processingOtlpTargetBindingDigest: Sha256Digest;
       processingProfileDigest: Sha256Digest;
       workerDeploymentBindingDigest: Sha256Digest;
@@ -2116,6 +2265,8 @@ export interface CustomerDeploymentQualificationReport {
       policyCompletedAt: string;
       credentialBrokerStartedAt: string;
       credentialBrokerCompletedAt: string;
+      otlpReceiverStartedAt: string;
+      otlpReceiverCompletedAt: string;
       continuityStartedAt: string;
       continuityCompletedAt: string;
       processingStartedAt: string;
@@ -2135,6 +2286,7 @@ export interface CustomerDeploymentQualificationReport {
         | "CustomerOidcQualificationReport"
         | "CustomerPolicyQualificationReport"
         | "CustomerCredentialBrokerQualificationReport"
+        | "CustomerOtlpReceiverQualificationReport"
         | "CustomerContinuityQualificationReport"
         | "CustomerProcessingContinuityQualificationReport"
         | "CustomerPostgreSQLContinuityQualificationReport";
@@ -2171,10 +2323,10 @@ export interface CustomerDeploymentQualificationReport {
       "design-partner-legal-brand-governance-not-qualified",
     ];
     summary: {
-      requiredEvidence: 9;
+      requiredEvidence: 10;
       passedEvidence: number;
       rejectedEvidence: number;
-      totalChecks: 20;
+      totalChecks: 24;
       passedChecks: number;
       failedChecks: number;
       overallStatus: "qualified" | "not-qualified";

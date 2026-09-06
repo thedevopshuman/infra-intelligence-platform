@@ -55,6 +55,15 @@ production external broker adapter. It retains no authority tuple, workload
 identity, or issued lease. The deployment aggregate rebinds its minimized
 report, profile, endpoint, and CA without calling the broker.
 
+Customer OTLP receiver qualification remains an operational harness as well:
+`scripts/qualify_customer_otlp_receiver.py` runs a digest-pinned official
+Collector outside the serving workloads, delivers three bounded synthetic
+signals through customer mTLS and channel authentication, and reads only the
+Collector's exporter self-metrics to establish downstream delivery. Its
+protected inputs and ephemeral queue do not enter the API, SDK transport,
+plugin runtime, or customer deployment aggregate; the aggregate rebinds only
+the minimized report, profile, public targets, trust files, and certificate.
+
 The private `src/iip/surfaces/worker_health.py` listener consumes only the
 application-owned readiness port. It exposes no control-plane use case,
 identity, tenant data, or provider detail.

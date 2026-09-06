@@ -759,6 +759,50 @@ class CustomerCredentialBrokerQualificationReport:
 
 
 @dataclass(frozen=True)
+class CustomerOtlpReceiverQualificationProfile:
+    """Protected exact signal catalog for customer receiver qualification."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerOtlpReceiverQualificationProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerOtlpReceiverQualificationProfile",
+                label="customer OTLP receiver qualification profile",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerOtlpReceiverQualificationReport:
+    """Minimized pinned-Collector customer receiver evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerOtlpReceiverQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerOtlpReceiverQualificationReport",
+                label="customer OTLP receiver qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerPolicyQualificationProfile:
     """Protected reviewed customer policy endpoint and decision cases."""
 
@@ -804,7 +848,7 @@ class CustomerPolicyQualificationReport:
 
 @dataclass(frozen=True)
 class CustomerDeploymentQualificationReport:
-    """Exact-release install, identity, policy, continuity, and database chain."""
+    """Exact-release install, identity, receiver, continuity, and database chain."""
 
     payload: Mapping[str, Any]
 

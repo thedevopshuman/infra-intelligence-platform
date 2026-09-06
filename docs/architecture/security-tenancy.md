@@ -60,6 +60,15 @@ The offline evaluation contract identifies instruction-shaped fixture evidence a
 
 Log bodies receive confidential handling by default and remain untrusted after redaction: retrieved or pushed text cannot grant authority or become instructions. OTLP channel credentials are independent of interactive control-plane identities, and channel configuration—not payload resource attributes—fixes tenant, integration, resource, service catalog, retention, and admission limits. The isolated mutual-TLS receiver binds one SPIFFE identity to that channel, supports an intermediate-issued client chain, rejects expired and CRL-revoked client certificates, and fails readiness plus intake when a configured CRL reaches `nextUpdate`; a newer CRL becomes authoritative only through a receiver rollout, while liveness remains non-secret and dependency-free.
 
+Customer receiver qualification preserves those boundaries: it requires a
+control-plane token plus metrics, logs, and traces channel tokens to be four
+distinct mode-`0600` values, supplies the client private key only to a
+short-lived read-only Collector container, disables upper- and lower-case
+ambient proxy variables, and retains no credential, key, endpoint, service,
+model, provider, or payload value. Offline verification rebinds only public or
+non-secret targets, trust material, the public certificate, and protected
+profile content.
+
 Every supported Evidence artifact receives non-configurable credential
 inspection before hashing and persistence. A reviewed
 `EvidenceRedactionPolicy` may add only bounded built-in detectors for exact

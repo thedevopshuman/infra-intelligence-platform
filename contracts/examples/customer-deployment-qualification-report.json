@@ -2,14 +2,14 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerDeploymentQualificationReport",
   "metadata": {
-    "id": "cdq_866d6569746e3bf52297280d3822a6ed",
+    "id": "cdq_8cfd6d1cfee732611d5915466e536356",
     "generatedAt": "2026-09-06T12:38:00Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
   },
   "spec": {
     "status": "qualified",
-    "qualificationLevel": "single-cluster-database-identity-policy-broker-prerequisites-v6",
+    "qualificationLevel": "single-cluster-database-identity-policy-broker-receiver-prerequisites-v7",
     "subject": {
       "profile": "production-core-v1",
       "applicationVersion": "0.84.0",
@@ -34,7 +34,14 @@
       "credentialBrokerProfileDigest": "sha256:1fac4beb2ad8113e815709c33c4985132c421a126cdb04846c621d41a66d39fc",
       "credentialBrokerAuthoritySetDigest": "sha256:82cdc43f692c3c40d92ad40d11e44e0fea88f4ec738a6eb941d620c49e00d5e1",
       "credentialBrokerCaBundleDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-      "processingOtlpTargetBindingDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "otlpReceiverApiTargetBindingDigest": "sha256:67f7aaa3a40b5a2a295d84c806d41b6a1f226a432f8ebe6742019f464f6f4c1f",
+      "otlpReceiverEndpointBindingDigest": "sha256:bfcb10b91671f51194954045ac28af4cde564f59e1cf13de85f1027c7c251ea7",
+      "otlpReceiverProfileDigest": "sha256:28eecb48600b36898411d4c747695f0ec0ae1d049418f79b968639dab428185f",
+      "otlpReceiverSignalSetDigest": "sha256:4556264ab3d91ea2a75796d2cb70b07079152617526be2ed0362b9124b0a95cf",
+      "otlpReceiverApiCaBundleDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "otlpReceiverCaBundleDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "otlpReceiverClientCertificateDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "processingOtlpTargetBindingDigest": "sha256:bfcb10b91671f51194954045ac28af4cde564f59e1cf13de85f1027c7c251ea7",
       "processingProfileDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
       "workerDeploymentBindingDigest": "sha256:a119bf7efb51d7364093d7ff7d9f3be0f456dfe3219a6a4205e86480fdc30197",
       "receiverDeploymentBindingDigest": "sha256:028fb6f98af1e9b07020a50c8e9b6bdeba89eda7f95169979a7ef83850b86813",
@@ -54,6 +61,8 @@
       "policyCompletedAt": "2026-09-06T12:20:01Z",
       "credentialBrokerStartedAt": "2026-09-06T12:25:00Z",
       "credentialBrokerCompletedAt": "2026-09-06T12:25:01Z",
+      "otlpReceiverStartedAt": "2026-09-06T12:26:00Z",
+      "otlpReceiverCompletedAt": "2026-09-06T12:26:03Z",
       "continuityStartedAt": "2026-09-06T12:30:00Z",
       "continuityCompletedAt": "2026-09-06T12:36:05Z",
       "processingStartedAt": "2026-09-06T12:36:10Z",
@@ -114,6 +123,14 @@
         "status": "passed"
       },
       {
+        "id": "customer-otlp-receiver",
+        "contractKind": "CustomerOtlpReceiverQualificationReport",
+        "reportId": "corq_9f57336fec1829af1970a3d774255fa4",
+        "reportDigest": "sha256:42b3b5800d596b032dfef55e95a1a67aa8f0df1507aa09522f2fa1bc04a2a721",
+        "observedStatus": "qualified",
+        "status": "passed"
+      },
+      {
         "id": "control-plane-continuity",
         "contractKind": "CustomerContinuityQualificationReport",
         "reportId": "ccq_a3aec6f511240ee7f6833809f33277d4",
@@ -124,16 +141,16 @@
       {
         "id": "worker-receiver-processing",
         "contractKind": "CustomerProcessingContinuityQualificationReport",
-        "reportId": "cpcq_ac9c5d03d898a755c4f9e1277da1af73",
-        "reportDigest": "sha256:57b0f89b39ae07e3f13ffb638e530179969e958cff6612cdb68a1ae38e365d8d",
+        "reportId": "cpcq_3600f86bb7e295fad3ac9ccd970de839",
+        "reportDigest": "sha256:b38173b4409f0a747cb2059ab2191e97749d1f181ec4f669cdde67131a232176",
         "observedStatus": "qualified",
         "status": "passed"
       },
       {
         "id": "postgresql-primary-promotion",
         "contractKind": "CustomerPostgreSQLContinuityQualificationReport",
-        "reportId": "cpgq_67129066ac814de2431e37bdc303f5af",
-        "reportDigest": "sha256:40f3adb5219e677b812287c6905dead59e36974f9bedada807f88aadb5a7ffbe",
+        "reportId": "cpgq_6f2537631028fb408eed5acb4783434b",
+        "reportDigest": "sha256:3f20d46552d1ca6a2dc38584388592230a88af97208e49313141695067b94637",
         "observedStatus": "qualified",
         "status": "passed"
       }
@@ -180,6 +197,10 @@
         "status": "passed"
       },
       {
+        "id": "customer-otlp-receiver",
+        "status": "passed"
+      },
+      {
         "id": "control-plane-continuity",
         "status": "passed"
       },
@@ -205,6 +226,10 @@
       },
       {
         "id": "credential-broker-binding-chain",
+        "status": "passed"
+      },
+      {
+        "id": "otlp-receiver-binding-chain",
         "status": "passed"
       },
       {
@@ -240,11 +265,11 @@
       "design-partner-legal-brand-governance-not-qualified"
     ],
     "summary": {
-      "requiredEvidence": 9,
-      "passedEvidence": 9,
+      "requiredEvidence": 10,
+      "passedEvidence": 10,
       "rejectedEvidence": 0,
-      "totalChecks": 22,
-      "passedChecks": 22,
+      "totalChecks": 24,
+      "passedChecks": 24,
       "failedChecks": 0,
       "overallStatus": "qualified"
     }

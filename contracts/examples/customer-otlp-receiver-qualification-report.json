@@ -1,0 +1,99 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerOtlpReceiverQualificationReport",
+  "metadata": {
+    "id": "corq_a602fbd2d3dc881273b1af076262fcbb",
+    "generatedAt": "2026-09-08T10:00:03Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualification": "customer-pinned-collector-to-iip-receiver-v1",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+      "chartVersion": "0.87.0",
+      "requiredMigration": "0023_ai_model_suitability.sql",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "apiTargetBindingDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "receiverEndpointBindingDigest": "sha256:bfcb10b91671f51194954045ac28af4cde564f59e1cf13de85f1027c7c251ea7",
+      "profileDigest": "sha256:38f522496cfd45ed9b8b701239a2b4512192f021829f072f2e1f8a64f4b42b1d",
+      "signalSetDigest": "sha256:4556264ab3d91ea2a75796d2cb70b07079152617526be2ed0362b9124b0a95cf",
+      "apiCaBundleDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "receiverCaBundleDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "clientCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    "profile": {
+      "name": "customer-pinned-collector-to-iip-receiver-v1",
+      "collectorDistribution": "opentelemetry-collector-contrib",
+      "collectorVersion": "0.158.0",
+      "collectorImageDigest": "sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5",
+      "inputTransport": "loopback-otlp-http-protobuf",
+      "outputTransport": "ca-verified-https-otlp-http-protobuf",
+      "workloadIdentity": "x509-client-certificate",
+      "channelCredential": "separate-per-signal-bearer",
+      "queueMode": "file-storage-persistent-sending-queue",
+      "redirectMode": "denied",
+      "proxyMode": "disabled"
+    },
+    "objective": {
+      "requestTimeoutSeconds": 5,
+      "deliveryTimeoutSeconds": 60,
+      "pollIntervalMilliseconds": 500,
+      "maximumDeliveryLatencyMilliseconds": 30000,
+      "maximumProfileAgeSeconds": 2592000
+    },
+    "measurements": {
+      "profileReviewedAt": "2026-09-08T09:00:00Z",
+      "startedAt": "2026-09-08T10:00:00Z",
+      "completedAt": "2026-09-08T10:00:03Z",
+      "signalCount": 3,
+      "collectorSubmittedItemCount": 3,
+      "directReceiverAcceptedPathCount": 3,
+      "collectorAcceptedItemCount": 3,
+      "receiverDeliveredItemCount": 3,
+      "collectorSendFailureCount": 0,
+      "finalQueueItemCount": 0,
+      "maximumDeliveryLatencyMilliseconds": 1700
+    },
+    "checks": [
+      {"id": "profile-binding", "status": "passed"},
+      {"id": "source-binding", "status": "passed"},
+      {"id": "immutable-release", "status": "passed"},
+      {"id": "api-runtime-identity", "status": "passed"},
+      {"id": "receiver-endpoint-binding", "status": "passed"},
+      {"id": "protected-input-files", "status": "passed"},
+      {"id": "collector-image-pinned", "status": "passed"},
+      {"id": "collector-config-validation", "status": "passed"},
+      {"id": "verified-tls", "status": "passed"},
+      {"id": "client-certificate-authentication", "status": "passed"},
+      {"id": "separate-channel-credentials", "status": "passed"},
+      {"id": "direct-no-proxy-no-redirect", "status": "passed"},
+      {"id": "metrics-delivery", "status": "passed"},
+      {"id": "logs-delivery", "status": "passed"},
+      {"id": "metadata-only-genai-delivery", "status": "passed"},
+      {"id": "receiver-durable-acknowledgement", "status": "passed"},
+      {"id": "collector-zero-send-failure", "status": "passed"},
+      {"id": "collector-queue-drained", "status": "passed"},
+      {"id": "delivery-latency-objective", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"}
+    ],
+    "limitations": [
+      "customer-long-running-collector-configuration-not-qualified",
+      "application-telemetry-fail-open-behavior-not-qualified",
+      "sustained-throughput-queue-capacity-and-disk-recovery-not-qualified",
+      "customer-pki-rotation-revocation-crl-distribution-and-ocsp-not-qualified",
+      "node-zone-region-and-multi-collector-failure-not-qualified"
+    ],
+    "summary": {
+      "totalChecks": 20,
+      "passedChecks": 20,
+      "failedChecks": 0,
+      "overallStatus": "qualified"
+    }
+  }
+}

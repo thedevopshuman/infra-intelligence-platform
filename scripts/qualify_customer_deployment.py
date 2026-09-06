@@ -21,6 +21,7 @@ import deployment_diagnostics as diagnostics
 import deployment_preflight as preflight
 import qualify_customer_continuity as continuity
 import qualify_customer_credential_broker as customer_credential_broker
+import qualify_customer_otlp_receiver as customer_otlp_receiver
 import qualify_customer_oidc as oidc
 import qualify_customer_policy as customer_policy
 import qualify_customer_processing_continuity as processing
@@ -32,7 +33,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "contracts/schemas/customer-deployment-qualification-report.schema.json"
 API_VERSION = "iip.platform/v1alpha1"
 KIND = "CustomerDeploymentQualificationReport"
-QUALIFICATION_LEVEL = "single-cluster-database-identity-policy-broker-prerequisites-v6"
+QUALIFICATION_LEVEL = "single-cluster-database-identity-policy-broker-receiver-prerequisites-v7"
 REPORT_ID = re.compile(r"^cdq_[a-f0-9]{32}$")
 DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 MAX_DOCUMENT_BYTES = 16 * 1024 * 1024
@@ -75,6 +76,12 @@ EVIDENCE_DEFINITIONS = (
         "customer-deployment-qualification.credential-broker.not-qualified",
     ),
     (
+        "customer-otlp-receiver",
+        "CustomerOtlpReceiverQualificationReport",
+        "qualified",
+        "customer-deployment-qualification.otlp-receiver.not-qualified",
+    ),
+    (
         "control-plane-continuity",
         "CustomerContinuityQualificationReport",
         "qualified",
@@ -104,6 +111,7 @@ CHECK_IDS = (
     "customer-oidc",
     "customer-policy",
     "customer-credential-broker",
+    "customer-otlp-receiver",
     "control-plane-continuity",
     "worker-receiver-processing",
     "postgresql-primary-promotion",
@@ -111,6 +119,7 @@ CHECK_IDS = (
     "oidc-target-chain",
     "policy-binding-chain",
     "credential-broker-binding-chain",
+    "otlp-receiver-binding-chain",
     "processing-target-chain",
     "database-target-chain",
     "evidence-order",
@@ -305,6 +314,7 @@ def _subject_and_bindings(
     oidc_report: Mapping[str, Any],
     policy_report: Mapping[str, Any],
     credential_broker_report: Mapping[str, Any],
+    otlp_receiver_report: Mapping[str, Any],
     continuity_report: Mapping[str, Any],
     processing_report: Mapping[str, Any],
     postgresql_report: Mapping[str, Any],
@@ -401,6 +411,22 @@ def _subject_and_bindings(
         credential_broker_spec.get("bindings"),
         "customer-deployment-qualification.credential-broker.invalid",
     )
+    otlp_receiver_metadata = _mapping(
+        otlp_receiver_report.get("metadata"),
+        "customer-deployment-qualification.otlp-receiver.invalid",
+    )
+    otlp_receiver_spec = _mapping(
+        otlp_receiver_report.get("spec"),
+        "customer-deployment-qualification.otlp-receiver.invalid",
+    )
+    otlp_receiver_subject = _mapping(
+        otlp_receiver_spec.get("subject"),
+        "customer-deployment-qualification.otlp-receiver.invalid",
+    )
+    otlp_receiver_bindings = _mapping(
+        otlp_receiver_spec.get("bindings"),
+        "customer-deployment-qualification.otlp-receiver.invalid",
+    )
     continuity_metadata = _mapping(
         continuity_report.get("metadata"),
         "customer-deployment-qualification.continuity.invalid",
@@ -460,6 +486,8 @@ def _subject_and_bindings(
         policy_subject.get("sourceRevision"),
         credential_broker_metadata.get("sourceRevision"),
         credential_broker_subject.get("sourceRevision"),
+        otlp_receiver_metadata.get("sourceRevision"),
+        otlp_receiver_subject.get("sourceRevision"),
         continuity_metadata.get("sourceRevision"),
         continuity_subject.get("sourceRevision"),
         processing_metadata.get("sourceRevision"),
@@ -498,6 +526,7 @@ def _subject_and_bindings(
             "sourceRevision": continuity_subject.get("sourceRevision"),
             "imageDigest": continuity_subject.get("imageDigest"),
         }
+        or otlp_receiver_subject != continuity_subject
         or processing_subject != continuity_subject
         or postgresql_subject != continuity_subject
         or ingress_spec.get("targetIdentity")
@@ -570,6 +599,13 @@ def _subject_and_bindings(
     ):
         _fail("customer-deployment-qualification.processing.crossed")
     if (
+        otlp_receiver_bindings.get("apiTargetBindingDigest")
+        != continuity_bindings.get("targetBindingDigest")
+        or otlp_receiver_bindings.get("receiverEndpointBindingDigest")
+        != processing_bindings.get("otlpTargetBindingDigest")
+    ):
+        _fail("customer-deployment-qualification.otlp-receiver.crossed")
+    if (
         postgresql_bindings.get("apiTargetBindingDigest")
         != processing_bindings.get("apiTargetBindingDigest")
         or postgresql_bindings.get("otlpTargetBindingDigest")
@@ -641,6 +677,27 @@ def _subject_and_bindings(
         "credentialBrokerCaBundleDigest": str(
             credential_broker_bindings["caBundleDigest"]
         ),
+        "otlpReceiverApiTargetBindingDigest": str(
+            otlp_receiver_bindings["apiTargetBindingDigest"]
+        ),
+        "otlpReceiverEndpointBindingDigest": str(
+            otlp_receiver_bindings["receiverEndpointBindingDigest"]
+        ),
+        "otlpReceiverProfileDigest": str(
+            otlp_receiver_bindings["profileDigest"]
+        ),
+        "otlpReceiverSignalSetDigest": str(
+            otlp_receiver_bindings["signalSetDigest"]
+        ),
+        "otlpReceiverApiCaBundleDigest": str(
+            otlp_receiver_bindings["apiCaBundleDigest"]
+        ),
+        "otlpReceiverCaBundleDigest": str(
+            otlp_receiver_bindings["receiverCaBundleDigest"]
+        ),
+        "otlpReceiverClientCertificateDigest": str(
+            otlp_receiver_bindings["clientCertificateDigest"]
+        ),
         "processingOtlpTargetBindingDigest": str(
             processing_bindings["otlpTargetBindingDigest"]
         ),
@@ -666,10 +723,13 @@ def _input_times(
     oidc_report: Mapping[str, Any],
     policy_report: Mapping[str, Any],
     credential_broker_report: Mapping[str, Any],
+    otlp_receiver_report: Mapping[str, Any],
     continuity_report: Mapping[str, Any],
     processing_report: Mapping[str, Any],
     postgresql_report: Mapping[str, Any],
 ) -> tuple[
+    datetime,
+    datetime,
     datetime,
     datetime,
     datetime,
@@ -719,6 +779,14 @@ def _input_times(
     )
     credential_broker_measurements = _mapping(
         credential_broker_spec.get("measurements"),
+        "customer-deployment-qualification.time.invalid",
+    )
+    otlp_receiver_spec = _mapping(
+        otlp_receiver_report.get("spec"),
+        "customer-deployment-qualification.time.invalid",
+    )
+    otlp_receiver_measurements = _mapping(
+        otlp_receiver_spec.get("measurements"),
         "customer-deployment-qualification.time.invalid",
     )
     continuity_spec = _mapping(
@@ -775,6 +843,14 @@ def _input_times(
             "customer-deployment-qualification.time.invalid",
         ),
         _parse_timestamp(
+            otlp_receiver_measurements.get("startedAt"),
+            "customer-deployment-qualification.time.invalid",
+        ),
+        _parse_timestamp(
+            otlp_receiver_measurements.get("completedAt"),
+            "customer-deployment-qualification.time.invalid",
+        ),
+        _parse_timestamp(
             continuity_measurements.get("startedAt"),
             "customer-deployment-qualification.time.invalid",
         ),
@@ -819,6 +895,8 @@ def build_report(
     policy_digest: str,
     credential_broker_report: Mapping[str, Any],
     credential_broker_digest: str,
+    otlp_receiver_report: Mapping[str, Any],
+    otlp_receiver_digest: str,
     continuity_report: Mapping[str, Any],
     continuity_digest: str,
     processing_report: Mapping[str, Any],
@@ -855,6 +933,7 @@ def build_report(
         oidc_report=oidc_report,
         policy_report=policy_report,
         credential_broker_report=credential_broker_report,
+        otlp_receiver_report=otlp_receiver_report,
         continuity_report=continuity_report,
         processing_report=processing_report,
         postgresql_report=postgresql_report,
@@ -875,6 +954,8 @@ def build_report(
         policy_completed,
         credential_broker_started,
         credential_broker_completed,
+        otlp_receiver_started,
+        otlp_receiver_completed,
         continuity_started,
         continuity_completed,
         processing_started,
@@ -888,6 +969,7 @@ def build_report(
         oidc_report=oidc_report,
         policy_report=policy_report,
         credential_broker_report=credential_broker_report,
+        otlp_receiver_report=otlp_receiver_report,
         continuity_report=continuity_report,
         processing_report=processing_report,
         postgresql_report=postgresql_report,
@@ -900,7 +982,9 @@ def build_report(
         and policy_started <= policy_completed
         and policy_completed <= credential_broker_started
         and credential_broker_started <= credential_broker_completed
-        and credential_broker_completed <= continuity_started
+        and credential_broker_completed <= otlp_receiver_started
+        and otlp_receiver_started <= otlp_receiver_completed
+        and otlp_receiver_completed <= continuity_started
         and continuity_started <= continuity_completed
         and continuity_completed <= processing_started
         and processing_started <= processing_completed
@@ -916,6 +1000,8 @@ def build_report(
         policy_completed,
         credential_broker_started,
         credential_broker_completed,
+        otlp_receiver_started,
+        otlp_receiver_completed,
         continuity_started,
         continuity_completed,
         processing_started,
@@ -950,6 +1036,7 @@ def build_report(
                 oidc_report,
                 policy_report,
                 credential_broker_report,
+                otlp_receiver_report,
                 continuity_report,
                 processing_report,
                 postgresql_report,
@@ -961,6 +1048,7 @@ def build_report(
                 oidc_digest,
                 policy_digest,
                 credential_broker_digest,
+                otlp_receiver_digest,
                 continuity_digest,
                 processing_digest,
                 postgresql_digest,
@@ -1004,6 +1092,11 @@ def build_report(
             "customer-deployment-qualification.credential-broker.not-qualified",
         ),
         _check(
+            "customer-otlp-receiver",
+            evidence_by_id["customer-otlp-receiver"]["status"] == "passed",
+            "customer-deployment-qualification.otlp-receiver.not-qualified",
+        ),
+        _check(
             "control-plane-continuity",
             evidence_by_id["control-plane-continuity"]["status"] == "passed",
             "customer-deployment-qualification.continuity.not-qualified",
@@ -1022,6 +1115,7 @@ def build_report(
         _check("oidc-target-chain", True, "customer-deployment-qualification.oidc.crossed"),
         _check("policy-binding-chain", True, "customer-deployment-qualification.policy.crossed"),
         _check("credential-broker-binding-chain", True, "customer-deployment-qualification.credential-broker.crossed"),
+        _check("otlp-receiver-binding-chain", True, "customer-deployment-qualification.otlp-receiver.crossed"),
         _check("processing-target-chain", True, "customer-deployment-qualification.processing.crossed"),
         _check("database-target-chain", True, "customer-deployment-qualification.database.crossed"),
         _check("evidence-order", ordered, "customer-deployment-qualification.evidence.order-invalid"),
@@ -1054,6 +1148,8 @@ def build_report(
             "policyCompletedAt": _timestamp(policy_completed),
             "credentialBrokerStartedAt": _timestamp(credential_broker_started),
             "credentialBrokerCompletedAt": _timestamp(credential_broker_completed),
+            "otlpReceiverStartedAt": _timestamp(otlp_receiver_started),
+            "otlpReceiverCompletedAt": _timestamp(otlp_receiver_completed),
             "continuityStartedAt": _timestamp(continuity_started),
             "continuityCompletedAt": _timestamp(continuity_completed),
             "processingStartedAt": _timestamp(processing_started),
@@ -1154,6 +1250,14 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         measurements.get("credentialBrokerCompletedAt"),
         "customer-deployment-qualification.report.time-invalid",
     )
+    otlp_receiver_started = _parse_timestamp(
+        measurements.get("otlpReceiverStartedAt"),
+        "customer-deployment-qualification.report.time-invalid",
+    )
+    otlp_receiver_completed = _parse_timestamp(
+        measurements.get("otlpReceiverCompletedAt"),
+        "customer-deployment-qualification.report.time-invalid",
+    )
     continuity_started = _parse_timestamp(
         measurements.get("continuityStartedAt"),
         "customer-deployment-qualification.report.time-invalid",
@@ -1202,7 +1306,9 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         and policy_started <= policy_completed
         and policy_completed <= credential_broker_started
         and credential_broker_started <= credential_broker_completed
-        and credential_broker_completed <= continuity_started
+        and credential_broker_completed <= otlp_receiver_started
+        and otlp_receiver_started <= otlp_receiver_completed
+        and otlp_receiver_completed <= continuity_started
         and continuity_started <= continuity_completed
         and continuity_completed <= processing_started
         and processing_started <= processing_completed
@@ -1218,6 +1324,8 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         policy_completed,
         credential_broker_started,
         credential_broker_completed,
+        otlp_receiver_started,
+        otlp_receiver_completed,
         continuity_started,
         continuity_completed,
         processing_started,
@@ -1272,6 +1380,12 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
             "customer-deployment-qualification.credential-broker.not-qualified",
         ),
         _check(
+            "customer-otlp-receiver",
+            evidence_by_id.get("customer-otlp-receiver", {}).get("status")
+            == "passed",
+            "customer-deployment-qualification.otlp-receiver.not-qualified",
+        ),
+        _check(
             "control-plane-continuity",
             evidence_by_id.get("control-plane-continuity", {}).get("status") == "passed",
             "customer-deployment-qualification.continuity.not-qualified",
@@ -1292,6 +1406,7 @@ def _expected_checks(report: Mapping[str, Any]) -> list[dict[str, str]]:
         _check("oidc-target-chain", True, "customer-deployment-qualification.oidc.crossed"),
         _check("policy-binding-chain", True, "customer-deployment-qualification.policy.crossed"),
         _check("credential-broker-binding-chain", True, "customer-deployment-qualification.credential-broker.crossed"),
+        _check("otlp-receiver-binding-chain", True, "customer-deployment-qualification.otlp-receiver.crossed"),
         _check("processing-target-chain", True, "customer-deployment-qualification.processing.crossed"),
         _check("database-target-chain", True, "customer-deployment-qualification.database.crossed"),
         _check("evidence-order", ordered, "customer-deployment-qualification.evidence.order-invalid"),
@@ -1392,6 +1507,13 @@ def _validate_inputs(
     credential_broker_profile_path: Path,
     credential_broker_endpoint: str,
     credential_broker_ca_bundle_path: Path,
+    otlp_receiver_path: Path,
+    otlp_receiver_profile_path: Path,
+    otlp_receiver_api_base_url: str,
+    otlp_receiver_endpoint: str,
+    otlp_receiver_api_ca_path: Path | None,
+    otlp_receiver_ca_path: Path,
+    otlp_receiver_client_certificate_path: Path,
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
@@ -1411,6 +1533,8 @@ def _validate_inputs(
     image_digest: str,
     helm: str,
 ) -> tuple[
+    Mapping[str, Any],
+    str,
     Mapping[str, Any],
     str,
     Mapping[str, Any],
@@ -1450,6 +1574,10 @@ def _validate_inputs(
     credential_broker_report, credential_broker_digest = _load_document(
         credential_broker_path,
         "customer-deployment-qualification.credential-broker.unreadable",
+    )
+    otlp_receiver_report, otlp_receiver_digest = _load_document(
+        otlp_receiver_path,
+        "customer-deployment-qualification.otlp-receiver.unreadable",
     )
     continuity_report, continuity_digest = _load_document(
         continuity_path, "customer-deployment-qualification.continuity.unreadable"
@@ -1502,6 +1630,17 @@ def _validate_inputs(
             image_digest=image_digest,
             require_qualified=False,
         )
+        customer_otlp_receiver.verify_report(
+            report_path=otlp_receiver_path,
+            profile_path=otlp_receiver_profile_path,
+            api_base_url=otlp_receiver_api_base_url,
+            receiver_endpoint=otlp_receiver_endpoint,
+            api_ca_path=otlp_receiver_api_ca_path,
+            receiver_ca_path=otlp_receiver_ca_path,
+            client_certificate_path=otlp_receiver_client_certificate_path,
+            image_digest=image_digest,
+            require_qualified=False,
+        )
         continuity.verify_report(
             report_path=continuity_path,
             ingress_report_path=ingress_path,
@@ -1541,6 +1680,7 @@ def _validate_inputs(
         oidc.CustomerOidcQualificationError,
         customer_policy.CustomerPolicyQualificationError,
         customer_credential_broker.CustomerCredentialBrokerQualificationError,
+        customer_otlp_receiver.CustomerOtlpReceiverQualificationError,
         continuity.CustomerContinuityQualificationError,
         processing.CustomerProcessingContinuityError,
         postgresql.CustomerPostgreSQLContinuityError,
@@ -1553,6 +1693,7 @@ def _validate_inputs(
         (oidc_path, oidc_digest, "customer-deployment-qualification.oidc.changed"),
         (policy_path, policy_digest, "customer-deployment-qualification.policy.changed"),
         (credential_broker_path, credential_broker_digest, "customer-deployment-qualification.credential-broker.changed"),
+        (otlp_receiver_path, otlp_receiver_digest, "customer-deployment-qualification.otlp-receiver.changed"),
         (continuity_path, continuity_digest, "customer-deployment-qualification.continuity.changed"),
         (processing_path, processing_digest, "customer-deployment-qualification.processing.changed"),
         (postgresql_path, postgresql_digest, "customer-deployment-qualification.database.changed"),
@@ -1572,6 +1713,8 @@ def _validate_inputs(
         policy_digest,
         credential_broker_report,
         credential_broker_digest,
+        otlp_receiver_report,
+        otlp_receiver_digest,
         continuity_report,
         continuity_digest,
         processing_report,
@@ -1596,6 +1739,13 @@ def qualify(
     credential_broker_profile_path: Path,
     credential_broker_endpoint: str,
     credential_broker_ca_bundle_path: Path,
+    otlp_receiver_path: Path,
+    otlp_receiver_profile_path: Path,
+    otlp_receiver_api_base_url: str,
+    otlp_receiver_endpoint: str,
+    otlp_receiver_api_ca_path: Path | None,
+    otlp_receiver_ca_path: Path,
+    otlp_receiver_client_certificate_path: Path,
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
@@ -1634,6 +1784,13 @@ def qualify(
         credential_broker_profile_path=credential_broker_profile_path,
         credential_broker_endpoint=credential_broker_endpoint,
         credential_broker_ca_bundle_path=credential_broker_ca_bundle_path,
+        otlp_receiver_path=otlp_receiver_path,
+        otlp_receiver_profile_path=otlp_receiver_profile_path,
+        otlp_receiver_api_base_url=otlp_receiver_api_base_url,
+        otlp_receiver_endpoint=otlp_receiver_endpoint,
+        otlp_receiver_api_ca_path=otlp_receiver_api_ca_path,
+        otlp_receiver_ca_path=otlp_receiver_ca_path,
+        otlp_receiver_client_certificate_path=otlp_receiver_client_certificate_path,
         continuity_path=continuity_path,
         processing_path=processing_path,
         processing_profile_path=processing_profile_path,
@@ -1671,12 +1828,14 @@ def qualify(
         policy_digest=inputs[9],
         credential_broker_report=inputs[10],
         credential_broker_digest=inputs[11],
-        continuity_report=inputs[12],
-        continuity_digest=inputs[13],
-        processing_report=inputs[14],
-        processing_digest=inputs[15],
-        postgresql_report=inputs[16],
-        postgresql_digest=inputs[17],
+        otlp_receiver_report=inputs[12],
+        otlp_receiver_digest=inputs[13],
+        continuity_report=inputs[14],
+        continuity_digest=inputs[15],
+        processing_report=inputs[16],
+        processing_digest=inputs[17],
+        postgresql_report=inputs[18],
+        postgresql_digest=inputs[19],
         context=context,
         namespace=namespace,
         release_name=release_name,
@@ -1709,6 +1868,13 @@ def verify_report(
     credential_broker_profile_path: Path,
     credential_broker_endpoint: str,
     credential_broker_ca_bundle_path: Path,
+    otlp_receiver_path: Path,
+    otlp_receiver_profile_path: Path,
+    otlp_receiver_api_base_url: str,
+    otlp_receiver_endpoint: str,
+    otlp_receiver_api_ca_path: Path | None,
+    otlp_receiver_ca_path: Path,
+    otlp_receiver_client_certificate_path: Path,
     continuity_path: Path,
     processing_path: Path,
     processing_profile_path: Path,
@@ -1749,6 +1915,13 @@ def verify_report(
         credential_broker_profile_path=credential_broker_profile_path,
         credential_broker_endpoint=credential_broker_endpoint,
         credential_broker_ca_bundle_path=credential_broker_ca_bundle_path,
+        otlp_receiver_path=otlp_receiver_path,
+        otlp_receiver_profile_path=otlp_receiver_profile_path,
+        otlp_receiver_api_base_url=otlp_receiver_api_base_url,
+        otlp_receiver_endpoint=otlp_receiver_endpoint,
+        otlp_receiver_api_ca_path=otlp_receiver_api_ca_path,
+        otlp_receiver_ca_path=otlp_receiver_ca_path,
+        otlp_receiver_client_certificate_path=otlp_receiver_client_certificate_path,
         continuity_path=continuity_path,
         processing_path=processing_path,
         processing_profile_path=processing_profile_path,
@@ -1797,12 +1970,14 @@ def verify_report(
         policy_digest=inputs[9],
         credential_broker_report=inputs[10],
         credential_broker_digest=inputs[11],
-        continuity_report=inputs[12],
-        continuity_digest=inputs[13],
-        processing_report=inputs[14],
-        processing_digest=inputs[15],
-        postgresql_report=inputs[16],
-        postgresql_digest=inputs[17],
+        otlp_receiver_report=inputs[12],
+        otlp_receiver_digest=inputs[13],
+        continuity_report=inputs[14],
+        continuity_digest=inputs[15],
+        processing_report=inputs[16],
+        processing_digest=inputs[17],
+        postgresql_report=inputs[18],
+        postgresql_digest=inputs[19],
         context=context,
         namespace=namespace,
         release_name=release_name,
@@ -1839,6 +2014,13 @@ def _common_inputs(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--credential-broker-profile", type=Path, required=True)
     parser.add_argument("--credential-broker-endpoint", required=True)
     parser.add_argument("--credential-broker-ca-file", type=Path, required=True)
+    parser.add_argument("--otlp-receiver-qualification-report", type=Path, required=True)
+    parser.add_argument("--otlp-receiver-qualification-profile", type=Path, required=True)
+    parser.add_argument("--otlp-receiver-api-base-url", required=True)
+    parser.add_argument("--otlp-receiver-endpoint", required=True)
+    parser.add_argument("--otlp-receiver-api-ca-file", type=Path)
+    parser.add_argument("--otlp-receiver-ca-file", type=Path, required=True)
+    parser.add_argument("--otlp-receiver-client-certificate-file", type=Path, required=True)
     parser.add_argument("--continuity-report", type=Path, required=True)
     parser.add_argument("--processing-report", type=Path, required=True)
     parser.add_argument("--processing-profile", type=Path, required=True)
@@ -1896,6 +2078,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         "credential_broker_profile_path": arguments.credential_broker_profile,
         "credential_broker_endpoint": arguments.credential_broker_endpoint,
         "credential_broker_ca_bundle_path": arguments.credential_broker_ca_file,
+        "otlp_receiver_path": arguments.otlp_receiver_qualification_report,
+        "otlp_receiver_profile_path": arguments.otlp_receiver_qualification_profile,
+        "otlp_receiver_api_base_url": arguments.otlp_receiver_api_base_url,
+        "otlp_receiver_endpoint": arguments.otlp_receiver_endpoint,
+        "otlp_receiver_api_ca_path": arguments.otlp_receiver_api_ca_file,
+        "otlp_receiver_ca_path": arguments.otlp_receiver_ca_file,
+        "otlp_receiver_client_certificate_path": arguments.otlp_receiver_client_certificate_file,
         "continuity_path": arguments.continuity_report,
         "processing_path": arguments.processing_report,
         "processing_profile_path": arguments.processing_profile,

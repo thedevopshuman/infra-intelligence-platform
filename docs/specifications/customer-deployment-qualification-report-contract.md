@@ -6,7 +6,7 @@
 
 `CustomerDeploymentQualificationReport` is the additive customer-environment
 profile anticipated by ADR 0120 and extended by ADRs 0129, 0130, 0131, 0132,
-and 0133. It binds nine independently owned reports for
+0133, and 0134. It binds ten independently owned reports for
 one exact application, chart, source revision, immutable image digest, and
 explicitly selected Kubernetes cluster:
 
@@ -20,12 +20,16 @@ explicitly selected Kubernetes cluster:
 6. a `CustomerCredentialBrokerQualificationReport` that binds the selected
    endpoint, protected authority profile, ordered authority set, and CA bundle
    to exact issuance and denial behavior through the production client;
-7. the `CustomerContinuityQualificationReport` that already binds that ingress
+7. a `CustomerOtlpReceiverQualificationReport` that binds the same API and
+   OTLP targets to a pinned official Collector delivering metrics, logs, and a
+   metadata-only GenAI span through verified client mTLS and separate channel
+   credentials;
+8. the `CustomerContinuityQualificationReport` that already binds that ingress
    probe to one PDB-governed API-pod Eviction; and
-8. a `CustomerProcessingContinuityQualificationReport` that proves durable
+9. a `CustomerProcessingContinuityQualificationReport` that proves durable
    metric intake and investigation completion across sequential worker and
    receiver pod Evictions; and
-9. a `CustomerPostgreSQLContinuityQualificationReport` that proves the stable
+10. a `CustomerPostgreSQLContinuityQualificationReport` that proves the stable
    writer endpoint advanced to a writable PostgreSQL timeline while the
    application recovered within its declared limits.
 
@@ -34,7 +38,8 @@ status, and pass/reject result. Crossed release identities, sources, target
 bindings, the nested continuity-to-ingress digest chain, the OIDC report's
 API/profile/issuer-metadata bindings, the policy report's exact source/image
 and endpoint/profile/snapshot-set bindings, the processing report's
-customer-broker endpoint/profile/authority-set/CA bindings, the processing
+credential-broker endpoint/profile/authority-set/CA bindings, the receiver
+report's API/OTLP/profile/signal/trust/client-certificate bindings, the processing
 report's API/OTLP/profile/component bindings, or the database report's
 API/OTLP/context/namespace/profile/target bindings are invalid input; they do not
 become a partially successful report. A valid but blocked,
@@ -43,7 +48,8 @@ unhealthy, stale, out-of-order, or unsuccessful input produces
 
 The OIDC prerequisite window must complete before the policy observation, the
 policy observation must complete before the credential-broker observation,
-the credential-broker observation must complete before the control-plane continuity window,
+the credential-broker observation must complete before the receiver observation,
+the receiver observation must complete before the control-plane continuity window,
 the control-plane window must complete before the processing window, the
 processing window must complete before database promotion observation, and the
 health observation must follow all workflows. Every
@@ -59,18 +65,20 @@ credentials, Secret values, or raw provider/Kubernetes errors. `cdq_` is a
 content-derived identifier over the complete metadata and specification.
 
 `qualified` means only
-`single-cluster-database-identity-policy-broker-prerequisites-v6`: live
+`single-cluster-database-identity-policy-broker-receiver-prerequisites-v7`: live
 dependencies were present; one customer issuer's discovery, JWKS, CORS,
 claims, deployed session, and release prerequisites passed; reviewed policy
 allow and deny cases remained bound to one immutable snapshot; the installed
 credential broker issued only the reviewed exact authority and denied six
-single-field mutations; the installed components were healthy after successful sequential API, worker, and receiver
+single-field mutations; a pinned official Collector delivered all three
+supported signal types to the exact installed receiver; the installed components were healthy after successful sequential API, worker, and receiver
 pod-disruption workflows; durable synthetic intake and investigation
 completion passed; a real PostgreSQL timeline promotion was observed; and every
 artifact described the same release and environment. The fixed `limitations`
 list keeps interactive OIDC/MFA/session/logout/revocation/rotation/HA, complete
 policy coverage and policy lifecycle/HA/audit, broker identity and provider
-credential lifecycle/HA/audit/non-Bearer schemes, publication/signature/
+credential lifecycle/HA/audit/non-Bearer schemes, permanent Collector
+configuration/queue recovery and PKI lifecycle/HA, publication/signature/
 vulnerability, database topology/fencing/RPO and regional DR, representative
 load, other integrations, live AI/provider pricing, regional capacity/SLO,
 design-partner, legal, brand, and governance gates outside this claim.

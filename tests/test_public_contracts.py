@@ -17,6 +17,8 @@ from infra_intelligence_sdk import (
     ControlPlaneLoadQualificationReport,
     CustomerCredentialBrokerQualificationProfile,
     CustomerCredentialBrokerQualificationReport,
+    CustomerOtlpReceiverQualificationProfile,
+    CustomerOtlpReceiverQualificationReport,
     CustomerContinuityQualificationReport,
     CustomerDeploymentQualificationReport,
     CustomerDeploymentPreflightReport,
@@ -231,6 +233,12 @@ class PublicContractSdkTests(unittest.TestCase):
             CustomerCredentialBrokerQualificationReport.from_dict(
                 example("customer-credential-broker-qualification-report.json")
             )
+        )
+        customer_otlp_profile = CustomerOtlpReceiverQualificationProfile.from_dict(
+            example("customer-otlp-receiver-qualification-profile.json")
+        )
+        customer_otlp = CustomerOtlpReceiverQualificationReport.from_dict(
+            example("customer-otlp-receiver-qualification-report.json")
         )
         customer_policy_profile = CustomerPolicyQualificationProfile.from_dict(
             example("customer-policy-qualification-profile.json")
@@ -512,7 +520,7 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         self.assertEqual(
             customer_deployment.to_dict()["spec"]["qualificationLevel"],
-            "single-cluster-database-identity-policy-broker-prerequisites-v6",
+            "single-cluster-database-identity-policy-broker-receiver-prerequisites-v7",
         )
         self.assertEqual(
             customer_processing_profile.to_dict()["kind"],
@@ -545,6 +553,14 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             customer_credential_broker.to_dict()["spec"]["qualification"],
             "customer-credential-broker-authority-prerequisites-v1",
+        )
+        self.assertEqual(
+            customer_otlp_profile.to_dict()["kind"],
+            "CustomerOtlpReceiverQualificationProfile",
+        )
+        self.assertEqual(
+            customer_otlp.to_dict()["spec"]["qualification"],
+            "customer-pinned-collector-to-iip-receiver-v1",
         )
         self.assertEqual(
             customer_policy_profile.to_dict()["kind"],

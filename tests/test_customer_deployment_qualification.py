@@ -21,6 +21,7 @@ import deployment_preflight as preflight  # noqa: E402
 import qualify_customer_continuity as continuity  # noqa: E402
 import qualify_customer_credential_broker as customer_credential_broker  # noqa: E402
 import qualify_customer_deployment as qualification  # noqa: E402
+import qualify_customer_otlp_receiver as customer_otlp_receiver  # noqa: E402
 import qualify_customer_oidc as oidc  # noqa: E402
 import qualify_customer_policy as customer_policy  # noqa: E402
 import qualify_customer_processing_continuity as processing  # noqa: E402
@@ -273,6 +274,40 @@ def credential_broker_report() -> dict[str, object]:
     )
 
 
+def otlp_receiver_report() -> dict[str, object]:
+    profile = json.loads(
+        (
+            ROOT
+            / "contracts/examples/customer-otlp-receiver-qualification-profile.json"
+        ).read_text(encoding="utf-8")
+    )
+    profile["metadata"]["reviewedAt"] = "2026-09-06T11:00:00Z"
+    return customer_otlp_receiver.build_report(
+        revision=REVISION,
+        repository=REPOSITORY,
+        image_digest=IMAGE_DIGEST,
+        api_target_digest=continuity._digest_value("https://iip.example.test"),
+        profile=profile,
+        api_ca_digest="sha256:" + "7" * 64,
+        receiver_ca_digest="sha256:" + "8" * 64,
+        client_certificate_digest="sha256:" + "9" * 64,
+        started_at=datetime(2026, 9, 6, 12, 26, tzinfo=timezone.utc),
+        completed_at=datetime(2026, 9, 6, 12, 26, 3, tzinfo=timezone.utc),
+        api_identity_valid=True,
+        credentials_separate=True,
+        direct_receiver_accepted_count=3,
+        result=customer_otlp_receiver.ProbeResult(
+            config_valid=True,
+            collector_started=True,
+            accepted={signal: True for signal in customer_otlp_receiver.SIGNALS},
+            delivered={signal: 1 for signal in customer_otlp_receiver.SIGNALS},
+            send_failed={signal: 0 for signal in customer_otlp_receiver.SIGNALS},
+            queue_size={signal: 0 for signal in customer_otlp_receiver.SIGNALS},
+            latency_milliseconds={signal: 900 for signal in customer_otlp_receiver.SIGNALS},
+        ),
+    )
+
+
 def processing_report(
     continuity_document: dict[str, object],
 ) -> dict[str, object]:
@@ -283,7 +318,9 @@ def processing_report(
         api_target_digest=continuity_document["spec"]["bindings"][
             "targetBindingDigest"
         ],
-        otlp_target_digest="sha256:" + "6" * 64,
+        otlp_target_digest=processing._digest_value(
+            "https://otlp.iip.example.com:4318"
+        ),
         context=CONTEXT,
         namespace=NAMESPACE,
         profile_digest="sha256:" + "5" * 64,
@@ -361,6 +398,7 @@ def inputs() -> tuple[dict[str, object], ...]:
         oidc_report(),
         policy_report(),
         credential_broker_report(),
+        otlp_receiver_report(),
         continuity_document,
         processing_document,
         postgresql_report(processing_document),
@@ -375,6 +413,7 @@ def build(
     oidc_document: dict[str, object] | None = None,
     policy_document: dict[str, object] | None = None,
     credential_broker_document: dict[str, object] | None = None,
+    otlp_receiver_document: dict[str, object] | None = None,
     continuity_document: dict[str, object] | None = None,
     processing_document: dict[str, object] | None = None,
     postgresql_document: dict[str, object] | None = None,
@@ -387,9 +426,10 @@ def build(
         oidc_document or documents[3],
         policy_document or documents[4],
         credential_broker_document or documents[5],
-        continuity_document or documents[6],
-        processing_document or documents[7],
-        postgresql_document or documents[8],
+        otlp_receiver_document or documents[6],
+        continuity_document or documents[7],
+        processing_document or documents[8],
+        postgresql_document or documents[9],
     )
     return qualification.build_report(
         preflight_report=selected[0],
@@ -404,12 +444,14 @@ def build(
         policy_digest=_digest(selected[4]),
         credential_broker_report=selected[5],
         credential_broker_digest=_digest(selected[5]),
-        continuity_report=selected[6],
-        continuity_digest=_digest(selected[6]),
-        processing_report=selected[7],
-        processing_digest=_digest(selected[7]),
-        postgresql_report=selected[8],
-        postgresql_digest=_digest(selected[8]),
+        otlp_receiver_report=selected[6],
+        otlp_receiver_digest=_digest(selected[6]),
+        continuity_report=selected[7],
+        continuity_digest=_digest(selected[7]),
+        processing_report=selected[8],
+        processing_digest=_digest(selected[8]),
+        postgresql_report=selected[9],
+        postgresql_digest=_digest(selected[9]),
         context=CONTEXT,
         namespace=NAMESPACE,
         release_name=RELEASE,
@@ -446,7 +488,7 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
     def test_exact_bound_inputs_produce_minimized_qualified_report(self) -> None:
         report = build()
         self.assertEqual(report["spec"]["status"], "qualified")
-        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 9)
+        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 10)
         serialized = json.dumps(report, sort_keys=True)
         for forbidden in (
             CONTEXT,
@@ -463,7 +505,7 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
 
     def test_crossed_processing_target_is_rejected(self) -> None:
         documents = inputs()
-        crossed = copy.deepcopy(documents[7])
+        crossed = copy.deepcopy(documents[8])
         crossed["spec"]["bindings"]["apiTargetBindingDigest"] = (
             "sha256:" + "f" * 64
         )
@@ -487,7 +529,7 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
 
     def test_crossed_database_target_is_rejected(self) -> None:
         documents = inputs()
-        crossed = copy.deepcopy(documents[8])
+        crossed = copy.deepcopy(documents[9])
         crossed["spec"]["bindings"]["otlpTargetBindingDigest"] = (
             "sha256:" + "f" * 64
         )
@@ -517,6 +559,18 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
         ):
             build(credential_broker_document=crossed)
 
+    def test_crossed_otlp_receiver_target_is_rejected(self) -> None:
+        documents = inputs()
+        crossed = copy.deepcopy(documents[6])
+        crossed["spec"]["bindings"]["receiverEndpointBindingDigest"] = (
+            "sha256:" + "f" * 64
+        )
+        with self.assertRaisesRegex(
+            qualification.CustomerDeploymentQualificationError,
+            "customer-deployment-qualification.otlp-receiver.crossed",
+        ):
+            build(otlp_receiver_document=crossed)
+
     def test_crossed_source_and_current_cluster_are_rejected(self) -> None:
         crossed = healthy_diagnostic()
         crossed["metadata"]["sourceRevision"] = "f" * 40
@@ -543,12 +597,14 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
                 policy_digest=_digest(documents[4]),
                 credential_broker_report=documents[5],
                 credential_broker_digest=_digest(documents[5]),
-                continuity_report=documents[6],
-                continuity_digest=_digest(documents[6]),
-                processing_report=documents[7],
-                processing_digest=_digest(documents[7]),
-                postgresql_report=documents[8],
-                postgresql_digest=_digest(documents[8]),
+                otlp_receiver_report=documents[6],
+                otlp_receiver_digest=_digest(documents[6]),
+                continuity_report=documents[7],
+                continuity_digest=_digest(documents[7]),
+                processing_report=documents[8],
+                processing_digest=_digest(documents[8]),
+                postgresql_report=documents[9],
+                postgresql_digest=_digest(documents[9]),
                 context=CONTEXT,
                 namespace=NAMESPACE,
                 release_name=RELEASE,
@@ -631,6 +687,8 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
             _digest(documents[7]),
             documents[8],
             _digest(documents[8]),
+            documents[9],
+            _digest(documents[9]),
         )
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "report.json"
@@ -656,6 +714,13 @@ class CustomerDeploymentQualificationTests(unittest.TestCase):
                     credential_broker_profile_path=Path("credential-broker-profile.json"),
                     credential_broker_endpoint="https://credential-broker.example.com",
                     credential_broker_ca_bundle_path=Path("credential-broker-ca.pem"),
+                    otlp_receiver_path=Path("otlp-receiver.json"),
+                    otlp_receiver_profile_path=Path("otlp-receiver-profile.json"),
+                    otlp_receiver_api_base_url="https://iip.example.test",
+                    otlp_receiver_endpoint="https://otlp.iip.example.com:4318",
+                    otlp_receiver_api_ca_path=Path("otlp-api-ca.pem"),
+                    otlp_receiver_ca_path=Path("otlp-receiver-ca.pem"),
+                    otlp_receiver_client_certificate_path=Path("otlp-client.crt"),
                     continuity_path=Path("continuity.json"),
                     processing_path=Path("processing.json"),
                     processing_profile_path=Path("processing-profile.json"),

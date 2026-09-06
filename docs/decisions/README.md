@@ -122,3 +122,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0116](0116-executable-oidc-browser-pkce-evidence.md) | Accepted | Prove the console's exact public-client authorization, S256 exchange, CORS, replay, and API-token path over real TLS |
 | [0117](0117-exact-release-index-publication.md) | Accepted | Copy both verified OCI layouts to exact registry digests and retain explicitly unsigned publication evidence |
 | [0118](0118-oci-subject-bound-buildkit-attestations.md) | Accepted | Bind BuildKit predicates through the exact OCI subject graph |
+| [0119](0119-distribution-libpq-production-runtime.md) | Accepted | Use distribution-managed libpq instead of a bundled binary wheel in release images |

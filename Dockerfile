@@ -18,7 +18,11 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
 
-RUN python -m pip install --no-cache-dir . \
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libpq5 \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir . \
+    && python -c "import psycopg; assert psycopg.pq.__impl__ == 'python'" \
     && addgroup --system --gid 10001 iip \
     && adduser --system --uid 10001 --ingroup iip --home /nonexistent --no-create-home iip
 

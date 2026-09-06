@@ -17,7 +17,9 @@ from deployment_preflight import (  # noqa: E402
     LIVE_CHECKS,
     DeploymentPreflightError,
     _observe_dependency,
+    _operational_alert_live_checks,
     _report_identifier,
+    _validate_rendered_profile,
     generate_report,
     validate_report_document,
     verify_report,
@@ -73,6 +75,13 @@ def rendered_profile() -> dict[str, object]:
             "tracesEnabled": True,
             "endpointConfigured": True,
             "collectorQueueLossConfigured": False,
+        },
+        "operationalAlerts": {
+            "enabled": True,
+            "apiVersion": "monitoring.coreos.com/v1",
+            "metricNameProfile": "otel-prometheus-underscore-no-suffix-v1",
+            "namespace": "observability",
+            "selectorLabelCount": 2,
         },
         "networkPolicy": {
             "enabled": True,
@@ -185,6 +194,40 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
                 },
             )
         )
+        alert_checks = (
+            (
+                {"id": "operational-alert-api", "status": "passed"},
+                {"id": "operational-alert-namespace", "status": "passed"},
+            )
+            if live and cluster_available
+            else (
+                (
+                    {
+                        "id": "operational-alert-api",
+                        "status": "failed",
+                        "errorCode": "preflight.operational-alert.api-unavailable",
+                    },
+                    {
+                        "id": "operational-alert-namespace",
+                        "status": "failed",
+                        "errorCode": "preflight.operational-alert.namespace-unavailable",
+                    },
+                )
+                if live
+                else (
+                    {
+                        "id": "operational-alert-api",
+                        "status": "not-run",
+                        "errorCode": "preflight.operational-alert.api-not-run",
+                    },
+                    {
+                        "id": "operational-alert-namespace",
+                        "status": "not-run",
+                        "errorCode": "preflight.operational-alert.namespace-not-run",
+                    },
+                )
+            )
+        )
 
         def observed(*args: object, **kwargs: object) -> tuple[str, dict | None]:
             dependency = kwargs["dependency"]
@@ -210,6 +253,9 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
             return_value=cluster_result,
         ), patch(
             "deployment_preflight._observe_dependency", side_effect=observed
+        ), patch(
+            "deployment_preflight._operational_alert_live_checks",
+            return_value=alert_checks,
         ):
             return dict(
                 generate_report(
@@ -231,7 +277,7 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
             tuple(check["id"] for check in report["spec"]["checks"]),
             COMMON_CHECKS + LIVE_CHECKS,
         )
-        self.assertEqual(report["spec"]["summary"]["notRunChecks"], 2)
+        self.assertEqual(report["spec"]["summary"]["notRunChecks"], 4)
         self.assertEqual(
             report["spec"]["dependencies"]["verificationStatus"], "not-run"
         )
@@ -289,7 +335,11 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
 
         self.assertEqual(report["spec"]["status"], "blocked")
         self.assertEqual(
-            report["spec"]["checks"][-2],
+            next(
+                check
+                for check in report["spec"]["checks"]
+                if check["id"] == "cluster-api"
+            ),
             {
                 "id": "cluster-api",
                 "status": "failed",
@@ -331,7 +381,7 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
         report = self.generate(profile, profile_name="production-ai-finops-v0")
 
         self.assertEqual(report["spec"]["status"], "configuration-ready")
-        self.assertEqual(report["spec"]["summary"]["totalChecks"], 29)
+        self.assertEqual(report["spec"]["summary"]["totalChecks"], 32)
         self.assertEqual(
             report["spec"]["customerQualificationRequired"][-3:],
             [
@@ -356,6 +406,35 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
                 "errorCode": "preflight.image.digest-required",
             },
         )
+
+    def test_production_profile_requires_operational_alert_policy(self) -> None:
+        profile = rendered_profile()
+        profile["operationalAlerts"]["enabled"] = False  # type: ignore[index]
+
+        report = self.generate(profile)
+
+        self.assertEqual(report["spec"]["status"], "blocked")
+        self.assertEqual(
+            next(
+                check
+                for check in report["spec"]["checks"]
+                if check["id"] == "operational-alert-policy"
+            ),
+            {
+                "id": "operational-alert-policy",
+                "status": "failed",
+                "errorCode": "preflight.operational-alert.policy-required",
+            },
+        )
+
+    def test_rendered_alert_profile_enforces_selector_label_limit(self) -> None:
+        profile = rendered_profile()
+        profile["operationalAlerts"]["selectorLabelCount"] = 33  # type: ignore[index]
+
+        with self.assertRaisesRegex(
+            DeploymentPreflightError, "preflight.profile.invalid"
+        ):
+            _validate_rendered_profile(profile)
 
     def test_every_enabled_workload_requires_a_usable_disruption_budget(self) -> None:
         for component in ("api", "worker"):
@@ -494,10 +573,10 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
         }
         forged["spec"]["status"] = "configuration-ready"
         forged["spec"]["summary"] = {
-            "totalChecks": 23,
-            "passedChecks": 21,
+            "totalChecks": 26,
+            "passedChecks": 22,
             "failedChecks": 0,
-            "notRunChecks": 2,
+            "notRunChecks": 4,
             "overallStatus": "configuration-ready",
         }
         forged["metadata"]["id"] = _report_identifier(
@@ -576,6 +655,90 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
 
         self.assertEqual(status, "unavailable")
         self.assertIsNone(observation)
+
+    def test_alert_prerequisites_use_read_only_discovery_and_minimize_results(
+        self,
+    ) -> None:
+        commands: list[tuple[str, ...]] = []
+
+        def fake_run(command: tuple[str, ...], **kwargs: object) -> str:
+            commands.append(command)
+            if "--raw" in command:
+                return json.dumps(
+                    {
+                        "groupVersion": "monitoring.coreos.com/v1",
+                        "resources": [
+                            {
+                                "name": "prometheusrules",
+                                "kind": "PrometheusRule",
+                                "namespaced": True,
+                            }
+                        ],
+                    }
+                )
+            return "87f6d7af-7f5f-4924-a668-f8b26fd6d2a8"
+
+        with patch("deployment_preflight._run", side_effect=fake_run):
+            checks = _operational_alert_live_checks(
+                rendered_profile(),
+                kubectl="kubectl",
+                context="explicit-context",
+                deployment_namespace="iip-private",
+                live=True,
+                cluster_available=True,
+            )
+
+        self.assertEqual(
+            checks,
+            (
+                {"id": "operational-alert-api", "status": "passed"},
+                {"id": "operational-alert-namespace", "status": "passed"},
+            ),
+        )
+        joined = "\n".join(" ".join(command) for command in commands)
+        self.assertIn("get --raw /apis/monitoring.coreos.com/v1", joined)
+        self.assertIn("get namespace observability --ignore-not-found", joined)
+        self.assertNotIn("apply", joined)
+        self.assertNotIn("create", joined)
+        self.assertNotIn("secret", joined.lower())
+        self.assertNotIn("observability", json.dumps(checks))
+
+    def test_missing_alert_api_and_namespace_are_explicit_failures(self) -> None:
+        def fake_run(command: tuple[str, ...], **kwargs: object) -> str:
+            if "--raw" in command:
+                return json.dumps(
+                    {
+                        "groupVersion": "monitoring.coreos.com/v1",
+                        "resources": [],
+                    }
+                )
+            return ""
+
+        with patch("deployment_preflight._run", side_effect=fake_run):
+            checks = _operational_alert_live_checks(
+                rendered_profile(),
+                kubectl="kubectl",
+                context="explicit-context",
+                deployment_namespace="iip-private",
+                live=True,
+                cluster_available=True,
+            )
+
+        self.assertEqual(
+            checks,
+            (
+                {
+                    "id": "operational-alert-api",
+                    "status": "failed",
+                    "errorCode": "preflight.operational-alert.api-unavailable",
+                },
+                {
+                    "id": "operational-alert-namespace",
+                    "status": "failed",
+                    "errorCode": "preflight.operational-alert.namespace-unavailable",
+                },
+            ),
+        )
 
     def test_contract_example_is_semantically_valid(self) -> None:
         report = json.loads(

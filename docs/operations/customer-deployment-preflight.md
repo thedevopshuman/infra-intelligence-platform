@@ -2,20 +2,22 @@
 
 **Status:** Executable production-profile gate
 
-The preflight catches incomplete production values and missing Kubernetes
-dependencies before Helm applies a workload. It supports the read-only core,
-protected GitHub context, and AI FinOps V0 profiles. A pass is necessary for a
-customer installation but is not production certification.
+The preflight catches incomplete production values, missing Kubernetes
+dependencies, and absent operational-alert API/namespace prerequisites before
+Helm applies a workload. It supports the read-only core, protected GitHub
+context, and AI FinOps V0 profiles. A pass is necessary for a customer
+installation but is not production certification.
 
 ## Start from the non-secret profiles
 
-The chart ships three composable examples:
+The chart ships four composable examples:
 
 - [`production-core.values.yaml`](../../deploy/helm/infra-intelligence/examples/production-core.values.yaml)
   enables the redundant API/worker, external identity/policy/credential
   boundaries, live evidence adapters, telemetry, TLS ingress, retention,
   backup, component disruption budgets, hard node spreading, and
-  least-authority network settings.
+  least-authority network settings. It also selects the bounded operational
+  alert profile and its example Prometheus rule labels.
 - [`production-ai-finops.values.yaml`](../../deploy/helm/infra-intelligence/examples/production-ai-finops.values.yaml)
   is an overlay that adds metadata-only AI usage intake, mutual-SPIFFE TLS and
   CRL references, redundant receiver replicas with their own disruption
@@ -25,6 +27,11 @@ The chart ships three composable examples:
   is an overlay that replaces local context files with allowlisted GitHub or
   GitHub Enterprise paths at exact commit revisions, brokered read credentials,
   an optional private CA reference, and explicit provider egress.
+- [`production-operational-alerts.values.yaml`](../../deploy/helm/infra-intelligence/examples/production-operational-alerts.values.yaml)
+  is the standalone alert overlay for deployments that do not start from the
+  production-core profile. Production core already selects the same bounded
+  policy; in either case replace the namespace and labels with values selected
+  by the customer Prometheus owner.
 
 Copy and merge the required settings into a protected customer values file.
 Replace every example registry, endpoint, identity, and CIDR. Values contain
@@ -56,9 +63,11 @@ silently co-locating them.
 Select an exact context; the live command never uses an implicit current
 context. The namespace must already exist, and the external-secret controller
 or customer operator must have created every referenced object. The backup PVC
-must be `Bound`.
+must be `Bound`. The alert target namespace must also exist and the cluster
+must expose a namespaced `PrometheusRule` at `monitoring.coreos.com/v1`.
 
-The invoking identity needs `get` only for the named namespace, Secrets,
+The invoking identity needs non-resource discovery for the exact monitoring
+group/version and `get` only for the deployment and alert namespaces, Secrets,
 ConfigMaps, and PVCs referenced by the rendered profile; it does not need
 `list`, `watch`, mutation, pod execution, or cluster-wide authority. Run it
 from a trusted operator workstation and remove any temporary qualification
@@ -80,7 +89,8 @@ selected combination as the one protected values file through
 `IIP_DEPLOYMENT_VALUES`. A successful cluster run writes
 `dist/customer-deployment-preflight-report.json` with `install-ready`. Any
 unavailable cluster, inaccessible or missing object, missing required Secret
-or ConfigMap key, or unbound PVC returns a stable failure and writes `blocked`
+or ConfigMap key, unbound PVC, absent PrometheusRule API, or absent/inaccessible
+alert namespace returns a stable failure and writes `blocked`
 evidence when the chart could be rendered.
 
 The Secret read makes `kubectl` emit only object UID, resource version, and key
@@ -88,6 +98,8 @@ names through a Kubernetes Go template; no data value crosses into the Python
 or report process. The retained report contains only counts and digests; it
 omits context, namespace, object names,
 keys, endpoints, values paths, CIDRs, tenant IDs, and provider errors.
+Alert discovery responses, rule labels, namespace names, and namespace UIDs are
+also absent; only the closed check results enter the report.
 
 ## Retain release evidence
 
@@ -121,7 +133,9 @@ Preflight intentionally leaves the following gates explicit:
 - workload-specific capacity plus clean, exact-release external ingress
   availability and latency evidence; use the
   [ingress qualification profile](ingress-availability-qualification.md);
-- continuous regional SLO aggregation and customer alert routing;
+- Prometheus rule selection/evaluation, missing-signal monitoring, continuous
+  regional SLO aggregation, Alertmanager routing, contact delivery, recovery,
+  and escalation;
 - for AI FinOps, live Bedrock model/region/streaming behavior, authoritative
   prices, and workload-quality validation of any proposed saving.
 

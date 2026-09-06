@@ -23,6 +23,10 @@ class OperationalAlertContractTests(unittest.TestCase):
     def test_rule_profile_is_optional_and_selectable(self) -> None:
         self.assertIn("{{- if .Values.operationalAlerts.enabled }}", self.template)
         self.assertIn("kind: PrometheusRule", self.template)
+        self.assertIn(
+            "default .Release.Namespace .Values.operationalAlerts.namespace | quote",
+            self.template,
+        )
         self.assertIn("enabled: true", self.overlay)
         self.assertIn("namespace: observability", self.overlay)
         self.assertIn("prometheus: platform", self.overlay)

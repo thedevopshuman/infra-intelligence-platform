@@ -47,6 +47,12 @@ leaves rule selection, delivery, contacts, escalation, and missing-telemetry
 observation with the customer. It does not make Prometheus part of the core
 portability contract.
 
+[ADR 0149](../decisions/0149-preinstall-operational-alert-prerequisite-evidence.md)
+binds that optional adapter into both production preflight profiles. Static
+evidence requires the closed policy; live evidence adds read-only exact-API and
+target-namespace discovery while retaining no namespace or discovery payload.
+Evaluation and notification delivery remain outside the preflight claim.
+
 ## Customer telemetry evidence
 
 OTLP is a push/export protocol, not a historical query protocol. The executable customer-telemetry boundaries therefore also address data already retained in a backend. `TelemetryEvidenceRequest` and `LogEvidenceRequest` express bounded normalized selectors; `TelemetryMetricsBackend` and `TelemetryLogsBackend` hide vendor query APIs; and the application validates normalized results before storing them through the immutable Evidence pipeline. [ADR 0014](../decisions/0014-backend-neutral-telemetry-evidence-query.md) records the metric decision, while [ADR 0023](../decisions/0023-backend-neutral-log-evidence-and-otlp-intake.md) records the stricter log minimization/redaction boundary. Defaults remain no-data; [ADR 0015](../decisions/0015-prometheus-telemetry-evidence-adapter.md) adds the first explicitly selected metric adapter, and [ADR 0025](../decisions/0025-loki-historical-log-evidence-adapter.md) adds the first explicitly selected historical log adapter. Both use protected catalogs and the shared credential-broker port without changing public selectors.

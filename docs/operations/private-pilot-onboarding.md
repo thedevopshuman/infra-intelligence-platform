@@ -67,6 +67,10 @@ Run the exact-context
 namespace, and protected-values generation. This proves prerequisite presence,
 not interoperability.
 
+For the production profiles, it also requires the bounded alert policy and
+proves that the configured PrometheusRule API and target namespace exist. It
+does not prove Prometheus selection or notification delivery.
+
 Install the verified chart by immutable image digest. Run migrations through
 the chart-owned migration job; never start serving a newer runtime against an
 unqualified schema. Confirm all three workloads report the expected release

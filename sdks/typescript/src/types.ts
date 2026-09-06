@@ -1099,6 +1099,7 @@ export type CustomerDeploymentPreflightCoreCheckId =
   | "scheduled-backup"
   | "evidence-retention"
   | "platform-telemetry"
+  | "operational-alert-policy"
   | "evidence-backends"
   | "service-account-isolation"
   | "test-fixtures-denied";
@@ -1108,12 +1109,15 @@ export type CustomerDeploymentPreflightAiCheckId =
   | "ai-receiver-mtls"
   | "ai-receiver-redundancy"
   | "ai-cost-allocation-savings"
+  | "ai-price-catalog-qualification"
   | "collector-loss-objective";
 
 export type CustomerDeploymentPreflightCheckId =
   | CustomerDeploymentPreflightCoreCheckId
   | CustomerDeploymentPreflightAiCheckId
   | "cluster-api"
+  | "operational-alert-api"
+  | "operational-alert-namespace"
   | "referenced-dependencies";
 
 export type CustomerDeploymentPreflightRequirement =
@@ -1123,6 +1127,7 @@ export type CustomerDeploymentPreflightRequirement =
   | "customer-policy-bundle"
   | "customer-workload-identity-broker"
   | "customer-collector-pki"
+  | "customer-operational-alert-routing"
   | "customer-postgresql-ha-dr"
   | "customer-workload-slo"
   | "live-bedrock-model-region-streaming"
@@ -1185,7 +1190,7 @@ export interface CustomerDeploymentPreflightReport {
     >;
     customerQualificationRequired: CustomerDeploymentPreflightRequirement[];
     summary: {
-      totalChecks: 23 | 28;
+      totalChecks: 26 | 32;
       passedChecks: number;
       failedChecks: number;
       notRunChecks: number;

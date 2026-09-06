@@ -9,9 +9,10 @@
 `CustomerDeploymentPreflightReport` answers whether one closed production
 profile is statically safe to configure and, when run against an explicitly
 named Kubernetes context, whether every referenced Secret key, ConfigMap, and
-backup claim exists before installation. It does not certify the external
-issuer, policy, credential, telemetry, database, provider, or workload behind
-those references.
+backup claim exists before installation. It also checks read-only discovery of
+the configured `PrometheusRule` API and target rule namespace. It does not
+certify the external issuer, policy, credential, telemetry, database, provider,
+or workload behind those references.
 
 The report is source-bound and configuration-bound. It records the exact
 application and chart versions plus SHA-256 digests of the ordered values
@@ -27,7 +28,9 @@ context, namespace, dependency name, endpoint, CIDR, tenant, or secret value.
   ingress, least-authority network policy, component-specific disruption
   budgets, hard two-domain single-skew topology spreading, scheduled backup,
   evidence retention, outbound OTLP telemetry, and live metric, log, and
-  Kubernetes Event evidence backends.
+  Kubernetes Event evidence backends. It also requires the supported bounded
+  operational-alert policy, explicit rule-selector labels, and target
+  namespace.
 - `production-ai-finops-v0` adds tenant-bound AI usage intake, redundant
   mutual-SPIFFE receiver replicas with their own disruption budget and a
   current-CRL reference, attribution, pricing, saving, allocation reporting,
@@ -42,6 +45,14 @@ preserves one replica and permits one voluntary disruption.
 an additive contract and profile revision; weakening a named profile requires
 a new profile name and decision record.
 
+`operational-alert-policy` requires metric export plus the fixed
+`monitoring.coreos.com/v1` and
+`otel-prometheus-underscore-no-suffix-v1` profiles, a resolved valid namespace,
+and at least one rule-selector label. The live `operational-alert-api` and
+`operational-alert-namespace` checks use Kubernetes discovery and exact-name
+lookup only. They do not prove that a Prometheus instance selects or evaluates
+the rules.
+
 ## Modes and status
 
 - `static` renders the complete chart and evaluates its sanitized deployment
@@ -50,7 +61,9 @@ a new profile name and decision record.
 - `cluster` requires an explicit context and namespace. It verifies API access,
   binds the report to the namespace UID and Kubernetes version, and checks the
   existence and exact required key set of every referenced dependency. A PVC
-  must be `Bound`. Only a fully passing cluster run is `install-ready`.
+  must be `Bound`. It also requires the namespaced PrometheusRule API and the
+  configured rule namespace to exist. Only a fully passing cluster run is
+  `install-ready`.
 - Any failed check makes the report `blocked`.
 
 `install-ready` means only that the chart configuration and prerequisite
@@ -62,12 +75,17 @@ cannot establish. The existing `customer-workload-slo` requirement includes
 the separate clean-release external
 [ingress availability qualification](ingress-availability-qualification-report-contract.md);
 preflight cannot satisfy it from chart values or cluster objects.
+`customer-operational-alert-routing` separately preserves Prometheus rule
+selection, missing-signal monitoring, Alertmanager routing, contact delivery,
+recovery, and escalation as customer-owned live evidence.
 
 ## Dependency minimization
 
 The Helm chart emits a non-secret deployment-profile ConfigMap. It contains
 configuration modes, enablement flags, replica counts, and Kubernetes object
-references already visible in rendered workload manifests. The preflight
+references already visible in rendered workload manifests. The operational
+alert section also contains its fixed profiles, resolved namespace, and only
+the selector-label count—not label values. The preflight
 process uses those references but retains only:
 
 - configured, observed, missing, invalid, and unavailable counts;
@@ -77,10 +95,13 @@ process uses those references but retains only:
 
 Secret commands make `kubectl` emit only metadata and key names across the
 subprocess boundary; the orchestration process and report never receive data
-values. A successful empty `--ignore-not-found` result is counted as missing;
-authorization, tool, transport, or malformed-response failures are counted as
-unavailable. Missing keys and unbound claims are invalid. All use stable
-aggregate results without provider or Kubernetes error text.
+values. Alert discovery is bounded to the exact group/version and checks only
+resource name, kind, and namespaced scope; namespace lookup emits only its UID,
+which is not retained. A successful empty `--ignore-not-found` result is
+counted as missing; authorization, tool, transport, or malformed-response
+failures are counted as unavailable. Missing keys and unbound claims are
+invalid. All use stable aggregate results without provider or Kubernetes error
+text.
 
 ## Verification
 

@@ -182,7 +182,10 @@ handoff for privacy-bounded query/receiver availability, ingestion freshness,
 local recording failures, and AI usage/cost coverage. It assumes the documented
 OpenTelemetry-to-Prometheus metric-name profile and installs no monitoring CRD,
 backend, notification receiver, contact, or route. Those remain customer-owned;
-see the [operational alert runbook](docs/operations/operational-alerts.md).
+see the [operational alert runbook](docs/operations/operational-alerts.md). The
+production deployment preflight now requires that policy and, in live mode,
+proves the exact PrometheusRule API and target namespace exist before Helm
+applies anything.
 
 An external PostgreSQL gate then uses a verified-TLS, default-read-only observer
 to prove that the stable writer endpoint advanced to a new writable WAL

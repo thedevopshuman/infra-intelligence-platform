@@ -213,6 +213,12 @@ Version 0.53 aligns the preflight model with component disruption budgets,
 hard topology spread, and vulnerability-qualified release evidence. The model
 remains an opaque validated envelope and grants no Kubernetes authority.
 
+The current opaque preflight envelope additionally accepts the strengthened
+26-check core and 32-check AI profiles with bounded operational-alert policy,
+read-only PrometheusRule API and target-namespace checks, and an explicit
+customer alert-routing requirement. It still grants no cluster or notification
+authority.
+
 Version 0.54 adds `KubernetesAvailabilityQualificationReport` for minimized,
 source-bound planned worker-drain evidence. It adds no API method, cluster
 credential, mutation authority, or customer availability claim.

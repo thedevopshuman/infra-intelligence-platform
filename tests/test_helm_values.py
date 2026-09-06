@@ -197,6 +197,21 @@ class HelmValuesContractTests(unittest.TestCase):
             ],
             0,
         )
+        self.assertEqual(
+            operational_alerts["properties"]["namespace"]["pattern"],
+            "^$|^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$",
+        )
+        label_map = self.schema["definitions"]["labelMap"]
+        self.assertEqual(label_map["maxProperties"], 32)
+        self.assertEqual(label_map["propertyNames"]["maxLength"], 63)
+        self.assertEqual(
+            operational_alerts["properties"]["labels"]["$ref"],
+            "#/definitions/labelMap",
+        )
+        label_validator = Draft7Validator(label_map)
+        self.assertFalse(list(label_validator.iter_errors({"prometheus": "platform"})))
+        self.assertTrue(list(label_validator.iter_errors({"bad\nkey": "value"})))
+        self.assertTrue(list(label_validator.iter_errors({"role": "bad:value"})))
         self.assertIn("operationalAlerts:\n  enabled: false", self.values)
 
         termination = self.schema["properties"]["apiTermination"]

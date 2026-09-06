@@ -3,7 +3,7 @@
   "kind": "CustomerDeploymentPreflightReport",
   "metadata": {
     "generatedAt": "2026-09-05T15:26:40Z",
-    "id": "cdp_a1ae962fad28409155e47d3b8a44e379",
+    "id": "cdp_a0ab582855c1c8361ab9612ee9891197",
     "sourceDirty": false,
     "sourceRevision": "afd2ce4e600094fb481bc1da2789a35de00c8828"
   },
@@ -27,10 +27,13 @@
       {"id": "scheduled-backup", "status": "passed"},
       {"id": "evidence-retention", "status": "passed"},
       {"id": "platform-telemetry", "status": "passed"},
+      {"id": "operational-alert-policy", "status": "passed"},
       {"id": "evidence-backends", "status": "passed"},
       {"id": "service-account-isolation", "status": "passed"},
       {"id": "test-fixtures-denied", "status": "passed"},
       {"errorCode": "preflight.cluster.not-run", "id": "cluster-api", "status": "not-run"},
+      {"errorCode": "preflight.operational-alert.api-not-run", "id": "operational-alert-api", "status": "not-run"},
+      {"errorCode": "preflight.operational-alert.namespace-not-run", "id": "operational-alert-namespace", "status": "not-run"},
       {"errorCode": "preflight.dependencies.not-run", "id": "referenced-dependencies", "status": "not-run"}
     ],
     "customerQualificationRequired": [
@@ -40,6 +43,7 @@
       "customer-policy-bundle",
       "customer-workload-identity-broker",
       "customer-collector-pki",
+      "customer-operational-alert-routing",
       "customer-postgresql-ha-dr",
       "customer-workload-slo"
     ],
@@ -69,10 +73,10 @@
     "status": "configuration-ready",
     "summary": {
       "failedChecks": 0,
-      "notRunChecks": 2,
+      "notRunChecks": 4,
       "overallStatus": "configuration-ready",
-      "passedChecks": 21,
-      "totalChecks": 23
+      "passedChecks": 22,
+      "totalChecks": 26
     }
   }
 }

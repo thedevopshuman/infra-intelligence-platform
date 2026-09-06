@@ -114,8 +114,11 @@ customer approval, or production claim; those remain external.
 An optional Helm alert-policy overlay now maps incomplete AI usage and
 unresolved cost coverage, alongside core platform health, into privacy-bounded
 Prometheus rules. OpenTelemetry semantics remain authoritative; the customer
-still owns rule discovery, backend evaluation, missing-telemetry observation,
+still owns rule selection, backend evaluation, missing-telemetry observation,
 notification routes, contacts, and escalation.
+The production preflight now requires that policy and proves the exact
+PrometheusRule API plus target namespace in live mode without claiming that a
+customer evaluator selected or delivered it.
 
 Two additional deterministic rules are delivered. Protected channel
 configuration maps provider retry attributes into `retryCount`, and the

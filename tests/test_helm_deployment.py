@@ -305,6 +305,25 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
                 self.assertIn("evidenceRedaction.policiesExistingSecret", template)
                 self.assertIn("evidenceRedaction.policiesSecretKey", template)
 
+    def test_deployment_profile_binds_operational_alert_prerequisites(self) -> None:
+        profile = (
+            CHART / "templates" / "deployment-profile.yaml"
+        ).read_text(encoding="utf-8")
+        production = (
+            CHART / "examples" / "production-core.values.yaml"
+        ).read_text(encoding="utf-8")
+
+        for expected in (
+            '"operationalAlerts"',
+            '"apiVersion" .Values.operationalAlerts.apiVersion',
+            '"metricNameProfile" .Values.operationalAlerts.metricNameProfile',
+            '"namespace" (default .Release.Namespace',
+            '"selectorLabelCount" (len .Values.operationalAlerts.labels)',
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, profile)
+        self.assertIn("operationalAlerts:\n  enabled: true", production)
+
     def test_github_context_is_secret_broker_and_egress_bounded(self) -> None:
         api = (CHART / "templates" / "deployment.yaml").read_text(encoding="utf-8")
         worker = (CHART / "templates" / "worker-deployment.yaml").read_text(

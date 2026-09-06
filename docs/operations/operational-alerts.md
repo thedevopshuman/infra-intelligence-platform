@@ -60,6 +60,13 @@ the customer's Prometheus rule selectors. The chart rejects enabled alerts
 when `telemetry.metricsEnabled` is false. Metric export also requires
 `telemetry.otlpEndpoint`.
 
+Both production deployment profiles require this bounded policy. Before
+installation, run the [customer deployment preflight](customer-deployment-preflight.md)
+against the exact context. Static mode checks the closed policy; cluster mode
+also discovers the exact namespaced PrometheusRule API and confirms the target
+namespace exists. That pass still does not prove selector, evaluation, or
+notification delivery.
+
 ## Rule inventory
 
 | Rule | Enabled when | Condition |

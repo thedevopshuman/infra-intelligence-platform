@@ -793,8 +793,12 @@
         "metricNameProfile": {
           "const": "otel-prometheus-underscore-no-suffix-v1"
         },
-        "namespace": { "$ref": "#/definitions/optionalName" },
-        "labels": { "$ref": "#/definitions/stringMap" },
+        "namespace": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^$|^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$"
+        },
+        "labels": { "$ref": "#/definitions/labelMap" },
         "evaluationIntervalSeconds": {
           "type": "integer",
           "minimum": 15,
@@ -1201,6 +1205,21 @@
       "type": "object",
       "maxProperties": 128,
       "additionalProperties": { "type": "string", "maxLength": 1024 }
+    },
+    "labelMap": {
+      "type": "object",
+      "maxProperties": 32,
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 63,
+        "pattern": "^[a-z0-9](?:[-.a-z0-9]*[a-z0-9])?$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 63,
+        "pattern": "^$|^[A-Za-z0-9](?:[-A-Za-z0-9_.]*[A-Za-z0-9])?$"
+      }
     },
     "quantityMap": {
       "type": "object",

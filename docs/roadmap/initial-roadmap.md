@@ -93,9 +93,13 @@ objective, approval, or production claim.
 
 The handoff also carries an optional privacy-bounded Prometheus Operator rule
 profile for backend-observed availability, freshness, local recording, and AI
-coverage signals. Customer rule discovery, missing-telemetry detection,
+coverage signals. Customer rule selection, missing-telemetry detection,
 notification routes, contacts, escalation, and long-window/regional operation
 remain external deployment gates.
+Both production preflight profiles now require the closed policy, and cluster
+mode proves exact PrometheusRule discovery plus the target namespace before
+installation. Prometheus selection and notification delivery are still not
+inferred from those prerequisites.
 
 One fail-closed local release command now composes the source, integration,
 recovery, multi-node availability, bundle, packaged N-1, vulnerability, and

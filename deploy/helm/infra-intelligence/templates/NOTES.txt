@@ -13,6 +13,9 @@ Optional scheduled logical backups require an existing protected PVC, the databa
 Secret, and database-only NetworkPolicy egress. A backup is not accepted until its
 checksum is written, but off-cluster durability, encryption, retention, and restore
 authorization remain the storage operator's responsibility.
+Optional operational alerts require the PrometheusRule API, a pre-created target
+namespace, matching customer Prometheus rule selectors, and separately configured
+notification routing. Run the live deployment preflight before installing them.
 For a fresh PostgreSQL-backed install, provide database.existingSecret and explicitly
 set database.migrations.enabled=true. The pre-install/pre-upgrade migration hook
 must succeed before serving workloads roll out; API readiness never applies migrations.

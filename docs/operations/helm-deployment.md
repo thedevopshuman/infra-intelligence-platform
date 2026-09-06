@@ -71,7 +71,9 @@ resource for privacy-bounded IIP signals. It does not install the CRD,
 Prometheus, Alertmanager, contacts, or routing, and it requires metric export
 to be enabled. Qualify the selected rule labels, metric-name translation,
 missing-data observation, and notification route with the
-[operational alert-policy handoff](operational-alerts.md).
+[operational alert-policy handoff](operational-alerts.md). The production
+preflight requires the policy and, in cluster mode, verifies the exact
+PrometheusRule discovery endpoint and target namespace without making changes.
 
 The default repository and tag are placeholders. Set `image.repository` to the published repository and `image.digest` to the verified release OCI index digest in production. A non-empty digest takes precedence over the tag for the API, worker, OTLP receiver, and migration Job. The chart injects its version and this exact digest into application workloads so authenticated users can verify them through `GET /v1/system/version` and the console.
 

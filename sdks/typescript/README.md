@@ -201,6 +201,12 @@ vulnerability-qualified-release requirement to the closed preflight unions.
 It does not turn Kubernetes placement configuration into live availability
 evidence.
 
+The current preflight union additionally carries the required bounded
+operational-alert policy, read-only PrometheusRule API and target-namespace
+checks, and the separate customer alert-routing requirement. It carries no
+Kubernetes mutation or notification authority. The same update corrects the
+AI check union to include price-catalog qualification and its 32-check total.
+
 Version 0.54 adds the offline
 `KubernetesAvailabilityQualificationReport`, component/phase state, and closed
 check identifiers. It adds no API method, Kubernetes credential, mutation

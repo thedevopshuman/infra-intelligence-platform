@@ -3,7 +3,7 @@ apiVersion: {{ .Values.operationalAlerts.apiVersion }}
 kind: PrometheusRule
 metadata:
   name: {{ include "infra-intelligence.fullname" . }}-operational-alerts
-  namespace: {{ default .Release.Namespace .Values.operationalAlerts.namespace }}
+  namespace: {{ default .Release.Namespace .Values.operationalAlerts.namespace | quote }}
   labels:
     {{- include "infra-intelligence.labels" . | nindent 4 }}
     {{- with .Values.operationalAlerts.labels }}

@@ -152,3 +152,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0146](0146-customer-reviewed-planned-failure-overlap.md) | Accepted | Correlate customer-approved sustained traffic with planned API, processing, and PostgreSQL continuity windows |
 | [0147](0147-versioned-private-pilot-operating-handoff.md) | Accepted | Package exact-version pilot scope, onboarding, support/security, and privacy-first feedback guidance without embedding customer commitments |
 | [0148](0148-customer-owned-operational-alert-policy-handoff.md) | Accepted | Ship optional privacy-bounded Prometheus rules while leaving telemetry storage and alert delivery with the customer |
+| [0149](0149-preinstall-operational-alert-prerequisite-evidence.md) | Accepted | Require the production preflight to prove alert policy configuration, PrometheusRule discovery, and the target namespace without claiming notification delivery |

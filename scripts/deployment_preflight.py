@@ -41,6 +41,7 @@ COMMON_CHECKS = (
     "scheduled-backup",
     "evidence-retention",
     "platform-telemetry",
+    "operational-alert-policy",
     "evidence-backends",
     "service-account-isolation",
     "test-fixtures-denied",
@@ -53,7 +54,12 @@ AI_CHECKS = (
     "ai-price-catalog-qualification",
     "collector-loss-objective",
 )
-LIVE_CHECKS = ("cluster-api", "referenced-dependencies")
+LIVE_CHECKS = (
+    "cluster-api",
+    "operational-alert-api",
+    "operational-alert-namespace",
+    "referenced-dependencies",
+)
 FAILURE_ERROR_CODES = {
     "helm-render": "preflight.helm.render-failed",
     "immutable-image": "preflight.image.digest-required",
@@ -73,6 +79,7 @@ FAILURE_ERROR_CODES = {
     "scheduled-backup": "preflight.backup.required",
     "evidence-retention": "preflight.evidence-retention.required",
     "platform-telemetry": "preflight.telemetry.required",
+    "operational-alert-policy": "preflight.operational-alert.policy-required",
     "evidence-backends": "preflight.evidence-backends.required",
     "service-account-isolation": "preflight.security.workload-isolation-required",
     "test-fixtures-denied": "preflight.test-fixtures.forbidden",
@@ -83,10 +90,14 @@ FAILURE_ERROR_CODES = {
     "ai-price-catalog-qualification": "preflight.ai.price-qualification-required",
     "collector-loss-objective": "preflight.ai.collector-objective-required",
     "cluster-api": "preflight.cluster.unavailable",
+    "operational-alert-api": "preflight.operational-alert.api-unavailable",
+    "operational-alert-namespace": "preflight.operational-alert.namespace-unavailable",
     "referenced-dependencies": "preflight.dependencies.incomplete",
 }
 NOT_RUN_ERROR_CODES = {
     "cluster-api": "preflight.cluster.not-run",
+    "operational-alert-api": "preflight.operational-alert.api-not-run",
+    "operational-alert-namespace": "preflight.operational-alert.namespace-not-run",
     "referenced-dependencies": "preflight.dependencies.not-run",
 }
 COMMON_CUSTOMER_REQUIREMENTS = (
@@ -96,6 +107,7 @@ COMMON_CUSTOMER_REQUIREMENTS = (
     "customer-policy-bundle",
     "customer-workload-identity-broker",
     "customer-collector-pki",
+    "customer-operational-alert-routing",
     "customer-postgresql-ha-dr",
     "customer-workload-slo",
 )
@@ -121,6 +133,7 @@ EXPECTED_PROFILE_KEYS = frozenset(
         "evidenceRedaction",
         "evidenceBackends",
         "telemetry",
+        "operationalAlerts",
         "networkPolicy",
         "podDisruptionBudget",
         "topologySpread",
@@ -135,6 +148,7 @@ REVISION = re.compile(r"^[a-f0-9]{40,64}$")
 DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$")
 NAME = re.compile(r"^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$")
+NAMESPACE = re.compile(r"^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$")
 
 
 class DeploymentPreflightError(RuntimeError):
@@ -403,6 +417,27 @@ def _validate_rendered_profile(profile: Mapping[str, Any]) -> None:
         _fail("preflight.profile.invalid")
     for key in evidence:
         _string(evidence, key)
+    operational_alerts = _object(profile, "operationalAlerts")
+    if set(operational_alerts) != {
+        "enabled",
+        "apiVersion",
+        "metricNameProfile",
+        "namespace",
+        "selectorLabelCount",
+    }:
+        _fail("preflight.profile.invalid")
+    _boolean(operational_alerts, "enabled")
+    _string(operational_alerts, "apiVersion")
+    _string(operational_alerts, "metricNameProfile")
+    alert_namespace = _string(operational_alerts, "namespace")
+    selector_label_count = _integer(operational_alerts, "selectorLabelCount")
+    if (
+        len(alert_namespace) > 63
+        or NAMESPACE.fullmatch(alert_namespace) is None
+        or selector_label_count < 0
+        or selector_label_count > 32
+    ):
+        _fail("preflight.profile.invalid")
     pdb = _object(profile, "podDisruptionBudget")
     if set(pdb) != {"api", "worker", "receiver"}:
         _fail("preflight.profile.invalid")
@@ -472,6 +507,7 @@ def _static_checks(
     backup = _object(profile, "backup")
     retention = _object(profile, "evidenceRetention")
     telemetry = _object(profile, "telemetry")
+    operational_alerts = _object(profile, "operationalAlerts")
     evidence = _object(profile, "evidenceBackends")
     security = _object(profile, "security")
     ai = _object(profile, "aiEconomics")
@@ -534,6 +570,17 @@ def _static_checks(
         _check("scheduled-backup", backup["enabled"] is True and backup["destinationConfigured"] is True, "preflight.backup.required"),
         _check("evidence-retention", retention["enabled"] is True, "preflight.evidence-retention.required"),
         _check("platform-telemetry", telemetry["metricsEnabled"] is True and telemetry["tracesEnabled"] is True and telemetry["endpointConfigured"] is True, "preflight.telemetry.required"),
+        _check(
+            "operational-alert-policy",
+            operational_alerts["enabled"] is True
+            and operational_alerts["apiVersion"] == "monitoring.coreos.com/v1"
+            and operational_alerts["metricNameProfile"]
+            == "otel-prometheus-underscore-no-suffix-v1"
+            and NAMESPACE.fullmatch(operational_alerts["namespace"]) is not None
+            and operational_alerts["selectorLabelCount"] >= 1
+            and telemetry["metricsEnabled"] is True,
+            "preflight.operational-alert.policy-required",
+        ),
         _check("evidence-backends", evidence["metrics"] == "prometheus" and evidence["logs"] in {"loki", "opensearch"} and evidence["kubernetesEvents"] == "kubernetes-api", "preflight.evidence-backends.required"),
         _check("service-account-isolation", security == {"serviceAccountTokenAutomount": False, "runAsNonRoot": True, "readOnlyRootFilesystem": True, "allowPrivilegeEscalation": False}, "preflight.security.workload-isolation-required"),
         _check("test-fixtures-denied", all(ai[key] is False for key in ("attributionTestFixtures", "priceTestFixtures", "savingsTestFixtures")), "preflight.test-fixtures.forbidden"),
@@ -629,6 +676,105 @@ def _cluster_environment(
         "clusterBindingDigest": binding,
         "namespaceDigest": _digest(namespace),
     }, {"id": "cluster-api", "status": "passed"}
+
+
+def _operational_alert_live_checks(
+    profile: Mapping[str, Any],
+    *,
+    kubectl: str,
+    context: str,
+    deployment_namespace: str,
+    live: bool,
+    cluster_available: bool,
+) -> tuple[dict[str, str], dict[str, str]]:
+    if not live:
+        return (
+            {
+                "id": "operational-alert-api",
+                "status": "not-run",
+                "errorCode": "preflight.operational-alert.api-not-run",
+            },
+            {
+                "id": "operational-alert-namespace",
+                "status": "not-run",
+                "errorCode": "preflight.operational-alert.namespace-not-run",
+            },
+        )
+    if not cluster_available:
+        return (
+            {
+                "id": "operational-alert-api",
+                "status": "failed",
+                "errorCode": "preflight.operational-alert.api-unavailable",
+            },
+            {
+                "id": "operational-alert-namespace",
+                "status": "failed",
+                "errorCode": "preflight.operational-alert.namespace-unavailable",
+            },
+        )
+
+    api_available = False
+    try:
+        raw = _run(
+            (
+                *_kubectl_base(kubectl, context),
+                "get",
+                "--raw",
+                "/apis/monitoring.coreos.com/v1",
+            ),
+            timeout=30,
+        )
+        if len(raw.encode("utf-8")) <= 1024 * 1024:
+            discovery = json.loads(raw)
+            resources = discovery.get("resources")
+            api_available = (
+                discovery.get("groupVersion") == "monitoring.coreos.com/v1"
+                and isinstance(resources, list)
+                and any(
+                    isinstance(item, dict)
+                    and item.get("name") == "prometheusrules"
+                    and item.get("kind") == "PrometheusRule"
+                    and item.get("namespaced") is True
+                    for item in resources
+                )
+            )
+    except (DeploymentPreflightError, UnicodeEncodeError, json.JSONDecodeError):
+        api_available = False
+
+    alerts = _object(profile, "operationalAlerts")
+    alert_namespace = _string(alerts, "namespace")
+    namespace_available = alert_namespace == deployment_namespace
+    if not namespace_available:
+        try:
+            namespace_uid = _run(
+                (
+                    *_kubectl_base(kubectl, context),
+                    "get",
+                    "namespace",
+                    alert_namespace,
+                    "--ignore-not-found",
+                    "-o",
+                    "jsonpath={.metadata.uid}",
+                ),
+                timeout=30,
+            ).strip()
+            namespace_available = 0 < len(namespace_uid) <= 128
+        except DeploymentPreflightError:
+            namespace_available = False
+
+    return (
+        _check(
+            "operational-alert-api",
+            api_available,
+            "preflight.operational-alert.api-unavailable",
+        ),
+        _check(
+            "operational-alert-namespace",
+            namespace_available,
+            "preflight.operational-alert.namespace-unavailable",
+        ),
+    )
 
 
 def _observe_dependency(
@@ -845,6 +991,16 @@ def generate_report(
             "errorCode": "preflight.cluster.not-run",
         }
     checks.append(cluster_check)
+    checks.extend(
+        _operational_alert_live_checks(
+            profile,
+            kubectl=kubectl,
+            context=context or "",
+            deployment_namespace=namespace,
+            live=live,
+            cluster_available=bool(cluster),
+        )
+    )
     dependency, dependency_check = _dependency_measurement(
         profile,
         kubectl=kubectl,
@@ -1052,7 +1208,7 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
                 or check.get("errorCode") != expected_error_codes.get(expected_id)
             ):
                 _fail("preflight.report.invalid")
-    cluster_check = checks[-2]
+    cluster_check = checks[-len(LIVE_CHECKS)]
     bound_cluster = "clusterBindingDigest" in environment
     if environment["mode"] == "static":
         if cluster_check.get("status") != "not-run" or bound_cluster:

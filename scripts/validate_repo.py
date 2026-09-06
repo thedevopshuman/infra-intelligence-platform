@@ -357,6 +357,7 @@ REQUIRED_PATHS = (
     "docs/decisions/0123-customer-control-plane-continuity-qualification.md",
     "docs/decisions/0147-versioned-private-pilot-operating-handoff.md",
     "docs/decisions/0148-customer-owned-operational-alert-policy-handoff.md",
+    "docs/decisions/0149-preinstall-operational-alert-prerequisite-evidence.md",
     "docs/operations/operational-alerts.md",
     "deploy/helm/infra-intelligence/templates/operational-alerts.yaml",
     "deploy/helm/infra-intelligence/examples/production-operational-alerts.values.yaml",

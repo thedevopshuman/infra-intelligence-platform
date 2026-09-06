@@ -55,6 +55,13 @@ telemetry:
   otlpEndpoint: https://otel-collector.observability.svc:4318
   existingSecret: iip-otel-export
 
+operationalAlerts:
+  enabled: true
+  namespace: observability
+  labels:
+    prometheus: platform
+    role: alert-rules
+
 telemetryEvidence:
   backend: prometheus
   prometheus:

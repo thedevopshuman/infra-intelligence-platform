@@ -5,7 +5,7 @@
 `BedrockInstrumentationCompatibilityReport` binds a compatibility claim to one
 IIP source revision, one exact Python dependency set, one Bedrock operation,
 one model and region, and either an offline botocore stub or a live AWS call.
-`compatible` means all eight `Converse` checks or all nine `ConverseStream`
+`compatible` means all ten `Converse` checks or all eleven `ConverseStream`
 checks passed for that exact qualification level; it does not silently promote
 offline evidence into live-provider proof or non-streaming evidence into
 streaming proof.
@@ -20,24 +20,35 @@ customer wrapper compares it with the reviewed target objective; timeout and
 retry configuration are bounded before the request begins.
 
 The two V0 operation profiles fix content capture off, a direct provider
-request path, an asynchronous telemetry path, and the official
-`opentelemetry-instrumentation-botocore` scope. It records the currently
-shipped legacy provider attribute, `gen_ai.system`, after IIP normalizes it to
-`aws.bedrock`. A conflicting `gen_ai.provider.name`/`gen_ai.system` pair is
-rejected instead of selecting one implicitly.
+request path, an asynchronous telemetry path, the official
+`opentelemetry-instrumentation-botocore` scope, and version `0.1.0` of the
+separately installed `iip-opentelemetry-aws-bedrock` usage adapter. The
+official scope records the currently shipped legacy provider attribute,
+`gen_ai.system`, which IIP normalizes to `aws.bedrock`. A conflicting
+`gen_ai.provider.name`/`gen_ai.system` pair is rejected instead of selecting
+one implicitly.
 
 The streaming profile consumes the returned event stream through the official
 instrumentation wrapper, requires message start/stop and a final metadata
 event, proves that the span does not finish before consumption, and normalizes
-only the final provider token totals. Streamed message fragments never enter
-the report, normalized record, or cost ledger.
+only final provider usage metadata. Streamed message fragments never enter the
+adapter, report, normalized record, or cost ledger.
 
-The pinned instrumentation reports provider input/output totals but does not
-report cache-read, cache-write, or reasoning subsets. The resulting usage is
-therefore intentionally `partial` and is not exact-cost eligible. A live model
-may become exact-cost eligible only after its billing capabilities and missing
-field semantics are separately qualified; configuring absent breakdowns as
-zero without that proof would understate spend.
+Amazon Bedrock defines its response `inputTokens` as uncached input when prompt
+caching is active, while OpenTelemetry defines `gen_ai.usage.input_tokens` as
+total input including cache. The adapter therefore publishes:
+
+```text
+gen_ai.usage.input_tokens = inputTokens + cacheReadInputTokens + cacheWriteInputTokens
+```
+
+It also publishes the provider cache values as
+`gen_ai.usage.cache_read.input_tokens` and
+`gen_ai.usage.cache_creation.input_tokens`. The qualification fixtures use
+non-zero cache values so a pass cannot be produced by zero-fill behavior.
+Reasoning remains missing, so the usage record is intentionally `partial` and
+does not claim intrinsic exact-cost eligibility. Absent provider cache meters
+also remain absent.
 
 The offline level runs the real boto3 client, botocore request machinery, and
 official instrumentation against `botocore.stub.Stubber` inside a no-network

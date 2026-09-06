@@ -59,7 +59,7 @@
             "provider": {"const": "aws.bedrock"},
             "operation": {"enum": ["Converse", "ConverseStream"]},
             "invocationTarget": {"const": "aws-bedrock"},
-            "instrumentation": {"const": "official-pinned-otel-python-botocore"},
+            "instrumentation": {"const": "official-botocore-with-pinned-iip-usage-adapter"},
             "credentialMode": {"const": "protected-dedicated-session-credentials-file"},
             "requestPath": {"const": "direct-to-provider"},
             "telemetryPath": {"const": "asynchronous-otel"},
@@ -92,8 +92,8 @@
         },
         "checks": {
           "type": "array",
-          "minItems": 18,
-          "maxItems": 18,
+          "minItems": 20,
+          "maxItems": 20,
           "prefixItems": [
             {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-binding"}}},
             {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
@@ -109,6 +109,8 @@
             {"$ref": "#/$defs/check", "properties": {"id": {"const": "supported-instrumentation-scope"}}},
             {"$ref": "#/$defs/check", "properties": {"id": {"const": "metadata-only-span"}}},
             {"$ref": "#/$defs/check", "properties": {"id": {"const": "provider-token-totals"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "cache-meter-enrichment"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "otel-total-input-semantics"}}},
             {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-normalization"}}},
             {"$ref": "#/$defs/check", "properties": {"id": {"const": "async-export-failure-isolated"}}},
             {"$ref": "#/$defs/check", "properties": {"id": {"const": "cost-eligibility-honest"}}},
@@ -135,9 +137,9 @@
           "additionalProperties": false,
           "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
           "properties": {
-            "totalChecks": {"const": 18},
-            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 18},
-            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 18},
+            "totalChecks": {"const": 20},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 20},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 20},
             "overallStatus": {"enum": ["qualified", "not-qualified"]}
           }
         }

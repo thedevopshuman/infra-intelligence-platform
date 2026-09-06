@@ -10,7 +10,9 @@ subsystem. It reuses the existing isolated OTLP intake, tenant channel,
 PostgreSQL durability, CloudEvents, evidence, export-health, SDK, and deployment
 patterns. The receiver recognizes the standard OpenTelemetry provider
 attribute plus the exact legacy alias emitted by the pinned Bedrock profile;
-normalized records and cost calculation remain provider neutral.
+the separately installed Bedrock usage adapter converts provider uncached and
+cache counters into OTel total-input semantics before export. Normalized
+records and cost calculation remain provider neutral.
 
 ```mermaid
 flowchart LR
@@ -51,7 +53,7 @@ wait for IIP, the Collector, or Grafana.
 
 | Boundary | Responsibility |
 | --- | --- |
-| Upstream instrumentation | Produce standard GenAI span metadata and provider-reported usage when available. |
+| Upstream instrumentation | Produce standard GenAI span metadata and provider-reported usage when available. The pinned Bedrock adapter corrects its provider-specific input/cache semantics before export. |
 | Customer Collector | Batch, buffer, retry, authenticate, redact, and route telemetry according to customer policy. |
 | Trace receiver surface | Authenticate the channel, bind tenant and integration, enforce bounds, decode OTLP, and reject content attributes. |
 | Provider adapter | Translate accepted provider attributes into the canonical usage input without granting authority. |
@@ -88,6 +90,11 @@ non-reasoning output = outputTokens - reasoningOutputTokens
 
 Negative results are invalid. Missing breakdown values are zero only when the
 source reports the parent total as complete; otherwise pricing is unresolved.
+For Bedrock prompt caching, the provider response instead reports uncached
+input separately. The provider adapter calculates canonical total input as
+`inputTokens + cacheReadInputTokens + cacheWriteInputTokens` before IIP sees
+the span; the provider-neutral engine still applies the formula above exactly
+once.
 
 ## Pricing and cost semantics
 
@@ -242,13 +249,16 @@ the kernel contains no provider pricing branch. This proves the local contract
 flow, not live provider instrumentation or invoice compatibility.
 
 The exact pinned Python botocore `Converse` and `ConverseStream` profiles now
-have separate source-bound no-network evidence. They exposed two upstream facts
-hidden by the synthetic flow: the shipped scope is service-specific and the
-provider still arrives as legacy `gen_ai.system`. The streaming gate also
+have separate source-bound no-network evidence. They exposed three upstream
+facts hidden by the synthetic flow: the shipped scope is service-specific, the
+provider still arrives as legacy `gen_ai.system`, and Bedrock's input counter
+excludes cache meters while OTel's total includes them. The streaming gate also
 proves the official span stays open until final metadata is consumed. The
-adapter normalizes that alias with conflict rejection. Missing cache/reasoning
-subsets remain missing, so neither profile is promoted to exact-cost
-eligibility. A separately enabled customer gate now binds one reviewed live
+receiver normalizes the provider alias with conflict rejection; the separately
+installed pinned usage adapter adds non-zero cache meters and canonical total
+input without reading content. Reasoning remains missing, so neither usage
+profile alone is promoted to exact-cost eligibility. A separately enabled
+customer gate now binds one reviewed live
 model/region/operation to a clean source and immutable release image, supplies
 temporary AWS session credentials through one protected read-only file, and
 emits expiry-bound minimized evidence. Repository verification covers that

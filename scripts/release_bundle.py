@@ -178,13 +178,20 @@ def _validate_release_identity(
     chart_version: str,
     python_sdk_version: str,
     typescript_sdk_version: str,
+    bedrock_instrumentation_version: str,
     revision: str,
     source_date: str,
     platforms: Sequence[str],
 ) -> None:
     if any(
         SEMVER.fullmatch(value) is None
-        for value in (version, chart_version, python_sdk_version, typescript_sdk_version)
+        for value in (
+            version,
+            chart_version,
+            python_sdk_version,
+            typescript_sdk_version,
+            bedrock_instrumentation_version,
+        )
     ):
         raise ReleaseBundleError("release.version.invalid")
     if REVISION.fullmatch(revision) is None:
@@ -207,6 +214,7 @@ def _artifact_specs(
     chart_version: str,
     python_sdk_version: str,
     typescript_sdk_version: str,
+    bedrock_instrumentation_version: str,
     *,
     include_mediation_bridge: bool = True,
 ) -> tuple[tuple[str, str, str], ...]:
@@ -246,6 +254,12 @@ def _artifact_specs(
             "typescript-sdk",
             "application/vnd.npm.package+gzip",
         ),
+        (
+            "iip-opentelemetry-aws-bedrock-"
+            f"{bedrock_instrumentation_version}.tar.gz",
+            "bedrock-otel-instrumentation-source",
+            "application/gzip",
+        ),
     )
 
 
@@ -256,6 +270,7 @@ def finalize_bundle(
     chart_version: str,
     python_sdk_version: str,
     typescript_sdk_version: str,
+    bedrock_instrumentation_version: str,
     revision: str,
     source_date: str,
     platforms: Sequence[str],
@@ -265,6 +280,7 @@ def finalize_bundle(
         chart_version=chart_version,
         python_sdk_version=python_sdk_version,
         typescript_sdk_version=typescript_sdk_version,
+        bedrock_instrumentation_version=bedrock_instrumentation_version,
         revision=revision,
         source_date=source_date,
         platforms=platforms,
@@ -274,7 +290,11 @@ def finalize_bundle(
 
     artifacts = []
     for filename, role, media_type in _artifact_specs(
-        version, chart_version, python_sdk_version, typescript_sdk_version
+        version,
+        chart_version,
+        python_sdk_version,
+        typescript_sdk_version,
+        bedrock_instrumentation_version,
     ):
         path = bundle / filename
         if not path.is_file() or path.stat().st_size < 1:
@@ -311,6 +331,7 @@ def finalize_bundle(
             "chartVersion": chart_version,
             "pythonSdkVersion": python_sdk_version,
             "typescriptSdkVersion": typescript_sdk_version,
+            "bedrockInstrumentationVersion": bedrock_instrumentation_version,
             "revision": revision,
             "sourceDate": source_date,
             "signatureStatus": "unsigned",
@@ -387,6 +408,7 @@ def verify_bundle(bundle: Path) -> Mapping[str, Any]:
         "chartVersion",
         "pythonSdkVersion",
         "typescriptSdkVersion",
+        "bedrockInstrumentationVersion",
         "revision",
         "sourceDate",
     )
@@ -406,6 +428,7 @@ def verify_bundle(bundle: Path) -> Mapping[str, Any]:
         chart_version=metadata["chartVersion"],
         python_sdk_version=metadata["pythonSdkVersion"],
         typescript_sdk_version=metadata["typescriptSdkVersion"],
+        bedrock_instrumentation_version=metadata["bedrockInstrumentationVersion"],
         revision=metadata["revision"],
         source_date=metadata["sourceDate"],
         platforms=tuple(item["name"] for item in declared_platforms),
@@ -433,6 +456,7 @@ def verify_bundle(bundle: Path) -> Mapping[str, Any]:
         metadata["chartVersion"],
         metadata["pythonSdkVersion"],
         metadata["typescriptSdkVersion"],
+        metadata["bedrockInstrumentationVersion"],
         include_mediation_bridge=bridge_declared,
     )
     expected_artifacts = {
@@ -499,6 +523,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     finalize.add_argument("--chart-version", required=True)
     finalize.add_argument("--python-sdk-version", required=True)
     finalize.add_argument("--typescript-sdk-version", required=True)
+    finalize.add_argument("--bedrock-instrumentation-version", required=True)
     finalize.add_argument("--revision", required=True)
     finalize.add_argument("--source-date", required=True)
     finalize.add_argument("--platforms", required=True)
@@ -513,6 +538,9 @@ def main(argv: Iterable[str] | None = None) -> int:
                 chart_version=arguments.chart_version,
                 python_sdk_version=arguments.python_sdk_version,
                 typescript_sdk_version=arguments.typescript_sdk_version,
+                bedrock_instrumentation_version=(
+                    arguments.bedrock_instrumentation_version
+                ),
                 revision=arguments.revision,
                 source_date=arguments.source_date,
                 platforms=_platforms(arguments.platforms),

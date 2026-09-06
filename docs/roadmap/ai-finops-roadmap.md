@@ -42,8 +42,11 @@ separate no-network gates against the exact pinned official Python botocore
 `Converse` and `ConverseStream` instrumentation. The streaming gate consumes
 the actual wrapped event stream through final usage metadata and proves span
 completion is deferred until then. Both gates normalize the shipped legacy
-provider attribute and service-specific scope without guessing absent
-cache/reasoning usage. A protected, expiry-bound customer workflow now
+provider attribute and service-specific scope. A separately installed,
+fail-open OpenTelemetry adapter now maps non-zero provider cache meters and
+converts Bedrock's uncached input into OTel total-input semantics without
+reading content or entering the inference path. Absent cache and reasoning
+meters remain unknown. A protected, expiry-bound customer workflow now
 qualifies one explicitly selected live model/region/operation using a dedicated
 temporary-session credentials file and retains no target or content in its
 transportable report; executing the selected billable call remains external.

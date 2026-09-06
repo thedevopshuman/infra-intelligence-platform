@@ -51,10 +51,17 @@ class BedrockInstrumentationCompatibilityContractTests(unittest.TestCase):
             self.stream_example["spec"]["profile"]["operation"],
             "ConverseStream",
         )
+        self.assertEqual(
+            self.example["spec"]["result"]["missingUsageFields"],
+            ["reasoningOutputTokens"],
+        )
+        self.assertTrue(
+            self.example["spec"]["result"]["cacheMetersVerified"]
+        )
         self.assertTrue(
             self.stream_example["spec"]["result"]["streamingVerified"]
         )
-        self.assertEqual(self.stream_example["spec"]["summary"]["totalChecks"], 9)
+        self.assertEqual(self.stream_example["spec"]["summary"]["totalChecks"], 11)
 
     def test_semantics_reject_live_overclaim_and_partial_exact_cost(self) -> None:
         live_overclaim = copy.deepcopy(self.example)
@@ -90,6 +97,9 @@ class BedrockInstrumentationCompatibilityHarnessTests(unittest.TestCase):
             ROOT / "requirements" / "bedrock-compatibility.txt"
         ).read_text(encoding="utf-8")
         product = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        adapter = (
+            ROOT / "instrumentation" / "python" / "aws-bedrock" / "pyproject.toml"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("boto3==1.43.73", requirements)
         self.assertIn(
@@ -98,6 +108,12 @@ class BedrockInstrumentationCompatibilityHarnessTests(unittest.TestCase):
         )
         self.assertNotIn("boto3", product)
         self.assertNotIn("opentelemetry-instrumentation-botocore", product)
+        self.assertIn('botocore==1.43.73', adapter)
+        self.assertIn(
+            'opentelemetry-instrumentation-botocore==0.65b0',
+            adapter,
+        )
+        self.assertIn("opentelemetry_pre_instrument", adapter)
 
     def test_offline_runner_is_no_network_and_live_credentials_are_explicit(self) -> None:
         runner = (ROOT / "scripts" / "test_bedrock_instrumentation.sh").read_text(
@@ -135,6 +151,28 @@ class BedrockInstrumentationCompatibilityHarnessTests(unittest.TestCase):
         self.assertIn("BatchSpanProcessor", harness)
         self.assertIn("total_max_attempts", harness)
         self.assertIn("providerCallLatencyMilliseconds", harness)
+        self.assertIn("install_bedrock_usage_enrichment", harness)
+        self.assertIn("gen_ai.usage.cache_creation.input_tokens", harness)
+
+    def test_usage_adapter_is_isolated_metadata_only_and_fail_open(self) -> None:
+        adapter = (
+            ROOT
+            / "instrumentation"
+            / "python"
+            / "aws-bedrock"
+            / "src"
+            / "iip_otel_aws_bedrock"
+            / "enrichment.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("from iip", adapter)
+        self.assertNotIn("infra_intelligence_sdk", adapter)
+        self.assertNotIn('"messages"', adapter)
+        self.assertNotIn('"output"', adapter)
+        self.assertIn("except Exception", adapter)
+        self.assertIn("total_input += value", adapter)
+        self.assertIn("gen_ai.usage.cache_read.input_tokens", adapter)
+        self.assertIn("gen_ai.usage.cache_creation.input_tokens", adapter)
 
 
 if __name__ == "__main__":

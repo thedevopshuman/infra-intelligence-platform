@@ -52,9 +52,10 @@ billing claim.
    report retains canonical digests, operation class, aggregate timing/counts,
    closed checks, validity, and explicit limitations.
 8. Keep customer Collector/PKI delivery and authoritative catalog
-   qualification as separate evidence. Missing cache/reasoning meters remain
-   partial and cannot become exact cost merely because the provider call
-   succeeds.
+   qualification as separate evidence. ADR 0137 subsequently adds qualified
+   cache-meter and total-input normalization; reasoning and absent provider
+   meters remain partial and cannot become exact cost merely because the
+   provider call succeeds.
 
 ## Consequences
 

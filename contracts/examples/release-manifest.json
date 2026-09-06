@@ -6,6 +6,7 @@
     "chartVersion": "0.87.0",
     "pythonSdkVersion": "0.66.0",
     "typescriptSdkVersion": "0.66.0",
+    "bedrockInstrumentationVersion": "0.1.0",
     "revision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDate": "2026-08-17T04:45:00Z",
     "signatureStatus": "unsigned"
@@ -53,6 +54,13 @@
         "mediaType": "application/vnd.npm.package+gzip",
         "sizeBytes": 16384,
         "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      {
+        "path": "iip-opentelemetry-aws-bedrock-0.1.0.tar.gz",
+        "role": "bedrock-otel-instrumentation-source",
+        "mediaType": "application/gzip",
+        "sizeBytes": 8192,
+        "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
       }
     ],
     "image": {

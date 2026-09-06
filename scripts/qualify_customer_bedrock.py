@@ -58,6 +58,8 @@ CHECK_IDS = (
     "supported-instrumentation-scope",
     "metadata-only-span",
     "provider-token-totals",
+    "cache-meter-enrichment",
+    "otel-total-input-semantics",
     "receiver-normalization",
     "async-export-failure-isolated",
     "cost-eligibility-honest",
@@ -70,6 +72,8 @@ COMPATIBILITY_COMMON_CHECKS = (
     "provider-alias-normalized",
     "metadata-only-span",
     "provider-token-totals",
+    "cache-meter-enrichment",
+    "otel-total-input-semantics",
     "receiver-normalization",
     "async-export-failure-isolated",
 )
@@ -103,6 +107,7 @@ PINNED_VERSIONS = {
     "boto3Version": "1.43.73",
     "botocoreVersion": "1.43.73",
     "instrumentationVersion": "0.65b0",
+    "usageAdapterVersion": "0.1.0",
     "otelSdkVersion": "1.44.0",
 }
 CREDENTIAL_KEYS = frozenset(
@@ -447,6 +452,7 @@ def _expected_compatibility_id(report: Mapping[str, Any]) -> str:
             "boto3": environment.get("boto3Version"),
             "botocore": environment.get("botocoreVersion"),
             "instrumentation": environment.get("instrumentationVersion"),
+            "usageAdapter": environment.get("usageAdapterVersion"),
             "otelSdk": environment.get("otelSdkVersion"),
         },
     }
@@ -488,17 +494,18 @@ def validate_live_report(
         or observed_profile.get("invocationTarget") != "aws-bedrock"
         or observed_profile.get("instrumentationScope")
         != "opentelemetry.instrumentation.botocore.bedrock-runtime"
+        or observed_profile.get("usageAdapter")
+        != "iip-opentelemetry-aws-bedrock"
         or observed_profile.get("contentCapture") is not False
         or observed_profile.get("requestPath") != "direct-to-provider"
         or observed_profile.get("telemetryPath") != "asynchronous-otel"
         or result.get("normalizedProvider") != "aws.bedrock"
         or result.get("usageCompleteness") != "partial"
-        or result.get("missingUsageFields")
-        != [
-            "cacheReadInputTokens",
-            "cacheWriteInputTokens",
-            "reasoningOutputTokens",
-        ]
+        or result.get("missingUsageFields") != ["reasoningOutputTokens"]
+        or result.get("providerInputTokenSemantics") != "uncached-input"
+        or result.get("normalizedInputTokenSemantics")
+        != "total-input-including-cache"
+        or result.get("cacheMetersVerified") is not True
         or result.get("contentCaptured") is not False
         or result.get("rawPayloadPersisted") is not False
         or result.get("exactCostEligible") is not False
@@ -608,6 +615,8 @@ def build_report(
         "supported-instrumentation-scope": True,
         "metadata-only-span": True,
         "provider-token-totals": True,
+        "cache-meter-enrichment": True,
+        "otel-total-input-semantics": True,
         "receiver-normalization": True,
         "async-export-failure-isolated": True,
         "cost-eligibility-honest": True,
@@ -636,7 +645,7 @@ def build_report(
             "provider": "aws.bedrock",
             "operation": target["operation"],
             "invocationTarget": "aws-bedrock",
-            "instrumentation": "official-pinned-otel-python-botocore",
+            "instrumentation": "official-botocore-with-pinned-iip-usage-adapter",
             "credentialMode": "protected-dedicated-session-credentials-file",
             "requestPath": "direct-to-provider",
             "telemetryPath": "asynchronous-otel",

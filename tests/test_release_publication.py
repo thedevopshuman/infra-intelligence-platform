@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VERSION = "0.84.0"
 CHART_VERSION = "0.87.0"
 SDK_VERSION = "0.66.0"
+BEDROCK_INSTRUMENTATION_VERSION = "0.1.0"
 
 
 class RecordingPublisher:
@@ -73,6 +74,8 @@ class ReleasePublicationTests(unittest.TestCase):
             f"infra-intelligence-contracts-{VERSION}.tar.gz",
             f"infra-intelligence-sdk-{SDK_VERSION}.tar.gz",
             f"iip-sdk-{SDK_VERSION}.tgz",
+            "iip-opentelemetry-aws-bedrock-"
+            f"{BEDROCK_INSTRUMENTATION_VERSION}.tar.gz",
         ):
             (self.bundle / filename).write_bytes(filename.encode("ascii"))
         finalize_bundle(
@@ -81,6 +84,7 @@ class ReleasePublicationTests(unittest.TestCase):
             chart_version=CHART_VERSION,
             python_sdk_version=SDK_VERSION,
             typescript_sdk_version=SDK_VERSION,
+            bedrock_instrumentation_version=BEDROCK_INSTRUMENTATION_VERSION,
             revision=current_revision(),
             source_date="2026-09-07T08:00:00Z",
             platforms=("linux/amd64", "linux/arm64"),

@@ -9,6 +9,9 @@ WORKDIR /app
 COPY requirements/bedrock-compatibility.txt /tmp/bedrock-compatibility.txt
 RUN python -m pip install --no-cache-dir --requirement /tmp/bedrock-compatibility.txt
 
+COPY instrumentation/python/aws-bedrock ./instrumentation/python/aws-bedrock
+RUN python -m pip install --no-cache-dir --no-deps ./instrumentation/python/aws-bedrock
+
 COPY pyproject.toml README.md ./
 COPY src ./src
 RUN addgroup --system --gid 10001 iip \

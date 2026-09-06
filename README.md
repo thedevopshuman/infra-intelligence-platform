@@ -74,10 +74,12 @@ An opt-in customer Bedrock gate now binds one reviewed model, region, and
 `Converse`/`ConverseStream` operation to the current clean source and immutable
 application image. It supplies temporary AWS session credentials through one
 dedicated mode-`0600` file mounted read-only into the pinned instrumentation
-container, makes one fixed synthetic request, and emits expiry-bound minimized
-evidence without retaining the target, credential, prompt, response, request
-ID, or token quantities. The mechanism is repository-verified; a customer must
-still run the selected live call. See the [customer Bedrock qualification
+container. A separately packaged metadata-only OTel adapter corrects Bedrock
+uncached/cache usage into standard total-input semantics without proxying the
+request. The gate makes one fixed synthetic request and emits expiry-bound
+minimized evidence without retaining the target, credential, prompt, response,
+request ID, or token quantities. The mechanism is repository-verified; a
+customer must still run the selected live call. See the [customer Bedrock qualification
 runbook](docs/operations/customer-bedrock-qualification.md).
 
 A pinned-Collector customer receiver gate now sends one synthetic metric, log,
@@ -264,12 +266,14 @@ full-flow gate now renders the usage, cost, change, saving, coverage, and protec
 application/team allocation dashboard. Separate
 no-network gates exercise the exact pinned official botocore `Converse` and
 `ConverseStream` instrumentation, including deferred stream-span completion,
-the shipped legacy provider attribute, and service-specific scope; another
+the shipped legacy provider attribute, service-specific scope, non-zero cache
+meters, and OTel total-input correction through the isolated Bedrock usage
+adapter; another
 exercises the real OpenAI Python client and official
 chat-completions instrumentation. Both prove receiver normalization and
 asynchronous exporter failure isolation without importing provider SDKs into
-the product image. Missing upstream token breakdowns remain unresolved rather
-than becoming zero. A protected, expiry-bound customer Bedrock workflow now
+the product image. Missing reasoning or provider cache meters remain unresolved
+rather than becoming zero. A protected, expiry-bound customer Bedrock workflow now
 qualifies one explicitly selected live model/region/operation without retaining
 credentials, target identity, prompt, response, request ID, or token counts;
 executing that billable call remains customer-owned. Live OpenAI

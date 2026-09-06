@@ -2,11 +2,12 @@
 
 **Status:** Executable offline interoperability profile; live profile opt-in
 
-This gate qualifies the official Python botocore instrumentation against IIP's
-metadata-only GenAI trace receiver without adding an IIP SDK or proxying the
-model request. The exact reviewed dependency set is isolated in
-`requirements/bedrock-compatibility.txt` and never enters the IIP product
-image.
+This gate qualifies the official Python botocore instrumentation plus the
+separately installed IIP Bedrock usage adapter against IIP's metadata-only
+GenAI trace receiver. It adds neither an IIP application SDK nor an inference
+proxy. The exact reviewed dependency set is isolated in
+`requirements/bedrock-compatibility.txt`; the adapter lives under
+`instrumentation/python/aws-bedrock`; neither enters the IIP product image.
 
 The upstream botocore instrumentation is currently published as a beta
 package. Keep it pinned, review semantic changes before upgrading, and rerun
@@ -38,6 +39,8 @@ The gate verifies:
   `gen_ai.provider.name`;
 - provider-reported input/output totals, metadata-only span contents, and the
   real IIP protobuf decoder, channel allowlist, ingestion service, and ledger;
+- non-zero provider cache-read/cache-write counters, their standard OTel
+  attributes, and normalization of Bedrock uncached input into OTel total input;
 - complete stream consumption, final metadata usage, and deferred span
   completion for `ConverseStream`; and
 - a deterministic failed exporter behind a batch processor does not change the
@@ -51,15 +54,40 @@ presented as evidence of live AWS behavior.
 
 ## Important cost limitation
 
-The pinned official instrumentation does not expose cache-read, cache-write,
-or reasoning-token subsets. The compatibility profile leaves those fields
-missing, so IIP records the usage as `partial` and does not claim exact cost
-eligibility. Do not add these fields to `zeroWhenAbsent` unless the chosen
-model, operation, and billing behavior prove that absence means zero.
+The pinned official instrumentation does not expose Bedrock cache counters and
+copies Bedrock's uncached `inputTokens` into OTel's total-input attribute. The
+IIP usage adapter corrects both behaviors for `Converse` and `ConverseStream`:
+it publishes cache read/cache creation and calculates OTel total input from the
+three provider input meters. It never converts an absent provider meter to
+zero.
+
+Bedrock does not expose the provider-neutral reasoning-output subset in this
+profile. IIP therefore records the normalized usage as `partial` and does not
+claim that the usage fact alone is exact-cost eligible. The cost engine must
+leave it unresolved unless the exact selected catalog rates make the missing
+split mathematically irrelevant; that separate behavior is not part of this
+qualification.
 
 The synthetic AI FinOps demo uses an explicitly controlled fixture profile to
-exercise full cost arithmetic. That proof and this upstream interoperability
+exercise full cost arithmetic. That proof and this provider-interoperability
 proof answer different questions.
+
+## Customer application installation
+
+Install the adapter beside the pinned normal OpenTelemetry Python botocore
+instrumentation in the customer application environment, then keep using the
+standard launcher:
+
+```bash
+python -m pip install ./instrumentation/python/aws-bedrock
+opentelemetry-instrument python customer_application.py
+```
+
+The package registers an `opentelemetry_pre_instrument` hook so its exact
+Bedrock extension loads before ordinary botocore auto-instrumentation. Manual
+instrumentation may call `iip_otel_aws_bedrock.install()` before
+`BotocoreInstrumentor().instrument(...)`. Do not mix unqualified dependency
+versions; this first adapter intentionally pins its private upstream boundary.
 
 ## Opt-in live qualification
 

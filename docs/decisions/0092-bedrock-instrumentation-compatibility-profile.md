@@ -44,6 +44,12 @@ Add a source-bound compatibility report and two explicit qualification levels:
    final metadata event with provider totals, and proof that the official span
    did not finish before consumption.
 
+**Amendment:** [ADR 0137](0137-bedrock-otel-cache-usage-normalization.md)
+supersedes item 6 for the exact pinned Python profile. A separately installed
+metadata-only OTel adapter now preserves reported cache meters and corrects
+Bedrock uncached input into OTel total-input semantics; reasoning and absent
+provider meters remain missing.
+
 ## Consequences
 
 - The standard Python auto-instrumentation route is executable without adding
@@ -53,8 +59,8 @@ Add a source-bound compatibility report and two explicit qualification levels:
 - A live report is model-, region-, and operation-specific. Streaming is
   claimed only by a `ConverseStream` report; neither operation proves invoice
   agreement, customer PKI/Collector behavior, or production load.
-- Cost calculation for this conservative upstream profile stays unresolved
-  until a model-specific breakdown policy or richer standard instrumentation
-  is qualified.
+- Cost calculation stays unresolved when a price-sensitive meter is missing.
+  ADR 0137 resolves reported cache meters but does not infer reasoning or
+  absent provider values.
 - Future semantic-convention migrations remain adapter concerns and must add
   conflict tests rather than silently changing normalized domain records.

@@ -1,10 +1,11 @@
 # Customer Bedrock qualification
 
 This optional customer-environment gate makes one real, billable Amazon
-Bedrock request. It validates the direct application-to-provider and official
-OpenTelemetry instrumentation path; it does not proxy model traffic. Use a
-clean checkout of the exact release source and Docker Desktop or another
-compatible Docker engine. Kubernetes is not required.
+Bedrock request. It validates the direct application-to-provider path through
+official OpenTelemetry botocore instrumentation and the pinned metadata-only
+IIP usage adapter; it does not proxy model traffic. Use a clean checkout of the
+exact release source and Docker Desktop or another compatible Docker engine.
+Kubernetes is not required.
 
 ## Prepare the reviewed profile
 
@@ -58,8 +59,9 @@ container environment.
 
 The command sends the fixed synthetic request already reviewed in the pinned
 compatibility harness. It asks for one short response, disables message-content
-capture, and retains neither prompt nor response. It can incur a small AWS
-charge.
+capture, verifies cache counters and OTel total-input normalization, and
+retains neither prompt nor response. Reasoning usage remains unresolved. The
+call can incur a small AWS charge.
 
 ```sh
 make qualify-customer-bedrock \

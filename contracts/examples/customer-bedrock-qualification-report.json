@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerBedrockQualificationReport",
   "metadata": {
-    "id": "cbq_9d6f2c6e9c784cea7259ffe8fcf4078e",
+    "id": "cbq_dadfd6db886d68aeeb075ec278057e85",
     "generatedAt": "2026-09-08T09:05:00Z",
     "validUntil": "2026-09-09T09:05:00Z",
     "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -28,7 +28,7 @@
       "provider": "aws.bedrock",
       "operation": "ConverseStream",
       "invocationTarget": "aws-bedrock",
-      "instrumentation": "official-pinned-otel-python-botocore",
+      "instrumentation": "official-botocore-with-pinned-iip-usage-adapter",
       "credentialMode": "protected-dedicated-session-credentials-file",
       "requestPath": "direct-to-provider",
       "telemetryPath": "asynchronous-otel",
@@ -63,6 +63,8 @@
       {"id": "supported-instrumentation-scope", "status": "passed"},
       {"id": "metadata-only-span", "status": "passed"},
       {"id": "provider-token-totals", "status": "passed"},
+      {"id": "cache-meter-enrichment", "status": "passed"},
+      {"id": "otel-total-input-semantics", "status": "passed"},
       {"id": "receiver-normalization", "status": "passed"},
       {"id": "async-export-failure-isolated", "status": "passed"},
       {"id": "cost-eligibility-honest", "status": "passed"},
@@ -77,8 +79,8 @@
       "additional-models-regions-operations-and-provider-apis-not-qualified"
     ],
     "summary": {
-      "totalChecks": 18,
-      "passedChecks": 18,
+      "totalChecks": 20,
+      "passedChecks": 20,
       "failedChecks": 0,
       "overallStatus": "qualified"
     }

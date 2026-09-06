@@ -30,6 +30,7 @@ REGISTRY_IMAGE = (
     "a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373"
 )
 SDK_VERSION = "0.66.0"
+BEDROCK_INSTRUMENTATION_VERSION = "0.1.0"
 
 
 def _run(command: tuple[str, ...], *, capture: bool = False) -> str:
@@ -101,6 +102,8 @@ def _fixture_bundle(directory: Path) -> tuple[Path, str]:
         f"infra-intelligence-contracts-{version}.tar.gz",
         f"infra-intelligence-sdk-{SDK_VERSION}.tar.gz",
         f"iip-sdk-{SDK_VERSION}.tgz",
+        "iip-opentelemetry-aws-bedrock-"
+        f"{BEDROCK_INSTRUMENTATION_VERSION}.tar.gz",
     ):
         (bundle / filename).write_bytes(filename.encode("ascii"))
     source_date = _run(
@@ -113,6 +116,7 @@ def _fixture_bundle(directory: Path) -> tuple[Path, str]:
         chart_version=chart_version,
         python_sdk_version=SDK_VERSION,
         typescript_sdk_version=SDK_VERSION,
+        bedrock_instrumentation_version=BEDROCK_INSTRUMENTATION_VERSION,
         revision=revision,
         source_date=source_date,
         platforms=("linux/amd64", "linux/arm64"),

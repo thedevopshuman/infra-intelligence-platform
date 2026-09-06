@@ -4,9 +4,9 @@
 
 The customer Bedrock qualification is an explicitly enabled, one-call proof
 that one exact approved AWS Bedrock model, region, and operation work through
-the pinned official Python botocore instrumentation and the shipped IIP
-metadata-only normalization boundary. It adds no runtime inference proxy or
-product SDK.
+the pinned official Python botocore instrumentation, the separately installed
+IIP usage adapter, and the shipped IIP metadata-only normalization boundary.
+It adds no runtime inference proxy or product SDK.
 
 The contracts are:
 
@@ -44,16 +44,18 @@ report, or passes those values as Docker environment variables.
 
 The isolated pinned compatibility image makes exactly one fixed synthetic
 request directly to AWS. `ConverseStream` must be consumed through its final
-usage event before the official span completes. Both operations encode the
-actual span as OTLP and pass it through the real IIP receiver adapter and
-ingestion service. A deliberately failing asynchronous exporter must not
-change the successful provider result.
+usage event before the official span completes. Both operations must expose
+provider cache-read/cache-write meters and normalize Bedrock's uncached input
+counter into OpenTelemetry total-input semantics before encoding the actual
+span as OTLP and passing it through the real IIP receiver and ingestion
+service. A deliberately failing asynchronous exporter must not change the
+successful provider result.
 
 The protected `BedrockInstrumentationCompatibilityReport` must say
 `live-provider-interoperability`, match the selected target and current clean
 source, carry the exact pinned boto3, botocore, OpenTelemetry instrumentation,
-and SDK versions, and record a provider-call duration within the reviewed
-objective. Offline Stubber evidence cannot satisfy this contract.
+usage adapter, and SDK versions, and record a provider-call duration within
+the reviewed objective. Offline Stubber evidence cannot satisfy this contract.
 
 ## Minimized report
 
@@ -64,7 +66,7 @@ version, and immutable image by SHA-256. It retains:
 - `Converse` or `ConverseStream`, but not model or region;
 - one provider call and one normalized usage record;
 - provider-call latency, but not token quantities;
-- 18 closed pass/fail checks;
+- 20 closed pass/fail checks, including cache-meter and total-input semantics;
 - exact generation and expiry times; and
 - six explicit non-claims.
 
@@ -76,7 +78,9 @@ the complete underlying report, current clean source, image digest, bindings,
 identity, and expiry.
 
 Successful evidence proves only the selected call and instrumentation profile.
-It does not prove credential expiry/revocation or IAM least authority, model
-quality/safety, exact cost, price authority, invoice agreement, deployed
-Collector/PKI transport, sustained load, quota behavior, regional HA, or any
-other model, region, operation, or provider API.
+It verifies cache meters when the selected response contains them but still
+leaves reasoning usage unresolved. It does not prove credential
+expiry/revocation or IAM least authority, model quality/safety, exact cost,
+price authority, invoice agreement, deployed Collector/PKI transport,
+sustained load, quota behavior, regional HA, or any other model, region,
+operation, or provider API.

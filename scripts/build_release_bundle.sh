@@ -34,6 +34,10 @@ IIP_RELEASE_TYPESCRIPT_SDK_VERSION=$(
     "$IIP_RELEASE_PYTHON" -c \
         'import json; print(json.load(open("sdks/typescript/package.json"))["version"])'
 )
+IIP_RELEASE_BEDROCK_INSTRUMENTATION_VERSION=$(
+    "$IIP_RELEASE_PYTHON" -c \
+        'import tomllib; print(tomllib.load(open("instrumentation/python/aws-bedrock/pyproject.toml", "rb"))["project"]["version"])'
+)
 IIP_RELEASE_CHART_VERSION=$(awk '$1 == "version:" {print $2; exit}' deploy/helm/infra-intelligence/Chart.yaml)
 IIP_RELEASE_CHART_APP_VERSION=$(awk '$1 == "appVersion:" {gsub(/"/, "", $2); print $2; exit}' deploy/helm/infra-intelligence/Chart.yaml)
 IIP_RELEASE_REVISION=$(git rev-parse HEAD)
@@ -69,6 +73,10 @@ git archive --format=tar.gz \
     --prefix="infra-intelligence-sdk-$IIP_RELEASE_PYTHON_SDK_VERSION/" \
     --output="$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-sdk-$IIP_RELEASE_PYTHON_SDK_VERSION.tar.gz" \
     HEAD:sdks/python
+git archive --format=tar.gz \
+    --prefix="iip-opentelemetry-aws-bedrock-$IIP_RELEASE_BEDROCK_INSTRUMENTATION_VERSION/" \
+    --output="$IIP_RELEASE_BUNDLE_ABSOLUTE/iip-opentelemetry-aws-bedrock-$IIP_RELEASE_BEDROCK_INSTRUMENTATION_VERSION.tar.gz" \
+    HEAD:instrumentation/python/aws-bedrock
 
 (
     cd sdks/typescript
@@ -103,6 +111,7 @@ git archive --format=tar.gz \
     --chart-version "$IIP_RELEASE_CHART_VERSION" \
     --python-sdk-version "$IIP_RELEASE_PYTHON_SDK_VERSION" \
     --typescript-sdk-version "$IIP_RELEASE_TYPESCRIPT_SDK_VERSION" \
+    --bedrock-instrumentation-version "$IIP_RELEASE_BEDROCK_INSTRUMENTATION_VERSION" \
     --revision "$IIP_RELEASE_REVISION" \
     --source-date "$IIP_RELEASE_SOURCE_DATE" \
     --platforms "$IIP_RELEASE_PLATFORMS"

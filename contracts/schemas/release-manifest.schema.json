@@ -16,6 +16,7 @@
         "chartVersion",
         "pythonSdkVersion",
         "typescriptSdkVersion",
+        "bedrockInstrumentationVersion",
         "revision",
         "sourceDate",
         "signatureStatus"
@@ -25,6 +26,7 @@
         "chartVersion": { "$ref": "#/$defs/semver" },
         "pythonSdkVersion": { "$ref": "#/$defs/semver" },
         "typescriptSdkVersion": { "$ref": "#/$defs/semver" },
+        "bedrockInstrumentationVersion": { "$ref": "#/$defs/semver" },
         "revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
         "sourceDate": { "type": "string", "format": "date-time" },
         "signatureStatus": { "const": "unsigned" }
@@ -37,8 +39,8 @@
       "properties": {
         "artifacts": {
           "type": "array",
-          "minItems": 5,
-          "maxItems": 6,
+          "minItems": 6,
+          "maxItems": 7,
           "items": { "$ref": "#/$defs/artifact" }
         },
         "image": { "$ref": "#/$defs/image" },
@@ -113,7 +115,8 @@
             "helm-chart",
             "public-contracts",
             "python-sdk-source",
-            "typescript-sdk"
+            "typescript-sdk",
+            "bedrock-otel-instrumentation-source"
           ]
         },
         "mediaType": {

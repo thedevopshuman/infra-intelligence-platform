@@ -94,6 +94,7 @@ The directory under `dist/iip-<version>-<revision>/` contains:
 - the Helm chart, including its strict values schema and value-free external-secret example;
 - public JSON Schemas, examples, specifications, and OpenAPI documents;
 - a Python SDK source package and a compiled npm package;
+- the separately versioned Bedrock OpenTelemetry usage-adapter source package;
 - `release-manifest.json` with revision, size, digest, platform, SBOM, and provenance evidence;
 - `SHA256SUMS`, covering every artifact and the manifest.
 

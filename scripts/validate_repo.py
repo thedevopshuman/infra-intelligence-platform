@@ -1647,6 +1647,8 @@ BEDROCK_INSTRUMENTATION_COMPATIBILITY_CHECKS = (
     "provider-alias-normalized",
     "metadata-only-span",
     "provider-token-totals",
+    "cache-meter-enrichment",
+    "otel-total-input-semantics",
     "receiver-normalization",
     "async-export-failure-isolated",
 )
@@ -1725,9 +1727,9 @@ def validate_bedrock_instrumentation_compatibility_document(
         fail(errors, "Bedrock instrumentation qualification level must match its result")
     expected_operation = "ConverseStream" if streaming else "Converse"
     expected_name = (
-        "otel-python-botocore-converse-stream-v1"
+        "otel-python-botocore-converse-stream-iip-usage-v1"
         if streaming
-        else "otel-python-botocore-converse-v1"
+        else "otel-python-botocore-converse-iip-usage-v1"
     )
     if (
         profile.get("operation") != expected_operation
@@ -1740,6 +1742,15 @@ def validate_bedrock_instrumentation_compatibility_document(
         and result.get("exactCostEligible") is not False
     ):
         fail(errors, "partial Bedrock usage cannot claim exact-cost eligibility")
+    if (
+        profile.get("usageAdapter") != "iip-opentelemetry-aws-bedrock"
+        or result.get("missingUsageFields") != ["reasoningOutputTokens"]
+        or result.get("providerInputTokenSemantics") != "uncached-input"
+        or result.get("normalizedInputTokenSemantics")
+        != "total-input-including-cache"
+        or result.get("cacheMetersVerified") is not True
+    ):
+        fail(errors, "Bedrock usage adapter semantics must match the closed profile")
 
 
 def validate_bedrock_instrumentation_compatibility_example(
@@ -5977,6 +5988,21 @@ def validate_python_boundaries(errors: List[str]) -> None:
                 fail(
                     errors,
                     f"plugin imports server internals in {path.relative_to(ROOT)}: {module}",
+                )
+
+    for path in sorted((ROOT / "instrumentation").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for module in iter_imports(tree):
+            if (
+                module == "iip"
+                or module.startswith("iip.")
+                or module == "infra_intelligence_sdk"
+                or module.startswith("infra_intelligence_sdk.")
+            ):
+                fail(
+                    errors,
+                    "instrumentation imports IIP runtime or SDK internals in "
+                    f"{path.relative_to(ROOT)}: {module}",
                 )
 
 

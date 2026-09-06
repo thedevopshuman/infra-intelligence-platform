@@ -106,9 +106,9 @@ def channel_configuration() -> Mapping[str, object]:
                         "gen_ai.usage.cache_read.input_tokens"
                     ),
                     "cacheWriteInputTokens": (
-                        "gen_ai.usage.cache_write.input_tokens"
+                        "gen_ai.usage.cache_creation.input_tokens"
                     ),
-                    "reasoningOutputTokens": "gen_ai.usage.reasoning_tokens",
+                    "reasoningOutputTokens": "gen_ai.usage.reasoning.output_tokens",
                     "zeroWhenAbsent": [
                         "cacheReadInputTokens",
                         "cacheWriteInputTokens",
@@ -163,7 +163,7 @@ def channel_configuration() -> Mapping[str, object]:
                     "cacheWriteInputTokens": (
                         "gen_ai.usage.cache_creation.input_tokens"
                     ),
-                    "reasoningOutputTokens": "gen_ai.usage.reasoning_tokens",
+                    "reasoningOutputTokens": "gen_ai.usage.reasoning.output_tokens",
                     "zeroWhenAbsent": [],
                     "reportedBy": "provider",
                 },
@@ -501,7 +501,7 @@ def _finished_spans(
                 {
                     "gen_ai.usage.cache_read.input_tokens": 0,
                     "gen_ai.usage.cache_creation.input_tokens": 0,
-                    "gen_ai.usage.reasoning_tokens": 0,
+                    "gen_ai.usage.reasoning.output_tokens": 0,
                 }
             )
         if content_attribute:

@@ -168,7 +168,9 @@ class ReleaseReadinessTests(unittest.TestCase):
         stale["metadata"]["sourceRevision"] = "c" * 40
         self._rewrite("policy-engine", stale)
         crossed = copy.deepcopy(self.documents["bedrock-converse-stream"])
-        crossed["spec"]["profile"]["name"] = "otel-python-botocore-converse-v1"
+        crossed["spec"]["profile"]["name"] = (
+            "otel-python-botocore-converse-iip-usage-v1"
+        )
         self._rewrite("bedrock-converse-stream", crossed)
 
         report = self._assess()

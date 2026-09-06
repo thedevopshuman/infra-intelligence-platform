@@ -1949,6 +1949,8 @@ export type CustomerBedrockQualificationCheckId =
   | "supported-instrumentation-scope"
   | "metadata-only-span"
   | "provider-token-totals"
+  | "cache-meter-enrichment"
+  | "otel-total-input-semantics"
   | "receiver-normalization"
   | "async-export-failure-isolated"
   | "cost-eligibility-honest"
@@ -1984,7 +1986,7 @@ export interface CustomerBedrockQualificationReport {
       provider: "aws.bedrock";
       operation: "Converse" | "ConverseStream";
       invocationTarget: "aws-bedrock";
-      instrumentation: "official-pinned-otel-python-botocore";
+      instrumentation: "official-botocore-with-pinned-iip-usage-adapter";
       credentialMode: "protected-dedicated-session-credentials-file";
       requestPath: "direct-to-provider";
       telemetryPath: "asynchronous-otel";
@@ -2017,7 +2019,7 @@ export interface CustomerBedrockQualificationReport {
       "additional-models-regions-operations-and-provider-apis-not-qualified",
     ];
     summary: {
-      totalChecks: 18;
+      totalChecks: 20;
       passedChecks: number;
       failedChecks: number;
       overallStatus: "qualified" | "not-qualified";

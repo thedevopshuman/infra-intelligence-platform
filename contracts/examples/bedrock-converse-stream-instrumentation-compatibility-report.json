@@ -19,10 +19,11 @@
       "boto3Version": "1.43.73",
       "botocoreVersion": "1.43.73",
       "instrumentationVersion": "0.65b0",
+      "usageAdapterVersion": "0.1.0",
       "otelSdkVersion": "1.44.0"
     },
     "profile": {
-      "name": "otel-python-botocore-converse-stream-v1",
+      "name": "otel-python-botocore-converse-stream-iip-usage-v1",
       "provider": "aws.bedrock",
       "service": "bedrock-runtime",
       "operation": "ConverseStream",
@@ -30,6 +31,7 @@
       "region": "us-east-1",
       "invocationTarget": "botocore-stubber",
       "instrumentationScope": "opentelemetry.instrumentation.botocore.bedrock-runtime",
+      "usageAdapter": "iip-opentelemetry-aws-bedrock",
       "providerAttribute": "gen_ai.system",
       "contentCapture": false,
       "requestPath": "direct-to-provider",
@@ -40,10 +42,11 @@
       "operationName": "chat",
       "usageCompleteness": "partial",
       "missingUsageFields": [
-        "cacheReadInputTokens",
-        "cacheWriteInputTokens",
         "reasoningOutputTokens"
       ],
+      "providerInputTokenSemantics": "uncached-input",
+      "normalizedInputTokenSemantics": "total-input-including-cache",
+      "cacheMetersVerified": true,
       "contentCaptured": false,
       "rawPayloadPersisted": false,
       "exactCostEligible": false,
@@ -58,13 +61,15 @@
       {"id": "provider-alias-normalized", "status": "passed"},
       {"id": "metadata-only-span", "status": "passed"},
       {"id": "provider-token-totals", "status": "passed"},
+      {"id": "cache-meter-enrichment", "status": "passed"},
+      {"id": "otel-total-input-semantics", "status": "passed"},
       {"id": "receiver-normalization", "status": "passed"},
       {"id": "async-export-failure-isolated", "status": "passed"},
       {"id": "stream-consumption-completed", "status": "passed"}
     ],
     "summary": {
-      "totalChecks": 9,
-      "passedChecks": 9,
+      "totalChecks": 11,
+      "passedChecks": 11,
       "failedChecks": 0,
       "overallStatus": "compatible"
     }

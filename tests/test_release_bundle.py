@@ -24,6 +24,7 @@ from scripts.release_bundle import (
 VERSION = "0.84.0"
 CHART_VERSION = "0.87.0"
 SDK_VERSION = "0.66.0"
+BEDROCK_INSTRUMENTATION_VERSION = "0.1.0"
 REVISION = "0123456789abcdef0123456789abcdef01234567"
 SOURCE_DATE = "2026-08-17T04:45:00+00:00"
 PLATFORMS = ("linux/amd64", "linux/arm64")
@@ -184,6 +185,8 @@ class ReleaseBundleTests(unittest.TestCase):
             f"infra-intelligence-contracts-{VERSION}.tar.gz",
             f"infra-intelligence-sdk-{SDK_VERSION}.tar.gz",
             f"iip-sdk-{SDK_VERSION}.tgz",
+            "iip-opentelemetry-aws-bedrock-"
+            f"{BEDROCK_INSTRUMENTATION_VERSION}.tar.gz",
         ):
             (self.bundle / filename).write_bytes(f"fixture:{filename}".encode())
 
@@ -197,6 +200,7 @@ class ReleaseBundleTests(unittest.TestCase):
             chart_version=CHART_VERSION,
             python_sdk_version=SDK_VERSION,
             typescript_sdk_version=SDK_VERSION,
+            bedrock_instrumentation_version=BEDROCK_INSTRUMENTATION_VERSION,
             revision=REVISION,
             source_date=SOURCE_DATE,
             platforms=PLATFORMS,
@@ -221,7 +225,11 @@ class ReleaseBundleTests(unittest.TestCase):
             ],
             list(PLATFORMS),
         )
-        self.assertEqual(len(manifest["spec"]["artifacts"]), 6)
+        self.assertEqual(len(manifest["spec"]["artifacts"]), 7)
+        self.assertEqual(
+            manifest["metadata"]["bedrockInstrumentationVersion"],
+            BEDROCK_INSTRUMENTATION_VERSION,
+        )
 
     def test_current_release_requires_mediation_bridge_metadata(self) -> None:
         self.finalize()

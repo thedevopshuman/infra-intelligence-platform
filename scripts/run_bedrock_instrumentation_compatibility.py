@@ -35,6 +35,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
 )
 from opentelemetry.trace import SpanKind
 
+from iip_otel_aws_bedrock import install as install_bedrock_usage_enrichment
 from iip import __version__ as APPLICATION_VERSION
 from iip.adapters.memory import InMemoryResourceStore
 from iip.adapters.otlp_ai_usage_receiver import ConfiguredAiUsageReceiver
@@ -60,13 +61,13 @@ COMMON_CHECK_IDS = (
     "provider-alias-normalized",
     "metadata-only-span",
     "provider-token-totals",
+    "cache-meter-enrichment",
+    "otel-total-input-semantics",
     "receiver-normalization",
     "async-export-failure-isolated",
 )
 STREAM_CHECK_ID = "stream-consumption-completed"
 MISSING_USAGE_FIELDS = (
-    "cacheReadInputTokens",
-    "cacheWriteInputTokens",
     "reasoningOutputTokens",
 )
 
@@ -129,7 +130,13 @@ def offline_response() -> dict[str, object]:
             }
         },
         "stopReason": "end_turn",
-        "usage": {"inputTokens": 17, "outputTokens": 5, "totalTokens": 22},
+        "usage": {
+            "inputTokens": 17,
+            "outputTokens": 5,
+            "totalTokens": 22,
+            "cacheReadInputTokens": 4,
+            "cacheWriteInputTokens": 2,
+        },
         "metrics": {"latencyMs": 12},
         "ResponseMetadata": {
             "RequestId": "offline-request-id",
@@ -170,6 +177,8 @@ def offline_stream_events() -> tuple[Mapping[str, object], ...]:
                     "inputTokens": 17,
                     "outputTokens": 5,
                     "totalTokens": 22,
+                    "cacheReadInputTokens": 4,
+                    "cacheWriteInputTokens": 2,
                 },
                 "metrics": {"latencyMs": 12},
             }
@@ -308,6 +317,7 @@ def instrumented_call(
             stubber.add_response("converse", offline_response(), parameters)
         stubber.activate()
 
+    require(install_bedrock_usage_enrichment(), "usage-enrichment.install-failed")
     instrumentor.instrument(tracer_provider=provider)
     call_started = time.monotonic_ns()
     try:
@@ -394,8 +404,8 @@ def channel_document(model_id: str, region: str) -> dict[str, object]:
                     "inputTokens": "gen_ai.usage.input_tokens",
                     "outputTokens": "gen_ai.usage.output_tokens",
                     "cacheReadInputTokens": "gen_ai.usage.cache_read.input_tokens",
-                    "cacheWriteInputTokens": "gen_ai.usage.cache_write.input_tokens",
-                    "reasoningOutputTokens": "gen_ai.usage.reasoning_tokens",
+                    "cacheWriteInputTokens": "gen_ai.usage.cache_creation.input_tokens",
+                    "reasoningOutputTokens": "gen_ai.usage.reasoning.output_tokens",
                     "zeroWhenAbsent": [],
                     "reportedBy": "provider",
                 },
@@ -458,10 +468,26 @@ def normalize_span(
         ),
         "span-content.present",
     )
+    provider_input = usage["inputTokens"]
+    cache_read = usage.get("cacheReadInputTokens")
+    cache_write = usage.get("cacheWriteInputTokens")
     require(
-        attributes.get("gen_ai.usage.input_tokens") == usage["inputTokens"]
+        all(
+            isinstance(value, int) and not isinstance(value, bool)
+            for value in (provider_input, cache_read, cache_write)
+        ),
+        "provider-cache-usage.invalid",
+    )
+    normalized_input = provider_input + cache_read + cache_write
+    require(
+        attributes.get("gen_ai.usage.input_tokens") == normalized_input
         and attributes.get("gen_ai.usage.output_tokens") == usage["outputTokens"],
         "provider-token-totals.mismatch",
+    )
+    require(
+        attributes.get("gen_ai.usage.cache_read.input_tokens") == cache_read
+        and attributes.get("gen_ai.usage.cache_creation.input_tokens") == cache_write,
+        "provider-cache-usage.mismatch",
     )
 
     receiver = ConfiguredAiUsageReceiver.from_json(
@@ -490,6 +516,12 @@ def normalize_span(
         and normalized_usage.get("completeness") == "partial"
         and normalized_usage.get("missingFields") == list(MISSING_USAGE_FIELDS),
         "receiver-usage-completeness.invalid",
+    )
+    require(
+        normalized_usage.get("inputTokens") == normalized_input
+        and normalized_usage.get("cacheReadInputTokens") == cache_read
+        and normalized_usage.get("cacheWriteInputTokens") == cache_write,
+        "receiver-usage-quantities.invalid",
     )
     require(
         isinstance(privacy, Mapping)
@@ -548,6 +580,7 @@ def compatibility_report(
                 "boto3": version("boto3"),
                 "botocore": version("botocore"),
                 "instrumentation": version("opentelemetry-instrumentation-botocore"),
+                "usageAdapter": version("iip-opentelemetry-aws-bedrock"),
                 "otelSdk": version("opentelemetry-sdk"),
             },
         },
@@ -584,13 +617,16 @@ def compatibility_report(
                 "instrumentationVersion": version(
                     "opentelemetry-instrumentation-botocore"
                 ),
+                "usageAdapterVersion": version(
+                    "iip-opentelemetry-aws-bedrock"
+                ),
                 "otelSdkVersion": version("opentelemetry-sdk"),
             },
             "profile": {
                 "name": (
-                    "otel-python-botocore-converse-stream-v1"
+                    "otel-python-botocore-converse-stream-iip-usage-v1"
                     if streaming
-                    else "otel-python-botocore-converse-v1"
+                    else "otel-python-botocore-converse-iip-usage-v1"
                 ),
                 "provider": "aws.bedrock",
                 "service": "bedrock-runtime",
@@ -601,6 +637,7 @@ def compatibility_report(
                     "botocore-stubber" if mode == "offline" else "aws-bedrock"
                 ),
                 "instrumentationScope": SCOPE_NAME,
+                "usageAdapter": "iip-opentelemetry-aws-bedrock",
                 "providerAttribute": "gen_ai.system",
                 "contentCapture": False,
                 "requestPath": "direct-to-provider",
@@ -611,6 +648,9 @@ def compatibility_report(
                 "operationName": "chat",
                 "usageCompleteness": "partial",
                 "missingUsageFields": list(MISSING_USAGE_FIELDS),
+                "providerInputTokenSemantics": "uncached-input",
+                "normalizedInputTokenSemantics": "total-input-including-cache",
+                "cacheMetersVerified": True,
                 "contentCaptured": False,
                 "rawPayloadPersisted": False,
                 "exactCostEligible": False,
@@ -653,9 +693,9 @@ def validate_report(report: Mapping[str, object]) -> None:
     )
     streaming = profile["operation"] == "ConverseStream"
     expected_name = (
-        "otel-python-botocore-converse-stream-v1"
+        "otel-python-botocore-converse-stream-iip-usage-v1"
         if streaming
-        else "otel-python-botocore-converse-v1"
+        else "otel-python-botocore-converse-iip-usage-v1"
     )
     require(
         profile["name"] == expected_name

@@ -68,10 +68,13 @@ requirement.
 Customer Bedrock qualification remains outside the serving and inference
 paths. `scripts/qualify_customer_bedrock.py` validates one protected reviewed
 target and one dedicated temporary-credential file, invokes the isolated
-pinned official-instrumentation container, and emits a protected detailed
-compatibility report plus a transportable minimized report. No provider SDK or
-credential enters `domain`, `application`, the product image, public SDK
-transport, agent runtime, or plugin runtime.
+pinned official-instrumentation container plus the separately packaged
+`instrumentation/python/aws-bedrock` usage adapter, and emits a protected
+detailed compatibility report plus a transportable minimized report. The
+adapter belongs in the customer's instrumented application environment and
+has no dependency on IIP server or SDK packages. No provider SDK or credential
+enters `domain`, `application`, the product image, public SDK transport, agent
+runtime, or plugin runtime.
 
 Customer OTLP receiver qualification remains an operational harness as well:
 `scripts/qualify_customer_otlp_receiver.py` runs a digest-pinned official
@@ -92,6 +95,7 @@ identity, tenant data, or provider detail.
 - A capability selected by an agent is a tool contract; the implementation delegates to a provider port.
 - A use-case sequence belongs in `application`, not an HTTP handler or queue consumer.
 - Shared data crossing a process boundary belongs in `contracts`, not a copied internal class.
+- Provider-specific telemetry enrichment that must run beside a customer library belongs in `instrumentation/<language>/<provider>`, not the public SDK or server kernel.
 - A derived read model belongs in an adapter and is rebuildable from domain records.
 - A component that needs both plugin discovery and a use case is wired in `bootstrap`.
 

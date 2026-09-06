@@ -71,6 +71,9 @@ span:
 | Response model | `gen_ai.response.model` (optional) |
 | Input usage | channel-configured; example `gen_ai.usage.input_tokens` |
 | Output usage | channel-configured; example `gen_ai.usage.output_tokens` |
+| Cache-read input | channel-configured; example `gen_ai.usage.cache_read.input_tokens` |
+| Cache-write input | channel-configured; example `gen_ai.usage.cache_creation.input_tokens` |
+| Reasoning output | channel-configured; example `gen_ai.usage.reasoning.output_tokens` |
 | Region | `cloud.region` on the resource, scope, or span |
 | Service | `service.name` on the resource |
 | Error | `error.type` (required for error status, otherwise normalized to `unknown`) |
@@ -96,10 +99,13 @@ instrumentation profile defines absence as zero. A profile that cannot make
 that guarantee must remove those fields from `zeroWhenAbsent`, producing
 partial usage and preventing an unsupported exact cost.
 
-The pinned official botocore profile does not currently report cache-read,
-cache-write, or reasoning subsets. Its qualification configuration therefore
-uses an empty `zeroWhenAbsent` list and produces partial, non-exact-cost-eligible
-usage. See the [Bedrock instrumentation qualification](bedrock-instrumentation-qualification.md).
+The pinned official botocore profile alone does not report cache-read,
+cache-write, or reasoning subsets and maps Bedrock's uncached input counter to
+OTel total input. The separately installed Bedrock usage adapter publishes
+reported cache meters and corrects total input for both `Converse` operations.
+It leaves absent cache values and reasoning missing, so its qualification uses
+an empty `zeroWhenAbsent` list and remains partial. See the [Bedrock
+instrumentation qualification](bedrock-instrumentation-qualification.md).
 
 The pinned official OpenAI chat-completions profile also leaves unreported
 cache-write and reasoning meters missing and remains partial. Its deployment

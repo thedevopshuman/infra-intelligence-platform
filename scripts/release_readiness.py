@@ -145,7 +145,10 @@ REQUIREMENTS = (
         "compatible",
         (
             (("spec", "qualificationLevel"), "offline-sdk-interoperability"),
-            (("spec", "profile", "name"), "otel-python-botocore-converse-v1"),
+            (
+                ("spec", "profile", "name"),
+                "otel-python-botocore-converse-iip-usage-v1",
+            ),
         ),
     ),
     EvidenceRequirement(
@@ -161,7 +164,7 @@ REQUIREMENTS = (
             (("spec", "qualificationLevel"), "offline-sdk-interoperability"),
             (
                 ("spec", "profile", "name"),
-                "otel-python-botocore-converse-stream-v1",
+                "otel-python-botocore-converse-stream-iip-usage-v1",
             ),
         ),
     ),

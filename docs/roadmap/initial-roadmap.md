@@ -19,7 +19,10 @@ requires an immutable workload suitability report before comparing a qualified
 candidate-model cohort with the reference-model cohort and calculating a
 scenario saving. The reference dashboard topology and separate pinned official
 botocore `Converse`/`ConverseStream`
-offline interoperability gates are executable. A protected, expiry-bound
+offline interoperability gates are executable. A separately installed
+metadata-only OTel adapter now maps provider cache counters and corrects
+Bedrock uncached input into OTel total-input semantics for both operations;
+reasoning remains explicitly unresolved. A protected, expiry-bound
 customer qualification workflow now binds one explicitly selected live
 model/region/operation to the clean source and immutable release image while
 retaining no credential, target, prompt, response, request ID, or token count;

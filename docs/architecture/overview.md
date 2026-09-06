@@ -204,6 +204,12 @@ temporary-session credentials file, then retains only expiry-bound minimized
 evidence. It neither introduces a provider SDK into IIP nor qualifies customer
 Collector delivery, pricing authority, workload quality, or broader AWS
 authority.
+[ADR 0137](../decisions/0137-bedrock-otel-cache-usage-normalization.md) adds a
+separately installed metadata-only provider adapter beside the customer's
+official botocore instrumentation. It converts Bedrock's uncached input and
+cache counters into standard OTel total-input/cache attributes for both
+`Converse` operations, fails open relative to the provider call, and leaves
+reasoning usage unresolved. It is not an IIP SDK or inference proxy.
 The tenant-explicit workflow worker now implements the separate pricing use
 case: protected immutable catalogs drive bounded integer cost calculation, and
 each new cost fact, minimized event, and outbox row commit atomically.

@@ -519,6 +519,40 @@ class ReleaseReadinessReport:
 
 
 @dataclass(frozen=True)
+class AiFinopsRuntimeCompatibilityReport:
+    """Source-bound local AI FinOps reference-flow evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "AiFinopsRuntimeCompatibilityReport":
+        if payload.get("apiVersion") != "iip.dev/v1alpha1":
+            raise ValueError(
+                "unsupported AI FinOps runtime compatibility report apiVersion"
+            )
+        if payload.get("kind") != "AiFinopsRuntimeCompatibilityReport":
+            raise ValueError(
+                "AI FinOps runtime compatibility report kind must be "
+                "AiFinopsRuntimeCompatibilityReport"
+            )
+        if not isinstance(payload.get("metadata"), Mapping):
+            raise ValueError(
+                "AI FinOps runtime compatibility report metadata must be an object"
+            )
+        if not isinstance(payload.get("spec"), Mapping):
+            raise ValueError(
+                "AI FinOps runtime compatibility report spec must be an object"
+            )
+        return cls(dict(payload))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class DeploymentDiagnosticReport:
     """Privacy-minimized point-in-time Kubernetes support evidence."""
 

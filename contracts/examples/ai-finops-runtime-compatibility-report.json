@@ -1,0 +1,71 @@
+{
+  "apiVersion": "iip.dev/v1alpha1",
+  "kind": "AiFinopsRuntimeCompatibilityReport",
+  "metadata": {
+    "id": "afc_cdbbd60f8517e3faa8b30bb854f3613f",
+    "generatedAt": "2026-09-08T10:05:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "compatible",
+    "qualificationLevel": "local-multi-provider-ai-finops-v1",
+    "environment": {
+      "platform": "linux/arm64",
+      "containerRuntime": "docker",
+      "containerRuntimeVersion": "28.3.3",
+      "applicationVersion": "0.84.0",
+      "costEngineVersion": "0.2.0"
+    },
+    "profile": {
+      "providers": ["aws.bedrock", "openai"],
+      "collectionPath": "otel-collector-to-isolated-otlp-trace-receiver",
+      "storage": "postgresql",
+      "telemetryBackend": "prometheus",
+      "dashboard": "grafana",
+      "pricingSource": "test-fixture",
+      "contentPolicy": "metadata-only"
+    },
+    "measurements": {
+      "usageRecordCount": 15,
+      "pricedRecordCount": 11,
+      "aggregateOutputPricedRecordCount": 1,
+      "unpricedRecordCount": 4,
+      "allocatedRecordCount": 10,
+      "unallocatedRecordCount": 5,
+      "findingCount": 3,
+      "rejectedContentSpanCount": 2,
+      "providerCount": 2
+    },
+    "checks": [
+      {"id": "compose-configuration", "status": "passed"},
+      {"id": "all-components-healthy", "status": "passed"},
+      {"id": "collector-delivery", "status": "passed"},
+      {"id": "normalized-ledger-persistence", "status": "passed"},
+      {"id": "metadata-only-content-rejection", "status": "passed"},
+      {"id": "replay-idempotency", "status": "passed"},
+      {"id": "data-driven-cost", "status": "passed"},
+      {"id": "aggregate-output-rate-equivalence", "status": "passed"},
+      {"id": "unpriced-coverage", "status": "passed"},
+      {"id": "protected-attribution", "status": "passed"},
+      {"id": "deterministic-findings", "status": "passed"},
+      {"id": "otlp-aggregate-export", "status": "passed"},
+      {"id": "grafana-dashboard", "status": "passed"},
+      {"id": "replacement-boundaries", "status": "passed"}
+    ],
+    "limitations": [
+      "synthetic-provider-spans",
+      "test-fixture-pricing",
+      "single-host-docker-runtime",
+      "customer-collector-pki-and-network-not-qualified",
+      "live-provider-private-prices-and-invoice-not-qualified",
+      "sustained-load-regional-ha-and-backend-lifecycle-not-qualified"
+    ],
+    "summary": {
+      "totalChecks": 14,
+      "passedChecks": 14,
+      "failedChecks": 0,
+      "overallStatus": "compatible"
+    }
+  }
+}

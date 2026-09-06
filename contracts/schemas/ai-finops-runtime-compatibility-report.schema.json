@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-finops-runtime-compatibility-report:v1alpha1",
+  "title": "AI FinOps Runtime Compatibility Report",
+  "description": "Source-bound local evidence for the provider-neutral OTLP-to-ledger-to-cost-to-Grafana AI FinOps reference flow.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.dev/v1alpha1"},
+    "kind": {"const": "AiFinopsRuntimeCompatibilityReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^afc_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationLevel", "environment", "profile", "measurements", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["compatible", "incompatible"]},
+        "qualificationLevel": {"const": "local-multi-provider-ai-finops-v1"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "profile": {"$ref": "#/$defs/profile"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "checks": {"$ref": "#/$defs/checks"},
+        "limitations": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "prefixItems": [
+            {"const": "synthetic-provider-spans"},
+            {"const": "test-fixture-pricing"},
+            {"const": "single-host-docker-runtime"},
+            {"const": "customer-collector-pki-and-network-not-qualified"},
+            {"const": "live-provider-private-prices-and-invoice-not-qualified"},
+            {"const": "sustained-load-regional-ha-and-backend-lifecycle-not-qualified"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 14},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 14},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 14},
+            "overallStatus": {"enum": ["compatible", "incompatible"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "containerRuntime", "containerRuntimeVersion", "applicationVersion", "costEngineVersion"],
+      "properties": {
+        "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+        "containerRuntime": {"const": "docker"},
+        "containerRuntimeVersion": {"type": "string", "minLength": 1, "maxLength": 64},
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "costEngineVersion": {"const": "0.2.0"}
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["providers", "collectionPath", "storage", "telemetryBackend", "dashboard", "pricingSource", "contentPolicy"],
+      "properties": {
+        "providers": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [{"const": "aws.bedrock"}, {"const": "openai"}],
+          "items": false
+        },
+        "collectionPath": {"const": "otel-collector-to-isolated-otlp-trace-receiver"},
+        "storage": {"const": "postgresql"},
+        "telemetryBackend": {"const": "prometheus"},
+        "dashboard": {"const": "grafana"},
+        "pricingSource": {"const": "test-fixture"},
+        "contentPolicy": {"const": "metadata-only"}
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["usageRecordCount", "pricedRecordCount", "aggregateOutputPricedRecordCount", "unpricedRecordCount", "allocatedRecordCount", "unallocatedRecordCount", "findingCount", "rejectedContentSpanCount", "providerCount"],
+      "properties": {
+        "usageRecordCount": {"const": 15},
+        "pricedRecordCount": {"const": 11},
+        "aggregateOutputPricedRecordCount": {"const": 1},
+        "unpricedRecordCount": {"const": 4},
+        "allocatedRecordCount": {"const": 10},
+        "unallocatedRecordCount": {"const": 5},
+        "findingCount": {"const": 3},
+        "rejectedContentSpanCount": {"const": 2},
+        "providerCount": {"const": 2}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^ai-finops-runtime-compatibility\\.[a-z0-9.-]+$", "maxLength": 160}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 14,
+      "maxItems": 14,
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "compose-configuration"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "all-components-healthy"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "collector-delivery"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "normalized-ledger-persistence"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "metadata-only-content-rejection"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "replay-idempotency"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "data-driven-cost"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "aggregate-output-rate-equivalence"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "unpriced-coverage"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "protected-attribution"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "deterministic-findings"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "otlp-aggregate-export"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "grafana-dashboard"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "replacement-boundaries"}}}
+      ],
+      "items": false
+    }
+  }
+}

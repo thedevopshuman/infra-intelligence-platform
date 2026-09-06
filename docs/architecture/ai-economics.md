@@ -256,6 +256,16 @@ content spans for both channels. Pricing selection is solely catalog-driven;
 the kernel contains no provider pricing branch. This proves the local contract
 flow, not live provider instrumentation or invoice compatibility.
 
+After that closed flow passes, the operational harness emits a minimized
+`AiFinopsRuntimeCompatibilityReport` bound to the source revision, dirty state,
+application and cost-engine versions, and Docker environment. Its fixed counts
+and checks prove the Collector-to-receiver-to-ledger-to-cost-to-Grafana chain
+without retaining model, service, tenant, invocation, token, rate, amount,
+endpoint, or credential values. The local release-readiness aggregate consumes
+this report as a `local-runtime` input while keeping customer Collector/PKI,
+live provider, approved pricing, invoice, sustained-load, regional, and
+backend-lifecycle claims external.
+
 The exact pinned Python botocore `Converse` and `ConverseStream` profiles now
 have separate source-bound no-network evidence. They exposed three upstream
 facts hidden by the synthetic flow: the shipped scope is service-specific, the

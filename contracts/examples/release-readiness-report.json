@@ -29,6 +29,7 @@
       {"id": "bedrock-converse", "contractKind": "BedrockInstrumentationCompatibilityReport", "qualificationBoundary": "offline-provider", "status": "passed", "reportDigest": "sha256:0909090909090909090909090909090909090909090909090909090909090909", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
       {"id": "bedrock-converse-stream", "contractKind": "BedrockInstrumentationCompatibilityReport", "qualificationBoundary": "offline-provider", "status": "passed", "reportDigest": "sha256:1010101010101010101010101010101010101010101010101010101010101010", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
       {"id": "openai-chat-completions", "contractKind": "OpenAIInstrumentationCompatibilityReport", "qualificationBoundary": "offline-provider", "status": "passed", "reportDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id": "ai-finops-runtime", "contractKind": "AiFinopsRuntimeCompatibilityReport", "qualificationBoundary": "local-runtime", "status": "passed", "reportDigest": "sha256:1919191919191919191919191919191919191919191919191919191919191919", "observedStatus": "compatible", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
       {"id": "postgresql-logical-recovery", "contractKind": "PostgreSQLRecoveryQualificationReport", "qualificationBoundary": "local-recovery", "status": "passed", "reportDigest": "sha256:1212121212121212121212121212121212121212121212121212121212121212", "observedStatus": "qualified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
       {"id": "postgresql-continuity", "contractKind": "PostgreSQLContinuityQualificationReport", "qualificationBoundary": "local-recovery", "status": "passed", "reportDigest": "sha256:1313131313131313131313131313131313131313131313131313131313131313", "observedStatus": "qualified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
       {"id": "kubernetes-planned-disruption", "contractKind": "KubernetesAvailabilityQualificationReport", "qualificationBoundary": "local-availability", "status": "passed", "reportDigest": "sha256:1414141414141414141414141414141414141414141414141414141414141414", "observedStatus": "qualified", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
@@ -48,8 +49,8 @@
       {"id": "legal-brand-and-governance", "status": "external-required", "reasonCode": "release-readiness.external.legal-brand-governance"}
     ],
     "summary": {
-      "requiredEvidence": 18,
-      "passedEvidence": 18,
+      "requiredEvidence": 19,
+      "passedEvidence": 19,
       "missingEvidence": 0,
       "rejectedEvidence": 0,
       "externalGateCount": 8,

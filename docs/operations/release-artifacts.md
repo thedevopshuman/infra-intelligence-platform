@@ -17,7 +17,7 @@ IIP_UPGRADE_FROM_REVISION=<supported-ancestor> \
 It runs source quality, local integration/recovery/availability evidence,
 multi-platform packaging, packaged install, the selected N-1
 upgrade/rollback/re-upgrade, exact-SBOM vulnerability qualification, and the
-18-evidence readiness aggregate. The final paths include the candidate's
+19-evidence readiness aggregate. The final paths include the candidate's
 12-character revision so evidence from different commits cannot silently
 share a release identity. It refuses an existing candidate directory rather
 than deleting or overwriting prior artifacts. It also removes inherited
@@ -38,6 +38,8 @@ make test-external-secrets PYTHON=.venv/bin/python
 make test-otlp-receiver PYTHON=.venv/bin/python
 make test-bedrock-instrumentation PYTHON=.venv/bin/python
 make test-openai-instrumentation PYTHON=.venv/bin/python
+make test-ai-finops PYTHON=.venv/bin/python
+make verify-ai-finops-runtime-report PYTHON=.venv/bin/python
 make test-backup-restore PYTHON=.venv/bin/python
 make test-postgres-continuity PYTHON=.venv/bin/python
 make test-deployment-preflight PYTHON=.venv/bin/python
@@ -56,8 +58,8 @@ the fully drained state. Generated reports remain outside Git and outside the im
 
 Retain the clean-revision capacity, credential-broker, OIDC-issuer,
 OIDC-browser, policy-engine, OTLP-receiver, Bedrock
-`Converse`/`ConverseStream`, OpenAI
-compatibility, protected GitHub-context, PostgreSQL logical-recovery, and PostgreSQL physical-continuity
+`Converse`/`ConverseStream`, OpenAI compatibility, complete local AI FinOps
+runtime, protected GitHub-context, PostgreSQL logical-recovery, and PostgreSQL physical-continuity
 qualification reports under `dist/` beside the release candidate as
 environment-specific evidence. Verify both recovery
 reports against the clean checkout with `make verify-backup-restore-report` and
@@ -207,7 +209,7 @@ IIP_RELEASE_READINESS_REPORT=/absolute/path/to/release-readiness.json \
   make assess-release-readiness PYTHON=.venv/bin/python
 ```
 
-The command verifies the bundle and requires all 18 source-bound local reports
+The command verifies the bundle and requires all 19 source-bound local reports
 to match its exact revision and successful profile. Recompute the inventory
 after transport with `make verify-release-readiness-report` and the same five
 paths. A successful result is `locally-qualified`, never production-ready or

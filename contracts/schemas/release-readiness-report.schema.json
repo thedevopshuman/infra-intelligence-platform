@@ -41,8 +41,8 @@
         },
         "evidence": {
           "type": "array",
-          "minItems": 18,
-          "maxItems": 18,
+          "minItems": 19,
+          "maxItems": 19,
           "items": {"$ref": "#/$defs/evidence"}
         },
         "externalGates": {
@@ -66,10 +66,10 @@
           "additionalProperties": false,
           "required": ["requiredEvidence", "passedEvidence", "missingEvidence", "rejectedEvidence", "externalGateCount", "overallStatus"],
           "properties": {
-            "requiredEvidence": {"const": 18},
-            "passedEvidence": {"type": "integer", "minimum": 0, "maximum": 18},
-            "missingEvidence": {"type": "integer", "minimum": 0, "maximum": 18},
-            "rejectedEvidence": {"type": "integer", "minimum": 0, "maximum": 18},
+            "requiredEvidence": {"const": 19},
+            "passedEvidence": {"type": "integer", "minimum": 0, "maximum": 19},
+            "missingEvidence": {"type": "integer", "minimum": 0, "maximum": 19},
+            "rejectedEvidence": {"type": "integer", "minimum": 0, "maximum": 19},
             "externalGateCount": {"const": 8},
             "overallStatus": {"enum": ["incomplete", "locally-qualified"]}
           }

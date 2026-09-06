@@ -69,6 +69,8 @@ ENVIRONMENT_EVIDENCE_TARGETS = (
     "test-otlp-receiver",
     "test-bedrock-instrumentation",
     "test-openai-instrumentation",
+    "test-ai-finops",
+    "verify-ai-finops-runtime-report",
     "test-backup-restore",
     "verify-backup-restore-report",
     "test-postgres-continuity",
@@ -296,8 +298,8 @@ def validate_outputs(
     )
     summary = readiness.get("spec", {}).get("summary")
     if not isinstance(summary, dict) or summary != {
-        "requiredEvidence": 18,
-        "passedEvidence": 18,
+        "requiredEvidence": 19,
+        "passedEvidence": 19,
         "missingEvidence": 0,
         "rejectedEvidence": 0,
         "externalGateCount": 8,

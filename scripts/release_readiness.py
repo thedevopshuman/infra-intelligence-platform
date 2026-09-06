@@ -186,6 +186,22 @@ REQUIREMENTS = (
         ),
     ),
     EvidenceRequirement(
+        "ai-finops-runtime",
+        "ai-finops-runtime-compatibility-report.json",
+        "ai-finops-runtime-compatibility-report.schema.json",
+        "iip.dev/v1alpha1",
+        "AiFinopsRuntimeCompatibilityReport",
+        "local-runtime",
+        ("spec", "status"),
+        "compatible",
+        (
+            (
+                ("spec", "qualificationLevel"),
+                "local-multi-provider-ai-finops-v1",
+            ),
+        ),
+    ),
+    EvidenceRequirement(
         "postgresql-logical-recovery",
         "postgresql-recovery-qualification-report.json",
         "postgresql-recovery-qualification-report.schema.json",
@@ -542,6 +558,18 @@ def _evidence_result(
         if not isinstance(profile, dict) or (
             profile.get("applicationVersion") != candidate["version"]
             or profile.get("chartVersion") != candidate["chartVersion"]
+        ):
+            return _reject(
+                requirement,
+                "release-readiness.evidence.release-mismatch",
+                report_digest=report_digest,
+                observed_status=observed_status,
+                source_revision=revision,
+            )
+    elif requirement.identifier == "ai-finops-runtime":
+        if (
+            _path(document, ("spec", "environment", "applicationVersion"))
+            != candidate["version"]
         ):
             return _reject(
                 requirement,

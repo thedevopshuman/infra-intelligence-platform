@@ -142,3 +142,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0136](0136-customer-bedrock-live-interoperability-qualification.md) | Accepted | Qualify one exact live Bedrock profile without exposing session credentials or provider content |
 | [0137](0137-bedrock-otel-cache-usage-normalization.md) | Accepted | Normalize Bedrock uncached/cache usage into OTel total-input semantics without an inference proxy |
 | [0138](0138-rate-equivalent-aggregate-output-cost.md) | Accepted | Price an aggregate output meter only when the exact catalog proves reasoning and non-reasoning rate equivalence |
+| [0139](0139-source-bound-ai-finops-runtime-evidence.md) | Accepted | Bind the complete local AI FinOps Docker flow to one minimized exact-source compatibility report |

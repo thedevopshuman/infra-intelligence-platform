@@ -104,6 +104,12 @@ class ReleaseReadinessTests(unittest.TestCase):
                     ("spec", "profile", "chartVersion"),
                     CANDIDATE["chartVersion"],
                 )
+            if requirement.identifier == "ai-finops-runtime":
+                _assign(
+                    document,
+                    ("spec", "environment", "applicationVersion"),
+                    CANDIDATE["version"],
+                )
             self.documents[requirement.identifier] = document
             self.paths[requirement.identifier].write_text(
                 json.dumps(document), encoding="utf-8"
@@ -134,7 +140,7 @@ class ReleaseReadinessTests(unittest.TestCase):
         release_readiness._validate_report_shape(report)
 
         self.assertEqual(report["spec"]["status"], "locally-qualified")
-        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 18)
+        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 19)
         self.assertEqual(len(report["spec"]["externalGates"]), 8)
         self.assertTrue(
             all(
@@ -198,6 +204,23 @@ class ReleaseReadinessTests(unittest.TestCase):
 
         report = self._assess()
         item = report["spec"]["evidence"][1]
+
+        self.assertEqual(item["status"], "rejected")
+        self.assertEqual(
+            item["errorCode"], "release-readiness.evidence.release-mismatch"
+        )
+
+    def test_ai_finops_runtime_must_match_candidate_version(self) -> None:
+        document = copy.deepcopy(self.documents["ai-finops-runtime"])
+        document["spec"]["environment"]["applicationVersion"] = "0.83.0"
+        self._rewrite("ai-finops-runtime", document)
+
+        report = self._assess()
+        item = next(
+            value
+            for value in report["spec"]["evidence"]
+            if value["id"] == "ai-finops-runtime"
+        )
 
         self.assertEqual(item["status"], "rejected")
         self.assertEqual(

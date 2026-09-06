@@ -587,6 +587,86 @@ export interface AiCostRecord {
   };
 }
 
+export type AiFinopsRuntimeCompatibilityCheckId =
+  | "compose-configuration"
+  | "all-components-healthy"
+  | "collector-delivery"
+  | "normalized-ledger-persistence"
+  | "metadata-only-content-rejection"
+  | "replay-idempotency"
+  | "data-driven-cost"
+  | "aggregate-output-rate-equivalence"
+  | "unpriced-coverage"
+  | "protected-attribution"
+  | "deterministic-findings"
+  | "otlp-aggregate-export"
+  | "grafana-dashboard"
+  | "replacement-boundaries";
+
+export interface AiFinopsRuntimeCompatibilityReport {
+  apiVersion: "iip.dev/v1alpha1";
+  kind: "AiFinopsRuntimeCompatibilityReport";
+  metadata: {
+    id: `afc_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: boolean;
+  };
+  spec: {
+    status: "compatible" | "incompatible";
+    qualificationLevel: "local-multi-provider-ai-finops-v1";
+    environment: {
+      platform: string;
+      containerRuntime: "docker";
+      containerRuntimeVersion: string;
+      applicationVersion: string;
+      costEngineVersion: "0.2.0";
+    };
+    profile: {
+      providers: ["aws.bedrock", "openai"];
+      collectionPath: "otel-collector-to-isolated-otlp-trace-receiver";
+      storage: "postgresql";
+      telemetryBackend: "prometheus";
+      dashboard: "grafana";
+      pricingSource: "test-fixture";
+      contentPolicy: "metadata-only";
+    };
+    measurements: {
+      usageRecordCount: 15;
+      pricedRecordCount: 11;
+      aggregateOutputPricedRecordCount: 1;
+      unpricedRecordCount: 4;
+      allocatedRecordCount: 10;
+      unallocatedRecordCount: 5;
+      findingCount: 3;
+      rejectedContentSpanCount: 2;
+      providerCount: 2;
+    };
+    checks: Array<
+      | { id: AiFinopsRuntimeCompatibilityCheckId; status: "passed" }
+      | {
+          id: AiFinopsRuntimeCompatibilityCheckId;
+          status: "failed";
+          errorCode: string;
+        }
+    >;
+    limitations: [
+      "synthetic-provider-spans",
+      "test-fixture-pricing",
+      "single-host-docker-runtime",
+      "customer-collector-pki-and-network-not-qualified",
+      "live-provider-private-prices-and-invoice-not-qualified",
+      "sustained-load-regional-ha-and-backend-lifecycle-not-qualified",
+    ];
+    summary: {
+      totalChecks: 14;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "compatible" | "incompatible";
+    };
+  };
+}
+
 export type AiSavingsRule =
   | "context-growth"
   | "retry-amplification"
@@ -2870,7 +2950,7 @@ export interface ReleaseReadinessReport {
       reasonCode: `release-readiness.external.${string}`;
     }>;
     summary: {
-      requiredEvidence: 18;
+      requiredEvidence: 19;
       passedEvidence: number;
       missingEvidence: number;
       rejectedEvidence: number;

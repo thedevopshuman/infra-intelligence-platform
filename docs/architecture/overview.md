@@ -231,7 +231,13 @@ until billable-attempt evidence exists, as fixed by
 [ADR 0096](../decisions/0096-source-bound-retry-amplification.md). Protected effective-time mappings separately
 resolve observed service/resource identity into immutable application/team or
 explicit unallocated facts; telemetry cannot assign its own ownership. The
-local OTLP aggregate projection and Grafana V0 dashboard are executable.
+local OTLP aggregate projection and Grafana V0 dashboard are executable. Their
+disposable Docker gate emits a source-bound, value-minimized
+`AiFinopsRuntimeCompatibilityReport` only after both provider shapes traverse
+the common durable ledger, cost, attribution, finding, aggregate-export, and
+dashboard path. Local release readiness requires that report while retaining
+live provider, customer telemetry, approved price, invoice, and production
+availability as separate qualification boundaries.
 
 Evidence providers cross a separate application-owned boundary. The [reference collection pipeline](evidence-collection-pipeline.md) authorizes an exact tenant, integration, evidence type, and resource scope before a provider runs, then validates and redacts provider output before hashing and atomic persistence. Providers do not receive ambient credentials through the application contract.
 

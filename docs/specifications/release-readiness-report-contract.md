@@ -18,7 +18,7 @@ are not retained.
 
 ## Required local evidence
 
-The `local-candidate-only` profile has 18 ordered requirements:
+The `local-candidate-only` profile has 19 ordered requirements:
 
 1. packaged install and N-1 release qualification;
 2. exact-SBOM vulnerability qualification;
@@ -31,21 +31,23 @@ The `local-candidate-only` profile has 18 ordered requirements:
 9. Bedrock `Converse` offline instrumentation compatibility;
 10. Bedrock `ConverseStream` offline instrumentation compatibility;
 11. OpenAI chat-completions offline instrumentation compatibility;
-12. PostgreSQL logical recovery;
-13. PostgreSQL physical continuity and PITR;
-14. multi-node Kubernetes planned-disruption API availability, durable receiver
+12. complete local multi-provider AI FinOps runtime compatibility;
+13. PostgreSQL logical recovery;
+14. PostgreSQL physical continuity and PITR;
+15. multi-node Kubernetes planned-disruption API availability, durable receiver
     intake, and workflow completion;
-15. protected GitHub context compatibility;
-16. plugin runtime compatibility;
-17. production-core static configuration preflight; and
-18. production AI FinOps static configuration preflight.
+16. protected GitHub context compatibility;
+17. plugin runtime compatibility;
+18. production-core static configuration preflight; and
+19. production AI FinOps static configuration preflight.
 
 Missing evidence is `missing`. Malformed, dirty, unsuccessful, wrong-profile,
-wrong-version, or wrong-revision evidence is `rejected`. Only 18 passed entries
+wrong-version, or wrong-revision evidence is `rejected`. Only 19 passed entries
 produce `locally-qualified`; every other combination is `incomplete`.
 
 The first two reports must additionally bind the exact release-manifest digest,
-version, and revision. Deployment preflight reports must bind the candidate
+version, and revision. The AI FinOps runtime report must bind the candidate
+application version. Deployment preflight reports must bind the candidate
 application and chart versions. Offline provider evidence remains visibly
 `offline-provider`; static Helm evidence remains visibly
 `configuration-only`.

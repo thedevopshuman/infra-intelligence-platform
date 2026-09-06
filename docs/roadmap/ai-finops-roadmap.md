@@ -58,7 +58,9 @@ and a disposable Collector/Prometheus/Loki/Grafana topology. Item 8 now has a
 deterministic full-flow gate covering deduplication, visible unpriced usage,
 content rejection, exact cost, and one saving. A source-bound offline report
 now also proves official SDK interoperability and asynchronous exporter-failure
-isolation. The explicitly enabled real-provider call remains.
+isolation. The full Docker flow now emits a separate minimized, source-bound
+runtime report and local release readiness requires it as an exact-candidate
+input. The explicitly enabled real-provider call remains.
 
 Two additional deterministic rules are delivered. Protected channel
 configuration maps provider retry attributes into `retryCount`, and the

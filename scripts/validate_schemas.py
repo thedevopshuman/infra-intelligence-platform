@@ -240,6 +240,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "ai-cost-record.json",
         "ai-cost-record-aggregate-output.json",
     ),
+    "ai-finops-runtime-compatibility-report.schema.json": (
+        "ai-finops-runtime-compatibility-report.json",
+    ),
     "ai-savings-finding.schema.json": (
         "ai-savings-finding.json",
         "ai-retry-savings-finding.json",

@@ -93,9 +93,23 @@ Bedrock-shaped record deliberately omits only reasoning output; its equal
 catalog output rates produce a four-line `aggregate-output-tokens` result and
 explicit rate-equivalence warning without manufacturing the missing split. The
 gate also verifies exact current-window, retry, model-cost, and allocation
-aggregates; Bedrock/OpenAI provider coverage; honest unresolved retry savings; visible
-unpriced/unallocated coverage; dashboard provisioning; Loki readiness; and
+aggregates; Bedrock/OpenAI provider coverage; honest unresolved retry savings;
+visible unpriced/unallocated coverage; dashboard provisioning; Loki readiness; and
 privacy-safe labels.
+
+After those checks pass, the gate writes the minimized, source-bound
+`dist/ai-finops-runtime-compatibility-report.json`. It contains fixed aggregate
+counts and versions, not model/service identities, token quantities, prices,
+amounts, endpoints, or credentials. A clean candidate verifies it with:
+
+```bash
+make verify-ai-finops-runtime-report PYTHON=.venv/bin/python
+```
+
+The report's `local-multi-provider-ai-finops-v1` level is local compatibility
+evidence only. Its mandatory limitations keep live providers, customer
+Collector/PKI/network behavior, approved private pricing, invoice agreement,
+sustained load, regional HA, and backend lifecycle outside the claim.
 
 ## Components and replacement boundaries
 

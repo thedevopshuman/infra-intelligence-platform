@@ -3,6 +3,7 @@ set -eu
 
 IIP_DOCKER_BIN=${IIP_DOCKER_BIN:-docker}
 IIP_TEST_PYTHON=${IIP_TEST_PYTHON:-python3}
+IIP_AI_FINOPS_RUNTIME_REPORT=${IIP_AI_FINOPS_RUNTIME_REPORT:-dist/ai-finops-runtime-compatibility-report.json}
 IIP_COMPOSE_FILE=deploy/docker-compose.ai-finops.yml
 IIP_COMPOSE_PROJECT=iip-ai-finops-test
 IIP_AI_FINOPS_ANCHOR=$(date -u '+%Y-%m-%dT%H:%M:00Z')
@@ -63,6 +64,22 @@ if ! command -v "$IIP_DOCKER_BIN" >/dev/null 2>&1; then
     exit 2
 fi
 
+IIP_AI_FINOPS_SOURCE_REVISION=$(git rev-parse HEAD)
+IIP_AI_FINOPS_SOURCE_DIRTY=false
+if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
+    IIP_AI_FINOPS_SOURCE_DIRTY=true
+fi
+IIP_AI_FINOPS_PLATFORM=$(
+    "$IIP_DOCKER_BIN" info --format '{{.OSType}}/{{.Architecture}}'
+)
+IIP_AI_FINOPS_CONTAINER_RUNTIME_VERSION=$(
+    "$IIP_DOCKER_BIN" version --format '{{.Server.Version}}'
+)
+IIP_AI_FINOPS_APPLICATION_VERSION=$(
+    "$IIP_TEST_PYTHON" -c \
+        'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])'
+)
+
 cleanup
 "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
     -f "$IIP_COMPOSE_FILE" config --quiet
@@ -115,7 +132,13 @@ if ! PYTHONPATH=src:sdks/python/src "$IIP_TEST_PYTHON" \
     --prometheus "http://127.0.0.1:${IIP_AI_FINOPS_PROMETHEUS_PORT}" \
     --grafana "http://127.0.0.1:${IIP_AI_FINOPS_GRAFANA_PORT}" \
     --loki "http://127.0.0.1:${IIP_AI_FINOPS_LOKI_PORT}" \
-    --timeout-seconds 60; then
+    --timeout-seconds 60 \
+    --report "$IIP_AI_FINOPS_RUNTIME_REPORT" \
+    --source-revision "$IIP_AI_FINOPS_SOURCE_REVISION" \
+    --source-dirty "$IIP_AI_FINOPS_SOURCE_DIRTY" \
+    --platform "$IIP_AI_FINOPS_PLATFORM" \
+    --container-runtime-version "$IIP_AI_FINOPS_CONTAINER_RUNTIME_VERSION" \
+    --application-version "$IIP_AI_FINOPS_APPLICATION_VERSION"; then
     "$IIP_DOCKER_BIN" compose --project-name "$IIP_COMPOSE_PROJECT" \
         -f "$IIP_COMPOSE_FILE" logs --no-color >&2
     exit 1

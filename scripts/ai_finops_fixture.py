@@ -6,12 +6,19 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import re
+import subprocess
+import tempfile
 import time
+import tomllib
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Mapping
+
+from jsonschema import Draft202012Validator, FormatChecker
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +43,46 @@ INSTRUMENTATION_SCOPE = (
     "opentelemetry.instrumentation.botocore.bedrock-runtime"
 )
 OPENAI_INSTRUMENTATION_SCOPE = "opentelemetry.util.genai.handler"
+COMPATIBILITY_SCHEMA = (
+    ROOT / "contracts/schemas/ai-finops-runtime-compatibility-report.schema.json"
+)
+COMPATIBILITY_CHECK_IDS = (
+    "compose-configuration",
+    "all-components-healthy",
+    "collector-delivery",
+    "normalized-ledger-persistence",
+    "metadata-only-content-rejection",
+    "replay-idempotency",
+    "data-driven-cost",
+    "aggregate-output-rate-equivalence",
+    "unpriced-coverage",
+    "protected-attribution",
+    "deterministic-findings",
+    "otlp-aggregate-export",
+    "grafana-dashboard",
+    "replacement-boundaries",
+)
+COMPATIBILITY_LIMITATIONS = (
+    "synthetic-provider-spans",
+    "test-fixture-pricing",
+    "single-host-docker-runtime",
+    "customer-collector-pki-and-network-not-qualified",
+    "live-provider-private-prices-and-invoice-not-qualified",
+    "sustained-load-regional-ha-and-backend-lifecycle-not-qualified",
+)
+COMPATIBILITY_MEASUREMENTS = {
+    "usageRecordCount": 15,
+    "pricedRecordCount": 11,
+    "aggregateOutputPricedRecordCount": 1,
+    "unpricedRecordCount": 4,
+    "allocatedRecordCount": 10,
+    "unallocatedRecordCount": 5,
+    "findingCount": 3,
+    "rejectedContentSpanCount": 2,
+    "providerCount": 2,
+}
+_REVISION = re.compile(r"[a-f0-9]{40,64}")
+_PLATFORM = re.compile(r"[a-z0-9_.-]+/[a-zA-Z0-9_.-]+")
 
 
 def _parse_anchor(value: str) -> datetime:
@@ -758,7 +805,7 @@ def verify_fixture(
     grafana_endpoint: str,
     loki_endpoint: str,
     timeout_seconds: int,
-) -> None:
+) -> Mapping[str, int]:
     deadline = time.monotonic() + timeout_seconds
     last_error: Exception | None = None
     while time.monotonic() < deadline:
@@ -1046,11 +1093,236 @@ def verify_fixture(
             ) as response:
                 if response.status != 200:
                     raise AssertionError("Loki is not ready")
-            return
+            return dict(COMPATIBILITY_MEASUREMENTS)
         except Exception as error:
             last_error = error
             time.sleep(1)
     raise RuntimeError("ai-finops.fixture.verification.timeout") from last_error
+
+
+def _canonical(value: object) -> bytes:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+
+
+def _compatibility_identifier(
+    metadata_without_id: Mapping[str, object],
+    spec: Mapping[str, object],
+) -> str:
+    return "afc_" + hashlib.sha256(
+        _canonical({"metadata": metadata_without_id, "spec": spec})
+    ).hexdigest()[:32]
+
+
+def build_compatibility_report(
+    *,
+    generated_at: datetime,
+    source_revision: str,
+    source_dirty: bool,
+    platform: str,
+    container_runtime_version: str,
+    application_version: str,
+    measurements: Mapping[str, int],
+) -> Mapping[str, object]:
+    if (
+        generated_at.tzinfo is None
+        or _REVISION.fullmatch(source_revision) is None
+        or not isinstance(source_dirty, bool)
+        or _PLATFORM.fullmatch(platform) is None
+        or not isinstance(container_runtime_version, str)
+        or not 1 <= len(container_runtime_version) <= 64
+        or not isinstance(application_version, str)
+        or dict(measurements) != COMPATIBILITY_MEASUREMENTS
+    ):
+        raise ValueError("ai-finops-runtime-compatibility.input.invalid")
+    metadata_without_id: dict[str, object] = {
+        "generatedAt": format_timestamp(generated_at),
+        "sourceRevision": source_revision,
+        "sourceDirty": source_dirty,
+    }
+    spec: Mapping[str, object] = {
+        "status": "compatible",
+        "qualificationLevel": "local-multi-provider-ai-finops-v1",
+        "environment": {
+            "platform": platform,
+            "containerRuntime": "docker",
+            "containerRuntimeVersion": container_runtime_version,
+            "applicationVersion": application_version,
+            "costEngineVersion": "0.2.0",
+        },
+        "profile": {
+            "providers": ["aws.bedrock", "openai"],
+            "collectionPath": "otel-collector-to-isolated-otlp-trace-receiver",
+            "storage": "postgresql",
+            "telemetryBackend": "prometheus",
+            "dashboard": "grafana",
+            "pricingSource": "test-fixture",
+            "contentPolicy": "metadata-only",
+        },
+        "measurements": dict(measurements),
+        "checks": [
+            {"id": identifier, "status": "passed"}
+            for identifier in COMPATIBILITY_CHECK_IDS
+        ],
+        "limitations": list(COMPATIBILITY_LIMITATIONS),
+        "summary": {
+            "totalChecks": len(COMPATIBILITY_CHECK_IDS),
+            "passedChecks": len(COMPATIBILITY_CHECK_IDS),
+            "failedChecks": 0,
+            "overallStatus": "compatible",
+        },
+    }
+    report: Mapping[str, object] = {
+        "apiVersion": "iip.dev/v1alpha1",
+        "kind": "AiFinopsRuntimeCompatibilityReport",
+        "metadata": {
+            "id": _compatibility_identifier(metadata_without_id, spec),
+            **metadata_without_id,
+        },
+        "spec": spec,
+    }
+    validate_compatibility_report(report)
+    return report
+
+
+def validate_compatibility_report(
+    document: object,
+    *,
+    require_clean: bool = False,
+    expected_source_revision: str | None = None,
+    expected_application_version: str | None = None,
+) -> Mapping[str, object]:
+    if not isinstance(document, Mapping):
+        raise ValueError("ai-finops-runtime-compatibility.report.invalid")
+    schema = json.loads(COMPATIBILITY_SCHEMA.read_text(encoding="utf-8"))
+    errors = sorted(
+        Draft202012Validator(
+            schema,
+            format_checker=FormatChecker(),
+        ).iter_errors(document),
+        key=lambda error: tuple(str(part) for part in error.absolute_path),
+    )
+    if errors:
+        raise ValueError("ai-finops-runtime-compatibility.report.invalid")
+    metadata = document["metadata"]
+    spec = document["spec"]
+    if not isinstance(metadata, Mapping) or not isinstance(spec, Mapping):
+        raise ValueError("ai-finops-runtime-compatibility.report.invalid")
+    metadata_without_id = {
+        key: value for key, value in metadata.items() if key != "id"
+    }
+    if metadata["id"] != _compatibility_identifier(metadata_without_id, spec):
+        raise ValueError("ai-finops-runtime-compatibility.identity.invalid")
+    checks = spec["checks"]
+    summary = spec["summary"]
+    if not isinstance(checks, list) or not isinstance(summary, Mapping):
+        raise ValueError("ai-finops-runtime-compatibility.report.invalid")
+    passed = sum(item["status"] == "passed" for item in checks)
+    expected_status = "compatible" if passed == len(checks) else "incompatible"
+    if summary != {
+        "totalChecks": len(COMPATIBILITY_CHECK_IDS),
+        "passedChecks": passed,
+        "failedChecks": len(COMPATIBILITY_CHECK_IDS) - passed,
+        "overallStatus": expected_status,
+    } or spec["status"] != expected_status:
+        raise ValueError("ai-finops-runtime-compatibility.summary.invalid")
+    if require_clean and metadata["sourceDirty"] is not False:
+        raise ValueError("ai-finops-runtime-compatibility.source.dirty")
+    if (
+        expected_source_revision is not None
+        and metadata["sourceRevision"] != expected_source_revision
+    ):
+        raise ValueError("ai-finops-runtime-compatibility.source.revision-mismatch")
+    if (
+        expected_application_version is not None
+        and spec["environment"]["applicationVersion"]
+        != expected_application_version
+    ):
+        raise ValueError(
+            "ai-finops-runtime-compatibility.application-version.mismatch"
+        )
+    return document
+
+
+def _source_identity() -> tuple[str, bool, str]:
+    def git(*arguments: str) -> str:
+        try:
+            result = subprocess.run(
+                ("git", *arguments),
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            raise ValueError(
+                "ai-finops-runtime-compatibility.source.unavailable"
+            ) from None
+        if result.returncode != 0:
+            raise ValueError(
+                "ai-finops-runtime-compatibility.source.unavailable"
+            )
+        return result.stdout.strip()
+
+    revision = git("rev-parse", "HEAD")
+    dirty = bool(git("status", "--porcelain", "--untracked-files=normal"))
+    try:
+        with (ROOT / "pyproject.toml").open("rb") as handle:
+            application_version = tomllib.load(handle)["project"]["version"]
+    except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError):
+        raise ValueError(
+            "ai-finops-runtime-compatibility.application-version.invalid"
+        ) from None
+    if (
+        _REVISION.fullmatch(revision) is None
+        or not isinstance(application_version, str)
+    ):
+        raise ValueError("ai-finops-runtime-compatibility.source.unavailable")
+    return revision, dirty, application_version
+
+
+def verify_current_compatibility_report(
+    document: object,
+    *,
+    require_clean: bool,
+) -> Mapping[str, object]:
+    revision, dirty, application_version = _source_identity()
+    if require_clean and dirty:
+        raise ValueError("ai-finops-runtime-compatibility.source.dirty")
+    return validate_compatibility_report(
+        document,
+        require_clean=require_clean,
+        expected_source_revision=revision,
+        expected_application_version=application_version,
+    )
+
+
+def _write_report(path: Path, report: Mapping[str, object]) -> None:
+    destination = path.expanduser().absolute()
+    if destination.is_symlink():
+        raise ValueError("ai-finops-runtime-compatibility.output.invalid")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            delete=False,
+        ) as handle:
+            json.dump(report, handle, indent=2)
+            handle.write("\n")
+            temporary = Path(handle.name)
+        os.replace(temporary, destination)
+    except OSError:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+        raise ValueError("ai-finops-runtime-compatibility.output.invalid") from None
 
 
 def _compact(document: Mapping[str, object]) -> str:
@@ -1089,6 +1361,16 @@ def main() -> None:
     verify.add_argument("--grafana", required=True)
     verify.add_argument("--loki", required=True)
     verify.add_argument("--timeout-seconds", type=int, default=60)
+    verify.add_argument("--report", required=True)
+    verify.add_argument("--source-revision", required=True)
+    verify.add_argument("--source-dirty", choices=("true", "false"), required=True)
+    verify.add_argument("--platform", required=True)
+    verify.add_argument("--container-runtime-version", required=True)
+    verify.add_argument("--application-version", required=True)
+
+    verify_report = subparsers.add_parser("verify-report")
+    verify_report.add_argument("--report", required=True)
+    verify_report.add_argument("--require-clean", action="store_true")
 
     arguments = parser.parse_args()
     if arguments.command == "configuration":
@@ -1114,7 +1396,23 @@ def main() -> None:
             arguments.receiver,
         )
         return
-    verify_fixture(
+    if arguments.command == "verify-report":
+        try:
+            candidate = Path(arguments.report).expanduser()
+            if candidate.is_symlink() or not candidate.is_file():
+                raise ValueError
+            report = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            raise ValueError(
+                "ai-finops-runtime-compatibility.report.invalid"
+            ) from None
+        verify_current_compatibility_report(
+            report,
+            require_clean=arguments.require_clean,
+        )
+        print("AI FinOps runtime compatibility report verified")
+        return
+    measurements = verify_fixture(
         anchor=_parse_anchor(arguments.anchor),
         database_url=arguments.database,
         api_endpoint=arguments.api,
@@ -1123,6 +1421,17 @@ def main() -> None:
         loki_endpoint=arguments.loki,
         timeout_seconds=arguments.timeout_seconds,
     )
+    report = build_compatibility_report(
+        generated_at=datetime.now(timezone.utc).replace(microsecond=0),
+        source_revision=arguments.source_revision,
+        source_dirty=arguments.source_dirty == "true",
+        platform=arguments.platform,
+        container_runtime_version=arguments.container_runtime_version,
+        application_version=arguments.application_version,
+        measurements=measurements,
+    )
+    _write_report(Path(arguments.report), report)
+    print(f"AI FinOps runtime compatibility report: {arguments.report}")
 
 
 if __name__ == "__main__":

@@ -34,6 +34,8 @@ class LocalReleaseQualificationTests(unittest.TestCase):
             "test-otlp-receiver",
             "test-bedrock-instrumentation",
             "test-openai-instrumentation",
+            "test-ai-finops",
+            "verify-ai-finops-runtime-report",
             "test-backup-restore",
             "test-postgres-continuity",
             "test-deployment-preflight",

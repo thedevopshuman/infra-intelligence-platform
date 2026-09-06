@@ -1,9 +1,9 @@
 # Python SDK boundary
 
-Version 0.77 adds the protected customer pilot-readiness profile and minimized
-design-partner-candidate report. It cross-binds existing release and customer
-evidence but grants no publication, signing, installation, provider, load, or
-promotion authority.
+Version 0.78 adds the protected sustained-workload profile and minimized
+qualification report. These offline transport types describe aggregate API,
+durable OTLP, scheduler, and asynchronous-investigation measurements; they do
+not generate traffic, carry credentials, or grant production approval.
 
 This package contains public transport and model types only. It does not import the server kernel. The API will expand contract-first; unstable methods remain under the `v1alpha1` namespace in their paths and models.
 
@@ -70,6 +70,16 @@ expose the AI economics
 records as public metadata-only envelopes. They do not
 instrument provider calls, send OTLP, or import an AWS SDK. Standard
 OpenTelemetry instrumentation remains the collection boundary.
+
+`CustomerSustainedWorkloadProfile` and
+`CustomerSustainedWorkloadQualificationReport` expose the separately operated
+customer capacity gate. The protected profile contains target and workload
+selection; the transportable report contains only pseudonymous digests,
+aggregate counts, percentiles, checks, and fixed limitations.
+
+Version 0.78 adds those sustained-workload envelopes. The SDK deliberately has
+no method for initiating a load run and cannot turn bounded synthetic evidence
+into customer workload representativeness or an availability certification.
 
 Version 0.77 adds the customer pilot preflight transport types. A candidate
 report binds one published and organizationally signed release to current local

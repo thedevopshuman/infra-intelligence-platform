@@ -1,0 +1,258 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-sustained-workload-qualification-report:v1alpha1",
+  "title": "Customer Sustained Workload Qualification Report",
+  "description": "Privacy-minimized evidence for one bounded sustained customer-environment mix of exact-release API reads, durable OTLP metric writes, and asynchronous investigations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerSustainedWorkloadQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "validUntil", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^cswq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "validUntil": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationLevel", "qualificationBoundary", "subject", "bindings", "objective", "environment", "measurements", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualificationLevel": {"const": "customer-sustained-core-workload-v1"},
+        "qualificationBoundary": {"const": "customer-environment-sustained-workload"},
+        "subject": {"$ref": "#/$defs/release"},
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileDigest", "apiTargetBindingDigest", "otlpTargetBindingDigest"],
+          "properties": {
+            "profileDigest": {"$ref": "#/$defs/digest"},
+            "apiTargetBindingDigest": {"$ref": "#/$defs/digest"},
+            "otlpTargetBindingDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "objective": {"$ref": "#/$defs/objective"},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["platform", "pythonVersion", "apiTransport", "otlpTransport", "apiCaSource", "otlpCaSource", "proxyMode", "redirectMode", "connectionMode", "scheduler", "receiverSuccessBoundary"],
+          "properties": {
+            "platform": {"type": "string", "pattern": "^[a-z0-9._-]+/[a-z0-9._-]+$"},
+            "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+            "apiTransport": {"const": "verified-https"},
+            "otlpTransport": {"const": "mutual-tls-https"},
+            "apiCaSource": {"enum": ["system", "custom"]},
+            "otlpCaSource": {"enum": ["system", "custom"]},
+            "proxyMode": {"const": "disabled"},
+            "redirectMode": {"const": "deny"},
+            "connectionMode": {"const": "close-per-request"},
+            "scheduler": {"const": "bounded-dual-fixed-rate-v1"},
+            "receiverSuccessBoundary": {"const": "postgresql-commit-before-http-200"}
+          }
+        },
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "checks": {"$ref": "#/$defs/checks"},
+        "limitations": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "prefixItems": [
+            {"const": "bounded-synthetic-core-workload"},
+            {"const": "single-tenant-resource-and-target-pair"},
+            {"const": "api-identity-read-otlp-metric-and-investigation-only"},
+            {"const": "no-provider-call-or-inference-path"},
+            {"const": "no-failure-injection-or-database-failover"},
+            {"const": "node-zone-region-and-long-window-slo-not-qualified"},
+            {"const": "customer-workload-representativeness-not-approved"}
+          ],
+          "items": false
+        },
+        "summary": {"$ref": "#/$defs/summary"}
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "chartVersion", "contractsApiVersion", "requiredMigration", "sourceRevision", "imageDigest"],
+      "properties": {
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+        "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$", "maxLength": 128},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["durationSeconds", "probeCyclesPerSecond", "probeConcurrency", "workflowSubmissionsPerMinute", "workflowConcurrency", "minimumApiSuccessBasisPoints", "minimumReceiverSuccessBasisPoints", "minimumWorkflowCompletionBasisPoints", "maximumProbeSchedulerMissBasisPoints", "maximumWorkflowSchedulerMissBasisPoints", "maximumApiP95LatencyMilliseconds", "maximumApiP99LatencyMilliseconds", "maximumReceiverP95LatencyMilliseconds", "maximumReceiverP99LatencyMilliseconds", "maximumWorkflowP95CompletionMilliseconds", "maximumWorkflowP99CompletionMilliseconds", "requestTimeoutMilliseconds", "maximumSchedulerLagMilliseconds", "maximumWorkflowCompletionMilliseconds", "maximumProfileAgeSeconds", "reportValiditySeconds"],
+      "properties": {
+        "durationSeconds": {"type": "integer", "minimum": 900, "maximum": 14400},
+        "probeCyclesPerSecond": {"type": "integer", "minimum": 1, "maximum": 30},
+        "probeConcurrency": {"type": "integer", "minimum": 1, "maximum": 64},
+        "workflowSubmissionsPerMinute": {"type": "integer", "minimum": 1, "maximum": 20},
+        "workflowConcurrency": {"type": "integer", "minimum": 1, "maximum": 32},
+        "minimumApiSuccessBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "minimumReceiverSuccessBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "minimumWorkflowCompletionBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "maximumProbeSchedulerMissBasisPoints": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "maximumWorkflowSchedulerMissBasisPoints": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "maximumApiP95LatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 60000},
+        "maximumApiP99LatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 120000},
+        "maximumReceiverP95LatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 60000},
+        "maximumReceiverP99LatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 120000},
+        "maximumWorkflowP95CompletionMilliseconds": {"type": "integer", "minimum": 1000, "maximum": 300000},
+        "maximumWorkflowP99CompletionMilliseconds": {"type": "integer", "minimum": 1000, "maximum": 600000},
+        "requestTimeoutMilliseconds": {"type": "integer", "minimum": 100, "maximum": 30000},
+        "maximumSchedulerLagMilliseconds": {"type": "integer", "minimum": 10, "maximum": 5000},
+        "maximumWorkflowCompletionMilliseconds": {"type": "integer", "minimum": 1000, "maximum": 600000},
+        "maximumProfileAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 7776000},
+        "reportValiditySeconds": {"type": "integer", "minimum": 300, "maximum": 604800}
+      }
+    },
+    "latency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p50Milliseconds", "p95Milliseconds", "p99Milliseconds", "maximumMilliseconds"],
+      "properties": {
+        "p50Milliseconds": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000},
+        "p95Milliseconds": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000},
+        "p99Milliseconds": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000},
+        "maximumMilliseconds": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000}
+      }
+    },
+    "pathMeasurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempts", "successes", "failures", "successBasisPoints", "latency"],
+      "properties": {
+        "attempts": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "successes": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "failures": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "successBasisPoints": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "latency": {"$ref": "#/$defs/latency"}
+      }
+    },
+    "probeMeasurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scheduledCycles", "attemptedCycles", "schedulerMissedCycles", "schedulerMissBasisPoints", "schedulerLagP95Milliseconds", "api", "receiver"],
+      "properties": {
+        "scheduledCycles": {"type": "integer", "minimum": 1, "maximum": 500000},
+        "attemptedCycles": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "schedulerMissedCycles": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "schedulerMissBasisPoints": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "schedulerLagP95Milliseconds": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "api": {"$ref": "#/$defs/pathMeasurements"},
+        "receiver": {"$ref": "#/$defs/pathMeasurements"}
+      }
+    },
+    "workflowMeasurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scheduledWorkflows", "attemptedSubmissions", "acceptedSubmissions", "submissionFailures", "completedWorkflows", "terminalFailures", "schedulerMissedWorkflows", "completionBasisPoints", "schedulerMissBasisPoints", "schedulerLagP95Milliseconds", "pollAttempts", "completionLatency"],
+      "properties": {
+        "scheduledWorkflows": {"type": "integer", "minimum": 1, "maximum": 5000},
+        "attemptedSubmissions": {"type": "integer", "minimum": 0, "maximum": 5000},
+        "acceptedSubmissions": {"type": "integer", "minimum": 0, "maximum": 5000},
+        "submissionFailures": {"type": "integer", "minimum": 0, "maximum": 5000},
+        "completedWorkflows": {"type": "integer", "minimum": 0, "maximum": 5000},
+        "terminalFailures": {"type": "integer", "minimum": 0, "maximum": 5000},
+        "schedulerMissedWorkflows": {"type": "integer", "minimum": 0, "maximum": 5000},
+        "completionBasisPoints": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "schedulerMissBasisPoints": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "schedulerLagP95Milliseconds": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "pollAttempts": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "completionLatency": {"$ref": "#/$defs/latency"}
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileReviewedAt", "startedAt", "completedAt", "actualDurationMilliseconds", "probes", "workflows"],
+      "properties": {
+        "profileReviewedAt": {"type": "string", "format": "date-time"},
+        "startedAt": {"type": "string", "format": "date-time"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "actualDurationMilliseconds": {"type": "integer", "minimum": 1, "maximum": 15100000},
+        "probes": {"$ref": "#/$defs/probeMeasurements"},
+        "workflows": {"$ref": "#/$defs/workflowMeasurements"}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-sustained-workload\\.[a-z0-9.-]+$", "maxLength": 180}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 22,
+      "maxItems": 22,
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-review"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "explicit-traffic-enable"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "direct-no-proxy-no-redirect"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-verified-https"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-mutual-tls"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "immutable-release-identity"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "bounded-workload-volume"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "observation-window"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "probe-scheduler-attainment"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workflow-scheduler-attainment"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-success-attainment"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-p95-latency"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-p99-latency"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-success-attainment"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-p95-latency"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-p99-latency"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-durable-intake"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workflow-completion-attainment"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workflow-p95-completion"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workflow-p99-completion"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}}
+      ],
+      "items": false
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalChecks", "passedChecks", "failedChecks", "scheduledProbeCycles", "successfulApiRequests", "successfulReceiverWrites", "scheduledWorkflows", "completedWorkflows", "overallStatus"],
+      "properties": {
+        "totalChecks": {"const": 22},
+        "passedChecks": {"type": "integer", "minimum": 0, "maximum": 22},
+        "failedChecks": {"type": "integer", "minimum": 0, "maximum": 22},
+        "scheduledProbeCycles": {"type": "integer", "minimum": 1, "maximum": 500000},
+        "successfulApiRequests": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "successfulReceiverWrites": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "scheduledWorkflows": {"type": "integer", "minimum": 1, "maximum": 5000},
+        "completedWorkflows": {"type": "integer", "minimum": 0, "maximum": 5000},
+        "overallStatus": {"enum": ["qualified", "not-qualified"]}
+      }
+    }
+  }
+}

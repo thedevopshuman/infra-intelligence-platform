@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-sustained-workload-profile:v1alpha1",
+  "title": "Customer Sustained Workload Profile",
+  "description": "Protected reviewed selection for a bounded sustained mix of exact-release API reads, durable OTLP metric writes, and asynchronous investigation work in one customer environment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerSustainedWorkloadProfile"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "actorId", "reviewedAt", "validUntil"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^cswp_[a-f0-9]{32}$"},
+        "tenantId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$"},
+        "actorId": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]{0,127}$"},
+        "reviewedAt": {"type": "string", "format": "date-time"},
+        "validUntil": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["qualificationLevel", "release", "targets", "resourceUid", "metric", "investigation", "objective"],
+      "properties": {
+        "qualificationLevel": {"const": "customer-sustained-core-workload-v1"},
+        "release": {"$ref": "#/$defs/release"},
+        "targets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["apiBaseUrl", "otlpBaseUrl"],
+          "properties": {
+            "apiBaseUrl": {"type": "string", "format": "uri", "minLength": 12, "maxLength": 2048},
+            "otlpBaseUrl": {"type": "string", "format": "uri", "minLength": 12, "maxLength": 2048}
+          }
+        },
+        "resourceUid": {"type": "string", "pattern": "^res_[a-f0-9]{32}$"},
+        "metric": {"$ref": "#/$defs/metric"},
+        "investigation": {"$ref": "#/$defs/investigation"},
+        "objective": {"$ref": "#/$defs/objective"}
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "chartVersion", "contractsApiVersion", "requiredMigration", "sourceRevision", "imageDigest"],
+      "properties": {
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+        "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$", "maxLength": 128},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "unit", "serviceName"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]{0,126}[a-zA-Z0-9]$"},
+        "unit": {"type": "string", "minLength": 1, "maxLength": 32},
+        "serviceName": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,126}[a-zA-Z0-9]$"}
+      }
+    },
+    "investigation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceTypes", "allowedTools", "maxToolCalls", "maxWallTimeSeconds", "maxEvidenceItems", "maxIterations"],
+      "properties": {
+        "evidenceTypes": {"type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": {"enum": ["resource.change", "kubernetes.event", "telemetry.metric", "telemetry.log"]}},
+        "allowedTools": {"type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": {"enum": ["resources/query", "evidence/fetch", "events/query", "metrics/query", "logs/query"]}},
+        "maxToolCalls": {"type": "integer", "minimum": 1, "maximum": 16},
+        "maxWallTimeSeconds": {"type": "integer", "minimum": 10, "maximum": 120},
+        "maxEvidenceItems": {"type": "integer", "minimum": 1, "maximum": 32},
+        "maxIterations": {"type": "integer", "minimum": 1, "maximum": 16}
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["durationSeconds", "probeCyclesPerSecond", "probeConcurrency", "workflowSubmissionsPerMinute", "workflowConcurrency", "minimumApiSuccessBasisPoints", "minimumReceiverSuccessBasisPoints", "minimumWorkflowCompletionBasisPoints", "maximumProbeSchedulerMissBasisPoints", "maximumWorkflowSchedulerMissBasisPoints", "maximumApiP95LatencyMilliseconds", "maximumApiP99LatencyMilliseconds", "maximumReceiverP95LatencyMilliseconds", "maximumReceiverP99LatencyMilliseconds", "maximumWorkflowP95CompletionMilliseconds", "maximumWorkflowP99CompletionMilliseconds", "requestTimeoutMilliseconds", "maximumSchedulerLagMilliseconds", "maximumWorkflowCompletionMilliseconds", "maximumProfileAgeSeconds", "reportValiditySeconds"],
+      "properties": {
+        "durationSeconds": {"type": "integer", "minimum": 900, "maximum": 14400},
+        "probeCyclesPerSecond": {"type": "integer", "minimum": 1, "maximum": 30},
+        "probeConcurrency": {"type": "integer", "minimum": 1, "maximum": 64},
+        "workflowSubmissionsPerMinute": {"type": "integer", "minimum": 1, "maximum": 20},
+        "workflowConcurrency": {"type": "integer", "minimum": 1, "maximum": 32},
+        "minimumApiSuccessBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "minimumReceiverSuccessBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "minimumWorkflowCompletionBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "maximumProbeSchedulerMissBasisPoints": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "maximumWorkflowSchedulerMissBasisPoints": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "maximumApiP95LatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 60000},
+        "maximumApiP99LatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 120000},
+        "maximumReceiverP95LatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 60000},
+        "maximumReceiverP99LatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 120000},
+        "maximumWorkflowP95CompletionMilliseconds": {"type": "integer", "minimum": 1000, "maximum": 300000},
+        "maximumWorkflowP99CompletionMilliseconds": {"type": "integer", "minimum": 1000, "maximum": 600000},
+        "requestTimeoutMilliseconds": {"type": "integer", "minimum": 100, "maximum": 30000},
+        "maximumSchedulerLagMilliseconds": {"type": "integer", "minimum": 10, "maximum": 5000},
+        "maximumWorkflowCompletionMilliseconds": {"type": "integer", "minimum": 1000, "maximum": 600000},
+        "maximumProfileAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 7776000},
+        "reportValiditySeconds": {"type": "integer", "minimum": 300, "maximum": 604800}
+      }
+    }
+  }
+}

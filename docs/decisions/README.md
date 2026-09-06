@@ -147,3 +147,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0141](0141-privacy-minimized-exact-ai-invocation-observation.md) | Accepted | Correlate one privileged tenant-bound AI invocation through active ledger generations without exposing trace identity in responses or metrics |
 | [0142](0142-customer-ai-finops-same-invocation-qualification.md) | Accepted | Qualify one exact live Bedrock-to-ledger-to-dashboard customer path with protected correlation and minimized evidence |
 | [0143](0143-customer-pilot-readiness-aggregation.md) | Accepted | Bind publication, organizational trust, customer deployment, load, and live AI evidence before a private design-partner trial |
+| [0144](0144-bounded-sustained-customer-core-workload.md) | Accepted | Measure bounded fixed-rate API, durable OTLP, and asynchronous investigation traffic in one customer environment |

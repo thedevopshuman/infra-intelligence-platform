@@ -661,6 +661,62 @@ class CustomerProcessingQualificationProfile:
 
 
 @dataclass(frozen=True)
+class CustomerSustainedWorkloadProfile:
+    """Protected selection for one bounded customer core workload run."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerSustainedWorkloadProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerSustainedWorkloadProfile",
+                label="customer sustained workload profile",
+            )
+        )
+
+    @property
+    def release(self) -> Mapping[str, Any]:
+        spec = self.payload.get("spec")
+        value = spec.get("release") if isinstance(spec, Mapping) else None
+        return value if isinstance(value, Mapping) else {}
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerSustainedWorkloadQualificationReport:
+    """Minimized bounded API, OTLP, and investigation workload evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerSustainedWorkloadQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerSustainedWorkloadQualificationReport",
+                label="customer sustained workload qualification report",
+            )
+        )
+
+    @property
+    def status(self) -> Optional[str]:
+        spec = self.payload.get("spec")
+        value = spec.get("status") if isinstance(spec, Mapping) else None
+        return value if isinstance(value, str) else None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerPostgreSQLContinuityProfile:
     """Protected input for one customer PostgreSQL promotion observation."""
 

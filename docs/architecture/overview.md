@@ -155,6 +155,14 @@ identity boundary, a bounded global fixed-rate schedule, explicit traffic
 enablement, and aggregate-only output. It remains an operational client with no
 runtime, SDK, plugin, or production-approval authority.
 
+[ADR 0144](../decisions/0144-bounded-sustained-customer-core-workload.md)
+adds an independently approved customer profile for a sustained mix of exact
+release reads, durable mTLS OTLP metrics, and asynchronous investigations. Its
+host-side dual fixed-rate scheduler skips late slots, reuses the existing
+processing client, and emits aggregate-only evidence. It does not become a
+serving workload or claim customer representativeness, provider traffic,
+failure behavior, regional capacity, or long-window SLO attainment.
+
 The signed plugin runner claims each exact-tenant request against its persisted
 session and canonical invocation digest before a container starts. PostgreSQL
 serializes the session request limit across replicas, retains host-created

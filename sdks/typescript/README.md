@@ -1,9 +1,9 @@
 # TypeScript SDK boundary
 
-Version 0.77 adds the protected customer pilot-readiness profile and minimized
-design-partner-candidate report. It cross-binds existing release and customer
-evidence but grants no publication, signing, installation, provider, load, or
-promotion authority.
+Version 0.78 adds the protected sustained-workload profile and minimized
+qualification report. These offline types describe aggregate API, durable
+OTLP, scheduler, and asynchronous-investigation measurements; they do not
+generate traffic, carry credentials, or grant production approval.
 
 The SDK exposes public contract types and a small fetch-based client. It has no dependency on server code or a framework runtime.
 
@@ -66,6 +66,16 @@ describe the
 metadata-only AI economics ledger. The SDK does not instrument or
 proxy model calls; applications continue using standard OpenTelemetry
 instrumentation and a customer-controlled Collector.
+
+`CustomerSustainedWorkloadProfile` and
+`CustomerSustainedWorkloadQualificationReport` type the separately operated
+customer capacity gate. The protected profile contains target and workload
+selection; the transportable report contains only pseudonymous digests,
+aggregate counts, percentiles, checks, and fixed limitations.
+
+Version 0.78 adds those sustained-workload types. The SDK deliberately has no
+method for initiating a load run and cannot turn bounded synthetic evidence
+into customer workload representativeness or an availability certification.
 
 Version 0.77 adds the customer pilot preflight types. A candidate report binds
 one published and organizationally signed release to current local readiness,

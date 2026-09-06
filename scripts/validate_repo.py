@@ -181,6 +181,15 @@ REQUIRED_PATHS = (
     "docs/operations/customer-pilot-readiness.md",
     "scripts/assess_customer_pilot_readiness.py",
     "tests/test_customer_pilot_readiness.py",
+    "docs/decisions/0144-bounded-sustained-customer-core-workload.md",
+    "docs/specifications/customer-sustained-workload-qualification-contract.md",
+    "contracts/schemas/customer-sustained-workload-profile.schema.json",
+    "contracts/schemas/customer-sustained-workload-qualification-report.schema.json",
+    "contracts/examples/customer-sustained-workload-profile.json",
+    "contracts/examples/customer-sustained-workload-qualification-report.json",
+    "docs/operations/customer-sustained-workload-qualification.md",
+    "scripts/qualify_customer_sustained_workload.py",
+    "tests/test_customer_sustained_workload.py",
     "docs/decisions/0141-privacy-minimized-exact-ai-invocation-observation.md",
     "docs/specifications/ai-invocation-observation-contract.md",
     "contracts/schemas/ai-economics-invocation-observation-request.schema.json",
@@ -2750,6 +2759,52 @@ def validate_customer_deployment_qualification_example(
         validate_report_document(report)
     except CustomerDeploymentQualificationError:
         fail(errors, "customer deployment qualification example must be semantically valid")
+
+
+def validate_customer_sustained_workload_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check the protected workload profile and minimized report together."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    profile = documents.get(example_dir / "customer-sustained-workload-profile.json")
+    report = documents.get(
+        example_dir / "customer-sustained-workload-qualification-report.json"
+    )
+    try:
+        from qualify_customer_sustained_workload import (
+            CustomerSustainedWorkloadError,
+            _digest,
+            validate_profile,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "customer sustained workload validator must be importable")
+        return
+    try:
+        if not isinstance(profile, dict) or not isinstance(report, dict):
+            raise CustomerSustainedWorkloadError(
+                "customer-sustained-workload.example.invalid"
+            )
+        validate_profile(profile)
+        validate_report_document(report)
+        profile_metadata = profile["metadata"]
+        profile_spec = profile["spec"]
+        report_spec = report["spec"]
+        if (
+            report_spec["subject"] != profile_spec["release"]
+            or report_spec["objective"] != profile_spec["objective"]
+            or report_spec["bindings"]["profileDigest"] != _digest(profile)
+            or report_spec["measurements"]["profileReviewedAt"]
+            != profile_metadata["reviewedAt"]
+            or parse_timestamp(report["metadata"]["validUntil"])
+            > parse_timestamp(profile_metadata["validUntil"])
+        ):
+            raise CustomerSustainedWorkloadError(
+                "customer-sustained-workload.example.crossed"
+            )
+    except (CustomerSustainedWorkloadError, KeyError, TypeError):
+        fail(errors, "customer sustained workload examples must be semantically valid")
 
 
 def validate_control_plane_load_qualification_example(
@@ -5724,6 +5779,14 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerPilotReadinessReport",
         ),
         (
+            "customer-sustained-workload-profile.json",
+            "CustomerSustainedWorkloadProfile",
+        ),
+        (
+            "customer-sustained-workload-qualification-report.json",
+            "CustomerSustainedWorkloadQualificationReport",
+        ),
+        (
             "customer-otlp-receiver-qualification-profile.json",
             "CustomerOtlpReceiverQualificationProfile",
         ),
@@ -5837,6 +5900,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_customer_pilot_readiness_examples(documents, errors)
     validate_customer_otlp_receiver_qualification_example(documents, errors)
     validate_customer_deployment_qualification_example(documents, errors)
+    validate_customer_sustained_workload_examples(documents, errors)
     validate_control_plane_load_qualification_example(documents, errors)
     validate_postgresql_recovery_qualification_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)

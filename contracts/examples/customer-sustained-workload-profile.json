@@ -1,0 +1,63 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerSustainedWorkloadProfile",
+  "metadata": {
+    "id": "cswp_088a29dae498108528acd722c7f0f71f",
+    "tenantId": "customer-qualification",
+    "actorId": "capacity-operator",
+    "reviewedAt": "2026-09-09T08:00:00Z",
+    "validUntil": "2026-09-16T08:00:00Z"
+  },
+  "spec": {
+    "qualificationLevel": "customer-sustained-core-workload-v1",
+    "release": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "requiredMigration": "0023_ai_model_suitability.sql",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "targets": {
+      "apiBaseUrl": "https://iip.example.test",
+      "otlpBaseUrl": "https://otlp.example.test"
+    },
+    "resourceUid": "res_0123456789abcdef0123456789abcdef",
+    "metric": {
+      "name": "iip.qualification.request.count",
+      "unit": "{request}",
+      "serviceName": "customer-sustained-workload"
+    },
+    "investigation": {
+      "evidenceTypes": ["resource.change"],
+      "allowedTools": ["resources/query", "evidence/fetch"],
+      "maxToolCalls": 8,
+      "maxWallTimeSeconds": 60,
+      "maxEvidenceItems": 16,
+      "maxIterations": 8
+    },
+    "objective": {
+      "durationSeconds": 900,
+      "probeCyclesPerSecond": 2,
+      "probeConcurrency": 4,
+      "workflowSubmissionsPerMinute": 1,
+      "workflowConcurrency": 2,
+      "minimumApiSuccessBasisPoints": 9990,
+      "minimumReceiverSuccessBasisPoints": 9990,
+      "minimumWorkflowCompletionBasisPoints": 9900,
+      "maximumProbeSchedulerMissBasisPoints": 10,
+      "maximumWorkflowSchedulerMissBasisPoints": 100,
+      "maximumApiP95LatencyMilliseconds": 2000,
+      "maximumApiP99LatencyMilliseconds": 5000,
+      "maximumReceiverP95LatencyMilliseconds": 2000,
+      "maximumReceiverP99LatencyMilliseconds": 5000,
+      "maximumWorkflowP95CompletionMilliseconds": 60000,
+      "maximumWorkflowP99CompletionMilliseconds": 120000,
+      "requestTimeoutMilliseconds": 2000,
+      "maximumSchedulerLagMilliseconds": 1000,
+      "maximumWorkflowCompletionMilliseconds": 120000,
+      "maximumProfileAgeSeconds": 2592000,
+      "reportValiditySeconds": 86400
+    }
+  }
+}

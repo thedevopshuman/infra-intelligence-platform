@@ -399,6 +399,7 @@ class ProcessingClient:
         if qualification_id not in {
             "customer-processing-continuity",
             "customer-postgresql-continuity",
+            "customer-sustained-workload",
         }:
             _fail("customer-processing-continuity.client.invalid")
         self.qualification_id = qualification_id
@@ -483,7 +484,8 @@ class ProcessingClient:
         ):
             _fail("customer-processing-continuity.resource.invalid")
 
-    def probe_cycle(self) -> tuple[bool, bool]:
+    def probe_cycle_measurement(self) -> tuple[bool, int, bool, int]:
+        api_started = time.monotonic()
         api_response = _request(
             self.api_opener,
             url=self.api_base_url + "/v1/system/version",
@@ -493,12 +495,14 @@ class ProcessingClient:
             content_type="application/json",
             timeout_milliseconds=self.request_timeout_milliseconds,
         )
+        api_latency = max(0, math.ceil((time.monotonic() - api_started) * 1000))
         api_ok = (
             api_response is not None
             and api_response[0] == 200
             and api_response[1] == "application/json"
             and self._runtime_identity_valid(api_response[2])
         )
+        otlp_started = time.monotonic()
         otlp_response = _request(
             self.otlp_opener,
             url=self.otlp_base_url + "/v1/metrics",
@@ -508,12 +512,17 @@ class ProcessingClient:
             content_type="application/x-protobuf",
             timeout_milliseconds=self.request_timeout_milliseconds,
         )
+        otlp_latency = max(0, math.ceil((time.monotonic() - otlp_started) * 1000))
         otlp_ok = (
             otlp_response is not None
             and otlp_response[0] == 200
             and otlp_response[1] == "application/x-protobuf"
             and otlp_response[2] == b""
         )
+        return api_ok, api_latency, otlp_ok, otlp_latency
+
+    def probe_cycle(self) -> tuple[bool, bool]:
+        api_ok, _, otlp_ok, _ = self.probe_cycle_measurement()
         return api_ok, otlp_ok
 
     def start_workflow(self, phase: str) -> tuple[str, float]:

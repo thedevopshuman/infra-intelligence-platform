@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-oidc-qualification qualify-customer-oidc verify-customer-oidc-qualification-report test-customer-policy-qualification qualify-customer-policy verify-customer-policy-qualification-report test-customer-credential-broker-qualification qualify-customer-credential-broker verify-customer-credential-broker-qualification-report test-customer-github-context-qualification qualify-customer-github-context verify-customer-github-context-qualification-report test-customer-bedrock-qualification qualify-customer-bedrock verify-customer-bedrock-qualification-report test-customer-ai-finops-prerequisites qualify-customer-ai-finops-prerequisites verify-customer-ai-finops-prerequisite-report test-customer-ai-finops-flow qualify-customer-ai-finops-flow verify-customer-ai-finops-flow-report test-customer-pilot-readiness assess-customer-pilot-readiness verify-customer-pilot-readiness-report test-customer-otlp-receiver-qualification qualify-customer-otlp-receiver verify-customer-otlp-receiver-qualification-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-postgresql-continuity qualify-customer-postgresql-continuity verify-customer-postgresql-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops verify-ai-finops-runtime-report test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-oidc-qualification qualify-customer-oidc verify-customer-oidc-qualification-report test-customer-policy-qualification qualify-customer-policy verify-customer-policy-qualification-report test-customer-credential-broker-qualification qualify-customer-credential-broker verify-customer-credential-broker-qualification-report test-customer-github-context-qualification qualify-customer-github-context verify-customer-github-context-qualification-report test-customer-bedrock-qualification qualify-customer-bedrock verify-customer-bedrock-qualification-report test-customer-ai-finops-prerequisites qualify-customer-ai-finops-prerequisites verify-customer-ai-finops-prerequisite-report test-customer-ai-finops-flow qualify-customer-ai-finops-flow verify-customer-ai-finops-flow-report test-customer-pilot-readiness assess-customer-pilot-readiness verify-customer-pilot-readiness-report test-customer-otlp-receiver-qualification qualify-customer-otlp-receiver verify-customer-otlp-receiver-qualification-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-sustained-workload qualify-customer-sustained-workload verify-customer-sustained-workload-report test-customer-postgresql-continuity qualify-customer-postgresql-continuity verify-customer-postgresql-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops verify-ai-finops-runtime-report test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -139,6 +139,15 @@ IIP_PROCESSING_PROBE_INTERVAL_MILLISECONDS ?= 250
 IIP_PROCESSING_MAXIMUM_WORKFLOW_MILLISECONDS ?= 60000
 IIP_PROCESSING_MAXIMUM_RECOVERY_MILLISECONDS ?= 120000
 IIP_PROCESSING_REQUEST_TIMEOUT_MILLISECONDS ?= 2000
+IIP_CUSTOMER_SUSTAINED_WORKLOAD_PROFILE ?=
+IIP_CUSTOMER_SUSTAINED_WORKLOAD_REPORT ?= dist/customer-sustained-workload-qualification-report.json
+IIP_CUSTOMER_SUSTAINED_WORKLOAD_API_TOKEN_FILE ?=
+IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_TOKEN_FILE ?=
+IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_CLIENT_CERT_FILE ?=
+IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_CLIENT_KEY_FILE ?=
+IIP_CUSTOMER_SUSTAINED_WORKLOAD_API_CA_FILE ?=
+IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_CA_FILE ?=
+IIP_CUSTOMER_SUSTAINED_WORKLOAD_ALLOW_TRAFFIC ?= false
 IIP_CUSTOMER_POSTGRESQL_REPORT ?= dist/customer-postgresql-continuity-qualification-report.json
 IIP_CUSTOMER_POSTGRESQL_PROFILE ?=
 IIP_CUSTOMER_POSTGRESQL_HOST ?=
@@ -243,6 +252,9 @@ help:
 	@echo "test-customer-processing-continuity Validate worker/receiver processing evidence"
 	@echo "qualify-customer-processing-continuity Evict worker and receiver pods under live processing"
 	@echo "verify-customer-processing-continuity-report Recompute exact processing evidence bindings"
+	@echo "test-customer-sustained-workload Validate bounded mixed customer workload evidence"
+	@echo "qualify-customer-sustained-workload Run API, durable OTLP, and investigation traffic"
+	@echo "verify-customer-sustained-workload-report Rebind retained sustained workload evidence"
 	@echo "test-customer-postgresql-continuity Validate customer PostgreSQL promotion evidence"
 	@echo "qualify-customer-postgresql-continuity Observe an externally initiated primary promotion"
 	@echo "verify-customer-postgresql-continuity-report Recompute exact PostgreSQL target evidence"
@@ -944,6 +956,41 @@ verify-customer-processing-continuity-report:
 		--worker-deployment "$(IIP_PROCESSING_WORKER_DEPLOYMENT)" \
 		--receiver-deployment "$(IIP_PROCESSING_RECEIVER_DEPLOYMENT)" \
 		--require-clean --require-qualified
+
+test-customer-sustained-workload:
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_customer_sustained_workload -v
+
+qualify-customer-sustained-workload:
+	@test "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_ALLOW_TRAFFIC)" = true || \
+		(echo "IIP_CUSTOMER_SUSTAINED_WORKLOAD_ALLOW_TRAFFIC must equal true" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_PROFILE)" || \
+		(echo "IIP_CUSTOMER_SUSTAINED_WORKLOAD_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_API_TOKEN_FILE)" || \
+		(echo "IIP_CUSTOMER_SUSTAINED_WORKLOAD_API_TOKEN_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_TOKEN_FILE)" || \
+		(echo "IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_TOKEN_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_CLIENT_CERT_FILE)" || \
+		(echo "IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_CLIENT_CERT_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_CLIENT_KEY_FILE)" || \
+		(echo "IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_CLIENT_KEY_FILE is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_sustained_workload.py generate \
+		--profile "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_PROFILE)" \
+		--api-token-file "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_API_TOKEN_FILE)" \
+		--otlp-token-file "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_TOKEN_FILE)" \
+		--otlp-client-cert-file "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_CLIENT_CERT_FILE)" \
+		--otlp-client-key-file "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_CLIENT_KEY_FILE)" \
+		$(if $(IIP_CUSTOMER_SUSTAINED_WORKLOAD_API_CA_FILE),--api-ca-file "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_API_CA_FILE)",) \
+		$(if $(IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_CA_FILE),--otlp-ca-file "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_OTLP_CA_FILE)",) \
+		--output "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_REPORT)" --allow-traffic
+
+verify-customer-sustained-workload-report:
+	@test -n "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_PROFILE)" || \
+		(echo "IIP_CUSTOMER_SUSTAINED_WORKLOAD_PROFILE is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_sustained_workload.py verify \
+		--profile "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_PROFILE)" \
+		--report "$(IIP_CUSTOMER_SUSTAINED_WORKLOAD_REPORT)" \
+		--require-qualified
 
 test-customer-postgresql-continuity:
 	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \

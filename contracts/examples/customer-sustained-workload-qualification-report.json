@@ -1,0 +1,165 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerSustainedWorkloadQualificationReport",
+  "metadata": {
+    "generatedAt": "2026-09-09T10:15:00Z",
+    "validUntil": "2026-09-10T10:15:00Z",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceDirty": false,
+    "id": "cswq_d781bc7768c21146efbc91914e566b93"
+  },
+  "spec": {
+    "status": "qualified",
+    "qualificationLevel": "customer-sustained-core-workload-v1",
+    "qualificationBoundary": "customer-environment-sustained-workload",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "requiredMigration": "0023_ai_model_suitability.sql",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "profileDigest": "sha256:c57058e5fa0578817e0eeeb96ccf0128962858b2e9e7d1a15a6b7a2ff365c659",
+      "apiTargetBindingDigest": "sha256:67f7aaa3a40b5a2a295d84c806d41b6a1f226a432f8ebe6742019f464f6f4c1f",
+      "otlpTargetBindingDigest": "sha256:0100977d38911fcd890a81c5723e1b5a8bb0f41eb0e3d7b0e168d9ad0f541a88"
+    },
+    "objective": {
+      "durationSeconds": 900,
+      "probeCyclesPerSecond": 2,
+      "probeConcurrency": 4,
+      "workflowSubmissionsPerMinute": 1,
+      "workflowConcurrency": 2,
+      "minimumApiSuccessBasisPoints": 9990,
+      "minimumReceiverSuccessBasisPoints": 9990,
+      "minimumWorkflowCompletionBasisPoints": 9900,
+      "maximumProbeSchedulerMissBasisPoints": 10,
+      "maximumWorkflowSchedulerMissBasisPoints": 100,
+      "maximumApiP95LatencyMilliseconds": 2000,
+      "maximumApiP99LatencyMilliseconds": 5000,
+      "maximumReceiverP95LatencyMilliseconds": 2000,
+      "maximumReceiverP99LatencyMilliseconds": 5000,
+      "maximumWorkflowP95CompletionMilliseconds": 60000,
+      "maximumWorkflowP99CompletionMilliseconds": 120000,
+      "requestTimeoutMilliseconds": 2000,
+      "maximumSchedulerLagMilliseconds": 1000,
+      "maximumWorkflowCompletionMilliseconds": 120000,
+      "maximumProfileAgeSeconds": 2592000,
+      "reportValiditySeconds": 86400
+    },
+    "environment": {
+      "platform": "darwin/arm64",
+      "pythonVersion": "3.14.3",
+      "apiTransport": "verified-https",
+      "otlpTransport": "mutual-tls-https",
+      "apiCaSource": "custom",
+      "otlpCaSource": "custom",
+      "proxyMode": "disabled",
+      "redirectMode": "deny",
+      "connectionMode": "close-per-request",
+      "scheduler": "bounded-dual-fixed-rate-v1",
+      "receiverSuccessBoundary": "postgresql-commit-before-http-200"
+    },
+    "measurements": {
+      "profileReviewedAt": "2026-09-09T08:00:00Z",
+      "startedAt": "2026-09-09T10:00:00Z",
+      "completedAt": "2026-09-09T10:15:00Z",
+      "actualDurationMilliseconds": 900000,
+      "probes": {
+        "scheduledCycles": 1800,
+        "attemptedCycles": 1800,
+        "schedulerMissedCycles": 0,
+        "schedulerMissBasisPoints": 0,
+        "schedulerLagP95Milliseconds": 2,
+        "api": {
+          "attempts": 1800,
+          "successes": 1800,
+          "failures": 0,
+          "successBasisPoints": 10000,
+          "latency": {
+            "p50Milliseconds": 25,
+            "p95Milliseconds": 25,
+            "p99Milliseconds": 25,
+            "maximumMilliseconds": 25
+          }
+        },
+        "receiver": {
+          "attempts": 1800,
+          "successes": 1800,
+          "failures": 0,
+          "successBasisPoints": 10000,
+          "latency": {
+            "p50Milliseconds": 35,
+            "p95Milliseconds": 35,
+            "p99Milliseconds": 35,
+            "maximumMilliseconds": 35
+          }
+        }
+      },
+      "workflows": {
+        "scheduledWorkflows": 15,
+        "attemptedSubmissions": 15,
+        "acceptedSubmissions": 15,
+        "submissionFailures": 0,
+        "completedWorkflows": 15,
+        "terminalFailures": 0,
+        "schedulerMissedWorkflows": 0,
+        "completionBasisPoints": 10000,
+        "schedulerMissBasisPoints": 0,
+        "schedulerLagP95Milliseconds": 2,
+        "pollAttempts": 45,
+        "completionLatency": {
+          "p50Milliseconds": 600,
+          "p95Milliseconds": 600,
+          "p99Milliseconds": 600,
+          "maximumMilliseconds": 600
+        }
+      }
+    },
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "profile-review", "status": "passed"},
+      {"id": "explicit-traffic-enable", "status": "passed"},
+      {"id": "direct-no-proxy-no-redirect", "status": "passed"},
+      {"id": "api-verified-https", "status": "passed"},
+      {"id": "receiver-mutual-tls", "status": "passed"},
+      {"id": "immutable-release-identity", "status": "passed"},
+      {"id": "bounded-workload-volume", "status": "passed"},
+      {"id": "observation-window", "status": "passed"},
+      {"id": "probe-scheduler-attainment", "status": "passed"},
+      {"id": "workflow-scheduler-attainment", "status": "passed"},
+      {"id": "api-success-attainment", "status": "passed"},
+      {"id": "api-p95-latency", "status": "passed"},
+      {"id": "api-p99-latency", "status": "passed"},
+      {"id": "receiver-success-attainment", "status": "passed"},
+      {"id": "receiver-p95-latency", "status": "passed"},
+      {"id": "receiver-p99-latency", "status": "passed"},
+      {"id": "receiver-durable-intake", "status": "passed"},
+      {"id": "workflow-completion-attainment", "status": "passed"},
+      {"id": "workflow-p95-completion", "status": "passed"},
+      {"id": "workflow-p99-completion", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"}
+    ],
+    "limitations": [
+      "bounded-synthetic-core-workload",
+      "single-tenant-resource-and-target-pair",
+      "api-identity-read-otlp-metric-and-investigation-only",
+      "no-provider-call-or-inference-path",
+      "no-failure-injection-or-database-failover",
+      "node-zone-region-and-long-window-slo-not-qualified",
+      "customer-workload-representativeness-not-approved"
+    ],
+    "summary": {
+      "totalChecks": 22,
+      "passedChecks": 22,
+      "failedChecks": 0,
+      "scheduledProbeCycles": 1800,
+      "successfulApiRequests": 1800,
+      "successfulReceiverWrites": 1800,
+      "scheduledWorkflows": 15,
+      "completedWorkflows": 15,
+      "overallStatus": "qualified"
+    }
+  }
+}

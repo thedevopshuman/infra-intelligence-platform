@@ -86,6 +86,13 @@ matching without content. Executing the selected billable request against the
 customer endpoints remains the final external Phase A gate; invoice agreement,
 sustained load, and customer backend lifecycle remain explicitly excluded.
 
+The infrastructure roadmap now provides a separate bounded sustained customer
+core-workload gate for API identity reads, durable OTLP metrics, and
+asynchronous investigations. It strengthens the shared runtime qualification
+but does not send AI provider traffic, reproduce a customer's inference mix,
+or qualify sustained AI economics throughput; those Phase A operating claims
+remain external.
+
 An additive private-pilot preflight now binds that same-invocation report to
 the exact prerequisite file, customer deployment, post-deployment bounded load,
 local release evidence, registry publication, and organizational keyless

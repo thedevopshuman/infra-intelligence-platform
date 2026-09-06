@@ -24,7 +24,8 @@ Provide one repository-owned orchestration command that:
 3. derives revision-named artifact and report paths from the current committed
    application version and full source revision;
 4. never accepts a pre-existing candidate directory or skips a failed stage;
-5. verifies the final bundle and requires the exact 18-of-18
+5. verifies the final bundle and requires the complete readiness input set
+   (18-of-18 when this decision was adopted; 19-of-19 after ADR 0139) and its
    `locally-qualified` readiness summary; and
 6. removes inherited IIP/provider/credential variables, then supplies only the
    closed local toolchain and evidence paths; and

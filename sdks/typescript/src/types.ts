@@ -3114,6 +3114,189 @@ export interface CustomerProcessingContinuityQualificationReport {
   };
 }
 
+export interface CustomerSustainedWorkloadProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerSustainedWorkloadProfile";
+  metadata: {
+    id: `cswp_${string}`;
+    tenantId: string;
+    actorId: string;
+    reviewedAt: string;
+    validUntil: string;
+  };
+  spec: {
+    qualificationLevel: "customer-sustained-core-workload-v1";
+    release: {
+      applicationVersion: string;
+      chartVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      requiredMigration: `${number}_${string}.sql`;
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    targets: { apiBaseUrl: string; otlpBaseUrl: string };
+    resourceUid: `res_${string}`;
+    metric: { name: string; unit: string; serviceName: string };
+    investigation: CustomerProcessingQualificationProfile["spec"]["investigation"];
+    objective: {
+      durationSeconds: number;
+      probeCyclesPerSecond: number;
+      probeConcurrency: number;
+      workflowSubmissionsPerMinute: number;
+      workflowConcurrency: number;
+      minimumApiSuccessBasisPoints: number;
+      minimumReceiverSuccessBasisPoints: number;
+      minimumWorkflowCompletionBasisPoints: number;
+      maximumProbeSchedulerMissBasisPoints: number;
+      maximumWorkflowSchedulerMissBasisPoints: number;
+      maximumApiP95LatencyMilliseconds: number;
+      maximumApiP99LatencyMilliseconds: number;
+      maximumReceiverP95LatencyMilliseconds: number;
+      maximumReceiverP99LatencyMilliseconds: number;
+      maximumWorkflowP95CompletionMilliseconds: number;
+      maximumWorkflowP99CompletionMilliseconds: number;
+      requestTimeoutMilliseconds: number;
+      maximumSchedulerLagMilliseconds: number;
+      maximumWorkflowCompletionMilliseconds: number;
+      maximumProfileAgeSeconds: number;
+      reportValiditySeconds: number;
+    };
+  };
+}
+
+export type CustomerSustainedWorkloadCheckId =
+  | "source-binding"
+  | "profile-review"
+  | "explicit-traffic-enable"
+  | "direct-no-proxy-no-redirect"
+  | "api-verified-https"
+  | "receiver-mutual-tls"
+  | "immutable-release-identity"
+  | "bounded-workload-volume"
+  | "observation-window"
+  | "probe-scheduler-attainment"
+  | "workflow-scheduler-attainment"
+  | "api-success-attainment"
+  | "api-p95-latency"
+  | "api-p99-latency"
+  | "receiver-success-attainment"
+  | "receiver-p95-latency"
+  | "receiver-p99-latency"
+  | "receiver-durable-intake"
+  | "workflow-completion-attainment"
+  | "workflow-p95-completion"
+  | "workflow-p99-completion"
+  | "minimized-output";
+
+export interface CustomerSustainedWorkloadQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerSustainedWorkloadQualificationReport";
+  metadata: {
+    id: `cswq_${string}`;
+    generatedAt: string;
+    validUntil: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualificationLevel: "customer-sustained-core-workload-v1";
+    qualificationBoundary: "customer-environment-sustained-workload";
+    subject: CustomerSustainedWorkloadProfile["spec"]["release"];
+    bindings: {
+      profileDigest: Sha256Digest;
+      apiTargetBindingDigest: Sha256Digest;
+      otlpTargetBindingDigest: Sha256Digest;
+    };
+    objective: CustomerSustainedWorkloadProfile["spec"]["objective"];
+    environment: {
+      platform: `${string}/${string}`;
+      pythonVersion: string;
+      apiTransport: "verified-https";
+      otlpTransport: "mutual-tls-https";
+      apiCaSource: "system" | "custom";
+      otlpCaSource: "system" | "custom";
+      proxyMode: "disabled";
+      redirectMode: "deny";
+      connectionMode: "close-per-request";
+      scheduler: "bounded-dual-fixed-rate-v1";
+      receiverSuccessBoundary: "postgresql-commit-before-http-200";
+    };
+    measurements: {
+      profileReviewedAt: string;
+      startedAt: string;
+      completedAt: string;
+      actualDurationMilliseconds: number;
+      probes: {
+        scheduledCycles: number;
+        attemptedCycles: number;
+        schedulerMissedCycles: number;
+        schedulerMissBasisPoints: number;
+        schedulerLagP95Milliseconds: number;
+        api: CustomerSustainedWorkloadPathMeasurements;
+        receiver: CustomerSustainedWorkloadPathMeasurements;
+      };
+      workflows: {
+        scheduledWorkflows: number;
+        attemptedSubmissions: number;
+        acceptedSubmissions: number;
+        submissionFailures: number;
+        completedWorkflows: number;
+        terminalFailures: number;
+        schedulerMissedWorkflows: number;
+        completionBasisPoints: number;
+        schedulerMissBasisPoints: number;
+        schedulerLagP95Milliseconds: number;
+        pollAttempts: number;
+        completionLatency: CustomerSustainedWorkloadLatency;
+      };
+    };
+    checks: Array<
+      | { id: CustomerSustainedWorkloadCheckId; status: "passed" }
+      | {
+          id: CustomerSustainedWorkloadCheckId;
+          status: "failed";
+          errorCode: `customer-sustained-workload.${string}`;
+        }
+    >;
+    limitations: [
+      "bounded-synthetic-core-workload",
+      "single-tenant-resource-and-target-pair",
+      "api-identity-read-otlp-metric-and-investigation-only",
+      "no-provider-call-or-inference-path",
+      "no-failure-injection-or-database-failover",
+      "node-zone-region-and-long-window-slo-not-qualified",
+      "customer-workload-representativeness-not-approved",
+    ];
+    summary: {
+      totalChecks: 22;
+      passedChecks: number;
+      failedChecks: number;
+      scheduledProbeCycles: number;
+      successfulApiRequests: number;
+      successfulReceiverWrites: number;
+      scheduledWorkflows: number;
+      completedWorkflows: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
+export interface CustomerSustainedWorkloadLatency {
+  p50Milliseconds: number | null;
+  p95Milliseconds: number | null;
+  p99Milliseconds: number | null;
+  maximumMilliseconds: number | null;
+}
+
+export interface CustomerSustainedWorkloadPathMeasurements {
+  attempts: number;
+  successes: number;
+  failures: number;
+  successBasisPoints: number;
+  latency: CustomerSustainedWorkloadLatency;
+}
+
 export type CustomerDeploymentQualificationEvidenceId =
   | "live-install-preflight"
   | "post-install-health"

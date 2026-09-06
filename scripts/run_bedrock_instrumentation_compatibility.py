@@ -9,12 +9,14 @@ import json
 import os
 import platform
 import sys
+import time
 from datetime import datetime, timezone
 from importlib.metadata import version
 from pathlib import Path
 from typing import Mapping, Sequence
 
 import boto3
+from botocore.config import Config
 from botocore.eventstream import EventStream
 from botocore.stub import Stubber
 from jsonschema import Draft202012Validator, FormatChecker
@@ -188,7 +190,13 @@ def request_parameters(model_id: str) -> dict[str, object]:
     }
 
 
-def provider_client(mode: str, region: str):
+def provider_client(mode: str, region: str, maximum_call_milliseconds: int):
+    timeout_seconds = max(1, (maximum_call_milliseconds + 999) // 1000)
+    configuration = Config(
+        connect_timeout=min(5, timeout_seconds),
+        read_timeout=timeout_seconds,
+        retries={"total_max_attempts": 1, "mode": "standard"},
+    )
     if mode == "offline":
         return boto3.client(
             "bedrock-runtime",
@@ -196,8 +204,11 @@ def provider_client(mode: str, region: str):
             aws_access_key_id="offline-access-key",
             aws_secret_access_key="offline-secret-key",
             aws_session_token="offline-session-token",
+            config=configuration,
         )
-    return boto3.client("bedrock-runtime", region_name=region)
+    return boto3.client(
+        "bedrock-runtime", region_name=region, config=configuration
+    )
 
 
 def _consume_stream(response: Mapping[str, object]) -> Mapping[str, object]:
@@ -242,8 +253,13 @@ def _consume_stream(response: Mapping[str, object]) -> Mapping[str, object]:
 
 
 def instrumented_call(
-    *, mode: str, operation: str, model_id: str, region: str
-) -> tuple[Mapping[str, object], ReadableSpan, int]:
+    *,
+    mode: str,
+    operation: str,
+    model_id: str,
+    region: str,
+    maximum_call_milliseconds: int,
+) -> tuple[Mapping[str, object], ReadableSpan, int, int]:
     os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "false"
     capture = InMemorySpanExporter()
     failed_export = _FailingAsyncExporter()
@@ -266,7 +282,7 @@ def instrumented_call(
         )
     )
     instrumentor = BotocoreInstrumentor()
-    client = provider_client(mode, region)
+    client = provider_client(mode, region, maximum_call_milliseconds)
     parameters = request_parameters(model_id)
     stubber = None
     fixture_event_name = "after-call.bedrock-runtime.ConverseStream"
@@ -293,6 +309,7 @@ def instrumented_call(
         stubber.activate()
 
     instrumentor.instrument(tracer_provider=provider)
+    call_started = time.monotonic_ns()
     try:
         if operation == "converse-stream":
             response = client.converse_stream(**parameters)
@@ -314,6 +331,13 @@ def instrumented_call(
             and usage["outputTokens"] > 0,
             "provider-usage.invalid",
         )
+        call_latency_milliseconds = max(
+            0, (time.monotonic_ns() - call_started + 999_999) // 1_000_000
+        )
+        require(
+            call_latency_milliseconds <= maximum_call_milliseconds,
+            "provider-call.latency-exceeded",
+        )
         provider.force_flush(timeout_millis=5_000)
     finally:
         instrumentor.uninstrument()
@@ -333,7 +357,7 @@ def instrumented_call(
     )
     require(len(spans) == 1, "instrumentation-span.count")
     require(failed_export.calls >= 1, "async-export.not-attempted")
-    return usage, spans[0], failed_export.calls
+    return usage, spans[0], failed_export.calls, call_latency_milliseconds
 
 
 def channel_document(model_id: str, region: str) -> dict[str, object]:
@@ -483,13 +507,19 @@ def normalize_span(
 
 
 def compatibility_report(
-    *, mode: str, operation: str, model_id: str, region: str
+    *,
+    mode: str,
+    operation: str,
+    model_id: str,
+    region: str,
+    maximum_call_milliseconds: int = 120_000,
 ) -> dict[str, object]:
-    usage, span, failed_export_calls = instrumented_call(
+    usage, span, failed_export_calls, call_latency_milliseconds = instrumented_call(
         mode=mode,
         operation=operation,
         model_id=model_id,
         region=region,
+        maximum_call_milliseconds=maximum_call_milliseconds,
     )
     normalize_span(span, usage=usage, model_id=model_id, region=region)
     require(failed_export_calls >= 1, "async-export.not-attempted")
@@ -586,6 +616,7 @@ def compatibility_report(
                 "exactCostEligible": False,
                 "liveProviderVerified": mode == "live",
                 "streamingVerified": streaming,
+                "providerCallLatencyMilliseconds": call_latency_milliseconds,
             },
             "checks": checks,
             "summary": {
@@ -688,14 +719,28 @@ def main() -> int:
             region = os.environ.get("AWS_REGION", "")
             require(bool(model_id), "live-test.model-required")
             require(bool(region), "live-test.region-required")
+            try:
+                maximum_call_milliseconds = int(
+                    os.environ.get(
+                        "IIP_BEDROCK_MAXIMUM_PROVIDER_CALL_MILLISECONDS", ""
+                    )
+                )
+            except ValueError:
+                raise CompatibilityFailure("live-test.latency-objective-invalid")
+            require(
+                1_000 <= maximum_call_milliseconds <= 120_000,
+                "live-test.latency-objective-invalid",
+            )
         else:
             model_id = OFFLINE_MODEL
             region = "us-east-1"
+            maximum_call_milliseconds = 30_000
         report = compatibility_report(
             mode=arguments.mode,
             operation=arguments.operation,
             model_id=model_id,
             region=region,
+            maximum_call_milliseconds=maximum_call_milliseconds,
         )
         validate_report(report)
         arguments.report.parent.mkdir(parents=True, exist_ok=True)

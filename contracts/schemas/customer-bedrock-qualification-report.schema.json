@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-bedrock-qualification-report:v1alpha1",
+  "title": "Customer Bedrock Qualification Report",
+  "description": "Privacy-minimized, source-bound evidence for one exact customer Amazon Bedrock live-provider interoperability call.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerBedrockQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "validUntil", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^cbq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "validUntil": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualification", "subject", "bindings", "profile", "objective", "measurements", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualification": {"const": "customer-bedrock-live-interoperability-v1"},
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["applicationVersion", "contractsApiVersion", "sourceRevision", "imageDigest"],
+          "properties": {
+            "applicationVersion": {"$ref": "#/$defs/semver"},
+            "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+            "sourceRevision": {"$ref": "#/$defs/revision"},
+            "imageDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileDigest", "environmentBindingDigest", "targetBindingDigest", "liveCompatibilityReportDigest"],
+          "properties": {
+            "profileDigest": {"$ref": "#/$defs/digest"},
+            "environmentBindingDigest": {"$ref": "#/$defs/digest"},
+            "targetBindingDigest": {"$ref": "#/$defs/digest"},
+            "liveCompatibilityReportDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "provider", "operation", "invocationTarget", "instrumentation", "credentialMode", "requestPath", "telemetryPath", "contentPolicy", "costEligibility"],
+          "properties": {
+            "name": {"const": "customer-bedrock-live-interoperability-v1"},
+            "provider": {"const": "aws.bedrock"},
+            "operation": {"enum": ["Converse", "ConverseStream"]},
+            "invocationTarget": {"const": "aws-bedrock"},
+            "instrumentation": {"const": "official-pinned-otel-python-botocore"},
+            "credentialMode": {"const": "protected-dedicated-session-credentials-file"},
+            "requestPath": {"const": "direct-to-provider"},
+            "telemetryPath": {"const": "asynchronous-otel"},
+            "contentPolicy": {"const": "fixed-synthetic-request-not-retained"},
+            "costEligibility": {"const": "partial-usage-not-exact-cost-eligible"}
+          }
+        },
+        "objective": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maximumProviderCallLatencyMilliseconds", "maximumProfileAgeSeconds", "maximumReportAgeSeconds"],
+          "properties": {
+            "maximumProviderCallLatencyMilliseconds": {"type": "integer", "minimum": 1000, "maximum": 120000},
+            "maximumProfileAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 7776000},
+            "maximumReportAgeSeconds": {"type": "integer", "minimum": 300, "maximum": 604800}
+          }
+        },
+        "measurements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileReviewedAt", "startedAt", "completedAt", "providerCallCount", "normalizedUsageRecordCount", "providerCallLatencyMilliseconds"],
+          "properties": {
+            "profileReviewedAt": {"type": "string", "format": "date-time"},
+            "startedAt": {"type": "string", "format": "date-time"},
+            "completedAt": {"type": "string", "format": "date-time"},
+            "providerCallCount": {"const": 1},
+            "normalizedUsageRecordCount": {"const": 1},
+            "providerCallLatencyMilliseconds": {"type": "integer", "minimum": 0, "maximum": 300000}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 18,
+          "maxItems": 18,
+          "prefixItems": [
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "immutable-release"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "protected-profile"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "protected-session-credentials"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "exact-provider"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "exact-model"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "exact-region"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "exact-operation"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "live-provider-call"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "official-instrumentation"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "supported-instrumentation-scope"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "metadata-only-span"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "provider-token-totals"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "receiver-normalization"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "async-export-failure-isolated"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "cost-eligibility-honest"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}}
+          ],
+          "items": false
+        },
+        "limitations": {
+          "type": "array",
+          "prefixItems": [
+            {"const": "credential-expiration-iam-least-authority-and-revocation-not-qualified"},
+            {"const": "model-quality-safety-and-output-correctness-not-qualified"},
+            {"const": "customer-collector-pki-and-network-path-not-qualified"},
+            {"const": "authoritative-pricing-private-rates-and-invoice-agreement-not-qualified"},
+            {"const": "sustained-load-quota-throttling-and-regional-ha-not-qualified"},
+            {"const": "additional-models-regions-operations-and-provider-apis-not-qualified"}
+          ],
+          "items": false,
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 18},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 18},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 18},
+            "overallStatus": {"enum": ["qualified", "not-qualified"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-bedrock-qualification\\.[a-z0-9.-]+$", "maxLength": 180}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    }
+  }
+}

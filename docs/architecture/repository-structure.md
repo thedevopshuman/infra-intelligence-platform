@@ -65,6 +65,14 @@ repository identity, revision, credential, and content do not enter the SDK
 transport or report, and the optional report is not a generic deployment
 requirement.
 
+Customer Bedrock qualification remains outside the serving and inference
+paths. `scripts/qualify_customer_bedrock.py` validates one protected reviewed
+target and one dedicated temporary-credential file, invokes the isolated
+pinned official-instrumentation container, and emits a protected detailed
+compatibility report plus a transportable minimized report. No provider SDK or
+credential enters `domain`, `application`, the product image, public SDK
+transport, agent runtime, or plugin runtime.
+
 Customer OTLP receiver qualification remains an operational harness as well:
 `scripts/qualify_customer_otlp_receiver.py` runs a digest-pinned official
 Collector outside the serving workloads, delivers three bounded synthetic

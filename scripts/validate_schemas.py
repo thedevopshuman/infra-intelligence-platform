@@ -136,6 +136,12 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "customer-github-context-qualification-report.schema.json": (
         "customer-github-context-qualification-report.json",
     ),
+    "customer-bedrock-qualification-profile.schema.json": (
+        "customer-bedrock-qualification-profile.json",
+    ),
+    "customer-bedrock-qualification-report.schema.json": (
+        "customer-bedrock-qualification-report.json",
+    ),
     "customer-deployment-qualification-report.schema.json": (
         "customer-deployment-qualification-report.json",
     ),

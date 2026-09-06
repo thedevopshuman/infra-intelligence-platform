@@ -143,6 +143,15 @@ REQUIRED_PATHS = (
     "docs/operations/customer-github-context-qualification.md",
     "scripts/qualify_customer_github_context.py",
     "tests/test_customer_github_context_qualification.py",
+    "docs/decisions/0136-customer-bedrock-live-interoperability-qualification.md",
+    "docs/specifications/customer-bedrock-qualification-report-contract.md",
+    "contracts/schemas/customer-bedrock-qualification-profile.schema.json",
+    "contracts/schemas/customer-bedrock-qualification-report.schema.json",
+    "contracts/examples/customer-bedrock-qualification-profile.json",
+    "contracts/examples/customer-bedrock-qualification-report.json",
+    "docs/operations/customer-bedrock-qualification.md",
+    "scripts/qualify_customer_bedrock.py",
+    "tests/test_customer_bedrock_qualification.py",
     "docs/decisions/0134-customer-otlp-receiver-interoperability-qualification.md",
     "docs/specifications/customer-otlp-receiver-qualification-report-contract.md",
     "contracts/schemas/customer-otlp-receiver-qualification-profile.schema.json",
@@ -2284,6 +2293,54 @@ def validate_customer_github_context_qualification_example(
         fail(
             errors,
             "customer GitHub context qualification examples must be semantically valid",
+        )
+
+
+def validate_customer_bedrock_qualification_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check exact customer Bedrock selection and minimized live evidence."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    profile = documents.get(example_dir / "customer-bedrock-qualification-profile.json")
+    report = documents.get(example_dir / "customer-bedrock-qualification-report.json")
+    try:
+        from qualify_customer_bedrock import (
+            CustomerBedrockQualificationError,
+            _digest_value,
+            validate_profile,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "customer Bedrock qualification validator must be importable")
+        return
+    try:
+        if not isinstance(profile, dict) or not isinstance(report, dict):
+            raise CustomerBedrockQualificationError(
+                "customer-bedrock-qualification.example.invalid"
+            )
+        validate_profile(profile)
+        validate_report_document(report)
+        metadata = profile["metadata"]
+        spec = profile["spec"]
+        report_spec = report["spec"]
+        bindings = report_spec["bindings"]
+        if (
+            bindings["profileDigest"] != _digest_value(profile)
+            or bindings["environmentBindingDigest"]
+            != _digest_value(metadata["environmentId"])
+            or bindings["targetBindingDigest"] != _digest_value(spec["target"])
+            or report_spec["profile"]["operation"] != spec["target"]["operation"]
+            or report_spec["subject"]["imageDigest"] != spec["release"]["imageDigest"]
+            or report_spec["objective"] != spec["objective"]
+        ):
+            raise CustomerBedrockQualificationError(
+                "customer-bedrock-qualification.example.crossed"
+            )
+    except (CustomerBedrockQualificationError, KeyError, TypeError):
+        fail(
+            errors,
+            "customer Bedrock qualification examples must be semantically valid",
         )
 
 
@@ -5248,6 +5305,14 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerGithubContextQualificationReport",
         ),
         (
+            "customer-bedrock-qualification-profile.json",
+            "CustomerBedrockQualificationProfile",
+        ),
+        (
+            "customer-bedrock-qualification-report.json",
+            "CustomerBedrockQualificationReport",
+        ),
+        (
             "customer-otlp-receiver-qualification-profile.json",
             "CustomerOtlpReceiverQualificationProfile",
         ),
@@ -5355,6 +5420,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_customer_policy_qualification_example(documents, errors)
     validate_customer_credential_broker_qualification_example(documents, errors)
     validate_customer_github_context_qualification_example(documents, errors)
+    validate_customer_bedrock_qualification_example(documents, errors)
     validate_customer_otlp_receiver_qualification_example(documents, errors)
     validate_customer_deployment_qualification_example(documents, errors)
     validate_control_plane_load_qualification_example(documents, errors)

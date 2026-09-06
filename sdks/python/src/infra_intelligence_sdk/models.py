@@ -803,6 +803,50 @@ class CustomerGithubContextQualificationReport:
 
 
 @dataclass(frozen=True)
+class CustomerBedrockQualificationProfile:
+    """Protected exact customer Bedrock live qualification input."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerBedrockQualificationProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerBedrockQualificationProfile",
+                label="customer Bedrock qualification profile",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerBedrockQualificationReport:
+    """Minimized exact customer Bedrock live-provider evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerBedrockQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerBedrockQualificationReport",
+                label="customer Bedrock qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerOtlpReceiverQualificationProfile:
     """Protected exact signal catalog for customer receiver qualification."""
 

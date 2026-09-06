@@ -1,0 +1,86 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerBedrockQualificationReport",
+  "metadata": {
+    "id": "cbq_9d6f2c6e9c784cea7259ffe8fcf4078e",
+    "generatedAt": "2026-09-08T09:05:00Z",
+    "validUntil": "2026-09-09T09:05:00Z",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualification": "customer-bedrock-live-interoperability-v1",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "profileDigest": "sha256:f2b8bd7fbe44cc952a8500d832408bf56c35b725bee647523f91f338ebba6f9d",
+      "environmentBindingDigest": "sha256:ebbaf6050b9190c0b9688b96de6c442e6239a02cedd056974af01ff8286610a2",
+      "targetBindingDigest": "sha256:68f3b4f2afb5ea8140bd49ae8e65ffd632abd08c9888d030f7019515fad4426b",
+      "liveCompatibilityReportDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "profile": {
+      "name": "customer-bedrock-live-interoperability-v1",
+      "provider": "aws.bedrock",
+      "operation": "ConverseStream",
+      "invocationTarget": "aws-bedrock",
+      "instrumentation": "official-pinned-otel-python-botocore",
+      "credentialMode": "protected-dedicated-session-credentials-file",
+      "requestPath": "direct-to-provider",
+      "telemetryPath": "asynchronous-otel",
+      "contentPolicy": "fixed-synthetic-request-not-retained",
+      "costEligibility": "partial-usage-not-exact-cost-eligible"
+    },
+    "objective": {
+      "maximumProviderCallLatencyMilliseconds": 60000,
+      "maximumProfileAgeSeconds": 2592000,
+      "maximumReportAgeSeconds": 86400
+    },
+    "measurements": {
+      "profileReviewedAt": "2026-09-08T09:00:00Z",
+      "startedAt": "2026-09-08T09:04:00Z",
+      "completedAt": "2026-09-08T09:05:00Z",
+      "providerCallCount": 1,
+      "normalizedUsageRecordCount": 1,
+      "providerCallLatencyMilliseconds": 1432
+    },
+    "checks": [
+      {"id": "profile-binding", "status": "passed"},
+      {"id": "source-binding", "status": "passed"},
+      {"id": "immutable-release", "status": "passed"},
+      {"id": "protected-profile", "status": "passed"},
+      {"id": "protected-session-credentials", "status": "passed"},
+      {"id": "exact-provider", "status": "passed"},
+      {"id": "exact-model", "status": "passed"},
+      {"id": "exact-region", "status": "passed"},
+      {"id": "exact-operation", "status": "passed"},
+      {"id": "live-provider-call", "status": "passed"},
+      {"id": "official-instrumentation", "status": "passed"},
+      {"id": "supported-instrumentation-scope", "status": "passed"},
+      {"id": "metadata-only-span", "status": "passed"},
+      {"id": "provider-token-totals", "status": "passed"},
+      {"id": "receiver-normalization", "status": "passed"},
+      {"id": "async-export-failure-isolated", "status": "passed"},
+      {"id": "cost-eligibility-honest", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"}
+    ],
+    "limitations": [
+      "credential-expiration-iam-least-authority-and-revocation-not-qualified",
+      "model-quality-safety-and-output-correctness-not-qualified",
+      "customer-collector-pki-and-network-path-not-qualified",
+      "authoritative-pricing-private-rates-and-invoice-agreement-not-qualified",
+      "sustained-load-quota-throttling-and-regional-ha-not-qualified",
+      "additional-models-regions-operations-and-provider-apis-not-qualified"
+    ],
+    "summary": {
+      "totalChecks": 18,
+      "passedChecks": 18,
+      "failedChecks": 0,
+      "overallStatus": "qualified"
+    }
+  }
+}

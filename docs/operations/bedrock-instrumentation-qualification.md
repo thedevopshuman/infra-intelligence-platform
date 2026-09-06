@@ -63,23 +63,23 @@ proof answer different questions.
 
 ## Opt-in live qualification
 
-The live gate makes one bounded selected operation. It is deliberately excluded
-from `make verify` and requires an explicit enable flag, exact model and region,
-and short-lived session credentials. The wrapper does not mount an AWS profile
-or search the host for credentials. `converse` is the default; select
-`converse-stream` explicitly for streaming evidence.
+The lower-level live gate makes one bounded selected operation. It is
+deliberately excluded from `make verify` and requires an explicit enable flag,
+exact model and region, latency bound, and a dedicated short-lived session
+credential file. It mounts only that file, never the host `.aws` directory, and
+does not pass credential values in the container environment. `converse` is the
+default; select `converse-stream` explicitly for streaming evidence.
 
 ```bash
 export IIP_BEDROCK_LIVE_TEST_ENABLED=true
 export IIP_BEDROCK_MODEL_ID='<approved-model-id>'
 export AWS_REGION='<approved-region>'
-export AWS_ACCESS_KEY_ID='<short-lived-access-key>'
-export AWS_SECRET_ACCESS_KEY='<short-lived-secret-key>'
-export AWS_SESSION_TOKEN='<short-lived-session-token>'
+export IIP_BEDROCK_AWS_CREDENTIALS_FILE='/secure/iip/bedrock-credentials'
+export IIP_BEDROCK_CREDENTIALS_PROFILE='iip-bedrock-qualification'
+export IIP_BEDROCK_MAXIMUM_PROVIDER_CALL_MILLISECONDS=60000
 make test-bedrock-live
 # Separately qualify streaming for the same exact model and region:
 IIP_BEDROCK_OPERATION=converse-stream make test-bedrock-live
-unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 ```
 
 Use a temporary identity restricted to `bedrock:InvokeModel` for `Converse` or
@@ -88,7 +88,8 @@ exact approved model, as documented by the
 [AWS ConverseStream API](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ConverseStream.html).
 The fixed synthetic request asks for one short response; the
 harness never prints or writes the prompt, response, provider request ID,
-credentials, trace/span IDs, or token quantities. It writes
+credentials, trace/span IDs, or token quantities. It records bounded
+provider-call latency and writes
 `dist/bedrock-instrumentation-live-report.json` or
 `dist/bedrock-converse-stream-instrumentation-live-report.json`, which retains
 operation, model, and region because compatibility evidence cannot be
@@ -100,3 +101,8 @@ network path, price catalog, invoice agreement, or sustained load. A streaming
 live report proves only its exact selected operation; a non-streaming report
 cannot be reused. Run `make test-otlp-receiver` separately for isolated
 Collector-to-IIP transport evidence.
+
+For customer evidence, use the [customer Bedrock qualification
+workflow](customer-bedrock-qualification.md). It adds a protected reviewed
+target, exact release-image binding, minimized expiry-bound report, and offline
+verifier around this lower-level harness.

@@ -15,6 +15,10 @@ request ID, tenant ID, token quantity, cost, or endpoint. Model and region are
 retained because interoperability cannot be generalized across untested
 Bedrock profiles.
 
+The result also retains provider-call latency in milliseconds. The live
+customer wrapper compares it with the reviewed target objective; timeout and
+retry configuration are bounded before the request begins.
+
 The two V0 operation profiles fix content capture off, a direct provider
 request path, an asynchronous telemetry path, and the official
 `opentelemetry-instrumentation-botocore` scope. It records the currently
@@ -44,3 +48,8 @@ sees it. The live level makes one explicitly enabled `Converse` or
 `ConverseStream` request with the same content-disabled instrumentation.
 Neither level covers invoice reconciliation, model quality, customer Collector
 or PKI interoperability, or production traffic volume.
+
+Customer promotion uses the separate [customer Bedrock qualification
+contracts](customer-bedrock-qualification-report-contract.md), which bind this
+underlying live evidence to a reviewed target and immutable application image
+without retaining the target or credential values in the transportable report.

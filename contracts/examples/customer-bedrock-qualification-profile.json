@@ -1,0 +1,27 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerBedrockQualificationProfile",
+  "metadata": {
+    "name": "bedrock-production-stream-us-east-1",
+    "environmentId": "customer-production-us-east-1",
+    "reviewedAt": "2026-09-08T09:00:00Z"
+  },
+  "spec": {
+    "target": {
+      "provider": "aws.bedrock",
+      "modelId": "amazon.nova-lite-v1:0",
+      "region": "us-east-1",
+      "operation": "ConverseStream",
+      "credentialsProfile": "iip-bedrock-qualification"
+    },
+    "release": {
+      "applicationVersion": "0.84.0",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "objective": {
+      "maximumProviderCallLatencyMilliseconds": 60000,
+      "maximumProfileAgeSeconds": 2592000,
+      "maximumReportAgeSeconds": 86400
+    }
+  }
+}

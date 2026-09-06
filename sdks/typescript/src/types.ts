@@ -1906,6 +1906,125 @@ export interface CustomerGithubContextQualificationReport {
   };
 }
 
+export interface CustomerBedrockQualificationProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerBedrockQualificationProfile";
+  metadata: {
+    name: string;
+    environmentId: string;
+    reviewedAt: string;
+  };
+  spec: {
+    target: {
+      provider: "aws.bedrock";
+      modelId: string;
+      region: string;
+      operation: "Converse" | "ConverseStream";
+      credentialsProfile: string;
+    };
+    release: {
+      applicationVersion: string;
+      imageDigest: Sha256Digest;
+    };
+    objective: {
+      maximumProviderCallLatencyMilliseconds: number;
+      maximumProfileAgeSeconds: number;
+      maximumReportAgeSeconds: number;
+    };
+  };
+}
+
+export type CustomerBedrockQualificationCheckId =
+  | "profile-binding"
+  | "source-binding"
+  | "immutable-release"
+  | "protected-profile"
+  | "protected-session-credentials"
+  | "exact-provider"
+  | "exact-model"
+  | "exact-region"
+  | "exact-operation"
+  | "live-provider-call"
+  | "official-instrumentation"
+  | "supported-instrumentation-scope"
+  | "metadata-only-span"
+  | "provider-token-totals"
+  | "receiver-normalization"
+  | "async-export-failure-isolated"
+  | "cost-eligibility-honest"
+  | "minimized-output";
+
+export interface CustomerBedrockQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerBedrockQualificationReport";
+  metadata: {
+    id: `cbq_${string}`;
+    generatedAt: string;
+    validUntil: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualification: "customer-bedrock-live-interoperability-v1";
+    subject: {
+      applicationVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      profileDigest: Sha256Digest;
+      environmentBindingDigest: Sha256Digest;
+      targetBindingDigest: Sha256Digest;
+      liveCompatibilityReportDigest: Sha256Digest;
+    };
+    profile: {
+      name: "customer-bedrock-live-interoperability-v1";
+      provider: "aws.bedrock";
+      operation: "Converse" | "ConverseStream";
+      invocationTarget: "aws-bedrock";
+      instrumentation: "official-pinned-otel-python-botocore";
+      credentialMode: "protected-dedicated-session-credentials-file";
+      requestPath: "direct-to-provider";
+      telemetryPath: "asynchronous-otel";
+      contentPolicy: "fixed-synthetic-request-not-retained";
+      costEligibility: "partial-usage-not-exact-cost-eligible";
+    };
+    objective: CustomerBedrockQualificationProfile["spec"]["objective"];
+    measurements: {
+      profileReviewedAt: string;
+      startedAt: string;
+      completedAt: string;
+      providerCallCount: 1;
+      normalizedUsageRecordCount: 1;
+      providerCallLatencyMilliseconds: number;
+    };
+    checks: Array<
+      | { id: CustomerBedrockQualificationCheckId; status: "passed" }
+      | {
+          id: CustomerBedrockQualificationCheckId;
+          status: "failed";
+          errorCode: `customer-bedrock-qualification.${string}`;
+        }
+    >;
+    limitations: [
+      "credential-expiration-iam-least-authority-and-revocation-not-qualified",
+      "model-quality-safety-and-output-correctness-not-qualified",
+      "customer-collector-pki-and-network-path-not-qualified",
+      "authoritative-pricing-private-rates-and-invoice-agreement-not-qualified",
+      "sustained-load-quota-throttling-and-regional-ha-not-qualified",
+      "additional-models-regions-operations-and-provider-apis-not-qualified",
+    ];
+    summary: {
+      totalChecks: 18;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export interface CustomerOtlpReceiverQualificationProfile {
   apiVersion: "iip.platform/v1alpha1";
   kind: "CustomerOtlpReceiverQualificationProfile";

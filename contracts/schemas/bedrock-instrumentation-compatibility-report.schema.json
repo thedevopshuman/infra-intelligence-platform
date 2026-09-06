@@ -65,7 +65,7 @@
         "result": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["normalizedProvider", "operationName", "usageCompleteness", "missingUsageFields", "contentCaptured", "rawPayloadPersisted", "exactCostEligible", "liveProviderVerified", "streamingVerified"],
+          "required": ["normalizedProvider", "operationName", "usageCompleteness", "missingUsageFields", "contentCaptured", "rawPayloadPersisted", "exactCostEligible", "liveProviderVerified", "streamingVerified", "providerCallLatencyMilliseconds"],
           "properties": {
             "normalizedProvider": {"const": "aws.bedrock"},
             "operationName": {"const": "chat"},
@@ -85,7 +85,8 @@
             "rawPayloadPersisted": {"const": false},
             "exactCostEligible": {"const": false},
             "liveProviderVerified": {"type": "boolean"},
-            "streamingVerified": {"type": "boolean"}
+            "streamingVerified": {"type": "boolean"},
+            "providerCallLatencyMilliseconds": {"type": "integer", "minimum": 0, "maximum": 300000}
           }
         },
         "checks": {

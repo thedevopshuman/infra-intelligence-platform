@@ -196,9 +196,17 @@ same isolated identity, admission, availability, and durability boundary to
 metadata-only GenAI client spans. The `/v1/traces` adapter drops unknown values,
 rejects content-bearing structures, and commits normalized usage plus its event
 atomically; pricing and recommendations remain separate downstream use cases.
+The customer Bedrock gate in
+[ADR 0136](../decisions/0136-customer-bedrock-live-interoperability-qualification.md)
+stays outside both serving and inference paths. It invokes one reviewed live
+target through the pinned official instrumentation container using a dedicated
+temporary-session credentials file, then retains only expiry-bound minimized
+evidence. It neither introduces a provider SDK into IIP nor qualifies customer
+Collector delivery, pricing authority, workload quality, or broader AWS
+authority.
 The tenant-explicit workflow worker now implements the separate pricing use
 case: protected immutable catalogs drive bounded integer cost calculation, and
-each new cost fact, minimized event, and outbox row commit atomically. Saving
+each new cost fact, minimized event, and outbox row commit atomically.
 The production promotion boundary additionally requires a current minimized
 qualification report bound to the exact tenant catalog and protected scope
 policy, then revalidates it before every catalog registration and cost pass as

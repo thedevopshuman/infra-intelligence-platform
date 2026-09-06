@@ -19,8 +19,12 @@ requires an immutable workload suitability report before comparing a qualified
 candidate-model cohort with the reference-model cohort and calculating a
 scenario saving. The reference dashboard topology and separate pinned official
 botocore `Converse`/`ConverseStream`
-offline interoperability gates are executable; live Bedrock
-model/region/operation qualification remains. Public Bedrock price acquisition
+offline interoperability gates are executable. A protected, expiry-bound
+customer qualification workflow now binds one explicitly selected live
+model/region/operation to the clean source and immutable release image while
+retaining no credential, target, prompt, response, request ID, or token count;
+running that billable customer call remains an external gate. Public Bedrock
+price acquisition
 is now an executable exact-source operation: a protected mapping turns a
 retained official Price List Bulk API snapshot into the provider-neutral
 catalog and minimized reproducibility evidence before separate qualification

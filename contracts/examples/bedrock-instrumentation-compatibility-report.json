@@ -48,7 +48,8 @@
       "rawPayloadPersisted": false,
       "exactCostEligible": false,
       "liveProviderVerified": false,
-      "streamingVerified": false
+      "streamingVerified": false,
+      "providerCallLatencyMilliseconds": 12
     },
     "checks": [
       {"id": "provider-call-completed", "status": "passed"},

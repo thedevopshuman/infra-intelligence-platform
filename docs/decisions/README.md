@@ -139,3 +139,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0133](0133-customer-credential-broker-authority-qualification.md) | Accepted | Qualify one customer broker's exact authority enforcement without importing credential-issuer ownership |
 | [0134](0134-customer-otlp-receiver-interoperability-qualification.md) | Accepted | Qualify pinned official Collector delivery through one exact customer receiver boundary |
 | [0135](0135-customer-github-context-interoperability-qualification.md) | Accepted | Qualify one immutable customer GitHub context read through exact brokered authority |
+| [0136](0136-customer-bedrock-live-interoperability-qualification.md) | Accepted | Qualify one exact live Bedrock profile without exposing session credentials or provider content |

@@ -48,6 +48,16 @@ Deployed profiles may delegate each exact decision through the [external policy 
 
 The Prometheus, Kubernetes Event, and GitHub context evidence adapters implement the `CredentialBroker` lease boundary. Each supplies authenticated tenant, actor, integration, provider, scope, reference, and deadline context; the returned bearer lease stays inside the adapter and has a redacted representation. Scope names contain two or three bounded lowercase segments so the exact `repository:contents:read` GitHub authority is representable without wildcards or arbitrary strings. Static protected-JSON brokers remain local-only. The optional external HTTPS client authenticates with explicitly projected workload identity, validates short lease lifetime and request correlation, disables redirects and environment proxies, and is shared across adapters. A disposable Docker profile proves CA-verified TLS, signed issuer/audience/subject/expiry enforcement, exact policy, rotation/revocation, value-minimized audit, outage, and recovery without exposing fixture secrets. A separate customer-environment qualifier binds one protected reviewed authority profile and CA to the production client and retains only digests, counts, timing, and stable results. The optional customer GitHub qualifier additionally requires that exact broker evidence before one immutable GitHub Cloud or Enterprise Server document read; its report retains neither authority nor repository/content values. The external issuer remains responsible for customer-specific workload/tenant/scope policy, issuance, rotation, revocation, availability, certificate lifecycle, and secret-free audit; process/plugin isolation remains deployment work.
 
+The customer Bedrock live qualifier has a separate non-serving credential
+boundary because AWS request signing does not use the current Bearer-lease
+contract. It accepts exactly one protected shared-credentials profile with a
+mandatory session-token field, mounts only that file read-only into the
+disposable compatibility container, and removes ambient credential providers,
+endpoint overrides, metadata lookup, and proxies. Credential values and their
+digests are never retained. This proves the selected credential was accepted
+for one request; it does not prove actual expiry, IAM least authority,
+revocation, federation, or production workload identity.
+
 ## Agent and prompt threats
 
 - Retrieved content cannot alter system policy, tool allowlists, budgets, or approval requirements.

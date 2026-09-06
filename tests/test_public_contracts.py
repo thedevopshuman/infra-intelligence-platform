@@ -15,6 +15,8 @@ from infra_intelligence_sdk import (
     ActionWorkflowPage,
     ConsoleAuthenticationConfiguration,
     ControlPlaneLoadQualificationReport,
+    CustomerBedrockQualificationProfile,
+    CustomerBedrockQualificationReport,
     CustomerCredentialBrokerQualificationProfile,
     CustomerCredentialBrokerQualificationReport,
     CustomerGithubContextQualificationProfile,
@@ -241,6 +243,12 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         customer_github = CustomerGithubContextQualificationReport.from_dict(
             example("customer-github-context-qualification-report.json")
+        )
+        customer_bedrock_profile = CustomerBedrockQualificationProfile.from_dict(
+            example("customer-bedrock-qualification-profile.json")
+        )
+        customer_bedrock = CustomerBedrockQualificationReport.from_dict(
+            example("customer-bedrock-qualification-report.json")
         )
         customer_otlp_profile = CustomerOtlpReceiverQualificationProfile.from_dict(
             example("customer-otlp-receiver-qualification-profile.json")
@@ -569,6 +577,14 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             customer_github.to_dict()["spec"]["qualification"],
             "customer-github-context-prerequisites-v1",
+        )
+        self.assertEqual(
+            customer_bedrock_profile.to_dict()["kind"],
+            "CustomerBedrockQualificationProfile",
+        )
+        self.assertEqual(
+            customer_bedrock.to_dict()["spec"]["qualification"],
+            "customer-bedrock-live-interoperability-v1",
         )
         self.assertEqual(
             customer_otlp_profile.to_dict()["kind"],

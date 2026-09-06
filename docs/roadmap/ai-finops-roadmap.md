@@ -43,7 +43,10 @@ separate no-network gates against the exact pinned official Python botocore
 the actual wrapped event stream through final usage metadata and proves span
 completion is deferred until then. Both gates normalize the shipped legacy
 provider attribute and service-specific scope without guessing absent
-cache/reasoning usage. Live model/region/operation qualification remains.
+cache/reasoning usage. A protected, expiry-bound customer workflow now
+qualifies one explicitly selected live model/region/operation using a dedicated
+temporary-session credentials file and retains no target or content in its
+transportable report; executing the selected billable call remains external.
 Item 7 includes the privacy-bounded OTLP aggregate projection, finding view,
 and a disposable Collector/Prometheus/Loki/Grafana topology. Item 8 now has a
 deterministic full-flow gate covering deduplication, visible unpriced usage,

@@ -248,8 +248,12 @@ provider still arrives as legacy `gen_ai.system`. The streaming gate also
 proves the official span stays open until final metadata is consumed. The
 adapter normalizes that alias with conflict rejection. Missing cache/reasoning
 subsets remain missing, so neither profile is promoted to exact-cost
-eligibility. Live model/region/operation qualification remains separate
-evidence.
+eligibility. A separately enabled customer gate now binds one reviewed live
+model/region/operation to a clean source and immutable release image, supplies
+temporary AWS session credentials through one protected read-only file, and
+emits expiry-bound minimized evidence. Repository verification covers that
+mechanism, but the selected customer call remains external until an operator
+runs it. Customer Collector/PKI delivery and price authority stay separate.
 
 The pinned official OpenAI Python chat-completions profile also has a separate
 no-network SDK interoperability gate. It emits the standard provider identity

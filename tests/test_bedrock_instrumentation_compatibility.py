@@ -106,7 +106,11 @@ class BedrockInstrumentationCompatibilityHarnessTests(unittest.TestCase):
 
         self.assertIn("--network none", runner)
         self.assertIn("IIP_BEDROCK_LIVE_TEST_ENABLED", runner)
-        self.assertIn("AWS_SESSION_TOKEN", runner)
+        self.assertIn("IIP_BEDROCK_AWS_CREDENTIALS_FILE", runner)
+        self.assertIn("AWS_SHARED_CREDENTIALS_FILE=/run/secrets/aws/credentials", runner)
+        self.assertNotIn("-e AWS_ACCESS_KEY_ID", runner)
+        self.assertNotIn("-e AWS_SECRET_ACCESS_KEY", runner)
+        self.assertNotIn("-e AWS_SESSION_TOKEN", runner)
         self.assertIn("--read-only", runner)
         self.assertIn("--cap-drop ALL", runner)
         self.assertNotIn("/.aws", runner)
@@ -129,6 +133,8 @@ class BedrockInstrumentationCompatibilityHarnessTests(unittest.TestCase):
         )
         self.assertIn('"zeroWhenAbsent": []', harness)
         self.assertIn("BatchSpanProcessor", harness)
+        self.assertIn("total_max_attempts", harness)
+        self.assertIn("providerCallLatencyMilliseconds", harness)
 
 
 if __name__ == "__main__":

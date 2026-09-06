@@ -97,6 +97,7 @@ services:
       IIP_AUTH_IDENTITIES_JSON: >-
         {"identities":[{"tokenSha256":"sha256:d52e86d5eeda090d11d9c961632390e6da1356df217d662abde728312befb25d","actorId":"ai-finops-local-operator","tenantId":"local","roles":["developer","platform-admin"]}]}
       IIP_WORKER_ID: ai-finops-worker
+      IIP_WORKER_HEALTH_PORT: "8081"
       IIP_WORKER_TENANTS: local
       IIP_AI_ATTRIBUTION_ENABLED: "true"
       IIP_AI_ATTRIBUTION_POLICIES_JSON: ${IIP_AI_ATTRIBUTION_POLICIES_JSON:?set IIP_AI_ATTRIBUTION_POLICIES_JSON}
@@ -131,6 +132,12 @@ services:
         condition: service_healthy
       otel-collector:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/readyz', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 10s
     init: true
     read_only: true
     tmpfs:

@@ -19,5 +19,7 @@ must succeed before serving workloads roll out; API readiness never applies migr
 For durable background investigations and non-replaying action timers, set
 worker.enabled=true, database.existingSecret, and at least one exact
 worker.tenants entry. The workflow worker has no wildcard tenant mode.
+Its worker.healthPort is pod-private and used only for process liveness and
+PostgreSQL/schema readiness; no Service exposes it.
 Production rollout still requires customer-specific identity, policy, credential-broker,
 network-policy, telemetry, storage recovery, and SLO validation.

@@ -14,6 +14,7 @@ worker:
   enabled: false
   replicaCount: 1
   terminationGracePeriodSeconds: 120
+  healthPort: 8081
   podDisruptionBudget:
     enabled: false
     minAvailable: 1

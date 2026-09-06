@@ -64,6 +64,10 @@ class HelmValuesContractTests(unittest.TestCase):
         self.assertIn('digest: ""', self.values)
         worker = properties["worker"]["properties"]
         self.assertEqual(worker["investigationConcurrency"]["maximum"], 64)
+        self.assertEqual(worker["healthPort"]["minimum"], 1024)
+        self.assertEqual(worker["healthPort"]["maximum"], 65535)
+        self.assertIn("healthPort", properties["worker"]["required"])
+        self.assertIn("healthPort: 8081", self.values)
         self.assertEqual(
             worker["maxTenantInvestigationConcurrency"]["maximum"], 64
         )

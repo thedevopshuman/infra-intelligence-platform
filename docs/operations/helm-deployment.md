@@ -94,6 +94,13 @@ cluster-mode pass is `install-ready`, and even that result remains
 
 The chart intentionally exposes only `ClusterIP` Services and keeps service-account token automounting disabled. Put any later external access behind a separately reviewed authenticated TLS boundary; do not turn the internal HTTP Service into an internet-facing load balancer.
 
+The workflow worker listens on `worker.healthPort` only for kubelet liveness
+and readiness checks. No Service or ingress selects that port. `/healthz` is
+process-only; `/readyz` performs the same bounded PostgreSQL/latest-migration
+check as the other durable processes. During termination the worker becomes
+not-ready before it stops polling and waits for bounded in-flight work. An
+optional Collector outage never changes this readiness result.
+
 ## Authenticated TLS ingress
 
 The optional Ingress keeps the backend Service internal and requires the customer's existing TLS Secret and controller. Configure the exact controller class, DNS host, TLS redirect annotation, and controller NetworkPolicy selectors, for example:

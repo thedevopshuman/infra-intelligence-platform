@@ -34,6 +34,10 @@ The reference code under `src/iip` proves these directions. Future languages or 
 
 The Kubernetes integration under `plugins/examples/` is the first executable proof of the plugin boundary. It imports only the public Python SDK, consumes versioned resource collection, invocation, mediation, and compatibility-report contracts, supports an offline stdio observer plus an explicit bounded `kubectl` per-type list/watch development transport with full-reconciliation recovery, and exposes a proposal-only action-provider conformance method. Separately signed offline, mediated-read, and mediated-action manifests pass in the no-network Docker matrix. The action path routes an allowed plugin request into the existing governed action service and proves the result stops pending independent approval without exposing execution or credentials. The runner and HTTPS mediation gateway are concrete adapters; their application-owned ledger, binding, policy, audit, credential, action-proposal, and gateway ports keep authority out of the plugin and domain. Lifecycle status, cancellation, and post-deadline reconciliation stay in the application boundary. The repository validator applies the same no-server-internals rule to all Python plugin packages.
 
+The private `src/iip/surfaces/worker_health.py` listener consumes only the
+application-owned readiness port. It exposes no control-plane use case,
+identity, tenant data, or provider detail.
+
 ## Placement decisions
 
 - A provider-specific API call belongs in `adapters/<provider>` or a plugin.

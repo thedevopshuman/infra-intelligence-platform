@@ -27,7 +27,8 @@ sequenceDiagram
 
 ## HTTP behavior
 
-- `/healthz` and `/readyz` are public and reveal only process liveness or a generic dependency-readiness result; no identity, tenant, endpoint, schema, or provider detail is returned.
+- Control-plane `/healthz` and `/readyz` are public and reveal only process liveness or a generic dependency-readiness result; no identity, tenant, endpoint, schema, or provider detail is returned.
+- The workflow worker exposes the same minimized paths only on an unserved pod-local health port. It has no public Service or `/v1` routes, and readiness carries no authentication or tenant authority.
 - `GET /v1/authentication/console` is the only public `/v1` exception. It returns a closed non-secret discovery document, accepts no query parameters, and is never tenant-specific.
 - Every other `/v1` operation requires exactly one syntactically valid Bearer credential.
 - Missing credentials return HTTP 401 with `authentication.required`.

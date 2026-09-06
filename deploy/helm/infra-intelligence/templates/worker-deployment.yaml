@@ -68,6 +68,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: IIP_WORKER_HEALTH_HOST
+              value: "0.0.0.0"
+            - name: IIP_WORKER_HEALTH_PORT
+              value: {{ .Values.worker.healthPort | quote }}
             - name: IIP_WORKER_TENANTS
               value: {{ join "," .Values.worker.tenants | quote }}
             {{- if .Values.evidenceRedaction.policiesExistingSecret }}
@@ -227,6 +231,23 @@ spec:
                   name: {{ .Values.investigationSignalCatalog.existingSecret | quote }}
                   key: {{ .Values.investigationSignalCatalog.secretKey | quote }}
             {{- end }}
+          ports:
+            - name: worker-health
+              containerPort: {{ .Values.worker.healthPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: worker-health
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: worker-health
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
           volumeMounts:

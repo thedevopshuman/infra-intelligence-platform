@@ -16,12 +16,17 @@ from iip.application.investigation_worker import (
     InvestigationWorker,
     InvestigationWorkerResult,
 )
+from iip.application.ports import PersistenceError
 from iip.bootstrap import (
     build_action_reconciler_from_env,
     build_event_delivery_from_env,
     build_ingestion_freshness_sampler_from_env,
     build_investigation_worker_from_env,
     build_workflow_worker_runtime_from_env,
+)
+from iip.surfaces.worker_health import (
+    WorkerHealthServer,
+    worker_health_address,
 )
 
 
@@ -386,6 +391,7 @@ def main() -> None:
         help="Process one bounded pass per configured tenant and exit",
     )
     arguments = parser.parse_args()
+    health_host, health_port = worker_health_address()
     tenants = configured_tenants()
     runtime = build_workflow_worker_runtime_from_env()
     worker_id = os.environ.get("IIP_WORKER_ID") or os.environ.get("HOSTNAME")
@@ -434,13 +440,20 @@ def main() -> None:
     )
     next_ai_allocation_at = time.monotonic()
     stopped = Event()
+    health = WorkerHealthServer(
+        runtime.readiness,
+        host=health_host,
+        port=health_port,
+    )
 
     def stop(_signum: int, _frame: object) -> None:
+        health.begin_draining()
         stopped.set()
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     try:
+        health.start()
         while not stopped.is_set():
             dispatch = (
                 scheduler.run_bounded_pass()
@@ -542,10 +555,16 @@ def main() -> None:
                 ai_savings_service is not None
                 and time.monotonic() >= next_ai_savings_at
             ):
-                savings_passes = tuple(
-                    ai_savings_service.run_once(tenant_id, worker_id)
-                    for tenant_id in tenants
-                )
+                savings_passes = []
+                savings_failures = 0
+                for tenant_id in tenants:
+                    try:
+                        savings_passes.append(
+                            ai_savings_service.run_once(tenant_id, worker_id)
+                        )
+                    except Exception:
+                        # Tenant, model, evidence, and storage detail stay out of logs.
+                        savings_failures += 1
                 summary = {
                     "profiles": sum(item.profiles for item in savings_passes),
                     "qualified": sum(item.qualified for item in savings_passes),
@@ -556,7 +575,10 @@ def main() -> None:
                     "belowThreshold": sum(
                         item.below_threshold for item in savings_passes
                     ),
-                    "failures": sum(item.failures for item in savings_passes),
+                    "failures": (
+                        sum(item.failures for item in savings_passes)
+                        + savings_failures
+                    ),
                 }
                 if summary["qualified"] or summary["failures"] or arguments.once:
                     print(
@@ -571,44 +593,53 @@ def main() -> None:
             for tenant_id in tenants:
                 if stopped.is_set():
                     break
-                reconciliation = action_reconciler.run_once(tenant_id)
-                worked = worked or reconciliation.transitioned > 0
-                if event_delivery is not None:
-                    delivery = event_delivery.run_once(tenant_id)
-                    if delivery.claimed > 0:
-                        print(
-                            json.dumps(
-                                {
-                                    "event": "outbox.delivery.completed",
-                                    "claimed": delivery.claimed,
-                                    "delivered": delivery.delivered,
-                                    "released": delivery.released,
-                                    "quarantined": delivery.quarantined,
-                                    "ambiguous": delivery.ambiguous,
-                                },
-                                separators=(",", ":"),
-                                sort_keys=True,
+                try:
+                    reconciliation = action_reconciler.run_once(tenant_id)
+                    worked = worked or reconciliation.transitioned > 0
+                    if event_delivery is not None:
+                        delivery = event_delivery.run_once(tenant_id)
+                        if delivery.claimed > 0:
+                            print(
+                                json.dumps(
+                                    {
+                                        "event": "outbox.delivery.completed",
+                                        "claimed": delivery.claimed,
+                                        "delivered": delivery.delivered,
+                                        "released": delivery.released,
+                                        "quarantined": delivery.quarantined,
+                                        "ambiguous": delivery.ambiguous,
+                                    },
+                                    separators=(",", ":"),
+                                    sort_keys=True,
+                                )
                             )
-                        )
-                        worked = True
+                            worked = True
+                except PersistenceError:
+                    # Readiness reports durable-store loss without restart churn.
+                    pass
             if ingestion_sampler is not None and time.monotonic() >= next_sample_at:
-                summary = ingestion_sampler.run_once()
-                print(
-                    json.dumps(
-                        {
-                            "event": "ingestion-freshness.sampled",
-                            "sampled": summary.sampled,
-                            "breached": summary.breached,
-                            "missing": summary.missing,
-                            "denied": summary.denied,
-                            "failed": summary.failed,
-                        },
-                        separators=(",", ":"),
-                        sort_keys=True,
-                    )
-                )
                 next_sample_at = time.monotonic() + sampling_interval
-                worked = True
+                try:
+                    summary = ingestion_sampler.run_once()
+                except PersistenceError:
+                    # The private readiness probe is the outage signal.
+                    pass
+                else:
+                    print(
+                        json.dumps(
+                            {
+                                "event": "ingestion-freshness.sampled",
+                                "sampled": summary.sampled,
+                                "breached": summary.breached,
+                                "missing": summary.missing,
+                                "denied": summary.denied,
+                                "failed": summary.failed,
+                            },
+                            separators=(",", ":"),
+                            sort_keys=True,
+                        )
+                    )
+                    worked = True
             if retention_enabled and time.monotonic() >= next_retention_at:
                 retention = run_evidence_retention_pass(
                     runtime.evidence_retention,
@@ -636,8 +667,14 @@ def main() -> None:
             if not worked:
                 stopped.wait(0.5)
     finally:
-        scheduler.close()
-        runtime.close()
+        health.begin_draining()
+        try:
+            scheduler.close()
+        finally:
+            try:
+                health.close()
+            finally:
+                runtime.close()
 
 
 if __name__ == "__main__":

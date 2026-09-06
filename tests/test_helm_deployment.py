@@ -103,6 +103,17 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
                     self.assertIn(expected, workload)
 
         self.assertIn("worker.terminationGracePeriodSeconds", worker)
+        for expected in (
+            "IIP_WORKER_HEALTH_HOST",
+            "IIP_WORKER_HEALTH_PORT",
+            "name: worker-health",
+            "path: /healthz",
+            "path: /readyz",
+            "port: worker-health",
+            ".Values.worker.healthPort",
+        ):
+            with self.subTest(worker_health=expected):
+                self.assertIn(expected, worker)
         self.assertIn("otlpIngest.terminationGracePeriodSeconds", receiver)
         self.assertIn("otlpIngest.endpointDrainSeconds", receiver)
         self.assertIn("preStop:", receiver)

@@ -1,0 +1,103 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Infrastructure Intelligence Workflow Worker Health API",
+    "version": "0.84.0",
+    "description": "Private process health listener for the workflow worker. The chart creates no Service or ingress for this listener, and it exposes no control-plane, tenant, workflow, provider, or credential operations."
+  },
+  "servers": [
+    {"url": "http://127.0.0.1:8081", "description": "Private pod/container health listener"}
+  ],
+  "security": [],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "workerHealth",
+        "description": "Report dependency-free process liveness.",
+        "responses": {
+          "200": {
+            "description": "Worker process health listener is running",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Healthy"}
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/InvalidRequest"}
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "workerReady",
+        "description": "Report required PostgreSQL and packaged-schema readiness; draining workers are unavailable.",
+        "responses": {
+          "200": {
+            "description": "Worker and required durable dependencies are ready",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Healthy"}
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "503": {
+            "description": "A required dependency, schema migration, or non-draining state is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Unavailable"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Healthy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status"],
+        "properties": {"status": {"const": "ok"}}
+      },
+      "Unavailable": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status", "error"],
+        "properties": {
+          "status": {"const": "unavailable"},
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code"],
+            "properties": {"code": {"const": "readiness.unavailable"}}
+          }
+        }
+      },
+      "InvalidRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code"],
+            "properties": {"code": {"const": "request.invalid"}}
+          }
+        }
+      }
+    },
+    "responses": {
+      "InvalidRequest": {
+        "description": "Health routes accept no query parameters",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/InvalidRequest"}
+          }
+        }
+      }
+    }
+  }
+}

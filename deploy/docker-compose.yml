@@ -121,6 +121,7 @@ services:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
       IIP_DATABASE_AUTO_MIGRATE: "false"
       IIP_WORKER_ID: local-workflow-worker
+      IIP_WORKER_HEALTH_PORT: "8081"
       IIP_WORKER_TENANTS: local
       IIP_WORKER_LEASE_SECONDS: ${IIP_WORKER_LEASE_SECONDS:-30}
       IIP_WORKER_HEARTBEAT_SECONDS: ${IIP_WORKER_HEARTBEAT_SECONDS:-10}
@@ -200,6 +201,12 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/readyz', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 10s
     restart: unless-stopped
     init: true
     read_only: true

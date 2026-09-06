@@ -85,6 +85,10 @@ REQUIRED_PATHS = (
     "docs/decisions/0108-sbom-vulnerability-policy-and-qualification.md",
     "docs/decisions/0109-component-aware-kubernetes-availability.md",
     "docs/decisions/0110-source-bound-multi-node-kubernetes-availability.md",
+    "docs/decisions/0127-private-dependency-aware-worker-health.md",
+    "docs/specifications/worker-health-contract.md",
+    "src/iip/surfaces/worker_health.py",
+    "tests/test_worker_health.py",
     "docs/operations/external-secrets.md",
     "deploy/helm/infra-intelligence/examples/iip-database.externalsecret.yaml",
     "scripts/test_external_secrets.sh",
@@ -679,6 +683,7 @@ REQUIRED_PATHS = (
     "scripts/backup_restore_experiment.py",
     "api/openapi/control-plane.openapi.json",
     "api/openapi/otlp-receiver.openapi.json",
+    "api/openapi/worker-health.openapi.json",
     "deploy/helm/infra-intelligence/Chart.yaml",
     "deploy/helm/infra-intelligence/values.schema.json",
     "deploy/helm/infra-intelligence/templates/migration-job.yaml",
@@ -839,6 +844,32 @@ def validate_authentication_boundary(
     )
     if not isinstance(mutual_tls, dict) or mutual_tls.get("type") != "mutualTLS":
         fail(errors, "OTLP receiver OpenAPI mutualTLS scheme is missing or invalid")
+
+    worker_health_path = ROOT / "api" / "openapi" / "worker-health.openapi.json"
+    worker_health = documents.get(worker_health_path)
+    if not isinstance(worker_health, dict):
+        fail(errors, "worker health OpenAPI document must be an object")
+        return
+    if worker_health.get("security") != []:
+        fail(errors, "worker health OpenAPI must remain unauthenticated and pod-private")
+    worker_paths = worker_health.get("paths")
+    if not isinstance(worker_paths, dict) or set(worker_paths) != {
+        "/healthz",
+        "/readyz",
+    }:
+        fail(errors, "worker health OpenAPI must expose only health routes")
+        return
+    for path, expected_responses in (
+        ("/healthz", {"200", "400"}),
+        ("/readyz", {"200", "400", "503"}),
+    ):
+        path_item = worker_paths.get(path)
+        if not isinstance(path_item, dict) or set(path_item) != {"get"}:
+            fail(errors, f"worker health OpenAPI {path} must expose only GET")
+            continue
+        responses = path_item["get"].get("responses")
+        if not isinstance(responses, dict) or set(responses) != expected_responses:
+            fail(errors, f"worker health OpenAPI {path} responses are incomplete")
 
 
 def canonical_digest(document: object) -> str:

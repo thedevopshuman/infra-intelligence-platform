@@ -216,6 +216,10 @@ make test-local-product
 make dev-down
 ```
 
+Docker also evaluates the worker's private `/readyz` listener. A running
+worker is healthy only after PostgreSQL is reachable and the latest packaged
+migration is present; the listener is not published to the host.
+
 `make test-local-product` reads the protected local credentials without printing
 them, verifies unauthenticated console discovery, and exercises the durable customer path end to end: complete collection ingestion,
 leased event delivery, durably queued worker investigation, immutable proposal, independent approval, one-shot

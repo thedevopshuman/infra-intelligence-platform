@@ -101,6 +101,7 @@
         "enabled",
         "replicaCount",
         "terminationGracePeriodSeconds",
+        "healthPort",
         "podDisruptionBudget",
         "tenants",
         "leaseSeconds",
@@ -121,6 +122,11 @@
           "type": "integer",
           "minimum": 30,
           "maximum": 900
+        },
+        "healthPort": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535
         },
         "podDisruptionBudget": { "$ref": "#/definitions/podDisruptionBudget" },
         "tenants": {

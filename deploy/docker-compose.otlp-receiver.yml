@@ -101,6 +101,7 @@ services:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
       IIP_DATABASE_AUTO_MIGRATE: "false"
       IIP_WORKER_ID: otlp-cost-worker
+      IIP_WORKER_HEALTH_PORT: "8081"
       IIP_WORKER_TENANTS: local
       IIP_AI_COST_ENGINE_ENABLED: "true"
       IIP_AI_PRICE_CATALOGS_JSON: ${IIP_AI_PRICE_CATALOGS_JSON:?set IIP_AI_PRICE_CATALOGS_JSON}
@@ -111,6 +112,12 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/readyz', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 10s
     init: true
     read_only: true
     tmpfs:

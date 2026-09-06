@@ -8,7 +8,9 @@ The platform exposes contracts at three levels:
 2. Machine validation under `contracts/schemas/`.
 3. Transport bindings under `api/` and the SDKs.
 
-The authenticated control plane and the independently authenticated OTLP intake listener have separate OpenAPI documents: [`control-plane.openapi.json`](../../api/openapi/control-plane.openapi.json) and [`otlp-receiver.openapi.json`](../../api/openapi/otlp-receiver.openapi.json). A deployment must not co-locate those route sets unless it deliberately enables the documented development compatibility mode.
+The authenticated control plane, independently authenticated OTLP intake listener, and private workflow-worker health listener have separate OpenAPI documents: [`control-plane.openapi.json`](../../api/openapi/control-plane.openapi.json), [`otlp-receiver.openapi.json`](../../api/openapi/otlp-receiver.openapi.json), and [`worker-health.openapi.json`](../../api/openapi/worker-health.openapi.json). A deployment must not co-locate those route sets unless it deliberately enables the documented development compatibility mode. The worker listener has no Service, authentication, tenant, or control routes.
+
+- [Workflow worker health contract](worker-health-contract.md)
 
 | Contract | Documentation | Schema | Example |
 | --- | --- | --- | --- |

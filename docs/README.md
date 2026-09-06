@@ -52,6 +52,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Customer deployment qualification report](specifications/customer-deployment-qualification-report-contract.md)
 - [Control-plane load qualification report](specifications/control-plane-load-qualification-report-contract.md)
 - [Kubernetes availability qualification report](specifications/kubernetes-availability-qualification-report-contract.md)
+- [Workflow worker health contract](specifications/worker-health-contract.md)
 
 ## Decisions and delivery
 

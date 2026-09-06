@@ -33,7 +33,9 @@ _DESTINATION = re.compile(
     r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?:[1-9][0-9]{0,4}"
 )
 _QUERY_KEY = re.compile(r"[A-Za-z][A-Za-z0-9._-]{0,63}")
-_SCOPE = re.compile(r"[a-z][a-z0-9._/-]{0,63}:[a-z][a-z0-9._/-]{0,63}")
+_SCOPE = re.compile(
+    r"[a-z][a-z0-9._/-]{0,63}(?::[a-z][a-z0-9._/-]{0,63}){1,2}"
+)
 _TEMPLATE_SEGMENT = re.compile(
     r"(?:[A-Za-z0-9._~-]+|\{[a-z][A-Za-z0-9]{0,31}\})"
 )

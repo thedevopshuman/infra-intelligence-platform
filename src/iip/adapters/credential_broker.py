@@ -31,7 +31,9 @@ _TENANT_ID = re.compile(r"[a-zA-Z0-9._-]{1,128}")
 _INTEGRATION_ID = re.compile(r"[a-z][a-z0-9._-]{2,127}")
 _CREDENTIAL_REF = re.compile(r"credential://[A-Za-z0-9._~:/-]{1,2020}")
 _PROVIDER = re.compile(r"[a-z][a-z0-9._-]{1,63}")
-_SCOPE = re.compile(r"[a-z][a-z0-9._/-]{0,63}:[a-z][a-z0-9._/-]{0,63}")
+_SCOPE = re.compile(
+    r"[a-z][a-z0-9._/-]{0,63}(?::[a-z][a-z0-9._/-]{0,63}){1,2}"
+)
 _REQUEST_ID = re.compile(r"crq_[a-f0-9]{32}")
 _MAX_CONFIGURATION_BYTES = 65_536
 _MAX_TOKEN_BYTES = 16_384

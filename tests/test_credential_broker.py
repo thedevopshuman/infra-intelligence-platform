@@ -272,6 +272,24 @@ class ExternalHttpCredentialBrokerTests(unittest.TestCase):
         self.assertNotIn(LEASE_SECRET, encoded_request)
         self.assertEqual(recorded["bounds"]["timeout_seconds"], 5.0)  # type: ignore[index]
 
+    def test_bounded_hierarchical_repository_scope_reaches_transport(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            token_path = Path(directory) / "token"
+            token_path.write_text(WORKLOAD_TOKEN, encoding="ascii")
+            client, transport = broker(str(token_path))
+
+            client.resolve(
+                lease_request(
+                    provider="github",
+                    scopes=("repository:contents:read",),
+                )
+            )
+
+        self.assertEqual(
+            transport.requests[0]["document"]["spec"]["scopes"],  # type: ignore[index]
+            ["repository:contents:read"],
+        )
+
     def test_response_identity_structure_and_lease_bounds_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             token_path = Path(directory) / "token"

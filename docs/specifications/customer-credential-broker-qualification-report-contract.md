@@ -35,7 +35,10 @@ mode-`0600` regular file. The CA bundle and immutable image digest are separate
 inputs. No token, issued credential, or credential value is permitted in the
 profile or committed example.
 
-The profile also fixes request/response limits, maximum lease and clock-skew
+Each requested scope uses the shared two- or three-segment bounded grammar;
+the third segment supports exact authorities such as
+`repository:contents:read` without permitting wildcards. The profile also
+fixes request/response limits, maximum lease and clock-skew
 bounds, a request deadline, maximum observed latency, and maximum profile age.
 The request deadline cannot exceed the maximum accepted lease lifetime.
 

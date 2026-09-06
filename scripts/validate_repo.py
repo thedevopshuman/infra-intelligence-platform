@@ -132,6 +132,17 @@ REQUIRED_PATHS = (
     "docs/operations/customer-credential-broker-qualification.md",
     "scripts/qualify_customer_credential_broker.py",
     "tests/test_customer_credential_broker_qualification.py",
+    "docs/decisions/0135-customer-github-context-interoperability-qualification.md",
+    "docs/specifications/customer-github-context-qualification-report-contract.md",
+    "contracts/schemas/customer-github-context-qualification-profile.schema.json",
+    "contracts/schemas/customer-github-context-qualification-report.schema.json",
+    "contracts/examples/customer-github-context-qualification-profile.json",
+    "contracts/examples/customer-github-context-qualification-report.json",
+    "contracts/examples/customer-credential-broker-qualification-profile-github-context.json",
+    "deploy/context/customer-github-context-qualification-integrations.example.json",
+    "docs/operations/customer-github-context-qualification.md",
+    "scripts/qualify_customer_github_context.py",
+    "tests/test_customer_github_context_qualification.py",
     "docs/decisions/0134-customer-otlp-receiver-interoperability-qualification.md",
     "docs/specifications/customer-otlp-receiver-qualification-report-contract.md",
     "contracts/schemas/customer-otlp-receiver-qualification-profile.schema.json",
@@ -2238,6 +2249,41 @@ def validate_customer_otlp_receiver_qualification_example(
         fail(
             errors,
             "customer OTLP receiver qualification examples must be semantically valid",
+        )
+
+
+def validate_customer_github_context_qualification_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check exact customer GitHub selection and minimized evidence."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    profile = documents.get(
+        example_dir / "customer-github-context-qualification-profile.json"
+    )
+    report = documents.get(
+        example_dir / "customer-github-context-qualification-report.json"
+    )
+    try:
+        from qualify_customer_github_context import (
+            CustomerGithubContextQualificationError,
+            validate_profile,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "customer GitHub context qualification validator must be importable")
+        return
+    try:
+        if not isinstance(profile, dict) or not isinstance(report, dict):
+            raise CustomerGithubContextQualificationError(
+                "customer-github-context-qualification.example.invalid"
+            )
+        validate_profile(profile)
+        validate_report_document(report)
+    except CustomerGithubContextQualificationError:
+        fail(
+            errors,
+            "customer GitHub context qualification examples must be semantically valid",
         )
 
 
@@ -5190,6 +5236,18 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerCredentialBrokerQualificationReport",
         ),
         (
+            "customer-credential-broker-qualification-profile-github-context.json",
+            "CustomerCredentialBrokerQualificationProfile",
+        ),
+        (
+            "customer-github-context-qualification-profile.json",
+            "CustomerGithubContextQualificationProfile",
+        ),
+        (
+            "customer-github-context-qualification-report.json",
+            "CustomerGithubContextQualificationReport",
+        ),
+        (
             "customer-otlp-receiver-qualification-profile.json",
             "CustomerOtlpReceiverQualificationProfile",
         ),
@@ -5296,6 +5354,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_customer_continuity_qualification_example(documents, errors)
     validate_customer_policy_qualification_example(documents, errors)
     validate_customer_credential_broker_qualification_example(documents, errors)
+    validate_customer_github_context_qualification_example(documents, errors)
     validate_customer_otlp_receiver_qualification_example(documents, errors)
     validate_customer_deployment_qualification_example(documents, errors)
     validate_control_plane_load_qualification_example(documents, errors)

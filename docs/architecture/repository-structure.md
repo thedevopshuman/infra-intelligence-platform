@@ -55,6 +55,16 @@ production external broker adapter. It retains no authority tuple, workload
 identity, or issued lease. The deployment aggregate rebinds its minimized
 report, profile, endpoint, and CA without calling the broker.
 
+Customer GitHub context qualification composes, but does not merge, those
+boundaries. `scripts/qualify_customer_github_context.py` first verifies one
+exact GitHub authority report from the customer broker qualifier, then invokes
+the existing `GithubContextDocumentsBackend` for one immutable document. It
+retains only source/image identity, counts, latency, digests, stable checks,
+and fixed limitations. The customer profile, integration snapshot, endpoint,
+repository identity, revision, credential, and content do not enter the SDK
+transport or report, and the optional report is not a generic deployment
+requirement.
+
 Customer OTLP receiver qualification remains an operational harness as well:
 `scripts/qualify_customer_otlp_receiver.py` runs a digest-pinned official
 Collector outside the serving workloads, delivers three bounded synthetic

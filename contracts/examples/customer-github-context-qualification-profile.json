@@ -1,0 +1,37 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerGithubContextQualificationProfile",
+  "metadata": {
+    "name": "customer-github-context-production",
+    "reviewedAt": "2026-09-08T09:00:00Z"
+  },
+  "spec": {
+    "serviceMode": "github-enterprise-server",
+    "query": {
+      "tenantId": "tenant-a",
+      "actorId": "investigation-runtime",
+      "integrationId": "github-context-production",
+      "resourceUid": "res_e0ae9225a316fce4c97df5c23057b97a",
+      "referenceId": "runbooks/api-rollout",
+      "documentKind": "runbook"
+    },
+    "expected": {
+      "endpoint": "https://github.example.com/api/v3",
+      "apiVersion": "2026-03-10",
+      "credentialRef": "credential://tenant-a/github/context-reader",
+      "repositoryOwner": "platform-team",
+      "repositoryName": "operations",
+      "commitSha": "0123456789abcdef0123456789abcdef01234567",
+      "path": "runbooks/api-rollout.md",
+      "blobSha": "505777a6b7b38f422c84ed4c7a93797b0011658a"
+    },
+    "objective": {
+      "requestTimeoutSeconds": 5,
+      "maximumResponseBytes": 2097152,
+      "maximumDocumentBytes": 1048576,
+      "requestDeadlineSeconds": 60,
+      "maximumReadLatencyMilliseconds": 10000,
+      "maximumProfileAgeSeconds": 2592000
+    }
+  }
+}

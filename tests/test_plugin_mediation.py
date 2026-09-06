@@ -229,6 +229,12 @@ class PluginMediationAdapterTests(unittest.TestCase):
     def test_redirects_are_disabled(self):
         self.assertIsNone(NoPluginMediationRedirectHandler().redirect_request())
 
+    def test_binding_accepts_bounded_hierarchical_broker_scope(self):
+        service = StaticPluginMediationBindingRegistry(
+            (binding(scopes=("repository:contents:read",)),)
+        )
+        self.assertIsNotNone(service)
+
 
 class PluginMediationSdkTests(unittest.TestCase):
     def test_sdk_sends_one_framed_request_and_correlates_response(self):

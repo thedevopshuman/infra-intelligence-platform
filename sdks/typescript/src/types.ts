@@ -1770,6 +1770,142 @@ export interface CustomerCredentialBrokerQualificationReport {
   };
 }
 
+export interface CustomerGithubContextQualificationProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerGithubContextQualificationProfile";
+  metadata: { name: string; reviewedAt: string };
+  spec: {
+    serviceMode: "github-cloud" | "github-enterprise-server";
+    query: {
+      tenantId: string;
+      actorId: string;
+      integrationId: string;
+      resourceUid: `res_${string}`;
+      referenceId: string;
+      documentKind: "runbook" | "source" | "configuration" | "service-catalog";
+    };
+    expected: {
+      endpoint: `https://${string}`;
+      apiVersion: string;
+      credentialRef: `credential://${string}`;
+      repositoryOwner: string;
+      repositoryName: string;
+      commitSha: string;
+      path: string;
+      blobSha: string;
+    };
+    objective: {
+      requestTimeoutSeconds: number;
+      maximumResponseBytes: number;
+      maximumDocumentBytes: number;
+      requestDeadlineSeconds: number;
+      maximumReadLatencyMilliseconds: number;
+      maximumProfileAgeSeconds: number;
+    };
+  };
+}
+
+export type CustomerGithubContextQualificationCheckId =
+  | "profile-binding"
+  | "source-binding"
+  | "immutable-release"
+  | "protected-input-files"
+  | "integration-config-binding"
+  | "exact-endpoint"
+  | "exact-api-version"
+  | "qualified-credential-broker"
+  | "exact-read-authority"
+  | "workload-identity-accepted"
+  | "provider-credential-accepted"
+  | "ca-verified-tls"
+  | "direct-no-proxy-no-redirect"
+  | "immutable-commit-request"
+  | "document-path-binding"
+  | "complete-single-document"
+  | "expected-git-blob"
+  | "bounded-read-latency"
+  | "content-not-retained"
+  | "minimized-output";
+
+export interface CustomerGithubContextQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerGithubContextQualificationReport";
+  metadata: {
+    id: `cgcq_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualification: "customer-github-context-prerequisites-v1";
+    subject: {
+      applicationVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      profileDigest: Sha256Digest;
+      integrationConfigurationDigest: Sha256Digest;
+      endpointBindingDigest: Sha256Digest;
+      repositoryBindingDigest: Sha256Digest;
+      documentBindingDigest: Sha256Digest;
+      githubCaBundleDigest: Sha256Digest;
+      credentialBrokerReportDigest: Sha256Digest;
+      credentialBrokerEndpointBindingDigest: Sha256Digest;
+      credentialBrokerProfileDigest: Sha256Digest;
+      credentialBrokerAuthoritySetDigest: Sha256Digest;
+      credentialBrokerCaBundleDigest: Sha256Digest;
+      observedRevisionDigest: Sha256Digest;
+    };
+    profile: {
+      name: "customer-github-context-prerequisites-v1";
+      serviceMode: "github-cloud" | "github-enterprise-server";
+      provider: "github";
+      api: "rest-repository-contents";
+      credentialMode: "external-request-scoped-bearer";
+      credentialScope: "repository:contents:read";
+      revisionMode: "exact-commit-and-git-blob";
+      transport: "ca-verified-https-json";
+      redirectMode: "denied";
+      proxyMode: "disabled";
+      contentRetention: "none-in-qualification-report";
+    };
+    objective: CustomerGithubContextQualificationProfile["spec"]["objective"];
+    measurements: {
+      profileReviewedAt: string;
+      startedAt: string;
+      completedAt: string;
+      selectedRepositoryCount: 1;
+      requestedDocumentCount: 1;
+      returnedDocumentCount: 0 | 1;
+      readLatencyMilliseconds: number;
+    };
+    checks: Array<
+      | { id: CustomerGithubContextQualificationCheckId; status: "passed" }
+      | {
+          id: CustomerGithubContextQualificationCheckId;
+          status: "failed";
+          errorCode: `customer-github-context-qualification.${string}`;
+        }
+    >;
+    limitations: [
+      "github-app-installation-and-credential-lifecycle-not-qualified",
+      "organization-repository-and-content-governance-not-qualified",
+      "rate-limit-secondary-throttling-and-sustained-load-not-qualified",
+      "certificate-network-proxy-and-service-ha-not-qualified",
+      "additional-repositories-documents-and-provider-apis-not-qualified",
+    ];
+    summary: {
+      totalChecks: 20;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export interface CustomerOtlpReceiverQualificationProfile {
   apiVersion: "iip.platform/v1alpha1";
   kind: "CustomerOtlpReceiverQualificationProfile";

@@ -1,0 +1,99 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerGithubContextQualificationReport",
+  "metadata": {
+    "id": "cgcq_e97ed57756d787465ed14420c7ac642c",
+    "generatedAt": "2026-09-08T10:00:00Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualification": "customer-github-context-prerequisites-v1",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "profileDigest": "sha256:ef0bbf759f580f1366dc0984591d6830e5ca091164b8ae36d711b7400b2e6530",
+      "integrationConfigurationDigest": "sha256:3289d5fbeb528fc3943ad9a21cb3f1583dbfa60b20e57e91d504a53292b00008",
+      "endpointBindingDigest": "sha256:c535aa396f5639ef4f5220ad1a65ea63d5839fb75b81647216d0c7e06b6e38cd",
+      "repositoryBindingDigest": "sha256:e71ff46a1a00601a90ae2011e920d30b2245d86f64a3890bc20580035b06b910",
+      "documentBindingDigest": "sha256:bf9182c5f3f62454a6282378dfbfcd2761eb9b2592ce5af33689267270c13162",
+      "githubCaBundleDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "credentialBrokerReportDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "credentialBrokerEndpointBindingDigest": "sha256:13276b5061c20821725fccce452d5b54c16fb5be292f2853c3d3da0e51089ecb",
+      "credentialBrokerProfileDigest": "sha256:d10904d00ec293706957d3e74d922106e6071efa02556fc8192681b2ca87ce75",
+      "credentialBrokerAuthoritySetDigest": "sha256:e9170080296d52d5bbe7b867761333a6a636f4dce0616429eddf2da788533521",
+      "credentialBrokerCaBundleDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "observedRevisionDigest": "sha256:28b10dfd1440241255f40b67aac82d04d3cdf740767dbb5112fa90cbc18cf665"
+    },
+    "profile": {
+      "name": "customer-github-context-prerequisites-v1",
+      "serviceMode": "github-enterprise-server",
+      "provider": "github",
+      "api": "rest-repository-contents",
+      "credentialMode": "external-request-scoped-bearer",
+      "credentialScope": "repository:contents:read",
+      "revisionMode": "exact-commit-and-git-blob",
+      "transport": "ca-verified-https-json",
+      "redirectMode": "denied",
+      "proxyMode": "disabled",
+      "contentRetention": "none-in-qualification-report"
+    },
+    "objective": {
+      "requestTimeoutSeconds": 5,
+      "maximumResponseBytes": 2097152,
+      "maximumDocumentBytes": 1048576,
+      "requestDeadlineSeconds": 60,
+      "maximumReadLatencyMilliseconds": 10000,
+      "maximumProfileAgeSeconds": 2592000
+    },
+    "measurements": {
+      "profileReviewedAt": "2026-09-08T09:00:00Z",
+      "startedAt": "2026-09-08T10:00:00Z",
+      "completedAt": "2026-09-08T10:00:00Z",
+      "selectedRepositoryCount": 1,
+      "requestedDocumentCount": 1,
+      "returnedDocumentCount": 1,
+      "readLatencyMilliseconds": 184
+    },
+    "checks": [
+      {"id": "profile-binding", "status": "passed"},
+      {"id": "source-binding", "status": "passed"},
+      {"id": "immutable-release", "status": "passed"},
+      {"id": "protected-input-files", "status": "passed"},
+      {"id": "integration-config-binding", "status": "passed"},
+      {"id": "exact-endpoint", "status": "passed"},
+      {"id": "exact-api-version", "status": "passed"},
+      {"id": "qualified-credential-broker", "status": "passed"},
+      {"id": "exact-read-authority", "status": "passed"},
+      {"id": "workload-identity-accepted", "status": "passed"},
+      {"id": "provider-credential-accepted", "status": "passed"},
+      {"id": "ca-verified-tls", "status": "passed"},
+      {"id": "direct-no-proxy-no-redirect", "status": "passed"},
+      {"id": "immutable-commit-request", "status": "passed"},
+      {"id": "document-path-binding", "status": "passed"},
+      {"id": "complete-single-document", "status": "passed"},
+      {"id": "expected-git-blob", "status": "passed"},
+      {"id": "bounded-read-latency", "status": "passed"},
+      {"id": "content-not-retained", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"}
+    ],
+    "limitations": [
+      "github-app-installation-and-credential-lifecycle-not-qualified",
+      "organization-repository-and-content-governance-not-qualified",
+      "rate-limit-secondary-throttling-and-sustained-load-not-qualified",
+      "certificate-network-proxy-and-service-ha-not-qualified",
+      "additional-repositories-documents-and-provider-apis-not-qualified"
+    ],
+    "summary": {
+      "totalChecks": 20,
+      "passedChecks": 20,
+      "failedChecks": 0,
+      "overallStatus": "qualified"
+    }
+  }
+}

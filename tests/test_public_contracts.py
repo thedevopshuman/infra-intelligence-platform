@@ -17,6 +17,8 @@ from infra_intelligence_sdk import (
     ControlPlaneLoadQualificationReport,
     CustomerCredentialBrokerQualificationProfile,
     CustomerCredentialBrokerQualificationReport,
+    CustomerGithubContextQualificationProfile,
+    CustomerGithubContextQualificationReport,
     CustomerOtlpReceiverQualificationProfile,
     CustomerOtlpReceiverQualificationReport,
     CustomerContinuityQualificationReport,
@@ -233,6 +235,12 @@ class PublicContractSdkTests(unittest.TestCase):
             CustomerCredentialBrokerQualificationReport.from_dict(
                 example("customer-credential-broker-qualification-report.json")
             )
+        )
+        customer_github_profile = CustomerGithubContextQualificationProfile.from_dict(
+            example("customer-github-context-qualification-profile.json")
+        )
+        customer_github = CustomerGithubContextQualificationReport.from_dict(
+            example("customer-github-context-qualification-report.json")
         )
         customer_otlp_profile = CustomerOtlpReceiverQualificationProfile.from_dict(
             example("customer-otlp-receiver-qualification-profile.json")
@@ -553,6 +561,14 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             customer_credential_broker.to_dict()["spec"]["qualification"],
             "customer-credential-broker-authority-prerequisites-v1",
+        )
+        self.assertEqual(
+            customer_github_profile.to_dict()["kind"],
+            "CustomerGithubContextQualificationProfile",
+        )
+        self.assertEqual(
+            customer_github.to_dict()["spec"]["qualification"],
+            "customer-github-context-prerequisites-v1",
         )
         self.assertEqual(
             customer_otlp_profile.to_dict()["kind"],

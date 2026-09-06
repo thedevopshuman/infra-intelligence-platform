@@ -1,0 +1,31 @@
+{
+  "integrations": [
+    {
+      "tenantId": "tenant-a",
+      "integrationId": "github-context-production",
+      "provider": "github",
+      "endpoint": "https://github.example.com/api/v3",
+      "apiVersion": "2026-03-10",
+      "credentialRef": "credential://tenant-a/github/context-reader",
+      "caBundlePath": "/etc/iip/github-ca/ca.crt",
+      "requestTimeoutSeconds": 5,
+      "maxResponseBytes": 2097152,
+      "repositories": [
+        {
+          "owner": "platform-team",
+          "name": "operations",
+          "commitSha": "0123456789abcdef0123456789abcdef01234567",
+          "documents": [
+            {
+              "referenceId": "runbooks/api-rollout",
+              "resourceRefs": ["res_e0ae9225a316fce4c97df5c23057b97a"],
+              "kind": "runbook",
+              "title": "API rollout recovery",
+              "path": "runbooks/api-rollout.md"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

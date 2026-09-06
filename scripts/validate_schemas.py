@@ -119,6 +119,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     ),
     "customer-credential-broker-qualification-profile.schema.json": (
         "customer-credential-broker-qualification-profile.json",
+        "customer-credential-broker-qualification-profile-github-context.json",
     ),
     "customer-credential-broker-qualification-report.schema.json": (
         "customer-credential-broker-qualification-report.json",
@@ -128,6 +129,12 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     ),
     "customer-otlp-receiver-qualification-report.schema.json": (
         "customer-otlp-receiver-qualification-report.json",
+    ),
+    "customer-github-context-qualification-profile.schema.json": (
+        "customer-github-context-qualification-profile.json",
+    ),
+    "customer-github-context-qualification-report.schema.json": (
+        "customer-github-context-qualification-report.json",
     ),
     "customer-deployment-qualification-report.schema.json": (
         "customer-deployment-qualification-report.json",

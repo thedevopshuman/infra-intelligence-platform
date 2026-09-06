@@ -13,7 +13,7 @@ These contracts define the protected exchange between an infrastructure adapter 
 
 The control plane constructs `CredentialLeaseRequest` from an already-authorized application port value. Tenant and actor come from authenticated request context; integration, provider, scopes, logical `credentialRef`, and deadline come from the selected protected integration and adapter. The external broker authenticates the control-plane workload independently and remains responsible for checking every asserted field against its own policy.
 
-`requestId` correlates one exchange and must be echoed by the response. It is not an action idempotency key. `requestedAt` is the control-plane clock at dispatch. Scopes are exact, nonempty, unique, bounded, and provider-specific; the broker must not return broader authority than requested.
+`requestId` correlates one exchange and must be echoed by the response. It is not an action idempotency key. `requestedAt` is the control-plane clock at dispatch. Scopes are exact, nonempty, unique, bounded, and provider-specific; the broker must not return broader authority than requested. A scope contains two or three lowercase segments of at most 64 characters each, separated by `:`. This represents both `events:read` and the GitHub adapter's `repository:contents:read` without admitting wildcards, whitespace, empty segments, or arbitrary depth.
 
 The request contains no provider credential. The `Authorization` header used to authenticate the broker call carries a separately projected workload-identity token with a broker-specific audience and is not part of the JSON contract.
 

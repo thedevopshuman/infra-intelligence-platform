@@ -17,6 +17,9 @@ query-key allowlist, broker scopes, expiry, request count, and response-byte
 limit. It deliberately excludes the provider URL, CA configuration,
 `credentialRef`, and credential value. The grant is included in the invocation
 and therefore covered by its canonical durable claim digest.
+Broker scopes use the same bounded two- or three-segment grammar as credential
+lease requests, so a mediated GitHub read can express
+`repository:contents:read` without expanding the plugin's authority syntax.
 
 `PluginMediationRequest` is untrusted plugin output. It can select only a grant,
 `GET`, one absolute path, and allowlisted query values. It has no scheme, host,

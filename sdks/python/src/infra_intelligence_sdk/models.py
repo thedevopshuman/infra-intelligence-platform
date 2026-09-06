@@ -759,6 +759,50 @@ class CustomerCredentialBrokerQualificationReport:
 
 
 @dataclass(frozen=True)
+class CustomerGithubContextQualificationProfile:
+    """Protected exact customer GitHub document qualification input."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerGithubContextQualificationProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerGithubContextQualificationProfile",
+                label="customer GitHub context qualification profile",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerGithubContextQualificationReport:
+    """Minimized exact customer GitHub context interoperability evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerGithubContextQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerGithubContextQualificationReport",
+                label="customer GitHub context qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerOtlpReceiverQualificationProfile:
     """Protected exact signal catalog for customer receiver qualification."""
 

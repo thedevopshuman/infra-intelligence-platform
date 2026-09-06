@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-github-context-qualification-report:v1alpha1",
+  "title": "Customer GitHub Context Qualification Report",
+  "description": "Privacy-minimized source-bound evidence for one exact customer GitHub or GitHub Enterprise context read through the production adapter and credential broker.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerGithubContextQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^cgcq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualification", "subject", "bindings", "profile", "objective", "measurements", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualification": {"const": "customer-github-context-prerequisites-v1"},
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["applicationVersion", "contractsApiVersion", "sourceRevision", "imageDigest"],
+          "properties": {
+            "applicationVersion": {"$ref": "#/$defs/semver"},
+            "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+            "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+            "imageDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileDigest", "integrationConfigurationDigest", "endpointBindingDigest", "repositoryBindingDigest", "documentBindingDigest", "githubCaBundleDigest", "credentialBrokerReportDigest", "credentialBrokerEndpointBindingDigest", "credentialBrokerProfileDigest", "credentialBrokerAuthoritySetDigest", "credentialBrokerCaBundleDigest", "observedRevisionDigest"],
+          "properties": {
+            "profileDigest": {"$ref": "#/$defs/digest"},
+            "integrationConfigurationDigest": {"$ref": "#/$defs/digest"},
+            "endpointBindingDigest": {"$ref": "#/$defs/digest"},
+            "repositoryBindingDigest": {"$ref": "#/$defs/digest"},
+            "documentBindingDigest": {"$ref": "#/$defs/digest"},
+            "githubCaBundleDigest": {"$ref": "#/$defs/digest"},
+            "credentialBrokerReportDigest": {"$ref": "#/$defs/digest"},
+            "credentialBrokerEndpointBindingDigest": {"$ref": "#/$defs/digest"},
+            "credentialBrokerProfileDigest": {"$ref": "#/$defs/digest"},
+            "credentialBrokerAuthoritySetDigest": {"$ref": "#/$defs/digest"},
+            "credentialBrokerCaBundleDigest": {"$ref": "#/$defs/digest"},
+            "observedRevisionDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "serviceMode", "provider", "api", "credentialMode", "credentialScope", "revisionMode", "transport", "redirectMode", "proxyMode", "contentRetention"],
+          "properties": {
+            "name": {"const": "customer-github-context-prerequisites-v1"},
+            "serviceMode": {"enum": ["github-cloud", "github-enterprise-server"]},
+            "provider": {"const": "github"},
+            "api": {"const": "rest-repository-contents"},
+            "credentialMode": {"const": "external-request-scoped-bearer"},
+            "credentialScope": {"const": "repository:contents:read"},
+            "revisionMode": {"const": "exact-commit-and-git-blob"},
+            "transport": {"const": "ca-verified-https-json"},
+            "redirectMode": {"const": "denied"},
+            "proxyMode": {"const": "disabled"},
+            "contentRetention": {"const": "none-in-qualification-report"}
+          }
+        },
+        "objective": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requestTimeoutSeconds", "maximumResponseBytes", "maximumDocumentBytes", "requestDeadlineSeconds", "maximumReadLatencyMilliseconds", "maximumProfileAgeSeconds"],
+          "properties": {
+            "requestTimeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 30},
+            "maximumResponseBytes": {"type": "integer", "minimum": 1024, "maximum": 2097152},
+            "maximumDocumentBytes": {"type": "integer", "minimum": 1, "maximum": 1048576},
+            "requestDeadlineSeconds": {"type": "integer", "minimum": 5, "maximum": 300},
+            "maximumReadLatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 30000},
+            "maximumProfileAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 7776000}
+          }
+        },
+        "measurements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileReviewedAt", "startedAt", "completedAt", "selectedRepositoryCount", "requestedDocumentCount", "returnedDocumentCount", "readLatencyMilliseconds"],
+          "properties": {
+            "profileReviewedAt": {"type": "string", "format": "date-time"},
+            "startedAt": {"type": "string", "format": "date-time"},
+            "completedAt": {"type": "string", "format": "date-time"},
+            "selectedRepositoryCount": {"const": 1},
+            "requestedDocumentCount": {"const": 1},
+            "returnedDocumentCount": {"type": "integer", "minimum": 0, "maximum": 1},
+            "readLatencyMilliseconds": {"type": "integer", "minimum": 0, "maximum": 300000}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 20,
+          "maxItems": 20,
+          "prefixItems": [
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "immutable-release"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "protected-input-files"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "integration-config-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "exact-endpoint"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "exact-api-version"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "qualified-credential-broker"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "exact-read-authority"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "workload-identity-accepted"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "provider-credential-accepted"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "ca-verified-tls"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "direct-no-proxy-no-redirect"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "immutable-commit-request"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "document-path-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "complete-single-document"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "expected-git-blob"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "bounded-read-latency"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "content-not-retained"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}}
+          ],
+          "items": false
+        },
+        "limitations": {
+          "type": "array",
+          "prefixItems": [
+            {"const": "github-app-installation-and-credential-lifecycle-not-qualified"},
+            {"const": "organization-repository-and-content-governance-not-qualified"},
+            {"const": "rate-limit-secondary-throttling-and-sustained-load-not-qualified"},
+            {"const": "certificate-network-proxy-and-service-ha-not-qualified"},
+            {"const": "additional-repositories-documents-and-provider-apis-not-qualified"}
+          ],
+          "items": false,
+          "minItems": 5,
+          "maxItems": 5
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 20},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 20},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 20},
+            "overallStatus": {"enum": ["qualified", "not-qualified"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-github-context-qualification\\.[a-z0-9.-]+$", "maxLength": 180}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    }
+  }
+}

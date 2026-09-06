@@ -107,6 +107,12 @@ REQUIRED_PATHS = (
     "contracts/schemas/ingress-availability-qualification-report.schema.json",
     "contracts/examples/ingress-availability-qualification-report.json",
     "scripts/qualify_ingress_availability.py",
+    "docs/operations/customer-continuity-qualification.md",
+    "docs/specifications/customer-continuity-qualification-report-contract.md",
+    "contracts/schemas/customer-continuity-qualification-report.schema.json",
+    "contracts/examples/customer-continuity-qualification-report.json",
+    "scripts/qualify_customer_continuity.py",
+    "tests/test_customer_continuity_qualification.py",
     "docs/operations/kubernetes-availability-qualification.md",
     "docs/specifications/kubernetes-availability-qualification-report-contract.md",
     "contracts/schemas/kubernetes-availability-qualification-report.schema.json",
@@ -190,6 +196,7 @@ REQUIRED_PATHS = (
     "docs/operations/investigation-capacity.md",
     "docs/operations/release-artifacts.md",
     "docs/decisions/0122-one-command-local-release-qualification.md",
+    "docs/decisions/0123-customer-control-plane-continuity-qualification.md",
     "scripts/qualify_local_release.py",
     "tests/test_local_release_qualification.py",
     "docs/operations/release-vulnerability-qualification.md",
@@ -1990,6 +1997,36 @@ def validate_ingress_availability_qualification_example(
         validate_report_document(report)
     except IngressQualificationError:
         fail(errors, "ingress availability example must be semantically valid")
+
+
+def validate_customer_continuity_qualification_example(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check minimized customer continuity arithmetic and closed semantics."""
+
+    path = (
+        ROOT
+        / "contracts"
+        / "examples"
+        / "customer-continuity-qualification-report.json"
+    )
+    report = documents.get(path)
+    try:
+        from qualify_customer_continuity import (
+            CustomerContinuityQualificationError,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(errors, "customer continuity example must be semantically valid")
+        return
+    try:
+        if not isinstance(report, dict):
+            raise CustomerContinuityQualificationError(
+                "customer-continuity.report.invalid"
+            )
+        validate_report_document(report)
+    except CustomerContinuityQualificationError:
+        fail(errors, "customer continuity example must be semantically valid")
 
 
 def validate_postgresql_recovery_qualification_example(
@@ -4850,6 +4887,10 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "IngressAvailabilityQualificationReport",
         ),
         (
+            "customer-continuity-qualification-report.json",
+            "CustomerContinuityQualificationReport",
+        ),
+        (
             "credential-broker-compatibility-report.json",
             "CredentialBrokerCompatibilityReport",
         ),
@@ -4925,6 +4966,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_release_vulnerability_examples(documents, errors)
     validate_customer_deployment_preflight_example(documents, errors)
     validate_ingress_availability_qualification_example(documents, errors)
+    validate_customer_continuity_qualification_example(documents, errors)
     validate_postgresql_recovery_qualification_example(documents, errors)
     validate_plugin_action_mediation_examples(documents, errors)
     validate_ai_economics_examples(documents, errors)

@@ -155,6 +155,13 @@ observes zero failed API or OTLP Service probes through recovery. This closes
 the local planned-disruption evidence gap; involuntary loss, shared database,
 customer-cluster, sustained-load, and regional availability remain external.
 
+Customer-continuity update: ADR 0123 adds a separately enabled customer
+profile that overlaps a sustained direct verified-HTTPS probe with one
+UID-preconditioned, PDB-governed API pod Eviction. It retains exact-release
+recovery, availability, and latency evidence without customer identifiers.
+Worker, receiver, database, node, zone, sustained customer-traffic capacity,
+and long-window regional certification remain external.
+
 Update: ADR 0058 adds a deployment-configured rolling useful-completion SLO over durable asynchronous jobs, including explicit late, failed, cancelled, and unfinished misses. ADR 0059 adds a privacy-bounded query availability counter and duration histogram with explicit objective values over the replaceable OTLP metrics boundary. Bounded external ingress qualification is delivered by ADR 0105; continuous regional coverage and notification routing remain open.
 
 ## Phase 4 — governed actions and workflows

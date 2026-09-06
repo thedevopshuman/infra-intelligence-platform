@@ -47,6 +47,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Plugin compatibility report contract](specifications/plugin-compatibility-contract.md)
 - [Plugin action mediation contracts](specifications/plugin-action-mediation-contract.md)
 - [Customer deployment preflight report](specifications/customer-deployment-preflight-report-contract.md)
+- [Customer continuity qualification report](specifications/customer-continuity-qualification-report-contract.md)
 - [Kubernetes availability qualification report](specifications/kubernetes-availability-qualification-report-contract.md)
 
 ## Decisions and delivery
@@ -59,6 +60,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Helm deployment and schema migration](operations/helm-deployment.md)
 - [Customer deployment preflight](operations/customer-deployment-preflight.md)
 - [Post-install deployment diagnostics](operations/deployment-diagnostics.md)
+- [Customer control-plane continuity qualification](operations/customer-continuity-qualification.md)
 - [Kubernetes planned-disruption availability qualification](operations/kubernetes-availability-qualification.md)
 - [Release artifacts and supply-chain evidence](operations/release-artifacts.md)
 - [OpenTelemetry metrics export](operations/opentelemetry-export.md)

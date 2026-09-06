@@ -89,6 +89,10 @@ Version 0.56 adds protected price-catalog qualification policy and minimized
 report types without a provider pricing client, promotion method, or negotiated
 rate exposure.
 
+Version 0.59 adds `CustomerContinuityQualificationReport` and its closed check,
+objective, environment, aggregate probe, and replacement types. It adds no
+client method, credential, or Kubernetes mutation authority.
+
 Version 0.58 adds the protected `EvidenceRedactionPolicy` type and optional
 Evidence policy provenance without a policy-installation API, arbitrary
 detector expressions, or a credential-redaction disable switch.

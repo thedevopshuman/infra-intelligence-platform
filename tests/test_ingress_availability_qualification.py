@@ -273,6 +273,22 @@ class IngressAvailabilityQualificationTests(unittest.TestCase):
         self.assertNotIn("--token\"", source)
         self.assertNotIn("IIP_AUTH_BEARER_TOKEN", source)
 
+    def test_probe_can_be_cooperatively_stopped_without_writing_evidence(self) -> None:
+        with self.assertRaisesRegex(
+            IngressQualificationError,
+            "ingress-qualification.probe.cancelled",
+        ):
+            generate_report(
+                profile="local-loopback",
+                base_url="http://127.0.0.1:9",
+                token_file=self.token_file,
+                output=self.output,
+                sample_count=3,
+                interval_milliseconds=0,
+                stop_requested=lambda: True,
+            )
+        self.assertFalse(self.output.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

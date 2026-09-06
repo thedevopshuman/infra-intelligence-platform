@@ -32,6 +32,16 @@ after recovery. The retained report contains aggregate states and digests only;
 it does not claim involuntary-node, database, regional, or customer-cluster
 availability. See the [Kubernetes availability qualification runbook](docs/operations/kubernetes-availability-qualification.md).
 
+For a customer-like deployment, a separate continuity gate runs at least five
+minutes of direct verified-HTTPS liveness, readiness, authentication, and exact
+release-identity probes while evicting one ready API pod through an
+explicit-context, UID-preconditioned `policy/v1` request. It requires redundant
+capacity, active PDB protection, bounded recovery, and declared availability
+and p95 latency objectives, then retains only aggregate measurements and
+pseudonymous bindings. The disruptive path is never part of `make verify` and
+requires an explicit enable flag; see the [customer continuity qualification
+runbook](docs/operations/customer-continuity-qualification.md).
+
 After registry publication, a separate promotion verifier derives both OCI
 index digests from that verified manifest and checks exact Cosign signer
 identity, issuer, version, and transparency evidence under a reviewed policy.

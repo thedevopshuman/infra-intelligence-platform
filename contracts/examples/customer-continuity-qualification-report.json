@@ -1,0 +1,119 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerContinuityQualificationReport",
+  "metadata": {
+    "id": "ccq_e55268972d45c0dba84b41c8a9d70799",
+    "generatedAt": "2026-09-06T12:36:05.000Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualificationLevel": "customer-control-plane-pod-eviction-v1",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "requiredMigration": "0023_ai_model_suitability.sql",
+      "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "targetBindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "kubernetesContextBindingDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "namespaceBindingDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "deploymentBindingDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "evictedPodBindingDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "objective": {
+      "sampleCount": 721,
+      "intervalMilliseconds": 500,
+      "minimumWindowSeconds": 300,
+      "minimumBaselineSeconds": 60,
+      "minimumPostRecoverySeconds": 60,
+      "minimumAvailabilityBasisPoints": 9990,
+      "maximumP95LatencyMilliseconds": 2000,
+      "requestTimeoutMilliseconds": 2000,
+      "maximumRecoverySeconds": 120
+    },
+    "environment": {
+      "platform": "linux/arm64",
+      "pythonVersion": "3.14.3",
+      "kubernetesVersion": "v1.36.1",
+      "transport": "verified-https",
+      "caSource": "system",
+      "proxyMode": "disabled",
+      "redirectMode": "deny",
+      "evictionApi": "policy/v1"
+    },
+    "measurements": {
+      "startedAt": "2026-09-06T12:30:00.000Z",
+      "evictionStartedAt": "2026-09-06T12:31:00.000Z",
+      "recoveredAt": "2026-09-06T12:31:05.000Z",
+      "completedAt": "2026-09-06T12:36:05.000Z",
+      "scheduledWindowSeconds": 360,
+      "actualWindowSeconds": 365,
+      "baselineSeconds": 60,
+      "recoverySeconds": 5,
+      "postRecoverySeconds": 300,
+      "ingress": {
+        "reportId": "iaq_0123456789abcdef0123456789abcdef",
+        "reportDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "status": "qualified",
+        "sampleCount": 721,
+        "successfulSamples": 721,
+        "failedSamples": 0,
+        "availabilityBasisPoints": 10000,
+        "p95CycleLatencyMilliseconds": 42,
+        "failureCategories": {
+          "transport": 0,
+          "http-status": 0,
+          "contract": 0,
+          "identity": 0
+        }
+      },
+      "deployment": {
+        "desiredReplicas": 2,
+        "readyReplicasBefore": 2,
+        "readyReplicasAfter": 2,
+        "maxUnavailable": 0,
+        "pdbMinAvailable": 1,
+        "pdbDisruptionsAllowedBefore": 1,
+        "evictionAccepted": true,
+        "originalPodReplaced": true
+      }
+    },
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"},
+      {"id": "direct-no-redirect-probe", "status": "passed"},
+      {"id": "explicit-context", "status": "passed"},
+      {"id": "exact-release-identity", "status": "passed"},
+      {"id": "redundant-capacity", "status": "passed"},
+      {"id": "zero-unavailable-rollout", "status": "passed"},
+      {"id": "pdb-protected", "status": "passed"},
+      {"id": "sustained-probe-window", "status": "passed"},
+      {"id": "probe-eviction-overlap", "status": "passed"},
+      {"id": "eviction-admitted", "status": "passed"},
+      {"id": "replacement-observed", "status": "passed"},
+      {"id": "recovery-objective", "status": "passed"},
+      {"id": "ingress-probe-qualified", "status": "passed"},
+      {"id": "availability-objective", "status": "passed"},
+      {"id": "latency-objective", "status": "passed"}
+    ],
+    "limitations": [
+      "single-api-pod-eviction",
+      "single-cluster",
+      "read-only-synthetic-traffic",
+      "database-failure-not-qualified",
+      "worker-receiver-continuity-not-qualified",
+      "regional-slo-not-qualified"
+    ],
+    "summary": {
+      "totalChecks": 16,
+      "passedChecks": 16,
+      "failedChecks": 0,
+      "overallStatus": "qualified"
+    }
+  }
+}

@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-continuity-qualification-report:v1alpha1",
+  "title": "Customer Continuity Qualification Report",
+  "description": "Privacy-minimized evidence that sustained external control-plane probes met declared objectives while one redundant API pod was evicted through the Kubernetes Eviction API.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerContinuityQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^ccq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualificationLevel", "subject", "bindings", "objective", "environment", "measurements", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualificationLevel": {"const": "customer-control-plane-pod-eviction-v1"},
+        "subject": {"$ref": "#/$defs/subject"},
+        "bindings": {"$ref": "#/$defs/bindings"},
+        "objective": {"$ref": "#/$defs/objective"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "checks": {"$ref": "#/$defs/checks"},
+        "limitations": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "prefixItems": [
+            {"const": "single-api-pod-eviction"},
+            {"const": "single-cluster"},
+            {"const": "read-only-synthetic-traffic"},
+            {"const": "database-failure-not-qualified"},
+            {"const": "worker-receiver-continuity-not-qualified"},
+            {"const": "regional-slo-not-qualified"}
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 16},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 16},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 16},
+            "overallStatus": {"enum": ["qualified", "not-qualified"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "chartVersion", "contractsApiVersion", "requiredMigration", "sourceRevision", "imageDigest"],
+      "properties": {
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "chartVersion": {"$ref": "#/$defs/semver"},
+        "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+        "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targetBindingDigest", "kubernetesContextBindingDigest", "namespaceBindingDigest", "deploymentBindingDigest", "evictedPodBindingDigest"],
+      "properties": {
+        "targetBindingDigest": {"$ref": "#/$defs/digest"},
+        "kubernetesContextBindingDigest": {"$ref": "#/$defs/digest"},
+        "namespaceBindingDigest": {"$ref": "#/$defs/digest"},
+        "deploymentBindingDigest": {"$ref": "#/$defs/digest"},
+        "evictedPodBindingDigest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sampleCount", "intervalMilliseconds", "minimumWindowSeconds", "minimumBaselineSeconds", "minimumPostRecoverySeconds", "minimumAvailabilityBasisPoints", "maximumP95LatencyMilliseconds", "requestTimeoutMilliseconds", "maximumRecoverySeconds"],
+      "properties": {
+        "sampleCount": {"type": "integer", "minimum": 301, "maximum": 10000},
+        "intervalMilliseconds": {"type": "integer", "minimum": 30, "maximum": 10000},
+        "minimumWindowSeconds": {"type": "integer", "minimum": 300, "maximum": 3600},
+        "minimumBaselineSeconds": {"type": "integer", "minimum": 30, "maximum": 900},
+        "minimumPostRecoverySeconds": {"type": "integer", "minimum": 30, "maximum": 900},
+        "minimumAvailabilityBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "maximumP95LatencyMilliseconds": {"type": "integer", "minimum": 1, "maximum": 60000},
+        "requestTimeoutMilliseconds": {"type": "integer", "minimum": 100, "maximum": 30000},
+        "maximumRecoverySeconds": {"type": "integer", "minimum": 10, "maximum": 600}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "pythonVersion", "kubernetesVersion", "transport", "caSource", "proxyMode", "redirectMode", "evictionApi"],
+      "properties": {
+        "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-z0-9_.-]+$", "maxLength": 128},
+        "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "kubernetesVersion": {"type": "string", "pattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$", "maxLength": 64},
+        "transport": {"const": "verified-https"},
+        "caSource": {"enum": ["system", "custom"]},
+        "proxyMode": {"const": "disabled"},
+        "redirectMode": {"const": "deny"},
+        "evictionApi": {"const": "policy/v1"}
+      }
+    },
+    "failureCategories": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transport", "http-status", "contract", "identity"],
+      "properties": {
+        "transport": {"type": "integer", "minimum": 0, "maximum": 30000},
+        "http-status": {"type": "integer", "minimum": 0, "maximum": 30000},
+        "contract": {"type": "integer", "minimum": 0, "maximum": 30000},
+        "identity": {"type": "integer", "minimum": 0, "maximum": 10000}
+      }
+    },
+    "ingressEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reportId", "reportDigest", "status", "sampleCount", "successfulSamples", "failedSamples", "availabilityBasisPoints", "p95CycleLatencyMilliseconds", "failureCategories"],
+      "properties": {
+        "reportId": {"type": "string", "pattern": "^iaq_[a-f0-9]{32}$"},
+        "reportDigest": {"$ref": "#/$defs/digest"},
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "sampleCount": {"type": "integer", "minimum": 301, "maximum": 10000},
+        "successfulSamples": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "failedSamples": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "availabilityBasisPoints": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "p95CycleLatencyMilliseconds": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0, "maximum": 360000},
+            {"type": "null"}
+          ]
+        },
+        "failureCategories": {"$ref": "#/$defs/failureCategories"}
+      }
+    },
+    "deploymentMeasurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["desiredReplicas", "readyReplicasBefore", "readyReplicasAfter", "maxUnavailable", "pdbMinAvailable", "pdbDisruptionsAllowedBefore", "evictionAccepted", "originalPodReplaced"],
+      "properties": {
+        "desiredReplicas": {"type": "integer", "minimum": 2, "maximum": 100},
+        "readyReplicasBefore": {"type": "integer", "minimum": 2, "maximum": 100},
+        "readyReplicasAfter": {"type": "integer", "minimum": 2, "maximum": 100},
+        "maxUnavailable": {"const": 0},
+        "pdbMinAvailable": {"type": "integer", "minimum": 1, "maximum": 99},
+        "pdbDisruptionsAllowedBefore": {"type": "integer", "minimum": 1, "maximum": 99},
+        "evictionAccepted": {"const": true},
+        "originalPodReplaced": {"const": true}
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startedAt", "evictionStartedAt", "recoveredAt", "completedAt", "scheduledWindowSeconds", "actualWindowSeconds", "baselineSeconds", "recoverySeconds", "postRecoverySeconds", "ingress", "deployment"],
+      "properties": {
+        "startedAt": {"type": "string", "format": "date-time"},
+        "evictionStartedAt": {"type": "string", "format": "date-time"},
+        "recoveredAt": {"type": "string", "format": "date-time"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "scheduledWindowSeconds": {"type": "integer", "minimum": 300, "maximum": 100000},
+        "actualWindowSeconds": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "baselineSeconds": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "recoverySeconds": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "postRecoverySeconds": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "ingress": {"$ref": "#/$defs/ingressEvidence"},
+        "deployment": {"$ref": "#/$defs/deploymentMeasurement"}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 64},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-continuity\\.[a-z0-9.-]+$", "maxLength": 128}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 16,
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "direct-no-redirect-probe"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "explicit-context"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "exact-release-identity"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "redundant-capacity"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "zero-unavailable-rollout"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "pdb-protected"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "sustained-probe-window"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "probe-eviction-overlap"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "eviction-admitted"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "replacement-observed"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "recovery-objective"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ingress-probe-qualified"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "availability-objective"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "latency-objective"}}}
+      ],
+      "items": false
+    }
+  }
+}

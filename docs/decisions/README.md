@@ -126,3 +126,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0120](0120-aggregate-local-release-readiness-evidence.md) | Accepted | Aggregate exact local candidate evidence while keeping customer and public-promotion gates explicit |
 | [0121](0121-privacy-minimized-deployment-diagnostics.md) | Accepted | Summarize one exact Kubernetes release for support without collecting customer names, logs, or Secret values |
 | [0122](0122-one-command-local-release-qualification.md) | Accepted | Compose every repository-controlled local release gate behind one fail-closed command |
+| [0123](0123-customer-control-plane-continuity-qualification.md) | Accepted | Bind sustained external release probes to one explicit PDB-governed API pod Eviction |

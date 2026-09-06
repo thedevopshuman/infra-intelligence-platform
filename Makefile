@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-otlp-receiver test-ai-finops test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -27,6 +27,23 @@ IIP_INGRESS_MINIMUM_AVAILABILITY_BASIS_POINTS ?= 9990
 IIP_INGRESS_MAXIMUM_P95_LATENCY_MILLISECONDS ?= 2000
 IIP_INGRESS_REQUEST_TIMEOUT_MILLISECONDS ?= 2000
 IIP_INGRESS_INTERVAL_MILLISECONDS ?= 1000
+IIP_CONTINUITY_REPORT ?= dist/customer-continuity-qualification-report.json
+IIP_CONTINUITY_INGRESS_REPORT ?= dist/customer-continuity-ingress-report.json
+IIP_CONTINUITY_BASE_URL ?=
+IIP_CONTINUITY_TOKEN_FILE ?=
+IIP_CONTINUITY_IMAGE_DIGEST ?=
+IIP_CONTINUITY_CA_FILE ?=
+IIP_CONTINUITY_DEPLOYMENT ?= iip-infra-intelligence
+IIP_CONTINUITY_ALLOW_DISRUPTION ?= false
+IIP_CONTINUITY_SAMPLES ?= 721
+IIP_CONTINUITY_INTERVAL_MILLISECONDS ?= 500
+IIP_CONTINUITY_MINIMUM_WINDOW_SECONDS ?= 300
+IIP_CONTINUITY_MINIMUM_BASELINE_SECONDS ?= 60
+IIP_CONTINUITY_MINIMUM_POST_RECOVERY_SECONDS ?= 60
+IIP_CONTINUITY_MINIMUM_AVAILABILITY_BASIS_POINTS ?= 9990
+IIP_CONTINUITY_MAXIMUM_P95_LATENCY_MILLISECONDS ?= 2000
+IIP_CONTINUITY_REQUEST_TIMEOUT_MILLISECONDS ?= 2000
+IIP_CONTINUITY_MAXIMUM_RECOVERY_SECONDS ?= 120
 IIP_KUBERNETES_AVAILABILITY_REPORT ?= dist/kubernetes-availability-qualification-report.json
 IIP_GITHUB_CONTEXT_COMPATIBILITY_REPORT ?= dist/github-context-compatibility-report.json
 IIP_RELEASE_SIGNATURE_POLICY ?=
@@ -60,6 +77,9 @@ help:
 	@echo "test-ingress-availability Exercise the minimized external probe against real local routes"
 	@echo "qualify-ingress-availability Qualify one HTTPS customer ingress and exact release identity"
 	@echo "verify-ingress-availability-report Verify clean current ingress qualification evidence"
+	@echo "test-customer-continuity Validate the customer continuity contract and safe orchestrator"
+	@echo "qualify-customer-continuity Probe HTTPS while evicting one explicitly selected API pod"
+	@echo "verify-customer-continuity-report Verify exact customer continuity and ingress evidence"
 	@echo "test-kubernetes-availability Validate the planned-disruption report and harness"
 	@echo "qualify-kubernetes-availability Prove API/OTLP availability during an owned Kind worker drain"
 	@echo "verify-kubernetes-availability-report Verify clean current planned-disruption evidence"
@@ -254,6 +274,50 @@ qualify-ingress-availability:
 verify-ingress-availability-report:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/qualify_ingress_availability.py verify \
 		--report "$(IIP_INGRESS_QUALIFICATION_REPORT)" \
+		--require-clean --require-qualified
+
+test-customer-continuity:
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_customer_continuity_qualification \
+		tests.test_ingress_availability_qualification -v
+
+qualify-customer-continuity:
+	@test "$(IIP_CONTINUITY_ALLOW_DISRUPTION)" = true || \
+		(echo "IIP_CONTINUITY_ALLOW_DISRUPTION must equal true" >&2; exit 2)
+	@test -n "$(IIP_KUBERNETES_CONTEXT)" || \
+		(echo "IIP_KUBERNETES_CONTEXT is required" >&2; exit 2)
+	@test -n "$(IIP_CONTINUITY_BASE_URL)" || \
+		(echo "IIP_CONTINUITY_BASE_URL is required" >&2; exit 2)
+	@test -n "$(IIP_CONTINUITY_TOKEN_FILE)" || \
+		(echo "IIP_CONTINUITY_TOKEN_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CONTINUITY_IMAGE_DIGEST)" || \
+		(echo "IIP_CONTINUITY_IMAGE_DIGEST is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_continuity.py run \
+		--base-url "$(IIP_CONTINUITY_BASE_URL)" \
+		--token-file "$(IIP_CONTINUITY_TOKEN_FILE)" \
+		--image-digest "$(IIP_CONTINUITY_IMAGE_DIGEST)" \
+		--context "$(IIP_KUBERNETES_CONTEXT)" \
+		--namespace "$(IIP_DEPLOYMENT_NAMESPACE)" \
+		--deployment "$(IIP_CONTINUITY_DEPLOYMENT)" \
+		--ingress-report "$(IIP_CONTINUITY_INGRESS_REPORT)" \
+		--output "$(IIP_CONTINUITY_REPORT)" \
+		--kubectl "$(KUBECTL)" \
+		--samples "$(IIP_CONTINUITY_SAMPLES)" \
+		--interval-milliseconds "$(IIP_CONTINUITY_INTERVAL_MILLISECONDS)" \
+		--minimum-window-seconds "$(IIP_CONTINUITY_MINIMUM_WINDOW_SECONDS)" \
+		--minimum-baseline-seconds "$(IIP_CONTINUITY_MINIMUM_BASELINE_SECONDS)" \
+		--minimum-post-recovery-seconds "$(IIP_CONTINUITY_MINIMUM_POST_RECOVERY_SECONDS)" \
+		--minimum-availability-basis-points "$(IIP_CONTINUITY_MINIMUM_AVAILABILITY_BASIS_POINTS)" \
+		--maximum-p95-latency-milliseconds "$(IIP_CONTINUITY_MAXIMUM_P95_LATENCY_MILLISECONDS)" \
+		--request-timeout-milliseconds "$(IIP_CONTINUITY_REQUEST_TIMEOUT_MILLISECONDS)" \
+		--maximum-recovery-seconds "$(IIP_CONTINUITY_MAXIMUM_RECOVERY_SECONDS)" \
+		$(if $(IIP_CONTINUITY_CA_FILE),--ca-file "$(IIP_CONTINUITY_CA_FILE)",) \
+		--allow-disruption
+
+verify-customer-continuity-report:
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_continuity.py verify \
+		--report "$(IIP_CONTINUITY_REPORT)" \
+		--ingress-report "$(IIP_CONTINUITY_INGRESS_REPORT)" \
 		--require-clean --require-qualified
 
 test-kubernetes-availability:

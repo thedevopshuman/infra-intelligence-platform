@@ -95,6 +95,11 @@ Version 0.56 adds protected AI price-catalog qualification policy and minimized
 report envelopes. These types add no provider pricing client, promotion API, or
 access to negotiated rates.
 
+Version 0.59 adds `CustomerContinuityQualificationReport` for minimized
+external-probe and API-pod-Eviction evidence. It adds no client method,
+credential, or Kubernetes mutation authority; the separately enabled
+repository harness remains the only owner of the disruption workflow.
+
 Version 0.58 adds the protected `EvidenceRedactionPolicy` envelope and optional
 Evidence policy provenance. It adds no policy installation method, arbitrary
 detector expression, or ability to disable mandatory credential redaction.

@@ -561,6 +561,28 @@ class CustomerDeploymentPreflightReport:
 
 
 @dataclass(frozen=True)
+class CustomerContinuityQualificationReport:
+    """Minimized customer control-plane pod-Eviction continuity evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerContinuityQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerContinuityQualificationReport",
+                label="customer continuity qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class KubernetesAvailabilityQualificationReport:
     """Source-bound planned worker-drain availability evidence."""
 

@@ -14,6 +14,7 @@ from infra_intelligence_sdk import (
     ActionWorkflow,
     ActionWorkflowPage,
     ConsoleAuthenticationConfiguration,
+    CustomerContinuityQualificationReport,
     CustomerDeploymentPreflightReport,
     ContextEvidenceRequest,
     ContextEvidenceResult,
@@ -187,6 +188,9 @@ class PublicContractSdkTests(unittest.TestCase):
         )
         deployment_preflight = CustomerDeploymentPreflightReport.from_dict(
             example("customer-deployment-preflight-report.json")
+        )
+        customer_continuity = CustomerContinuityQualificationReport.from_dict(
+            example("customer-continuity-qualification-report.json")
         )
         kubernetes_availability = KubernetesAvailabilityQualificationReport.from_dict(
             example("kubernetes-availability-qualification-report.json")
@@ -449,6 +453,10 @@ class PublicContractSdkTests(unittest.TestCase):
         self.assertEqual(
             deployment_preflight.to_dict()["spec"]["status"],
             "configuration-ready",
+        )
+        self.assertEqual(
+            customer_continuity.to_dict()["spec"]["qualificationLevel"],
+            "customer-control-plane-pod-eviction-v1",
         )
         self.assertEqual(
             kubernetes_availability.to_dict()["spec"]["qualificationLevel"],

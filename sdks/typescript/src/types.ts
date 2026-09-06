@@ -1142,6 +1142,134 @@ export interface KubernetesAvailabilityQualificationReport {
   };
 }
 
+export type CustomerContinuityQualificationCheckId =
+  | "source-binding"
+  | "minimized-output"
+  | "direct-no-redirect-probe"
+  | "explicit-context"
+  | "exact-release-identity"
+  | "redundant-capacity"
+  | "zero-unavailable-rollout"
+  | "pdb-protected"
+  | "sustained-probe-window"
+  | "probe-eviction-overlap"
+  | "eviction-admitted"
+  | "replacement-observed"
+  | "recovery-objective"
+  | "ingress-probe-qualified"
+  | "availability-objective"
+  | "latency-objective";
+
+export interface CustomerContinuityQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerContinuityQualificationReport";
+  metadata: {
+    id: `ccq_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualificationLevel: "customer-control-plane-pod-eviction-v1";
+    subject: {
+      applicationVersion: string;
+      chartVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      requiredMigration: `${number}_${string}.sql`;
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      targetBindingDigest: Sha256Digest;
+      kubernetesContextBindingDigest: Sha256Digest;
+      namespaceBindingDigest: Sha256Digest;
+      deploymentBindingDigest: Sha256Digest;
+      evictedPodBindingDigest: Sha256Digest;
+    };
+    objective: {
+      sampleCount: number;
+      intervalMilliseconds: number;
+      minimumWindowSeconds: number;
+      minimumBaselineSeconds: number;
+      minimumPostRecoverySeconds: number;
+      minimumAvailabilityBasisPoints: number;
+      maximumP95LatencyMilliseconds: number;
+      requestTimeoutMilliseconds: number;
+      maximumRecoverySeconds: number;
+    };
+    environment: {
+      platform: `${string}/${string}`;
+      pythonVersion: string;
+      kubernetesVersion: string;
+      transport: "verified-https";
+      caSource: "system" | "custom";
+      proxyMode: "disabled";
+      redirectMode: "deny";
+      evictionApi: "policy/v1";
+    };
+    measurements: {
+      startedAt: string;
+      evictionStartedAt: string;
+      recoveredAt: string;
+      completedAt: string;
+      scheduledWindowSeconds: number;
+      actualWindowSeconds: number;
+      baselineSeconds: number;
+      recoverySeconds: number;
+      postRecoverySeconds: number;
+      ingress: {
+        reportId: `iaq_${string}`;
+        reportDigest: Sha256Digest;
+        status: "qualified" | "not-qualified";
+        sampleCount: number;
+        successfulSamples: number;
+        failedSamples: number;
+        availabilityBasisPoints: number;
+        p95CycleLatencyMilliseconds: number | null;
+        failureCategories: {
+          transport: number;
+          "http-status": number;
+          contract: number;
+          identity: number;
+        };
+      };
+      deployment: {
+        desiredReplicas: number;
+        readyReplicasBefore: number;
+        readyReplicasAfter: number;
+        maxUnavailable: 0;
+        pdbMinAvailable: number;
+        pdbDisruptionsAllowedBefore: number;
+        evictionAccepted: true;
+        originalPodReplaced: true;
+      };
+    };
+    checks: Array<
+      | { id: CustomerContinuityQualificationCheckId; status: "passed" }
+      | {
+          id: CustomerContinuityQualificationCheckId;
+          status: "failed";
+          errorCode: `customer-continuity.${string}`;
+        }
+    >;
+    limitations: [
+      "single-api-pod-eviction",
+      "single-cluster",
+      "read-only-synthetic-traffic",
+      "database-failure-not-qualified",
+      "worker-receiver-continuity-not-qualified",
+      "regional-slo-not-qualified",
+    ];
+    summary: {
+      totalChecks: 16;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export type ReleaseQualificationInstallCheckId =
   | "bundle-integrity"
   | "source-identity"

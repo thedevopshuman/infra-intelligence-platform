@@ -483,6 +483,8 @@ def generate_report(
     now: Callable[[], datetime] | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     sleeper: Callable[[float], None] = time.sleep,
+    started_callback: Callable[[datetime], None] | None = None,
+    stop_requested: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
     if profile not in PROFILES:
         _fail("ingress-qualification.profile.invalid")
@@ -537,11 +539,15 @@ def generate_report(
     opener = build_opener(ProxyHandler({}), _DenyRedirects(), HTTPSHandler(context=context))
     clock = now or (lambda: datetime.now(timezone.utc))
     started_at = clock()
+    if started_callback is not None:
+        started_callback(started_at)
     path_attempts: dict[str, list[_Attempt]] = {identifier: [] for identifier, _, _ in PATHS}
     cycle_success_latencies: list[int] = []
     failure_categories = {category: 0 for category in FAILURE_CATEGORIES}
     successful_samples = 0
     for sample_index in range(selected_samples):
+        if stop_requested is not None and stop_requested():
+            _fail("ingress-qualification.probe.cancelled")
         cycle_started = monotonic()
         cycle: list[_Attempt] = []
         for identifier, path, authenticated in PATHS:

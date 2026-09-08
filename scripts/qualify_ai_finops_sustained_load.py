@@ -135,6 +135,16 @@ PROHIBITED_RETAINED_KEYS = frozenset(
         "traceId",
     }
 )
+_PROHIBITED_LABEL_FRAGMENTS = (
+    "trace",
+    "span",
+    "request",
+    "prompt",
+    "response",
+    "content",
+    "credential",
+)
+_SAFE_SEMANTIC_LABEL_KEYS = frozenset({"gen_ai_response_model"})
 CONTENT_SENTINEL = "must-never-cross-sustained-load-boundary"
 
 
@@ -1033,25 +1043,28 @@ def _prohibited_labels_absent(endpoint: str) -> bool:
         endpoint,
         '{__name__=~"iip_ai_(usage|cost|allocation).*"}',
     )
-    prohibited = (
-        "trace",
-        "span",
-        "request",
-        "prompt",
-        "response",
-        "content",
-        "credential",
-    )
     for item in series:
         metric = item.get("metric")
-        if isinstance(metric, Mapping) and any(
-            fragment in str(candidate).lower()
-            for key, value in metric.items()
-            if key != "__name__"
-            for candidate in (key, value)
-            for fragment in prohibited
-        ):
-            return False
+        if not isinstance(metric, Mapping):
+            continue
+        for key, value in metric.items():
+            if key == "__name__":
+                continue
+            normalized_key = str(key).lower()
+            normalized_value = str(value).lower()
+            prohibited_key = (
+                normalized_key not in _SAFE_SEMANTIC_LABEL_KEYS
+                and any(
+                    fragment in normalized_key
+                    for fragment in _PROHIBITED_LABEL_FRAGMENTS
+                )
+            )
+            prohibited_value = any(
+                fragment in normalized_value
+                for fragment in _PROHIBITED_LABEL_FRAGMENTS
+            )
+            if prohibited_key or prohibited_value:
+                return False
     return True
 
 

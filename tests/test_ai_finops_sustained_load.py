@@ -744,7 +744,15 @@ class AiFinopsSustainedLoadTests(unittest.TestCase):
         )
 
     def test_privacy_label_scan_ignores_metric_name_but_scans_keys_and_values(self) -> None:
-        safe = [{"metric": {"__name__": "iip_ai_allocation_requests", "team": "ops"}}]
+        safe = [
+            {
+                "metric": {
+                    "__name__": "iip_ai_allocation_requests",
+                    "team": "ops",
+                    "gen_ai_response_model": "example.foundation-model-v1:0",
+                }
+            }
+        ]
         with patch.object(qualification, "_prometheus_query", return_value=safe):
             self.assertTrue(qualification._prohibited_labels_absent("http://127.0.0.1:1"))
         prohibited_key = [{"metric": {"__name__": "iip_ai_cost_requests", "trace_id": "x"}}]
@@ -755,6 +763,34 @@ class AiFinopsSustainedLoadTests(unittest.TestCase):
         prohibited_value = [{"metric": {"__name__": "iip_ai_cost_requests", "team": "prompt-lab"}}]
         with patch.object(
             qualification, "_prometheus_query", return_value=prohibited_value
+        ):
+            self.assertFalse(qualification._prohibited_labels_absent("http://127.0.0.1:1"))
+        prohibited_semantic_value = [
+            {
+                "metric": {
+                    "__name__": "iip_ai_cost_requests",
+                    "gen_ai_response_model": "response-body",
+                }
+            }
+        ]
+        with patch.object(
+            qualification,
+            "_prometheus_query",
+            return_value=prohibited_semantic_value,
+        ):
+            self.assertFalse(qualification._prohibited_labels_absent("http://127.0.0.1:1"))
+        prohibited_semantic_near_miss = [
+            {
+                "metric": {
+                    "__name__": "iip_ai_cost_requests",
+                    "gen_ai_response_body": "opaque",
+                }
+            }
+        ]
+        with patch.object(
+            qualification,
+            "_prometheus_query",
+            return_value=prohibited_semantic_near_miss,
         ):
             self.assertFalse(qualification._prohibited_labels_absent("http://127.0.0.1:1"))
 

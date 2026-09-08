@@ -222,6 +222,14 @@ deadline, or detects concurrent local cohort contamination produces valid
 excessive workload, a hard representational-ceiling breach, or a generator
 failure stops without creating promotable evidence.
 
+`metadata-only-boundaries` rejects prohibited trace, span, request, prompt,
+response, content, and credential fragments in every selected AI metric label
+value and in label keys. The standardized OpenTelemetry
+`gen_ai_response_model` key is the sole key-name exception because it names a
+model metadata dimension rather than response content; its value remains
+subject to the same prohibited-fragment scan. Metric names are excluded from
+the key scan because aggregate instruments such as `*_requests` are expected.
+
 The report ID is `afslq_` plus the first 32 lowercase hexadecimal characters
 of SHA-256 over canonical JSON containing report `metadata` without `id` and
 the complete `spec`. Offline verification recomputes both content identities,

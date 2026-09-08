@@ -269,6 +269,14 @@ class AiFinopsSustainedLoadTests(unittest.TestCase):
         self.assertIn("collector-acceptance", failed)
         self.assertIn("usage-ledger-persistence", failed)
 
+        diagnostic = qualification._failure_diagnostic(report)
+        self.assertEqual(diagnostic["summary"], report["spec"]["summary"])
+        self.assertEqual(
+            set(diagnostic["failedChecks"]),
+            failed,
+        )
+        self.assertFalse(qualification._has_forbidden_key(diagnostic))
+
     def test_absent_workload_backlog_sampling_is_valid_not_qualified_evidence(self) -> None:
         report = build(raw=raw_result(backlog_sample_count=0))
         qualification.validate_report_document(report)

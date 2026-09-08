@@ -1481,6 +1481,29 @@ def _check(identifier: str, passed: bool, error_code: str) -> dict[str, str]:
     return {"id": identifier, "status": "failed", "errorCode": error_code}
 
 
+def _failure_diagnostic(report: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Return bounded, contract-minimized detail for a non-qualified run."""
+
+    spec = _mapping(
+        report.get("spec"), "ai-finops-sustained-load.report.invalid"
+    )
+    checks = spec.get("checks")
+    if not isinstance(checks, list):
+        _fail("ai-finops-sustained-load.report.invalid")
+    diagnostic = {
+        "failedChecks": [
+            item.get("id")
+            for item in checks
+            if isinstance(item, Mapping) and item.get("status") == "failed"
+        ],
+        "summary": spec.get("summary"),
+        "measurements": spec.get("measurements"),
+    }
+    if _has_forbidden_key(diagnostic):
+        _fail("ai-finops-sustained-load.output.not-minimized")
+    return diagnostic
+
+
 def _profile_document_from_report(spec: Mapping[str, Any]) -> dict[str, Any]:
     bindings = _mapping(spec.get("bindings"), "ai-finops-sustained-load.report.invalid")
     return {
@@ -2403,6 +2426,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"AI FinOps sustained load {report['spec']['status']}: "
                 f"{arguments.report}"
             )
+            if report["spec"]["status"] != "qualified":
+                print(
+                    "AI FinOps sustained-load diagnostic: "
+                    + json.dumps(
+                        _failure_diagnostic(report),
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    file=sys.stderr,
+                )
             return 0 if report["spec"]["status"] == "qualified" else 1
         verify_report(
             profile_path=arguments.profile,

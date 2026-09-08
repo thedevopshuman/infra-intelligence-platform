@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-finops-sustained-load-profile:v1alpha1",
+  "title": "AI FinOps Sustained Load Profile",
+  "description": "Content-addressed local selection for a bounded fixed-rate synthetic AI economics workload through the disposable Docker topology.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.dev/v1alpha1"},
+    "kind": {"const": "AiFinopsSustainedLoadProfile"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^afslp_[a-f0-9]{32}$"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["qualificationLevel", "providers", "distribution", "workload", "objectives"],
+      "properties": {
+        "qualificationLevel": {"const": "local-ai-finops-sustained-load-v1"},
+        "providers": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {"const": "aws.bedrock"},
+            {"const": "openai"}
+          ],
+          "items": false
+        },
+        "distribution": {"const": "round-robin-equal"},
+        "workload": {"$ref": "#/$defs/workload"},
+        "objectives": {"$ref": "#/$defs/objectives"}
+      }
+    }
+  },
+  "$defs": {
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "durationSeconds",
+        "spansPerSecond",
+        "producerConcurrency",
+        "replayBasisPoints",
+        "requestTimeoutMilliseconds",
+        "maximumSchedulerLagMilliseconds",
+        "maximumPipelineDrainMilliseconds"
+      ],
+      "properties": {
+        "durationSeconds": {"type": "integer", "minimum": 300, "maximum": 1800},
+        "spansPerSecond": {"type": "integer", "minimum": 1, "maximum": 40},
+        "producerConcurrency": {"type": "integer", "minimum": 1, "maximum": 32},
+        "replayBasisPoints": {"type": "integer", "minimum": 100, "maximum": 1000},
+        "requestTimeoutMilliseconds": {"type": "integer", "minimum": 100, "maximum": 30000},
+        "maximumSchedulerLagMilliseconds": {"type": "integer", "minimum": 10, "maximum": 5000},
+        "maximumPipelineDrainMilliseconds": {"type": "integer", "minimum": 1000, "maximum": 300000}
+      }
+    },
+    "objectives": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximumSchedulerMissBasisPoints",
+        "minimumCollectorAcceptanceBasisPoints",
+        "minimumUsagePersistenceBasisPoints",
+        "minimumAttributionCompletionBasisPoints",
+        "minimumCostCompletionBasisPoints",
+        "minimumPricedCoverageBasisPoints",
+        "maximumExportP95Milliseconds",
+        "maximumAttributionP95Milliseconds",
+        "maximumCostP95Milliseconds"
+      ],
+      "properties": {
+        "maximumSchedulerMissBasisPoints": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "minimumCollectorAcceptanceBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "minimumUsagePersistenceBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "minimumAttributionCompletionBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "minimumCostCompletionBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "minimumPricedCoverageBasisPoints": {"type": "integer", "minimum": 9000, "maximum": 10000},
+        "maximumExportP95Milliseconds": {"type": "integer", "minimum": 1, "maximum": 60000},
+        "maximumAttributionP95Milliseconds": {"type": "integer", "minimum": 1, "maximum": 300000},
+        "maximumCostP95Milliseconds": {"type": "integer", "minimum": 1, "maximum": 300000}
+      }
+    }
+  }
+}

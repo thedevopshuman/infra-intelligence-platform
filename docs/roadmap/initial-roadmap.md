@@ -116,6 +116,22 @@ dirty or pre-existing candidates. It does not collapse the eight external
 customer, organizational, provider, pilot, or governance gates into a local
 claim.
 
+A separate source-bound AI FinOps sustained-load gate now exercises the full
+single-host Docker path under a bounded fixed-rate synthetic provider mix. It
+measures scheduler misses, Collector acceptance, durable usage persistence,
+asynchronous attribution and cost completion, direct commit-bound usage-ledger
+replay idempotency, stage latencies, pipeline drain, cohort-isolated Prometheus
+convergence, and Grafana availability without retaining sensitive or
+high-cardinality values. Its exact fixture policy/catalog and attribution/cost
+engine generations scope the database measurements, while the runner inspects
+both running image identities. Its 9,984-span maximum leaves the wrapper's
+15-record seed below the allocation exporter's 10,000-record ceiling. This is a
+local regression profile, not
+customer workload, provider, billing, failure, backend
+lifecycle, long-window SLO, or HA evidence. It is intentionally not the
+twentieth release-readiness input: cross-architecture calibration and an
+explicit v2 readiness migration remain before that promotion.
+
 Post-install first response now has a separate privacy-minimized
 `DeploymentDiagnosticReport`. An operator selects an exact context, namespace,
 release, and immutable image digest; the read-only tool retains only aggregate
@@ -194,6 +210,18 @@ Deliverables:
 Exit gate: releases have comparable scorecards, and failures can be explained from platform telemetry.
 
 Reference slice delivered: deterministic weighted scorer, hard gates, budget checks, red-herring resistance, adversarial instruction-boundary scoring with live context/log containment tests and a shared multilingual, multi-technique adversarial corpus, repeated-run harness, durable tenant-scoped background dispatch with heartbeats and crash takeover, bounded process-local parallelism, rotated tenant polling, a deployment-wide same-tenant live-lease cap, a durable per-tenant outstanding-job admission ceiling, concurrent PostgreSQL verification of both limits, and a source-bound executable PostgreSQL profile covering 128-tenant admission, overload isolation, idempotency at capacity, first-pass claims, and terminal capacity release, durable pre-tool investigation leases, cooperative cancellation and conservative stale-execution recovery, auditable risk-aware cross-signal budget planning with protected tenant-catalog generation and one bounded provider-gap promotion, dependency-aware PostgreSQL/schema readiness, automatic exact-source freshness sampling, optional OTLP/HTTP exporters for bounded ingestion-freshness and query/receiver availability metrics plus terminal investigation traces, privileged process-local plus shared-store API/worker/receiver exporter-delivery health with failure recovery and staleness detection, rolling sampled per-signal export-attempt SLOs, a two-window sampled export-attempt burn-rate report, a customer-Collector-observed sending-queue depth and send-loss objective sourced from the Collector's own self-metrics, an authenticated console/API/SDK runtime version report tied to release revision and Helm image identity, normalized historical metric/log evidence boundaries, Docker-verified Prometheus, Loki, and OpenSearch query adapters, isolated tenant-bound OTLP metrics/logs evidence receivers with CA-verified SPIFFE mTLS, PostgreSQL-before-success semantics, a validated persistent Collector queue profile, and executable compatibility evidence, deterministic investigation metric/log selection, closed unit-aware threshold and log-count assessment, ordered explicit and scope-end rolling two-window plus fixed-period or calendar-day-aligned seasonal difference/ratio assessment, deterministic Kubernetes Event condition correlation, a real-cluster verified read-only Kubernetes API adapter, and a protected customer-environment gate for a bounded sustained mix of exact-release API reads, durable OTLP metrics, and asynchronous investigations. The OTLP/Collector portability direction is accepted in ADR 0012, the first outbound metric adapter in ADR 0013, the backend-neutral metric query in ADR 0014, the Prometheus translation boundary in ADR 0015, the metrics receiver boundary in ADR 0016, the investigation selection/assessment boundaries in ADRs 0017–0019, ADR 0032, ADR 0034, ADR 0054, ADR 0075, and ADR 0076, the Kubernetes Event boundaries in ADRs 0020–0021, the log query/OTLP intake boundary in ADR 0023, the log investigation boundary in ADR 0024, the Loki adapter boundary in ADR 0025, the OpenSearch adapter boundary in ADR 0084, lifecycle durability in ADR 0030, investigation trace export in ADR 0031, adversarial release gating in ADR 0033, dispatch in ADR 0039, tenant-fair admission in ADR 0060, bounded backlog admission in ADR 0061, local capacity evidence in ADR 0074, receiver isolation in ADR 0041, readiness in ADR 0042, freshness sampling in ADR 0043, exporter health and SLO measurement in ADRs 0052, 0072, and 0073, runtime identity in ADR 0053, receiver workload identity/buffering in ADR 0080, receiver availability in ADR 0081, multi-window burn-rate calculation in ADR 0082, calendar-aware seasonal baseline alignment in ADR 0083, the OpenSearch log backend in ADR 0084, expired-client-certificate rejection evidence in ADR 0085, the multilingual/technique-diverse adversarial instruction corpus in ADR 0086, the Collector-observed queue/loss objective in ADR 0087, CRL-based revoked-client-certificate rejection evidence in ADR 0088, fail-closed CRL validity-window enforcement in ADR 0089, intermediate-chain plus CRL-rollout evidence in ADR 0090, sustained customer core-workload qualification in ADR 0144, and customer-approved planned-failure overlap qualification in ADR 0146. Remaining: learned baselines, further production backends/signals, further customer PKI and Collector interoperability (OCSP, customer-specific chain and rotation cadence, CRL distribution qualification), regional aggregation of the Collector queue/loss objective, representative production-traffic and involuntary/automatic failover certification, further design-partner-sourced multilingual/indirect-injection corpora and paraphrase/obfuscation coverage, expanded privacy controls, and measured release SLOs.
+
+AI economics qualification update: ADR 0153 adds an explicitly invoked local
+fixed-rate synthetic workload over the complete Docker
+Collector-to-ledger-to-cost-to-dashboard path. The source-bound report makes
+scheduler, persistence, asynchronous completion, latency, drain, usage-ledger
+replay, and isolated aggregate convergence regressions comparable without
+claiming customer capacity. Replay is paced through the direct commit-bound
+receiver only after exact original durability, and database joins require the
+exact fixture policy/catalog and engine generations. Its 9,984-span maximum
+preserves the rolling allocation exporter's 10,000-record ceiling after the
+wrapper seeds the 15-record functional fixture. Cross-architecture calibration
+and a future versioned release-readiness promotion remain open.
 
 Privacy update: ADR 0115 delivers the first expanded privacy control through
 content-addressed exact-tenant policy rules for bounded email and validated-IPv4

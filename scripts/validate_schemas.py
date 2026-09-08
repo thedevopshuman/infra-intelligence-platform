@@ -288,6 +288,12 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "ai-finops-runtime-compatibility-report.schema.json": (
         "ai-finops-runtime-compatibility-report.json",
     ),
+    "ai-finops-sustained-load-profile.schema.json": (
+        "ai-finops-sustained-load-profile.json",
+    ),
+    "ai-finops-sustained-load-qualification-report.schema.json": (
+        "ai-finops-sustained-load-qualification-report.json",
+    ),
     "ai-savings-finding.schema.json": (
         "ai-savings-finding.json",
         "ai-retry-savings-finding.json",

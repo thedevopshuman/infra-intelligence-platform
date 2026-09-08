@@ -53,6 +53,25 @@ make test-release-readiness PYTHON=.venv/bin/python
 make release-bundle PYTHON=.venv/bin/python
 ```
 
+The standalone sustained AI FinOps load profile is intentionally not in that
+list of release inputs. Operators and CI environments can exercise and retain
+it separately with:
+
+```bash
+make test-ai-finops-sustained-load PYTHON=.venv/bin/python
+make verify-ai-finops-sustained-load-report PYTHON=.venv/bin/python
+```
+
+It proves one bounded fixed-rate synthetic workload through a single local
+Docker host, including paced commit-bound replay, exact fixture/engine-scoped
+database measurements, inspected running image identities, and exclusion of
+concurrent durable local usage from Prometheus convergence. The current
+19-input `ReleaseReadinessReport` remains unchanged; the sustained report
+cannot satisfy or extend it. Promotion to a mandatory input requires
+calibration on supported `linux/amd64` and `linux/arm64` environments plus a
+future versioned readiness contract. See the
+[standalone qualification runbook](ai-finops-sustained-load-qualification.md).
+
 The one-command workflow also runs the plugin compatibility and three-node
 Kubernetes planned-disruption gate required by the aggregate. Its v2 profile
 proves API access, durable non-empty receiver intake, and worker completion in
@@ -70,6 +89,11 @@ reports against the clean checkout with `make verify-backup-restore-report` and
 embedded in the portable bundle because their PostgreSQL, host,
 container-runtime, PKI fixture, Collector, and database-topology measurements describe the
 certification environment, not every installation target.
+If the standalone AI FinOps sustained-load profile is run, retain its report
+beside these artifacts while preserving its
+`single-host-docker-synthetic-ai-economics-load` boundary. It is regression
+evidence only, not release-readiness, customer traffic, provider, billing,
+failure, backend-lifecycle, long-window SLO, or HA evidence.
 The external-secret profile emits no report or secret material; retain its
 terminal pass/fail result in the release workflow log. It proves the local
 Kubernetes provider handoff, not the selected customer secret backend.

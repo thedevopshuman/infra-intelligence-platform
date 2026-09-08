@@ -30,6 +30,28 @@ attribution workers, bounded OTLP aggregates, Prometheus, and Grafana together.
 It remains fixture-based local evidence; live providers, customer telemetry,
 and approved pricing stay external gates.
 
+A separate `local-ai-finops-sustained-load-v1` gate now applies a bounded
+fixed-rate schedule to both synthetic provider shapes and measures Collector
+acceptance, durable usage, asynchronous attribution and cost completion,
+commit-bound usage-ledger replay idempotency, stage latency, pipeline drain,
+cohort-isolated Prometheus convergence, and the Grafana dashboard. Replay is
+paced, deadline-bounded, and sent directly to the isolated receiver only after
+exact original durability; the original load always crosses the Collector. Its
+9,984-span semantic ceiling leaves room for the wrapper's 15-record functional
+seed below the allocation exporter's 10,000-row limit. The minimized report
+binds the exact local fixture policy/catalog and attribution/cost engine
+generations plus inspected running image identities. It is exact-source local
+regression evidence only; traffic-free verification independently compares its
+reported application-image identity only when given a trusted expected digest.
+Customer-representative AI traffic, live providers, customer
+Collector/PKI/network behavior, private prices and invoices, bursts and
+failures, backend lifecycle, long-window SLOs, and node/zone/region HA remain
+unqualified. The gate is explicitly invoked and remains outside `make verify`,
+`make qualify-local-release`, and the 19-input `ReleaseReadinessReport`
+`v1alpha1` policy until supported `amd64` and `arm64` environments are
+calibrated. See the
+[sustained-load qualification runbook](docs/operations/ai-finops-sustained-load-qualification.md).
+
 A separate owned three-node Kind gate now turns those availability declarations
 into live evidence. It spreads two replicas of the API, worker, and receiver
 across two workers, commits one real OTLP metric, continuously probes exact
@@ -374,6 +396,7 @@ streaming/private-endpoint behavior and invoice qualification remain. See the
 [AWS Bedrock public-price import](docs/operations/aws-bedrock-price-catalog-import.md),
 [savings-engine runbook](docs/operations/ai-savings-engine.md),
 [local AI FinOps dashboard](docs/operations/ai-finops-local-demo.md),
+[local AI FinOps sustained-load qualification](docs/operations/ai-finops-sustained-load-qualification.md),
 [Bedrock instrumentation qualification](docs/operations/bedrock-instrumentation-qualification.md),
 [customer Bedrock qualification](docs/operations/customer-bedrock-qualification.md),
 [customer AI FinOps prerequisites](docs/operations/customer-ai-finops-prerequisites.md),
@@ -429,6 +452,8 @@ make test-customer-failure-overlap
 make test-otel
 make test-otlp-receiver
 make test-ai-finops
+make test-ai-finops-sustained-load PYTHON=.venv/bin/python
+make verify-ai-finops-sustained-load-report PYTHON=.venv/bin/python
 make test-aws-bedrock-price-import
 make test-bedrock-instrumentation
 make test-openai-instrumentation

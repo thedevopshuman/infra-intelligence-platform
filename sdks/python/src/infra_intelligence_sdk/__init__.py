@@ -16,6 +16,8 @@ from .models import (
     AiAttributionPolicy,
     AiCostRecord,
     AiFinopsRuntimeCompatibilityReport,
+    AiFinopsSustainedLoadProfile,
+    AiFinopsSustainedLoadQualificationReport,
     AiModelSuitabilityReport,
     AiPriceCatalog,
     AiPriceCatalogImportReport,
@@ -158,6 +160,8 @@ __all__ = [
     "AiAttributionPolicy",
     "AiCostRecord",
     "AiFinopsRuntimeCompatibilityReport",
+    "AiFinopsSustainedLoadProfile",
+    "AiFinopsSustainedLoadQualificationReport",
     "AiModelSuitabilityReport",
     "AiPriceCatalog",
     "AiPriceCatalogImportReport",
@@ -291,4 +295,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.82.0"
+__version__ = "0.83.0"

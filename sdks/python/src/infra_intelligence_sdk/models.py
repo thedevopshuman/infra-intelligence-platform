@@ -555,6 +555,72 @@ class AiFinopsRuntimeCompatibilityReport:
 
 
 @dataclass(frozen=True)
+class AiFinopsSustainedLoadProfile:
+    """Closed local selection for one bounded AI economics load run."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "AiFinopsSustainedLoadProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiFinopsSustainedLoadProfile",
+                label="AI FinOps sustained load profile",
+                api_version="iip.dev/v1alpha1",
+            )
+        )
+
+    @property
+    def workload(self) -> Mapping[str, Any]:
+        spec = self.payload.get("spec")
+        value = spec.get("workload") if isinstance(spec, Mapping) else None
+        return value if isinstance(value, Mapping) else {}
+
+    @property
+    def objectives(self) -> Mapping[str, Any]:
+        spec = self.payload.get("spec")
+        value = spec.get("objectives") if isinstance(spec, Mapping) else None
+        return value if isinstance(value, Mapping) else {}
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class AiFinopsSustainedLoadQualificationReport:
+    """Source- and generation-bound aggregate local AI economics load evidence."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "AiFinopsSustainedLoadQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="AiFinopsSustainedLoadQualificationReport",
+                label="AI FinOps sustained load qualification report",
+                api_version="iip.dev/v1alpha1",
+            )
+        )
+
+    @property
+    def status(self) -> Optional[str]:
+        spec = self.payload.get("spec")
+        value = spec.get("status") if isinstance(spec, Mapping) else None
+        return value if isinstance(value, str) else None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class DeploymentDiagnosticReport:
     """Privacy-minimized point-in-time Kubernetes support evidence."""
 

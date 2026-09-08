@@ -1,5 +1,13 @@
 # Python SDK boundary
 
+Version 0.83 adds offline `AiFinopsSustainedLoadProfile` and
+`AiFinopsSustainedLoadQualificationReport` envelopes. They describe one
+bounded local Docker regression workload and its aggregate pipeline evidence;
+the report binds exact fixture policy/catalog and attribution/cost engine
+generations, commit-bound replay accounting, inspected image identities, and
+cohort-isolation status. The SDK adds no traffic generator, OTLP exporter,
+provider integration, or capacity/promotion authority.
+
 Version 0.82 upgrades the offline customer pilot readiness envelopes to
 `iip.platform/v1alpha2` and `customer-ai-finops-design-partner-v2`. A candidate now requires a tenth,
 source-bound `CustomerOperationalAlertQualificationReport`, its protected
@@ -82,6 +90,8 @@ host-created failures for plugin handling; it is not a control-plane HTTP client
 `AiSavingsFindingPage`, `AiAllocationReport`,
 `AiEconomicsInvocationObservationRequest`,
 `AiEconomicsInvocationObservation`,
+`AiFinopsSustainedLoadProfile`,
+`AiFinopsSustainedLoadQualificationReport`,
 `CustomerAiFinopsPrerequisiteProfile`, and
 `CustomerAiFinopsPrerequisiteReport`,
 `CustomerAiFinopsFlowQualificationProfile`,

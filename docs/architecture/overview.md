@@ -291,6 +291,26 @@ dashboard path. Local release readiness requires that report while retaining
 live provider, customer telemetry, approved price, invoice, and production
 availability as separate qualification boundaries.
 
+[ADR 0153](../decisions/0153-source-bound-sustained-ai-finops-load-qualification.md)
+adds a second, explicitly invoked local Docker profile for sustained synthetic
+AI economics throughput. A bounded fixed-rate scheduler sends equal
+Bedrock- and OpenAI-shaped metadata-only spans through the same Collector and
+durable pipeline, measures acceptance, ledger persistence, asynchronous
+attribution/cost completion and latency, bounded drain, aggregate convergence,
+and dashboard availability, and emits only source-bound aggregate evidence.
+After exact original durability, a paced replay uses the receiver's direct
+commit-bound channel rather than treating an asynchronous Collector response as
+idempotency evidence. Exact fixture policy/catalog and attribution/cost engine
+generations scope the database joins, while a run-prefix exclusion check keeps
+unrelated durable local traffic from compensating the Prometheus delta. Running
+application and Collector image identities are inspected rather than inferred
+from tags.
+
+The generator remains an operational harness rather than a serving use case,
+SDK method, agent tool, or plugin capability. This first single-host profile is
+not part of release readiness while its thresholds are calibrated across the
+supported release architectures.
+
 The customer AI FinOps prerequisite gate keeps those boundaries separate while
 making their relationship verifiable. One protected profile selects the exact
 release, environment, streaming Bedrock path, production catalog, and

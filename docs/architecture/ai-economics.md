@@ -263,8 +263,39 @@ and checks prove the Collector-to-receiver-to-ledger-to-cost-to-Grafana chain
 without retaining model, service, tenant, invocation, token, rate, amount,
 endpoint, or credential values. The local release-readiness aggregate consumes
 this report as a `local-runtime` input while keeping customer Collector/PKI,
-live provider, approved pricing, invoice, sustained-load, regional, and
+live provider, approved pricing, invoice, customer sustained-load, regional, and
 backend-lifecycle claims external.
+
+The separate `local-ai-finops-sustained-load-v1` operational profile extends
+that fixture boundary with a five-to-thirty-minute bounded fixed-rate schedule.
+It distributes synthetic metadata-only spans equally across both provider
+shapes, counts late scheduler slots instead of replaying catch-up bursts, and
+measures Collector acceptance, usage persistence, asynchronous attribution and
+cost completion, commit-bound usage-ledger replay idempotency, stage latencies,
+pipeline drain, and cohort-isolated Prometheus/Grafana convergence. Replay is
+paced at the original total rate, shares the drain deadline, and goes directly
+to the isolated receiver only after exact original durability so success means
+the PostgreSQL transaction committed rather than merely entering a Collector
+pipeline. Its content-addressed profile and minimized
+`AiFinopsSustainedLoadQualificationReport` bind the exact source, inspected
+running application and Collector image identities, attribution engine `0.1.0`,
+cost engine `0.2.0`, fixed local fixture policy/catalog generations, Docker
+runtime, and PostgreSQL migration. Traffic-free verification independently
+compares the application image only when the operator supplies a trusted
+expected digest. No provider account, tenant, model, invocation, trace, token,
+policy/catalog source hash, price, amount, endpoint, credential, or content
+value is retained. The 9,984-span semantic maximum leaves the wrapper's
+15-record functional seed below the rolling allocation exporter's fail-closed
+10,000-record source ceiling.
+
+This profile establishes a reproducible local regression boundary, not a
+capacity promise. It does not qualify customer workload representativeness,
+live provider traffic, customer Collector/PKI/network behavior, private price
+or invoice agreement, bursts, injected failures, backend lifecycle, long-window
+SLOs, or node/zone/region HA. It remains outside the closed
+`ReleaseReadinessReport` v1 and the one-command local release workflow pending
+`linux/amd64` and `linux/arm64` calibration. Making it mandatory later requires
+an explicit v2 readiness contract and migration.
 
 A separate customer prerequisite aggregate then binds that exact runtime and
 release evidence to one qualified customer deployment, its exact customer OTLP

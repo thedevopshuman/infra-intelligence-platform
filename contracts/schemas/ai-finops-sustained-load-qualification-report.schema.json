@@ -1,0 +1,376 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-finops-sustained-load-qualification-report:v1alpha1",
+  "title": "AI FinOps Sustained Load Qualification Report",
+  "description": "Source-bound aggregate evidence for one bounded fixed-rate synthetic AI economics workload through the local Docker reference topology.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.dev/v1alpha1"},
+    "kind": {"const": "AiFinopsSustainedLoadQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^afslq_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "sourceDirty": {"type": "boolean"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "qualificationLevel",
+        "qualificationBoundary",
+        "subject",
+        "bindings",
+        "workload",
+        "objectives",
+        "environment",
+        "measurements",
+        "checks",
+        "limitations",
+        "summary"
+      ],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualificationLevel": {"const": "local-ai-finops-sustained-load-v1"},
+        "qualificationBoundary": {"const": "single-host-docker-synthetic-ai-economics-load"},
+        "subject": {"$ref": "#/$defs/subject"},
+        "bindings": {"$ref": "#/$defs/bindings"},
+        "workload": {"$ref": "urn:iip:contracts:ai-finops-sustained-load-profile:v1alpha1#/$defs/workload"},
+        "objectives": {"$ref": "urn:iip:contracts:ai-finops-sustained-load-profile:v1alpha1#/$defs/objectives"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "checks": {"$ref": "#/$defs/checks"},
+        "limitations": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "prefixItems": [
+            {"const": "synthetic-provider-spans"},
+            {"const": "test-fixture-pricing"},
+            {"const": "single-tenant-single-host-docker-runtime"},
+            {"const": "customer-collector-pki-and-network-not-qualified"},
+            {"const": "live-provider-private-prices-and-invoice-not-qualified"},
+            {"const": "burst-failure-regional-ha-and-long-window-slo-not-qualified"},
+            {"const": "customer-workload-representativeness-not-approved"}
+          ],
+          "items": false
+        },
+        "summary": {"$ref": "#/$defs/summary"}
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "counter": {"type": "integer", "minimum": 0, "maximum": 10000},
+    "basisPoints": {"type": "integer", "minimum": 0, "maximum": 10000},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "attributionEngineVersion", "costEngineVersion", "sourceRevision", "imageDigest"],
+      "properties": {
+        "applicationVersion": {"$ref": "#/$defs/semver"},
+        "attributionEngineVersion": {"const": "0.1.0", "description": "Exact attribution engine generation required by the fixed local cohort."},
+        "costEngineVersion": {"const": "0.2.0", "description": "Exact cost engine generation required by the fixed local cohort."},
+        "sourceRevision": {"$ref": "#/$defs/revision"},
+        "imageDigest": {"$ref": "#/$defs/digest", "description": "Image ID inspected from the running application container."}
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileId",
+        "profileDigest",
+        "attributionPolicyId",
+        "attributionPolicyVersion",
+        "priceCatalogId",
+        "priceCatalogVersion"
+      ],
+      "properties": {
+        "profileId": {"type": "string", "pattern": "^afslp_[a-f0-9]{32}$"},
+        "profileDigest": {"$ref": "#/$defs/digest"},
+        "attributionPolicyId": {"const": "aap_22222222222222222222222222222222"},
+        "attributionPolicyVersion": {"const": "2026-09-05.1"},
+        "priceCatalogId": {"const": "apc_11111111111111111111111111111111"},
+        "priceCatalogVersion": {"const": "2026-09-05.1"}
+      }
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine", "version", "migration"],
+      "properties": {
+        "engine": {"const": "postgresql"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64},
+        "migration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$", "maxLength": 128}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "pythonVersion",
+        "containerRuntime",
+        "containerRuntimeVersion",
+        "collectorImageDigest",
+        "composeConfigurationValid",
+        "allComponentsHealthy",
+        "collectionTransport",
+        "collectorAcceptanceBoundary",
+        "receiverDeliveryBoundary",
+        "database",
+        "telemetryBackend",
+        "dashboard",
+        "pricingSource",
+        "contentPolicy",
+        "scheduler"
+      ],
+      "properties": {
+        "platform": {"type": "string", "pattern": "^[a-z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+        "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "containerRuntime": {"const": "docker"},
+        "containerRuntimeVersion": {"type": "string", "minLength": 1, "maxLength": 64},
+        "collectorImageDigest": {"$ref": "#/$defs/digest", "description": "Image ID inspected from the running OpenTelemetry Collector container."},
+        "composeConfigurationValid": {"type": "boolean"},
+        "allComponentsHealthy": {"type": "boolean"},
+        "collectionTransport": {"const": "otlp-http-protobuf"},
+        "collectorAcceptanceBoundary": {"const": "collector-pipeline-acceptance-only"},
+        "receiverDeliveryBoundary": {"const": "postgresql-commit-before-http-200"},
+        "database": {"$ref": "#/$defs/database"},
+        "telemetryBackend": {"const": "prometheus"},
+        "dashboard": {"const": "grafana"},
+        "pricingSource": {"const": "test-fixture"},
+        "contentPolicy": {"const": "metadata-only"},
+        "scheduler": {"const": "bounded-fixed-rate-v1"}
+      }
+    },
+    "latency": {
+      "type": "object",
+      "description": "Nearest-rank stage latency summary; 2,200,000 milliseconds is a representational safety ceiling rather than an objective.",
+      "additionalProperties": false,
+      "required": ["p50Milliseconds", "p95Milliseconds", "p99Milliseconds", "maximumMilliseconds"],
+      "properties": {
+        "p50Milliseconds": {"type": ["integer", "null"], "minimum": 0, "maximum": 2200000},
+        "p95Milliseconds": {"type": ["integer", "null"], "minimum": 0, "maximum": 2200000},
+        "p99Milliseconds": {"type": ["integer", "null"], "minimum": 0, "maximum": 2200000},
+        "maximumMilliseconds": {"type": ["integer", "null"], "minimum": 0, "maximum": 2200000}
+      }
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scheduledSpans",
+        "attemptedSpans",
+        "schedulerMissedSpans",
+        "collectorAcceptedSpans",
+        "collectorRejectedSpans",
+        "schedulerMissBasisPoints",
+        "collectorAcceptanceBasisPoints",
+        "exportLatency"
+      ],
+      "properties": {
+        "scheduledSpans": {"type": "integer", "minimum": 1, "maximum": 9984},
+        "attemptedSpans": {"$ref": "#/$defs/counter"},
+        "schedulerMissedSpans": {"$ref": "#/$defs/counter"},
+        "collectorAcceptedSpans": {"$ref": "#/$defs/counter"},
+        "collectorRejectedSpans": {"$ref": "#/$defs/counter"},
+        "schedulerMissBasisPoints": {"$ref": "#/$defs/basisPoints"},
+        "collectorAcceptanceBasisPoints": {"$ref": "#/$defs/basisPoints"},
+        "exportLatency": {"$ref": "#/$defs/latency"}
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scheduledSpans",
+        "attemptedSpans",
+        "receiverAcknowledgedSpans",
+        "receiverUnacknowledgedSpans",
+        "usageRecordsBeforeReplay",
+        "usageRecordsAfterReplay"
+      ],
+      "properties": {
+        "scheduledSpans": {"$ref": "#/$defs/counter"},
+        "attemptedSpans": {"$ref": "#/$defs/counter"},
+        "receiverAcknowledgedSpans": {"$ref": "#/$defs/counter", "description": "Replay spans whose commit-bound receiver acknowledgement was observed by the shared drain deadline."},
+        "receiverUnacknowledgedSpans": {"$ref": "#/$defs/counter", "description": "Attempted replay spans without a commit-bound acknowledgement observed by the shared drain deadline, including explicit rejection, timeout, and acknowledgement after the deadline."},
+        "usageRecordsBeforeReplay": {"$ref": "#/$defs/counter"},
+        "usageRecordsAfterReplay": {"$ref": "#/$defs/counter"}
+      }
+    },
+    "pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "usageRecords",
+        "usagePersistenceBasisPoints",
+        "attributionRecords",
+        "attributionCompletionBasisPoints",
+        "costRecords",
+        "costCompletionBasisPoints",
+        "pricedCostRecords",
+        "unpricedCostRecords",
+        "pricedCoverageBasisPoints",
+        "backlogSampleCount",
+        "peakAttributionBacklogRecords",
+        "finalAttributionBacklogRecords",
+        "peakCostBacklogRecords",
+        "finalCostBacklogRecords",
+        "attributionLatency",
+        "costLatency",
+        "drainMilliseconds"
+      ],
+      "properties": {
+        "usageRecords": {"$ref": "#/$defs/counter"},
+        "usagePersistenceBasisPoints": {"$ref": "#/$defs/basisPoints"},
+        "attributionRecords": {"$ref": "#/$defs/counter"},
+        "attributionCompletionBasisPoints": {"$ref": "#/$defs/basisPoints"},
+        "costRecords": {"$ref": "#/$defs/counter"},
+        "costCompletionBasisPoints": {"$ref": "#/$defs/basisPoints"},
+        "pricedCostRecords": {"$ref": "#/$defs/counter"},
+        "unpricedCostRecords": {"$ref": "#/$defs/counter"},
+        "pricedCoverageBasisPoints": {"$ref": "#/$defs/basisPoints"},
+        "backlogSampleCount": {"type": "integer", "minimum": 0, "maximum": 2000},
+        "peakAttributionBacklogRecords": {"$ref": "#/$defs/counter"},
+        "finalAttributionBacklogRecords": {"$ref": "#/$defs/counter"},
+        "peakCostBacklogRecords": {"$ref": "#/$defs/counter"},
+        "finalCostBacklogRecords": {"$ref": "#/$defs/counter"},
+        "attributionLatency": {"$ref": "#/$defs/latency"},
+        "costLatency": {"$ref": "#/$defs/latency"},
+        "drainMilliseconds": {"type": "integer", "minimum": 0, "maximum": 1000000}
+      }
+    },
+    "providerMeasurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "scheduledSpans", "usageRecords", "attributionRecords", "costRecords", "pricedCostRecords"],
+      "properties": {
+        "provider": {"enum": ["aws.bedrock", "openai"]},
+        "scheduledSpans": {"$ref": "#/$defs/counter"},
+        "usageRecords": {"$ref": "#/$defs/counter"},
+        "attributionRecords": {"$ref": "#/$defs/counter"},
+        "costRecords": {"$ref": "#/$defs/counter"},
+        "pricedCostRecords": {"$ref": "#/$defs/counter"}
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prometheusConverged",
+        "expectedUsageRequests",
+        "observedUsageRequests",
+        "expectedCostRequests",
+        "observedCostRequests",
+        "cohortIsolationPreserved",
+        "grafanaDashboardAvailable",
+        "metadataOnlyPreserved",
+        "prohibitedLabelsAbsent"
+      ],
+      "properties": {
+        "prometheusConverged": {"type": "boolean"},
+        "expectedUsageRequests": {"$ref": "#/$defs/counter"},
+        "observedUsageRequests": {"$ref": "#/$defs/counter"},
+        "expectedCostRequests": {"$ref": "#/$defs/counter"},
+        "observedCostRequests": {"$ref": "#/$defs/counter"},
+        "cohortIsolationPreserved": {"type": "boolean", "description": "True only when no other local-tenant usage record created at or after the database marker has a trace ID outside this run's 96-bit trace-prefix cohort."},
+        "grafanaDashboardAvailable": {"type": "boolean"},
+        "metadataOnlyPreserved": {"type": "boolean"},
+        "prohibitedLabelsAbsent": {"type": "boolean"}
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startedAt", "completedAt", "actualDurationMilliseconds", "generator", "replay", "pipeline", "providers", "observability"],
+      "properties": {
+        "startedAt": {"type": "string", "format": "date-time"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "actualDurationMilliseconds": {"type": "integer", "minimum": 1, "maximum": 2400000, "description": "Whole qualification duration, including bounded shutdown of replay clients still in flight at the shared drain deadline; the upper bound is a representational safety ceiling, not an objective."},
+        "generator": {"$ref": "#/$defs/generator"},
+        "replay": {"$ref": "#/$defs/replay"},
+        "pipeline": {"$ref": "#/$defs/pipeline"},
+        "providers": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {"$ref": "#/$defs/providerMeasurements", "properties": {"provider": {"const": "aws.bedrock"}}},
+            {"$ref": "#/$defs/providerMeasurements", "properties": {"provider": {"const": "openai"}}}
+          ],
+          "items": false
+        },
+        "observability": {"$ref": "#/$defs/observability"}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^ai-finops-sustained-load\\.[a-z0-9.-]+$", "maxLength": 180}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 19,
+      "maxItems": 19,
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-binding"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "compose-configuration"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "all-components-healthy"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "bounded-load-volume"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "fixed-rate-scheduler"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "collector-acceptance"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "usage-ledger-persistence"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "replay-idempotency"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "attribution-completion"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "cost-completion"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "priced-coverage"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "export-p95-latency"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "attribution-p95-latency"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "cost-p95-latency"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "pipeline-drain"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "prometheus-convergence"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "grafana-dashboard"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "metadata-only-boundaries"}}}
+      ],
+      "items": false
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalChecks", "passedChecks", "failedChecks", "scheduledSpans", "persistedUsageRecords", "completedAttributions", "completedCosts", "overallStatus"],
+      "properties": {
+        "totalChecks": {"const": 19},
+        "passedChecks": {"type": "integer", "minimum": 0, "maximum": 19},
+        "failedChecks": {"type": "integer", "minimum": 0, "maximum": 19},
+        "scheduledSpans": {"type": "integer", "minimum": 1, "maximum": 9984},
+        "persistedUsageRecords": {"$ref": "#/$defs/counter"},
+        "completedAttributions": {"$ref": "#/$defs/counter"},
+        "completedCosts": {"$ref": "#/$defs/counter"},
+        "overallStatus": {"enum": ["qualified", "not-qualified"]}
+      }
+    }
+  }
+}

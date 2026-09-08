@@ -1,0 +1,198 @@
+{
+  "apiVersion": "iip.dev/v1alpha1",
+  "kind": "AiFinopsSustainedLoadQualificationReport",
+  "metadata": {
+    "id": "afslq_ac48a99f8533e4203c874c97aedcfafc",
+    "generatedAt": "2026-09-08T10:05:34Z",
+    "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualificationLevel": "local-ai-finops-sustained-load-v1",
+    "qualificationBoundary": "single-host-docker-synthetic-ai-economics-load",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "attributionEngineVersion": "0.1.0",
+      "costEngineVersion": "0.2.0",
+      "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
+      "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bindings": {
+      "profileId": "afslp_952838d3616e54673be0e86e5c0b8c9e",
+      "profileDigest": "sha256:cbdab6511fde230d52824d38a91b9b5b9af19e03c8c561d3968a16513675bc23",
+      "attributionPolicyId": "aap_22222222222222222222222222222222",
+      "attributionPolicyVersion": "2026-09-05.1",
+      "priceCatalogId": "apc_11111111111111111111111111111111",
+      "priceCatalogVersion": "2026-09-05.1"
+    },
+    "workload": {
+      "durationSeconds": 300,
+      "spansPerSecond": 10,
+      "producerConcurrency": 8,
+      "replayBasisPoints": 1000,
+      "requestTimeoutMilliseconds": 5000,
+      "maximumSchedulerLagMilliseconds": 1000,
+      "maximumPipelineDrainMilliseconds": 60000
+    },
+    "objectives": {
+      "maximumSchedulerMissBasisPoints": 100,
+      "minimumCollectorAcceptanceBasisPoints": 9900,
+      "minimumUsagePersistenceBasisPoints": 9900,
+      "minimumAttributionCompletionBasisPoints": 9900,
+      "minimumCostCompletionBasisPoints": 9900,
+      "minimumPricedCoverageBasisPoints": 10000,
+      "maximumExportP95Milliseconds": 2000,
+      "maximumAttributionP95Milliseconds": 30000,
+      "maximumCostP95Milliseconds": 30000
+    },
+    "environment": {
+      "platform": "linux/arm64",
+      "pythonVersion": "3.12.11",
+      "containerRuntime": "docker",
+      "containerRuntimeVersion": "29.7.2",
+      "collectorImageDigest": "sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5",
+      "composeConfigurationValid": true,
+      "allComponentsHealthy": true,
+      "collectionTransport": "otlp-http-protobuf",
+      "collectorAcceptanceBoundary": "collector-pipeline-acceptance-only",
+      "receiverDeliveryBoundary": "postgresql-commit-before-http-200",
+      "database": {
+        "engine": "postgresql",
+        "version": "18.4",
+        "migration": "0024_ai_invocation_correlation.sql"
+      },
+      "telemetryBackend": "prometheus",
+      "dashboard": "grafana",
+      "pricingSource": "test-fixture",
+      "contentPolicy": "metadata-only",
+      "scheduler": "bounded-fixed-rate-v1"
+    },
+    "measurements": {
+      "startedAt": "2026-09-08T10:00:00Z",
+      "completedAt": "2026-09-08T10:05:34Z",
+      "actualDurationMilliseconds": 334000,
+      "generator": {
+        "scheduledSpans": 3000,
+        "attemptedSpans": 3000,
+        "schedulerMissedSpans": 0,
+        "collectorAcceptedSpans": 3000,
+        "collectorRejectedSpans": 0,
+        "schedulerMissBasisPoints": 0,
+        "collectorAcceptanceBasisPoints": 10000,
+        "exportLatency": {
+          "p50Milliseconds": 8,
+          "p95Milliseconds": 17,
+          "p99Milliseconds": 29,
+          "maximumMilliseconds": 45
+        }
+      },
+      "replay": {
+        "scheduledSpans": 300,
+        "attemptedSpans": 300,
+        "receiverAcknowledgedSpans": 300,
+        "receiverUnacknowledgedSpans": 0,
+        "usageRecordsBeforeReplay": 3000,
+        "usageRecordsAfterReplay": 3000
+      },
+      "pipeline": {
+        "usageRecords": 3000,
+        "usagePersistenceBasisPoints": 10000,
+        "attributionRecords": 3000,
+        "attributionCompletionBasisPoints": 10000,
+        "costRecords": 3000,
+        "costCompletionBasisPoints": 10000,
+        "pricedCostRecords": 3000,
+        "unpricedCostRecords": 0,
+        "pricedCoverageBasisPoints": 10000,
+        "backlogSampleCount": 300,
+        "peakAttributionBacklogRecords": 47,
+        "finalAttributionBacklogRecords": 0,
+        "peakCostBacklogRecords": 52,
+        "finalCostBacklogRecords": 0,
+        "attributionLatency": {
+          "p50Milliseconds": 850,
+          "p95Milliseconds": 1400,
+          "p99Milliseconds": 1900,
+          "maximumMilliseconds": 2300
+        },
+        "costLatency": {
+          "p50Milliseconds": 900,
+          "p95Milliseconds": 1700,
+          "p99Milliseconds": 2300,
+          "maximumMilliseconds": 2800
+        },
+        "drainMilliseconds": 34000
+      },
+      "providers": [
+        {
+          "provider": "aws.bedrock",
+          "scheduledSpans": 1500,
+          "usageRecords": 1500,
+          "attributionRecords": 1500,
+          "costRecords": 1500,
+          "pricedCostRecords": 1500
+        },
+        {
+          "provider": "openai",
+          "scheduledSpans": 1500,
+          "usageRecords": 1500,
+          "attributionRecords": 1500,
+          "costRecords": 1500,
+          "pricedCostRecords": 1500
+        }
+      ],
+      "observability": {
+        "prometheusConverged": true,
+        "expectedUsageRequests": 3000,
+        "observedUsageRequests": 3000,
+        "expectedCostRequests": 3000,
+        "observedCostRequests": 3000,
+        "cohortIsolationPreserved": true,
+        "grafanaDashboardAvailable": true,
+        "metadataOnlyPreserved": true,
+        "prohibitedLabelsAbsent": true
+      }
+    },
+    "checks": [
+      {"id": "source-binding", "status": "passed"},
+      {"id": "profile-binding", "status": "passed"},
+      {"id": "compose-configuration", "status": "passed"},
+      {"id": "all-components-healthy", "status": "passed"},
+      {"id": "bounded-load-volume", "status": "passed"},
+      {"id": "fixed-rate-scheduler", "status": "passed"},
+      {"id": "collector-acceptance", "status": "passed"},
+      {"id": "usage-ledger-persistence", "status": "passed"},
+      {"id": "replay-idempotency", "status": "passed"},
+      {"id": "attribution-completion", "status": "passed"},
+      {"id": "cost-completion", "status": "passed"},
+      {"id": "priced-coverage", "status": "passed"},
+      {"id": "export-p95-latency", "status": "passed"},
+      {"id": "attribution-p95-latency", "status": "passed"},
+      {"id": "cost-p95-latency", "status": "passed"},
+      {"id": "pipeline-drain", "status": "passed"},
+      {"id": "prometheus-convergence", "status": "passed"},
+      {"id": "grafana-dashboard", "status": "passed"},
+      {"id": "metadata-only-boundaries", "status": "passed"}
+    ],
+    "limitations": [
+      "synthetic-provider-spans",
+      "test-fixture-pricing",
+      "single-tenant-single-host-docker-runtime",
+      "customer-collector-pki-and-network-not-qualified",
+      "live-provider-private-prices-and-invoice-not-qualified",
+      "burst-failure-regional-ha-and-long-window-slo-not-qualified",
+      "customer-workload-representativeness-not-approved"
+    ],
+    "summary": {
+      "totalChecks": 19,
+      "passedChecks": 19,
+      "failedChecks": 0,
+      "scheduledSpans": 3000,
+      "persistedUsageRecords": 3000,
+      "completedAttributions": 3000,
+      "completedCosts": 3000,
+      "overallStatus": "qualified"
+    }
+  }
+}

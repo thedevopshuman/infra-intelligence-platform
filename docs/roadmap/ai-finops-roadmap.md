@@ -93,6 +93,23 @@ but does not send AI provider traffic, reproduce a customer's inference mix,
 or qualify sustained AI economics throughput; those Phase A operating claims
 remain external.
 
+A standalone local `local-ai-finops-sustained-load-v1` profile now closes the
+narrower repository regression gap. It applies a bounded fixed-rate schedule
+to equal synthetic Bedrock/OpenAI metadata-only traffic through the complete
+single-host Docker ledger, attribution, cost, aggregate-export, and dashboard
+path, then emits source-bound aggregate evidence. Original traffic crosses the
+Collector; replay is direct, paced, commit-bound, and suppressed unless exact
+original durability is reached. Exact fixture policy/catalog and engine
+generations scope the database cohort, while other local usage created at or
+after the run marker invalidates aggregate convergence. This does not close the
+customer Phase A operating claim: customer-representative traffic, live
+providers, private pricing/invoice agreement, customer Collector/PKI/network,
+bursts and failure recovery, backend lifecycle, long-window SLOs, and
+node/zone/region HA remain external. The profile stays outside release
+readiness v1 until its objectives are calibrated on supported `linux/amd64`
+and `linux/arm64` environments; mandatory promotion requires a future
+versioned readiness decision.
+
 An additive private-pilot preflight now binds that same-invocation report to
 the exact prerequisite file, customer deployment, post-deployment bounded load,
 post-deployment sustained core-workload evidence, local release evidence,

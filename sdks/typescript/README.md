@@ -1,5 +1,13 @@
 # TypeScript SDK boundary
 
+Version 0.83 adds offline `AiFinopsSustainedLoadProfile` and
+`AiFinopsSustainedLoadQualificationReport` types. They describe one bounded
+local Docker regression workload and its aggregate pipeline evidence without
+adding traffic generation, OTLP export, provider integration, or
+capacity/promotion authority. The report type fixes fixture policy/catalog and
+attribution/cost engine generations, commit-bound replay accounting, inspected
+image identities, cohort-isolation status, and the exact ordered check tuple.
+
 Version 0.82 upgrades the offline customer pilot readiness types to
 `iip.platform/v1alpha2` and `customer-ai-finops-design-partner-v2`. A candidate now requires a tenth,
 source-bound `CustomerOperationalAlertQualificationReport`, its protected
@@ -78,6 +86,8 @@ transport is runtime-specific.
 `AiSavingsFindingPage`, `AiModelSuitabilityReport`, `AiAllocationReport`,
 `AiEconomicsInvocationObservationRequest`,
 `AiEconomicsInvocationObservation`,
+`AiFinopsSustainedLoadProfile`,
+`AiFinopsSustainedLoadQualificationReport`,
 `CustomerAiFinopsPrerequisiteProfile`,
 `CustomerAiFinopsPrerequisiteReport`,
 `CustomerAiFinopsFlowQualificationProfile`,

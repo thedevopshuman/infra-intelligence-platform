@@ -739,6 +739,242 @@ export interface AiFinopsRuntimeCompatibilityReport {
   };
 }
 
+export interface AiFinopsSustainedLoadWorkload {
+  durationSeconds: number;
+  spansPerSecond: number;
+  producerConcurrency: number;
+  replayBasisPoints: number;
+  requestTimeoutMilliseconds: number;
+  maximumSchedulerLagMilliseconds: number;
+  maximumPipelineDrainMilliseconds: number;
+}
+
+export interface AiFinopsSustainedLoadObjectives {
+  maximumSchedulerMissBasisPoints: number;
+  minimumCollectorAcceptanceBasisPoints: number;
+  minimumUsagePersistenceBasisPoints: number;
+  minimumAttributionCompletionBasisPoints: number;
+  minimumCostCompletionBasisPoints: number;
+  minimumPricedCoverageBasisPoints: number;
+  maximumExportP95Milliseconds: number;
+  maximumAttributionP95Milliseconds: number;
+  maximumCostP95Milliseconds: number;
+}
+
+export interface AiFinopsSustainedLoadProfile {
+  apiVersion: "iip.dev/v1alpha1";
+  kind: "AiFinopsSustainedLoadProfile";
+  metadata: {
+    id: `afslp_${string}`;
+  };
+  spec: {
+    qualificationLevel: "local-ai-finops-sustained-load-v1";
+    providers: ["aws.bedrock", "openai"];
+    distribution: "round-robin-equal";
+    workload: AiFinopsSustainedLoadWorkload;
+    objectives: AiFinopsSustainedLoadObjectives;
+  };
+}
+
+export interface AiFinopsSustainedLoadLatency {
+  p50Milliseconds: number | null;
+  p95Milliseconds: number | null;
+  p99Milliseconds: number | null;
+  maximumMilliseconds: number | null;
+}
+
+export interface AiFinopsSustainedLoadProviderMeasurements {
+  provider: "aws.bedrock" | "openai";
+  scheduledSpans: number;
+  usageRecords: number;
+  attributionRecords: number;
+  costRecords: number;
+  pricedCostRecords: number;
+}
+
+export type AiFinopsSustainedLoadCheckId =
+  | "source-binding"
+  | "profile-binding"
+  | "compose-configuration"
+  | "all-components-healthy"
+  | "bounded-load-volume"
+  | "fixed-rate-scheduler"
+  | "collector-acceptance"
+  | "usage-ledger-persistence"
+  | "replay-idempotency"
+  | "attribution-completion"
+  | "cost-completion"
+  | "priced-coverage"
+  | "export-p95-latency"
+  | "attribution-p95-latency"
+  | "cost-p95-latency"
+  | "pipeline-drain"
+  | "prometheus-convergence"
+  | "grafana-dashboard"
+  | "metadata-only-boundaries";
+
+export type AiFinopsSustainedLoadCheck<
+  TId extends AiFinopsSustainedLoadCheckId,
+> =
+  | { id: TId; status: "passed" }
+  | {
+      id: TId;
+      status: "failed";
+      errorCode: `ai-finops-sustained-load.${string}`;
+    };
+
+export interface AiFinopsSustainedLoadQualificationReport {
+  apiVersion: "iip.dev/v1alpha1";
+  kind: "AiFinopsSustainedLoadQualificationReport";
+  metadata: {
+    id: `afslq_${string}`;
+    generatedAt: string;
+    sourceRevision: string;
+    sourceDirty: boolean;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualificationLevel: "local-ai-finops-sustained-load-v1";
+    qualificationBoundary: "single-host-docker-synthetic-ai-economics-load";
+    subject: {
+      applicationVersion: string;
+      attributionEngineVersion: "0.1.0";
+      costEngineVersion: "0.2.0";
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      profileId: `afslp_${string}`;
+      profileDigest: Sha256Digest;
+      attributionPolicyId: "aap_22222222222222222222222222222222";
+      attributionPolicyVersion: "2026-09-05.1";
+      priceCatalogId: "apc_11111111111111111111111111111111";
+      priceCatalogVersion: "2026-09-05.1";
+    };
+    workload: AiFinopsSustainedLoadWorkload;
+    objectives: AiFinopsSustainedLoadObjectives;
+    environment: {
+      platform: `${string}/${string}`;
+      pythonVersion: string;
+      containerRuntime: "docker";
+      containerRuntimeVersion: string;
+      collectorImageDigest: Sha256Digest;
+      composeConfigurationValid: boolean;
+      allComponentsHealthy: boolean;
+      collectionTransport: "otlp-http-protobuf";
+      collectorAcceptanceBoundary: "collector-pipeline-acceptance-only";
+      receiverDeliveryBoundary: "postgresql-commit-before-http-200";
+      database: {
+        engine: "postgresql";
+        version: string;
+        migration: `${number}_${string}.sql`;
+      };
+      telemetryBackend: "prometheus";
+      dashboard: "grafana";
+      pricingSource: "test-fixture";
+      contentPolicy: "metadata-only";
+      scheduler: "bounded-fixed-rate-v1";
+    };
+    measurements: {
+      startedAt: string;
+      completedAt: string;
+      actualDurationMilliseconds: number;
+      generator: {
+        scheduledSpans: number;
+        attemptedSpans: number;
+        schedulerMissedSpans: number;
+        collectorAcceptedSpans: number;
+        collectorRejectedSpans: number;
+        schedulerMissBasisPoints: number;
+        collectorAcceptanceBasisPoints: number;
+        exportLatency: AiFinopsSustainedLoadLatency;
+      };
+      replay: {
+        scheduledSpans: number;
+        attemptedSpans: number;
+        receiverAcknowledgedSpans: number;
+        receiverUnacknowledgedSpans: number;
+        usageRecordsBeforeReplay: number;
+        usageRecordsAfterReplay: number;
+      };
+      pipeline: {
+        usageRecords: number;
+        usagePersistenceBasisPoints: number;
+        attributionRecords: number;
+        attributionCompletionBasisPoints: number;
+        costRecords: number;
+        costCompletionBasisPoints: number;
+        pricedCostRecords: number;
+        unpricedCostRecords: number;
+        pricedCoverageBasisPoints: number;
+        backlogSampleCount: number;
+        peakAttributionBacklogRecords: number;
+        finalAttributionBacklogRecords: number;
+        peakCostBacklogRecords: number;
+        finalCostBacklogRecords: number;
+        attributionLatency: AiFinopsSustainedLoadLatency;
+        costLatency: AiFinopsSustainedLoadLatency;
+        drainMilliseconds: number;
+      };
+      providers: [
+        AiFinopsSustainedLoadProviderMeasurements & { provider: "aws.bedrock" },
+        AiFinopsSustainedLoadProviderMeasurements & { provider: "openai" },
+      ];
+      observability: {
+        prometheusConverged: boolean;
+        expectedUsageRequests: number;
+        observedUsageRequests: number;
+        expectedCostRequests: number;
+        observedCostRequests: number;
+        cohortIsolationPreserved: boolean;
+        grafanaDashboardAvailable: boolean;
+        metadataOnlyPreserved: boolean;
+        prohibitedLabelsAbsent: boolean;
+      };
+    };
+    checks: [
+      AiFinopsSustainedLoadCheck<"source-binding">,
+      AiFinopsSustainedLoadCheck<"profile-binding">,
+      AiFinopsSustainedLoadCheck<"compose-configuration">,
+      AiFinopsSustainedLoadCheck<"all-components-healthy">,
+      AiFinopsSustainedLoadCheck<"bounded-load-volume">,
+      AiFinopsSustainedLoadCheck<"fixed-rate-scheduler">,
+      AiFinopsSustainedLoadCheck<"collector-acceptance">,
+      AiFinopsSustainedLoadCheck<"usage-ledger-persistence">,
+      AiFinopsSustainedLoadCheck<"replay-idempotency">,
+      AiFinopsSustainedLoadCheck<"attribution-completion">,
+      AiFinopsSustainedLoadCheck<"cost-completion">,
+      AiFinopsSustainedLoadCheck<"priced-coverage">,
+      AiFinopsSustainedLoadCheck<"export-p95-latency">,
+      AiFinopsSustainedLoadCheck<"attribution-p95-latency">,
+      AiFinopsSustainedLoadCheck<"cost-p95-latency">,
+      AiFinopsSustainedLoadCheck<"pipeline-drain">,
+      AiFinopsSustainedLoadCheck<"prometheus-convergence">,
+      AiFinopsSustainedLoadCheck<"grafana-dashboard">,
+      AiFinopsSustainedLoadCheck<"metadata-only-boundaries">,
+    ];
+    limitations: [
+      "synthetic-provider-spans",
+      "test-fixture-pricing",
+      "single-tenant-single-host-docker-runtime",
+      "customer-collector-pki-and-network-not-qualified",
+      "live-provider-private-prices-and-invoice-not-qualified",
+      "burst-failure-regional-ha-and-long-window-slo-not-qualified",
+      "customer-workload-representativeness-not-approved",
+    ];
+    summary: {
+      totalChecks: 19;
+      passedChecks: number;
+      failedChecks: number;
+      scheduledSpans: number;
+      persistedUsageRecords: number;
+      completedAttributions: number;
+      completedCosts: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export type AiSavingsRule =
   | "context-growth"
   | "retry-amplification"

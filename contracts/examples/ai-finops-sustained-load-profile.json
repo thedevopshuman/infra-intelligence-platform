@@ -1,0 +1,32 @@
+{
+  "apiVersion": "iip.dev/v1alpha1",
+  "kind": "AiFinopsSustainedLoadProfile",
+  "metadata": {
+    "id": "afslp_952838d3616e54673be0e86e5c0b8c9e"
+  },
+  "spec": {
+    "qualificationLevel": "local-ai-finops-sustained-load-v1",
+    "providers": ["aws.bedrock", "openai"],
+    "distribution": "round-robin-equal",
+    "workload": {
+      "durationSeconds": 300,
+      "spansPerSecond": 10,
+      "producerConcurrency": 8,
+      "replayBasisPoints": 1000,
+      "requestTimeoutMilliseconds": 5000,
+      "maximumSchedulerLagMilliseconds": 1000,
+      "maximumPipelineDrainMilliseconds": 60000
+    },
+    "objectives": {
+      "maximumSchedulerMissBasisPoints": 100,
+      "minimumCollectorAcceptanceBasisPoints": 9900,
+      "minimumUsagePersistenceBasisPoints": 9900,
+      "minimumAttributionCompletionBasisPoints": 9900,
+      "minimumCostCompletionBasisPoints": 9900,
+      "minimumPricedCoverageBasisPoints": 10000,
+      "maximumExportP95Milliseconds": 2000,
+      "maximumAttributionP95Milliseconds": 30000,
+      "maximumCostP95Milliseconds": 30000
+    }
+  }
+}

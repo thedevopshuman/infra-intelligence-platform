@@ -1,5 +1,11 @@
 # Python SDK boundary
 
+Version 0.81 adds offline `CustomerOperationalAlertQualificationProfile` and
+`CustomerOperationalAlertQualificationReport` envelopes. They expose only the
+protected selection and minimized read-only proof for one customer evaluator
+and synthetic firing/recovery route; they add no monitoring mutation, alert
+submission, contact, or escalation method.
+
 Version 0.80 adds offline `CustomerFailureOverlapProfile` and
 `CustomerFailureOverlapQualificationReport` envelopes. They expose the
 customer-reviewed, source-bound planned-failure overlap result without adding

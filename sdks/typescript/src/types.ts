@@ -1790,6 +1790,165 @@ export interface CustomerOidcQualificationReport {
   };
 }
 
+export interface CustomerOperationalAlertQualificationProfile {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerOperationalAlertQualificationProfile";
+  metadata: { name: string; reviewedAt: string };
+  spec: {
+    ruleSet: "core-v1" | "ai-finops-v0";
+    deployment: {
+      clusterBindingDigest: Sha256Digest;
+      namespaceBindingDigest: Sha256Digest;
+    };
+    monitoring: {
+      prometheusBaseUrl: string;
+      alertmanagerBaseUrl: string;
+      receiptUrl: string;
+      productionRuleGroup: "iip.platform.availability";
+      syntheticRuleGroup: string;
+      syntheticAlertName: "IIPQualificationSynthetic";
+      probeId: string;
+      routeId: string;
+      services: Array<{
+        component: "api" | "workflow-worker" | "otlp-receiver";
+        serviceName: string;
+      }>;
+    };
+    objective: {
+      requestTimeoutMilliseconds: number;
+      maximumResponseBytes: number;
+      maximumObservationAgeSeconds: number;
+      maximumNotificationLatencyMilliseconds: number;
+      maximumClockSkewSeconds: number;
+      maximumProfileAgeSeconds: number;
+      reportValiditySeconds: number;
+    };
+  };
+}
+
+export type CustomerOperationalAlertQualificationCheckId =
+  | "profile-binding"
+  | "source-binding"
+  | "immutable-release"
+  | "protected-input-files"
+  | "verified-https"
+  | "no-proxy-no-redirect"
+  | "prometheus-ready"
+  | "production-rule-group-loaded"
+  | "production-rules-complete"
+  | "production-rules-healthy"
+  | "component-heartbeats-observed"
+  | "synthetic-rule-loaded"
+  | "synthetic-rule-healthy"
+  | "synthetic-rule-inactive"
+  | "alertmanager-ready"
+  | "receipt-evidence-current"
+  | "firing-notification-delivered"
+  | "recovery-notification-delivered"
+  | "notification-latency-objective"
+  | "minimized-output";
+
+export interface CustomerOperationalAlertQualificationReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "CustomerOperationalAlertQualificationReport";
+  metadata: {
+    id: `coar_${string}`;
+    generatedAt: string;
+    validUntil: string;
+    sourceRevision: string;
+    sourceDirty: false;
+  };
+  spec: {
+    status: "qualified" | "not-qualified";
+    qualification: "customer-operational-alert-routing-v1";
+    qualificationBoundary: "customer-rule-evaluation-and-notification-route";
+    subject: {
+      applicationVersion: string;
+      chartVersion: string;
+      contractsApiVersion: "iip.platform/v1alpha1";
+      requiredMigration: `${number}_${string}.sql`;
+      sourceRevision: string;
+      imageDigest: Sha256Digest;
+    };
+    bindings: {
+      profileDigest: Sha256Digest;
+      clusterBindingDigest: Sha256Digest;
+      namespaceBindingDigest: Sha256Digest;
+      prometheusTargetBindingDigest: Sha256Digest;
+      alertmanagerTargetBindingDigest: Sha256Digest;
+      receiptTargetBindingDigest: Sha256Digest;
+      probeRouteBindingDigest: Sha256Digest;
+      prometheusCaBundleDigest: Sha256Digest;
+      alertmanagerCaBundleDigest: Sha256Digest;
+      receiptCaBundleDigest: Sha256Digest;
+      releaseBindingDigest: Sha256Digest;
+    };
+    profile: {
+      name: "customer-operational-alert-routing-v1";
+      ruleSet: "core-v1" | "ai-finops-v0";
+      metricNameProfile: "otel-prometheus-underscore-no-suffix-v1";
+      prometheusApi: "v1";
+      alertmanagerApi: "v2";
+      receiptApi: "iip.qualification/v1";
+      transport: "ca-verified-https";
+      proxyMode: "disabled";
+      redirectMode: "denied";
+    };
+    objective: CustomerOperationalAlertQualificationProfile["spec"]["objective"];
+    measurements: {
+      profileReviewedAt: string;
+      startedAt: string;
+      completedAt: string;
+      profileAgeSeconds: number;
+      expectedRuleCount: number;
+      loadedExpectedRuleCount: number;
+      unhealthyExpectedRuleCount: number;
+      expectedComponentCount: number;
+      observedComponentCount: number;
+      receiptEventCount: number;
+      firingNotificationCount: number;
+      recoveryNotificationCount: number;
+      maximumNotificationLatencyMilliseconds: number;
+    };
+    observations: {
+      verifiedHttps: boolean;
+      protectedInputs: boolean;
+      prometheusReady: boolean;
+      productionGroupLoaded: boolean;
+      syntheticRuleLoaded: boolean;
+      syntheticRuleHealthy: boolean;
+      syntheticRuleInactive: boolean;
+      alertmanagerReady: boolean;
+      receiptEvidenceCurrent: boolean;
+    };
+    checks: Array<
+      | {
+          id: CustomerOperationalAlertQualificationCheckId;
+          status: "passed";
+        }
+      | {
+          id: CustomerOperationalAlertQualificationCheckId;
+          status: "failed";
+          errorCode: `customer-operational-alert-qualification.${string}`;
+        }
+    >;
+    limitations: [
+      "customer-receipt-service-authenticity-and-retention-not-qualified",
+      "additional-routes-receivers-silences-and-inhibition-not-qualified",
+      "human-on-call-acknowledgement-and-escalation-not-qualified",
+      "collector-backend-and-alertmanager-ha-not-qualified",
+      "long-window-regional-slo-and-disaster-recovery-not-qualified",
+      "real-component-failure-and-customer-workload-impact-not-qualified",
+    ];
+    summary: {
+      totalChecks: 20;
+      passedChecks: number;
+      failedChecks: number;
+      overallStatus: "qualified" | "not-qualified";
+    };
+  };
+}
+
 export interface CustomerCredentialBrokerQualificationProfile {
   apiVersion: "iip.platform/v1alpha1";
   kind: "CustomerCredentialBrokerQualificationProfile";

@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-operational-alert-qualification-report:v1alpha1",
+  "title": "Customer Operational Alert Qualification Report",
+  "description": "Minimized source-bound evidence that one customer evaluator loaded IIP rules and one synthetic firing/recovery traversed the selected notification route.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerOperationalAlertQualificationReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generatedAt", "validUntil", "sourceRevision", "sourceDirty"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^coar_[a-f0-9]{32}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "validUntil": {"type": "string", "format": "date-time"},
+        "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "sourceDirty": {"const": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "qualification", "qualificationBoundary", "subject", "bindings", "profile", "objective", "measurements", "observations", "checks", "limitations", "summary"],
+      "properties": {
+        "status": {"enum": ["qualified", "not-qualified"]},
+        "qualification": {"const": "customer-operational-alert-routing-v1"},
+        "qualificationBoundary": {"const": "customer-rule-evaluation-and-notification-route"},
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["applicationVersion", "chartVersion", "contractsApiVersion", "requiredMigration", "sourceRevision", "imageDigest"],
+          "properties": {
+            "applicationVersion": {"$ref": "#/$defs/semver"},
+            "chartVersion": {"$ref": "#/$defs/semver"},
+            "contractsApiVersion": {"const": "iip.platform/v1alpha1"},
+            "requiredMigration": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"},
+            "sourceRevision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+            "imageDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileDigest", "clusterBindingDigest", "namespaceBindingDigest", "prometheusTargetBindingDigest", "alertmanagerTargetBindingDigest", "receiptTargetBindingDigest", "probeRouteBindingDigest", "prometheusCaBundleDigest", "alertmanagerCaBundleDigest", "receiptCaBundleDigest", "releaseBindingDigest"],
+          "properties": {
+            "profileDigest": {"$ref": "#/$defs/digest"},
+            "clusterBindingDigest": {"$ref": "#/$defs/digest"},
+            "namespaceBindingDigest": {"$ref": "#/$defs/digest"},
+            "prometheusTargetBindingDigest": {"$ref": "#/$defs/digest"},
+            "alertmanagerTargetBindingDigest": {"$ref": "#/$defs/digest"},
+            "receiptTargetBindingDigest": {"$ref": "#/$defs/digest"},
+            "probeRouteBindingDigest": {"$ref": "#/$defs/digest"},
+            "prometheusCaBundleDigest": {"$ref": "#/$defs/digest"},
+            "alertmanagerCaBundleDigest": {"$ref": "#/$defs/digest"},
+            "receiptCaBundleDigest": {"$ref": "#/$defs/digest"},
+            "releaseBindingDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "ruleSet", "metricNameProfile", "prometheusApi", "alertmanagerApi", "receiptApi", "transport", "proxyMode", "redirectMode"],
+          "properties": {
+            "name": {"const": "customer-operational-alert-routing-v1"},
+            "ruleSet": {"enum": ["core-v1", "ai-finops-v0"]},
+            "metricNameProfile": {"const": "otel-prometheus-underscore-no-suffix-v1"},
+            "prometheusApi": {"const": "v1"},
+            "alertmanagerApi": {"const": "v2"},
+            "receiptApi": {"const": "iip.qualification/v1"},
+            "transport": {"const": "ca-verified-https"},
+            "proxyMode": {"const": "disabled"},
+            "redirectMode": {"const": "denied"}
+          }
+        },
+        "objective": {"$ref": "#/$defs/objective"},
+        "measurements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileReviewedAt", "startedAt", "completedAt", "profileAgeSeconds", "expectedRuleCount", "loadedExpectedRuleCount", "unhealthyExpectedRuleCount", "expectedComponentCount", "observedComponentCount", "receiptEventCount", "firingNotificationCount", "recoveryNotificationCount", "maximumNotificationLatencyMilliseconds"],
+          "properties": {
+            "profileReviewedAt": {"type": "string", "format": "date-time"},
+            "startedAt": {"type": "string", "format": "date-time"},
+            "completedAt": {"type": "string", "format": "date-time"},
+            "profileAgeSeconds": {"type": "integer", "minimum": 0, "maximum": 7776000},
+            "expectedRuleCount": {"type": "integer", "minimum": 5, "maximum": 9},
+            "loadedExpectedRuleCount": {"type": "integer", "minimum": 0, "maximum": 9},
+            "unhealthyExpectedRuleCount": {"type": "integer", "minimum": 0, "maximum": 9},
+            "expectedComponentCount": {"type": "integer", "minimum": 2, "maximum": 3},
+            "observedComponentCount": {"type": "integer", "minimum": 0, "maximum": 3},
+            "receiptEventCount": {"type": "integer", "minimum": 0, "maximum": 2},
+            "firingNotificationCount": {"type": "integer", "minimum": 0, "maximum": 1},
+            "recoveryNotificationCount": {"type": "integer", "minimum": 0, "maximum": 1},
+            "maximumNotificationLatencyMilliseconds": {"type": "integer", "minimum": 0, "maximum": 3900000}
+          }
+        },
+        "observations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["verifiedHttps", "protectedInputs", "prometheusReady", "productionGroupLoaded", "syntheticRuleLoaded", "syntheticRuleHealthy", "syntheticRuleInactive", "alertmanagerReady", "receiptEvidenceCurrent"],
+          "properties": {
+            "verifiedHttps": {"type": "boolean"},
+            "protectedInputs": {"type": "boolean"},
+            "prometheusReady": {"type": "boolean"},
+            "productionGroupLoaded": {"type": "boolean"},
+            "syntheticRuleLoaded": {"type": "boolean"},
+            "syntheticRuleHealthy": {"type": "boolean"},
+            "syntheticRuleInactive": {"type": "boolean"},
+            "alertmanagerReady": {"type": "boolean"},
+            "receiptEvidenceCurrent": {"type": "boolean"}
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 20,
+          "maxItems": 20,
+          "prefixItems": [
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "immutable-release"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "protected-input-files"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "verified-https"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "no-proxy-no-redirect"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "prometheus-ready"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "production-rule-group-loaded"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "production-rules-complete"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "production-rules-healthy"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "component-heartbeats-observed"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "synthetic-rule-loaded"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "synthetic-rule-healthy"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "synthetic-rule-inactive"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "alertmanager-ready"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "receipt-evidence-current"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "firing-notification-delivered"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "recovery-notification-delivered"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "notification-latency-objective"}}},
+            {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}}
+          ],
+          "items": false
+        },
+        "limitations": {
+          "type": "array",
+          "prefixItems": [
+            {"const": "customer-receipt-service-authenticity-and-retention-not-qualified"},
+            {"const": "additional-routes-receivers-silences-and-inhibition-not-qualified"},
+            {"const": "human-on-call-acknowledgement-and-escalation-not-qualified"},
+            {"const": "collector-backend-and-alertmanager-ha-not-qualified"},
+            {"const": "long-window-regional-slo-and-disaster-recovery-not-qualified"},
+            {"const": "real-component-failure-and-customer-workload-impact-not-qualified"}
+          ],
+          "items": false,
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalChecks", "passedChecks", "failedChecks", "overallStatus"],
+          "properties": {
+            "totalChecks": {"const": 20},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 20},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 20},
+            "overallStatus": {"enum": ["qualified", "not-qualified"]}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestTimeoutMilliseconds", "maximumResponseBytes", "maximumObservationAgeSeconds", "maximumNotificationLatencyMilliseconds", "maximumClockSkewSeconds", "maximumProfileAgeSeconds", "reportValiditySeconds"],
+      "properties": {
+        "requestTimeoutMilliseconds": {"type": "integer", "minimum": 100, "maximum": 30000},
+        "maximumResponseBytes": {"type": "integer", "minimum": 4096, "maximum": 1048576},
+        "maximumObservationAgeSeconds": {"type": "integer", "minimum": 30, "maximum": 3600},
+        "maximumNotificationLatencyMilliseconds": {"type": "integer", "minimum": 100, "maximum": 300000},
+        "maximumClockSkewSeconds": {"type": "integer", "minimum": 0, "maximum": 300},
+        "maximumProfileAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 7776000},
+        "reportValiditySeconds": {"type": "integer", "minimum": 300, "maximum": 604800}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["passed", "failed"]},
+        "errorCode": {"type": "string", "pattern": "^customer-operational-alert-qualification\\.[a-z0-9.-]+$", "maxLength": 180}
+      },
+      "oneOf": [
+        {"properties": {"status": {"const": "passed"}}, "not": {"required": ["errorCode"]}},
+        {"required": ["errorCode"], "properties": {"status": {"const": "failed"}}}
+      ]
+    }
+  }
+}

@@ -360,6 +360,15 @@ REQUIRED_PATHS = (
     "docs/decisions/0149-preinstall-operational-alert-prerequisite-evidence.md",
     "docs/decisions/0150-otel-component-heartbeat-and-missing-signal-alerts.md",
     "docs/operations/operational-alerts.md",
+    "docs/decisions/0151-customer-operational-alert-route-qualification.md",
+    "docs/specifications/customer-operational-alert-qualification-contract.md",
+    "contracts/schemas/customer-operational-alert-qualification-profile.schema.json",
+    "contracts/schemas/customer-operational-alert-qualification-report.schema.json",
+    "contracts/examples/customer-operational-alert-qualification-profile.json",
+    "contracts/examples/customer-operational-alert-qualification-report.json",
+    "docs/operations/customer-operational-alert-qualification.md",
+    "scripts/qualify_customer_operational_alerts.py",
+    "tests/test_customer_operational_alert_qualification.py",
     "deploy/helm/infra-intelligence/templates/operational-alerts.yaml",
     "deploy/helm/infra-intelligence/examples/production-operational-alerts.values.yaml",
     "scripts/qualify_local_release.py",
@@ -2343,6 +2352,96 @@ def validate_customer_otlp_receiver_qualification_example(
         fail(
             errors,
             "customer OTLP receiver qualification examples must be semantically valid",
+        )
+
+
+def validate_customer_operational_alert_qualification_examples(
+    documents: Mapping[Path, object], errors: List[str]
+) -> None:
+    """Check protected alert selection and minimized route evidence."""
+
+    example_dir = ROOT / "contracts" / "examples"
+    profile = documents.get(
+        example_dir / "customer-operational-alert-qualification-profile.json"
+    )
+    report = documents.get(
+        example_dir / "customer-operational-alert-qualification-report.json"
+    )
+    try:
+        from qualify_customer_operational_alerts import (
+            CustomerOperationalAlertQualificationError,
+            _digest_value,
+            _strict_https_url,
+            validate_profile,
+            validate_report_document,
+        )
+    except ImportError:
+        fail(
+            errors,
+            "customer operational alert qualification validator must be importable",
+        )
+        return
+    try:
+        if not isinstance(profile, dict) or not isinstance(report, dict):
+            raise CustomerOperationalAlertQualificationError(
+                "customer-operational-alert-qualification.example.invalid"
+            )
+        validate_profile(profile)
+        validate_report_document(report)
+        profile_spec = profile["spec"]
+        deployment = profile_spec["deployment"]
+        monitoring = profile_spec["monitoring"]
+        report_spec = report["spec"]
+        bindings = report_spec["bindings"]
+        expected_profile_bindings = {
+            "profileDigest": _digest_value(profile),
+            "clusterBindingDigest": deployment["clusterBindingDigest"],
+            "namespaceBindingDigest": deployment["namespaceBindingDigest"],
+            "prometheusTargetBindingDigest": _digest_value(
+                _strict_https_url(
+                    monitoring["prometheusBaseUrl"],
+                    "customer-operational-alert-qualification.example.invalid",
+                    root_only=True,
+                )
+            ),
+            "alertmanagerTargetBindingDigest": _digest_value(
+                _strict_https_url(
+                    monitoring["alertmanagerBaseUrl"],
+                    "customer-operational-alert-qualification.example.invalid",
+                    root_only=True,
+                )
+            ),
+            "receiptTargetBindingDigest": _digest_value(
+                _strict_https_url(
+                    monitoring["receiptUrl"],
+                    "customer-operational-alert-qualification.example.invalid",
+                    root_only=False,
+                )
+            ),
+            "probeRouteBindingDigest": _digest_value(
+                {
+                    "probeId": monitoring["probeId"],
+                    "routeId": monitoring["routeId"],
+                }
+            ),
+        }
+        if (
+            any(
+                bindings.get(key) != value
+                for key, value in expected_profile_bindings.items()
+            )
+            or report_spec["profile"]["ruleSet"] != profile_spec["ruleSet"]
+            or report_spec["objective"] != profile_spec["objective"]
+            or report_spec["measurements"]["profileReviewedAt"]
+            != profile["metadata"]["reviewedAt"]
+        ):
+            raise CustomerOperationalAlertQualificationError(
+                "customer-operational-alert-qualification.example.crossed"
+            )
+    except (CustomerOperationalAlertQualificationError, KeyError, TypeError):
+        fail(
+            errors,
+            "customer operational alert qualification examples must be semantically valid",
         )
 
 
@@ -5895,6 +5994,14 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "CustomerOtlpReceiverQualificationReport",
         ),
         (
+            "customer-operational-alert-qualification-profile.json",
+            "CustomerOperationalAlertQualificationProfile",
+        ),
+        (
+            "customer-operational-alert-qualification-report.json",
+            "CustomerOperationalAlertQualificationReport",
+        ),
+        (
             "customer-deployment-preflight-report.json",
             "CustomerDeploymentPreflightReport",
         ),
@@ -5999,6 +6106,7 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
     validate_customer_ai_finops_flow_examples(documents, errors)
     validate_customer_pilot_readiness_examples(documents, errors)
     validate_customer_otlp_receiver_qualification_example(documents, errors)
+    validate_customer_operational_alert_qualification_examples(documents, errors)
     validate_customer_deployment_qualification_example(documents, errors)
     validate_customer_sustained_workload_examples(documents, errors)
     validate_customer_failure_overlap_examples(documents, errors)

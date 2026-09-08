@@ -861,6 +861,50 @@ class CustomerOidcQualificationReport:
 
 
 @dataclass(frozen=True)
+class CustomerOperationalAlertQualificationProfile:
+    """Protected customer alert evaluator and notification-route selection."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerOperationalAlertQualificationProfile":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerOperationalAlertQualificationProfile",
+                label="customer operational alert qualification profile",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class CustomerOperationalAlertQualificationReport:
+    """Minimized proof for one customer alert evaluation and notification route."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "CustomerOperationalAlertQualificationReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="CustomerOperationalAlertQualificationReport",
+                label="customer operational alert qualification report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class CustomerCredentialBrokerQualificationProfile:
     """Protected reviewed customer credential-broker authority cases."""
 

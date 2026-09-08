@@ -1,5 +1,11 @@
 # TypeScript SDK boundary
 
+Version 0.81 adds offline `CustomerOperationalAlertQualificationProfile` and
+`CustomerOperationalAlertQualificationReport` types. They describe the
+protected selection and minimized read-only proof for one customer evaluator
+and synthetic firing/recovery route without adding monitoring mutation, alert
+submission, contact, or escalation methods.
+
 Version 0.80 adds offline `CustomerFailureOverlapProfile` and
 `CustomerFailureOverlapQualificationReport` types. They describe the
 customer-reviewed, source-bound planned-failure overlap result without adding

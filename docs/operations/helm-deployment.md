@@ -72,7 +72,9 @@ heartbeat and missing-series rules. It does not install the CRD,
 Prometheus, Alertmanager, contacts, or routing, and it requires metric export
 to be enabled. Qualify the selected rule labels, metric-name translation,
 heartbeat evaluation, and notification route with the
-[operational alert-policy handoff](operational-alerts.md). The production
+[operational alert-policy handoff](operational-alerts.md) and retain the
+[customer alert-route qualification](customer-operational-alert-qualification.md).
+The production
 preflight requires the policy and, in cluster mode, verifies the exact
 PrometheusRule discovery endpoint and target namespace without making changes.
 

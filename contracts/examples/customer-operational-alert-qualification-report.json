@@ -1,0 +1,119 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerOperationalAlertQualificationReport",
+  "metadata": {
+    "id": "coar_38b0e8b102fb6351aace66ab871c09f5",
+    "generatedAt": "2026-09-08T10:00:05Z",
+    "validUntil": "2026-09-09T10:00:05Z",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceDirty": false
+  },
+  "spec": {
+    "status": "qualified",
+    "qualification": "customer-operational-alert-routing-v1",
+    "qualificationBoundary": "customer-rule-evaluation-and-notification-route",
+    "subject": {
+      "applicationVersion": "0.84.0",
+      "chartVersion": "0.87.0",
+      "contractsApiVersion": "iip.platform/v1alpha1",
+      "requiredMigration": "0023_ai_model_suitability.sql",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "bindings": {
+      "profileDigest": "sha256:2573ff6a662aa65d16c068f6d5a8b43a94c77c9e1bff408641e98fadabd0d16f",
+      "clusterBindingDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "namespaceBindingDigest": "sha256:c9dbff0c151173617eb3e25cf0337b4df9c924c9eb60cb0889e9656d35a1ddf0",
+      "prometheusTargetBindingDigest": "sha256:b384c694b7821d68fb0844a94ef803bbb9540bc6bd600c11a93ed1dc1a98817f",
+      "alertmanagerTargetBindingDigest": "sha256:645b76c206ae7a7b2f7f015be321f085be7bd908c28b8eae13ed2953563f6303",
+      "receiptTargetBindingDigest": "sha256:7048e597593d6584e29cb33b047232a8c5e28fbe43d802830d0572c0e0f38482",
+      "probeRouteBindingDigest": "sha256:f424d630e8305d9e0f5b730f94519800ffb889a4ab86734bc8ce85a018c5768c",
+      "prometheusCaBundleDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "alertmanagerCaBundleDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "receiptCaBundleDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "releaseBindingDigest": "sha256:25c4c5c60dee029f9d603cd491ccb6510f281587480d81586779bda958ab2ed4"
+    },
+    "profile": {
+      "name": "customer-operational-alert-routing-v1",
+      "ruleSet": "ai-finops-v0",
+      "metricNameProfile": "otel-prometheus-underscore-no-suffix-v1",
+      "prometheusApi": "v1",
+      "alertmanagerApi": "v2",
+      "receiptApi": "iip.qualification/v1",
+      "transport": "ca-verified-https",
+      "proxyMode": "disabled",
+      "redirectMode": "denied"
+    },
+    "objective": {
+      "requestTimeoutMilliseconds": 5000,
+      "maximumResponseBytes": 262144,
+      "maximumObservationAgeSeconds": 900,
+      "maximumNotificationLatencyMilliseconds": 30000,
+      "maximumClockSkewSeconds": 5,
+      "maximumProfileAgeSeconds": 2592000,
+      "reportValiditySeconds": 86400
+    },
+    "measurements": {
+      "profileReviewedAt": "2026-09-08T09:00:00Z",
+      "startedAt": "2026-09-08T10:00:00Z",
+      "completedAt": "2026-09-08T10:00:05Z",
+      "profileAgeSeconds": 3605,
+      "expectedRuleCount": 9,
+      "loadedExpectedRuleCount": 9,
+      "unhealthyExpectedRuleCount": 0,
+      "expectedComponentCount": 3,
+      "observedComponentCount": 3,
+      "receiptEventCount": 2,
+      "firingNotificationCount": 1,
+      "recoveryNotificationCount": 1,
+      "maximumNotificationLatencyMilliseconds": 2400
+    },
+    "observations": {
+      "verifiedHttps": true,
+      "protectedInputs": true,
+      "prometheusReady": true,
+      "productionGroupLoaded": true,
+      "syntheticRuleLoaded": true,
+      "syntheticRuleHealthy": true,
+      "syntheticRuleInactive": true,
+      "alertmanagerReady": true,
+      "receiptEvidenceCurrent": true
+    },
+    "checks": [
+      {"id": "profile-binding", "status": "passed"},
+      {"id": "source-binding", "status": "passed"},
+      {"id": "immutable-release", "status": "passed"},
+      {"id": "protected-input-files", "status": "passed"},
+      {"id": "verified-https", "status": "passed"},
+      {"id": "no-proxy-no-redirect", "status": "passed"},
+      {"id": "prometheus-ready", "status": "passed"},
+      {"id": "production-rule-group-loaded", "status": "passed"},
+      {"id": "production-rules-complete", "status": "passed"},
+      {"id": "production-rules-healthy", "status": "passed"},
+      {"id": "component-heartbeats-observed", "status": "passed"},
+      {"id": "synthetic-rule-loaded", "status": "passed"},
+      {"id": "synthetic-rule-healthy", "status": "passed"},
+      {"id": "synthetic-rule-inactive", "status": "passed"},
+      {"id": "alertmanager-ready", "status": "passed"},
+      {"id": "receipt-evidence-current", "status": "passed"},
+      {"id": "firing-notification-delivered", "status": "passed"},
+      {"id": "recovery-notification-delivered", "status": "passed"},
+      {"id": "notification-latency-objective", "status": "passed"},
+      {"id": "minimized-output", "status": "passed"}
+    ],
+    "limitations": [
+      "customer-receipt-service-authenticity-and-retention-not-qualified",
+      "additional-routes-receivers-silences-and-inhibition-not-qualified",
+      "human-on-call-acknowledgement-and-escalation-not-qualified",
+      "collector-backend-and-alertmanager-ha-not-qualified",
+      "long-window-regional-slo-and-disaster-recovery-not-qualified",
+      "real-component-failure-and-customer-workload-impact-not-qualified"
+    ],
+    "summary": {
+      "totalChecks": 20,
+      "passedChecks": 20,
+      "failedChecks": 0,
+      "overallStatus": "qualified"
+    }
+  }
+}

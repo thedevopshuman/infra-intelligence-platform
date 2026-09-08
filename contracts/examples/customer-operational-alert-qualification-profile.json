@@ -1,0 +1,39 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "CustomerOperationalAlertQualificationProfile",
+  "metadata": {
+    "name": "customer-operational-alerts",
+    "reviewedAt": "2026-09-08T09:00:00Z"
+  },
+  "spec": {
+    "ruleSet": "ai-finops-v0",
+    "deployment": {
+      "clusterBindingDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "namespaceBindingDigest": "sha256:c9dbff0c151173617eb3e25cf0337b4df9c924c9eb60cb0889e9656d35a1ddf0"
+    },
+    "monitoring": {
+      "prometheusBaseUrl": "https://prometheus.example.test",
+      "alertmanagerBaseUrl": "https://alertmanager.example.test",
+      "receiptUrl": "https://notification-receipts.example.test/v1/receipts",
+      "productionRuleGroup": "iip.platform.availability",
+      "syntheticRuleGroup": "iip.qualification",
+      "syntheticAlertName": "IIPQualificationSynthetic",
+      "probeId": "iip-alert-route-20260908",
+      "routeId": "platform-primary",
+      "services": [
+        {"component": "api", "serviceName": "iip-control-plane"},
+        {"component": "workflow-worker", "serviceName": "iip-workflow-worker"},
+        {"component": "otlp-receiver", "serviceName": "iip-otlp-receiver"}
+      ]
+    },
+    "objective": {
+      "requestTimeoutMilliseconds": 5000,
+      "maximumResponseBytes": 262144,
+      "maximumObservationAgeSeconds": 900,
+      "maximumNotificationLatencyMilliseconds": 30000,
+      "maximumClockSkewSeconds": 5,
+      "maximumProfileAgeSeconds": 2592000,
+      "reportValiditySeconds": 86400
+    }
+  }
+}

@@ -37,6 +37,7 @@ make test-oidc PYTHON=.venv/bin/python
 make test-policy-engine PYTHON=.venv/bin/python
 make test-external-secrets PYTHON=.venv/bin/python
 make test-operational-alerts
+make test-customer-operational-alert-qualification PYTHON=.venv/bin/python
 make test-otlp-receiver PYTHON=.venv/bin/python
 make test-bedrock-instrumentation PYTHON=.venv/bin/python
 make test-openai-instrumentation PYTHON=.venv/bin/python
@@ -79,6 +80,12 @@ customer context and the exact protected values generation, verify it with
 `make verify-deployment-preflight-report`, and retain it beside—not inside—the
 release bundle. That report proves prerequisite presence, not external-system
 or workload qualification.
+
+After the customer monitoring owner drives the isolated synthetic rule through
+firing and recovery, run `make qualify-customer-operational-alerts` and retain
+its minimized report outside the bundle. This is customer-environment evidence
+for one evaluator and notification route, not local release evidence or a
+claim about other routes, human response, or monitoring HA.
 
 After installation, run `make qualify-ingress-availability` from the same clean
 checkout against the external HTTPS URL and immutable image digest, then run

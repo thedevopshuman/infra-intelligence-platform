@@ -86,12 +86,14 @@ minimized reports outside Git. The required order is:
 2. customer external policy allow/deny cases;
 3. customer credential-broker least-authority issuance and denials;
 4. pinned customer Collector/OTLP delivery and queue/loss observation;
-5. customer ingress/API continuity, worker/receiver continuity, and PostgreSQL
+5. loaded operational rules, translated heartbeats, and one synthetic
+   firing/recovery notification route;
+6. customer ingress/API continuity, worker/receiver continuity, and PostgreSQL
    promotion/recovery;
-6. aggregate customer deployment qualification and a fresh diagnostic;
-7. post-deployment bounded control-plane load;
-8. customer-approved sustained core-workload and planned-failure overlap;
-9. production price-catalog qualification, live Bedrock compatibility, AI
+7. aggregate customer deployment qualification and a fresh diagnostic;
+8. post-deployment bounded control-plane load;
+9. customer-approved sustained core-workload and planned-failure overlap;
+10. production price-catalog qualification, live Bedrock compatibility, AI
    FinOps prerequisite aggregation, and the same-invocation ledger-to-dashboard
    flow.
 
@@ -119,8 +121,9 @@ with their named owners.
   Collector; watch exporter delivery and Collector queue/loss, not just local
   acceptance.
 - Install and test the optional [operational alert policy](operational-alerts.md)
-  or an equivalent backend-native adapter, including one synthetic firing and
-  recovery through the customer's private route.
+  or an equivalent backend-native adapter. Retain the
+  [customer alert-route qualification](customer-operational-alert-qualification.md)
+  for one synthetic firing and recovery through the customer's private route.
 - Review freshness, query/receiver availability, investigation completion, AI
   coverage, unknown pricing/attribution, and evidence-backed savings on the
   agreed cadence.

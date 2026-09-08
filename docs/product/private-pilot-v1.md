@@ -41,7 +41,8 @@ unavailable. Prompt and response content is rejected by default.
   private-pilot readiness evidence join.
 - Optional privacy-bounded Prometheus operational rules, with the customer
   retaining the monitoring CRD, evaluation, routing, contact, and escalation
-  authority.
+  authority, plus a read-only source-bound qualification of one synthetic
+  firing/recovery route.
 
 The customer may operate only a subset of the investigation integrations, but
 the first AI FinOps pilot admission requires the same-invocation Bedrock flow
@@ -55,6 +56,8 @@ A pilot can start only when all of the following are true:
   identity, and verified against its manifest and checksums;
 - the protected customer configuration and every external dependency have
   passed the documented preflight and live qualification gates;
+- the selected operational rules are loaded and healthy, component heartbeats
+  are visible, and one synthetic firing/recovery route is currently qualified;
 - the aggregate customer readiness report says `design-partner-candidate` and
   is still current;
 - customer and platform owners approve the workload proxy, planned

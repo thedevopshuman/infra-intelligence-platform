@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:customer-operational-alert-qualification-profile:v1alpha1",
+  "title": "Customer Operational Alert Qualification Profile",
+  "description": "Protected selection of one customer Prometheus-compatible evaluator, Alertmanager-compatible router, and synthetic notification receipt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "CustomerOperationalAlertQualificationProfile"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "reviewedAt"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "reviewedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ruleSet", "deployment", "monitoring", "objective"],
+      "properties": {
+        "ruleSet": {"enum": ["core-v1", "ai-finops-v0"]},
+        "deployment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["clusterBindingDigest", "namespaceBindingDigest"],
+          "properties": {
+            "clusterBindingDigest": {"$ref": "#/$defs/digest"},
+            "namespaceBindingDigest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "monitoring": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["prometheusBaseUrl", "alertmanagerBaseUrl", "receiptUrl", "productionRuleGroup", "syntheticRuleGroup", "syntheticAlertName", "probeId", "routeId", "services"],
+          "properties": {
+            "prometheusBaseUrl": {"$ref": "#/$defs/httpsUrl"},
+            "alertmanagerBaseUrl": {"$ref": "#/$defs/httpsUrl"},
+            "receiptUrl": {"$ref": "#/$defs/httpsUrl"},
+            "productionRuleGroup": {"const": "iip.platform.availability"},
+            "syntheticRuleGroup": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{2,127}$", "not": {"const": "iip.platform.availability"}},
+            "syntheticAlertName": {"const": "IIPQualificationSynthetic"},
+            "probeId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{2,127}$"},
+            "routeId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{2,127}$"},
+            "services": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["component", "serviceName"],
+                "properties": {
+                  "component": {"enum": ["api", "workflow-worker", "otlp-receiver"]},
+                  "serviceName": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{2,127}$"}
+                }
+              }
+            }
+          }
+        },
+        "objective": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requestTimeoutMilliseconds", "maximumResponseBytes", "maximumObservationAgeSeconds", "maximumNotificationLatencyMilliseconds", "maximumClockSkewSeconds", "maximumProfileAgeSeconds", "reportValiditySeconds"],
+          "properties": {
+            "requestTimeoutMilliseconds": {"type": "integer", "minimum": 100, "maximum": 30000},
+            "maximumResponseBytes": {"type": "integer", "minimum": 4096, "maximum": 1048576},
+            "maximumObservationAgeSeconds": {"type": "integer", "minimum": 30, "maximum": 3600},
+            "maximumNotificationLatencyMilliseconds": {"type": "integer", "minimum": 100, "maximum": 300000},
+            "maximumClockSkewSeconds": {"type": "integer", "minimum": 0, "maximum": 300},
+            "maximumProfileAgeSeconds": {"type": "integer", "minimum": 3600, "maximum": 7776000},
+            "reportValiditySeconds": {"type": "integer", "minimum": 300, "maximum": 604800}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "httpsUrl": {"type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048},
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+  }
+}

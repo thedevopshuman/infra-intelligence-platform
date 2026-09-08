@@ -1,4 +1,4 @@
-.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-oidc-qualification qualify-customer-oidc verify-customer-oidc-qualification-report test-customer-policy-qualification qualify-customer-policy verify-customer-policy-qualification-report test-customer-credential-broker-qualification qualify-customer-credential-broker verify-customer-credential-broker-qualification-report test-customer-github-context-qualification qualify-customer-github-context verify-customer-github-context-qualification-report test-customer-bedrock-qualification qualify-customer-bedrock verify-customer-bedrock-qualification-report test-customer-ai-finops-prerequisites qualify-customer-ai-finops-prerequisites verify-customer-ai-finops-prerequisite-report test-customer-ai-finops-flow qualify-customer-ai-finops-flow verify-customer-ai-finops-flow-report test-customer-pilot-readiness assess-customer-pilot-readiness verify-customer-pilot-readiness-report test-customer-failure-overlap assess-customer-failure-overlap verify-customer-failure-overlap-report test-customer-otlp-receiver-qualification qualify-customer-otlp-receiver verify-customer-otlp-receiver-qualification-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-sustained-workload qualify-customer-sustained-workload verify-customer-sustained-workload-report test-customer-postgresql-continuity qualify-customer-postgresql-continuity verify-customer-postgresql-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-operational-alerts test-otlp-receiver test-ai-finops verify-ai-finops-runtime-report test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
+.PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-oidc-qualification qualify-customer-oidc verify-customer-oidc-qualification-report test-customer-operational-alert-qualification qualify-customer-operational-alerts verify-customer-operational-alert-qualification-report test-customer-policy-qualification qualify-customer-policy verify-customer-policy-qualification-report test-customer-credential-broker-qualification qualify-customer-credential-broker verify-customer-credential-broker-qualification-report test-customer-github-context-qualification qualify-customer-github-context verify-customer-github-context-qualification-report test-customer-bedrock-qualification qualify-customer-bedrock verify-customer-bedrock-qualification-report test-customer-ai-finops-prerequisites qualify-customer-ai-finops-prerequisites verify-customer-ai-finops-prerequisite-report test-customer-ai-finops-flow qualify-customer-ai-finops-flow verify-customer-ai-finops-flow-report test-customer-pilot-readiness assess-customer-pilot-readiness verify-customer-pilot-readiness-report test-customer-failure-overlap assess-customer-failure-overlap verify-customer-failure-overlap-report test-customer-otlp-receiver-qualification qualify-customer-otlp-receiver verify-customer-otlp-receiver-qualification-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-sustained-workload qualify-customer-sustained-workload verify-customer-sustained-workload-report test-customer-postgresql-continuity qualify-customer-postgresql-continuity verify-customer-postgresql-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-operational-alerts test-otlp-receiver test-ai-finops verify-ai-finops-runtime-report test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 PYTHON ?= python3
 HELM ?= helm
@@ -67,6 +67,16 @@ IIP_CUSTOMER_BEDROCK_PROFILE ?=
 IIP_CUSTOMER_BEDROCK_AWS_CREDENTIALS_FILE ?=
 IIP_CUSTOMER_BEDROCK_IMAGE_DIGEST ?= $(IIP_CONTINUITY_IMAGE_DIGEST)
 IIP_CUSTOMER_BEDROCK_ALLOW_PROVIDER_CALL ?= false
+IIP_CUSTOMER_OPERATIONAL_ALERT_REPORT ?= dist/customer-operational-alert-qualification-report.json
+IIP_CUSTOMER_OPERATIONAL_ALERT_PROFILE ?=
+IIP_CUSTOMER_OPERATIONAL_ALERT_PROMETHEUS_TOKEN_FILE ?=
+IIP_CUSTOMER_OPERATIONAL_ALERT_ALERTMANAGER_TOKEN_FILE ?=
+IIP_CUSTOMER_OPERATIONAL_ALERT_RECEIPT_TOKEN_FILE ?=
+IIP_CUSTOMER_OPERATIONAL_ALERT_PROMETHEUS_CA_FILE ?=
+IIP_CUSTOMER_OPERATIONAL_ALERT_ALERTMANAGER_CA_FILE ?=
+IIP_CUSTOMER_OPERATIONAL_ALERT_RECEIPT_CA_FILE ?=
+IIP_CUSTOMER_OPERATIONAL_ALERT_IMAGE_DIGEST ?= $(IIP_CONTINUITY_IMAGE_DIGEST)
+IIP_CUSTOMER_OPERATIONAL_ALERT_ALLOW_OBSERVATION ?= false
 IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_PROFILE ?=
 IIP_CUSTOMER_AI_FINOPS_PREREQUISITE_REPORT ?= dist/customer-ai-finops-prerequisite-report.json
 IIP_CUSTOMER_AI_FINOPS_FLOW_PROFILE ?=
@@ -224,6 +234,9 @@ help:
 	@echo "test-customer-oidc-qualification Validate external OIDC evidence and safe client boundaries"
 	@echo "qualify-customer-oidc Qualify one customer issuer and deployed release"
 	@echo "verify-customer-oidc-qualification-report Rebind retained OIDC evidence"
+	@echo "test-customer-operational-alert-qualification Validate alert-route evidence boundaries"
+	@echo "qualify-customer-operational-alerts Read one customer evaluator and firing/recovery route"
+	@echo "verify-customer-operational-alert-qualification-report Rebind retained alert-route evidence"
 	@echo "test-customer-policy-qualification Validate external policy-bundle evidence"
 	@echo "qualify-customer-policy Qualify reviewed customer allow/deny policy cases"
 	@echo "verify-customer-policy-qualification-report Rebind retained customer policy evidence"
@@ -511,6 +524,61 @@ verify-customer-oidc-qualification-report:
 		--profile "$(IIP_CUSTOMER_OIDC_PROFILE)" \
 		--api-base-url "$(IIP_CUSTOMER_OIDC_API_BASE_URL)" \
 		--image-digest "$(IIP_CUSTOMER_OIDC_IMAGE_DIGEST)" \
+		--require-qualified
+
+test-customer-operational-alert-qualification:
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_customer_operational_alert_qualification -v
+
+qualify-customer-operational-alerts:
+	@test "$(IIP_CUSTOMER_OPERATIONAL_ALERT_ALLOW_OBSERVATION)" = true || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_ALLOW_OBSERVATION must equal true" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_PROFILE)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_PROMETHEUS_TOKEN_FILE)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_PROMETHEUS_TOKEN_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_ALERTMANAGER_TOKEN_FILE)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_ALERTMANAGER_TOKEN_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_RECEIPT_TOKEN_FILE)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_RECEIPT_TOKEN_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_PROMETHEUS_CA_FILE)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_PROMETHEUS_CA_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_ALERTMANAGER_CA_FILE)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_ALERTMANAGER_CA_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_RECEIPT_CA_FILE)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_RECEIPT_CA_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_IMAGE_DIGEST)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_IMAGE_DIGEST is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_operational_alerts.py qualify \
+		--profile "$(IIP_CUSTOMER_OPERATIONAL_ALERT_PROFILE)" \
+		--image-digest "$(IIP_CUSTOMER_OPERATIONAL_ALERT_IMAGE_DIGEST)" \
+		--prometheus-token-file "$(IIP_CUSTOMER_OPERATIONAL_ALERT_PROMETHEUS_TOKEN_FILE)" \
+		--alertmanager-token-file "$(IIP_CUSTOMER_OPERATIONAL_ALERT_ALERTMANAGER_TOKEN_FILE)" \
+		--receipt-token-file "$(IIP_CUSTOMER_OPERATIONAL_ALERT_RECEIPT_TOKEN_FILE)" \
+		--prometheus-ca-file "$(IIP_CUSTOMER_OPERATIONAL_ALERT_PROMETHEUS_CA_FILE)" \
+		--alertmanager-ca-file "$(IIP_CUSTOMER_OPERATIONAL_ALERT_ALERTMANAGER_CA_FILE)" \
+		--receipt-ca-file "$(IIP_CUSTOMER_OPERATIONAL_ALERT_RECEIPT_CA_FILE)" \
+		--output "$(IIP_CUSTOMER_OPERATIONAL_ALERT_REPORT)" \
+		--allow-monitoring-observation
+
+verify-customer-operational-alert-qualification-report:
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_PROFILE)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_PROFILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_PROMETHEUS_CA_FILE)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_PROMETHEUS_CA_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_ALERTMANAGER_CA_FILE)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_ALERTMANAGER_CA_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_RECEIPT_CA_FILE)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_RECEIPT_CA_FILE is required" >&2; exit 2)
+	@test -n "$(IIP_CUSTOMER_OPERATIONAL_ALERT_IMAGE_DIGEST)" || \
+		(echo "IIP_CUSTOMER_OPERATIONAL_ALERT_IMAGE_DIGEST is required" >&2; exit 2)
+	PYTHONPATH=scripts:src:sdks/python/src $(PYTHON) scripts/qualify_customer_operational_alerts.py verify \
+		--report "$(IIP_CUSTOMER_OPERATIONAL_ALERT_REPORT)" \
+		--profile "$(IIP_CUSTOMER_OPERATIONAL_ALERT_PROFILE)" \
+		--image-digest "$(IIP_CUSTOMER_OPERATIONAL_ALERT_IMAGE_DIGEST)" \
+		--prometheus-ca-file "$(IIP_CUSTOMER_OPERATIONAL_ALERT_PROMETHEUS_CA_FILE)" \
+		--alertmanager-ca-file "$(IIP_CUSTOMER_OPERATIONAL_ALERT_ALERTMANAGER_CA_FILE)" \
+		--receipt-ca-file "$(IIP_CUSTOMER_OPERATIONAL_ALERT_RECEIPT_CA_FILE)" \
 		--require-qualified
 
 test-customer-policy-qualification:

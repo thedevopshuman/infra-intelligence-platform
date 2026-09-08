@@ -53,6 +53,14 @@ evidence requires the closed policy; live evidence adds read-only exact-API and
 target-namespace discovery while retaining no namespace or discovery payload.
 Evaluation and notification delivery remain outside the preflight claim.
 
+[ADR 0151](../decisions/0151-customer-operational-alert-route-qualification.md)
+adds a separate read-only customer qualification boundary for the documented
+Prometheus/Alertmanager adapter. It binds loaded/healthy rules, translated
+component heartbeats, router readiness, and one synthetic firing/recovery
+receipt while retaining only aggregates and digests. Monitoring configuration,
+the temporary rule, receipt service, contacts, and mutation authority remain
+customer-owned.
+
 [ADR 0150](../decisions/0150-otel-component-heartbeat-and-missing-signal-alerts.md)
 adds one fail-open, privacy-safe component heartbeat through the same metrics
 exporter and separate missing-series rules for enabled API, worker, and receiver
@@ -112,6 +120,7 @@ Collector's own self-metrics. ADRs 0088 and 0089 additionally enforce a
 configured client CRL and fail readiness/intake when its validity window
 closes. ADR 0090 proves a root/intermediate/leaf client hierarchy plus
 activation of a newer CRL through an explicit receiver rollout.
-Customer-specific PKI/OCSP and CRL-distribution qualification, regional
-aggregation of the queue/loss objective, and notification routing remain
-Phase 3 operational-hardening gates.
+Customer-specific PKI/OCSP and CRL-distribution qualification and regional
+aggregation of the queue/loss objective remain Phase 3 operational-hardening
+gates. One Prometheus/Alertmanager notification route is now qualifiable under
+ADR 0151; additional backends, routes, HA, and escalation remain external.

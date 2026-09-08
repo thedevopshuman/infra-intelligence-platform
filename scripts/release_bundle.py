@@ -38,6 +38,8 @@ REQUIRED_PILOT_HANDOFF_PATHS = frozenset(
         "docs/operations/release-artifacts.md",
         "docs/operations/helm-deployment.md",
         "docs/operations/operational-alerts.md",
+        "docs/operations/customer-operational-alert-qualification.md",
+        "docs/specifications/customer-operational-alert-qualification-contract.md",
     }
 )
 

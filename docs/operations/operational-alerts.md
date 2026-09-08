@@ -67,6 +67,12 @@ also discovers the exact namespaced PrometheusRule API and confirms the target
 namespace exists. That pass still does not prove selector, evaluation, or
 notification delivery.
 
+After installation, run the read-only
+[customer operational-alert qualification](customer-operational-alert-qualification.md).
+It verifies rule selection and health, translated heartbeat presence, router
+readiness, and one customer-generated synthetic firing/recovery receipt. The
+qualifier does not install a rule or send an alert.
+
 Before publishing a release, validate both rendered production profiles with
 the same Prometheus parser used by the reference backend:
 
@@ -169,4 +175,6 @@ customer backend's rule language. Do not reuse these metric names if the
 Collector/backend applies a different name translation. Preserve aggregation,
 minimum-sample, privacy, and missing-data semantics. Qualify one deliberately
 firing synthetic condition and one recovery notification before relying on
-the adapter in a pilot.
+the adapter in a pilot. The bundled customer qualification targets the
+documented Prometheus/Alertmanager API profile; another backend needs an
+equivalent source-bound adapter and report rather than an unsupported claim.

@@ -201,7 +201,12 @@ notification operation remain open. ADR 0148 supplies an optional bounded
 Prometheus rule profile without claiming those customer-owned outcomes. ADR
 0150 adds a traffic-independent OTel component heartbeat and missing-series
 rules while leaving independent backend monitoring and notification delivery
-external.
+external. ADR 0151 adds a read-only customer-environment qualifier for the
+documented Prometheus/Alertmanager adapter: it binds loaded and healthy rules,
+positive component heartbeats, router readiness, and one current synthetic
+firing/recovery receipt. The customer still owns the temporary rule, receipt
+service, routes, contacts, escalation, HA, regional aggregation, and real
+failure exercises.
 
 Deployment update: ADR 0109 adds zero-unavailable worker and receiver rollouts,
 component-specific disruption budgets, chart-generated hard topology spread,
@@ -299,7 +304,7 @@ fit inside the same customer-approved private-pilot proxy. Representative
 production traffic, automatic and involuntary failover, production operation,
 and partner acceptance remain outside the preflight.
 
-Update: ADR 0058 adds a deployment-configured rolling useful-completion SLO over durable asynchronous jobs, including explicit late, failed, cancelled, and unfinished misses. ADR 0059 adds a privacy-bounded query availability counter and duration histogram with explicit objective values over the replaceable OTLP metrics boundary. Bounded external ingress qualification is delivered by ADR 0105; continuous regional coverage and notification routing remain open.
+Update: ADR 0058 adds a deployment-configured rolling useful-completion SLO over durable asynchronous jobs, including explicit late, failed, cancelled, and unfinished misses. ADR 0059 adds a privacy-bounded query availability counter and duration histogram with explicit objective values over the replaceable OTLP metrics boundary. Bounded external ingress qualification is delivered by ADR 0105, and ADR 0151 qualifies one synthetic customer notification route. Continuous regional coverage, additional routes, and operating escalation remain open.
 
 ## Phase 4 — governed actions and workflows
 

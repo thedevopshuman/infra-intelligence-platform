@@ -1,13 +1,13 @@
 {
-  "apiVersion": "iip.platform/v1alpha1",
+  "apiVersion": "iip.platform/v1alpha2",
   "kind": "CustomerPilotReadinessProfile",
   "metadata": {
-    "id": "cprp_769b1b0f8f70e8003a4ab2493462f3bb",
+    "id": "cprp_16e216dd14585e1c6c26621ce2ee546e",
     "reviewedAt": "2026-09-08T08:00:00Z",
     "validUntil": "2026-09-15T08:00:00Z"
   },
   "spec": {
-    "qualificationLevel": "customer-ai-finops-design-partner-v1",
+    "qualificationLevel": "customer-ai-finops-design-partner-v2",
     "release": {
       "applicationVersion": "0.84.0",
       "chartVersion": "0.87.0",
@@ -20,11 +20,14 @@
       "signaturePolicyDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "publicationTargetSetDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "clusterBindingDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "namespaceBindingDigest": "sha256:1212121212121212121212121212121212121212121212121212121212121212",
       "environmentBindingDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "controlPlaneTargetDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
       "otlpTargetDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
       "sustainedWorkloadProfileDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
-      "failureOverlapProfileDigest": "sha256:abababababababababababababababababababababababababababababababab"
+      "failureOverlapProfileDigest": "sha256:abababababababababababababababababababababababababababababababab",
+      "operationalAlertProfileDigest": "sha256:2323232323232323232323232323232323232323232323232323232323232323",
+      "operationalAlertBindingSetDigest": "sha256:3434343434343434343434343434343434343434343434343434343434343434"
     },
     "objective": {
       "maximumProfileAgeSeconds": 2592000,

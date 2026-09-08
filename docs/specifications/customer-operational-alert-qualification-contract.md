@@ -2,7 +2,9 @@
 
 **Status:** `v1alpha1` executable customer-environment evidence
 
-**Decision:** [ADR 0151](../decisions/0151-customer-operational-alert-route-qualification.md)
+**Decisions:** [ADR 0151](../decisions/0151-customer-operational-alert-route-qualification.md)
+and
+[ADR 0152](../decisions/0152-require-operational-alert-qualification-before-private-pilot.md)
 
 **Machine contracts:**
 [`customer-operational-alert-qualification-profile.schema.json`](../../contracts/schemas/customer-operational-alert-qualification-profile.schema.json)
@@ -92,3 +94,9 @@ evidence, including reports generated beyond the accepted future clock skew.
 qualify the receipt service's authenticity/retention, other routes or receivers,
 silences/inhibition, human response/escalation, monitoring HA, long-window or
 regional SLOs, disaster recovery, or the effects of a real component failure.
+
+For `customer-ai-finops-design-partner-v2` admission, this report is the
+mandatory tenth pilot-readiness source. It must use `ai-finops-v0`, start after
+the selected deployment qualification, and cross-bind the same release,
+cluster, namespace, and AI-flow Prometheus target. That requirement adds no
+monitoring or pilot authority to either qualifier.

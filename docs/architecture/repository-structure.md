@@ -105,10 +105,22 @@ Customer pilot readiness is an additive host-side promotion preflight.
 `scripts/assess_customer_pilot_readiness.py` revalidates and cross-binds the
 existing publication, organizational signature, local readiness, customer
 deployment, bounded read load, sustained core-workload, customer-approved
-planned-failure overlap, AI prerequisite, and same-invocation reports. It
-does not repeat their external actions or import signing, registry, customer,
-provider, load-generation, installation, or mutation authority. Only the
-protected profile and minimized report shapes enter the public SDK boundary.
+planned-failure overlap, AI prerequisite, same-invocation, and customer
+operational-alert reports. Its v2 aggregate additionally binds the exact
+namespace, `ai-finops-v0` alert profile, canonical alert binding set, and
+same-invocation Prometheus target and requires alert observation after
+deployment qualification. It does not repeat their external actions or import
+signing, registry, customer, provider, load-generation, installation,
+monitoring-mutation, or pilot authority. Only the protected profile and
+minimized report shapes enter the public SDK boundary.
+
+Customer operational-alert qualification is a separate read-only host-side
+harness. `scripts/qualify_customer_operational_alerts.py` reads bounded
+CA-verified Prometheus, Alertmanager, and customer receipt APIs with three
+distinct credentials, then emits aggregate-only evidence for loaded rules,
+component heartbeats, and one synthetic firing/recovery route. It does not
+install rules, post or silence alerts, change routes, stop a component, contact
+a person, or enter an API, worker, agent, plugin, or SDK authority path.
 
 Customer sustained-workload qualification remains a separate host-side
 operational harness. `scripts/qualify_customer_sustained_workload.py` reuses

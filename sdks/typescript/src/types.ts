@@ -2873,7 +2873,7 @@ export interface CustomerFailureOverlapQualificationReport {
 }
 
 export interface CustomerPilotReadinessProfile {
-  apiVersion: "iip.platform/v1alpha1";
+  apiVersion: "iip.platform/v1alpha2";
   kind: "CustomerPilotReadinessProfile";
   metadata: {
     id: `cprp_${string}`;
@@ -2881,7 +2881,7 @@ export interface CustomerPilotReadinessProfile {
     validUntil: string;
   };
   spec: {
-    qualificationLevel: "customer-ai-finops-design-partner-v1";
+    qualificationLevel: "customer-ai-finops-design-partner-v2";
     release: {
       applicationVersion: string;
       chartVersion: string;
@@ -2894,11 +2894,14 @@ export interface CustomerPilotReadinessProfile {
       signaturePolicyDigest: Sha256Digest;
       publicationTargetSetDigest: Sha256Digest;
       clusterBindingDigest: Sha256Digest;
+      namespaceBindingDigest: Sha256Digest;
       environmentBindingDigest: Sha256Digest;
       controlPlaneTargetDigest: Sha256Digest;
       otlpTargetDigest: Sha256Digest;
       sustainedWorkloadProfileDigest: Sha256Digest;
       failureOverlapProfileDigest: Sha256Digest;
+      operationalAlertProfileDigest: Sha256Digest;
+      operationalAlertBindingSetDigest: Sha256Digest;
     };
     objective: {
       maximumProfileAgeSeconds: number;
@@ -2919,7 +2922,8 @@ export type CustomerPilotReadinessEvidenceId =
   | "sustained-core-workload"
   | "customer-failure-overlap"
   | "ai-finops-prerequisites"
-  | "same-invocation-ai-finops";
+  | "same-invocation-ai-finops"
+  | "customer-operational-alerts";
 
 export type CustomerPilotReadinessCheckId =
   | "source-binding"
@@ -2935,17 +2939,20 @@ export type CustomerPilotReadinessCheckId =
   | "customer-failure-overlap"
   | "ai-finops-prerequisites"
   | "same-invocation-ai-finops"
+  | "customer-operational-alerts"
   | "publication-signature-chain"
   | "deployed-image-chain"
   | "customer-environment-chain"
+  | "operational-alert-environment-chain"
   | "sustained-workload-environment-chain"
   | "failure-overlap-environment-chain"
   | "post-deployment-load-window"
+  | "post-deployment-operational-alert-window"
   | "post-deployment-sustained-workload-window"
   | "minimized-output";
 
 export interface CustomerPilotReadinessReport {
-  apiVersion: "iip.platform/v1alpha1";
+  apiVersion: "iip.platform/v1alpha2";
   kind: "CustomerPilotReadinessReport";
   metadata: {
     id: `cpr_${string}`;
@@ -2956,7 +2963,7 @@ export interface CustomerPilotReadinessReport {
   };
   spec: {
     status: "design-partner-candidate" | "not-candidate";
-    qualificationLevel: "customer-ai-finops-design-partner-v1";
+    qualificationLevel: "customer-ai-finops-design-partner-v2";
     qualificationBoundary: "private-design-partner-preflight";
     subject: {
       applicationVersion: string;
@@ -2973,6 +2980,7 @@ export interface CustomerPilotReadinessReport {
       releasePublicationReportDigest: Sha256Digest;
       releaseSignatureReportDigest: Sha256Digest;
       customerDeploymentReportDigest: Sha256Digest;
+      customerOperationalAlertReportDigest: Sha256Digest;
       controlPlaneLoadReportDigest: Sha256Digest;
       sustainedWorkloadReportDigest: Sha256Digest;
       failureOverlapReportDigest: Sha256Digest;
@@ -2995,6 +3003,8 @@ export interface CustomerPilotReadinessReport {
       newestFoundationEvidenceAt: string;
       oldestCustomerEvidenceAt: string;
       customerDeploymentQualifiedAt: string;
+      operationalAlertStartedAt: string;
+      operationalAlertQualifiedAt: string;
       controlPlaneLoadStartedAt: string;
       controlPlaneLoadCompletedAt: string;
       sustainedWorkloadStartedAt: string;
@@ -3012,6 +3022,7 @@ export interface CustomerPilotReadinessReport {
         | "ReleasePublicationReport"
         | "ReleaseSignatureVerificationReport"
         | "CustomerDeploymentQualificationReport"
+        | "CustomerOperationalAlertQualificationReport"
         | "ControlPlaneLoadQualificationReport"
         | "CustomerSustainedWorkloadQualificationReport"
         | "CustomerFailureOverlapQualificationReport"
@@ -3022,6 +3033,7 @@ export interface CustomerPilotReadinessReport {
         | "registry-publication"
         | "organizational-trust"
         | "customer-deployment"
+        | "customer-rule-evaluation-and-notification-route"
         | "customer-load"
         | "customer-environment-sustained-workload"
         | "customer-environment-planned-failure-overlap"
@@ -3072,10 +3084,10 @@ export interface CustomerPilotReadinessReport {
       },
     ];
     summary: {
-      requiredEvidence: 9;
+      requiredEvidence: 10;
       passedEvidence: number;
       rejectedEvidence: number;
-      totalChecks: 21;
+      totalChecks: 24;
       passedChecks: number;
       failedChecks: number;
       externalGateCount: 3;

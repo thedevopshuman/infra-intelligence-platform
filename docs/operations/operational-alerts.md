@@ -73,6 +73,13 @@ It verifies rule selection and health, translated heartbeat presence, router
 readiness, and one customer-generated synthetic firing/recovery receipt. The
 qualifier does not install a rule or send an alert.
 
+For the private AI FinOps pilot, use the complete `ai-finops-v0` profile and
+run the qualifier only after the selected customer deployment is qualified.
+Its current minimized report is the mandatory tenth source in
+`customer-ai-finops-design-partner-v2` readiness. The pilot assessor cross-
+binds the exact release, cluster, namespace, alert profile/binding set, and
+same-invocation Prometheus target but acquires no monitoring authority.
+
 Before publishing a release, validate both rendered production profiles with
 the same Prometheus parser used by the reference backend:
 

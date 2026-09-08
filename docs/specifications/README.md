@@ -159,4 +159,9 @@ The authenticated control plane, independently authenticated OTLP intake listene
 
 `v1alpha1` means consumers should pin versions and expect deliberate evolution. Breaking changes create a new API/schema version. Fields are never silently repurposed.
 
+The customer pilot readiness profile and report use `iip.platform/v1alpha2`
+after their ten-source admission change. Their embedded release subject and
+seven platform/customer source contracts remain `iip.platform/v1alpha1`; the
+three release-evidence source contracts remain `iip.dev/v1alpha1`.
+
 Planned contracts: evaluation results and asynchronous AI economics exports.

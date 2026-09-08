@@ -4,6 +4,11 @@
 
 **Date:** 2026-09-06
 
+The `v1` in this document names the first usable product slice. Its current
+admission contract uses the stricter
+`customer-ai-finops-design-partner-v2` evidence semantics from ADR 0152; those
+versions describe different boundaries.
+
 ## Product outcome
 
 The first usable release is a private, single-design-partner deployment that
@@ -38,11 +43,12 @@ unavailable. Prompt and response content is rejected by default.
   the Grafana reference dashboard.
 - Signed immutable image publication, software-bill-of-materials and
   vulnerability gates, a verified Helm bundle, minimized diagnostics, and the
-  private-pilot readiness evidence join.
-- Optional privacy-bounded Prometheus operational rules, with the customer
-  retaining the monitoring CRD, evaluation, routing, contact, and escalation
-  authority, plus a read-only source-bound qualification of one synthetic
-  firing/recovery route.
+  v2 private-pilot readiness evidence join.
+- Privacy-bounded Prometheus operational rules using `ai-finops-v0` for this
+  pilot, with the customer retaining the monitoring CRD, evaluation, routing,
+  contact, and escalation authority, plus a read-only source-bound
+  qualification of one synthetic firing/recovery route. The rule handoff
+  remains optional for deployments outside this admission profile.
 
 The customer may operate only a subset of the investigation integrations, but
 the first AI FinOps pilot admission requires the same-invocation Bedrock flow
@@ -56,10 +62,12 @@ A pilot can start only when all of the following are true:
   identity, and verified against its manifest and checksums;
 - the protected customer configuration and every external dependency have
   passed the documented preflight and live qualification gates;
-- the selected operational rules are loaded and healthy, component heartbeats
-  are visible, and one synthetic firing/recovery route is currently qualified;
-- the aggregate customer readiness report says `design-partner-candidate` and
-  is still current;
+- the selected `ai-finops-v0` operational rules are loaded and healthy,
+  component heartbeats are visible, and one synthetic firing/recovery route is
+  currently qualified after the selected deployment;
+- the aggregate customer readiness report uses
+  `customer-ai-finops-design-partner-v2`, includes that alert evidence as its
+  tenth exact source, says `design-partner-candidate`, and is still current;
 - customer and platform owners approve the workload proxy, planned
   disruptions, cost boundary, data handling, rollback, and evidence retention;
 - named support and security channels, participants, service hours, response
@@ -68,7 +76,9 @@ A pilot can start only when all of the following are true:
 
 The readiness report is evidence for this decision. It does not make the
 decision and carries no installation, provider-call, disruption, signing, or
-production authority.
+production authority. Historical nine-input
+`customer-ai-finops-design-partner-v1` reports cannot satisfy this admission
+boundary.
 
 ## Pilot success measures
 

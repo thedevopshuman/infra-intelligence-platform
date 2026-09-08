@@ -1,5 +1,11 @@
 # TypeScript SDK boundary
 
+Version 0.82 upgrades the offline customer pilot readiness types to
+`iip.platform/v1alpha2` and `customer-ai-finops-design-partner-v2`. A candidate now requires a tenth,
+source-bound `CustomerOperationalAlertQualificationReport`, its protected
+profile and complete binding-set digests, and post-deployment alert timing;
+the SDK adds no monitoring mutation or notification authority.
+
 Version 0.81 adds offline `CustomerOperationalAlertQualificationProfile` and
 `CustomerOperationalAlertQualificationReport` types. They describe the
 protected selection and minimized read-only proof for one customer evaluator

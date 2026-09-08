@@ -80,9 +80,13 @@ A separate customer pilot readiness aggregate now joins the exact local
 candidate, registry publication, organizational signatures, qualified customer
 deployment, post-deployment bounded read load, bounded sustained core workload,
 customer-approved planned-failure overlap, AI prerequisites, and
-same-invocation result. Its `design-partner-candidate` status is deliberately a
-private preflight rather than pilot acceptance, production certification, or
-public-launch approval.
+same-invocation result. The v2 semantic level adds the current post-deployment
+`ai-finops-v0` operational-alert report as the tenth source and binds its exact
+release, cluster, namespace, protected profile/binding set, and Prometheus
+target. Its `design-partner-candidate` status is deliberately a private
+preflight rather than pilot acceptance, production certification, or public-
+launch approval. The historical nine-input v1 aggregate is not current
+admission evidence.
 
 The first private-pilot technical scope and ordered operating handoff are now
 explicit. Current release bundles include a checksum-bound documentation
@@ -99,8 +103,11 @@ escalation, and long-window/regional operation remain external deployment
 gates.
 Both production preflight profiles now require the closed policy, and cluster
 mode proves exact PrometheusRule discovery plus the target namespace before
-installation. Prometheus selection and notification delivery are still not
-inferred from those prerequisites.
+installation. Those prerequisites do not infer Prometheus selection or
+notification delivery. A separate read-only customer qualifier now observes
+all `ai-finops-v0` rules, expected heartbeats, router readiness, and one
+synthetic firing/recovery receipt; ADR 0152 requires that evidence in pilot
+readiness without transferring monitoring authority.
 
 One fail-closed local release command now composes the source, integration,
 recovery, multi-node availability, bundle, packaged N-1, vulnerability, and
@@ -300,9 +307,14 @@ Pilot-readiness update: ADR 0145 makes that sustained report the eighth private
 pilot input, rebinds its protected profile plus API/OTLP targets to the exact
 deployment, and requires a post-deployment window. ADR 0146 adds a ninth input
 that proves the planned API, worker/receiver, and PostgreSQL continuity windows
-fit inside the same customer-approved private-pilot proxy. Representative
-production traffic, automatic and involuntary failover, production operation,
-and partner acceptance remain outside the preflight.
+fit inside the same customer-approved private-pilot proxy. ADR 0152 advances
+the semantic level to `customer-ai-finops-design-partner-v2` and adds the
+post-deployment `ai-finops-v0` operational-alert report as the mandatory tenth
+input, cross-bound to the exact release, cluster, namespace, alert profile/
+binding set, and same-invocation Prometheus target. Historical v1 evidence
+cannot satisfy current admission. Representative production traffic,
+automatic and involuntary failover, production operation, other alert routes,
+human escalation, and partner acceptance remain outside the preflight.
 
 Update: ADR 0058 adds a deployment-configured rolling useful-completion SLO over durable asynchronous jobs, including explicit late, failed, cancelled, and unfinished misses. ADR 0059 adds a privacy-bounded query availability counter and duration histogram with explicit objective values over the replaceable OTLP metrics boundary. Bounded external ingress qualification is delivered by ADR 0105, and ADR 0151 qualifies one synthetic customer notification route. Continuous regional coverage, additional routes, and operating escalation remain open.
 

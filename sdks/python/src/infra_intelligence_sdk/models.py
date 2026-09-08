@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 
 API_VERSION = "iip.platform/v1alpha1"
+PILOT_READINESS_API_VERSION = "iip.platform/v1alpha2"
 
 
 @dataclass(frozen=True)
@@ -79,8 +80,9 @@ def _validate_envelope(
     *,
     kind: str,
     label: str,
+    api_version: str = API_VERSION,
 ) -> Dict[str, Any]:
-    if payload.get("apiVersion") != API_VERSION:
+    if payload.get("apiVersion") != api_version:
         raise ValueError(f"unsupported {label} apiVersion")
     if payload.get("kind") != kind:
         raise ValueError(f"{label} kind must be {kind}")
@@ -1143,6 +1145,7 @@ class CustomerPilotReadinessProfile:
                 payload,
                 kind="CustomerPilotReadinessProfile",
                 label="customer pilot readiness profile",
+                api_version=PILOT_READINESS_API_VERSION,
             )
         )
 
@@ -1169,6 +1172,7 @@ class CustomerPilotReadinessReport:
                 payload,
                 kind="CustomerPilotReadinessReport",
                 label="customer pilot readiness report",
+                api_version=PILOT_READINESS_API_VERSION,
             )
         )
 

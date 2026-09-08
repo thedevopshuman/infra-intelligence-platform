@@ -178,6 +178,7 @@ REQUIRED_PATHS = (
     "scripts/qualify_customer_ai_finops_flow.py",
     "tests/test_customer_ai_finops_flow.py",
     "docs/decisions/0143-customer-pilot-readiness-aggregation.md",
+    "docs/decisions/0152-require-operational-alert-qualification-before-private-pilot.md",
     "docs/specifications/customer-pilot-readiness-contract.md",
     "contracts/schemas/customer-pilot-readiness-profile.schema.json",
     "contracts/schemas/customer-pilot-readiness-report.schema.json",
@@ -1062,12 +1063,13 @@ def validate_versioned_envelope(
     *,
     filename: str,
     kind: str,
+    api_version: str = "iip.platform/v1alpha1",
     errors: List[str],
 ) -> None:
     if not isinstance(document, dict):
         fail(errors, f"{filename} must be an object")
         return
-    if document.get("apiVersion") != "iip.platform/v1alpha1" or document.get("kind") != kind:
+    if document.get("apiVersion") != api_version or document.get("kind") != kind:
         fail(errors, f"{filename} has the wrong version or kind")
     if not isinstance(document.get("metadata"), dict) or not isinstance(
         document.get("spec"), dict
@@ -2797,7 +2799,7 @@ def validate_customer_pilot_readiness_examples(
     report = documents.get(example_dir / "customer-pilot-readiness-report.json")
     try:
         from assess_customer_pilot_readiness import (
-            API_VERSION,
+            SOURCE_API_VERSION,
             CustomerPilotReadinessError,
             _digest,
             validate_profile,
@@ -2821,17 +2823,20 @@ def validate_customer_pilot_readiness_examples(
         report_bindings = report_spec["bindings"]
         expected_subject = {
             **profile_release,
-            "contractsApiVersion": API_VERSION,
+            "contractsApiVersion": SOURCE_API_VERSION,
         }
         expected_environment = {
             key: profile_bindings[key]
             for key in (
                 "clusterBindingDigest",
+                "namespaceBindingDigest",
                 "environmentBindingDigest",
                 "controlPlaneTargetDigest",
                 "otlpTargetDigest",
                 "sustainedWorkloadProfileDigest",
                 "failureOverlapProfileDigest",
+                "operationalAlertProfileDigest",
+                "operationalAlertBindingSetDigest",
             )
         }
         if (
@@ -6060,9 +6065,23 @@ def validate_examples(documents: Mapping[Path, object], errors: List[str]) -> No
             "ResourceChangeEvidenceResult",
         ),
     )
+    v1alpha2_examples = {
+        "customer-pilot-readiness-profile.json",
+        "customer-pilot-readiness-report.json",
+    }
     for name, kind in versioned_examples:
         manifest = documents.get(example_dir / name)
-        validate_versioned_envelope(manifest, filename=name, kind=kind, errors=errors)
+        validate_versioned_envelope(
+            manifest,
+            filename=name,
+            kind=kind,
+            api_version=(
+                "iip.platform/v1alpha2"
+                if name in v1alpha2_examples
+                else "iip.platform/v1alpha1"
+            ),
+            errors=errors,
+        )
 
     validate_evidence_redaction_policy_example(documents, errors)
     validate_collection_examples(documents, errors)

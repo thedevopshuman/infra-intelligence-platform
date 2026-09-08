@@ -98,9 +98,11 @@ The [ingestion freshness boundary](ingestion-freshness-telemetry.md) evaluates t
 adds an optional privacy-bounded Prometheus rule translation over those
 backend-observed signals. [ADR 0150](../decisions/0150-otel-component-heartbeat-and-missing-signal-alerts.md)
 adds a metadata-only OTel heartbeat and missing-series rules for enabled API,
-worker, and receiver services. Independent Collector/backend observation,
-regional aggregation, rule selection/evaluation, routing, contacts, and
-escalation remain customer-owned.
+worker, and receiver services. [ADR 0151](../decisions/0151-customer-operational-alert-route-qualification.md)
+adds a read-only customer evidence boundary for loaded rules, heartbeat
+translation, router readiness, and one synthetic firing/recovery route.
+Independent Collector/backend observation, regional aggregation, monitoring
+configuration, other routes, contacts, and escalation remain customer-owned.
 
 [ADR 0123](../decisions/0123-customer-control-plane-continuity-qualification.md)
 composes the read-only external probe with one separately enabled,
@@ -184,6 +186,16 @@ records customer approval of the workload as a private-pilot core proxy and
 binds the exact release, deployment, targets, and owning profiles. The ninth
 pilot input still preserves representative production traffic, automatic and
 involuntary failover, long-window SLO, and production-operation gates.
+
+[ADR 0152](../decisions/0152-require-operational-alert-qualification-before-private-pilot.md)
+advances the pilot aggregate to
+`customer-ai-finops-design-partner-v2` and requires that operational-alert
+report as the tenth source. It cross-binds the exact release, cluster,
+namespace, `ai-finops-v0` alert profile and complete binding set, and the
+same-invocation Prometheus target; it also requires a current post-deployment
+observation. The historical nine-input v1 artifact cannot satisfy current
+admission. The offline join imports no monitoring, traffic, provider,
+installation, or pilot authority.
 
 [ADR 0147](../decisions/0147-versioned-private-pilot-operating-handoff.md)
 adds a versioned, checksum-bound documentation artifact to the release bundle.

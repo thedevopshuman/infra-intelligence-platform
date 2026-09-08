@@ -125,10 +125,16 @@ runbook](docs/operations/customer-ai-finops-flow-qualification.md).
 The private-pilot preflight now binds that live flow to the exact local release
 evidence, registry publication, organizational signatures, customer deployment,
 post-deployment bounded read load, and bounded sustained API/OTLP/investigation
-workload reports plus customer-approved planned-failure overlap. It emits a minimized
-`design-partner-candidate` artifact without authorizing a pilot or overstating
-production/public-launch readiness; see the [customer pilot readiness
-runbook](docs/operations/customer-pilot-readiness.md).
+workload reports plus customer-approved planned-failure overlap. The current
+`customer-ai-finops-design-partner-v2` profile adds a mandatory tenth report:
+a current post-deployment qualification of all `ai-finops-v0` rules,
+component heartbeats, and one synthetic firing/recovery route. The preflight
+cross-binds its exact release, cluster, namespace, protected alert profile,
+complete alert binding set, and same-invocation Prometheus target. It emits a
+minimized `design-partner-candidate` artifact without monitoring or pilot
+authority or an overstated production/public-launch claim. Historical
+nine-input v1 reports cannot satisfy current admission; see the
+[customer pilot readiness runbook](docs/operations/customer-pilot-readiness.md).
 
 A separate continuity gate runs at least five
 minutes of direct verified-HTTPS liveness, readiness, authentication, and exact

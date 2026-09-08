@@ -84,6 +84,15 @@ Retain the protected profile, CA bundles, and minimized report under the
 customer evidence policy. Do not place them, endpoint credentials, route
 configuration, receipt payloads, contact details, or screenshots in Git.
 
+For a private AI FinOps pilot, select `ai-finops-v0` and start this observation
+only after the exact customer deployment report is qualified. Retain the alert
+report as the mandatory tenth input to the
+[v2 customer pilot readiness preflight](customer-pilot-readiness.md). That
+preflight cross-binds the exact release, cluster, namespace, alert profile,
+complete alert binding set, and same-invocation Prometheus target and rejects a
+stale or expired report. `core-v1` remains valid for narrower alert-route
+qualification but cannot satisfy AI FinOps pilot admission.
+
 ## Interpreting the result
 
 A qualified report proves the selected production rules were loaded and

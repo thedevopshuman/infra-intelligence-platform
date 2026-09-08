@@ -61,6 +61,13 @@ receipt while retaining only aggregates and digests. Monitoring configuration,
 the temporary rule, receipt service, contacts, and mutation authority remain
 customer-owned.
 
+[ADR 0152](../decisions/0152-require-operational-alert-qualification-before-private-pilot.md)
+makes the current `ai-finops-v0` alert report the tenth source in the v2
+private-pilot preflight. That offline join requires a post-deployment report
+and cross-binds its release, cluster, namespace, alert profile/binding set, and
+Prometheus target without making Prometheus or Alertmanager a kernel
+dependency or granting monitoring authority.
+
 [ADR 0150](../decisions/0150-otel-component-heartbeat-and-missing-signal-alerts.md)
 adds one fail-open, privacy-safe component heartbeat through the same metrics
 exporter and separate missing-series rules for enabled API, worker, and receiver

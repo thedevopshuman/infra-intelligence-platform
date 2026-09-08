@@ -86,13 +86,13 @@ minimized reports outside Git. The required order is:
 2. customer external policy allow/deny cases;
 3. customer credential-broker least-authority issuance and denials;
 4. pinned customer Collector/OTLP delivery and queue/loss observation;
-5. loaded operational rules, translated heartbeats, and one synthetic
-   firing/recovery notification route;
-6. customer ingress/API continuity, worker/receiver continuity, and PostgreSQL
+5. customer ingress/API continuity, worker/receiver continuity, and PostgreSQL
    promotion/recovery;
-7. aggregate customer deployment qualification and a fresh diagnostic;
+6. aggregate customer deployment qualification and a fresh diagnostic;
+7. post-deployment loaded operational rules, translated heartbeats, and one
+   synthetic firing/recovery notification route using `ai-finops-v0`;
 8. post-deployment bounded control-plane load;
-9. customer-approved sustained core-workload and planned-failure overlap;
+9. customer-approved sustained core-workload and planned-failure overlap; and
 10. production price-catalog qualification, live Bedrock compatibility, AI
    FinOps prerequisite aggregation, and the same-invocation ledger-to-dashboard
    flow.
@@ -104,10 +104,13 @@ local fixture does not substitute for a selected customer system.
 ## 5. Assess pilot admission
 
 Run the [customer pilot readiness workflow](customer-pilot-readiness.md) with
-the exact nine evidence inputs and the approved protected profile. Confirm the
-result is current and says `design-partner-candidate`. Independently record the
-customer/platform go decision, accepted limitations, support readiness, cost
-boundary, and change window in the external pilot plan.
+the exact ten evidence inputs and an approved
+`customer-ai-finops-design-partner-v2` protected profile. The mandatory tenth
+source is the current post-deployment operational-alert report. Confirm the
+result is current and says `design-partner-candidate`. Historical nine-input
+v1 reports do not meet current admission. Independently record the customer/
+platform go decision, accepted limitations, support readiness, cost boundary,
+and change window in the external pilot plan.
 
 No report in the repository authorizes provider spend, disruption, mutation,
 credential issuance, publication, or production use. Those actions remain
@@ -120,8 +123,8 @@ with their named owners.
 - Route IIP operational and AI economics signals through the customer
   Collector; watch exporter delivery and Collector queue/loss, not just local
   acceptance.
-- Install and test the optional [operational alert policy](operational-alerts.md)
-  or an equivalent backend-native adapter. Retain the
+- Keep the admitted [operational alert policy](operational-alerts.md), or its
+  qualified backend-native equivalent, active. Retain the
   [customer alert-route qualification](customer-operational-alert-qualification.md)
   for one synthetic firing and recovery through the customer's private route.
 - Review freshness, query/receiver availability, investigation completion, AI

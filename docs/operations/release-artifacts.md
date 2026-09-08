@@ -86,6 +86,10 @@ firing and recovery, run `make qualify-customer-operational-alerts` and retain
 its minimized report outside the bundle. This is customer-environment evidence
 for one evaluator and notification route, not local release evidence or a
 claim about other routes, human response, or monitoring HA.
+For a private AI FinOps pilot, run it after customer deployment qualification
+with `ai-finops-v0`; the v2 pilot-readiness assessor requires this exact report
+as its tenth source and rejects stale, expired, or crossed environment
+evidence.
 
 After installation, run `make qualify-ingress-availability` from the same clean
 checkout against the external HTTPS URL and immutable image digest, then run

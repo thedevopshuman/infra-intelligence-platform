@@ -98,7 +98,12 @@ the exact prerequisite file, customer deployment, post-deployment bounded load,
 post-deployment sustained core-workload evidence, local release evidence,
 registry publication, organizational keyless signatures, and a customer-
 approved report proving the planned API, worker/receiver, and PostgreSQL
-continuity windows fit inside the sustained core-workload run.
+continuity windows fit inside the sustained core-workload run. The current v2
+semantic level also requires a tenth, post-deployment operational-alert report
+covering the complete `ai-finops-v0` rule set, expected heartbeats, and one
+synthetic firing/recovery route. The join cross-binds its release, cluster,
+namespace, alert profile/binding set, and Prometheus target to the deployment
+and same-invocation evidence.
 `design-partner-candidate` closes the manual-correlation gap for
 one exact build and customer target; actual partner operation/acceptance,
 representative production traffic, automatic and involuntary failover,
@@ -125,6 +130,10 @@ single-route evidence gap for the documented adapter with a read-only
 customer qualifier covering all nine AI FinOps rules, component heartbeats,
 router readiness, and one synthetic firing/recovery receipt. Other backends,
 routes, escalation, human response, and monitoring HA remain external.
+ADR 0152 makes a current instance of that report the mandatory tenth source
+for `customer-ai-finops-design-partner-v2` readiness. The historical nine-input
+v1 aggregate cannot satisfy current pilot admission, and the offline assessor
+gains no rule, route, provider, traffic, or pilot authority.
 
 Two additional deterministic rules are delivered. Protected channel
 configuration maps provider retry attributes into `retryCount`, and the

@@ -155,3 +155,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0149](0149-preinstall-operational-alert-prerequisite-evidence.md) | Accepted | Require the production preflight to prove alert policy configuration, PrometheusRule discovery, and the target namespace without claiming notification delivery |
 | [0150](0150-otel-component-heartbeat-and-missing-signal-alerts.md) | Accepted | Emit privacy-safe component heartbeats through OTel and alert when enabled service telemetry disappears |
 | [0151](0151-customer-operational-alert-route-qualification.md) | Accepted | Qualify one customer evaluator and firing/recovery notification route without importing monitoring mutation authority |
+| [0152](0152-require-operational-alert-qualification-before-private-pilot.md) | Accepted | Advance pilot readiness to v2 and require exact AI FinOps alert-route evidence as the tenth admission input |

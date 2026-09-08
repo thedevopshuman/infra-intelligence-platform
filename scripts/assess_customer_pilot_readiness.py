@@ -28,6 +28,7 @@ import qualify_control_plane_load as control_plane_load  # noqa: E402
 import qualify_customer_ai_finops as ai_prerequisite  # noqa: E402
 import qualify_customer_ai_finops_flow as ai_flow  # noqa: E402
 import qualify_customer_deployment as customer_deployment  # noqa: E402
+import qualify_customer_operational_alerts as operational_alert  # noqa: E402
 import assess_customer_failure_overlap as failure_overlap  # noqa: E402
 import qualify_customer_sustained_workload as sustained_workload  # noqa: E402
 import release_publication  # noqa: E402
@@ -35,10 +36,11 @@ import release_readiness  # noqa: E402
 import release_signature_verification as release_signature  # noqa: E402
 
 
-API_VERSION = "iip.platform/v1alpha1"
+API_VERSION = "iip.platform/v1alpha2"
+SOURCE_API_VERSION = "iip.platform/v1alpha1"
 PROFILE_KIND = "CustomerPilotReadinessProfile"
 REPORT_KIND = "CustomerPilotReadinessReport"
-QUALIFICATION_LEVEL = "customer-ai-finops-design-partner-v1"
+QUALIFICATION_LEVEL = "customer-ai-finops-design-partner-v2"
 QUALIFICATION_BOUNDARY = "private-design-partner-preflight"
 PROFILE_ID = re.compile(r"^cprp_[a-f0-9]{32}$")
 REPORT_ID = re.compile(r"^cpr_[a-f0-9]{32}$")
@@ -58,12 +60,15 @@ CHECK_IDS = (
     "customer-failure-overlap",
     "ai-finops-prerequisites",
     "same-invocation-ai-finops",
+    "customer-operational-alerts",
     "publication-signature-chain",
     "deployed-image-chain",
     "customer-environment-chain",
+    "operational-alert-environment-chain",
     "sustained-workload-environment-chain",
     "failure-overlap-environment-chain",
     "post-deployment-load-window",
+    "post-deployment-operational-alert-window",
     "post-deployment-sustained-workload-window",
     "minimized-output",
 )
@@ -477,6 +482,18 @@ REQUIREMENTS = (
             "customer-pilot-readiness.ai-flow.invalid",
         ),
     ),
+    Requirement(
+        "customer-operational-alerts",
+        "CustomerOperationalAlertQualificationReport",
+        "customer-rule-evaluation-and-notification-route",
+        "qualified",
+        "customer",
+        _wrap_validator(
+            operational_alert.validate_report_document,
+            operational_alert.CustomerOperationalAlertQualificationError,
+            "customer-pilot-readiness.operational-alert.invalid",
+        ),
+    ),
 )
 
 
@@ -542,6 +559,7 @@ def _release_and_environment_bindings(
     publication = sources["registry-publication"].document
     signature = sources["organizational-signatures"].document
     deployment = sources["customer-deployment"].document
+    alerts = sources["customer-operational-alerts"].document
     load = sources["control-plane-load"].document
     sustained = sources["sustained-core-workload"].document
     overlap = sources["customer-failure-overlap"].document
@@ -553,6 +571,9 @@ def _release_and_environment_bindings(
     signature_release = _mapping(_path(signature, ("spec", "release")), code)
     deployment_subject = _mapping(_path(deployment, ("spec", "subject")), code)
     deployment_bindings = _mapping(_path(deployment, ("spec", "bindings")), code)
+    alert_subject = _mapping(_path(alerts, ("spec", "subject")), code)
+    alert_profile = _mapping(_path(alerts, ("spec", "profile")), code)
+    alert_bindings = _mapping(_path(alerts, ("spec", "bindings")), code)
     load_identity = _mapping(_path(load, ("spec", "targetIdentity")), code)
     sustained_subject = _mapping(_path(sustained, ("spec", "subject")), code)
     sustained_bindings = _mapping(_path(sustained, ("spec", "bindings")), code)
@@ -595,14 +616,14 @@ def _release_and_environment_bindings(
         "deploymentProfile": "production-ai-finops-v0",
         "applicationVersion": exact_release["applicationVersion"],
         "chartVersion": exact_release["chartVersion"],
-        "contractsApiVersion": API_VERSION,
+        "contractsApiVersion": SOURCE_API_VERSION,
         "sourceRevision": exact_release["sourceRevision"],
         "imageDigest": control_digest,
     }
     expected_sustained_subject = {
         "applicationVersion": exact_release["applicationVersion"],
         "chartVersion": exact_release["chartVersion"],
-        "contractsApiVersion": API_VERSION,
+        "contractsApiVersion": SOURCE_API_VERSION,
         "requiredMigration": deployment_subject.get("requiredMigration"),
         "sourceRevision": exact_release["sourceRevision"],
         "imageDigest": control_digest,
@@ -643,6 +664,8 @@ def _release_and_environment_bindings(
         or flow_subject != expected_customer_subject
         or sustained_subject != expected_sustained_subject
         or overlap_subject != expected_sustained_subject
+        or alert_subject != expected_sustained_subject
+        or alert_profile.get("ruleSet") != "ai-finops-v0"
         or any(
             metadata.get("sourceRevision") != exact_release["sourceRevision"]
             for metadata in source_metadata
@@ -650,7 +673,7 @@ def _release_and_environment_bindings(
         or load_identity
         != {
             "applicationVersion": exact_release["applicationVersion"],
-            "contractsApiVersion": API_VERSION,
+            "contractsApiVersion": SOURCE_API_VERSION,
             "requiredMigration": deployment_subject.get("requiredMigration"),
             "buildMode": "release",
             "sourceRevision": exact_release["sourceRevision"],
@@ -663,20 +686,27 @@ def _release_and_environment_bindings(
     policy_digest = _path(signature, ("spec", "policy", "digest"))
     target_set_digest = _digest(list(publication_targets))
     cluster_digest = deployment_bindings.get("clusterBindingDigest")
+    namespace_digest = deployment_bindings.get("namespaceBindingDigest")
     environment_digest = prerequisite_bindings.get("environmentBindingDigest")
     control_target_digest = deployment_bindings.get("continuityTargetBindingDigest")
+    alert_profile_digest = alert_bindings.get("profileDigest")
+    alert_binding_set_digest = _digest(alert_bindings)
     environment_set = {
         "clusterBindingDigest": cluster_digest,
+        "namespaceBindingDigest": namespace_digest,
         "environmentBindingDigest": environment_digest,
         "controlPlaneTargetDigest": control_target_digest,
         "otlpTargetDigest": sustained_bindings.get("otlpTargetBindingDigest"),
         "sustainedWorkloadProfileDigest": sustained_bindings.get("profileDigest"),
         "failureOverlapProfileDigest": overlap_bindings.get("profileDigest"),
+        "operationalAlertProfileDigest": alert_profile_digest,
+        "operationalAlertBindingSetDigest": alert_binding_set_digest,
     }
     if (
         expected_bindings.get("signaturePolicyDigest") != policy_digest
         or expected_bindings.get("publicationTargetSetDigest") != target_set_digest
         or expected_bindings.get("clusterBindingDigest") != cluster_digest
+        or expected_bindings.get("namespaceBindingDigest") != namespace_digest
         or expected_bindings.get("environmentBindingDigest") != environment_digest
         or expected_bindings.get("controlPlaneTargetDigest") != control_target_digest
         or expected_bindings.get("otlpTargetDigest")
@@ -685,6 +715,14 @@ def _release_and_environment_bindings(
         != sustained_bindings.get("profileDigest")
         or expected_bindings.get("failureOverlapProfileDigest")
         != overlap_bindings.get("profileDigest")
+        or expected_bindings.get("operationalAlertProfileDigest")
+        != alert_profile_digest
+        or expected_bindings.get("operationalAlertBindingSetDigest")
+        != alert_binding_set_digest
+        or alert_bindings.get("clusterBindingDigest") != cluster_digest
+        or alert_bindings.get("namespaceBindingDigest") != namespace_digest
+        or alert_bindings.get("prometheusTargetBindingDigest")
+        != flow_bindings.get("prometheusTargetDigest")
         or _path(load, ("spec", "targetBindingDigest")) != control_target_digest
         or sustained_bindings.get("apiTargetBindingDigest")
         != control_target_digest
@@ -758,6 +796,7 @@ def _evidence_item(
     elif requirement.identifier in {
         "sustained-core-workload",
         "customer-failure-overlap",
+        "customer-operational-alerts",
         "ai-finops-prerequisites",
         "same-invocation-ai-finops",
     }:
@@ -803,6 +842,7 @@ def _derived_checks(
     evidence: Sequence[Mapping[str, Any]],
     *,
     post_deployment_load: bool,
+    post_deployment_operational_alert: bool,
     post_deployment_sustained_workload: bool,
 ) -> list[dict[str, str]]:
     evidence_pass = {
@@ -843,15 +883,25 @@ def _derived_checks(
             "same-invocation-ai-finops",
             evidence_pass["same-invocation-ai-finops"],
         ),
+        _check(
+            "customer-operational-alerts",
+            evidence_pass["customer-operational-alerts"],
+        ),
         _check("publication-signature-chain", True),
         _check("deployed-image-chain", True),
         _check("customer-environment-chain", True),
+        _check("operational-alert-environment-chain", True),
         _check("sustained-workload-environment-chain", True),
         _check("failure-overlap-environment-chain", True),
         _check(
             "post-deployment-load-window",
             post_deployment_load,
             "customer-pilot-readiness.load.before-deployment",
+        ),
+        _check(
+            "post-deployment-operational-alert-window",
+            post_deployment_operational_alert,
+            "customer-pilot-readiness.operational-alert.before-deployment",
         ),
         _check(
             "post-deployment-sustained-workload-window",
@@ -947,6 +997,14 @@ def build_report(
         "customer-pilot-readiness.control-plane-load.invalid",
     )
     load_completed = sources["control-plane-load"].generated_at
+    operational_alert_started = _parse_time(
+        _path(
+            sources["customer-operational-alerts"].document,
+            ("spec", "measurements", "startedAt"),
+        ),
+        "customer-pilot-readiness.operational-alert.invalid",
+    )
+    operational_alert_completed = sources["customer-operational-alerts"].generated_at
     sustained_started = _parse_time(
         _path(
             sources["sustained-core-workload"].document,
@@ -958,6 +1016,9 @@ def build_report(
     overlap_completed = sources["customer-failure-overlap"].generated_at
     flow_completed = sources["same-invocation-ai-finops"].generated_at
     post_deployment_load = deployment_time <= load_started <= load_completed
+    post_deployment_operational_alert = (
+        deployment_time <= operational_alert_started <= operational_alert_completed
+    )
     post_deployment_sustained_workload = (
         deployment_time <= sustained_started <= sustained_completed
     )
@@ -968,6 +1029,7 @@ def build_report(
     checks = _derived_checks(
         evidence,
         post_deployment_load=post_deployment_load,
+        post_deployment_operational_alert=post_deployment_operational_alert,
         post_deployment_sustained_workload=post_deployment_sustained_workload,
     )
     summary = _summary(evidence, checks)
@@ -994,6 +1056,7 @@ def build_report(
         if requirement.identifier in {
             "sustained-core-workload",
             "customer-failure-overlap",
+            "customer-operational-alerts",
             "ai-finops-prerequisites",
             "same-invocation-ai-finops",
         }:
@@ -1021,7 +1084,7 @@ def build_report(
         "qualificationBoundary": QUALIFICATION_BOUNDARY,
         "subject": {
             **exact_release,
-            "contractsApiVersion": API_VERSION,
+            "contractsApiVersion": SOURCE_API_VERSION,
         },
         "bindings": {
             "profileDigest": _digest(profile),
@@ -1036,6 +1099,9 @@ def build_report(
             ].file_digest,
             "customerDeploymentReportDigest": sources[
                 "customer-deployment"
+            ].file_digest,
+            "customerOperationalAlertReportDigest": sources[
+                "customer-operational-alerts"
             ].file_digest,
             "controlPlaneLoadReportDigest": sources[
                 "control-plane-load"
@@ -1080,6 +1146,8 @@ def build_report(
             "newestFoundationEvidenceAt": _timestamp(max(foundation_times)),
             "oldestCustomerEvidenceAt": _timestamp(min(customer_times)),
             "customerDeploymentQualifiedAt": _timestamp(deployment_time),
+            "operationalAlertStartedAt": _timestamp(operational_alert_started),
+            "operationalAlertQualifiedAt": _timestamp(operational_alert_completed),
             "controlPlaneLoadStartedAt": _timestamp(load_started),
             "controlPlaneLoadCompletedAt": _timestamp(load_completed),
             "sustainedWorkloadStartedAt": _timestamp(sustained_started),
@@ -1174,6 +1242,12 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
     deployment = _parse_time(
         measurements.get("customerDeploymentQualifiedAt"), code
     )
+    operational_alert_started = _parse_time(
+        measurements.get("operationalAlertStartedAt"), code
+    )
+    operational_alert_completed = _parse_time(
+        measurements.get("operationalAlertQualifiedAt"), code
+    )
     load_started = _parse_time(measurements.get("controlPlaneLoadStartedAt"), code)
     load_completed = _parse_time(
         measurements.get("controlPlaneLoadCompletedAt"), code
@@ -1191,6 +1265,9 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
     expected_checks = _derived_checks(
         evidence,
         post_deployment_load=deployment <= load_started <= load_completed,
+        post_deployment_operational_alert=(
+            deployment <= operational_alert_started <= operational_alert_completed
+        ),
         post_deployment_sustained_workload=(
             deployment <= sustained_started <= sustained_completed
         ),
@@ -1247,6 +1324,10 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
                 ("releasePublicationReportDigest", "registry-publication"),
                 ("releaseSignatureReportDigest", "organizational-signatures"),
                 ("customerDeploymentReportDigest", "customer-deployment"),
+                (
+                    "customerOperationalAlertReportDigest",
+                    "customer-operational-alerts",
+                ),
                 ("controlPlaneLoadReportDigest", "control-plane-load"),
                 ("sustainedWorkloadReportDigest", "sustained-core-workload"),
                 ("failureOverlapReportDigest", "customer-failure-overlap"),
@@ -1266,6 +1347,9 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
         or valid_until > validity_ceiling
         or oldest_foundation > newest_foundation
         or flow_completed > generated + timedelta(
+            seconds=int(objective["maximumClockSkewSeconds"])
+        )
+        or operational_alert_completed > generated + timedelta(
             seconds=int(objective["maximumClockSkewSeconds"])
         )
         or sustained_completed > generated + timedelta(
@@ -1384,6 +1468,7 @@ def _source_paths(arguments: argparse.Namespace) -> dict[str, Path]:
         "registry-publication": arguments.release_publication,
         "organizational-signatures": arguments.release_signatures,
         "customer-deployment": arguments.customer_deployment,
+        "customer-operational-alerts": arguments.operational_alerts,
         "control-plane-load": arguments.control_plane_load,
         "sustained-core-workload": arguments.sustained_workload,
         "customer-failure-overlap": arguments.failure_overlap,
@@ -1398,6 +1483,7 @@ def _add_inputs(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--release-publication", type=Path, required=True)
     parser.add_argument("--release-signatures", type=Path, required=True)
     parser.add_argument("--customer-deployment", type=Path, required=True)
+    parser.add_argument("--operational-alerts", type=Path, required=True)
     parser.add_argument("--control-plane-load", type=Path, required=True)
     parser.add_argument("--sustained-workload", type=Path, required=True)
     parser.add_argument("--failure-overlap", type=Path, required=True)
@@ -1414,6 +1500,8 @@ def _parser() -> argparse.ArgumentParser:
     publication_digest.add_argument(
         "--release-publication", type=Path, required=True
     )
+    alert_digest = commands.add_parser("operational-alert-binding-set-digest")
+    alert_digest.add_argument("--operational-alerts", type=Path, required=True)
     generate = commands.add_parser("generate")
     _add_inputs(generate)
     generate.add_argument("--output", type=Path, required=True)
@@ -1455,6 +1543,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             REQUIREMENTS[1].validator(publication)
             print(_digest(_path(publication, ("spec", "targets"))))
+            return 0
+        if arguments.command == "operational-alert-binding-set-digest":
+            alerts, _ = _read_document(
+                arguments.operational_alerts,
+                code="customer-pilot-readiness.customer-operational-alerts.unreadable",
+            )
+            try:
+                operational_alert.validate_report_document(alerts)
+            except operational_alert.CustomerOperationalAlertQualificationError:
+                _fail("customer-pilot-readiness.operational-alert.invalid")
+            print(_digest(_path(alerts, ("spec", "bindings"))))
             return 0
         paths = _source_paths(arguments)
         if arguments.command == "generate":

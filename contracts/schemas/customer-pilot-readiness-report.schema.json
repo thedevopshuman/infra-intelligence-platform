@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:iip:contracts:customer-pilot-readiness-report:v1alpha1",
+  "$id": "urn:iip:contracts:customer-pilot-readiness-report:v1alpha2",
   "title": "Customer Pilot Readiness Report",
-  "description": "Privacy-minimized aggregate proving that one exact published and signed release has current local, customer deployment, narrow load, sustained core-workload, planned-failure overlap, and same-invocation AI FinOps evidence before a private design-partner trial.",
+  "description": "Privacy-minimized aggregate proving that one exact published and signed release has current local, customer deployment, operational-alert, narrow load, sustained core-workload, planned-failure overlap, and same-invocation AI FinOps evidence before a private design-partner trial.",
   "type": "object",
   "additionalProperties": false,
   "required": ["apiVersion", "kind", "metadata", "spec"],
   "properties": {
-    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "apiVersion": {"const": "iip.platform/v1alpha2"},
     "kind": {"const": "CustomerPilotReadinessReport"},
     "metadata": {
       "type": "object",
@@ -27,7 +27,7 @@
       "required": ["status", "qualificationLevel", "qualificationBoundary", "subject", "bindings", "objective", "measurements", "evidence", "checks", "limitations", "externalGates", "summary"],
       "properties": {
         "status": {"enum": ["design-partner-candidate", "not-candidate"]},
-        "qualificationLevel": {"const": "customer-ai-finops-design-partner-v1"},
+        "qualificationLevel": {"const": "customer-ai-finops-design-partner-v2"},
         "qualificationBoundary": {"const": "private-design-partner-preflight"},
         "subject": {"$ref": "#/$defs/subject"},
         "bindings": {"$ref": "#/$defs/bindings"},
@@ -66,12 +66,12 @@
           "additionalProperties": false,
           "required": ["requiredEvidence", "passedEvidence", "rejectedEvidence", "totalChecks", "passedChecks", "failedChecks", "externalGateCount", "overallStatus"],
           "properties": {
-            "requiredEvidence": {"const": 9},
-            "passedEvidence": {"type": "integer", "minimum": 0, "maximum": 9},
-            "rejectedEvidence": {"type": "integer", "minimum": 0, "maximum": 9},
-            "totalChecks": {"const": 21},
-            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 21},
-            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 21},
+            "requiredEvidence": {"const": 10},
+            "passedEvidence": {"type": "integer", "minimum": 0, "maximum": 10},
+            "rejectedEvidence": {"type": "integer", "minimum": 0, "maximum": 10},
+            "totalChecks": {"const": 24},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 24},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 24},
             "externalGateCount": {"const": 3},
             "overallStatus": {"enum": ["design-partner-candidate", "not-candidate"]}
           }
@@ -100,13 +100,14 @@
     "bindings": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["profileDigest", "releaseReadinessReportDigest", "releasePublicationReportDigest", "releaseSignatureReportDigest", "customerDeploymentReportDigest", "controlPlaneLoadReportDigest", "sustainedWorkloadReportDigest", "failureOverlapReportDigest", "aiFinopsPrerequisiteReportDigest", "aiFinopsFlowReportDigest", "signaturePolicyDigest", "publicationTargetSetDigest", "customerEnvironmentSetDigest"],
+      "required": ["profileDigest", "releaseReadinessReportDigest", "releasePublicationReportDigest", "releaseSignatureReportDigest", "customerDeploymentReportDigest", "customerOperationalAlertReportDigest", "controlPlaneLoadReportDigest", "sustainedWorkloadReportDigest", "failureOverlapReportDigest", "aiFinopsPrerequisiteReportDigest", "aiFinopsFlowReportDigest", "signaturePolicyDigest", "publicationTargetSetDigest", "customerEnvironmentSetDigest"],
       "properties": {
         "profileDigest": {"$ref": "#/$defs/digest"},
         "releaseReadinessReportDigest": {"$ref": "#/$defs/digest"},
         "releasePublicationReportDigest": {"$ref": "#/$defs/digest"},
         "releaseSignatureReportDigest": {"$ref": "#/$defs/digest"},
         "customerDeploymentReportDigest": {"$ref": "#/$defs/digest"},
+        "customerOperationalAlertReportDigest": {"$ref": "#/$defs/digest"},
         "controlPlaneLoadReportDigest": {"$ref": "#/$defs/digest"},
         "sustainedWorkloadReportDigest": {"$ref": "#/$defs/digest"},
         "failureOverlapReportDigest": {"$ref": "#/$defs/digest"},
@@ -132,13 +133,15 @@
     "measurements": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["profileReviewedAt", "oldestFoundationEvidenceAt", "newestFoundationEvidenceAt", "oldestCustomerEvidenceAt", "customerDeploymentQualifiedAt", "controlPlaneLoadStartedAt", "controlPlaneLoadCompletedAt", "sustainedWorkloadStartedAt", "sustainedWorkloadCompletedAt", "failureOverlapQualifiedAt", "aiFinopsFlowCompletedAt", "assessedAt", "oldestFoundationEvidenceAgeSeconds", "oldestCustomerEvidenceAgeSeconds"],
+      "required": ["profileReviewedAt", "oldestFoundationEvidenceAt", "newestFoundationEvidenceAt", "oldestCustomerEvidenceAt", "customerDeploymentQualifiedAt", "operationalAlertStartedAt", "operationalAlertQualifiedAt", "controlPlaneLoadStartedAt", "controlPlaneLoadCompletedAt", "sustainedWorkloadStartedAt", "sustainedWorkloadCompletedAt", "failureOverlapQualifiedAt", "aiFinopsFlowCompletedAt", "assessedAt", "oldestFoundationEvidenceAgeSeconds", "oldestCustomerEvidenceAgeSeconds"],
       "properties": {
         "profileReviewedAt": {"type": "string", "format": "date-time"},
         "oldestFoundationEvidenceAt": {"type": "string", "format": "date-time"},
         "newestFoundationEvidenceAt": {"type": "string", "format": "date-time"},
         "oldestCustomerEvidenceAt": {"type": "string", "format": "date-time"},
         "customerDeploymentQualifiedAt": {"type": "string", "format": "date-time"},
+        "operationalAlertStartedAt": {"type": "string", "format": "date-time"},
+        "operationalAlertQualifiedAt": {"type": "string", "format": "date-time"},
         "controlPlaneLoadStartedAt": {"type": "string", "format": "date-time"},
         "controlPlaneLoadCompletedAt": {"type": "string", "format": "date-time"},
         "sustainedWorkloadStartedAt": {"type": "string", "format": "date-time"},
@@ -155,9 +158,9 @@
       "additionalProperties": false,
       "required": ["id", "contractKind", "qualificationBoundary", "reportId", "reportDigest", "observedStatus", "status"],
       "properties": {
-        "id": {"enum": ["release-readiness", "registry-publication", "organizational-signatures", "customer-deployment", "control-plane-load", "sustained-core-workload", "customer-failure-overlap", "ai-finops-prerequisites", "same-invocation-ai-finops"]},
-        "contractKind": {"enum": ["ReleaseReadinessReport", "ReleasePublicationReport", "ReleaseSignatureVerificationReport", "CustomerDeploymentQualificationReport", "ControlPlaneLoadQualificationReport", "CustomerSustainedWorkloadQualificationReport", "CustomerFailureOverlapQualificationReport", "CustomerAiFinopsPrerequisiteReport", "CustomerAiFinopsFlowQualificationReport"]},
-        "qualificationBoundary": {"enum": ["local-candidate", "registry-publication", "organizational-trust", "customer-deployment", "customer-load", "customer-environment-sustained-workload", "customer-environment-planned-failure-overlap", "ai-finops-prerequisites", "same-invocation-customer-runtime"]},
+        "id": {"enum": ["release-readiness", "registry-publication", "organizational-signatures", "customer-deployment", "control-plane-load", "sustained-core-workload", "customer-failure-overlap", "ai-finops-prerequisites", "same-invocation-ai-finops", "customer-operational-alerts"]},
+        "contractKind": {"enum": ["ReleaseReadinessReport", "ReleasePublicationReport", "ReleaseSignatureVerificationReport", "CustomerDeploymentQualificationReport", "ControlPlaneLoadQualificationReport", "CustomerSustainedWorkloadQualificationReport", "CustomerFailureOverlapQualificationReport", "CustomerAiFinopsPrerequisiteReport", "CustomerAiFinopsFlowQualificationReport", "CustomerOperationalAlertQualificationReport"]},
+        "qualificationBoundary": {"enum": ["local-candidate", "registry-publication", "organizational-trust", "customer-deployment", "customer-load", "customer-environment-sustained-workload", "customer-environment-planned-failure-overlap", "ai-finops-prerequisites", "same-invocation-customer-runtime", "customer-rule-evaluation-and-notification-route"]},
         "reportId": {"type": "string", "pattern": "^[a-z]{3,5}_[a-f0-9]{32}$"},
         "reportDigest": {"$ref": "#/$defs/digest"},
         "observedStatus": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
@@ -171,8 +174,8 @@
     },
     "evidenceList": {
       "type": "array",
-      "minItems": 9,
-      "maxItems": 9,
+      "minItems": 10,
+      "maxItems": 10,
       "prefixItems": [
         {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "release-readiness"}, "contractKind": {"const": "ReleaseReadinessReport"}, "qualificationBoundary": {"const": "local-candidate"}}},
         {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "registry-publication"}, "contractKind": {"const": "ReleasePublicationReport"}, "qualificationBoundary": {"const": "registry-publication"}}},
@@ -182,7 +185,8 @@
         {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "sustained-core-workload"}, "contractKind": {"const": "CustomerSustainedWorkloadQualificationReport"}, "qualificationBoundary": {"const": "customer-environment-sustained-workload"}}},
         {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "customer-failure-overlap"}, "contractKind": {"const": "CustomerFailureOverlapQualificationReport"}, "qualificationBoundary": {"const": "customer-environment-planned-failure-overlap"}}},
         {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "ai-finops-prerequisites"}, "contractKind": {"const": "CustomerAiFinopsPrerequisiteReport"}, "qualificationBoundary": {"const": "ai-finops-prerequisites"}}},
-        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "same-invocation-ai-finops"}, "contractKind": {"const": "CustomerAiFinopsFlowQualificationReport"}, "qualificationBoundary": {"const": "same-invocation-customer-runtime"}}}
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "same-invocation-ai-finops"}, "contractKind": {"const": "CustomerAiFinopsFlowQualificationReport"}, "qualificationBoundary": {"const": "same-invocation-customer-runtime"}}},
+        {"$ref": "#/$defs/evidence", "properties": {"id": {"const": "customer-operational-alerts"}, "contractKind": {"const": "CustomerOperationalAlertQualificationReport"}, "qualificationBoundary": {"const": "customer-rule-evaluation-and-notification-route"}}}
       ],
       "items": false
     },
@@ -202,8 +206,8 @@
     },
     "checks": {
       "type": "array",
-      "minItems": 21,
-      "maxItems": 21,
+      "minItems": 24,
+      "maxItems": 24,
       "prefixItems": [
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "source-binding"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "profile-review"}}},
@@ -218,12 +222,15 @@
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "customer-failure-overlap"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-finops-prerequisites"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "same-invocation-ai-finops"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "customer-operational-alerts"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "publication-signature-chain"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "deployed-image-chain"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "customer-environment-chain"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "operational-alert-environment-chain"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "sustained-workload-environment-chain"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "failure-overlap-environment-chain"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "post-deployment-load-window"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "post-deployment-operational-alert-window"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "post-deployment-sustained-workload-window"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "minimized-output"}}}
       ],

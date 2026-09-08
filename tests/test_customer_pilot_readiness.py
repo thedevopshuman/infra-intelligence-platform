@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import copy
+import io
 import json
 import os
 import stat
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -30,6 +32,8 @@ NAMESPACE = "sha256:" + "7" * 64
 DATABASE_TARGET = "sha256:" + "6" * 64
 PROCESSING_PROFILE = "sha256:" + "5" * 64
 POSTGRESQL_PROFILE = "sha256:" + "4" * 64
+PROMETHEUS_TARGET = "sha256:" + "3" * 64
+OPERATIONAL_ALERT_PROFILE = "sha256:" + "2" * 64
 
 
 def _stamp(value: datetime) -> str:
@@ -42,7 +46,11 @@ def _digest(character: str) -> str:
     return "sha256:" + character * 64
 
 
-def _profile(now: datetime, targets: list[dict[str, str]]) -> dict:
+def _profile(
+    now: datetime,
+    targets: list[dict[str, str]],
+    operational_alert_bindings: dict[str, str],
+) -> dict:
     metadata = {
         "reviewedAt": _stamp(now - timedelta(hours=2)),
         "validUntil": _stamp(now + timedelta(days=2)),
@@ -61,11 +69,16 @@ def _profile(now: datetime, targets: list[dict[str, str]]) -> dict:
             "signaturePolicyDigest": POLICY,
             "publicationTargetSetDigest": pilot._digest(targets),
             "clusterBindingDigest": CLUSTER,
+            "namespaceBindingDigest": NAMESPACE,
             "environmentBindingDigest": ENVIRONMENT,
             "controlPlaneTargetDigest": TARGET,
             "otlpTargetDigest": OTLP_TARGET,
             "sustainedWorkloadProfileDigest": SUSTAINED_PROFILE,
             "failureOverlapProfileDigest": FAILURE_OVERLAP_PROFILE,
+            "operationalAlertProfileDigest": OPERATIONAL_ALERT_PROFILE,
+            "operationalAlertBindingSetDigest": pilot._digest(
+                operational_alert_bindings
+            ),
         },
         "objective": {
             "maximumProfileAgeSeconds": 604800,
@@ -94,6 +107,8 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
     overlap_at = now - timedelta(minutes=20)
     prerequisite_at = now - timedelta(minutes=30)
     flow_at = now - timedelta(minutes=5)
+    operational_alert_started = now - timedelta(minutes=55)
+    operational_alert_completed = now - timedelta(minutes=52)
     targets = [
         {
             "role": "control-plane-image",
@@ -114,7 +129,7 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
         "deploymentProfile": "production-ai-finops-v0",
         "applicationVersion": "0.84.0",
         "chartVersion": "0.87.0",
-        "contractsApiVersion": pilot.API_VERSION,
+        "contractsApiVersion": pilot.SOURCE_API_VERSION,
         "sourceRevision": REVISION,
         "imageDigest": CONTROL_IMAGE,
     }
@@ -122,10 +137,26 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
         "profile": "production-ai-finops-v0",
         "applicationVersion": "0.84.0",
         "chartVersion": "0.87.0",
-        "contractsApiVersion": pilot.API_VERSION,
+        "contractsApiVersion": pilot.SOURCE_API_VERSION,
         "requiredMigration": "0023_ai_model_suitability.sql",
         "sourceRevision": REVISION,
         "imageDigest": CONTROL_IMAGE,
+    }
+    operational_alert_subject = {
+        key: value for key, value in deployment_subject.items() if key != "profile"
+    }
+    operational_alert_bindings = {
+        "profileDigest": OPERATIONAL_ALERT_PROFILE,
+        "clusterBindingDigest": CLUSTER,
+        "namespaceBindingDigest": NAMESPACE,
+        "prometheusTargetBindingDigest": PROMETHEUS_TARGET,
+        "alertmanagerTargetBindingDigest": _digest("1"),
+        "receiptTargetBindingDigest": _digest("2"),
+        "probeRouteBindingDigest": _digest("3"),
+        "prometheusCaBundleDigest": _digest("4"),
+        "alertmanagerCaBundleDigest": _digest("5"),
+        "receiptCaBundleDigest": _digest("6"),
+        "releaseBindingDigest": _digest("7"),
     }
     raw = {
         "release-readiness": {
@@ -223,7 +254,7 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
                 "targetBindingDigest": TARGET,
                 "targetIdentity": {
                     "applicationVersion": "0.84.0",
-                    "contractsApiVersion": pilot.API_VERSION,
+                    "contractsApiVersion": pilot.SOURCE_API_VERSION,
                     "requiredMigration": "0023_ai_model_suitability.sql",
                     "buildMode": "release",
                     "sourceRevision": REVISION,
@@ -249,7 +280,7 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
                 "subject": {
                     "applicationVersion": "0.84.0",
                     "chartVersion": "0.87.0",
-                    "contractsApiVersion": pilot.API_VERSION,
+                    "contractsApiVersion": pilot.SOURCE_API_VERSION,
                     "requiredMigration": "0023_ai_model_suitability.sql",
                     "sourceRevision": REVISION,
                     "imageDigest": CONTROL_IMAGE,
@@ -278,7 +309,7 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
                 "subject": {
                     "applicationVersion": "0.84.0",
                     "chartVersion": "0.87.0",
-                    "contractsApiVersion": pilot.API_VERSION,
+                    "contractsApiVersion": pilot.SOURCE_API_VERSION,
                     "requiredMigration": "0023_ai_model_suitability.sql",
                     "sourceRevision": REVISION,
                     "imageDigest": CONTROL_IMAGE,
@@ -330,7 +361,27 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
                 "bindings": {
                     "environmentBindingDigest": ENVIRONMENT,
                     "controlPlaneTargetDigest": TARGET,
+                    "prometheusTargetDigest": PROMETHEUS_TARGET,
                     "prerequisiteReportDigest": _digest("8"),
+                },
+            },
+        },
+        "customer-operational-alerts": {
+            "metadata": {
+                "id": "coar_" + "9" * 32,
+                "generatedAt": _stamp(operational_alert_completed),
+                "validUntil": _stamp(now + timedelta(hours=17)),
+                "sourceRevision": REVISION,
+                "sourceDirty": False,
+            },
+            "spec": {
+                "status": "qualified",
+                "subject": operational_alert_subject,
+                "profile": {"ruleSet": "ai-finops-v0"},
+                "bindings": operational_alert_bindings,
+                "measurements": {
+                    "startedAt": _stamp(operational_alert_started),
+                    "completedAt": _stamp(operational_alert_completed),
                 },
             },
         },
@@ -338,14 +389,14 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
     documents = {
         key: pilot.EvidenceDocument(
             document=value,
-            file_digest=_digest(str(index + 1)),
+            file_digest=_digest(format(index + 1, "x")),
             generated_at=datetime.fromisoformat(
                 value["metadata"]["generatedAt"].replace("Z", "+00:00")
             ),
         )
         for index, (key, value) in enumerate(raw.items())
     }
-    return _profile(now, targets), documents
+    return _profile(now, targets, operational_alert_bindings), documents
 
 
 class CustomerPilotReadinessTests(unittest.TestCase):
@@ -363,16 +414,34 @@ class CustomerPilotReadinessTests(unittest.TestCase):
         pilot.validate_profile(profile)
         pilot.validate_report_document(report)
 
+    def test_cli_derives_complete_operational_alert_binding_set_digest(self) -> None:
+        alert_path = EXAMPLES / "customer-operational-alert-qualification-report.json"
+        alert = json.loads(alert_path.read_text())
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = pilot.main(
+                [
+                    "operational-alert-binding-set-digest",
+                    "--operational-alerts",
+                    str(alert_path),
+                ]
+            )
+        self.assertEqual(result, 0)
+        self.assertEqual(
+            output.getvalue().strip(), pilot._digest(alert["spec"]["bindings"])
+        )
+
     def test_builds_minimized_design_partner_candidate(self) -> None:
         report = pilot.build_report(
             profile=self.profile, sources=self.sources, generated_at=self.now
         )
         self.assertEqual(report["spec"]["status"], "design-partner-candidate")
-        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 9)
+        self.assertEqual(report["spec"]["summary"]["passedEvidence"], 10)
+        self.assertEqual(report["spec"]["summary"]["totalChecks"], 24)
         self.assertEqual(len(report["spec"]["externalGates"]), 3)
         self.assertEqual(
             report["metadata"]["validUntil"],
-            _stamp(self.now + timedelta(hours=18)),
+            _stamp(self.now + timedelta(hours=17)),
         )
         encoded = json.dumps(report)
         for forbidden in (
@@ -496,6 +565,98 @@ class CustomerPilotReadinessTests(unittest.TestCase):
             evidence["errorCode"],
             "customer-pilot-readiness.evidence.status-not-qualified",
         )
+
+    def test_unsuccessful_or_expired_operational_alert_rejects_the_candidate(self) -> None:
+        sources = dict(self.sources)
+        alerts = copy.deepcopy(sources["customer-operational-alerts"].document)
+        alerts["spec"]["status"] = "not-qualified"
+        sources["customer-operational-alerts"] = pilot.EvidenceDocument(
+            alerts,
+            sources["customer-operational-alerts"].file_digest,
+            sources["customer-operational-alerts"].generated_at,
+        )
+        report = pilot.build_report(
+            profile=self.profile, sources=sources, generated_at=self.now
+        )
+        evidence = next(
+            item
+            for item in report["spec"]["evidence"]
+            if item["id"] == "customer-operational-alerts"
+        )
+        self.assertEqual(report["spec"]["status"], "not-candidate")
+        self.assertEqual(
+            evidence["errorCode"],
+            "customer-pilot-readiness.evidence.status-not-qualified",
+        )
+
+        sources = dict(self.sources)
+        alerts = copy.deepcopy(sources["customer-operational-alerts"].document)
+        alerts["metadata"]["validUntil"] = _stamp(self.now)
+        sources["customer-operational-alerts"] = pilot.EvidenceDocument(
+            alerts,
+            sources["customer-operational-alerts"].file_digest,
+            sources["customer-operational-alerts"].generated_at,
+        )
+        report = pilot.build_report(
+            profile=self.profile, sources=sources, generated_at=self.now
+        )
+        evidence = next(
+            item
+            for item in report["spec"]["evidence"]
+            if item["id"] == "customer-operational-alerts"
+        )
+        self.assertEqual(report["spec"]["status"], "not-candidate")
+        self.assertEqual(
+            evidence["errorCode"], "customer-pilot-readiness.evidence.expired"
+        )
+
+    def test_operational_alert_expiry_caps_candidate_validity(self) -> None:
+        sources = dict(self.sources)
+        alerts = copy.deepcopy(sources["customer-operational-alerts"].document)
+        alert_expiry = self.now + timedelta(hours=2)
+        alerts["metadata"]["validUntil"] = _stamp(alert_expiry)
+        sources["customer-operational-alerts"] = pilot.EvidenceDocument(
+            alerts,
+            sources["customer-operational-alerts"].file_digest,
+            sources["customer-operational-alerts"].generated_at,
+        )
+        report = pilot.build_report(
+            profile=self.profile, sources=sources, generated_at=self.now
+        )
+        self.assertEqual(report["spec"]["status"], "design-partner-candidate")
+        self.assertEqual(report["metadata"]["validUntil"], _stamp(alert_expiry))
+
+    def test_operational_alert_scope_and_environment_are_exactly_bound(self) -> None:
+        mutations = (
+            ("profile", "ruleSet", "core-v1"),
+            ("subject", "imageDigest", _digest("0")),
+            ("bindings", "clusterBindingDigest", _digest("0")),
+            ("bindings", "namespaceBindingDigest", _digest("0")),
+            ("bindings", "prometheusTargetBindingDigest", _digest("0")),
+            ("bindings", "profileDigest", _digest("0")),
+            ("bindings", "alertmanagerTargetBindingDigest", _digest("0")),
+        )
+        for section, field, value in mutations:
+            with self.subTest(section=section, field=field):
+                sources = dict(self.sources)
+                alerts = copy.deepcopy(
+                    sources["customer-operational-alerts"].document
+                )
+                alerts["spec"][section][field] = value
+                sources["customer-operational-alerts"] = pilot.EvidenceDocument(
+                    alerts,
+                    sources["customer-operational-alerts"].file_digest,
+                    sources["customer-operational-alerts"].generated_at,
+                )
+                with self.assertRaisesRegex(
+                    pilot.CustomerPilotReadinessError,
+                    "customer-pilot-readiness.evidence.crossed",
+                ):
+                    pilot.build_report(
+                        profile=self.profile,
+                        sources=sources,
+                        generated_at=self.now,
+                    )
 
     def test_dirty_source_is_rejected_and_crossed_revision_fails_closed(self) -> None:
         sources = dict(self.sources)
@@ -659,13 +820,40 @@ class CustomerPilotReadinessTests(unittest.TestCase):
             "customer-pilot-readiness.sustained-workload.before-deployment",
         )
 
+    def test_operational_alert_must_follow_deployment_qualification(self) -> None:
+        sources = dict(self.sources)
+        alerts = copy.deepcopy(sources["customer-operational-alerts"].document)
+        alerts["spec"]["measurements"]["startedAt"] = _stamp(
+            self.now - timedelta(hours=2)
+        )
+        sources["customer-operational-alerts"] = pilot.EvidenceDocument(
+            alerts,
+            sources["customer-operational-alerts"].file_digest,
+            sources["customer-operational-alerts"].generated_at,
+        )
+        report = pilot.build_report(
+            profile=self.profile, sources=sources, generated_at=self.now
+        )
+        self.assertEqual(report["spec"]["status"], "not-candidate")
+        check = next(
+            item
+            for item in report["spec"]["checks"]
+            if item["id"] == "post-deployment-operational-alert-window"
+        )
+        self.assertEqual(
+            check["errorCode"],
+            "customer-pilot-readiness.operational-alert.before-deployment",
+        )
+
     def test_report_binding_digests_must_match_evidence_items(self) -> None:
         report = copy.deepcopy(
             pilot.build_report(
                 profile=self.profile, sources=self.sources, generated_at=self.now
             )
         )
-        report["spec"]["bindings"]["sustainedWorkloadReportDigest"] = _digest("0")
+        report["spec"]["bindings"]["customerOperationalAlertReportDigest"] = (
+            _digest("0")
+        )
         metadata = dict(report["metadata"])
         metadata.pop("id")
         report["metadata"]["id"] = pilot._report_id(metadata, report["spec"])

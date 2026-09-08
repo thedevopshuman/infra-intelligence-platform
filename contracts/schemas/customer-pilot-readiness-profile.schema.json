@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:iip:contracts:customer-pilot-readiness-profile:v1alpha1",
+  "$id": "urn:iip:contracts:customer-pilot-readiness-profile:v1alpha2",
   "title": "Customer Pilot Readiness Profile",
-  "description": "Protected reviewed selection binding one published and organizationally signed IIP release to one customer deployment, narrow load target, sustained core-workload and planned-failure overlap profiles, and same-invocation AI FinOps environment before a private design-partner trial.",
+  "description": "Protected reviewed selection binding one published and organizationally signed IIP release to one customer deployment, operational-alert environment, narrow load target, sustained core-workload and planned-failure overlap profiles, and same-invocation AI FinOps environment before a private design-partner trial.",
   "type": "object",
   "additionalProperties": false,
   "required": ["apiVersion", "kind", "metadata", "spec"],
   "properties": {
-    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "apiVersion": {"const": "iip.platform/v1alpha2"},
     "kind": {"const": "CustomerPilotReadinessProfile"},
     "metadata": {
       "type": "object",
@@ -24,7 +24,7 @@
       "additionalProperties": false,
       "required": ["qualificationLevel", "release", "bindings", "objective"],
       "properties": {
-        "qualificationLevel": {"const": "customer-ai-finops-design-partner-v1"},
+        "qualificationLevel": {"const": "customer-ai-finops-design-partner-v2"},
         "release": {
           "type": "object",
           "additionalProperties": false,
@@ -41,16 +41,19 @@
         "bindings": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["signaturePolicyDigest", "publicationTargetSetDigest", "clusterBindingDigest", "environmentBindingDigest", "controlPlaneTargetDigest", "otlpTargetDigest", "sustainedWorkloadProfileDigest", "failureOverlapProfileDigest"],
+          "required": ["signaturePolicyDigest", "publicationTargetSetDigest", "clusterBindingDigest", "namespaceBindingDigest", "environmentBindingDigest", "controlPlaneTargetDigest", "otlpTargetDigest", "sustainedWorkloadProfileDigest", "failureOverlapProfileDigest", "operationalAlertProfileDigest", "operationalAlertBindingSetDigest"],
           "properties": {
             "signaturePolicyDigest": {"$ref": "#/$defs/digest"},
             "publicationTargetSetDigest": {"$ref": "#/$defs/digest"},
             "clusterBindingDigest": {"$ref": "#/$defs/digest"},
+            "namespaceBindingDigest": {"$ref": "#/$defs/digest"},
             "environmentBindingDigest": {"$ref": "#/$defs/digest"},
             "controlPlaneTargetDigest": {"$ref": "#/$defs/digest"},
             "otlpTargetDigest": {"$ref": "#/$defs/digest"},
             "sustainedWorkloadProfileDigest": {"$ref": "#/$defs/digest"},
-            "failureOverlapProfileDigest": {"$ref": "#/$defs/digest"}
+            "failureOverlapProfileDigest": {"$ref": "#/$defs/digest"},
+            "operationalAlertProfileDigest": {"$ref": "#/$defs/digest"},
+            "operationalAlertBindingSetDigest": {"$ref": "#/$defs/digest"}
           }
         },
         "objective": {

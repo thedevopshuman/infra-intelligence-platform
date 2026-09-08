@@ -5,7 +5,9 @@ import json
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import Mock
 
+from iip.adapters.credential_broker import CredentialBrokerUnavailableError
 from scripts import run_credential_broker_compatibility as compatibility
 from scripts import validate_repo
 
@@ -21,6 +23,24 @@ def decode_claims(token: str) -> dict[str, object]:
 
 
 class CredentialBrokerCompatibilityTests(unittest.TestCase):
+    def test_denial_helper_requires_the_expected_stable_error(self) -> None:
+        broker = Mock()
+        broker.resolve.side_effect = CredentialBrokerUnavailableError(
+            "credential.broker.request.denied"
+        )
+
+        compatibility.expect_stable_denial(
+            broker,
+            compatibility.lease_request(),
+            expected_error="credential.broker.request.denied",
+        )
+        with self.assertRaisesRegex(RuntimeError, "unstable error"):
+            compatibility.expect_stable_denial(
+                broker,
+                compatibility.lease_request(),
+                expected_error="credential.broker.upstream.unavailable",
+            )
+
     def test_workload_tokens_are_signed_short_lived_and_generation_bound(self) -> None:
         now = datetime(2026, 8, 17, 12, 0, tzinfo=timezone.utc)
         token_a = compatibility.workload_token(

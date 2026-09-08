@@ -169,11 +169,13 @@ def lease_request(
 def expect_stable_denial(
     broker: ExternalHttpCredentialBroker,
     request: CredentialLeaseRequest,
+    *,
+    expected_error: str,
 ) -> None:
     try:
         broker.resolve(request)
     except CredentialBrokerUnavailableError as error:
-        if str(error) != "credential.broker.upstream.unavailable":
+        if str(error) != expected_error:
             raise RuntimeError("credential compatibility returned an unstable error")
         return
     raise RuntimeError("credential compatibility unexpectedly issued a lease")
@@ -349,7 +351,11 @@ def run_profile(docker: str, report_path: Path) -> dict[str, object]:
                 ),
                 encoding="ascii",
             )
-            expect_stable_denial(broker, lease_request())
+            expect_stable_denial(
+                broker,
+                lease_request(),
+                expected_error="credential.broker.upstream.unavailable",
+            )
             token_path.write_text(
                 workload_token(
                     signing_key,
@@ -361,7 +367,11 @@ def run_profile(docker: str, report_path: Path) -> dict[str, object]:
                 ),
                 encoding="ascii",
             )
-            expect_stable_denial(broker, lease_request())
+            expect_stable_denial(
+                broker,
+                lease_request(),
+                expected_error="credential.broker.upstream.unavailable",
+            )
             token_path.write_text(
                 workload_token(
                     signing_key,
@@ -372,7 +382,11 @@ def run_profile(docker: str, report_path: Path) -> dict[str, object]:
                 ),
                 encoding="ascii",
             )
-            expect_stable_denial(broker, lease_request())
+            expect_stable_denial(
+                broker,
+                lease_request(),
+                expected_error="credential.broker.upstream.unavailable",
+            )
             token_path.write_text(
                 workload_token(
                     signing_key,
@@ -383,13 +397,22 @@ def run_profile(docker: str, report_path: Path) -> dict[str, object]:
                 ),
                 encoding="ascii",
             )
-            expect_stable_denial(broker, lease_request())
+            expect_stable_denial(
+                broker,
+                lease_request(),
+                expected_error="credential.broker.upstream.unavailable",
+            )
 
             token_path.write_text(token_a, encoding="ascii")
-            expect_stable_denial(broker, lease_request(tenant_id="tenant-b"))
+            expect_stable_denial(
+                broker,
+                lease_request(tenant_id="tenant-b"),
+                expected_error="credential.broker.request.denied",
+            )
             expect_stable_denial(
                 broker,
                 lease_request(scopes=("metrics:read", "admin:write")),
+                expected_error="credential.broker.request.denied",
             )
 
             token_path.write_text(token_b, encoding="ascii")
@@ -398,15 +421,27 @@ def run_profile(docker: str, report_path: Path) -> dict[str, object]:
             if lease_a.secret == lease_b.secret:
                 raise RuntimeError("credential compatibility lease did not rotate")
             token_path.write_text(token_a, encoding="ascii")
-            expect_stable_denial(broker, lease_request())
+            expect_stable_denial(
+                broker,
+                lease_request(),
+                expected_error="credential.broker.upstream.unavailable",
+            )
 
             token_path.write_text(token_b, encoding="ascii")
-            expect_stable_denial(client(directory, trusted=False), lease_request())
+            expect_stable_denial(
+                client(directory, trusted=False),
+                lease_request(),
+                expected_error="credential.broker.upstream.unavailable",
+            )
             run_command(
                 compose_command(docker, "stop", "credential-broker"),
                 environment=environment,
             )
-            expect_stable_denial(broker, lease_request())
+            expect_stable_denial(
+                broker,
+                lease_request(),
+                expected_error="credential.broker.upstream.unavailable",
+            )
             run_command(
                 compose_command(
                     docker,

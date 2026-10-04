@@ -20,7 +20,8 @@ One encrypted archive holds the related offline state together:
 - Prometheus and Grafana data;
 - the installation manifest, retained immutable input/configuration
   generations, rendered dashboard/Collector configuration, credentials,
-  certificates, and private transport keys;
+  certificates, and private transport keys, including settled transport
+  generations, overlap bundles, pointer, and history when enrolled;
 - a manifest binding file hashes, source project/daemon, operational deployment
   fingerprint, and actual runtime image IDs with their OS/architecture.
 
@@ -119,6 +120,12 @@ PostgreSQL shutdown. A killed database or a merely stopped-but-retained
 container is not accepted. Nothing is stopped automatically to satisfy these
 checks.
 
+Complete or cancel any pending [transport rotation](community-trust-rotation.md)
+before backup. An intermediate prepared/activated/rolled-back selection is not
+accepted as stable backup state. The successful-start receipt is not copied:
+its exact source-container identities cannot authorize finalization on a
+restored installation.
+
 Success means a bounded encrypted archive was published without replacing any
 file. The source is still stopped. Decide explicitly whether to resume it or
 keep it fenced for recovery; taking a backup alone does not fence future
@@ -178,9 +185,13 @@ that restriction.
 
 Expired pricing qualifications need a reviewed, valid replacement through
 the normal configuration workflow. Expired transport certificates are not
-renewed by restore; the missing rotation procedure remains an operational
-blocker. Never regenerate an entire installation to replace certificates or
-silently generate a different database password.
+renewed by restore. Where the matching operational deployment includes the
+[stopped-stack rotation procedure](community-trust-rotation.md), use it to
+replace an expired trust generation while preserving credentials and data.
+It does not bypass the exact deployment/image recovery restrictions or
+automatically update external exporters. Never regenerate an entire
+installation to replace certificates or silently generate a different database
+password.
 
 After startup, verify your expected tenant records, recent sample usage,
 coverage, dashboard access, Collector queue behavior, and end-to-end intake

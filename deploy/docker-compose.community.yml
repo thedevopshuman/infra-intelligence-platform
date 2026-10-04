@@ -38,12 +38,17 @@ services:
     cap_drop: ["ALL"]
     cap_add: ["CHOWN", "DAC_OVERRIDE", "FOWNER"]
     security_opt: ["no-new-privileges:true"]
+    labels:
+      io.iip.community.transport-generation: ${IIP_COMMUNITY_TRANSPORT_GENERATION:?validate selected transport first}
+      io.iip.community.installation-binding: ${IIP_COMMUNITY_INSTALLATION_BINDING:?validate protected installation first}
+      io.iip.community.deployment: ${IIP_COMMUNITY_DEPLOYMENT:?validate operational deployment first}
     environment:
       IIP_COMMUNITY_POSTGRES_PASSWORD: ${IIP_COMMUNITY_POSTGRES_PASSWORD:?initialize credentials first}
       IIP_COMMUNITY_GRAFANA_PASSWORD: ${IIP_COMMUNITY_GRAFANA_PASSWORD:?initialize credentials first}
+      IIP_COMMUNITY_TRANSPORT_GENERATION: ${IIP_COMMUNITY_TRANSPORT_GENERATION:?validate selected transport first}
     volumes:
       - type: bind
-        source: ${IIP_COMMUNITY_STATE:?initialize the community installation first}/transport
+        source: ${IIP_COMMUNITY_TRANSPORT_DIRECTORY:?validate selected transport first}
         target: /transport
         read_only: true
       - ./community:/configuration:ro

@@ -70,7 +70,7 @@ generated protected credentials, verified database/telemetry transport,
 operator-reviewed catalogs/attribution, durable state and Collector buffering,
 safe configuration generations, and a savings-independent rolling dashboard.
 It does not close the public-install gate: published artifacts and a fresh-host
-walkthrough, supported upgrade/recovery and certificate lifecycle, database/outbox
+walkthrough, supported upgrade/recovery and customer certificate lifecycle, database/outbox
 retention, and real provider evidence remain outstanding. Its operational
 limitations must not be presented as a fully supported public-v1 deployment.
 
@@ -83,6 +83,19 @@ Grafana/Prometheus data, exact images, and unchanged credentials/trust. That
 result is not a customer recovery drill, measured RPO/RTO, cross-version
 upgrade, or off-host key/archive custody. Those evidence and lifecycle
 obligations remain open, and the gate must be rerun for the release candidate.
+
+The [stopped-stack community transport lifecycle](../operations/community-trust-rotation.md)
+adds whole-CA/leaf generations, an atomic selection pointer, operator-staged
+external overlap trust, valid-old-generation rollback, and exact-start-receipt
+finalization after an operator intake check. It preserves passwords, tokens,
+data, and configuration and can prepare from expired source material. Its
+owned local synthetic Docker gate passed on 2026-10-04, including old-only
+trust rejection, new/overlap acceptance, persisted/queued data, rollback,
+encrypted fresh recovery, SQL TLS, and safe repeated startup. This does not
+establish a customer exporter rollout, live provider evidence, unattended
+renewal, revocation, HA/hot rotation, or enterprise/Kubernetes PKI integration;
+those evidence and operating responsibilities remain distinct. The gate must
+be rerun for the release candidate.
 
 | Workstream | Required result | Evidence to close it |
 | --- | --- | --- |

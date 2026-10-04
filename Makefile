@@ -4,7 +4,7 @@
 
 PYTHON ?= python3
 
-.PHONY: community-check community-up community-status community-down test-community test-community-recovery
+.PHONY: community-check community-up community-status community-down test-community test-community-recovery test-community-trust
 HELM ?= helm
 KUBECTL ?= kubectl
 DOCKER ?= docker
@@ -369,6 +369,7 @@ help:
 	@echo "community-down Stop the community preview while preserving data and credentials"
 	@echo "test-community Test encrypted intake and persistent community lifecycle in Docker"
 	@echo "test-community-recovery Exercise owned offline encrypted community restore in Docker"
+	@echo "test-community-trust Exercise owned certificate rotation, rollback, and recovery in Docker"
 	@echo "package-chart Package the Helm chart under dist/"
 	@echo "release-bundle Build an unsigned multi-platform release bundle with SBOM/provenance"
 	@echo "verify-release-bundle Verify IIP_RELEASE_BUNDLE checksums and OCI attestations"
@@ -2021,6 +2022,9 @@ test-community:
 
 test-community-recovery:
 	IIP_TEST_COMMUNITY_RECOVERY=true PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest discover -s tests -p test_community_recovery_runtime.py -v
+
+test-community-trust:
+	IIP_TEST_COMMUNITY_TRUST=true PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest discover -s tests -p test_community_trust_runtime.py -v
 
 package-chart:
 	mkdir -p dist

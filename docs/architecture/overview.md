@@ -253,6 +253,16 @@ source fencing. Recovery changes neither serving authority nor tenant identity
 and does not implement migration, certificate renewal, HA, or a production
 recovery objective; see the [recovery runbook](../operations/community-recovery.md).
 
+[ADR 0159](../decisions/0159-stopped-community-transport-rotation.md) adds a
+separate stopped-stack lifecycle for the community CA and all five leaf
+keypairs. Immutable generations and one protected pointer keep selection
+atomic; external exporters receive an operator-managed overlap bundle before
+activation or rollback. Explicit startup and its exact-container health receipt,
+together with the operator's real-intake assertion, gate finalization. This
+does not add PKI authority to the server, rotate passwords/tokens, or promise
+hot rotation, HA, revocation, or managed external exporters. See the
+[transport-rotation runbook](../operations/community-trust-rotation.md).
+
 [ADR 0134](../decisions/0134-customer-otlp-receiver-interoperability-qualification.md)
 adds a host-side customer gate that uses a digest-pinned official Collector and
 its exporter self-metrics to prove metrics, logs, and metadata-only GenAI spans

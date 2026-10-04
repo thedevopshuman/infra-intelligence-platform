@@ -22,6 +22,7 @@ available; this onboarding unit focuses on inbound Bedrock telemetry.
 | Savings | Optional reviewed fixed-window profiles; no fabricated opportunity or monetary saving |
 | Persistence | Named PostgreSQL, Collector queue, Prometheus, and Grafana volumes survive `down` |
 | Recovery | Explicit encrypted offline whole-installation copy to fresh stopped state; exact deployment/images and source fencing required; not an upgrade or recovery objective |
+| Transport lifecycle | Explicit stopped-stack whole-CA/leaf rotation with external overlap trust, pre-finalization rollback, and operator intake verification; no hot renewal |
 | Interfaces | API/console, authenticated Grafana, and Prometheus on loopback; HTTPS/Bearer Collector intake on loopback; database and mTLS receiver have no host ports |
 
 The source host needs Python with the repository dependencies, Docker, and
@@ -94,6 +95,16 @@ schema. It waits for component health and verifies that the TLS Collector
 rejects an unauthenticated empty export. This is **not** proof that a real
 invocation has arrived or been priced.
 
+Building requires all installation containers removed: this includes
+`make community-up` and `scripts/community_stack.py up --build`. Ordinary
+`scripts/community_stack.py up` against an exact healthy, unchanged project is
+a read-only no-op, not a repair command. It checks expected service health and
+the initializer's selected trust, installation/credential, and operational
+deployment bindings without rerunning the initializer. For unhealthy or
+mismatched state, source/configuration changes, rebuilding, or repair, use
+`down` first, preserving volumes, then the appropriate startup command. Never
+use `down --volumes` for this workflow.
+
 Successful startup now records actual container image IDs and their
 OS/architecture in protected `runtime-images.json`, bound to the operational
 deployment files. Preserve that record for offline backup; version strings or
@@ -121,7 +132,9 @@ Configure the application's existing asynchronous OTel exporter:
 
 - trace endpoint: `https://localhost:14322/v1/traces`;
 - protocol: OTLP/HTTP protobuf;
-- CA: the installation's `transport/ca.crt`, explicitly supplied to the exporter;
+- CA: the `caPath` returned by `scripts/community_trust.py --state PATH status`,
+  explicitly supplied to the exporter; `transport/ca.crt` is current only
+  before transport-generation enrollment;
 - Authorization: `Bearer` plus `collectorToken` from protected credentials;
 - resource attributes: the exact reviewed service, namespace, environment,
   and cloud region;
@@ -193,6 +206,13 @@ restores over an existing installation. Do not use `make community-up` on
 recovered state: its implicit `--build` is intentionally rejected; follow the
 runbook's explicit validated no-build startup.
 
+The [transport rotation runbook](community-trust-rotation.md) replaces the
+whole local CA and all five leaf/key pairs while keeping passwords, tokens,
+data, and pricing/attribution unchanged. Prepare/activate/rollback require
+removed containers; startup is blocked while prepared. Configuration and
+backup are blocked during an unfinished rotation. External exporter trust is
+staged by the operator, not silently changed by IIP.
+
 ## Known release work
 
 This preview is deliberately not a replacement for the current production
@@ -202,11 +222,17 @@ public artifact installation remain release work. No external credential
 broker is needed for inbound telemetry; integrations that perform provider
 reads still need their own governed authority.
 
-Certificates expire after 365 days and fail closed. An operator-facing trust
-rotation/rollback command is not implemented yet; the CA signing key is not
-retained. Do not delete installation state to regenerate certificates against
-an existing database: that would also regenerate its password. Long-lived
-operation needs a tested trust-lifecycle procedure first.
+Leaf certificates expire after 365 days and fail closed. The CA signing key is
+not retained; the new stopped-stack rotation command replaces the complete
+trust generation and preserves the installation. Its status view warns within
+30 days of expiry, but scheduling and external-exporter changes remain
+operator-owned. Do not delete installation state to regenerate certificates
+against an existing database: that would also regenerate its password.
+The owned local synthetic rotation/rollback/recovery gate has passed; see its
+[recorded scope](community-trust-rotation.md#evidence-and-remaining-responsibilities).
+Long-lived operation still needs the gate rerun for the release candidate and
+a customer-tested maintenance/expiry procedure; a command is not an unattended
+renewal service.
 
 Prometheus is bounded to 30 days/2 GB. The Collector has a bounded persistent
 queue; records older than the protected intake age may be rejected after a

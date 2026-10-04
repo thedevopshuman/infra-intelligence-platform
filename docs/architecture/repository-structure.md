@@ -206,6 +206,14 @@ archive parsing enters the server domain/application packages. The separately
 invoked Docker test remains an owned operational experiment, not a customer
 recovery guarantee.
 
+`scripts/community_trust.py` similarly owns only host-side transport lifecycle:
+immutable CA/leaf generations, an atomic protected selection pointer,
+stopped-stack transition checks, public overlap material, and receipt-bound
+finalization. The installer projects the selected generation; ordinary serving
+packages continue consuming their existing verified-TLS paths. The lifecycle
+does not change public API/SDK contracts, create a hosted CA, modify external
+exporters, or move Docker/filesystem authority into domain or application code.
+
 - A provider-specific API call belongs in `adapters/<provider>` or a plugin.
 - A capability selected by an agent is a tool contract; the implementation delegates to a provider port.
 - A use-case sequence belongs in `application`, not an HTTP handler or queue consumer.

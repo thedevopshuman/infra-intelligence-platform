@@ -162,3 +162,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0156](0156-persistent-single-host-community-onboarding.md) | Accepted implementation boundary | Add empty, protected, persistent single-host onboarding without converting local evidence into public-v1 or production authority |
 | [0157](0157-apache-licensed-learning-release.md) | Accepted | Publish an Apache-2.0 source-only learning prerelease without relaxing production qualification |
 | [0158](0158-offline-encrypted-community-recovery.md) | Accepted implementation boundary | Recover one offline encrypted community installation into fresh stopped state using exact images and explicit source fencing |
+| [0159](0159-stopped-community-transport-rotation.md) | Accepted implementation boundary | Rotate a stopped community trust generation with external CA overlap, bounded rollback, and receipt-bound operator finalization |

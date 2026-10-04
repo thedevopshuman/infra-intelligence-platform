@@ -76,6 +76,7 @@ The documentation tree is the product and engineering system of record. A change
 - [Local development](operations/local-development.md)
 - [Persistent community installation](operations/community-installation.md)
 - [Offline encrypted community recovery](operations/community-recovery.md)
+- [Stopped-stack community transport rotation](operations/community-trust-rotation.md)
 - [Transactional outbox event delivery](operations/event-delivery.md)
 - [Helm deployment and schema migration](operations/helm-deployment.md)
 - [Customer deployment preflight](operations/customer-deployment-preflight.md)

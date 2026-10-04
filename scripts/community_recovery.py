@@ -250,9 +250,12 @@ def _digest(path: Path) -> dict:
 
 
 def _state_paths(state: Path) -> list[str]:
+    from community_trust import backup_paths
+
     stack._private_directory(state / "transport")
     stack._private_directory(state / "config")
-    paths = ["installation.json", "credentials.json", *(f"transport/{name}" for name in TRANSPORT_FILES)]
+    paths = ["installation.json", "credentials.json", *(f"transport/{name}" for name in TRANSPORT_FILES),
+             *backup_paths(state)]
     generations = sorted((state / "config").iterdir())
     if not 1 <= len(generations) <= 256:
         raise RecoveryError("community.recovery.configuration-limit")
@@ -292,12 +295,14 @@ def _check_database(docker: RecoveryDocker, project: str, images: dict) -> None:
 
 def backup(state: Path, destination: Path, key: Path, *, max_bytes: int = DEFAULT_MAX_BYTES) -> None:
     from community_backup_crypto import encrypt_file
+    from community_trust import require_settled
 
     _bound(max_bytes)
     state, destination, key = state.absolute(), destination.absolute(), key.absolute()
     if (state / ".recovery-incomplete").exists() or (state / ".recovery-incomplete").is_symlink():
         raise RecoveryError("community.recovery.incomplete")
     stack.installed_environment(state, validate_contracts=False)
+    require_settled(state)
     stack._private_directory(destination.parent)
     if key == destination:
         raise RecoveryError("community.recovery.destination-invalid")
@@ -380,7 +385,7 @@ def _validate_outer_archive(payload: Path, max_bytes: int) -> None:
                     raise RecoveryError("community.recovery.archive-invalid")
                 return
             count += 1
-            if count > 2000 or header[257:265] != b"ustar\x0000" or header[156:157] != tarfile.REGTYPE:
+            if count > 4096 or header[257:265] != b"ustar\x0000" or header[156:157] != tarfile.REGTYPE:
                 raise RecoveryError("community.recovery.archive-invalid")
             entry = tarfile.TarInfo.frombuf(header, encoding="utf-8", errors="strict")
             if entry.tobuf(format=tarfile.USTAR_FORMAT, encoding="utf-8", errors="strict") != header:
@@ -408,7 +413,7 @@ def _unpack(payload: Path, work: Path, max_bytes: int) -> dict:
             if (not entry.isfile() or entry.pax_headers or not parts or any(part in ("..", ".") for part in parts)
                     or entry.name.startswith("/") or "\\" in entry.name or entry.name in members
                     or PurePosixPath(entry.name).as_posix() != entry.name
-                    or entry.mode != 0o600 or entry.size < 0 or len(members) >= 2000
+                    or entry.mode != 0o600 or entry.size < 0 or len(members) >= 4096
                     or entry.uid != 0 or entry.gid != 0 or entry.uname or entry.gname
                     or entry.linkname or len(entry.name.encode("utf-8")) > 255
                     or any(ord(character) < 32 or ord(character) == 127 for character in entry.name)):

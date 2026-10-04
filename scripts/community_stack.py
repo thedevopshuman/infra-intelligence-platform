@@ -344,22 +344,36 @@ def installed_environment(state: Path, *, validate_contracts: bool = True) -> tu
         "IIP_AI_SAVINGS_ENGINE_ENABLED": "true" if inputs["savings"]["profiles"] else "false",
         **{variable: compact(inputs[name]) for name, variable in INPUT_FILES.items()},
     }
-    from community_transport import transport_environment, validate_transport
+    from community_transport import transport_environment
 
     # A modified manifest cannot silently downgrade the packaged TLS posture.
     transport = installation["transportEnvironment"]
     if transport != transport_environment():
         raise InstallationError("community.transport.invalid")
     if validate_contracts:
-        validate_transport(state)
+        from community_trust import selected_transport
+
+        directory, transport_generation = selected_transport(state, for_startup=True)
+    else:
+        # Shutdown/status do not consume mounted material. Keep rescue possible
+        # even when a certificate or lifecycle document needs repair.
+        directory, transport_generation = state / "transport", "0" * 64
+    environment["IIP_COMMUNITY_TRANSPORT_DIRECTORY"] = str(directory)
+    environment["IIP_COMMUNITY_TRANSPORT_GENERATION"] = transport_generation
     environment.update(transport)
     if validate_contracts:
-        from community_recovery import recovered_environment
+        from community_recovery import deployment_digest, recovered_environment
 
         # Restored startup must preserve the images that actually held these
         # volumes, not re-resolve the original mutable tags. Rescue ps/down
         # intentionally skip this deployment check and cannot create services.
         environment.update(recovered_environment(state))
+        environment["IIP_COMMUNITY_DEPLOYMENT"] = deployment_digest()
+    else:
+        environment["IIP_COMMUNITY_DEPLOYMENT"] = "0" * 64
+    environment["IIP_COMMUNITY_INSTALLATION_BINDING"] = hashlib.sha256(
+        compact({"installation": installation, "credentials": credentials}).encode()
+    ).hexdigest()
     return environment, installation["project"]
 
 
@@ -370,6 +384,13 @@ def run_compose(state: Path, arguments: Sequence[str], *, validate_contracts: bo
     try:
         executable, endpoint, environment = local_docker_binding(state, dict(os.environ))
         environment.update(values)
+        if arguments[0] in ("up", "build"):
+            if not validate_contracts:
+                raise InstallationError("community.start.validation-required")
+            from community_trust import guard_start
+
+            if not guard_start(state, arguments, values):
+                return ""  # Already healthy: never rerun a projector against live files.
         completed = subprocess.run(
             [executable, "--host", endpoint, "compose", "--project-name", project, "--file", str(COMPOSE), *arguments],
             cwd=ROOT, env=environment, capture_output=True, text=True, check=True,
@@ -386,6 +407,9 @@ def configure(state: Path, inputs: Mapping[str, dict]) -> None:
     """Switch an offline installation to a complete immutable configuration set."""
     state = state.absolute()
     require_complete_recovery(state)
+    from community_trust import require_settled
+
+    require_settled(state)
     if run_compose(state, ["ps", "--all", "--quiet"], validate_contracts=False).strip():
         raise InstallationError("community.configuration.stop-required")
     installation = read_protected(state / "installation.json")
@@ -409,7 +433,10 @@ def configure(state: Path, inputs: Mapping[str, dict]) -> None:
 
 def wait_for_collector(state: Path, *, timeout_seconds: int = 60) -> None:
     """Prove the selected TLS listener rejects unauthenticated empty exports."""
-    context = ssl.create_default_context(cafile=str(state / "transport" / "ca.crt"))
+    from community_trust import selected_transport
+
+    directory, _ = selected_transport(state, for_startup=True)
+    context = ssl.create_default_context(cafile=str(directory / "ca.crt"))
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=context))
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
@@ -460,6 +487,9 @@ def execute(arguments: argparse.Namespace) -> int:
         run_compose(arguments.state, options)
         wait_for_collector(arguments.state)
         record_runtime(arguments.state)
+        from community_trust import record_started
+
+        record_started(arguments.state)
         print("Persistent single-host preview started without demo data.")
         print("Console: http://127.0.0.1:18083/console")
         print("Grafana: http://127.0.0.1:13001/d/iip-community-ai-finops (user: admin)")
@@ -492,9 +522,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         with nullcontext() if arguments.command == "init" else installation_lock(arguments.state):
             return execute(arguments)
-    except (InstallationError, OSError, ValueError, TypeError, KeyError):
+    except (InstallationError, OSError, ValueError, TypeError, KeyError, RecursionError):
         # Input/parser/provider details may contain sensitive material.
-        print("ERROR: community.operation.failed; check protected inputs, permissions, certificate/report validity, and Docker availability.", file=sys.stderr)
+        print("ERROR: community.operation.failed; check protected inputs, permissions, certificate/report validity, and Docker availability. If containers already exist, inspect status; stop before rebuilding or repairing.", file=sys.stderr)
         return 2
 
 

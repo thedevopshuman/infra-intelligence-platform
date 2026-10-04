@@ -35,6 +35,7 @@ class CiSupplyChainTests(unittest.TestCase):
         self.assertIn("version: v4.1.3", workflow)
         self.assertIn("make test-postgres-continuity", workflow)
         self.assertIn("make test-community-recovery", workflow)
+        self.assertIn("make test-community-trust", workflow)
         self.assertIn("make test-release-signatures", workflow)
         self.assertIn("make test-release-vulnerabilities", workflow)
 

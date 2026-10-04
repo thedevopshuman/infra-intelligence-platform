@@ -14,6 +14,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/release.yml"
 COSIGN_WRAPPER = ROOT / "scripts/cosign_container.sh"
+JOBS = (
+    "build",
+    "vulnerabilities",
+    "publish-images",
+    "signatures",
+    "sign-downloads",
+    "publish",
+)
+
+
+def job_section(workflow: str, name: str) -> str:
+    selected = workflow.split(f"\n  {name}:\n", 1)[1]
+    return re.split(r"(?m)^  [a-z][a-z0-9-]+:\n", selected, maxsplit=1)[0]
 
 
 class ReleaseWorkflowTests(unittest.TestCase):
@@ -21,7 +34,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         action_references = re.findall(r"^\s+(?:- )?uses: ([^\s#]+)", workflow, re.M)
 
-        self.assertEqual(len(action_references), 6)
+        self.assertEqual(len(action_references), 37)
         for reference in action_references:
             with self.subTest(reference=reference):
                 self.assertRegex(
@@ -30,13 +43,26 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 )
         self.assertIn('      - "v*"', workflow)
         self.assertNotIn("workflow_dispatch", workflow)
-        self.assertIn("environment: release", workflow)
+        self.assertEqual(workflow.count("environment: release"), 3)
         self.assertIn("timeout-minutes: 90", workflow)
         self.assertIn("cancel-in-progress: false", workflow)
         self.assertIn("contents: write", workflow)
         self.assertNotIn("packages: write", workflow)
         self.assertIn("id-token: write", workflow)
         self.assertIn("persist-credentials: false", workflow)
+        self.assertEqual(
+            set(action_references),
+            {
+                "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+                "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+                "azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4",
+                "docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1",
+                "docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069",
+                "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+                "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+            },
+        )
 
     def test_release_orders_closed_gates_before_external_release(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -48,6 +74,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "Verify release builder platforms",
             "\n          make verify\n",
             "make release-bundle",
+            "release_stage.py pack",
             "make qualify-release-vulnerabilities",
             "Authenticate the publication boundary",
             "release_publication.py publish",
@@ -66,9 +93,13 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
     def test_vulnerability_gate_precedes_registry_authority_and_mutation(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
-        step_names = re.findall(r"(?m)^      - name: (.+)$", workflow)
-        build = step_names.index("Verify and build the clean candidate")
-        self.assertEqual(step_names[build + 1], "Qualify release vulnerabilities")
+        build = job_section(workflow, "build")
+        vulnerabilities = job_section(workflow, "vulnerabilities")
+        publication = job_section(workflow, "publish-images")
+        self.assertIn("needs: build", vulnerabilities)
+        self.assertIn("needs: [build, vulnerabilities]", publication)
+        self.assertIn("release_stage.py pack", build)
+        self.assertIn("release_stage.py unpack", vulnerabilities)
         self.assertEqual(workflow.count("make qualify-release-vulnerabilities"), 1)
         vulnerability = workflow.index("make qualify-release-vulnerabilities")
         for later in (
@@ -85,6 +116,108 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "dist/release-vulnerability-qualification-report.json",
             workflow,
         )
+
+    def test_six_job_graph_reuses_successful_checkpoints(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        observed = re.findall(r"(?m)^  ([a-z][a-z0-9-]+):\n", workflow.split("\njobs:\n", 1)[1])
+        self.assertEqual(tuple(observed), JOBS)
+        expected_needs = {
+            "vulnerabilities": "needs: build",
+            "publish-images": "needs: [build, vulnerabilities]",
+            "signatures": "needs: [build, vulnerabilities, publish-images]",
+            "sign-downloads": "needs: [build, vulnerabilities, publish-images, signatures]",
+            "publish": "needs: [build, vulnerabilities, publish-images, signatures, sign-downloads]",
+        }
+        for name, dependency in expected_needs.items():
+            with self.subTest(job=name):
+                self.assertIn(dependency, job_section(workflow, name))
+
+        self.assertEqual(workflow.count("make release-bundle"), 1)
+        self.assertEqual(workflow.count("release_stage.py pack"), 1)
+        self.assertEqual(workflow.count("release_stage.py unpack"), 5)
+        for name in JOBS[1:]:
+            selected = job_section(workflow, name)
+            self.assertNotIn("make release-bundle", selected)
+            self.assertNotIn("release_stage.py pack", selected)
+        self.assertEqual(workflow.count("actions/upload-artifact@"), 5)
+        self.assertEqual(
+            workflow.count("artifact_id: ${{ steps.upload.outputs.artifact-id }}"),
+            5,
+        )
+        self.assertEqual(
+            workflow.count("artifact_digest: ${{ steps.upload.outputs.artifact-digest }}"),
+            5,
+        )
+        self.assertEqual(workflow.count("compression-level: 0"), 5)
+        self.assertEqual(workflow.count("retention-days: 7"), 5)
+        self.assertEqual(workflow.count("overwrite: false"), 5)
+        self.assertEqual(workflow.count("if-no-files-found: error"), 5)
+        self.assertEqual(workflow.count("${{ github.run_attempt }}"), 9)
+        upload_blocks = re.findall(
+            r"(?ms)^      - name: Upload .+?\n        id: upload\n.+?(?=^      - |^\n  [a-z])",
+            workflow,
+        )
+        self.assertEqual(len(upload_blocks), 5)
+        for block in upload_blocks:
+            self.assertIn("${{ github.run_attempt }}", block)
+            self.assertIn("compression-level: 0", block)
+            self.assertIn("retention-days: 7", block)
+            self.assertIn("overwrite: false", block)
+            self.assertIn("if-no-files-found: error", block)
+
+        download_blocks = re.findall(
+            r"(?ms)^      - name: Download exact .+?\n        uses: actions/download-artifact@.+?(?=^      - )",
+            workflow,
+        )
+        self.assertEqual(len(download_blocks), 15)
+        for block in download_blocks:
+            self.assertIn("artifact-ids: ${{ needs.", block)
+            self.assertIn("digest-mismatch: error", block)
+            self.assertNotRegex(block, r"(?m)^          name:")
+
+    def test_job_permissions_keep_authority_at_owning_stage(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        build = job_section(workflow, "build")
+        vulnerabilities = job_section(workflow, "vulnerabilities")
+        publish_images = job_section(workflow, "publish-images")
+        signatures = job_section(workflow, "signatures")
+        sign_downloads = job_section(workflow, "sign-downloads")
+        publish = job_section(workflow, "publish")
+
+        for selected in (build, vulnerabilities, signatures):
+            self.assertIn("permissions:\n      contents: read", selected)
+            self.assertNotIn("environment: release", selected)
+            self.assertNotIn("id-token: write", selected)
+            self.assertNotIn("contents: write", selected)
+        for selected in (publish_images, sign_downloads):
+            self.assertIn("environment: release", selected)
+            self.assertIn("permissions:\n      contents: read\n      id-token: write", selected)
+            self.assertNotIn("contents: write", selected)
+        self.assertIn("environment: release", publish)
+        self.assertIn("permissions:\n      contents: write", publish)
+        self.assertNotIn("id-token: write", publish)
+        self.assertNotIn("DOCKERHUB_TOKEN", publish)
+        self.assertEqual(workflow.count("DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}"), 1)
+        self.assertIn("DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}", publish_images)
+
+    def test_download_signing_and_final_publication_fail_closed(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        signing = job_section(workflow, "sign-downloads")
+        publish = job_section(workflow, "publish")
+        self.assertEqual(signing.count("cosign_container.sh sign-blob --yes"), 2)
+        self.assertEqual(signing.count("cosign_container.sh verify-blob"), 2)
+        self.assertLess(
+            signing.index("cosign_container.sh sign-blob --yes"),
+            signing.index("cosign_container.sh verify-blob"),
+        )
+        upload = signing.split("      - name: Upload download signatures and checksum\n", 1)[1]
+        self.assertNotIn("dist/checkpoints/build", upload)
+        self.assertNotIn("infra-intelligence-community-", upload)
+        self.assertIn("Refuse an existing GitHub release", publish)
+        self.assertIn("error.code != 404", publish)
+        self.assertIn("release.github.already-exists", publish)
+        self.assertIn("release.github.existence-check-failed", publish)
+        self.assertLess(publish.index("Reverify every staged release input"), publish.index("gh release create"))
 
     def test_multiarch_builder_is_explicit_and_immutable(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -170,7 +303,12 @@ class ReleaseWorkflowTests(unittest.TestCase):
                    if "docker logout docker.io" in step]
         self.assertEqual(len(cleanup), 1)
         self.assertRegex(cleanup[0], r"(?m)^\s+if:\s+(?:\$\{\{\s*)?always\(\)")
-        self.assertGreater(workflow.index("docker logout docker.io"), workflow.index("gh release create"))
+        publish_images = job_section(workflow, "publish-images")
+        self.assertGreater(
+            publish_images.index("docker logout docker.io"),
+            publish_images.index("cosign_container.sh sign --yes"),
+        )
+        self.assertNotIn("docker logout docker.io", job_section(workflow, "publish"))
 
     def test_real_workflow_validation_runs_before_ci_verification_and_release_authentication(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -260,20 +398,30 @@ class ReleaseWorkflowTests(unittest.TestCase):
     def test_community_kit_is_separately_signed_and_published_without_rebuilding(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
         preparation = workflow.split(
-            "      - name: Prepare signed customer release assets\n", 1,
+            "      - name: Sign and immediately verify customer downloads\n", 1,
         )[1].split("\n      - name:", 1)[0]
         publication = workflow.split("      - name: Publish verified GitHub release\n", 1)[1].split(
             "\n      - name:", 1,
         )[0]
         self.assertIn("infra-intelligence-community-", preparation)
-        self.assertIn("--bundle dist/community-kit.sigstore.json", preparation)
+        self.assertIn('--bundle "$signatures/community-kit.sigstore.json"', preparation)
         self.assertEqual(preparation.count("cosign_container.sh sign-blob --yes"), 2)
+        self.assertEqual(preparation.count("cosign_container.sh verify-blob"), 2)
         self.assertNotIn("build_installation_kit", preparation)
         self.assertNotIn("installation_kit.py build", preparation)
-        self.assertIn("community-kit.sigstore.json#", publication)
-        self.assertIn("RELEASE_KIT: ${{ steps.assets.outputs.kit }}", publication)
+        self.assertIn(
+            "RELEASE_KIT_SIGNATURE: "
+            "dist/checkpoints/download-signatures/community-kit.sigstore.json",
+            publication,
+        )
+        self.assertIn('"$RELEASE_KIT_SIGNATURE#Compose kit Sigstore evidence"', publication)
+        self.assertIn(
+            "RELEASE_KIT: dist/${{ needs.build.outputs.bundle_name }}/"
+            "infra-intelligence-community-${{ needs.build.outputs.version }}.tar.gz",
+            publication,
+        )
         self.assertIn('"$RELEASE_KIT#Persistent Compose installation kit"', publication)
-        self.assertIn("printf 'kit=%s\\n' \"$kit\" >> \"$GITHUB_OUTPUT\"", preparation)
+        self.assertIn("kit_signature_sha256", preparation)
 
     def test_cosign_wrapper_is_digest_pinned_and_least_authority(self) -> None:
         wrapper = COSIGN_WRAPPER.read_text(encoding="utf-8")

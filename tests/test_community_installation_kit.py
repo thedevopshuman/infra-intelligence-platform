@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -287,14 +288,18 @@ class CommunityInstallationKitTests(unittest.TestCase):
             target.write_bytes((ROOT / name).read_bytes())
         git(source, "init", "-q")
         commit(source)
-        kit.build_installation_kit(source, self.archive, VERSION)
-        kit.inspect_installation_kit(self.archive, VERSION)
+        # This test packages real source, not the fixed-version synthetic kit.
+        # Keep it valid across a release bump without weakening version checks.
+        version = tomllib.loads(git(source, "show", "HEAD:pyproject.toml").decode())["project"]["version"]
+        prefix = f"infra-intelligence-community-{version}"
+        kit.build_installation_kit(source, self.archive, version)
+        kit.inspect_installation_kit(self.archive, version)
         unpack = self.directory / "unpacked"
         unpack.mkdir()
         with tarfile.open(self.archive) as archive:
             names = set(archive.getnames())
             for path in git(source, "ls-files", "src", "deploy", "requirements").decode().splitlines():
-                self.assertIn(f"{PREFIX}/{path}", names)
+                self.assertIn(f"{prefix}/{path}", names)
             for member in archive:
                 target = unpack / member.name
                 if member.isdir():
@@ -306,7 +311,7 @@ class CommunityInstallationKitTests(unittest.TestCase):
                     with stream:
                         target.write_bytes(stream.read())
                     target.chmod(member.mode)
-        extracted = unpack / PREFIX
+        extracted = unpack / prefix
         self.assertFalse((extracted / ".git").exists())
         inputs = self.directory / "protected-inputs"
         inputs.mkdir(mode=0o700)

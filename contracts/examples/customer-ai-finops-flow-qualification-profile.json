@@ -8,17 +8,17 @@
   },
   "spec": {
     "release": {
-      "applicationVersion": "0.84.2",
-      "chartVersion": "0.87.2",
+      "applicationVersion": "0.84.3",
+      "chartVersion": "0.87.3",
       "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "prerequisites": {
-      "profileDigest": "sha256:91bd7c3e48a22e22585bb96bc44fd7240f8b31017b5f28b2489eceb4de802e47",
-      "reportDigest": "sha256:9f256ab444b14881e94605cd5aa15bb434166ced93d259427d6c7996de2e4c4c"
+      "profileDigest": "sha256:b00fda0b9451697a44fccfa4191cf280821caf6d17c2223a06308e45e6ee80de",
+      "reportDigest": "sha256:00739012cd8bb5febc414ee84a8a6f862f7e24d5550aeea1c7722561838afd1b"
     },
     "bedrock": {
-      "profileDigest": "sha256:8c4a1e9ef6dbffcd783f03d306d18195e2e60c8b36019651d59240c40d2f4593"
+      "profileDigest": "sha256:e170d5bd3428b762baa420a4e9a1d3c491c5c7afe3014b2b71b281ff7882df0b"
     },
     "collection": {
       "provider": "aws.bedrock",

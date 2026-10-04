@@ -1,3 +1,3 @@
 """Provider-neutral reference kernel for the Infrastructure Intelligence Platform."""
 
-__version__ = "0.84.2"
+__version__ = "0.84.3"

@@ -61,6 +61,11 @@ workflow evaluates vulnerabilities before loading registry credentials or
 publishing. These source changes still need a new image build and passing
 exact-artifact scan; they do not repair the existing Docker Hub images.
 
+Candidate `0.84.3` (bundled chart `0.87.3`; SDK versions unchanged) carries
+that correction and six saved release stages. The archive and evidence
+helpers have focused tests; the first live run and failed-job resume still
+need execution. See the [retry runbook](../operations/resumable-application-releases.md).
+
 ## Dependency integration design
 
 The following are selected implementation directions, not installed or locked
@@ -104,8 +109,8 @@ Manual `scope=charts` is diagnostic, not a full application qualification.
 
 For a failed workflow, rerun failed jobs when successful prerequisites and
 their exact artifacts are retained. A failed step within one job is not an
-independently rerunnable job. Future publishing jobs must upload immutable,
-checksum-bound checkpoints before the next expensive stage. If a checkpoint
+independently rerunnable job. The six-job application workflow now uploads
+immutable, checksum-bound checkpoints before the next expensive stage. If a checkpoint
 is missing, reconstruct and verify exact inputs; never mark an absent gate as
 passed. The existing signature-only workflow diagnoses two image signatures;
 it neither signs downloads nor publishes a release.

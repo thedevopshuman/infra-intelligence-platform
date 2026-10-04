@@ -180,6 +180,13 @@ continues to compose the existing public configuration boundaries.
 `scripts/package_licensed_chart.py` similarly packages the committed chart with
 the same revision's license notices without changing chart behavior.
 
+Release checkpoint transport remains outside server and SDK packages.
+`scripts/release_stage.py` seals and restores the bounded archive using trusted
+job-output hashes. `scripts/verify_release_stage_evidence.py` joins existing
+publication, signature and vulnerability contracts to the same bundle and
+rechecks freshness before publication. Neither helper grants signing or
+registry authority; that remains scoped to protected workflow jobs.
+
 `scripts/community_images.py` is likewise host-side operational tooling. It
 resolves an explicitly selected set of five registry digests to native Linux
 image IDs on the already-bound local Docker daemon. Optional downloads receive

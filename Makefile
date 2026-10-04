@@ -343,6 +343,7 @@ help:
 	@echo "test-release-upgrade Prove sustained availability across a packaged N-1 transition"
 	@echo "qualify-release Run both packaged profiles and require one complete report"
 	@echo "test-release-publication Copy exact OCI layouts to an isolated local registry"
+	@echo "test-release-stages Check saved release archive, evidence and workflow boundaries without Docker"
 	@echo "test-release-signatures Exercise pinned Cosign signing and tamper rejection locally"
 	@echo "qualify-release-signatures Verify published release digests against organizational trust"
 	@echo "verify-release-signature-report Validate retained minimized signature evidence"
@@ -1674,6 +1675,12 @@ test-release-signatures:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \
 		tests.test_release_signature_verification -v
 	IIP_DOCKER_BIN=$(DOCKER) scripts/test_release_signatures.sh
+
+.PHONY: test-release-stages
+test-release-stages:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_release_stage tests.test_release_stage_evidence \
+		tests.test_release_workflow -v
 
 .PHONY: test-release-recovery
 test-release-recovery:

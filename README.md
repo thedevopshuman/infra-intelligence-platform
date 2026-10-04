@@ -353,9 +353,10 @@ qualification runbook](docs/operations/release-vulnerability-qualification.md).
 
 The protected tag-only release workflow connects those gates: from a clean
 exact-version tag at the fetched `main` tip it builds the verified bundle,
+qualifies every attached SPDX SBOM against a fresh vulnerability database,
 copies both OCI indexes unchanged to `thedevopshuman/iip` and
 `thedevopshuman/iip-bridge` on Docker Hub, signs their immutable digests with
-GitHub OIDC, qualifies signatures and every attached SPDX SBOM, signs the
+GitHub OIDC, qualifies signatures, signs the
 customer archive and Compose kit, and only then creates a GitHub release.
 The public repositories, required-review `release` environment and immutable
 version-tag protections are configured. The `v0.84.0` attempt failed workflow
@@ -363,9 +364,14 @@ validation before publication. `v0.84.1` uploaded the images but failed signing
 because its trust-cache path was read-only; those unsigned tags are not an
 accepted release. `v0.84.2` uploaded and signed both images, then its verifier
 rejected Cosign's equivalent Docker Hub hostname. The parser correction and
-manual signature-only recheck do not publish the missing customer assets or
-qualify production use. No existing tag is moved or overwritten. See the
-[release procedure](docs/operations/release-artifacts.md).
+manual signature-only recheck did not publish the missing customer assets.
+Recovery subsequently verified its signatures but rejected PyJWT `2.13.0`
+under the vulnerability policy. Candidate `0.84.3` pins the fixed `2.14.0` and
+splits publication into six checksum-bound jobs, so retained successful builds
+can be reused after a late failure. This is not yet a published release or
+production qualification. No existing tag is moved or overwritten. See the
+[release procedure](docs/operations/release-artifacts.md) and
+[saved-stage retry runbook](docs/operations/resumable-application-releases.md).
 
 The Docker recovery gates retain separate source-bound logical
 `PostgreSQLRecoveryQualificationReport` and physical

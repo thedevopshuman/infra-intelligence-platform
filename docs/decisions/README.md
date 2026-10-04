@@ -171,3 +171,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0165](0165-exact-docker-hub-signature-alias.md) | Accepted compatibility correction | Recognize only the exact Docker Hub claim hostname alias and keep manual signature rechecks separate from release promotion |
 | [0166](0166-independent-chart-release-and-targeted-validation.md) | Accepted implementation boundary | Separate chart publication from image builds and use conservative targeted CI with explicit deferred coverage |
 | [0167](0167-exact-source-release-recovery.md) | Accepted implementation boundary | Recover exact original source and published OCI graphs without image rebuilds, tag mutation or misleading archive provenance |
+| [0168](0168-resumable-application-release-stages.md) | Accepted implementation boundary | Resume six protected release stages through immutable artifact IDs, external hashes and source-bound evidence without rebuilding successful inputs |

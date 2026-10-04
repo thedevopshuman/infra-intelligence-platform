@@ -13,16 +13,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  build:
     if: github.repository == 'thedevopshuman/infra-intelligence-platform'
-    environment: release
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    env:
-      DOCKER_CONFIG: /tmp/iip-release-docker-${{ github.run_id }}-${{ github.run_attempt }}
     permissions:
-      contents: write
-      id-token: write
+      contents: read
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      chart_version: ${{ steps.release.outputs.chart_version }}
+      bundle_name: ${{ steps.stage.outputs.bundle_name }}
+      archive_name: ${{ steps.stage.outputs.archive_name }}
+      archive_sha256: ${{ steps.stage.outputs.archive_sha256 }}
+      manifest_sha256: ${{ steps.stage.outputs.manifest_sha256 }}
+      control_repository: ${{ steps.release.outputs.control_repository }}
+      bridge_repository: ${{ steps.release.outputs.bridge_repository }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -66,6 +73,7 @@ jobs:
           printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
           printf 'chart_version=%s\n' "$chart_version" >> "$GITHUB_OUTPUT"
           printf 'bundle=dist/iip-%s-%s\n' "$version" "$short_revision" >> "$GITHUB_OUTPUT"
+          printf 'archive=dist/iip-%s-%s.tar.gz\n' "$version" "$short_revision" >> "$GITHUB_OUTPUT"
           printf 'control_repository=docker.io/thedevopshuman/iip\n' >> "$GITHUB_OUTPUT"
           printf 'bridge_repository=docker.io/thedevopshuman/iip-bridge\n' >> "$GITHUB_OUTPUT"
       - name: Set up ARM64 emulation
@@ -94,11 +102,205 @@ jobs:
         run: |
           make verify
           make release-bundle
+      - name: Seal verified build checkpoint
+        id: stage
+        env:
+          RELEASE_ARCHIVE: ${{ steps.release.outputs.archive }}
+          RELEASE_BUNDLE: ${{ steps.release.outputs.bundle }}
+          RELEASE_CHART_VERSION: ${{ steps.release.outputs.chart_version }}
+          RELEASE_REVISION: ${{ github.sha }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          python scripts/release_stage.py pack \
+            --bundle "$RELEASE_BUNDLE" \
+            --output "$RELEASE_ARCHIVE" \
+            --revision "$RELEASE_REVISION" > dist/release-stage.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+
+          metadata = json.loads(Path("dist/release-stage.json").read_text(encoding="utf-8"))
+          if set(metadata) != {
+              "archive", "fileSha256", "manifestSha256", "bundle",
+              "version", "chartVersion",
+          }:
+              raise SystemExit("release.stage.metadata-invalid")
+          archive = Path(os.environ["RELEASE_ARCHIVE"])
+          bundle = Path(os.environ["RELEASE_BUNDLE"])
+          if (
+              Path(metadata["archive"]).resolve() != archive.resolve()
+              or Path(metadata["bundle"]).resolve() != bundle.resolve()
+              or metadata["version"] != os.environ["RELEASE_VERSION"]
+              or metadata["chartVersion"] != os.environ["RELEASE_CHART_VERSION"]
+          ):
+              raise SystemExit("release.stage.metadata-mismatch")
+          digest = re.compile(r"[0-9a-f]{64}")
+          if any(
+              not isinstance(metadata[name], str)
+              or digest.fullmatch(metadata[name]) is None
+              for name in ("fileSha256", "manifestSha256")
+          ):
+              raise SystemExit("release.stage.digest-invalid")
+          outputs = {
+              "archive_name": archive.name,
+              "bundle_name": bundle.name,
+              "archive_sha256": metadata["fileSha256"],
+              "manifest_sha256": metadata["manifestSha256"],
+          }
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
+              for name, value in outputs.items():
+                  stream.write(f"{name}={value}\n")
+          PY
+      - name: Upload immutable build checkpoint
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-build-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ steps.release.outputs.archive }}
+          compression-level: 0
+          retention-days: 7
+          overwrite: false
+          if-no-files-found: error
+
+  vulnerabilities:
+    if: github.repository == 'thedevopshuman/infra-intelligence-platform'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      report_sha256: ${{ steps.evidence.outputs.report_sha256 }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/verify.txt
+      - run: python -m pip install --requirement requirements/verify.txt
+      - name: Download exact build checkpoint
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: dist/checkpoints/build
+          digest-mismatch: error
+      - name: Restore verified build checkpoint
+        env:
+          BUILD_ARTIFACT_DIGEST: ${{ needs.build.outputs.artifact_digest }}
+          RELEASE_ARCHIVE: dist/checkpoints/build/${{ needs.build.outputs.archive_name }}
+          RELEASE_ARCHIVE_SHA256: ${{ needs.build.outputs.archive_sha256 }}
+          RELEASE_MANIFEST_SHA256: ${{ needs.build.outputs.manifest_sha256 }}
+          RELEASE_REVISION: ${{ github.sha }}
+        run: |
+          python -c 'import os,re,sys; sys.exit(0 if re.fullmatch(r"[0-9a-f]{64}", os.environ["BUILD_ARTIFACT_DIGEST"]) else "release.stage.artifact-digest-invalid")'
+          python scripts/release_stage.py unpack \
+            --archive "$RELEASE_ARCHIVE" \
+            --expected-sha256 "$RELEASE_ARCHIVE_SHA256" \
+            --expected-manifest-sha256 "$RELEASE_MANIFEST_SHA256" \
+            --revision "$RELEASE_REVISION" \
+            --output dist
       - name: Qualify release vulnerabilities
         env:
-          IIP_RELEASE_BUNDLE: ${{ steps.release.outputs.bundle }}
+          IIP_RELEASE_BUNDLE: dist/${{ needs.build.outputs.bundle_name }}
           IIP_RELEASE_VULNERABILITY_REPORT: dist/release-vulnerability-qualification-report.json
         run: make qualify-release-vulnerabilities
+      - name: Bind vulnerability evidence to the checkpoint
+        id: evidence
+        env:
+          RELEASE_BUNDLE: dist/${{ needs.build.outputs.bundle_name }}
+          RELEASE_REVISION: ${{ github.sha }}
+          VULNERABILITY_REPORT: dist/release-vulnerability-qualification-report.json
+        run: |
+          report_sha256=$(sha256sum "$VULNERABILITY_REPORT" | cut -d ' ' -f1)
+          python scripts/verify_release_stage_evidence.py \
+            --bundle "$RELEASE_BUNDLE" \
+            --revision "$RELEASE_REVISION" \
+            --vulnerability-report "$VULNERABILITY_REPORT" \
+            --vulnerability-sha256 "$report_sha256"
+          printf 'report_sha256=%s\n' "$report_sha256" >> "$GITHUB_OUTPUT"
+      - name: Upload vulnerability evidence
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-vulnerabilities-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist/release-vulnerability-qualification-report.json
+          compression-level: 0
+          retention-days: 7
+          overwrite: false
+          if-no-files-found: error
+
+  publish-images:
+    if: github.repository == 'thedevopshuman/infra-intelligence-platform'
+    needs: [build, vulnerabilities]
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DOCKER_CONFIG: /tmp/iip-release-docker-${{ github.run_id }}-${{ github.run_attempt }}
+    outputs:
+      publication_sha256: ${{ steps.evidence.outputs.publication_sha256 }}
+      policy_sha256: ${{ steps.evidence.outputs.policy_sha256 }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/verify.txt
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          version: v0.37.2
+          driver: docker-container
+          driver-opts: image=docker.io/moby/buildkit@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea # v0.33.1
+          use: true
+          cleanup: true
+      - run: python -m pip install --requirement requirements/verify.txt
+      - name: Download exact build checkpoint
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: dist/checkpoints/build
+          digest-mismatch: error
+      - name: Download exact vulnerability evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.vulnerabilities.outputs.artifact_id }}
+          path: dist/checkpoints/vulnerabilities
+          digest-mismatch: error
+      - name: Restore and verify qualified build
+        env:
+          RELEASE_ARCHIVE: dist/checkpoints/build/${{ needs.build.outputs.archive_name }}
+          RELEASE_BUNDLE: dist/${{ needs.build.outputs.bundle_name }}
+          RELEASE_REVISION: ${{ github.sha }}
+          VULNERABILITY_REPORT: dist/checkpoints/vulnerabilities/release-vulnerability-qualification-report.json
+        run: |
+          python scripts/release_stage.py unpack \
+            --archive "$RELEASE_ARCHIVE" \
+            --expected-sha256 "${{ needs.build.outputs.archive_sha256 }}" \
+            --expected-manifest-sha256 "${{ needs.build.outputs.manifest_sha256 }}" \
+            --revision "$RELEASE_REVISION" \
+            --output dist
+          python scripts/verify_release_stage_evidence.py \
+            --bundle "$RELEASE_BUNDLE" \
+            --revision "$RELEASE_REVISION" \
+            --vulnerability-report "$VULNERABILITY_REPORT" \
+            --vulnerability-sha256 "${{ needs.vulnerabilities.outputs.report_sha256 }}"
       - name: Authenticate the publication boundary
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -115,10 +317,10 @@ jobs:
             --username "$DOCKERHUB_USERNAME" --password-stdin
       - name: Publish exact verified OCI indexes
         env:
-          RELEASE_BUNDLE: ${{ steps.release.outputs.bundle }}
+          RELEASE_BUNDLE: dist/${{ needs.build.outputs.bundle_name }}
           RELEASE_TAG: ${{ github.ref_name }}
-          CONTROL_REPOSITORY: ${{ steps.release.outputs.control_repository }}
-          BRIDGE_REPOSITORY: ${{ steps.release.outputs.bridge_repository }}
+          CONTROL_REPOSITORY: ${{ needs.build.outputs.control_repository }}
+          BRIDGE_REPOSITORY: ${{ needs.build.outputs.bridge_repository }}
         run: |
           python scripts/release_publication.py publish "$RELEASE_BUNDLE" \
             --control-plane-repository "$CONTROL_REPOSITORY" \
@@ -133,45 +335,435 @@ jobs:
             dist/release-publication-report.json --role plugin-mediation-bridge-image)
           scripts/cosign_container.sh sign --yes "$control_reference"
           scripts/cosign_container.sh sign --yes "$bridge_reference"
-      - name: Qualify release signatures
+      - name: Derive exact signature policy and bind publication evidence
+        id: evidence
         env:
-          IIP_RELEASE_BUNDLE: ${{ steps.release.outputs.bundle }}
-          IIP_RELEASE_SIGNATURE_POLICY: dist/release-signature-policy.json
-          IIP_RELEASE_SIGNATURE_REPORT: dist/release-signature-verification-report.json
+          RELEASE_BUNDLE: dist/${{ needs.build.outputs.bundle_name }}
           RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_REVISION: ${{ github.sha }}
+          VULNERABILITY_REPORT: dist/checkpoints/vulnerabilities/release-vulnerability-qualification-report.json
         run: |
           python scripts/release_publication.py github-signature-policy \
             dist/release-publication-report.json \
             --github-repository "$RELEASE_REPOSITORY" \
             --generation "$GITHUB_RUN_NUMBER" \
-            --output "$IIP_RELEASE_SIGNATURE_POLICY"
-          make qualify-release-signatures COSIGN=scripts/cosign_container.sh
-      - name: Prepare signed customer release assets
-        id: assets
+            --output dist/release-signature-policy.json
+          publication_sha256=$(sha256sum dist/release-publication-report.json | cut -d ' ' -f1)
+          policy_sha256=$(sha256sum dist/release-signature-policy.json | cut -d ' ' -f1)
+          python scripts/verify_release_stage_evidence.py \
+            --bundle "$RELEASE_BUNDLE" \
+            --revision "$RELEASE_REVISION" \
+            --vulnerability-report "$VULNERABILITY_REPORT" \
+            --vulnerability-sha256 "${{ needs.vulnerabilities.outputs.report_sha256 }}" \
+            --publication-report dist/release-publication-report.json \
+            --publication-sha256 "$publication_sha256"
+          printf 'publication_sha256=%s\n' "$publication_sha256" >> "$GITHUB_OUTPUT"
+          printf 'policy_sha256=%s\n' "$policy_sha256" >> "$GITHUB_OUTPUT"
+      - name: Upload publication evidence
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-publication-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dist/release-publication-report.json
+            dist/release-signature-policy.json
+          compression-level: 0
+          retention-days: 7
+          overwrite: false
+          if-no-files-found: error
+      - name: Clear publication credentials
+        if: always()
+        run: docker logout docker.io
+
+  signatures:
+    if: github.repository == 'thedevopshuman/infra-intelligence-platform'
+    needs: [build, vulnerabilities, publish-images]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      DOCKER_CONFIG: /tmp/iip-release-verification-docker-${{ github.run_id }}-${{ github.run_attempt }}
+    outputs:
+      report_sha256: ${{ steps.evidence.outputs.report_sha256 }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/verify.txt
+      - run: python -m pip install --requirement requirements/verify.txt
+      - name: Download exact build checkpoint
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: dist/checkpoints/build
+          digest-mismatch: error
+      - name: Download exact vulnerability evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.vulnerabilities.outputs.artifact_id }}
+          path: dist/checkpoints/vulnerabilities
+          digest-mismatch: error
+      - name: Download exact publication evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.publish-images.outputs.artifact_id }}
+          path: dist/checkpoints/publication
+          digest-mismatch: error
+      - name: Restore and verify published build
         env:
-          RELEASE_BUNDLE: ${{ steps.release.outputs.bundle }}
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_ARCHIVE: dist/checkpoints/build/${{ needs.build.outputs.archive_name }}
+          RELEASE_BUNDLE: dist/${{ needs.build.outputs.bundle_name }}
+          RELEASE_REVISION: ${{ github.sha }}
+          VULNERABILITY_REPORT: dist/checkpoints/vulnerabilities/release-vulnerability-qualification-report.json
+          PUBLICATION_REPORT: dist/checkpoints/publication/release-publication-report.json
+          SIGNATURE_POLICY: dist/checkpoints/publication/release-signature-policy.json
+        run: |
+          mkdir -m 700 -p "$DOCKER_CONFIG"
+          python scripts/release_stage.py unpack \
+            --archive "$RELEASE_ARCHIVE" \
+            --expected-sha256 "${{ needs.build.outputs.archive_sha256 }}" \
+            --expected-manifest-sha256 "${{ needs.build.outputs.manifest_sha256 }}" \
+            --revision "$RELEASE_REVISION" \
+            --output dist
+          printf '%s  %s\n' "${{ needs.publish-images.outputs.publication_sha256 }}" "$PUBLICATION_REPORT" \
+            | sha256sum --check --strict
+          printf '%s  %s\n' "${{ needs.publish-images.outputs.policy_sha256 }}" "$SIGNATURE_POLICY" \
+            | sha256sum --check --strict
+          python scripts/verify_release_stage_evidence.py \
+            --bundle "$RELEASE_BUNDLE" \
+            --revision "$RELEASE_REVISION" \
+            --vulnerability-report "$VULNERABILITY_REPORT" \
+            --vulnerability-sha256 "${{ needs.vulnerabilities.outputs.report_sha256 }}" \
+            --publication-report "$PUBLICATION_REPORT" \
+            --publication-sha256 "${{ needs.publish-images.outputs.publication_sha256 }}"
+      - name: Qualify release signatures
+        env:
+          IIP_RELEASE_BUNDLE: dist/${{ needs.build.outputs.bundle_name }}
+          IIP_RELEASE_SIGNATURE_POLICY: dist/checkpoints/publication/release-signature-policy.json
+          IIP_RELEASE_SIGNATURE_REPORT: dist/release-signature-verification-report.json
+        run: make qualify-release-signatures COSIGN=scripts/cosign_container.sh
+      - name: Bind signature evidence to the checkpoint
+        id: evidence
+        env:
+          RELEASE_BUNDLE: dist/${{ needs.build.outputs.bundle_name }}
+          RELEASE_REVISION: ${{ github.sha }}
+          VULNERABILITY_REPORT: dist/checkpoints/vulnerabilities/release-vulnerability-qualification-report.json
+          PUBLICATION_REPORT: dist/checkpoints/publication/release-publication-report.json
+          SIGNATURE_POLICY: dist/checkpoints/publication/release-signature-policy.json
+          SIGNATURE_REPORT: dist/release-signature-verification-report.json
+        run: |
+          report_sha256=$(sha256sum "$SIGNATURE_REPORT" | cut -d ' ' -f1)
+          python scripts/verify_release_stage_evidence.py \
+            --bundle "$RELEASE_BUNDLE" \
+            --revision "$RELEASE_REVISION" \
+            --vulnerability-report "$VULNERABILITY_REPORT" \
+            --vulnerability-sha256 "${{ needs.vulnerabilities.outputs.report_sha256 }}" \
+            --publication-report "$PUBLICATION_REPORT" \
+            --publication-sha256 "${{ needs.publish-images.outputs.publication_sha256 }}" \
+            --signature-policy "$SIGNATURE_POLICY" \
+            --signature-policy-sha256 "${{ needs.publish-images.outputs.policy_sha256 }}" \
+            --signature-report "$SIGNATURE_REPORT" \
+            --signature-sha256 "$report_sha256"
+          printf 'report_sha256=%s\n' "$report_sha256" >> "$GITHUB_OUTPUT"
+      - name: Upload signature evidence
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-signatures-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist/release-signature-verification-report.json
+          compression-level: 0
+          retention-days: 7
+          overwrite: false
+          if-no-files-found: error
+
+  sign-downloads:
+    if: github.repository == 'thedevopshuman/infra-intelligence-platform'
+    needs: [build, vulnerabilities, publish-images, signatures]
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DOCKER_CONFIG: /tmp/iip-release-download-signing-docker-${{ github.run_id }}-${{ github.run_attempt }}
+    outputs:
+      checksum_sha256: ${{ steps.assets.outputs.checksum_sha256 }}
+      archive_signature_sha256: ${{ steps.assets.outputs.archive_signature_sha256 }}
+      kit_signature_sha256: ${{ steps.assets.outputs.kit_signature_sha256 }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/verify.txt
+      - run: python -m pip install --requirement requirements/verify.txt
+      - name: Download exact build checkpoint
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: dist/checkpoints/build
+          digest-mismatch: error
+      - name: Download exact vulnerability evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.vulnerabilities.outputs.artifact_id }}
+          path: dist/checkpoints/vulnerabilities
+          digest-mismatch: error
+      - name: Download exact publication evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.publish-images.outputs.artifact_id }}
+          path: dist/checkpoints/publication
+          digest-mismatch: error
+      - name: Download exact signature evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.signatures.outputs.artifact_id }}
+          path: dist/checkpoints/signatures
+          digest-mismatch: error
+      - name: Restore and verify fully qualified build
+        env:
+          RELEASE_ARCHIVE: dist/checkpoints/build/${{ needs.build.outputs.archive_name }}
+          RELEASE_BUNDLE: dist/${{ needs.build.outputs.bundle_name }}
           RELEASE_REVISION: ${{ github.sha }}
         run: |
-          short_revision=$(printf '%s' "$RELEASE_REVISION" | cut -c1-12)
-          archive="dist/iip-$RELEASE_VERSION-$short_revision.tar.gz"
-          tar --create --gzip --file "$archive" \
-            --directory dist "$(basename "$RELEASE_BUNDLE")"
-          sha256sum "$archive" > "$archive.sha256"
+          mkdir -m 700 -p "$DOCKER_CONFIG"
+          python scripts/release_stage.py unpack \
+            --archive "$RELEASE_ARCHIVE" \
+            --expected-sha256 "${{ needs.build.outputs.archive_sha256 }}" \
+            --expected-manifest-sha256 "${{ needs.build.outputs.manifest_sha256 }}" \
+            --revision "$RELEASE_REVISION" \
+            --output dist
+          python scripts/verify_release_stage_evidence.py \
+            --bundle "$RELEASE_BUNDLE" \
+            --revision "$RELEASE_REVISION" \
+            --vulnerability-report dist/checkpoints/vulnerabilities/release-vulnerability-qualification-report.json \
+            --vulnerability-sha256 "${{ needs.vulnerabilities.outputs.report_sha256 }}" \
+            --publication-report dist/checkpoints/publication/release-publication-report.json \
+            --publication-sha256 "${{ needs.publish-images.outputs.publication_sha256 }}" \
+            --signature-policy dist/checkpoints/publication/release-signature-policy.json \
+            --signature-policy-sha256 "${{ needs.publish-images.outputs.policy_sha256 }}" \
+            --signature-report dist/checkpoints/signatures/release-signature-verification-report.json \
+            --signature-sha256 "${{ needs.signatures.outputs.report_sha256 }}"
+      - name: Sign and immediately verify customer downloads
+        id: assets
+        env:
+          ARCHIVE_NAME: ${{ needs.build.outputs.archive_name }}
+          ARCHIVE_SHA256: ${{ needs.build.outputs.archive_sha256 }}
+          BUNDLE_NAME: ${{ needs.build.outputs.bundle_name }}
+          RELEASE_CERTIFICATE_IDENTITY: https://github.com/thedevopshuman/infra-intelligence-platform/.github/workflows/release.yml@refs/tags/${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          archive="dist/checkpoints/build/$ARCHIVE_NAME"
+          kit="dist/$BUNDLE_NAME/infra-intelligence-community-$RELEASE_VERSION.tar.gz"
+          signatures="dist/download-signatures"
+          mkdir -m 700 "$signatures"
+          printf '%s  %s\n' "$ARCHIVE_SHA256" "$ARCHIVE_NAME" \
+            > "$signatures/$ARCHIVE_NAME.sha256"
+          (
+            cd dist/checkpoints/build
+            sha256sum --check --strict "../../download-signatures/$ARCHIVE_NAME.sha256"
+          )
           scripts/cosign_container.sh sign-blob --yes \
-            --bundle "$archive.sigstore.json" "$archive"
-          kit="$RELEASE_BUNDLE/infra-intelligence-community-$RELEASE_VERSION.tar.gz"
+            --bundle "$signatures/$ARCHIVE_NAME.sigstore.json" "$archive"
+          scripts/cosign_container.sh verify-blob \
+            --bundle "$signatures/$ARCHIVE_NAME.sigstore.json" \
+            --certificate-identity "$RELEASE_CERTIFICATE_IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$archive"
           scripts/cosign_container.sh sign-blob --yes \
-            --bundle dist/community-kit.sigstore.json "$kit"
-          printf 'archive=%s\n' "$archive" >> "$GITHUB_OUTPUT"
-          printf 'kit=%s\n' "$kit" >> "$GITHUB_OUTPUT"
+            --bundle "$signatures/community-kit.sigstore.json" "$kit"
+          scripts/cosign_container.sh verify-blob \
+            --bundle "$signatures/community-kit.sigstore.json" \
+            --certificate-identity "$RELEASE_CERTIFICATE_IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$kit"
+          checksum_sha256=$(sha256sum "$signatures/$ARCHIVE_NAME.sha256" | cut -d ' ' -f1)
+          archive_signature_sha256=$(sha256sum "$signatures/$ARCHIVE_NAME.sigstore.json" | cut -d ' ' -f1)
+          kit_signature_sha256=$(sha256sum "$signatures/community-kit.sigstore.json" | cut -d ' ' -f1)
+          printf 'checksum_sha256=%s\n' "$checksum_sha256" >> "$GITHUB_OUTPUT"
+          printf 'archive_signature_sha256=%s\n' "$archive_signature_sha256" >> "$GITHUB_OUTPUT"
+          printf 'kit_signature_sha256=%s\n' "$kit_signature_sha256" >> "$GITHUB_OUTPUT"
+      - name: Upload download signatures and checksum
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-download-signatures-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dist/download-signatures/${{ needs.build.outputs.archive_name }}.sha256
+            dist/download-signatures/${{ needs.build.outputs.archive_name }}.sigstore.json
+            dist/download-signatures/community-kit.sigstore.json
+          compression-level: 0
+          retention-days: 7
+          overwrite: false
+          if-no-files-found: error
+
+  publish:
+    if: github.repository == 'thedevopshuman/infra-intelligence-platform'
+    needs: [build, vulnerabilities, publish-images, signatures, sign-downloads]
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      DOCKER_CONFIG: /tmp/iip-release-download-verification-docker-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/verify.txt
+      - run: python -m pip install --requirement requirements/verify.txt
+      - name: Download exact build checkpoint
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: dist/checkpoints/build
+          digest-mismatch: error
+      - name: Download exact vulnerability evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.vulnerabilities.outputs.artifact_id }}
+          path: dist/checkpoints/vulnerabilities
+          digest-mismatch: error
+      - name: Download exact publication evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.publish-images.outputs.artifact_id }}
+          path: dist/checkpoints/publication
+          digest-mismatch: error
+      - name: Download exact signature evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.signatures.outputs.artifact_id }}
+          path: dist/checkpoints/signatures
+          digest-mismatch: error
+      - name: Download exact customer-download signatures
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.sign-downloads.outputs.artifact_id }}
+          path: dist/checkpoints/download-signatures
+          digest-mismatch: error
+      - name: Reverify every staged release input
+        env:
+          ARCHIVE_NAME: ${{ needs.build.outputs.archive_name }}
+          BUNDLE_NAME: ${{ needs.build.outputs.bundle_name }}
+          RELEASE_CERTIFICATE_IDENTITY: https://github.com/thedevopshuman/infra-intelligence-platform/.github/workflows/release.yml@refs/tags/${{ github.ref_name }}
+          RELEASE_REVISION: ${{ github.sha }}
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          mkdir -m 700 -p "$DOCKER_CONFIG"
+          python scripts/release_stage.py unpack \
+            --archive "dist/checkpoints/build/$ARCHIVE_NAME" \
+            --expected-sha256 "${{ needs.build.outputs.archive_sha256 }}" \
+            --expected-manifest-sha256 "${{ needs.build.outputs.manifest_sha256 }}" \
+            --revision "$RELEASE_REVISION" \
+            --output dist
+          python scripts/verify_release_stage_evidence.py \
+            --bundle "dist/$BUNDLE_NAME" \
+            --revision "$RELEASE_REVISION" \
+            --vulnerability-report dist/checkpoints/vulnerabilities/release-vulnerability-qualification-report.json \
+            --vulnerability-sha256 "${{ needs.vulnerabilities.outputs.report_sha256 }}" \
+            --publication-report dist/checkpoints/publication/release-publication-report.json \
+            --publication-sha256 "${{ needs.publish-images.outputs.publication_sha256 }}" \
+            --signature-policy dist/checkpoints/publication/release-signature-policy.json \
+            --signature-policy-sha256 "${{ needs.publish-images.outputs.policy_sha256 }}" \
+            --signature-report dist/checkpoints/signatures/release-signature-verification-report.json \
+            --signature-sha256 "${{ needs.signatures.outputs.report_sha256 }}"
+          printf '%s  %s\n' \
+            "${{ needs.sign-downloads.outputs.checksum_sha256 }}" \
+            "dist/checkpoints/download-signatures/$ARCHIVE_NAME.sha256" \
+            | sha256sum --check --strict
+          printf '%s  %s\n' \
+            "${{ needs.sign-downloads.outputs.archive_signature_sha256 }}" \
+            "dist/checkpoints/download-signatures/$ARCHIVE_NAME.sigstore.json" \
+            | sha256sum --check --strict
+          printf '%s  %s\n' \
+            "${{ needs.sign-downloads.outputs.kit_signature_sha256 }}" \
+            "dist/checkpoints/download-signatures/community-kit.sigstore.json" \
+            | sha256sum --check --strict
+          (
+            cd dist/checkpoints/build
+            sha256sum --check --strict "../download-signatures/$ARCHIVE_NAME.sha256"
+          )
+          scripts/cosign_container.sh verify-blob \
+            --bundle "dist/checkpoints/download-signatures/$ARCHIVE_NAME.sigstore.json" \
+            --certificate-identity "$RELEASE_CERTIFICATE_IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "dist/checkpoints/build/$ARCHIVE_NAME"
+          scripts/cosign_container.sh verify-blob \
+            --bundle dist/checkpoints/download-signatures/community-kit.sigstore.json \
+            --certificate-identity "$RELEASE_CERTIFICATE_IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "dist/$BUNDLE_NAME/infra-intelligence-community-$RELEASE_VERSION.tar.gz"
+      - name: Refuse an existing GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+          from urllib.error import HTTPError, URLError
+          from urllib.parse import quote
+          from urllib.request import Request, urlopen
+
+          token = os.environ.get("GH_TOKEN", "")
+          tag = os.environ.get("RELEASE_TAG", "")
+          if not token or not tag:
+              raise SystemExit("release.github.context-invalid")
+          url = (
+              "https://api.github.com/repos/thedevopshuman/"
+              "infra-intelligence-platform/releases/tags/" + quote(tag, safe="")
+          )
+          request = Request(
+              url,
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": "Bearer " + token,
+                  "User-Agent": "iip-protected-release",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+          )
+          try:
+              with urlopen(request, timeout=20):
+                  raise SystemExit("release.github.already-exists")
+          except HTTPError as error:
+              if error.code != 404:
+                  raise SystemExit("release.github.existence-check-failed") from None
+          except (OSError, TimeoutError, URLError):
+              raise SystemExit("release.github.existence-check-failed") from None
+          PY
       - name: Publish verified GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_ARCHIVE: ${{ steps.assets.outputs.archive }}
-          RELEASE_KIT: ${{ steps.assets.outputs.kit }}
-          RELEASE_BUNDLE: ${{ steps.release.outputs.bundle }}
-          RELEASE_CHART_VERSION: ${{ steps.release.outputs.chart_version }}
+          RELEASE_ARCHIVE: dist/checkpoints/build/${{ needs.build.outputs.archive_name }}
+          RELEASE_ARCHIVE_CHECKSUM: dist/checkpoints/download-signatures/${{ needs.build.outputs.archive_name }}.sha256
+          RELEASE_ARCHIVE_SIGNATURE: dist/checkpoints/download-signatures/${{ needs.build.outputs.archive_name }}.sigstore.json
+          RELEASE_BUNDLE: dist/${{ needs.build.outputs.bundle_name }}
+          RELEASE_CHART_VERSION: ${{ needs.build.outputs.chart_version }}
+          RELEASE_KIT: dist/${{ needs.build.outputs.bundle_name }}/infra-intelligence-community-${{ needs.build.outputs.version }}.tar.gz
+          RELEASE_KIT_SIGNATURE: dist/checkpoints/download-signatures/community-kit.sigstore.json
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           printf '%s\n' \
@@ -180,19 +772,17 @@ jobs:
             > dist/release-notes.md
           gh release create "$RELEASE_TAG" \
             "$RELEASE_ARCHIVE#Verified release bundle" \
-            "$RELEASE_ARCHIVE.sha256#Release bundle checksum" \
-            "$RELEASE_ARCHIVE.sigstore.json#Release bundle Sigstore evidence" \
+            "$RELEASE_ARCHIVE_CHECKSUM#Release bundle checksum" \
+            "$RELEASE_ARCHIVE_SIGNATURE#Release bundle Sigstore evidence" \
             "$RELEASE_KIT#Persistent Compose installation kit" \
-            "dist/community-kit.sigstore.json#Compose kit Sigstore evidence" \
+            "$RELEASE_KIT_SIGNATURE#Compose kit Sigstore evidence" \
             "$RELEASE_BUNDLE/release-manifest.json#Release manifest" \
             "$RELEASE_BUNDLE/SHA256SUMS#Bundle checksums" \
             "$RELEASE_BUNDLE/infra-intelligence-$RELEASE_CHART_VERSION.tgz#Helm chart" \
-            "dist/release-publication-report.json#Publication evidence" \
-            "dist/release-signature-policy.json#Signature policy" \
-            "dist/release-signature-verification-report.json#Signature evidence" \
-            "dist/release-vulnerability-qualification-report.json#Vulnerability evidence" \
+            "dist/checkpoints/publication/release-publication-report.json#Publication evidence" \
+            "dist/checkpoints/publication/release-signature-policy.json#Signature policy" \
+            "dist/checkpoints/signatures/release-signature-verification-report.json#Signature evidence" \
+            "dist/checkpoints/vulnerabilities/release-vulnerability-qualification-report.json#Vulnerability evidence" \
+            --repo thedevopshuman/infra-intelligence-platform \
             --verify-tag --title "IIP $RELEASE_TAG" \
             --notes-file dist/release-notes.md
-      - name: Clear publication credentials
-        if: always()
-        run: docker logout docker.io

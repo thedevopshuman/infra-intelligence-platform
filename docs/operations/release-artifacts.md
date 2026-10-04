@@ -335,18 +335,26 @@ client-side preflight can eliminate a remote race.
 
 `.github/workflows/release.yml` turns an accepted `v<application-version>` tag
 into a release without rebuilding during registry publication. It requires the
-tag commit to equal both the clean checkout and fetched `main` tip, runs
-`make verify-workflows` and `make verify`, builds the attested bundle, publishes
+tag commit to equal both the clean checkout and fetched `main` tip at build
+admission, runs `make verify-workflows` and `make verify`, builds and checkpoints
+the attested bundle, and evaluates every platform's SPDX SBOM against a fresh
+vulnerability database before any registry login. After that gate it publishes
 both exact OCI indexes to
 `docker.io/thedevopshuman/iip` and `docker.io/thedevopshuman/iip-bridge`,
 signs their immutable references with GitHub OIDC,
-generates the matching exact-identity policy, and then runs the signature and
-fresh-database vulnerability gates. Only after those gates pass does it sign
+generates the matching exact-identity policy, and runs the signature gate.
+Only after those gates pass does it sign
 the complete customer archive and create the GitHub release with the manifest,
 checksums, Helm chart, and minimized qualification reports. The small
 `infra-intelligence-community-<version>.tar.gz` kit is also a direct release
 asset, independently signed with `community-kit.sigstore.json`. It is the same
-kit already contained in the verified bundle, not a second build.
+kit already contained in the verified bundle, not a second build. Build, scan,
+image publication, signature verification, download signing and GitHub release
+publication are separate jobs. Every consumer verifies exact saved artifact
+hashes, source identity and report bindings. Read the
+[saved-stage retry runbook](resumable-application-releases.md) before rerunning
+a failed job; expired scans must be refreshed and existing releases are never
+silently overwritten.
 
 The pinned Cosign wrapper sets `TUF_ROOT=/tmp/sigstore`, using Cosign's
 [supported TUF cache setting](https://github.com/sigstore/cosign/blob/v3.1.2/pkg/cosign/env/env.go).

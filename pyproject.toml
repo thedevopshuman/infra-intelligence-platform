@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 dependencies = [
   "cryptography==50.0.1",
   "googleapis-common-protos==1.75.1",
-  "opentelemetry-exporter-otlp-proto-http==1.44.0",
+  "opentelemetry-exporter-otlp-proto-http==1.45.0",
   "opentelemetry-proto==1.44.0",
   "opentelemetry-sdk==1.44.0",
   "psycopg==3.3.4",

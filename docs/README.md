@@ -2,11 +2,37 @@
 
 The documentation tree is the product and engineering system of record. A change is incomplete when behavior and documentation disagree.
 
-## Start learning
+## Install and use IIP
 
-- [First Docker learning session](learning/first-session.md)
-- [Learning preview release and limits](releases/learning-v0.84.0.md)
-- [Public production-v1 roadmap](roadmap/public-v1-release-plan.md)
+IIP runs in your environment. The website hosts information, not your
+infrastructure data, AI usage ledger or credentials. The primary installation
+path is persistent Docker Compose; the complete bundled Helm path comes next.
+Compare [installation options](operations/installation-options.md) before
+choosing a profile. Current release limits are explicit there; an implemented
+installer is not proof that its images have been published or qualified.
+
+| What you want to do | Start here |
+| --- | --- |
+| Install a persistent instance from published artifacts | [Compose installation kit](operations/community-installation-kit.md): authenticate the download and image, then initialize and start |
+| Prepare the required configuration | [Reviewed inputs](operations/community-installation.md#prepare-the-reviewed-inputs): your channel, prices, price qualification and ownership mapping |
+| Find your token and sign in | [Console and Grafana login](operations/community-installation.md#sign-in-to-the-console-and-grafana): different credentials for each service |
+| Send your application's AI telemetry | [Connect an application](operations/community-installation.md#connect-an-application-and-see-first-value): asynchronous, metadata-only OTLP |
+| Enable an integration or understand plugins | [Integration and plugin guide](operations/installation-options.md#integrations-telemetry-and-plugins): what exists, what is configured and what remains experimental |
+| Install on an existing Kubernetes platform | [Bring-your-own-dependencies Helm guide](operations/helm-deployment.md): not the planned all-in-one chart |
+| Stop, back up or recover an instance | [Safe lifecycle](operations/community-installation.md#stop-and-update-configuration), [encrypted recovery](operations/community-recovery.md), [certificate rotation](operations/community-trust-rotation.md) |
+| Try a disposable example before preparing real inputs | [Docker walkthrough](learning/first-session.md): synthetic data, no Kubernetes or provider account required |
+
+For Compose, no Kubernetes cluster or Docker Desktop Kubernetes setting is
+required. Real Bedrock usage still requires your application to have its own
+provider access; IIP does not take those credentials or sit in the inference
+request path. An empty installation has no AI usage to display until you
+connect an application.
+
+The only published predecessor is the
+[source-only learning preview](releases/learning-v0.84.0.md). It is optional,
+disposable and separate from persistent installation. See the
+[public-v1 release plan](roadmap/public-v1-release-plan.md) for the remaining
+publication, supported-installation and production gates.
 
 ## Product
 

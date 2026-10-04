@@ -11,6 +11,10 @@ Docker Compose first, then a separate full-stack Helm installation for
 Kubernetes**. Compare [installation options](docs/operations/installation-options.md)
 for dependencies, login, integration enablement and current limitations.
 
+Use the [installation and user guide](docs/README.md#install-and-use-iip) as the
+documentation entry point: it links the persistent installer, configuration,
+token/Grafana login, application telemetry, integrations and recovery steps.
+
 The persistent Compose implementation starts empty and keeps data across
 restarts. The candidate bundle builder now includes a
 [versioned installation source kit](docs/operations/community-installation-kit.md)

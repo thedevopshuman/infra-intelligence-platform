@@ -169,13 +169,45 @@ delete/reinitialize it while retained data belongs to that installation.
 Custom state inside the checkout must be beneath `.iip/`; otherwise initialization
 rejects it to keep protected files outside the image build context.
 
-## Connect an application and see first value
+## Sign in to the console and Grafana
 
-Open the [console](http://127.0.0.1:18083/console) or
-[community dashboard](http://127.0.0.1:13001/d/iip-community-ai-finops).
-Use the `apiToken` from the protected `credentials.json` for the console;
-Grafana's user is `admin` and its password is `grafanaPassword` in that file.
-The launcher never prints credentials. No anonymous Grafana access is enabled.
+There is no IIP cloud account or token-registration website. `init` generates
+credentials on your machine for this installation. The default file is
+`.iip/community/credentials.json` inside the checkout or extracted kit. If
+you selected `--state /absolute/protected/path`, it is
+`/absolute/protected/path/credentials.json` instead. Use that same state path
+for every lifecycle command; do not initialize another installation to recover
+a missing login token.
+
+After `up` succeeds:
+
+1. Open the credential file in a trusted local editor, away from screen
+   sharing. Keep its owner-only permissions; never upload it, commit it or
+   include it in a support request.
+2. Open the [IIP console](http://127.0.0.1:18083/console). In **Connect your
+   workspace**, paste only the `apiToken` value into the token field—without
+   JSON quotes or a `Bearer ` prefix—and select **Connect securely**. The
+   console adds the HTTP authorization prefix itself. The sidebar identity
+   button reopens this dialog.
+3. Open the [community dashboard](http://127.0.0.1:13001/d/iip-community-ai-finops).
+   Sign in as `admin`, using `grafanaPassword` from the same file. Grafana does
+   not accept the IIP console token, and anonymous access is disabled.
+
+| Credential field | Use it for | Do not use it for |
+| --- | --- | --- |
+| `apiToken` | This installation's console and API | Grafana, Collector or a different IIP installation |
+| `grafanaPassword` | Grafana's `admin` login | The IIP console or application exporter |
+| `collectorToken` | The application's OTLP exporter Authorization header | Interactive console login |
+| `receiverToken`, `databasePassword` | Internal installation services, wired by the launcher | Browser login or application-side telemetry configuration |
+
+The launcher and `status` do not print credentials. The shared console still
+labels this mode as local development and may suggest `make dev-up` in its
+help/error text. For this profile, use the token above; `make dev-up` starts a
+different development stack and is not the community login or recovery path.
+Likewise, the disposable learning token and port `18082` do not belong to this
+persistent installation at port `18083`.
+
+## Connect an application and see first value
 
 Configure the application's existing asynchronous OTel exporter:
 
@@ -185,8 +217,8 @@ Configure the application's existing asynchronous OTel exporter:
   explicitly supplied to the exporter; `transport/ca.crt` is current only
   before transport-generation enrollment;
 - Authorization: `Bearer` plus `collectorToken` from protected credentials;
-- resource attributes: the exact reviewed service, namespace, environment,
-  and cloud region;
+- resource attributes: the exact reviewed `service.name`, `service.namespace`,
+  `deployment.environment.name` and `cloud.region`;
 - retain eligible metadata spans; disable prompt/message/body capture.
 
 Keep this CA local to the exporter, not the system trust store. Do not disable
@@ -194,7 +226,19 @@ certificate verification. Another container's `localhost` is not the host:
 this first profile is for a host application; remote/container onboarding
 needs explicit routing and certificate design, not exposing these ports.
 Follow the [Bedrock instrumentation guide](bedrock-instrumentation-qualification.md)
-for the existing provider adapter. It is not an inference proxy or a new IIP SDK.
+for the pinned botocore instrumentation and existing provider adapter. Install
+them beside the application that makes Bedrock calls, not in the IIP container.
+This is not an inference proxy or a new IIP SDK. To obtain the selected CA path
+without printing credentials, run from the same kit:
+
+```bash
+.venv/bin/python scripts/community_trust.py status
+```
+
+For custom state, add `--state /absolute/protected/path` before `status`. Use the
+reported `caPath`, including after a completed transport rotation; do not guess
+that an old CA filename is still active. Keep the Collector token in the
+application's protected exporter configuration, not source control or chat.
 
 The generated Collector filters exact reviewed string values before its
 persistent queue, rejects content-bearing keys/events/links and dropped-field
@@ -220,18 +264,55 @@ Backend freshness alone does not prove that the latest projection succeeded.
 For release-quality live proof, use the existing
 [same-invocation qualification](customer-ai-finops-flow-qualification.md).
 
+## First-session checks
+
+Run `.venv/bin/python scripts/community_stack.py status` from the same kit to
+inspect services without printing secrets. With custom state, place
+`--state /absolute/protected/path` before `status`.
+
+| What you see | What to check next |
+| --- | --- |
+| Console cannot connect | Confirm `up` succeeded, use port `18083`, and use this installation's `apiToken` without the `Bearer ` prefix. Do not substitute a learning, Collector or Grafana credential. |
+| Grafana rejects login | Use username `admin` and `grafanaPassword`; this profile does not enable anonymous access. |
+| AI Economics is empty | Expected before application telemetry arrives. Match the reviewed service/model/region/scope and time window; a healthy Collector alone does not prove ledger delivery. |
+| Usage is visible but cost is incomplete | Inspect pending and unpriced counts, exact model/meter coverage, catalog qualification expiry and worker health. Missing prices are not zero cost. |
+| Usage is unallocated | Check the reviewed effective-time attribution mapping; a workload's team label does not authorize ownership. |
+| No savings opportunity appears | Savings evaluation is optional. A finding needs a completed reviewed window and evidence; the product must not invent a recommendation. |
+| The Plugins screen has no enable/install button | Expected. It operates existing invocations, not a marketplace. Follow the [integration/plugin matrix](installation-options.md#integrations-telemetry-and-plugins); do not grant the API a Docker socket or cloud credentials to make the example run. |
+
+For startup/configuration errors, run `check` against the same state and review
+the protected file permissions, qualification validity and local Docker
+availability. If an existing stack is unhealthy, inspect `status` before
+stopping or repairing it. Do not delete state, volumes or credentials as a
+troubleshooting shortcut. Share only redacted symptoms and stable error codes
+under the [support policy](../../SUPPORT.md).
+
 ## Stop and update configuration
 
 ```bash
-make community-status PYTHON=.venv/bin/python
-make community-down PYTHON=.venv/bin/python
+.venv/bin/python scripts/community_stack.py status
+.venv/bin/python scripts/community_stack.py down
 .venv/bin/python scripts/community_stack.py configure \
   --channel /protected/bedrock-channels.json \
   --catalogs /protected/new-ai-catalogs.json \
   --qualifications /protected/new-ai-catalog-qualifications.json \
   --attribution /protected/ai-attribution.json
-make community-up PYTHON=.venv/bin/python
+.venv/bin/python scripts/community_stack.py check
+.venv/bin/python scripts/community_stack.py up
 ```
+
+These are configuration-only changes using the already selected image; they
+do not build or upgrade the application. For custom state, put `--state
+/absolute/protected/path` before each verb. Digest-selected installations must
+not use `make community-up` here: that source-development target adds
+`--build`, which digest mode deliberately rejects. Do not replace the original
+kit/image as part of a configuration refresh; cross-version upgrade needs its
+own qualified procedure.
+
+If this installation uses savings evaluation, also pass
+`--savings /protected/ai-savings.json` with its complete reviewed wrapper to
+`configure`. Omitting `--savings` deliberately disables savings evaluation;
+it does not preserve the previous profiles.
 
 `down` removes containers, not named volumes or credentials. `configure`
 requires **all** previous project containers removed, validates the complete

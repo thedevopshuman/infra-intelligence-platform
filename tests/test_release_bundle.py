@@ -173,11 +173,12 @@ def write_oci_fixture(
 def write_pilot_handoff_fixture(
     path: Path,
     *,
+    version: str = VERSION,
     paths: set[str] | None = None,
     add_symlink: bool = False,
 ) -> None:
     selected = paths if paths is not None else set(REQUIRED_PILOT_HANDOFF_PATHS)
-    prefix = f"infra-intelligence-pilot-handoff-{VERSION}"
+    prefix = f"infra-intelligence-pilot-handoff-{version}"
     with tarfile.open(path, mode="w:gz") as archive:
         for relative in sorted(selected):
             content = f"fixture:{relative}\n".encode()

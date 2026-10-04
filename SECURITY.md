@@ -1,40 +1,38 @@
 # Security policy
 
-Infrastructure Intelligence Platform is pre-release software. The repository
-does not yet accept general production deployments and does not publish a
-staffed vulnerability-reporting address or response-time commitment.
+The learning preview is not supported for production or customer data. It has
+deliberately public demo credentials and ephemeral storage. Do not expose its
+ports, use a remote Docker host, or put real credentials into its examples.
+Production/community hardening and qualified deployment instructions are
+separate; do not infer their completion from a learning release.
 
-## Report safely
+Use GitHub's private vulnerability reporting for this repository:
+[Report a vulnerability](https://github.com/thedevopshuman/infra-intelligence-platform/security/advisories/new).
+Do not publish credentials, customer telemetry, private prompts, or exploitation
+details in a public issue. If the private reporting form is unavailable, open
+an issue requesting a private contact **without vulnerability details**.
 
-Do not open a public issue containing exploit details, credentials, customer
-data, infrastructure identifiers, private endpoints, prompts or responses,
-raw telemetry, protected profiles, or diagnostic artifacts. A private
-design-partner pilot must establish a named security owner and a private
-reporting and escalation path in its customer-owned pilot plan before
-installation.
+Include the release/commit, affected boundary, a minimal synthetic reproducer,
+and expected versus actual behavior. Remove private data. There is no promised
+response time, bounty program, security certification, or long-term maintenance
+window for the learning preview. A patched preview may replace the current
+one; production-version support policy remains part of the v1 release work.
 
-Until that path exists, do not send sensitive details to the project and do
-not start the pilot. A non-sensitive report may identify the affected version,
-public contract, and stable error code, but must not include material that
-could identify a customer or enable exploitation. See [SUPPORT.md](SUPPORT.md)
-for the ordinary support boundary.
+## Private-pilot boundary
 
-When a private report is authorized, preserve the exact release identity,
-UTC observation window, relevant minimized report digests, and a concise impact
-description. Rotate or revoke exposed credentials through the owning customer
-system; IIP does not own customer identity, PKI, secret-store, provider, or
-policy-engine lifecycles.
+A private customer pilot still needs its own named security owner and private
+reporting/escalation path before installation. Do not send customer profiles,
+infrastructure identifiers, protected diagnostics or private endpoints to the
+public project. An authorized report should preserve the exact release,
+observation window, minimized evidence digests and impact description. Rotate
+or revoke exposed credentials through the customer system that owns them;
+IIP does not own customer identity, PKI, secret-store, provider or policy-engine
+lifecycles.
 
-## Supported scope
-
-Only the exact candidate and environment admitted by the
+Only the exact candidate/environment admitted by the
 [private-pilot onboarding workflow](docs/operations/private-pilot-onboarding.md)
-are in private-pilot scope. A branch tip, local development stack, unsigned
-bundle, expired qualification report, or modified artifact is not an admitted
-candidate. Public production support, severity response objectives, embargo
-handling, coordinated disclosure, and supported-version windows remain
-organizational decisions required before public launch.
-
-The baseline threat and authority model is documented in
-[security, tenancy, and authority](docs/architecture/security-tenancy.md).
-
+is in pilot scope. A branch tip, learning release, unsigned bundle, expired
+qualification or modified artifact is not an admitted candidate. Coordinated
+disclosure handling and production severity/support objectives remain
+organizational work. See [SUPPORT.md](SUPPORT.md) and the baseline
+[security, tenancy and authority model](docs/architecture/security-tenancy.md).

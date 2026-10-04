@@ -2,6 +2,12 @@
 
 The documentation tree is the product and engineering system of record. A change is incomplete when behavior and documentation disagree.
 
+## Start learning
+
+- [First Docker learning session](learning/first-session.md)
+- [Learning preview release and limits](releases/learning-v0.84.0.md)
+- [Public production-v1 roadmap](roadmap/public-v1-release-plan.md)
+
 ## Product
 
 - [Product constitution](product/constitution.md)

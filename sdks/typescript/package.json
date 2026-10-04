@@ -2,11 +2,12 @@
   "name": "@iip/sdk",
   "version": "0.84.0",
   "private": true,
+  "license": "Apache-2.0",
   "description": "TypeScript client boundary for the Infrastructure Intelligence Platform",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": ["dist", "LICENSE", "NOTICE"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit"

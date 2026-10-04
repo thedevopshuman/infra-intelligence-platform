@@ -8,9 +8,8 @@ commitment.
 
 ## Where to report a problem
 
-- Use a public repository discussion or issue only for reproducible,
-  non-sensitive product defects and documentation questions after a repository
-  host is selected.
+- Use [GitHub issues](https://github.com/thedevopshuman/infra-intelligence-platform/issues)
+  for reproducible, non-sensitive defects and learning/documentation questions.
 - Use the separately agreed private pilot channel for customer-environment
   incidents, diagnostic artifacts, operational identifiers, or commercially
   sensitive usage and cost observations.
@@ -43,6 +42,11 @@ resource names, database dumps, or protected qualification profiles. The
 defines the triage, rollback, evidence, and exit workflow.
 
 ## Support boundary
+
+The [learning preview](docs/releases/learning-v0.84.0.md) is a disposable local
+exercise with best-effort feedback only, not a supported customer deployment.
+For learning setup problems include OS, Docker/Compose versions, release tag,
+the failed command and redacted output. No model-provider account is required.
 
 The current private-pilot scope is defined in
 [the first usable release](docs/product/private-pilot-v1.md). A successful

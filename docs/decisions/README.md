@@ -160,3 +160,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0154](0154-verified-postgresql-transport-security.md) | Accepted | Require explicit hostname-verified PostgreSQL TLS for every packaged database client and reserve plaintext for named local fixtures |
 | [0155](0155-public-open-source-v1-first.md) | Accepted sequencing | Prioritize public open-source v1 while preserving qualification boundaries and explicit ownership/licensing decisions |
 | [0156](0156-persistent-single-host-community-onboarding.md) | Accepted implementation boundary | Add empty, protected, persistent single-host onboarding without converting local evidence into public-v1 or production authority |
+| [0157](0157-apache-licensed-learning-release.md) | Accepted | Publish an Apache-2.0 source-only learning prerelease without relaxing production qualification |

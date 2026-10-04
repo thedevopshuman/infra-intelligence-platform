@@ -4,6 +4,12 @@
 
 **Date:** 2026-10-04
 
+**Learning milestone:** The owner has prioritized a source-only learning
+prerelease before production v1 and delegated the license choice. Apache-2.0
+is selected under [ADR 0157](../decisions/0157-apache-licensed-learning-release.md).
+The [learning release](../releases/learning-v0.84.0.md) provides a disposable
+Docker session, not completion of the production work below.
+
 The project owner selected public open-source v1 before a private customer
 pilot. [ADR 0155](../decisions/0155-public-open-source-v1-first.md) records that
 order. This plan complements the [infrastructure roadmap](initial-roadmap.md)
@@ -45,8 +51,10 @@ domain: The DevOps Human is the umbrella site, with IIP as one product, not a
 new name for the whole platform or company. Website branch preparation does
 not constitute a live deployment, DNS cutover, or IIP release.
 
-There is still no release tag, selected license, organizationally
-signed public artifact, or public supported-version/security contact policy.
+Apache-2.0 and learning-preview contribution/security reporting policies are
+now present. The learning tag is a separate source-only prerelease channel;
+there is still no production release, organizationally signed public artifact,
+or production supported-version policy.
 The live customer reports needed for private-pilot admission are also absent.
 Examples and implemented qualification scripts are not evidence of completed
 external runs.
@@ -118,7 +126,9 @@ artifacts before promotion. A passed source test suite alone is insufficient.
   and documentation. Current repository privacy is a staging state, not a
   change to the public-first target. Image/package namespace ownership and
   release-signing identities still need to be finalized.
-- Open-source license and contributor/legal policy.
+- **Selected:** Apache-2.0 for original project material, with contribution
+  rules and retained third-party obligations. Dependency compliance and
+  production maintenance commitments remain release work.
 - Public identity/naming disposition, responsible maintainers, support and
   private security reporting channels, and supported-version commitments.
 - An authorized live provider/test environment and bounded cost allowance for

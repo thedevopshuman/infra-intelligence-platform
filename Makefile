@@ -362,6 +362,9 @@ help:
 	@echo "ai-finops-down Stop and remove the disposable AI FinOps slice"
 	@echo "community-check Validate protected non-fixture single-host configuration"
 	@echo "community-up  Build/start the persistent community preview without demo data"
+	@echo "learning-up   Start the disposable Docker-only learning session with synthetic data"
+	@echo "learning-status List this checkout's learning containers"
+	@echo "learning-down Remove only the learning project and its disposable data"
 	@echo "community-status Show the community preview containers"
 	@echo "community-down Stop the community preview while preserving data and credentials"
 	@echo "test-community Test encrypted intake and persistent community lifecycle in Docker"
@@ -1980,6 +1983,16 @@ dev-credentials:
 
 dev-down:
 	$(PYTHON) scripts/local_stack.py down
+
+.PHONY: learning-up learning-status learning-down
+learning-up:
+	IIP_DOCKER_BIN=$(DOCKER) sh scripts/learning.sh up
+
+learning-status:
+	IIP_DOCKER_BIN=$(DOCKER) sh scripts/learning.sh status
+
+learning-down:
+	IIP_DOCKER_BIN=$(DOCKER) sh scripts/learning.sh down
 
 ai-finops-up:
 	$(PYTHON) scripts/ai_finops_stack.py up

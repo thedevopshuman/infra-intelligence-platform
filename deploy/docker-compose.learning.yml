@@ -1,0 +1,45 @@
+# Overlay for the disposable, source-built learning preview only.
+x-learning-no-proxy: &learning-no-proxy
+  HTTP_PROXY: ""
+  HTTPS_PROXY: ""
+  ALL_PROXY: ""
+  FTP_PROXY: ""
+  NO_PROXY: "*"
+  http_proxy: ""
+  https_proxy: ""
+  all_proxy: ""
+  ftp_proxy: ""
+  no_proxy: "*"
+
+services:
+  postgres:
+    environment: *learning-no-proxy
+  api:
+    environment: *learning-no-proxy
+    build:
+      target: learning
+  ai-usage-receiver:
+    environment: *learning-no-proxy
+  workflow-worker:
+    environment: *learning-no-proxy
+  otel-collector:
+    environment: *learning-no-proxy
+  prometheus:
+    environment: *learning-no-proxy
+  loki:
+    environment: *learning-no-proxy
+  grafana:
+    environment: *learning-no-proxy
+  learning-tools:
+    image: ${IIP_AI_FINOPS_IMAGE:?set learning image}
+    profiles: [learning-tools]
+    pull_policy: never
+    command: [python, scripts/learning_fixture.py, seed]
+    environment:
+      <<: *learning-no-proxy
+      IIP_AI_FINOPS_ANCHOR: ${IIP_AI_FINOPS_ANCHOR:?set fixture anchor}
+    init: true
+    read_only: true
+    tmpfs: [/tmp:mode=1777]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]

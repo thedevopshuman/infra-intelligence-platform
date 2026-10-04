@@ -38,6 +38,13 @@ def write_fixture(directory: Path) -> None:
         ip_address="127.0.0.3",
     )
 
+    # Linux bind mounts preserve the host's ownership and mode. The official
+    # image runs initdb hooks as postgres, not the host user who owns mktemp's
+    # 0700 directory. Expose only this disposable one-hour test identity for
+    # the fixture copy; PostgreSQL makes its own private-key copy mode 0600.
+    # This helper is not used for customer or community credentials.
+    directory.chmod(0o755)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()

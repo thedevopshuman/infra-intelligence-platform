@@ -4,15 +4,40 @@
 
 Infrastructure Intelligence Platform (IIP) is an architecture-first foundation for building a vendor-neutral control plane that understands infrastructure as a resource graph and event timeline, then lets governed agents investigate and act with evidence.
 
-The next release target is **public open-source v1**, ahead of a private pilot.
+## Start with the learning preview
+
+The first release is **`learning-v0.84.0`**, a source-built, disposable learning
+preview under [Apache-2.0](LICENSE), not production v1. With Docker Desktop
+running, download the source from the
+[learning release](https://github.com/thedevopshuman/infra-intelligence-platform/releases/tag/learning-v0.84.0),
+extract it, and run from the extracted folder:
+
+```bash
+sh scripts/learning.sh up
+```
+
+No host Python, Kubernetes, cloud account, or model-provider key is required.
+The first build needs Internet access. It starts eight visible containers and
+checks synthetic usage, estimated cost, attribution, findings, and Grafana.
+Open the [console](http://127.0.0.1:18082/console) and use the demo token printed
+by the launcher. Follow the [first-session guide](docs/learning/first-session.md)
+for AI Economics, dashboards, and a resource investigation with cited evidence.
+Stop and discard only this demo's sample data with `sh scripts/learning.sh down`.
+Keep this deliberately insecure fixture on your own computer; never connect
+customer workloads or expose its ports. See the
+[release scope and limitations](docs/releases/learning-v0.84.0.md).
+
+## Product status
+
+The next production release target remains **public open-source v1**, ahead of a private pilot.
 The [public v1 release plan](docs/roadmap/public-v1-release-plan.md) separates
 implemented capabilities from remaining installation, live-integration,
 reliability, licensing, and publication work. The current code is pre-release;
-no open-source license has been selected yet.
+the learning milestone does not close the production release gates.
 
 The selected GitHub owner is `thedevopshuman`. Platform source lives in
 [`thedevopshuman/infra-intelligence-platform`](https://github.com/thedevopshuman/infra-intelligence-platform),
-currently private pending licensing and publication checks. The separate
+owned by The DevOps Human. The separate
 [`thedevopshuman/website`](https://github.com/thedevopshuman/website) repository
 hosts the umbrella site: IIP is one product to describe at `thedevopshuman.com`,
 alongside existing DevOps content and future products. The domain is not an IIP
@@ -582,4 +607,6 @@ rules to disable credential inspection.
 
 ## Licensing
 
-No open-source license has been selected yet. Until that decision is recorded, do not assume permission to redistribute this repository. See the [open-source and commercial boundary](docs/product/open-source-boundary.md).
+Original project material is licensed under [Apache-2.0](LICENSE). Preserve
+third-party licenses and notices. See the [open-source and commercial
+boundary](docs/product/open-source-boundary.md) and [contribution guide](CONTRIBUTING.md).

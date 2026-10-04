@@ -7,6 +7,7 @@ name = "infra-intelligence-kernel"
 version = "0.84.0"
 description = "Reference kernel for the Infrastructure Intelligence Platform"
 readme = "README.md"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.11"
 dependencies = [
   "cryptography==50.0.1",
@@ -25,6 +26,7 @@ iip-worker = "iip.surfaces.worker:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+license-files = ["LICENSE", "NOTICE"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

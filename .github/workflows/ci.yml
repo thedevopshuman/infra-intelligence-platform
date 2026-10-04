@@ -13,6 +13,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  learning-preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Start and verify the Docker-only synthetic learning flow
+        run: sh scripts/learning.sh up
+      - name: Inspect learning services
+        run: sh scripts/learning.sh status
+      - name: Remove only this disposable learning project
+        if: always()
+        run: sh scripts/learning.sh down
+
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 15

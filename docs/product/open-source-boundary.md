@@ -1,11 +1,16 @@
 # Open-source and commercial boundary
 
-**Status:** Decision required before public release  
-**Date:** 2026-08-14
+**Status:** Apache-2.0 foundation accepted; commercial packaging undecided
+**Date:** 2026-10-04
 
-No license has been selected. This page is a working proposal, not a grant of rights.
+Original repository code and documentation are licensed under
+[Apache-2.0](../../LICENSE), selected for the source-only learning preview in
+[ADR 0157](../decisions/0157-apache-licensed-learning-release.md). Third-party
+material retains its own licensing. The license is the grant of rights;
+the commercial ideas below do not restrict already licensed code or imply a
+production support promise.
 
-## Proposed open foundation
+## Open foundation
 
 - Resource, event, evidence, agent, plugin, action, and investigation contracts.
 - Core SDKs and plugin development kit.
@@ -26,5 +31,7 @@ No license has been selected. This page is a working proposal, not a grant of ri
 
 The open layer must be genuinely useful for a small team, support independent extension, and avoid an intentionally crippled core. The commercial layer should monetize operation, governance, scale, support, and curated intelligence—not contract incompatibility or data hostage-taking.
 
-Before public release, decide project ownership, contributor agreement or developer certificate, dependency policy, trademark policy, and a specific OSI-approved or source-available license strategy with legal review.
-
+The selected GitHub owner is `thedevopshuman`. Contributions follow
+[CONTRIBUTING.md](../../CONTRIBUTING.md). Formal company/trademark disposition,
+additional contributor agreements if needed, dependency/compliance review,
+commercial packaging, and production support commitments remain undecided.

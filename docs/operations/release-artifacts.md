@@ -134,10 +134,22 @@ The directory under `dist/iip-<version>-<revision>/` contains:
 - public JSON Schemas, examples, specifications, and OpenAPI documents;
 - a Python SDK source package and a compiled npm package;
 - the separately versioned Bedrock OpenTelemetry usage-adapter source package;
+- a versioned persistent community installation source kit, including runtime,
+  Compose assets, lifecycle tools, pinned requirements and operating guides;
 - a versioned private-pilot operating handoff containing `SECURITY.md`,
   `SUPPORT.md`, and the exact revision's complete documentation tree;
 - `release-manifest.json` with revision, size, digest, platform, SBOM, and provenance evidence;
 - `SHA256SUMS`, covering every artifact and the manifest.
+
+The chart, public-contract and operating-handoff archives include the same
+committed root `LICENSE` and `NOTICE`; a downloaded artifact must not depend on
+the recipient separately finding the repository license. The community kit
+also carries both files. See the [installation-kit guide](community-installation-kit.md)
+for its content checks and non-Git installation path. Older verified manifests
+can legitimately omit the additive kit role, so select the
+`community-installation-source` artifact explicitly instead of assuming every
+historical bundle contains it. No current source change adds assets to the
+already published `learning-v0.84.0` release.
 
 For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64` or `linux/amd64` can limit the image build. A customer release should retain both default platforms unless its published support matrix says otherwise.
 

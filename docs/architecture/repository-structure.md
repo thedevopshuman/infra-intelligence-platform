@@ -171,6 +171,15 @@ incomplete archive structure. Customer contacts, support/security channels,
 response objectives, protected profiles, feedback records, and live evidence
 remain outside source control and the portable bundle.
 
+Persistent community installation packaging is also operational tooling.
+`scripts/installation_kit.py` reads committed source objects, builds a bounded
+versioned archive and inspects it without extracting or executing its code.
+The release manifest binds this kit alongside the runtime images. Packaging
+imports no Docker, provider or serving authority, and the extracted installer
+continues to compose the existing public configuration boundaries.
+`scripts/package_licensed_chart.py` similarly packages the committed chart with
+the same revision's license notices without changing chart behavior.
+
 Exact AI invocation observation follows the normal serving boundaries.
 `src/iip/application/query_ai_invocation.py` owns authorization, active-source
 selection, privacy minimization, and record revalidation; the in-memory and

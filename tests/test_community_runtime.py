@@ -128,9 +128,29 @@ class CommunityRuntimeTests(unittest.TestCase):
                     self.assertEqual(response.status, 200)
 
             try:
-                compose("build", "initialize")
-                compose("up", "--detach", "--wait", "--wait-timeout", "240")
+                self.assertEqual(stack.main(["--state", str(state), "up", "--build"]), 0)
                 stack.wait_for_collector(state)
+                # Exercise the documented first login, not just container health.
+                with opener.open("http://127.0.0.1:18083/console", timeout=5) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertIn(b"<html", response.read())
+                session_url = "http://127.0.0.1:18083/v1/session"
+                for token in (None, credentials["collectorToken"]):
+                    request = urllib.request.Request(session_url)
+                    if token:
+                        request.add_header("Authorization", "Bearer " + token)
+                    with self.assertRaises(urllib.error.HTTPError) as denied:
+                        opener.open(request, timeout=5)
+                    self.assertEqual(denied.exception.code, 401)
+                    denied.exception.close()
+                request = urllib.request.Request(session_url, headers={
+                    "Authorization": "Bearer " + credentials["apiToken"],
+                })
+                with opener.open(request, timeout=5) as response:
+                    session = json.load(response)
+                self.assertEqual(session["metadata"], {
+                    "tenantId": "local", "actorId": "community-operator",
+                })
                 self.assertEqual(sql("SELECT count(*) FROM iip.ai_usage_records"), "0")
                 self.assertEqual(sql("SELECT count(*) FROM pg_stat_activity a JOIN pg_stat_ssl s USING(pid) WHERE a.datname='iip' AND a.client_addr IS NOT NULL AND NOT s.ssl"), "0")
                 probe = "import os,psycopg; from iip.adapters.postgres.connection import PostgresConnectionConfiguration; c=PostgresConnectionConfiguration.from_environment(os.environ['IIP_DATABASE_URL']); db=psycopg.connect(c.connection_string); print(db.execute('SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()').fetchone()[0]); db.close()"
@@ -158,7 +178,7 @@ class CommunityRuntimeTests(unittest.TestCase):
                     "from pathlib import Path; data=b''.join(p.read_bytes() for p in Path('/volumes/queue').rglob('*') if p.is_file()); markers=(b'private-span-name',b'private-schema-resource',b'private-schema-scope',b'private-prompt-must-not-be-queued',b'private-request-id-before-hashing',b'private-error-type-before-drop',b'private-allowed-key-must-not-be-queued',b'private-entity-schema',b'private-entity-type',b'private-unknown-resource',b'private-unknown-scope',b'private-unknown-span'); print(','.join(v.decode() for v in markers if v in data) or ('clean' if data else 'empty'))")
                 self.assertEqual(queue_scan.strip(), "clean")
                 compose("down")
-                compose("up", "--detach", "--wait", "--wait-timeout", "240")
+                self.assertEqual(stack.main(["--state", str(state), "up"]), 0)
                 stack.wait_for_collector(state)
                 wait_counts(2)
                 expression = 'sum(iip_ai_allocation_requests{iip_ai_allocation_dimension="application",job="iip-ai-economics"})'

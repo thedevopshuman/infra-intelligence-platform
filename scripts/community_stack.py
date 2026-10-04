@@ -474,14 +474,16 @@ def execute(arguments: argparse.Namespace) -> int:
 
         environment, _ = installed_environment(arguments.state)
         recovered = "IIP_COMMUNITY_POSTGRES_IMAGE" in environment
-        options = ["up", "--detach", "--wait", "--wait-timeout", "240"]
+        # A missing selected image must never trigger an implicit source build.
+        # The explicit --build path below builds once before starting services.
+        options = ["up", "--detach", "--wait", "--wait-timeout", "240", "--no-build"]
         if recovered:
             if arguments.build:
                 raise InstallationError("community.recovery.build-prohibited")
             RecoveryDocker(arguments.state).require_images(
                 read_protected(arguments.state / "recovery-images.json")
             )
-            options.extend(("--no-build", "--pull", "never"))
+            options.extend(("--pull", "never"))
         if arguments.build:
             run_compose(arguments.state, ["build", "initialize"])
         run_compose(arguments.state, options)

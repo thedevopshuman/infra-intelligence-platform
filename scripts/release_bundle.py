@@ -12,6 +12,11 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping, Sequence
 
+if __package__:
+    from .installation_kit import InstallationKitError, inspect_installation_kit
+else:
+    from installation_kit import InstallationKitError, inspect_installation_kit
+
 
 SPDX_PREDICATE = "https://spdx.dev/Document"
 SLSA_PREDICATE = "https://slsa.dev/provenance/v1"
@@ -292,6 +297,7 @@ def _artifact_specs(
     *,
     include_mediation_bridge: bool = True,
     include_pilot_handoff: bool = True,
+    include_community_installation: bool = True,
 ) -> tuple[tuple[str, str, str], ...]:
     image_specs = [
         (
@@ -344,7 +350,22 @@ def _artifact_specs(
                 "application/gzip",
             ),
         )
+    if include_community_installation:
+        portable_specs += (
+            (
+                f"infra-intelligence-community-{version}.tar.gz",
+                "community-installation-source",
+                "application/gzip",
+            ),
+        )
     return tuple(image_specs) + portable_specs
+
+
+def _inspect_community_installation(path: Path, version: str) -> None:
+    try:
+        inspect_installation_kit(path, version)
+    except InstallationKitError:
+        raise ReleaseBundleError("release.community-installation.invalid") from None
 
 
 def finalize_bundle(
@@ -385,6 +406,8 @@ def finalize_bundle(
             raise ReleaseBundleError("release.artifact.missing")
         if role == "private-pilot-operating-handoff":
             inspect_pilot_handoff(path, version)
+        if role == "community-installation-source":
+            _inspect_community_installation(path, version)
         artifacts.append(
             {
                 "path": filename,
@@ -529,6 +552,11 @@ def verify_bundle(bundle: Path) -> Mapping[str, Any]:
         and artifact.get("role") == "private-pilot-operating-handoff"
         for artifact in artifacts
     )
+    community_declared = any(
+        isinstance(artifact, dict)
+        and artifact.get("role") == "community-installation-source"
+        for artifact in artifacts
+    )
     version_match = re.match(
         r"^([0-9]+)\.([0-9]+)\.([0-9]+)", metadata["version"]
     )
@@ -553,6 +581,7 @@ def verify_bundle(bundle: Path) -> Mapping[str, Any]:
         metadata["bedrockInstrumentationVersion"],
         include_mediation_bridge=bridge_declared,
         include_pilot_handoff=handoff_declared,
+        include_community_installation=community_declared,
     )
     expected_artifacts = {
         filename: (role, media_type)
@@ -590,6 +619,11 @@ def verify_bundle(bundle: Path) -> Mapping[str, Any]:
         inspect_pilot_handoff(
             bundle
             / f"infra-intelligence-pilot-handoff-{metadata['version']}.tar.gz",
+            metadata["version"],
+        )
+    if community_declared:
+        _inspect_community_installation(
+            bundle / f"infra-intelligence-community-{metadata['version']}.tar.gz",
             metadata["version"],
         )
     expected_lines = _expected_checksum_lines(bundle, manifest)

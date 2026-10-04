@@ -4,7 +4,22 @@
 
 Infrastructure Intelligence Platform (IIP) is an architecture-first foundation for building a vendor-neutral control plane that understands infrastructure as a resource graph and event timeline, then lets governed agents investigate and act with evidence.
 
-## Start with the learning preview
+## Installation and release direction
+
+The public release is being built for actual self-hosted use: **persistent
+Docker Compose first, then a separate full-stack Helm installation for
+Kubernetes**. Compare [installation options](docs/operations/installation-options.md)
+for dependencies, login, integration enablement and current limitations.
+
+The persistent Compose implementation starts empty and keeps data across
+restarts. The candidate bundle builder now includes a
+[versioned installation source kit](docs/operations/community-installation-kit.md)
+with application source, launcher, deployment assets and operating guides.
+Non-Git initialization and configuration validation are tested. It is not yet a published or qualified public-v1
+installer. The existing Helm chart remains a bring-your-own-dependencies
+reference; the new full-stack Kubernetes profile is still to be implemented.
+
+## Optional: try the published learning preview
 
 The first release is **`learning-v0.84.0`**, a source-built, disposable learning
 preview under [Apache-2.0](LICENSE), not production v1. With Docker Desktop

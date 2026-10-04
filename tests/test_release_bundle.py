@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
+from scripts.installation_kit import REQUIRED_KIT_PATHS
 from scripts.release_bundle import (
     IN_TOTO,
     OCI_INDEX,
@@ -193,6 +194,21 @@ def write_pilot_handoff_fixture(
             archive.addfile(member)
 
 
+def write_community_installation_fixture(path: Path, *, version: str = VERSION) -> None:
+    """Structural release fixture only; executable extraction has its own tests."""
+    with tarfile.open(path, mode="w:gz", format=tarfile.USTAR_FORMAT) as archive:
+        for relative in sorted(REQUIRED_KIT_PATHS):
+            content = (
+                f'[project]\nversion = "{version}"\n'
+                if relative == "pyproject.toml"
+                else f"fixture:{relative}\n"
+            ).encode()
+            member = tarfile.TarInfo(f"infra-intelligence-community-{version}/{relative}")
+            member.size = len(content)
+            member.mode = 0o644
+            archive.addfile(member, io.BytesIO(content))
+
+
 class ReleaseBundleTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -215,6 +231,9 @@ class ReleaseBundleTests(unittest.TestCase):
             (self.bundle / filename).write_bytes(f"fixture:{filename}".encode())
         write_pilot_handoff_fixture(
             self.bundle / f"infra-intelligence-pilot-handoff-{VERSION}.tar.gz"
+        )
+        write_community_installation_fixture(
+            self.bundle / f"infra-intelligence-community-{VERSION}.tar.gz"
         )
 
     def tearDown(self) -> None:
@@ -252,7 +271,11 @@ class ReleaseBundleTests(unittest.TestCase):
             ],
             list(PLATFORMS),
         )
-        self.assertEqual(len(manifest["spec"]["artifacts"]), 8)
+        self.assertEqual(len(manifest["spec"]["artifacts"]), 9)
+        self.assertIn(
+            "community-installation-source",
+            [item["role"] for item in manifest["spec"]["artifacts"]],
+        )
         self.assertIn(
             "private-pilot-operating-handoff",
             [item["role"] for item in manifest["spec"]["artifacts"]],
@@ -295,6 +318,39 @@ class ReleaseBundleTests(unittest.TestCase):
             ReleaseBundleError, "release.artifact.(size|digest)-mismatch"
         ):
             verify_bundle(self.bundle)
+
+    def test_new_builder_requires_complete_community_kit(self) -> None:
+        kit = self.bundle / f"infra-intelligence-community-{VERSION}.tar.gz"
+        kit.write_bytes(b"not-an-installation")
+        with self.assertRaisesRegex(ReleaseBundleError, "release.community-installation.invalid"):
+            self.finalize()
+        kit.unlink()
+        with self.assertRaisesRegex(ReleaseBundleError, "release.artifact.missing"):
+            self.finalize()
+
+    def test_transport_verification_inspects_community_kit(self) -> None:
+        self.finalize()
+        kit = self.bundle / f"infra-intelligence-community-{VERSION}.tar.gz"
+        kit.write_bytes(b"not-an-installation")
+        with self.assertRaisesRegex(ReleaseBundleError, "release.community-installation.invalid"):
+            verify_bundle(self.bundle)
+
+    def test_historical_bundle_without_community_role_remains_verifiable(self) -> None:
+        self.finalize()
+        manifest_path = self.bundle / "release-manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["spec"]["artifacts"] = [
+            artifact for artifact in manifest["spec"]["artifacts"]
+            if artifact["role"] != "community-installation-source"
+        ]
+        manifest_path.write_text(json.dumps(manifest))
+        paths = [self.bundle / artifact["path"] for artifact in manifest["spec"]["artifacts"]]
+        paths.append(manifest_path)
+        (self.bundle / "SHA256SUMS").write_text("".join(
+            f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
+            for path in sorted(paths)
+        ))
+        self.assertEqual(len(verify_bundle(self.bundle)["spec"]["artifacts"]), 8)
 
     def test_image_without_sbom_fails_closed(self) -> None:
         image = self.bundle / f"infra-intelligence-control-plane-{VERSION}.oci.tar"

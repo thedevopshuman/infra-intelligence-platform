@@ -27,7 +27,9 @@ available; this onboarding unit focuses on inbound Bedrock telemetry.
 
 The source host needs Python with the repository dependencies, Docker, and
 Compose. Use the repository's documented dependency installation before
-running the commands below. Docker administrators and the local account are
+running the commands below. A [versioned installation source kit](community-installation-kit.md)
+now carries the same tools for use outside a Git checkout; public publication
+and fresh-host qualification remain pending. Docker administrators and the local account are
 trusted: protected values are used in container environments and can be read
 by daemon administrators. The launcher checks the selected Unix-socket daemon
 without installation credentials, then pins that socket for Compose. Unset
@@ -114,6 +116,8 @@ exact images locally and refuses build/pull fallback.
 For an existing selected image, pass `--image` to `init`, then run
 `scripts/community_stack.py up` without `--build`. Prefer a verified digest
 when release artifacts become available; this work does not publish any.
+Startup passes `--no-build` to Compose even after an explicit preceding build,
+so a missing selected image never silently falls back to compiling source.
 Custom state uses `--state /absolute/protected/path` before the command. Its
 absolute location determines the isolated Compose project: do not move it or
 delete/reinitialize it while retained data belongs to that installation.

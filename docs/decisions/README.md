@@ -165,3 +165,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0159](0159-stopped-community-transport-rotation.md) | Accepted implementation boundary | Rotate a stopped community trust generation with external CA overlap, bounded rollback, and receipt-bound operator finalization |
 | [0160](0160-opt-in-delivered-outbox-retention.md) | Accepted | Expire only delivered outbox state under explicit tenant-scoped audited policy |
 | [0161](0161-explicit-ai-history-availability.md) | Accepted | Distinguish retired AI history without partial totals or changing existing successful read envelopes |
+| [0162](0162-versioned-community-installation-kit.md) | Accepted implementation boundary | Package committed persistent Compose installation sources without operator state or implicit image builds |

@@ -244,6 +244,13 @@ allocation projection for its primary dashboard. The installer has no provider,
 production-promotion, or server application authority; local lifecycle limits
 remain explicit in the [runbook](../operations/community-installation.md).
 
+[ADR 0162](../decisions/0162-versioned-community-installation-kit.md) packages
+that persistent Compose path into a committed-source installation archive
+bound to the release manifest. Non-Git extraction tests establish installer
+closure; public artifact distribution, exact-image installation and operational
+release qualification remain separate gates. The planned full-stack Helm
+profile does not replace the existing bring-your-own-dependencies chart.
+
 [ADR 0158](../decisions/0158-offline-encrypted-community-recovery.md) adds a
 separate host-side cold-recovery boundary for that installation. It joins the
 four stopped data volumes and protected configuration/credentials in one

@@ -149,9 +149,25 @@ class CommunityStackTests(unittest.TestCase):
                 self.assertEqual(stack.main(["--state", str(self.state), "up", "--build"]), 0)
             self.assertEqual(run.call_args_list[0].args[1], ["build", "initialize"])
             self.assertEqual(run.call_args_list[1].args[1][0], "up")
+            self.assertIn("--no-build", run.call_args_list[1].args[1])
         self.assertIn("build:\n      context: ..\n      dockerfile: Dockerfile", stack.COMPOSE.read_text())
         ignored = (ROOT / ".dockerignore").read_text().splitlines()
         self.assertTrue({".iip", ".env", ".env.*", "*.log"}.issubset(ignored))
+
+    def test_selected_image_start_never_falls_back_to_source_build(self) -> None:
+        self.install()
+        with (
+            patch.object(stack, "run_compose", return_value="") as run,
+            patch.object(stack, "wait_for_collector"),
+            patch("community_recovery.record_runtime"),
+            patch("community_trust.record_started"),
+            redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(stack.main(["--state", str(self.state), "up"]), 0)
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args[1], [
+            "up", "--detach", "--wait", "--wait-timeout", "240", "--no-build",
+        ])
 
     def test_initialize_creates_private_unique_credentials_without_traffic(self) -> None:
         with patch.object(subprocess, "run") as run:

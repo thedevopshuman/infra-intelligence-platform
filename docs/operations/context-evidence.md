@@ -10,12 +10,12 @@ accepted.
 
 ## Docker Desktop
 
-The local Compose stack mounts `deploy/context` read-only at `/var/run/iip-context`. Enable the example catalog before `make local-up`:
+The local Compose stack mounts `deploy/context` read-only at `/var/run/iip-context`. Enable the example catalog before `make dev-up`:
 
 ```bash
 export IIP_CONTEXT_BACKEND=files
 export IIP_CONTEXT_INTEGRATIONS_JSON="$(tr -d '\n' < deploy/context/integrations.example.json)"
-make local-up
+make dev-up PYTHON=.venv/bin/python
 ```
 
 Ingest the canonical resource example, then update the request timestamps/deadline and submit `contracts/examples/context-evidence-request.json` to `POST /v1/evidence/context/queries`. The response is Evidence metadata; normalized artifact bytes remain internal.

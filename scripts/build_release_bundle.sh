@@ -58,9 +58,13 @@ fi
 mkdir "$IIP_RELEASE_BUNDLE"
 IIP_RELEASE_BUNDLE_ABSOLUTE=$(cd "$IIP_RELEASE_BUNDLE" && pwd)
 
-git archive --format=tar.gz --prefix=infra-intelligence/ \
-    --output="$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-$IIP_RELEASE_CHART_VERSION.tgz" \
-    HEAD:deploy/helm/infra-intelligence
+"$IIP_RELEASE_PYTHON" scripts/installation_kit.py build \
+    --output "$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-community-$IIP_RELEASE_VERSION.tar.gz" \
+    --version "$IIP_RELEASE_VERSION"
+
+"$IIP_RELEASE_PYTHON" scripts/package_licensed_chart.py \
+    --revision "$IIP_RELEASE_REVISION" \
+    --output "$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-$IIP_RELEASE_CHART_VERSION.tgz"
 "$IIP_RELEASE_HELM_BIN" lint \
     "$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-$IIP_RELEASE_CHART_VERSION.tgz" \
     >/dev/null
@@ -68,11 +72,11 @@ git archive --format=tar.gz --prefix=infra-intelligence/ \
 git archive --format=tar.gz \
     --prefix="infra-intelligence-contracts-$IIP_RELEASE_VERSION/" \
     --output="$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-contracts-$IIP_RELEASE_VERSION.tar.gz" \
-    HEAD contracts api/openapi docs/specifications
+    "$IIP_RELEASE_REVISION" LICENSE NOTICE contracts api/openapi docs/specifications
 git archive --format=tar.gz \
     --prefix="infra-intelligence-pilot-handoff-$IIP_RELEASE_VERSION/" \
     --output="$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-pilot-handoff-$IIP_RELEASE_VERSION.tar.gz" \
-    HEAD SECURITY.md SUPPORT.md docs
+    "$IIP_RELEASE_REVISION" LICENSE NOTICE SECURITY.md SUPPORT.md docs
 git archive --format=tar.gz \
     --prefix="infra-intelligence-sdk-$IIP_RELEASE_PYTHON_SDK_VERSION/" \
     --output="$IIP_RELEASE_BUNDLE_ABSOLUTE/infra-intelligence-sdk-$IIP_RELEASE_PYTHON_SDK_VERSION.tar.gz" \

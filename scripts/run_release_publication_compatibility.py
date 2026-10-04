@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import release_bundle  # noqa: E402
 import release_publication  # noqa: E402
 from tests.test_release_bundle import (  # noqa: E402
+    write_community_installation_fixture,
     write_oci_fixture,
     write_pilot_handoff_fixture,
 )
@@ -111,6 +112,10 @@ def _fixture_bundle(directory: Path) -> tuple[Path, str]:
         (bundle / filename).write_bytes(filename.encode("ascii"))
     write_pilot_handoff_fixture(
         bundle / f"infra-intelligence-pilot-handoff-{version}.tar.gz",
+        version=version,
+    )
+    write_community_installation_fixture(
+        bundle / f"infra-intelligence-community-{version}.tar.gz",
         version=version,
     )
     source_date = _run(

@@ -68,6 +68,13 @@
         "mediaType": "application/gzip",
         "sizeBytes": 131072,
         "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      {
+        "path": "infra-intelligence-community-0.84.0.tar.gz",
+        "role": "community-installation-source",
+        "mediaType": "application/gzip",
+        "sizeBytes": 1048576,
+        "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
       }
     ],
     "image": {

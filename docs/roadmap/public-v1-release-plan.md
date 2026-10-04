@@ -4,11 +4,11 @@
 
 **Date:** 2026-10-04
 
-**Learning milestone:** The owner has prioritized a source-only learning
-prerelease before production v1 and delegated the license choice. Apache-2.0
-is selected under [ADR 0157](../decisions/0157-apache-licensed-learning-release.md).
-The [learning release](../releases/learning-v0.84.0.md) provides a disposable
-Docker session, not completion of the production work below.
+**Published predecessor:** Apache-2.0 is selected under
+[ADR 0157](../decisions/0157-apache-licensed-learning-release.md). The
+[learning release](../releases/learning-v0.84.0.md) is a source-only,
+disposable milestone, not the durable installation target or completion of
+the production work below.
 
 The project owner selected public open-source v1 before a private customer
 pilot. [ADR 0155](../decisions/0155-public-open-source-v1-first.md) records that
@@ -24,6 +24,32 @@ evidence, and understand AI usage, estimated cost, attribution, changes, and an
 evidence-backed savings opportunity. The application keeps calling its model
 provider directly. Collection remains asynchronous and metadata-only by
 default; IIP does not require an inference proxy or a new customer SDK.
+
+## Accepted installation sequence
+
+The primary public installation target is a persistent, usable single-host
+Compose distribution built from versioned published artifacts. The existing
+[community preview](../operations/community-installation.md) is its executable
+development foundation. The [installation source kit](../operations/community-installation-kit.md)
+now packages that path for non-Git use; authenticated publication, exact
+runtime/dependency images, fresh-host first value and supported upgrades remain
+open. It remains pre-release.
+
+The second installation target is a full-stack Kubernetes profile delivered
+through Helm. It must be a new, explicitly bounded profile that installs the
+dependencies needed for a usable stack and proves their persistence, security,
+upgrade and recovery behavior. It is distinct from the existing
+[production-oriented Helm chart](../operations/helm-deployment.md), which
+intentionally requires customer-owned PostgreSQL, identity, ingress,
+certificates, observability and other enabled services. The existing chart
+must not be relabeled as a bundled installer or weakened to create the new
+profile.
+
+The [installation-options matrix](../operations/installation-options.md)
+records what each current or planned path runs, which dependencies remain
+external, how login and integrations work, and which release claims remain
+open. No install command for unpublished artifacts or an unimplemented
+Kubernetes profile is implied by this sequence.
 
 ## Current evidence
 
@@ -65,7 +91,7 @@ external runs.
 ## Remaining release work
 
 The [persistent community preview](../operations/community-installation.md)
-implements an initial source-checkout installation path: empty startup,
+implements an initial source-based installation path: empty startup,
 generated protected credentials, verified database/telemetry transport,
 operator-reviewed catalogs/attribution, durable state and Collector buffering,
 safe configuration generations, and a savings-independent rolling dashboard.
@@ -73,6 +99,12 @@ It does not close the public-install gate: published artifacts and a fresh-host
 walkthrough, supported upgrade/recovery and customer certificate lifecycle, database/outbox
 retention, and real provider evidence remain outstanding. Its operational
 limitations must not be presented as a fully supported public-v1 deployment.
+
+The current Helm chart remains a bring-your-own-dependencies deployment path,
+not the second full-stack installation target. The bundled Kubernetes profile
+still needs a defined dependency and values boundary, storage and credential
+model, executable install/upgrade/recovery tests, and fresh-cluster evidence.
+Until those exist, the repository has no whole-stack Helm installation.
 
 An [offline encrypted community recovery implementation](../operations/community-recovery.md)
 now joins stopped database/queue/backend data and protected state, verifies
@@ -99,7 +131,7 @@ be rerun for the release candidate.
 
 | Workstream | Required result | Evidence to close it |
 | --- | --- | --- |
-| Installation and first value | Versioned public images/chart, complete prerequisites, a guided route from empty installation to real resources and AI cost views, useful empty/error states | A fresh-machine install using published artifacts and public instructions, followed by an end-to-end user walkthrough |
+| Installation and first value | Primary persistent Compose distribution from versioned public artifacts, followed by a separately bounded full-stack Kubernetes profile; complete prerequisites, guided first value, and useful empty/error states | Fresh-host Compose installation and fresh-cluster Kubernetes installation using published artifacts and public instructions, each followed by its supported end-to-end walkthrough |
 | Supported scope and compatibility | A supported feature/backend/version matrix; stable public API/SDK behavior and migration policy; experimental interfaces clearly identified | Contract and compatibility tests for each supported path; documented upgrade/rollback and data migration behavior |
 | Live AI economics | Qualified Bedrock SDK/operation/model/region; customer-controlled OTel delivery; approved real pricing; attribution, dashboard and evidence-backed findings | A real provider-to-dashboard run with prompts/responses absent, coverage gaps visible, and calculated estimates distinguished from billing totals |
 | Reliability and security | Verified transport for every deployed client, tenant isolation, usable identity/permissions, bounded capacity, recovery, monitoring and private disclosure | Clean candidate checks plus supported-deployment exercises for worker/receiver, identity, policy/broker where enabled, Collector buffering, backup restore, failure behavior and alert delivery |
@@ -134,27 +166,29 @@ experimental. A product milestone name alone does not stabilize contracts.
 
 ## Next three implementation units
 
-1. **Public installation and supported scope.** Audit the complete onboarding
-   path and publish the feature/dependency matrix. Make an operator able to
-   reach real first value using the documented public interfaces. Explain
-   required external services and require only the dependencies actually used
-   by each explicitly supported profile; any new profile needs its own
-   contract and tests, and must not weaken existing production profiles.
-   Prioritize a durable, non-fixture setup from release artifacts, including
-   Collector configuration, generated credentials, real price configuration,
-   and dashboard import. An inbound-only AI telemetry profile should not need
-   outbound provider credentials or the external broker unless an enabled
-   feature actually performs those reads.
-2. **Live Bedrock and deployment reliability.** Exercise the same invocation
-   through instrumentation, OTel, ledger, real price catalog, worker,
-   attribution, and Grafana. Complete worker/receiver verified-database tests,
-   sustained-load calibration for supported architectures, identity lifecycle,
-   backup/recovery and alert-delivery evidence for the supported deployment.
-3. **Public release candidate.** Freeze the compatibility policy, select release
-   versions, regenerate clean local evidence, package public onboarding and
-   license/notice material, publish/sign the exact artifacts, and reproduce
-   installation and upgrade from their public locations. Resolve any failures
-   before announcing v1.
+1. **Persistent Compose release path.** Publish and authenticate the implemented
+   source kit together with exact runtime/dependency images so installation
+   does not require a source build.
+   Freeze its supported host, feature, dependency and login boundary; retain
+   generated credentials, non-fixture configuration, Collector queue,
+   dashboard, durable data and recovery behavior. Prove installation and
+   upgrade on each selected fresh host. An inbound-only AI telemetry profile
+   must not require provider credentials or the external broker unless an
+   enabled feature actually performs those reads.
+2. **Separate full-stack Kubernetes Helm profile.** Define and implement the
+   second installation path with its own closed values and dependency boundary,
+   durable storage, generated or referenced credentials, installation,
+   upgrade and recovery tests, and fresh-cluster evidence. Keep the existing
+   bring-your-own production chart intact. Do not infer HA, production PKI,
+   external identity or operational support from a bundled single-cluster
+   profile.
+3. **Live outcome and public release candidate.** Exercise one authorized
+   Bedrock invocation through instrumentation, OTel, ledger, qualified real
+   pricing, worker, attribution and Grafana with content capture absent and
+   coverage gaps visible. Freeze the compatibility policy, regenerate clean
+   evidence for the exact artifacts and both advertised installation paths,
+   publish/sign them, and reproduce install, upgrade and recovery before
+   announcing v1.
 
 The protected release workflow currently builds after `make verify`; it does
 not itself consume the full local qualification evidence. Unit 3 must close

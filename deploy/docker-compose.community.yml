@@ -72,7 +72,7 @@ services:
       - grafana-config:/volumes/grafana
 
   postgres:
-    image: ${IIP_COMMUNITY_POSTGRES_IMAGE:-postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15}
+    image: ${IIP_COMMUNITY_POSTGRES_IMAGE:-docker.io/library/postgres@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15}
     user: "70:70"
     command:
       - postgres
@@ -214,7 +214,7 @@ services:
       start_period: 10s
 
   otel-collector:
-    image: ${IIP_COMMUNITY_COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib@sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5}
+    image: ${IIP_COMMUNITY_COLLECTOR_IMAGE:-docker.io/otel/opentelemetry-collector-contrib@sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5}
     user: "10001:10001"
     command: ["--config=/run/iip/collector.yaml"]
     environment:
@@ -233,7 +233,7 @@ services:
     networks: [community, host-access]
 
   prometheus:
-    image: ${IIP_COMMUNITY_PROMETHEUS_IMAGE:-prom/prometheus:v3.13.1}
+    image: ${IIP_COMMUNITY_PROMETHEUS_IMAGE:-docker.io/prom/prometheus@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893}
     user: "65534:65534"
     command:
       - --config.file=/run/iip/prometheus.yml
@@ -260,7 +260,7 @@ services:
     networks: [community, host-access]
 
   grafana:
-    image: ${IIP_COMMUNITY_GRAFANA_IMAGE:-grafana/grafana@sha256:e932bd6ed0e026595b08483cd0141e5103e1ab7ff8604839ff899b8dc54cabcb}
+    image: ${IIP_COMMUNITY_GRAFANA_IMAGE:-docker.io/grafana/grafana@sha256:e932bd6ed0e026595b08483cd0141e5103e1ab7ff8604839ff899b8dc54cabcb}
     user: "472:472"
     environment:
       GF_SECURITY_ADMIN_USER: admin

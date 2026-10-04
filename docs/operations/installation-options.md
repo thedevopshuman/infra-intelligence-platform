@@ -26,8 +26,11 @@ installation option.
 | `learning-v0.84.0` source prerelease | Published source-only learning milestone | Disposable synthetic learning topology | Source checkout and local Docker dependencies | Known local learning credential; not an identity lifecycle | Disposable fixture data | Not a durable installation, provider qualification, signed runtime distribution or production release |
 
 Follow the [persistent community installation](community-installation.md) only
-for the current development-main preview. Its commands build or select an
-image already present on the host. The [installation source kit](community-installation-kit.md)
+for the current development-main preview. Source developers explicitly build;
+digest-selected installations explicitly prepare all five image references with
+`images --pull` and check them with `images`. Startup binds the native-platform
+local image IDs and never implicitly pulls or builds. Publisher/signature
+verification remains separate. The [installation source kit](community-installation-kit.md)
 packages these tools but is not yet published or qualified as a public-v1
 installation. Follow the [Helm deployment runbook](helm-deployment.md) only when its
 external prerequisites are intentionally supplied. Successful `helm lint`,

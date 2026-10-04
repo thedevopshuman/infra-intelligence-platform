@@ -269,8 +269,7 @@ def initialize(state: Path, inputs: Mapping[str, dict], *, image: str) -> Path:
     else:
         if len(relative.parts) < 2 or relative.parts[0] != ".iip":
             raise InstallationError("community.installation.build-context-prohibited")
-    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._/@:-]{1,255}", image):
-        raise InstallationError("community.image.invalid")
+    validate_image_selection(image)
     generated = {name: secrets.token_urlsafe(48) for name in (
         "apiToken", "collectorToken", "receiverToken", "databasePassword", "grafanaPassword",
     )}
@@ -295,19 +294,58 @@ def initialize(state: Path, inputs: Mapping[str, dict], *, image: str) -> Path:
     return state
 
 
+def validate_image_selection(image: object) -> None:
+    if not isinstance(image, str) or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._/@:-]{1,255}", image):
+        raise InstallationError("community.image.invalid")
+    if "@" in image:
+        from community_images import require_digest_reference
+
+        # A malformed digest selection must not fall back to tag/source mode.
+        require_digest_reference(image)
+
+
+def read_installation(state: Path) -> dict:
+    """Validate non-secret installation metadata without loading credentials."""
+    _private_directory(state)
+    installation = read_protected(state / "installation.json")
+    if (
+        set(installation) != {"format", "project", "image", "tenant", "transportEnvironment", "configurationGeneration"}
+        or type(installation["format"]) is not int or installation["format"] != 1
+        or installation["project"] != project_name(state.absolute())
+        or not isinstance(installation["configurationGeneration"], str)
+        or not re.fullmatch(r"[a-f0-9]{64}", installation["configurationGeneration"])
+    ):
+        raise InstallationError("community.installation.invalid")
+    validate_image_selection(installation["image"])
+    return installation
+
+
+def prepare_images(state: Path, *, pull: bool = False) -> dict[str, str]:
+    """Prepare the exact image cache; no installation secrets enter Docker."""
+    from community_docker import local_docker_binding
+    from community_images import selected_image_references, resolve_images
+
+    state = state.absolute()
+    require_complete_recovery(state)
+    installation = read_installation(state)
+    recovery = state / "recovery-images.json"
+    if recovery.exists() or recovery.is_symlink():
+        raise InstallationError("community.recovery.image-preparation-prohibited")
+    selected_image_references(installation["image"])
+    executable, endpoint, environment = local_docker_binding(state, dict(os.environ))
+    return resolve_images(installation["image"], executable=executable,
+        endpoint=endpoint, environment=environment, pull=pull)
+
+
 def installed_environment(state: Path, *, validate_contracts: bool = True) -> tuple[dict[str, str], str]:
     state = state.absolute()
     _private_directory(state)
     if validate_contracts:
         require_complete_recovery(state)
-    installation = read_protected(state / "installation.json")
+    installation = read_installation(state)
     credentials = read_protected(state / "credentials.json")
     if (
-        set(installation) != {"format", "project", "image", "tenant", "transportEnvironment", "configurationGeneration"}
-        or installation["format"] != 1
-        or installation["project"] != project_name(state)
-        or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._/@:-]{1,255}", installation["image"])
-        or set(credentials) != {"apiToken", "collectorToken", "receiverToken", "databasePassword", "grafanaPassword"}
+        set(credentials) != {"apiToken", "collectorToken", "receiverToken", "databasePassword", "grafanaPassword"}
         or any(not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-]{64}", value)
                for value in credentials.values())
         or len(set(credentials.values())) != 5
@@ -379,11 +417,15 @@ def installed_environment(state: Path, *, validate_contracts: bool = True) -> tu
 
 def run_compose(state: Path, arguments: Sequence[str], *, validate_contracts: bool = True) -> str:
     from community_docker import CommunityDockerError, local_docker_binding
+    from community_images import CommunityImageError, resolve_images
 
     values, project = installed_environment(state, validate_contracts=validate_contracts)
+    arguments = list(arguments)
+    digest_selected = "@" in values["IIP_COMMUNITY_IMAGE"]
+    if digest_selected and (arguments[0] == "build" or "--build" in arguments):
+        raise InstallationError("community.image.digest-build-prohibited")
     try:
         executable, endpoint, environment = local_docker_binding(state, dict(os.environ))
-        environment.update(values)
         if arguments[0] in ("up", "build"):
             if not validate_contracts:
                 raise InstallationError("community.start.validation-required")
@@ -391,12 +433,27 @@ def run_compose(state: Path, arguments: Sequence[str], *, validate_contracts: bo
 
             if not guard_start(state, arguments, values):
                 return ""  # Already healthy: never rerun a projector against live files.
+        if arguments[0] == "up" and digest_selected:
+            # Recovery has already replaced its selection with recorded local
+            # IDs; it must never enter the registry-reference resolver here.
+            values.update(resolve_images(values["IIP_COMMUNITY_IMAGE"],
+                executable=executable, endpoint=endpoint, environment=dict(environment)))
+            if "--no-build" not in arguments:
+                arguments.append("--no-build")
+            if "--pull" in arguments:
+                offset = arguments.index("--pull")
+                if arguments[offset + 1:offset + 2] != ["never"]:
+                    raise InstallationError("community.image.implicit-pull-prohibited")
+            else:
+                arguments.extend(("--pull", "never"))
+        environment.update(values)
         completed = subprocess.run(
-            [executable, "--host", endpoint, "compose", "--project-name", project, "--file", str(COMPOSE), *arguments],
+            [executable, "--host", endpoint, "compose", "--env-file", os.devnull,
+             "--project-name", project, "--file", str(COMPOSE), *arguments],
             cwd=ROOT, env=environment, capture_output=True, text=True, check=True,
             timeout=600 if arguments[0] == "build" else 300,
         )
-    except CommunityDockerError as error:
+    except (CommunityDockerError, CommunityImageError) as error:
         raise InstallationError(str(error)) from None
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         raise InstallationError("community.docker.command-failed") from error
@@ -469,11 +526,17 @@ def execute(arguments: argparse.Namespace) -> int:
     elif arguments.command == "check":
         installed_environment(arguments.state)
         print("Protected configuration is valid; live telemetry and release readiness are not certified.")
+    elif arguments.command == "images":
+        prepare_images(arguments.state, pull=arguments.pull)
+        print("All five selected image digests are present for this daemon's Linux platform.")
+        print("Publisher/signature verification is separate. No containers were started or changed.")
     elif arguments.command == "up":
         from community_recovery import RecoveryDocker, record_runtime
 
         environment, _ = installed_environment(arguments.state)
         recovered = "IIP_COMMUNITY_POSTGRES_IMAGE" in environment
+        if arguments.build and not recovered and "@" in environment["IIP_COMMUNITY_IMAGE"]:
+            raise InstallationError("community.image.digest-build-prohibited")
         # A missing selected image must never trigger an implicit source build.
         # The explicit --build path below builds once before starting services.
         options = ["up", "--detach", "--wait", "--wait-timeout", "240", "--no-build"]
@@ -516,6 +579,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             selected.add_argument(f"--{name}", type=Path, required=name != "savings")
     init.add_argument("--image", default="iip-community:0.84.0")
     subparsers.add_parser("check", help="revalidate protected inputs without Docker or provider calls")
+    images = subparsers.add_parser("images", help="check exact selected image digests in the local daemon; not publisher verification")
+    images.add_argument("--pull", action="store_true", help="explicitly download the five selected image digests without installation credentials")
     up = subparsers.add_parser("up", help="start without adding demo data")
     up.add_argument("--build", action="store_true", help="build the application image from this checkout")
     subparsers.add_parser("status", help="show Compose health without printing credentials")

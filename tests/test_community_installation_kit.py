@@ -97,7 +97,7 @@ class CommunityInstallationKitTests(unittest.TestCase):
         self.assertEqual(result["files"], len(kit.REQUIRED_KIT_PATHS))
         self.assertGreater(result["contentBytes"], 0)
         for missing in (
-            "scripts/community_trust.py", "scripts/community_recovery.py",
+            "scripts/community_trust.py", "scripts/community_recovery.py", "scripts/community_images.py",
             "deploy/community/collector.yaml", "LICENSE",
             "src/iip/adapters/postgres/migrations/0026_ai_history_availability.sql",
         ):
@@ -262,8 +262,9 @@ class CommunityInstallationKitTests(unittest.TestCase):
     def test_real_committed_kit_runs_without_checkout_or_inherited_pythonpath(self) -> None:
         from tests.test_community_stack import installation_inputs
 
-        # A genuine clean Git snapshot: runtime comes from committed source,
-        # and the new packaging helper is committed into this owned test tree.
+        # A genuine clean Git snapshot: overlay the current minimum operating
+        # closure before committing this owned test tree, so a new installer
+        # helper or changed startup path is exercised before the root commit.
         source = self.directory / "snapshot"
         source.mkdir()
         with tarfile.open(fileobj=io.BytesIO(git(ROOT, "archive", "--format=tar", "HEAD"))) as archive:
@@ -280,9 +281,10 @@ class CommunityInstallationKitTests(unittest.TestCase):
                     target.chmod(member.mode & 0o777)
                 else:
                     self.fail("Source snapshot unexpectedly contains a link or special entry")
-        (source / "scripts/installation_kit.py").write_bytes((ROOT / "scripts/installation_kit.py").read_bytes())
-        for name in ("community-installation-kit.md", "installation-options.md"):
-            (source / "docs/operations" / name).write_bytes((ROOT / "docs/operations" / name).read_bytes())
+        for name in kit.REQUIRED_KIT_PATHS:
+            target = source / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((ROOT / name).read_bytes())
         git(source, "init", "-q")
         commit(source)
         kit.build_installation_kit(source, self.archive, VERSION)

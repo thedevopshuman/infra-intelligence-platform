@@ -251,6 +251,13 @@ closure; public artifact distribution, exact-image installation and operational
 release qualification remain separate gates. The planned full-stack Helm
 profile does not replace the existing bring-your-own-dependencies chart.
 
+[ADR 0163](../decisions/0163-digest-selected-community-images.md) adds explicit
+five-image cache preparation and native-platform local-ID startup binding for
+digest-selected Compose installations. Startup cannot implicitly pull or build;
+publisher authentication remains the separate release-signature boundary.
+Recovered installations keep their recorded image IDs rather than resolving
+the original registry references again.
+
 [ADR 0158](../decisions/0158-offline-encrypted-community-recovery.md) adds a
 separate host-side cold-recovery boundary for that installation. It joins the
 four stopped data volumes and protected configuration/credentials in one

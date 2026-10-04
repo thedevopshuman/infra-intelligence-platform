@@ -4,7 +4,7 @@
 
 PYTHON ?= python3
 
-.PHONY: community-check community-up community-status community-down test-community test-community-recovery test-community-trust
+.PHONY: community-check community-up community-status community-down test-community test-community-images test-community-recovery test-community-trust
 HELM ?= helm
 KUBECTL ?= kubectl
 DOCKER ?= docker
@@ -2020,6 +2020,9 @@ community-down:
 
 test-community:
 	IIP_TEST_COMMUNITY_RUNTIME=true PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest discover -s tests -p test_community_runtime.py -v
+
+test-community-images:
+	IIP_TEST_COMMUNITY_IMAGE_RUNTIME=true PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest discover -s tests -p test_community_image_runtime.py -v
 
 test-community-recovery:
 	IIP_TEST_COMMUNITY_RECOVERY=true PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest discover -s tests -p test_community_recovery_runtime.py -v

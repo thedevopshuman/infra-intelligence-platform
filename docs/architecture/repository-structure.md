@@ -180,6 +180,13 @@ continues to compose the existing public configuration boundaries.
 `scripts/package_licensed_chart.py` similarly packages the committed chart with
 the same revision's license notices without changing chart behavior.
 
+`scripts/community_images.py` is likewise host-side operational tooling. It
+resolves an explicitly selected set of five registry digests to native Linux
+image IDs on the already-bound local Docker daemon. Optional downloads receive
+only the operator's Docker CLI environment, never installation credentials.
+Startup uses that mapping only within its installation lock; no image-presence
+receipt, serving API, SDK capability or signature authority is introduced.
+
 Exact AI invocation observation follows the normal serving boundaries.
 `src/iip/application/query_ai_invocation.py` owns authorization, active-source
 selection, privacy minimization, and record revalidation; the in-memory and

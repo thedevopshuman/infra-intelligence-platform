@@ -31,9 +31,12 @@ The primary public installation target is a persistent, usable single-host
 Compose distribution built from versioned published artifacts. The existing
 [community preview](../operations/community-installation.md) is its executable
 development foundation. The [installation source kit](../operations/community-installation-kit.md)
-now packages that path for non-Git use; authenticated publication, exact
-runtime/dependency images, fresh-host first value and supported upgrades remain
-open. It remains pre-release.
+now packages that path for non-Git use. The launcher can select one fully
+qualified application digest, explicitly fetch/check it with four
+digest-selected dependencies, and start from the five local image IDs without
+implicit pulls or builds. Authenticated publication of those artifacts,
+fresh-host first value and supported upgrades remain open. It remains
+pre-release.
 
 The second installation target is a full-stack Kubernetes profile delivered
 through Helm. It must be a new, explicitly bounded profile that installs the
@@ -95,10 +98,16 @@ implements an initial source-based installation path: empty startup,
 generated protected credentials, verified database/telemetry transport,
 operator-reviewed catalogs/attribution, durable state and Collector buffering,
 safe configuration generations, and a savings-independent rolling dashboard.
-It does not close the public-install gate: published artifacts and a fresh-host
-walkthrough, supported upgrade/recovery and customer certificate lifecycle, database/outbox
-retention, and real provider evidence remain outstanding. Its operational
-limitations must not be presented as a fully supported public-v1 deployment.
+Its digest-selected path now checks the application, PostgreSQL, Collector,
+Prometheus and Grafana references before a stopped start, binds Compose to the
+actual local image IDs, and disables implicit build and pull. This is local
+selection evidence only: it does not authenticate the publisher or source,
+verify release signatures, or qualify those images. It does not close the
+public-install gate: published authenticated artifacts and a fresh-host
+walkthrough, supported upgrade/recovery and customer certificate lifecycle,
+database/outbox retention, and real provider evidence remain outstanding. Its
+operational limitations must not be presented as a fully supported public-v1
+deployment.
 
 The current Helm chart remains a bring-your-own-dependencies deployment path,
 not the second full-stack installation target. The bundled Kubernetes profile
@@ -131,7 +140,7 @@ be rerun for the release candidate.
 
 | Workstream | Required result | Evidence to close it |
 | --- | --- | --- |
-| Installation and first value | Primary persistent Compose distribution from versioned public artifacts, followed by a separately bounded full-stack Kubernetes profile; complete prerequisites, guided first value, and useful empty/error states | Fresh-host Compose installation and fresh-cluster Kubernetes installation using published artifacts and public instructions, each followed by its supported end-to-end walkthrough |
+| Installation and first value | Primary persistent Compose distribution from versioned public artifacts and five exact images, followed by a separately bounded full-stack Kubernetes profile; complete prerequisites, guided first value, and useful empty/error states | Fresh-host Compose installation from authenticated kit and image digests, plus fresh-cluster Kubernetes installation using published artifacts and public instructions, each followed by its supported end-to-end walkthrough |
 | Supported scope and compatibility | A supported feature/backend/version matrix; stable public API/SDK behavior and migration policy; experimental interfaces clearly identified | Contract and compatibility tests for each supported path; documented upgrade/rollback and data migration behavior |
 | Live AI economics | Qualified Bedrock SDK/operation/model/region; customer-controlled OTel delivery; approved real pricing; attribution, dashboard and evidence-backed findings | A real provider-to-dashboard run with prompts/responses absent, coverage gaps visible, and calculated estimates distinguished from billing totals |
 | Reliability and security | Verified transport for every deployed client, tenant isolation, usable identity/permissions, bounded capacity, recovery, monitoring and private disclosure | Clean candidate checks plus supported-deployment exercises for worker/receiver, identity, policy/broker where enabled, Collector buffering, backup restore, failure behavior and alert delivery |
@@ -167,8 +176,11 @@ experimental. A product milestone name alone does not stabilize contracts.
 ## Next three implementation units
 
 1. **Persistent Compose release path.** Publish and authenticate the implemented
-   source kit together with exact runtime/dependency images so installation
-   does not require a source build.
+   source kit together with the exact application, PostgreSQL, Collector,
+   Prometheus and Grafana image digests. Use the implemented explicit image
+   fetch/check and no-build/no-pull startup so installation does not require a
+   source build. Local digest/architecture inspection is not a substitute for
+   publisher authentication, signature qualification or release evidence.
    Freeze its supported host, feature, dependency and login boundary; retain
    generated credentials, non-fixture configuration, Collector queue,
    dashboard, durable data and recovery behavior. Prove installation and

@@ -166,3 +166,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0160](0160-opt-in-delivered-outbox-retention.md) | Accepted | Expire only delivered outbox state under explicit tenant-scoped audited policy |
 | [0161](0161-explicit-ai-history-availability.md) | Accepted | Distinguish retired AI history without partial totals or changing existing successful read envelopes |
 | [0162](0162-versioned-community-installation-kit.md) | Accepted implementation boundary | Package committed persistent Compose installation sources without operator state or implicit image builds |
+| [0163](0163-digest-selected-community-images.md) | Accepted implementation boundary | Check and start a community installation from five exact local image digests without implicit pull or build fallback |

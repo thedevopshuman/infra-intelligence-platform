@@ -73,8 +73,10 @@ python3 -m venv .venv
 Prepare reviewed owner-only channel, pricing, current catalog-qualification
 and attribution files using the [installation runbook](community-installation.md#prepare-the-reviewed-inputs).
 The installer must not invent prices or organizational ownership. Select the
-exact independently verified application image from the release; load or pull
-it through the release's published procedure first. Then use actual protected
+exact independently verified application image from the release. In
+digest-selected mode, `--image` must be one fully qualified
+`registry/path@sha256:<64 lowercase hex>` reference. A tag, a tag-plus-digest,
+an unqualified name, or malformed digest is rejected. Then use actual protected
 file paths and that image reference:
 
 ```bash
@@ -85,20 +87,42 @@ file paths and that image reference:
   --qualifications /protected/ai-catalog-qualifications.json \
   --attribution /protected/ai-attribution.json
 .venv/bin/python scripts/community_stack.py check
+.venv/bin/python scripts/community_stack.py images --pull
+.venv/bin/python scripts/community_stack.py images
 .venv/bin/python scripts/community_stack.py up
 ```
 
-Set `IIP_VERIFIED_IMAGE` to the verified digest reference, not a guessed tag.
-Ordinary `up` does not build a missing image. Source developers may explicitly
-use `up --build`, but that is not a released-image qualification. Dependencies
-may still be pulled by Compose; recovery startup retains its stricter
-exact-local-images/no-pull behavior.
+Set `IIP_VERIFIED_IMAGE` to the independently authenticated release digest,
+not a guessed reference. `images --pull` is the only digest-mode operation that
+fetches images. It explicitly fetches the application, PostgreSQL, OpenTelemetry
+Collector, Prometheus, and Grafana references through the operator's Docker
+registry configuration. It receives no IIP installation credentials. Run
+`images` without `--pull` to prove those exact five references are already
+present for Linux on the bound daemon's native architecture.
 
-The kit does not authenticate third-party service images. Their exact digests
-and supported architectures still need release qualification; the current
-Prometheus reference is tag-only. Ordinary startup may resolve and pull service
-images, so this candidate is not an offline or fully authenticated runtime
-distribution.
+Digest-mode `up` never builds or pulls. When the stack is stopped, it
+re-inspects all five references under the installation lock, binds every
+Compose service to the corresponding local content-addressed image ID, and
+starts with Compose pull disabled. A missing or incompatible image blocks
+startup. A healthy repeated `up` does not resolve images or mutate Compose
+state, although successful-start records may be refreshed. `up --build` is rejected in digest
+mode. The legacy tag/source path and explicit `up --build` remain available to
+source developers, but they are not released-image qualification; `images` is
+available only to a digest-selected installation.
+
+The selected helper defines all four dependencies as fully qualified digest
+references:
+
+- `docker.io/library/postgres@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15`;
+- `docker.io/otel/opentelemetry-collector-contrib@sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5`;
+- `docker.io/prom/prometheus@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893`;
+- `docker.io/grafana/grafana@sha256:e932bd6ed0e026595b08483cd0141e5103e1ab7ff8604839ff899b8dc54cabcb`.
+
+Local presence and architecture checks do **not** authenticate an image,
+connect it to source, verify a signature or attestation, scan it, or qualify a
+release. Those checks still belong to the release's authenticated publication
+procedure. The kit remains neither an offline dependency bundle nor a
+fresh-host-qualified public distribution.
 
 ## First login, operation and stopping
 
@@ -121,6 +145,11 @@ installation/project binding. A new archive is **not** an upgrade procedure;
 do not copy state into it or reinitialize against existing data. Follow the
 [recovery](community-recovery.md) and [trust lifecycle](community-trust-rotation.md)
 runbooks, and retain exact images and deployment files with recovery custody.
+The `images` operation is rejected for recovered installations: their startup
+continues to require the exact recorded image IDs with no network, pull, or
+build fallback. Because recovery binds the operational helper bytes, preserve
+the original kit with its backups; a newer kit is not a cross-version restore
+or upgrade procedure.
 
 Connect the instrumented application using the runbook's authenticated OTLP
 endpoint and CA. Only that application calls Bedrock. An empty healthy stack
@@ -135,7 +164,15 @@ example; there is no plugin marketplace or UI enable switch.
 including an extracted non-Git tree that initializes and checks protected
 configuration with synthetic test inputs and no Docker or provider calls.
 The separate `make test-community`, recovery and trust gates exercise actual
-local containers. Neither category replaces a fresh supported-host install of
+local containers. `make test-community-images PYTHON=.venv/bin/python` separately
+uses a uniquely labelled application image and an owned loopback registry to
+exercise explicit digest pulls, cached-image startup after removing that registry,
+healthy repeated startup, stopped restart, exact container image identities and
+missing-image refusal. It requires free community ports and the test's pinned
+registry/dependency images in the local cache, may contact Docker Hub for the
+four public dependencies during explicit pulls, and cleans only its own resources.
+It is a synthetic local regression, not a public-registry authentication test
+or a fresh-host installation. Neither category replaces a fresh supported-host install of
 public artifacts, real provider-to-dashboard evidence, a supported upgrade,
 credential lifecycle, retention or release-signature verification. Those remain
 tracked in the [public v1 plan](../roadmap/public-v1-release-plan.md).

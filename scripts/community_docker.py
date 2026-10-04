@@ -142,7 +142,7 @@ def _sanitize_environment(base_environment: dict[str, str]) -> dict[str, str]:
     return {
         key: value
         for key, value in base_environment.items()
-        if not key.startswith(("IIP_", "COMPOSE_", "PG"))
+        if not key.startswith(("IIP_", "COMPOSE_", "PG")) and key != "DOCKER_DEFAULT_PLATFORM"
     }
 
 

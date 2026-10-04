@@ -19,6 +19,12 @@ Non-Git initialization and configuration validation are tested. It is not yet a 
 installer. The existing Helm chart remains a bring-your-own-dependencies
 reference; the new full-stack Kubernetes profile is still to be implemented.
 
+Digest-selected Compose installations now have an explicit `images --pull`
+preparation step. Startup checks all five selected images locally, uses their
+exact native-platform image IDs, and prohibits implicit pulls or source builds.
+Image presence is not publisher-signature verification or release approval;
+see the [installation source-kit guide](docs/operations/community-installation-kit.md).
+
 ## Optional: try the published learning preview
 
 The first release is **`learning-v0.84.0`**, a source-built, disposable learning

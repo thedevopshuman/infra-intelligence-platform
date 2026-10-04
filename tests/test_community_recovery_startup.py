@@ -189,13 +189,13 @@ class CommunityRecoveryStartupTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertNotIn("preview started", output)
 
-    def test_compose_image_overrides_keep_existing_dependency_defaults(self) -> None:
+    def test_compose_image_overrides_keep_digest_pinned_dependency_defaults(self) -> None:
         document = stack.COMPOSE.read_text(encoding="utf-8")
         for variable, default in (
-            ("IIP_COMMUNITY_POSTGRES_IMAGE", "postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15"),
-            ("IIP_COMMUNITY_COLLECTOR_IMAGE", "otel/opentelemetry-collector-contrib@sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5"),
-            ("IIP_COMMUNITY_PROMETHEUS_IMAGE", "prom/prometheus:v3.13.1"),
-            ("IIP_COMMUNITY_GRAFANA_IMAGE", "grafana/grafana@sha256:e932bd6ed0e026595b08483cd0141e5103e1ab7ff8604839ff899b8dc54cabcb"),
+            ("IIP_COMMUNITY_POSTGRES_IMAGE", "docker.io/library/postgres@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15"),
+            ("IIP_COMMUNITY_COLLECTOR_IMAGE", "docker.io/otel/opentelemetry-collector-contrib@sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5"),
+            ("IIP_COMMUNITY_PROMETHEUS_IMAGE", "docker.io/prom/prometheus@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893"),
+            ("IIP_COMMUNITY_GRAFANA_IMAGE", "docker.io/grafana/grafana@sha256:e932bd6ed0e026595b08483cd0141e5103e1ab7ff8604839ff899b8dc54cabcb"),
         ):
             self.assertIn("image: ${" + variable + ":-" + default + "}", document)
 

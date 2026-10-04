@@ -56,6 +56,7 @@ class CommunityStartGuardTests(unittest.TestCase):
         self.state = Path(temporary.name).resolve() / "installation"
         stack.initialize(self.state, installation_inputs(), image="iip-community:test")
         self.values = {
+            "IIP_COMMUNITY_IMAGE": "iip-community:test",
             "IIP_COMMUNITY_TRANSPORT_GENERATION": "a" * 64,
             "IIP_COMMUNITY_INSTALLATION_BINDING": "b" * 64,
             "IIP_COMMUNITY_DEPLOYMENT": "c" * 64,

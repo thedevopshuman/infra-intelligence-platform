@@ -65,7 +65,7 @@ REQUIRED_KIT_PATHS = frozenset({
     "scripts/installation_kit.py",
     *{f"scripts/community_{name}.py" for name in (
         "stack", "transport", "collector", "dashboard", "docker", "recovery",
-        "backup_crypto", "trust",
+        "backup_crypto", "trust", "images",
     )},
     "deploy/docker-compose.community.yml",
     *{f"deploy/community/{name}" for name in (

@@ -13,7 +13,7 @@ available; this onboarding unit focuses on inbound Bedrock telemetry.
 | Item | This preview |
 | --- | --- |
 | Host | One trusted local Docker Desktop/Docker Engine daemon with Compose v2 and a Unix socket; no remote Docker contexts |
-| Application | Current checkout built explicitly, or an operator-selected, already available application image; public signed distribution remains pending |
+| Application | Current checkout built explicitly, or an operator-selected fully qualified digest reference checked with four digest-pinned dependencies; public signed distribution remains pending |
 | Installation scope | One protected tenant and one Bedrock trace channel; one Collector and one metrics backend |
 | Instrumentation | Pinned Python botocore profile plus the existing Bedrock usage adapter; exact scope `opentelemetry.instrumentation.botocore.bedrock-runtime` |
 | Provider access | Only the instrumented application calls Bedrock; IIP receives no AWS credentials |
@@ -82,6 +82,30 @@ make community-check PYTHON=.venv/bin/python
 make community-up PYTHON=.venv/bin/python
 ```
 
+Those commands are the retained source-development path: `community-up`
+performs an explicit local build. For an installation from a selected image,
+replace initialization with a fully qualified application reference of the
+form `registry/path@sha256:<64 lowercase hex>`, then explicitly fetch/check all
+five selected images before starting:
+
+```bash
+.venv/bin/python scripts/community_stack.py init \
+  --image "$IIP_VERIFIED_IMAGE" \
+  --channel /protected/bedrock-channels.json \
+  --catalogs /protected/ai-catalogs.json \
+  --qualifications /protected/ai-catalog-qualifications.json \
+  --attribution /protected/ai-attribution.json
+.venv/bin/python scripts/community_stack.py check
+.venv/bin/python scripts/community_stack.py images --pull
+.venv/bin/python scripts/community_stack.py images
+.venv/bin/python scripts/community_stack.py up
+```
+
+Digest mode rejects tags, tag-plus-digest references, unqualified names and
+malformed or uppercase digests. Public application-image publication is still
+pending, so this document does not supply or infer a value for
+`IIP_VERIFIED_IMAGE`.
+
 `init` performs no Docker or provider action. It creates `.iip/community` with
 mode `0700`, five independent random credentials, a private local trust domain,
 and immutable content-addressed configuration generations. Every host-side
@@ -99,25 +123,46 @@ invocation has arrived or been priced.
 
 Building requires all installation containers removed: this includes
 `make community-up` and `scripts/community_stack.py up --build`. Ordinary
-`scripts/community_stack.py up` against an exact healthy, unchanged project is
-a read-only no-op, not a repair command. It checks expected service health and
+`scripts/community_stack.py up` against an exact healthy, unchanged project
+skips Compose and image resolution; it does not repair or recreate services,
+although successful-start records may refresh. It checks expected service health and
 the initializer's selected trust, installation/credential, and operational
 deployment bindings without rerunning the initializer. For unhealthy or
 mismatched state, source/configuration changes, rebuilding, or repair, use
 `down` first, preserving volumes, then the appropriate startup command. Never
 use `down --volumes` for this workflow.
 
-Successful startup now records actual container image IDs and their
+Successful startup records actual container image IDs and their
 OS/architecture in protected `runtime-images.json`, bound to the operational
 deployment files. Preserve that record for offline backup; version strings or
 mutable tags cannot reconstruct it. Recovered startup instead requires those
 exact images locally and refuses build/pull fallback.
 
-For an existing selected image, pass `--image` to `init`, then run
-`scripts/community_stack.py up` without `--build`. Prefer a verified digest
-when release artifacts become available; this work does not publish any.
-Startup passes `--no-build` to Compose even after an explicit preceding build,
-so a missing selected image never silently falls back to compiling source.
+The application plus PostgreSQL, OpenTelemetry Collector, Prometheus and
+Grafana form the five-image digest selection. `images --pull` is the only
+digest-mode operation that fetches them. It may use the operator's existing
+Docker registry configuration, but reads no IIP credentials or configuration
+generation and waits for no service. `images` without `--pull` verifies that
+the exact references are local Linux images for the bound daemon's native
+architecture. It does not authenticate their publisher, connect them to
+source, verify signatures/attestations, or qualify a release.
+
+When a digest-mode stack is stopped, `up` repeats that exact five-image check
+under the installation lock, substitutes the locally inspected image IDs for
+all Compose services, and invokes Compose with `--no-build --pull never`.
+Missing or incompatible images fail before startup, and `up --build` is
+prohibited. A healthy repeated `up` does not resolve images or mutate Compose
+state, although successful-start records may be refreshed. The legacy tag/source mode retains
+its explicit build path for development only; `images` rejects that mode.
+
+All four dependency selections are fully qualified digest references.
+Prometheus is pinned to
+`sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893`.
+Pinning is necessary for deterministic startup but is not independent trust;
+release qualification must still authenticate and test the selected images.
+Startup passes `--no-build` to Compose even after an explicit source build, so
+a missing selected application image never silently falls back to compiling
+source.
 Custom state uses `--state /absolute/protected/path` before the command. Its
 absolute location determines the isolated Compose project: do not move it or
 delete/reinitialize it while retained data belongs to that installation.
@@ -208,7 +253,10 @@ a separately protected key, and a fresh destination that remains stopped.
 It never stops a source, fences another host automatically, uploads data, or
 restores over an existing installation. Do not use `make community-up` on
 recovered state: its implicit `--build` is intentionally rejected; follow the
-runbook's explicit validated no-build startup.
+runbook's explicit validated no-build startup. The `images` operation is also
+rejected for recovered state: recovery remains bound to its recorded image IDs
+and exact operational helper bytes. Preserve the original kit with each backup;
+a newer kit is not a supported cross-version restore or upgrade path.
 
 The [transport rotation runbook](community-trust-rotation.md) replaces the
 whole local CA and all five leaf/key pairs while keeping passwords, tokens,

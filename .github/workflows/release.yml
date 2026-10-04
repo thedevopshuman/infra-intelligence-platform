@@ -80,7 +80,29 @@ jobs:
           mkdir -p "$DOCKER_CONFIG"
           printf '%s' "$DOCKERHUB_TOKEN" | docker login docker.io \
             --username "$DOCKERHUB_USERNAME" --password-stdin
+      - name: Set up ARM64 emulation
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          image: docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0 # qemu-v10.2.3-68
+          platforms: arm64
+      - name: Set up release OCI builder
+        id: buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          version: v0.37.2
+          driver: docker-container
+          driver-opts: image=docker.io/moby/buildkit@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea # v0.33.1
+          use: true
+          cleanup: true
+      - name: Verify release builder platforms
+        env:
+          BUILDER_PLATFORMS: ${{ steps.buildx.outputs.platforms }}
+        run: |
+          docker buildx inspect --bootstrap
+          python -c 'import os, sys; available = {item.strip() for item in os.environ["BUILDER_PLATFORMS"].split(",")}; sys.exit(0 if {"linux/amd64", "linux/arm64"} <= available else "Release builder lacks required AMD64/ARM64 platforms")'
       - name: Verify and build the clean candidate
+        env:
+          IIP_RELEASE_PLATFORMS: linux/amd64,linux/arm64
         run: |
           make verify
           make release-bundle

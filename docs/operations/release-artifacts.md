@@ -356,6 +356,15 @@ and configure:
 | `DOCKERHUB_USERNAME` | `thedevopshuman` |
 | `DOCKERHUB_TOKEN` | An expiring Docker Hub Read & Write personal access token, without Delete permission |
 
+Environment scope is recommended, not an extra requirement enforced by the
+workflow: GitHub also resolves an existing repository-level secret through
+the same `secrets` context. The release job still requires environment approval,
+but a repository-level token may be referenced by other authorized workflows
+without that approval. Prefer migrating it to environment scope for narrower
+access; do not claim the broader copy is protected by the release environment.
+GitHub cannot reveal or move an encrypted value: migration requires the owner
+to enter the value again. See [GitHub secret scopes](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
+
 Create the token through Docker Account settings → Personal access tokens;
 use a 30-day initial expiry and rotate before expiry. A personal token follows
 the account's permissions; it is not restricted to just these two repositories.
@@ -365,6 +374,16 @@ The workflow rejects a missing token or wrong username before the build,
 authenticates over stdin, isolates Docker configuration in the runner's private
 temporary directory and always attempts logout. It does not need GitHub
 Packages write permission or a paid Docker plan.
+
+The Ubuntu release runner explicitly prepares ARM64 emulation and a
+`docker-container` Buildx builder before packaging both `linux/amd64` and
+`linux/arm64` images. The setup Actions use commit pins, binfmt and BuildKit
+use digest pins, and Buildx has an explicit version. A bootstrapped builder
+must report both platforms before the build starts; setting a desired platform
+list is not treated as detected support. Emulation setup is confined to the
+ephemeral GitHub runner, not an operator's installed host. See Docker's
+[multi-platform workflow](https://docs.docker.com/build/ci/github-actions/multi-platform/)
+and [builder configuration](https://docs.docker.com/build/ci/github-actions/configure-builder/).
 
 Before pushing the first release tag, repository owners must:
 
@@ -390,6 +409,22 @@ single maintainer may approve their own triggered run; this is explicit human
 approval, not independent two-person review. Review these live settings before
 each release. Environment tag filtering does not itself protect Git tags from
 updates or deletions. No token is required for ordinary anonymous public pulls.
+
+The initial registry/repository protection setup is now applied:
+
+- GitHub ruleset `Immutable IIP release tags` rejects updates and deletion of
+  `refs/tags/v*`, without bypass actors. New version tags are still permitted.
+- GitHub ruleset `Preserve main history` rejects force-pushes and deletion of
+  `refs/heads/main`; ordinary fast-forward development remains permitted. This
+  does not enforce a PR review or make a passing CI run optional for release.
+- Both Docker Hub repositories use **Specific tags are immutable**, matching
+  `^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`. This protects the release
+  version tags without locking unrelated signature/attestation storage tags.
+
+Recheck live protections before publication; administrators can change these
+settings. Do not move or replace a failed/withdrawn version tag to another
+commit or digest. Correct the source and publish a new version. These settings
+are not a substitute for exact-digest signature or runtime verification.
 
 Verify the downloaded archive before extracting it. Substitute the accepted
 repository and version in the certificate identity:

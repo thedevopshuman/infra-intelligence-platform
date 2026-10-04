@@ -217,8 +217,11 @@ artifacts before promotion. A passed source test suite alone is insufficient.
   `thedevopshuman/iip` and `thedevopshuman/iip-bridge`. The workflow targets
   those canonical repositories with its exact GitHub OIDC signing identity
   and a separately signed Compose-kit asset (ADR 0164). Publishing credentials,
-  immutable-tag/main protections, live signing and anonymous install evidence
-  still need completion; namespace creation is not image publication.
+  live signing and anonymous install evidence still need completion; namespace
+  creation is not image publication. Docker Hub version-tag immutability,
+  GitHub version-tag update/deletion protection and main-history protection are
+  configured. Main still permits fast-forward development; review live rules
+  and exact-revision CI before authorizing a release.
 - **Selected:** Apache-2.0 for original project material, with contribution
   rules and retained third-party obligations. Dependency compliance and
   production maintenance commitments remain release work.

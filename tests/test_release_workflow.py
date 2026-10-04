@@ -19,9 +19,9 @@ COSIGN_WRAPPER = ROOT / "scripts/cosign_container.sh"
 class ReleaseWorkflowTests(unittest.TestCase):
     def test_release_workflow_has_a_bounded_protected_identity(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
-        action_references = re.findall(r"^\s*- uses: ([^\s#]+)", workflow, re.M)
+        action_references = re.findall(r"^\s+(?:- )?uses: ([^\s#]+)", workflow, re.M)
 
-        self.assertEqual(len(action_references), 4)
+        self.assertEqual(len(action_references), 6)
         for reference in action_references:
             with self.subTest(reference=reference):
                 self.assertRegex(
@@ -43,6 +43,9 @@ class ReleaseWorkflowTests(unittest.TestCase):
         ordered = (
             "validate-github-context",
             "Authenticate the publication boundary",
+            "Set up ARM64 emulation",
+            "Set up release OCI builder",
+            "Verify release builder platforms",
             "make verify",
             "make release-bundle",
             "release_publication.py publish",
@@ -59,6 +62,66 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("release-publication-report.json", workflow)
         self.assertIn("release-signature-verification-report.json", workflow)
         self.assertIn("release-vulnerability-qualification-report.json", workflow)
+
+    def test_multiarch_builder_is_explicit_and_immutable(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        steps = {
+            step.split("\n", 1)[0]: step
+            for step in re.split(r"(?m)^      - name: ", workflow)[1:]
+        }
+        emulation = steps["Set up ARM64 emulation"]
+        builder = steps["Set up release OCI builder"]
+        validation = steps["Verify release builder platforms"]
+        build = steps["Verify and build the clean candidate"]
+        self.assertIn("docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1", emulation)
+        self.assertIn("platforms: arm64", emulation)
+        self.assertIn(
+            "image: docker.io/tonistiigi/binfmt@sha256:"
+            "400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0",
+            emulation,
+        )
+        self.assertIn("docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069", builder)
+        self.assertIn("id: buildx", builder)
+        self.assertIn("version: v0.37.2", builder)
+        self.assertIn("driver: docker-container", builder)
+        self.assertIn(
+            "driver-opts: image=docker.io/moby/buildkit@sha256:"
+            "cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea",
+            builder,
+        )
+        self.assertIn("use: true", builder)
+        self.assertIn("cleanup: true", builder)
+        # Do not override detected platforms: the next step verifies actual
+        # builder output rather than a caller-asserted capability list.
+        self.assertNotIn("platforms:", builder)
+        self.assertIn("BUILDER_PLATFORMS: ${{ steps.buildx.outputs.platforms }}", validation)
+        self.assertIn("docker buildx inspect --bootstrap", validation)
+        self.assertIn("IIP_RELEASE_PLATFORMS: linux/amd64,linux/arm64", build)
+        self.assertIn("DOCKER_CONFIG: ${{ runner.temp }}/iip-release-docker", workflow)
+
+    def test_builder_platform_check_rejects_missing_architectures(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        validation = workflow.split(
+            "      - name: Verify release builder platforms\n", 1,
+        )[1].split("\n      - name:", 1)[0]
+        command = next(line.strip() for line in validation.splitlines() if "python -c " in line)
+        # Execute only the stdlib capability check, never Docker or binfmt.
+        expression = command.removeprefix("python -c '").removesuffix("'")
+        for platforms, accepted in (
+            ("linux/amd64,linux/arm64", True),
+            ("linux/arm64, linux/amd64,linux/386", True),
+            ("linux/amd64", False),
+            ("linux/arm64", False),
+            ("linux/amd64/v2,linux/arm/v7", False),
+            ("", False),
+        ):
+            with self.subTest(platforms=platforms):
+                completed = subprocess.run(
+                    [sys.executable, "-c", expression],
+                    env={"BUILDER_PLATFORMS": platforms},
+                    stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10,
+                )
+                self.assertEqual(completed.returncode == 0, accepted, completed.stderr)
 
     def test_release_targets_canonical_docker_hub_repositories(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")

@@ -101,6 +101,13 @@ investigationCompletionSlo:
 investigationQueue:
   maxOutstandingJobsPerTenant: 1000
 
+eventOutboxRetention:
+  enabled: false
+  # Explicit operator choice required to enable; at least 30 days (2592000).
+  publishedSeconds: null
+  intervalSeconds: 3600
+  batchSize: 100
+
 evidenceRetention:
   enabled: false
   intervalSeconds: 3600

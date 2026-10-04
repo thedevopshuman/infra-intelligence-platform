@@ -371,6 +371,15 @@ Authenticated investigations may also enter a durable tenant-scoped PostgreSQL q
 
 ## Storage responsibilities
 
+[ADR 0160](../decisions/0160-opt-in-delivered-outbox-retention.md) separates
+delivered transport-state retention from authoritative history. An exact-tenant
+application use case exposes observation to administrators and opt-in bounded
+expiration to the enrolled worker under separate policy actions. PostgreSQL
+atomically deletes only old acknowledged, unleased, non-quarantined outbox rows
+and appends aggregate audit. The entire supported publication-SLO window,
+immutable event log, deduplication identity, and undelivered work remain intact.
+AI-ledger payload retirement is not implied by that separate lifecycle.
+
 The logical boundaries remain product-neutral. [ADR 0004](../decisions/0004-postgresql-observation-store-and-outbox.md) selects PostgreSQL for the initial resource/observation, event-log, checkpoint, and outbox substrate while leaving other stores and later transport specialization open:
 
 | Store | Responsibility | Required semantics |

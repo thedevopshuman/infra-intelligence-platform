@@ -37,6 +37,11 @@ from iip.application.evidence_retention import (
     EvidenceRetentionStateError,
     GetEvidenceRetentionCommand,
 )
+from iip.application.event_outbox_retention import (
+    EventOutboxRetentionAuthorizationError,
+    EventOutboxRetentionStateError,
+    GetEventOutboxRetentionCommand,
+)
 from iip.application.ingest_collection import (
     CollectionConflictError,
     IngestCollectionCommand,
@@ -369,6 +374,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if path == "/v1/operations/evidence/retention":
             self._query_evidence_retention(actor, parsed.query)
+            return
+        if path == "/v1/operations/events/retention":
+            self._query_event_outbox_retention(actor, parsed.query)
             return
         if path == "/v1/ai/economics/allocation":
             self._query_ai_allocation(actor, parsed.query)
@@ -877,6 +885,19 @@ class ApiHandler(BaseHTTPRequestHandler):
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 {"error": {"code": "evidence.retention.unavailable"}},
             )
+
+    def _query_event_outbox_retention(self, actor: ActorContext, query: str) -> None:
+        try:
+            if query:
+                raise ValueError
+            report = self.runtime.event_outbox_retention.get(GetEventOutboxRetentionCommand(actor))
+            self._json(HTTPStatus.OK, report.to_dict())
+        except ValueError:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": "request.invalid"}})
+        except EventOutboxRetentionAuthorizationError:
+            self._json(HTTPStatus.FORBIDDEN, {"error": {"code": "policy.denied"}})
+        except (EventOutboxRetentionStateError, PersistenceError):
+            self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": {"code": "event.outbox-retention.unavailable"}})
 
     def _query_actions(self, actor: ActorContext, query: str) -> None:
         try:
@@ -1885,6 +1906,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "investigation-completion-slo"
             ),
             "/v1/operations/evidence/retention": "evidence-retention",
+            "/v1/operations/events/retention": "event-outbox-retention",
             "/v1/ai/economics/allocation": "ai-allocation-report",
             "/v1/ai/economics/savings-findings": "ai-savings-findings",
             "/v1/actions": "actions-list",

@@ -453,6 +453,28 @@ class EvidenceRetentionReport:
 
 
 @dataclass(frozen=True)
+class EventOutboxRetentionReport:
+    """Tenant-scoped delivered-outbox lifecycle state for operators."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(
+        cls, payload: Mapping[str, Any]
+    ) -> "EventOutboxRetentionReport":
+        return cls(
+            _validate_envelope(
+                payload,
+                kind="EventOutboxRetentionReport",
+                label="event outbox retention report",
+            )
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
 class RuntimeVersionReport:
     """Authenticated application, contract, storage, build, and deployment identity."""
 

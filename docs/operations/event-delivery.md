@@ -86,4 +86,14 @@ This is not a receiver-processing claim. For HTTPS it ends at a successful bound
 
 ## Remaining production work
 
-The webhook is one replaceable publisher, not a claim that HTTP replaces a broker. A production decision still needs measured throughput and failure evidence, outbox retention enforcement, long-term/regional objective aggregation and alert routing, payload retention rules, bulk-recovery policy, and customer receiver interoperability tests. Kafka, NATS JetStream, cloud queues, or another transport can implement the same application port without changing ingestion or SLO semantics.
+The webhook is one replaceable publisher, not a claim that HTTP replaces a broker.
+[Delivered-outbox retention](event-outbox-retention.md) now provides a separate
+disabled-by-default, audited cleanup path for old successful delivery state.
+It preserves the full supported SLO window, immutable event history, and every
+undelivered or quarantined row. A production decision still needs measured
+throughput and failure evidence, an explicitly reviewed retention policy,
+long-term/regional objective aggregation and alert routing, authoritative
+payload retention rules, bulk-recovery policy, and customer receiver
+interoperability tests. Kafka, NATS JetStream, cloud queues, or another
+transport can implement the same application port without changing ingestion
+or SLO semantics.

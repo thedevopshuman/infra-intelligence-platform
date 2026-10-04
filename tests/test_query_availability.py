@@ -227,6 +227,7 @@ class QueryAvailabilityHttpBoundaryTests(unittest.TestCase):
                 "investigation-completion-slo"
             ),
             "/v1/operations/evidence/retention": "evidence-retention",
+            "/v1/operations/events/retention": "event-outbox-retention",
             "/v1/evidence/ev_secret": "evidence-get",
             "/v1/investigations/inv_secret": "investigation-get",
             "/v1/investigations/inv_secret/status": "investigation-status",

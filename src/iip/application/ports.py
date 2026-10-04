@@ -1299,6 +1299,35 @@ class EvidenceRetentionState:
     audit_ref: Optional[str] = None
 
 
+@dataclass(frozen=True)
+class EventOutboxRetentionState:
+    """Aggregate delivered-outbox lifecycle facts; immutable events stay intact."""
+
+    tenant_id: str
+    evaluated_at: str
+    stored_rows: int
+    published_rows: int
+    eligible_rows: int
+    expired_rows: int
+    remaining_eligible_rows: int
+    protected_rows: int
+    audit_ref: Optional[str] = None
+
+
+class EventOutboxRetentionStore(Protocol):
+    def evaluate_event_outbox_retention(
+        self,
+        tenant_id: str,
+        evaluated_at: str,
+        *,
+        published_seconds: int,
+        limit: int,
+        expire: bool,
+        policy_digest: str,
+    ) -> EventOutboxRetentionState:
+        """Observe or atomically retire delivered rows with aggregate audit."""
+
+
 class EvidenceRetentionStore(Protocol):
     def evaluate_evidence_retention(
         self,

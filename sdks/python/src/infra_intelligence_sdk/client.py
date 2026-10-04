@@ -28,6 +28,7 @@ from .models import (
     EventDeliveryReplayCommand,
     EventDeliveryHealthReport,
     EventDeliverySloReport,
+    EventOutboxRetentionReport,
     IngestionFreshnessReport,
     InvestigationCompletionSloReport,
     InvestigationReport,
@@ -278,6 +279,13 @@ class Client:
 
         return EvidenceRetentionReport.from_dict(
             self._get("/v1/operations/evidence/retention")
+        )
+
+    def get_event_outbox_retention(self) -> EventOutboxRetentionReport:
+        """Observe delivered outbox retention as an administrator."""
+
+        return EventOutboxRetentionReport.from_dict(
+            self._get("/v1/operations/events/retention")
         )
 
     def ingest_resource_collection(

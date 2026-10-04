@@ -49,6 +49,16 @@ class EvidenceRetentionPass:
 
 
 @dataclass(frozen=True)
+class EventOutboxRetentionPass:
+    """Aggregate lifecycle result across exact enrolled tenants."""
+
+    tenants: int
+    expired_rows: int
+    remaining_eligible_rows: int
+    failures: int
+
+
+@dataclass(frozen=True)
 class AiCostWorkerPass:
     """Value-minimized result across explicitly enrolled tenant catalogs."""
 
@@ -221,6 +231,16 @@ def evidence_retention_interval_seconds() -> int:
     return interval
 
 
+def event_outbox_retention_interval_seconds() -> int:
+    raw = os.environ.get("IIP_EVENT_OUTBOX_RETENTION_INTERVAL_SECONDS", "3600")
+    if not raw.isascii() or not raw.isdecimal() or len(raw) > 5:
+        raise ValueError("event.outbox-retention.configuration.invalid")
+    interval = int(raw)
+    if not 60 <= interval <= 86_400:
+        raise ValueError("event.outbox-retention.configuration.invalid")
+    return interval
+
+
 def ai_cost_interval_seconds() -> int:
     try:
         interval = int(os.environ.get("IIP_AI_COST_INTERVAL_SECONDS", "10"))
@@ -383,6 +403,24 @@ def run_evidence_retention_pass(
     return EvidenceRetentionPass(len(tenants), expired, remaining, failures)
 
 
+def run_event_outbox_retention_pass(
+    service: Any, tenants: tuple[str, ...],
+) -> EventOutboxRetentionPass:
+    """Run one bounded batch per tenant; never log payloads or identities."""
+    expired = remaining = failures = 0
+    for tenant in tenants:
+        try:
+            rows = service.expire(tenant).to_dict()["spec"]["rows"]
+            counts = (rows["expired"], rows["remainingEligible"])
+            if any(type(value) is not int or value < 0 for value in counts):
+                raise ValueError("event.outbox-retention.state-invalid")
+            expired += counts[0]
+            remaining += counts[1]
+        except Exception:
+            failures += 1
+    return EventOutboxRetentionPass(len(tenants), expired, remaining, failures)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run durable tenant workflow timers")
     parser.add_argument(
@@ -415,6 +453,11 @@ def main() -> None:
         evidence_retention_interval_seconds() if retention_enabled else 3600
     )
     next_retention_at = time.monotonic()
+    outbox_retention_enabled = runtime.event_outbox_retention.enabled
+    outbox_retention_interval = (
+        event_outbox_retention_interval_seconds() if outbox_retention_enabled else 3600
+    )
+    next_outbox_retention_at = time.monotonic()
     ai_attribution_service = runtime.ai_attribution_resolution
     ai_attribution_interval = (
         ai_attribution_interval_seconds()
@@ -661,6 +704,17 @@ def main() -> None:
                     )
                 )
                 next_retention_at = time.monotonic() + retention_interval
+                worked = True
+            if outbox_retention_enabled and time.monotonic() >= next_outbox_retention_at:
+                retention = run_event_outbox_retention_pass(runtime.event_outbox_retention, tenants)
+                print(json.dumps({
+                    "event": "event.outbox-retention.completed",
+                    "tenants": retention.tenants,
+                    "expiredRows": retention.expired_rows,
+                    "remainingEligibleRows": retention.remaining_eligible_rows,
+                    "failures": retention.failures,
+                }, separators=(",", ":"), sort_keys=True))
+                next_outbox_retention_at = time.monotonic() + outbox_retention_interval
                 worked = True
             if arguments.once:
                 break

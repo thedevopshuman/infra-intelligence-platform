@@ -271,6 +271,22 @@
         }
       }
     },
+    "/v1/operations/events/retention": {
+      "get": {
+        "operationId": "getEventOutboxRetention",
+        "description": "Observe deployment-owned retention policy and aggregate lifecycle state for delivered transactional-outbox rows in the authenticated tenant. This endpoint never mutates storage, deletes immutable events, or returns event identity, content, destination details, or credentials.",
+        "responses": {
+          "200": {"description": "Tenant-scoped delivered event outbox retention state", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/event-outbox-retention-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
+          "503": {
+            "description": "Event outbox retention storage state is unavailable, corrupt, or inconsistent",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "event.outbox-retention.unavailable"}}}}
+          }
+        }
+      }
+    },
     "/v1/operations/investigations/completion-slo": {
       "get": {
         "operationId": "getInvestigationCompletionSlo",
@@ -823,6 +839,7 @@
       "TelemetryExportSloReport": {"$ref": "../../contracts/schemas/telemetry-export-slo-report.schema.json"},
       "EventDeliveryHealthReport": {"$ref": "../../contracts/schemas/event-delivery-health-report.schema.json"},
       "EventDeliverySloReport": {"$ref": "../../contracts/schemas/event-delivery-slo-report.schema.json"},
+      "EventOutboxRetentionReport": {"$ref": "../../contracts/schemas/event-outbox-retention-report.schema.json"},
       "InvestigationCompletionSloReport": {"$ref": "../../contracts/schemas/investigation-completion-slo-report.schema.json"},
       "EvidenceRetentionReport": {"$ref": "../../contracts/schemas/evidence-retention-report.schema.json"},
       "RuntimeVersionReport": {"$ref": "../../contracts/schemas/runtime-version-report.schema.json"},

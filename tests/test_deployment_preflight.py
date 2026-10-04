@@ -75,6 +75,7 @@ def rendered_profile() -> dict[str, object]:
         },
         "backup": {"enabled": True, "destinationConfigured": True},
         "evidenceRetention": {"enabled": True},
+        "eventOutboxRetention": {"enabled": False, "publishedSeconds": 2592000, "batchSize": 100, "intervalSeconds": 3600},
         "evidenceRedaction": {"customPoliciesConfigured": False},
         "evidenceBackends": {
             "metrics": "prometheus",

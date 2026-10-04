@@ -18,6 +18,7 @@
     "investigationCompletionSlo",
     "investigationQueue",
     "evidenceRetention",
+    "eventOutboxRetention",
     "evidenceRedaction",
     "queryAvailabilitySlo",
     "serviceAccount",
@@ -351,6 +352,21 @@
           "maximum": 100000
         }
       }
+    },
+    "eventOutboxRetention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "intervalSeconds", "batchSize"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "publishedSeconds": {"type": ["integer", "null"], "minimum": 2592000, "maximum": 315360000},
+        "intervalSeconds": {"type": "integer", "minimum": 60, "maximum": 86400},
+        "batchSize": {"type": "integer", "minimum": 1, "maximum": 1000}
+      },
+      "allOf": [{
+        "if": {"properties": {"enabled": {"const": true}}},
+        "then": {"required": ["publishedSeconds"], "properties": {"publishedSeconds": {"type": "integer"}}}
+      }]
     },
     "evidenceRetention": {
       "type": "object",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Mapping
@@ -113,6 +114,10 @@ from iip.application.investigate import DeterministicInvestigationService
 from iip.application.evidence_retention import (
     EvidenceRetentionPolicy,
     EvidenceRetentionService,
+)
+from iip.application.event_outbox_retention import (
+    EventOutboxRetentionPolicy,
+    EventOutboxRetentionService,
 )
 from iip.application.investigation_dispatch import (
     InvestigationDispatchLimits,
@@ -228,6 +233,7 @@ class Runtime:
     queries: ResourceQueryService
     evidence: EvidenceCollectionService
     evidence_retention: EvidenceRetentionService
+    event_outbox_retention: EventOutboxRetentionService
     kubernetes_event_evidence: KubernetesEventEvidenceService
     resource_change_evidence: ResourceChangeEvidenceService
     context_evidence: ContextEvidenceService
@@ -323,6 +329,7 @@ def build_local_runtime(
     ai_allocation_telemetry_sink: AiAllocationTelemetrySink | None = None,
     ai_allocation_window_seconds: int = 86_400,
     evidence_redaction_policies: tuple[Mapping[str, object], ...] | None = None,
+    event_outbox_retention_policy: EventOutboxRetentionPolicy | None = None,
 ) -> Runtime:
     """Build the dependency graph for local execution."""
 
@@ -381,6 +388,7 @@ def build_local_runtime(
         ai_allocation_telemetry_sink,
         ai_allocation_window_seconds,
         evidence_redaction_policies,
+        event_outbox_retention_policy,
     )
 
 
@@ -440,6 +448,7 @@ def _compose_runtime(
     ai_allocation_telemetry_sink: AiAllocationTelemetrySink | None = None,
     ai_allocation_window_seconds: int = 86_400,
     evidence_redaction_policies: tuple[Mapping[str, object], ...] | None = None,
+    event_outbox_retention_policy: EventOutboxRetentionPolicy | None = None,
 ) -> Runtime:
     """Compose use cases from ports without leaking adapters into their owners."""
 
@@ -651,6 +660,9 @@ def _compose_runtime(
             policy,
             clock,
             evidence_retention_policy,
+        ),
+        event_outbox_retention=EventOutboxRetentionService(
+            store, policy, clock, event_outbox_retention_policy,
         ),
         kubernetes_event_evidence=kubernetes_event_evidence,
         resource_change_evidence=resource_change_evidence,
@@ -868,6 +880,7 @@ def build_postgres_runtime(
     ai_allocation_telemetry_sink: AiAllocationTelemetrySink | None = None,
     ai_allocation_window_seconds: int = 86_400,
     evidence_redaction_policies: tuple[Mapping[str, object], ...] | None = None,
+    event_outbox_retention_policy: EventOutboxRetentionPolicy | None = None,
 ) -> Runtime:
     """Build a PostgreSQL-backed runtime without leaking the adapter into use cases."""
 
@@ -933,6 +946,7 @@ def build_postgres_runtime(
         ai_allocation_telemetry_sink,
         ai_allocation_window_seconds,
         evidence_redaction_policies,
+        event_outbox_retention_policy,
     )
 
 
@@ -1009,6 +1023,18 @@ def build_runtime_from_env(*, include_action_executor: bool = True) -> Runtime:
 def build_workflow_worker_runtime_from_env() -> Runtime:
     """Compose a worker without interactive identity credentials or action impact."""
 
+    # Validate feature-specific enrollment before creating adapters or starting
+    # any background work; older worker profiles allow a broader tenant grammar.
+    if _event_outbox_retention_policy_from_env().enabled:
+        tenants = tuple(
+            item.strip() for item in os.environ.get("IIP_WORKER_TENANTS", "").split(",")
+            if item.strip()
+        )
+        if (
+            not tenants or len(tenants) > 1000 or len(set(tenants)) != len(tenants)
+            or any(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", tenant) is None for tenant in tenants)
+        ):
+            raise ValueError("event.outbox-retention.configuration.invalid")
     return _build_runtime_from_env(
         DenyAllAuthenticator(),
         include_action_executor=False,
@@ -1038,6 +1064,7 @@ def _build_runtime_from_env(
     collector_queue_loss_objectives = _collector_queue_loss_objectives_from_env()
     investigation_dispatch_limits = _investigation_dispatch_limits_from_env()
     evidence_retention_policy = _evidence_retention_policy_from_env()
+    event_outbox_retention_policy = _event_outbox_retention_policy_from_env()
     evidence_redaction_policies = _evidence_redaction_policies_from_env()
     metrics_runtime = _otel_metrics_runtime_from_env()
     try:
@@ -1187,6 +1214,7 @@ def _build_runtime_from_env(
                 signal_catalog=signal_catalog,
                 investigation_dispatch_limits=investigation_dispatch_limits,
                 evidence_retention_policy=evidence_retention_policy,
+                event_outbox_retention_policy=event_outbox_retention_policy,
                 telemetry_health_reporting=telemetry_health_reporting,
                 otlp_receiver_objectives=otlp_receiver_objectives,
                 otlp_receiver_telemetry_sink=(
@@ -1277,6 +1305,7 @@ def _build_runtime_from_env(
             signal_catalog=signal_catalog,
             investigation_dispatch_limits=investigation_dispatch_limits,
             evidence_retention_policy=evidence_retention_policy,
+            event_outbox_retention_policy=event_outbox_retention_policy,
             telemetry_health_reporting=telemetry_health_reporting,
             otlp_receiver_objectives=otlp_receiver_objectives,
             otlp_receiver_telemetry_sink=(
@@ -1906,6 +1935,26 @@ def _investigation_dispatch_limits_from_env() -> InvestigationDispatchLimits:
     except ValueError:
         raise ValueError("investigation.queue.configuration.invalid") from None
     return InvestigationDispatchLimits(max_outstanding_jobs_per_tenant=value)
+
+
+def _event_outbox_retention_policy_from_env() -> EventOutboxRetentionPolicy:
+    """No duration is silently adopted when destructive cleanup is enabled."""
+    prefix = "IIP_EVENT_OUTBOX_RETENTION_"
+    enabled = os.environ.get(prefix + "ENABLED", "false")
+    duration = os.environ.get(prefix + "PUBLISHED_SECONDS")
+    batch = os.environ.get(prefix + "BATCH_SIZE", "100")
+    if (
+        enabled not in ("true", "false")
+        or (enabled == "true" and duration is None)
+        or any(value is not None and re.fullmatch(r"[0-9]{1,10}", value) is None
+               for value in (duration, batch))
+    ):
+        raise ValueError("event.outbox-retention.configuration.invalid")
+    return EventOutboxRetentionPolicy(
+        enabled=enabled == "true",
+        published_seconds=int(duration) if duration is not None else 2_592_000,
+        batch_size=int(batch),
+    )
 
 
 def _evidence_retention_policy_from_env() -> EvidenceRetentionPolicy:

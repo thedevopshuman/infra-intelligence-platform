@@ -26,6 +26,12 @@ data:
   IIP_INVESTIGATION_COMPLETION_SLO_MINIMUM_ELIGIBLE_JOBS: {{ .Values.investigationCompletionSlo.minimumEligibleJobs | quote }}
   IIP_INVESTIGATION_MAX_OUTSTANDING_JOBS_PER_TENANT: {{ .Values.investigationQueue.maxOutstandingJobsPerTenant | quote }}
   IIP_EVIDENCE_RETENTION_ENABLED: {{ .Values.evidenceRetention.enabled | quote }}
+  IIP_EVENT_OUTBOX_RETENTION_ENABLED: {{ .Values.eventOutboxRetention.enabled | quote }}
+  IIP_EVENT_OUTBOX_RETENTION_INTERVAL_SECONDS: {{ .Values.eventOutboxRetention.intervalSeconds | int64 | quote }}
+  IIP_EVENT_OUTBOX_RETENTION_BATCH_SIZE: {{ .Values.eventOutboxRetention.batchSize | int64 | quote }}
+  {{- if .Values.eventOutboxRetention.publishedSeconds }}
+  IIP_EVENT_OUTBOX_RETENTION_PUBLISHED_SECONDS: {{ .Values.eventOutboxRetention.publishedSeconds | int64 | quote }}
+  {{- end }}
   IIP_EVIDENCE_RETENTION_INTERVAL_SECONDS: {{ .Values.evidenceRetention.intervalSeconds | int64 | quote }}
   IIP_EVIDENCE_RETENTION_EPHEMERAL_SECONDS: {{ .Values.evidenceRetention.ephemeralSeconds | int64 | quote }}
   IIP_EVIDENCE_RETENTION_STANDARD_SECONDS: {{ .Values.evidenceRetention.standardSeconds | int64 | quote }}

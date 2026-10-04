@@ -1,0 +1,26 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "EventOutboxRetentionReport",
+  "metadata": {
+    "tenantId": "tenant-acme",
+    "evaluatedAt": "2026-10-04T12:00:00Z"
+  },
+  "spec": {
+    "status": "cleanup-required",
+    "mode": "observe",
+    "policy": {
+      "enabled": true,
+      "publishedSeconds": 2592000,
+      "batchSize": 100,
+      "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "rows": {
+      "storedBefore": 240,
+      "published": 200,
+      "eligible": 12,
+      "expired": 0,
+      "remainingEligible": 12,
+      "protected": 228
+    }
+  }
+}

@@ -105,6 +105,17 @@ be rerun for the release candidate.
 | Reliability and security | Verified transport for every deployed client, tenant isolation, usable identity/permissions, bounded capacity, recovery, monitoring and private disclosure | Clean candidate checks plus supported-deployment exercises for worker/receiver, identity, policy/broker where enabled, Collector buffering, backup restore, failure behavior and alert delivery |
 | Public distribution and maintenance | Owner-selected license and repository/registry namespaces, release signing, dependency notices, contribution rules, support/security routes | Verified signed artifacts installed by a new user; correct license/notice files in source and packages; published maintainer and supported-version policies |
 
+The [delivered-outbox lifecycle](../operations/event-outbox-retention.md) adds
+an explicitly configured, disabled-by-default cleanup path for old successful
+delivery state. It does not remove immutable events, audit records, or
+unpublished/quarantined work. In particular, the community publisher is
+disabled, so this is not a remedy for its growing undelivered backlog. A
+privacy-safe customer-owned event destination and operating policy remain
+necessary. AI-ledger retention also remains open: historical allocation reads,
+exact invocation observations, future repricing/reattribution, and cited
+findings need explicit retained/retired semantics before payload retirement can
+be enabled. Silently omitting historical usage is not an acceptable lifecycle.
+
 The release plan must name which features are supported and which remain
 experimental before assigning a completion percentage or delivery date. A
 public v1 label must not imply that all providers, autonomous actions, plugin

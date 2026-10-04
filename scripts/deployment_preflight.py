@@ -138,6 +138,7 @@ EXPECTED_PROFILE_KEYS = frozenset(
         "ingress",
         "backup",
         "evidenceRetention",
+        "eventOutboxRetention",
         "evidenceRedaction",
         "evidenceBackends",
         "telemetry",
@@ -373,6 +374,18 @@ def _validate_rendered_profile(profile: Mapping[str, Any]) -> None:
     _integer(worker, "replicaCount")
     _integer(worker, "tenantCount")
     database = _object(profile, "database")
+    outbox_retention = _object(profile, "eventOutboxRetention")
+    if set(outbox_retention) != {"enabled", "publishedSeconds", "batchSize", "intervalSeconds"}:
+        _fail("preflight.profile.invalid")
+    _boolean(outbox_retention, "enabled")
+    if not (
+        2_592_000 <= _integer(outbox_retention, "publishedSeconds") <= 315_360_000
+        and 1 <= _integer(outbox_retention, "batchSize") <= 1000
+        and 60 <= _integer(outbox_retention, "intervalSeconds") <= 86_400
+    ):
+        _fail("preflight.profile.invalid")
+    if outbox_retention["enabled"] and _object(profile, "worker").get("enabled") is not True:
+        _fail("preflight.profile.invalid")
     if set(database) != {
         "existingSecretConfigured",
         "migrationsEnabled",

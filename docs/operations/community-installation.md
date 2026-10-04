@@ -236,7 +236,10 @@ renewal service.
 
 Prometheus is bounded to 30 days/2 GB. The Collector has a bounded persistent
 queue; records older than the protected intake age may be rejected after a
-long outage. Database AI-ledger retention is not implemented. Event publishing
+long outage. Database AI-ledger retention is not implemented. The separate
+[delivered-outbox retention control](event-outbox-retention.md) is available
+through explicit application/Helm configuration, but is disabled in this
+community profile and cannot remove undelivered work. Event publishing
 is disabled to avoid silently logging customer identities, so the durable
 outbox also grows until an explicit downstream-delivery/retention policy is
 configured. Monitor disk; this is not an unattended long-term deployment.

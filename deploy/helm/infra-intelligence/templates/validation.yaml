@@ -46,6 +46,16 @@
 {{- if and .Values.evidenceRetention.enabled (not .Values.worker.enabled) }}
 {{- fail "worker.enabled must be true when evidenceRetention.enabled=true" }}
 {{- end }}
+{{- if and .Values.eventOutboxRetention.enabled (not .Values.worker.enabled) }}
+{{- fail "worker.enabled must be true when eventOutboxRetention.enabled=true" }}
+{{- end }}
+{{- if .Values.eventOutboxRetention.enabled }}
+{{- range .Values.worker.tenants }}
+{{- if not (regexMatch "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" .) }}
+{{- fail "eventOutboxRetention requires canonical worker tenant identifiers" }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- if and .Values.aiAttribution.enabled (not .Values.worker.enabled) }}
 {{- fail "worker.enabled must be true when aiAttribution.enabled=true" }}
 {{- end }}

@@ -67,6 +67,8 @@ Resource observer integrations use the exported `ResourceCollectionRequest`, `Re
 
 `getEventDeliverySlo` returns the deployment-configured rolling publication objective with mature-cohort aggregate counts and integer-basis-point attainment. It measures publisher acknowledgement, not downstream receiver processing.
 
+`EventOutboxRetentionReport` and `getEventOutboxRetention` expose the observe-only, tenant-scoped policy and aggregate state for delivered outbox cleanup. They never return event identity or content and cannot execute cleanup.
+
 `getInvestigationCompletionSlo` returns the deployment-configured rolling useful-completion objective for durable asynchronous jobs. It requires platform-administrator authority and contains aggregate outcomes only—never investigation identity, request, evidence, finding, worker, or provider data.
 
 `EventDeliveryReplayParameters` and `proposeEventDeliveryReplay` bind one exact quarantine generation into the normal investigation, independent approval, policy, audit, and one-shot execution workflow. Dry-run is the default; live replay preserves the CloudEvents ID so receivers must remain idempotent.

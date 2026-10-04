@@ -204,6 +204,9 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
     "evidence-retention-report.schema.json": (
         "evidence-retention-report.json",
     ),
+    "event-outbox-retention-report.schema.json": (
+        "event-outbox-retention-report.json",
+    ),
     "investigation-report.schema.json": (
         "investigation-report.json",
         "investigation-report-adaptive-replan.json",

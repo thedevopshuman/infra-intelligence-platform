@@ -120,6 +120,7 @@
   "ingress" (dict "enabled" .Values.ingress.enabled "classConfigured" (not (empty .Values.ingress.className)) "hostConfigured" (not (empty .Values.ingress.host)) "tlsConfigured" (not (empty .Values.ingress.tls.existingSecret)) "redirectConfigured" (not (empty .Values.ingress.tlsRedirectAnnotation)))
   "backup" (dict "enabled" .Values.backup.enabled "destinationConfigured" (not (empty .Values.backup.destination.existingClaim)))
   "evidenceRetention" (dict "enabled" .Values.evidenceRetention.enabled)
+  "eventOutboxRetention" (dict "enabled" .Values.eventOutboxRetention.enabled "publishedSeconds" (default 2592000 .Values.eventOutboxRetention.publishedSeconds) "batchSize" .Values.eventOutboxRetention.batchSize "intervalSeconds" .Values.eventOutboxRetention.intervalSeconds)
   "evidenceRedaction" (dict "customPoliciesConfigured" (not (empty .Values.evidenceRedaction.policiesExistingSecret)))
   "evidenceBackends" (dict "metrics" .Values.telemetryEvidence.backend "logs" .Values.logEvidence.backend "kubernetesEvents" .Values.kubernetesEventEvidence.backend "context" .Values.contextEvidence.backend)
   "telemetry" (dict "metricsEnabled" .Values.telemetry.metricsEnabled "tracesEnabled" .Values.telemetry.tracesEnabled "endpointConfigured" (not (empty .Values.telemetry.otlpEndpoint)) "collectorQueueLossConfigured" (not (empty .Values.collectorQueueLoss.bindingJson)))

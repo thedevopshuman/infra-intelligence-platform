@@ -19,6 +19,7 @@ from iip.adapters.postgres.connection import (
     connection_string_for,
     validate_connection_environment,
 )
+from iip.adapters.event_outbox_retention import retention_audit, retention_cutoff
 from iip.adapters.ai_cost_store import (
     prepare_ai_cost_writes,
     prepare_ai_price_catalog,
@@ -54,6 +55,7 @@ from iip.application.ports import (
     AiSavingsFindingLedgerQuery,
     EventDeliverySloState,
     EventDeliveryState,
+    EventOutboxRetentionState,
     OutboxMessage,
     PersistenceError,
     ProjectionRebuildResult,
@@ -106,6 +108,7 @@ SCHEMA_MIGRATIONS = (
     "0022_ai_retry_savings_rule.sql",
     "0023_ai_model_suitability.sql",
     "0024_ai_invocation_correlation.sql",
+    "0025_delivered_outbox_retention.sql",
 )
 
 
@@ -1572,6 +1575,93 @@ class PostgresResourceStore:
             return tuple(
                 stored[(item.tenant_id, item.finding_id)]
                 for item in prepared
+            )
+
+    @_translate_database_errors
+    def evaluate_event_outbox_retention(
+        self,
+        tenant_id: str,
+        evaluated_at: str,
+        *,
+        published_seconds: int,
+        limit: int,
+        expire: bool,
+        policy_digest: str,
+    ) -> EventOutboxRetentionState:
+        cutoff = retention_cutoff(
+            tenant_id, evaluated_at, published_seconds=published_seconds,
+            limit=limit, expire=expire, policy_digest=policy_digest,
+        )
+        eligibility = """
+            published_at IS NOT NULL AND published_at < %s
+            AND created_at < %s AND quarantined_at IS NULL
+            AND claimed_by IS NULL AND claim_expires_at IS NULL
+        """
+        with self._connect() as connection:
+            # Limits are local to this retention transaction, never inherited
+            # by ingestion, replay, or another tenant's database operation.
+            connection.execute("SET LOCAL lock_timeout = '2s'")
+            connection.execute("SET LOCAL statement_timeout = '10s'")
+            # This namespace is independent of ingestion, Evidence, and action
+            # locks. Published rows are terminal; normal delivery cannot make
+            # a fresh acknowledgement older than this historical cutoff.
+            connection.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"event-outbox-retention:{tenant_id}",),
+            )
+            before = connection.execute(
+                f"""
+                SELECT count(*) AS stored,
+                       count(*) FILTER (WHERE published_at IS NOT NULL) AS published,
+                       count(*) FILTER (WHERE {eligibility}) AS eligible
+                FROM iip.event_outbox WHERE tenant_id = %s
+                """,
+                (cutoff, cutoff, tenant_id),
+            ).fetchone()
+            if before is None:
+                raise PersistenceError("storage.corrupt")
+            eligible = int(before["eligible"])
+            expired = 0
+            audit_ref = None
+            if expire and eligible:
+                removed = connection.execute(
+                    f"""
+                    WITH candidates AS (
+                        SELECT outbox_id FROM iip.event_outbox
+                        WHERE tenant_id = %s AND {eligibility}
+                        ORDER BY published_at, outbox_id
+                        FOR UPDATE SKIP LOCKED LIMIT %s
+                    )
+                    DELETE FROM iip.event_outbox AS outbox
+                    USING candidates
+                    WHERE outbox.tenant_id = %s
+                      AND outbox.outbox_id = candidates.outbox_id
+                    RETURNING outbox.outbox_id
+                    """,
+                    (tenant_id, cutoff, cutoff, limit, tenant_id),
+                ).fetchall()
+                expired = len(removed)
+                if expired:
+                    audit = retention_audit(
+                        tenant_id, evaluated_at, policy_digest, expired, eligible - expired,
+                    )
+                    row = connection.execute(
+                        """
+                        INSERT INTO iip.audit_records (tenant_id, category, document)
+                        VALUES (%s, 'event-outbox-retention-expired', %s)
+                        RETURNING audit_offset
+                        """,
+                        (tenant_id, Jsonb(audit)),
+                    ).fetchone()
+                    if row is None:
+                        raise PersistenceError("storage.unavailable")
+                    audit_ref = f"audit://{tenant_id}/records/{row['audit_offset']}"
+            return EventOutboxRetentionState(
+                tenant_id=tenant_id, evaluated_at=evaluated_at,
+                stored_rows=int(before["stored"]), published_rows=int(before["published"]),
+                eligible_rows=eligible, expired_rows=expired,
+                remaining_eligible_rows=eligible - expired,
+                protected_rows=int(before["stored"]) - eligible, audit_ref=audit_ref,
             )
 
     @_translate_database_errors

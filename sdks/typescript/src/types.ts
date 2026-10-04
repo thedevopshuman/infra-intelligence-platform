@@ -5146,6 +5146,31 @@ export interface EvidenceRetentionReport {
   };
 }
 
+export interface EventOutboxRetentionReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "EventOutboxRetentionReport";
+  metadata: { tenantId: string; evaluatedAt: string };
+  spec: {
+    status: "disabled" | "current" | "cleanup-required";
+    mode: "observe" | "expire";
+    policy: {
+      enabled: boolean;
+      publishedSeconds: number;
+      batchSize: number;
+      digest: Sha256Digest;
+    };
+    rows: {
+      storedBefore: number;
+      published: number;
+      eligible: number;
+      expired: number;
+      remainingEligible: number;
+      protected: number;
+    };
+    auditRef?: string;
+  };
+}
+
 export interface PlatformEvent<TData extends Record<string, unknown> = Record<string, unknown>> {
   specversion: "1.0";
   id: string;

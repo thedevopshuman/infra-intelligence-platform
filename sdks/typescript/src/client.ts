@@ -19,6 +19,7 @@ import type {
   EventDeliveryHealthReport,
   EventDeliverySloReport,
   EventDeliveryReplayParameters,
+  EventOutboxRetentionReport,
   IngestionFreshnessReport,
   InvestigationCompletionSloReport,
   InvestigationId,
@@ -338,6 +339,12 @@ export class InfrastructureIntelligenceClient {
   async getEvidenceRetention(): Promise<EvidenceRetentionReport> {
     return this.get<EvidenceRetentionReport>(
       "/v1/operations/evidence/retention",
+    );
+  }
+
+  async getEventOutboxRetention(): Promise<EventOutboxRetentionReport> {
+    return this.get<EventOutboxRetentionReport>(
+      "/v1/operations/events/retention",
     );
   }
 

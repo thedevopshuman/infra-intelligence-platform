@@ -185,6 +185,13 @@ identity, tenant data, or provider detail.
 
 ## Placement decisions
 
+Delivered-outbox retention follows normal serving boundaries:
+`application/event_outbox_retention.py` owns authorization, policy binding, and
+aggregate report semantics; the resource adapters own terminal-row selection,
+tenant serialization, and atomic deletion/audit; the HTTP surface observes only
+and the worker schedules explicit tenant batches. Only bootstrap selects the
+configured policy. Public SDKs consume the report and cannot execute cleanup.
+
 The community installation helpers under `scripts/community_*.py` are
 operational composition tooling. They validate existing public configuration
 through the owning application/adapter boundaries, generate protected local

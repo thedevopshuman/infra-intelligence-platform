@@ -485,6 +485,15 @@ The command creates protected local-only credentials under `.iip/`, builds and s
 
 Evidence artifact retention remains disabled in the local stack unless `IIP_EVIDENCE_RETENTION_ENABLED=true` is supplied. When enabled, the non-interactive worker processes only its explicitly enrolled tenant and emits aggregate, content-free completion logs.
 
+[Delivered-event outbox retention](docs/operations/event-outbox-retention.md)
+is a separate opt-in control. Administrators can observe eligible delivery-state
+rows through the public API/SDK before enabling an explicitly selected duration.
+Worker batches remove only old acknowledged rows, preserve at least the full
+30-day supported publication-SLO history, and commit aggregate audit atomically.
+They never delete immutable events or pending/retrying/quarantined work. The
+community preview keeps this disabled with its publisher; it does not bound AI
+ledger, event-log, audit-log, or undelivered-backlog growth.
+
 Mandatory credential redaction is always enabled for supported Evidence media.
 Customers can add reviewed exact-tenant email/IPv4 detectors without custom
 code by supplying the protected policy wrapper described in the [evidence

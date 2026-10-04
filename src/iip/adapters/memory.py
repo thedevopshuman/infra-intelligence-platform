@@ -17,6 +17,7 @@ from iip.application.ports import (
     AiSavingsFindingLedgerQuery,
     EventDeliverySloState,
     EventDeliveryState,
+    EventOutboxRetentionState,
     OutboxMessage,
     PersistenceError,
     PolicyDecision,
@@ -29,6 +30,7 @@ from iip.application.ports import (
     StoredEvent,
 )
 from iip.application.query_ai_allocations import validate_ai_allocation_ledger_query
+from iip.adapters.event_outbox_retention import retention_audit, retention_cutoff
 from iip.application.query_ai_invocation import validate_ai_invocation_query
 from iip.application.query_ai_savings import (
     validate_ai_savings_finding_ledger_query,
@@ -93,6 +95,7 @@ class InMemoryResourceStore:
         self._history: list[ResourceObservationRecord] = []
         self._event_log: list[StoredEvent] = []
         self._outbox: Dict[int, _MemoryOutboxEntry] = {}
+        self._outbox_retention_audit: list[dict[str, object]] = []
         self._checkpoints: Dict[tuple[str, str], SourceCheckpoint] = {}
         self._reconciliations: Dict[tuple[str, str], ReconciliationSnapshot] = {}
         self._ai_usage: Dict[
@@ -1118,6 +1121,65 @@ class InMemoryResourceStore:
         )
         return cls._ai_savings_usage_matches(usage, baseline_query)
 
+    def evaluate_event_outbox_retention(
+        self,
+        tenant_id: str,
+        evaluated_at: str,
+        *,
+        published_seconds: int,
+        limit: int,
+        expire: bool,
+        policy_digest: str,
+    ) -> EventOutboxRetentionState:
+        cutoff = retention_cutoff(
+            tenant_id, evaluated_at, published_seconds=published_seconds,
+            limit=limit, expire=expire, policy_digest=policy_digest,
+        )
+        with self._lock:
+            stored = published = 0
+            candidates: list[tuple[datetime, int]] = []
+            for entry in self._outbox.values():
+                if entry.event.tenant_id != tenant_id:
+                    continue
+                stored += 1
+                if entry.published_at is None:
+                    continue
+                published += 1
+                try:
+                    created = datetime.fromisoformat(entry.created_at.replace("Z", "+00:00"))
+                    if created.tzinfo is None or entry.published_at.tzinfo is None:
+                        raise ValueError
+                    eligible = (
+                        entry.published_at < cutoff and created < cutoff
+                        and entry.claimed_by is None and entry.claim_expires_at is None
+                        and entry.quarantined_at is None
+                    )
+                except (AttributeError, TypeError, ValueError):
+                    raise PersistenceError("storage.corrupt") from None
+                if eligible:
+                    candidates.append((entry.published_at, entry.message_id))
+            candidates.sort()
+            selected = candidates[:limit] if expire else []
+            expired = len(selected)
+            audit_ref = None
+            if expired:
+                audit = retention_audit(
+                    tenant_id, evaluated_at, policy_digest, expired, len(candidates) - expired,
+                )
+                audit_ref = f"audit://{tenant_id}/event-outbox-retention/{len(self._outbox_retention_audit) + 1}"
+                # Audit failure cannot consume rows. Both changes are visible
+                # together under the same lock; retained event-log IDs survive.
+                self._outbox_retention_audit.append(audit)
+                for _, message_id in selected:
+                    del self._outbox[message_id]
+            return EventOutboxRetentionState(
+                tenant_id=tenant_id, evaluated_at=evaluated_at,
+                stored_rows=stored, published_rows=published,
+                eligible_rows=len(candidates), expired_rows=expired,
+                remaining_eligible_rows=len(candidates) - expired,
+                protected_rows=stored - len(candidates), audit_ref=audit_ref,
+            )
+
     def claim_outbox(
         self,
         tenant_id: str,
@@ -1735,6 +1797,8 @@ class AllowTenantPolicy:
             "evidence-retention:read",
             "event-delivery-health:read",
             "event-delivery-slo:read",
+            "event-outbox-retention:expire",
+            "event-outbox-retention:read",
             "ingestion-telemetry:read",
             "investigation-completion-slo:read",
             "plugin:open-session",

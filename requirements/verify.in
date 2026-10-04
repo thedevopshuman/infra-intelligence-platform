@@ -6,7 +6,7 @@ psycopg[binary]==3.3.4
 cryptography==50.0.1
 PyJWT==2.14.0
 # Stable runtime OpenTelemetry metrics SDK, OTLP/HTTP exporter, and receiver protobufs.
-googleapis-common-protos==1.75.1
+googleapis-common-protos==1.75.5
 opentelemetry-proto==1.44.0
 opentelemetry-sdk==1.44.0
 opentelemetry-exporter-otlp-proto-http==1.44.0

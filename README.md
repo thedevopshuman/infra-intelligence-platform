@@ -10,6 +10,14 @@ implemented capabilities from remaining installation, live-integration,
 reliability, licensing, and publication work. The current code is pre-release;
 no open-source license has been selected yet.
 
+The selected GitHub owner is `thedevopshuman`. Platform source lives in
+[`thedevopshuman/infra-intelligence-platform`](https://github.com/thedevopshuman/infra-intelligence-platform),
+currently private pending licensing and publication checks. The separate
+[`thedevopshuman/website`](https://github.com/thedevopshuman/website) repository
+hosts the umbrella site: IIP is one product to describe at `thedevopshuman.com`,
+alongside existing DevOps content and future products. The domain is not an IIP
+application endpoint, and this selection does not finalize product branding.
+
 A separate [persistent community installation](docs/operations/community-installation.md)
 now starts empty with generated credentials, verified database/telemetry
 transport, reviewed pricing and ownership, a durable Collector queue, and a

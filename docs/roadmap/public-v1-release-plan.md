@@ -36,7 +36,16 @@ wiring has composition/render tests but has not yet been exercised by that
 live Helm gate. Full release evidence must be regenerated for the selected
 clean candidate.
 
-At this audit there is no Git remote, tag, selected license, organizationally
+The owner has selected `thedevopshuman` on GitHub. The verified source through
+`3e2df75` is pushed to the private
+[platform repository](https://github.com/thedevopshuman/infra-intelligence-platform).
+The existing [website repository](https://github.com/thedevopshuman/website)
+remains separate. `thedevopshuman.com` is the selected informational site/docs
+domain: The DevOps Human is the umbrella site, with IIP as one product, not a
+new name for the whole platform or company. Website branch preparation does
+not constitute a live deployment, DNS cutover, or IIP release.
+
+There is still no release tag, selected license, organizationally
 signed public artifact, or public supported-version/security contact policy.
 The live customer reports needed for private-pilot admission are also absent.
 Examples and implemented qualification scripts are not evidence of completed
@@ -104,7 +113,11 @@ artifacts before promotion. A passed source test suite alone is insufficient.
 
 ## Owner decisions
 
-- GitHub owner/repository and corresponding image/package ownership.
+- **Selected:** GitHub owner `thedevopshuman`, separate platform and website
+  repositories, and `thedevopshuman.com` for the umbrella site/product details
+  and documentation. Current repository privacy is a staging state, not a
+  change to the public-first target. Image/package namespace ownership and
+  release-signing identities still need to be finalized.
 - Open-source license and contributor/legal policy.
 - Public identity/naming disposition, responsible maintainers, support and
   private security reporting channels, and supported-version commitments.

@@ -125,6 +125,10 @@ published OCI indexes, then verified before remaining gates can continue.
 Neither a mutable tag pull nor a native-platform-only Docker export recreates
 the multi-platform release bundle.
 
+Use the [exact-source recovery runbook](release-recovery.md) for the scoped
+`v0.84.2` reconstruction and read-only qualification commands. It retains
+stage outputs for local retries but does not yet automate protected publishing.
+
 Do not alter old tags, call a signature diagnostic a full qualification, skip
 vulnerability policy or sign a different archive under old evidence. Durable
 stage checkpoints and resumable publication remain REL-005 in the ledger.

@@ -1,6 +1,6 @@
 # Release test coverage ledger
 
-**Updated:** 2026-10-04
+**Updated:** 2026-10-05
 
 Keep deferred tests visible without running every expensive environment on
 every edit. An implementation, an example and an executed test are different
@@ -14,15 +14,18 @@ an item; old evidence does not automatically qualify new artifacts.
 | REL-001 | CI selection | Unit cases for chart/docs, runtime, mixed, missing/invalid Git base, manual scope; action syntax and pinned actions | Local tests and workflow syntax passed |
 | REL-002 | Chart packaging | Exact tag/version/source/main-tip and clean tree, licensed committed archive, immutable canonical image pin, no app-version coupling, no image build; reject collision | Local tests including real Helm packaging passed; image qualification remains a separate release prerequisite |
 | K8S-001 | Local core Helm | Explicit local Kind identity, new owned namespace, TLS PostgreSQL, migration, readiness, correct/incorrect auth, exact application/image/chart identity and same-version upgrade | Local arm64 install/upgrade passed; fixture namespace removed |
+| REL-007 | Exact-source recovery | Reject mismatched source/tag, dirty source, ignored SDK output contamination, unsafe archive members, incomplete/tampered OCI graphs, extra bundle files and write-capable adapter commands | 40 focused tests passed; actual complete public layouts reconstructed and reverified locally |
+| REL-008 | Security correction and publication order | Fixed PyJWT pin across runtime and three existing locks, authentication tests under the updated dependency, vulnerability gate before registry login/publication/signing | Source pin and locks updated to 2.14.0 with no other dependency changes; 31 focused authentication tests passed. New image qualification remains REL-003 |
 
 ## Deferred coverage and release obligations
 
 | ID | What remains | When it must run | Owner and evidence to close |
 | --- | --- | --- | --- |
-| REL-003 | Recover and checkpoint the failed app publication | Before accepting `v0.84.2` or a replacement candidate | Release maintainer: original source and exact published OCI indexes, verified SBOM/provenance/signatures, fresh vulnerability result, signed kit/checksums and public download |
+| REL-003 | Qualify and publish a safe replacement candidate | Before accepting an application release | Release maintainer: old `v0.84.2` bundle recovered and signatures passed, but fresh vulnerability policy rejected it; corrected candidate needs exact source/index/SBOM/signature binding, fresh passing scan, signed kit/checksums and public download |
 | REL-004 | Protected chart release and anonymous verification | First chart release and every chart publication | Release maintainer: exact tag commit, protected approval, Sigstore verification with chart workflow identity, archive checksum and anonymous download/install |
 | REL-005 | Resume publishing without repeat builds | Before claiming failed-step release recovery is automatic | Release maintainer: immutable checkpoint after build/publication; failed-job rerun consumes exact retained inputs; collisions fail closed |
 | REL-006 | Chart repository migration and distribution index/OCI | Only if separate chart repository/distribution is selected | Release maintainer: license/history migration, signed identity change, protected workflow and consumer install/upgrade instructions; no moved old tags |
+| REL-009 | Production dependency resolution | Before claiming fully locked reproducible dependency inputs | Runtime maintainer: a production-only lock consumed by Docker, build-backend pinning and cross-platform checks; do not install the verification lock or bundled psycopg driver into production. This is not the cause of the direct PyJWT finding |
 | K8S-002 | Data-preserving cross-version chart/app upgrade | Before advertising a supported upgrade pair | Platform maintainer: old published version to new version with tenant data, migrations, rejected unsafe rollback and post-upgrade reads |
 | K8S-003 | Upstream stack dependency composition | Each new or changed locked dependency | Platform maintainer: provenance/checksum review, license inventory, schema/lint/render and fresh-namespace runtime; external-service and bundled-service profiles |
 | K8S-004 | Persistent storage, backup/restore and uninstall | Before offering bundled durable Kubernetes installation | Platform maintainer: PVC retention, database/queue/dashboard recovery into fresh storage; uninstall cannot delete externally owned services |
@@ -60,3 +63,28 @@ the optional stack, enterprise identity, HA or every integration is qualified.
   TLS and same-version upgrade with a retained sentinel all passed. The owned
   namespace was confirmed absent afterward. This fixture used ephemeral DB
   storage and no worker, receiver, provider traffic, upstream stack or HA.
+- 2026-10-05 local recovery: rebuilt only original-source packages and exported
+  both existing complete `v0.84.2` OCI indexes, without an application image
+  build or registry write. Full graph verification passed for both platforms;
+  manifest digest is
+  `sha256:c5ead4a30011ea71524cebd45eee55f17eb20068a5ddc80b0853d7ba91a4aa74`.
+  Original-source publication inspection and image signature qualification
+  passed through the explicit read-only adapters. Recovery tooling was a
+  development worktree, not yet an approved public signing workflow.
+- The corresponding fresh Trivy `0.73.0` report at `2026-10-04T18:31:00Z`
+  (2026-10-05 local time), database updated `2026-10-04T14:28:15Z`, **rejected**
+  the candidate: control-plane amd64 and arm64 each had one critical, five
+  high, twelve medium and one low finding; bridge platforms each had five
+  medium and one low. No exceptions were applied. A follow-up amd64 diagnostic
+  traced all six critical/high findings to PyJWT `2.13.0`, fixed in
+  [upstream 2.14.0](https://github.com/jpadilla/pyjwt/releases/tag/2.14.0).
+  These are per-platform package findings, not twelve distinct vulnerabilities
+  or evidence of an exploited IIP deployment. Images and historical tags remain
+  unchanged. Signed downloads and public promotion did not run.
+- 2026-10-05 integrated recovery/security change: `make verify
+  PYTHON=.venv/bin/python` passed under PyJWT `2.14.0`; pinned actionlint passed.
+  The first verification attempt caught a Helm test/executable filename
+  collision during discovery. Renaming only the safety-test module and its
+  focused Make target fixed it; the complete subsequent run passed. Source,
+  schema, Python, TypeScript, console, Helm rendering and preflight checks are
+  development evidence, not a scan of newly built application images.

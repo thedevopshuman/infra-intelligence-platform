@@ -10,6 +10,8 @@ from unittest.mock import patch
 
 from scripts import test_helm_chart_smoke as smoke
 
+# Keep this test module's basename distinct from the executable smoke harness:
+# older operational modules add scripts/ to the discovery import search path.
 
 RUN_ID = "a" * 32
 IMAGE = "docker.io/thedevopshuman/iip@sha256:" + "b" * 64

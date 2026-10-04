@@ -1,6 +1,6 @@
 # Installation and release delivery plan
 
-**Updated:** 2026-10-04
+**Updated:** 2026-10-05
 
 Build a repeatable route from a small reviewed change to a usable self-hosted
 release. Keep the persistent Compose path, make the core Helm chart independently
@@ -35,7 +35,7 @@ silently move existing tags or change the historical application bundle format.
 | --- | --- | --- |
 | 1. Short development loop | Automatic docs/chart-only checks; conservative full fallback; manual full checks; one isolated Kind smoke command using an existing image | Implemented tooling in this change; record executed evidence in the coverage ledger |
 | 2. Independent core chart | Protected chart-only packaging/signing/publication, exact chart tag, committed licensed archive, no application rebuild or Docker Hub write credential | Implemented workflow; publication waits for a qualified committed default image pin |
-| 3. Finish application distribution | Recover the already-published exact image indexes, reconstitute original-source assets, qualify signatures and vulnerabilities, sign downloads, publish the persistent kit | Pending; `v0.84.2` images are signed but the GitHub artifact release is incomplete |
+| 3. Finish application distribution | Recover and evaluate the old candidate, remediate rejected dependencies in a new candidate, qualify exact signatures and vulnerabilities, sign downloads and publish the persistent kit | Old bundle recovered and signatures verified; fresh scan rejected PyJWT 2.13.0 in `v0.84.2`. New candidate required; no qualified GitHub artifact release yet |
 | 4. Publish the first core chart | Select qualified application digest and `appVersion`, bump chart version, run install/upgrade coverage, tag `helm-v<chart version>`, approve the protected release | Pending; placeholder image defaults deliberately block publication |
 | 5. Compose upstream services | Pin and lock the selected upstream charts, write closed profile values and Secret/CA wiring, package all locked dependencies with notices | Pending; no all-in-one chart is advertised yet |
 | 6. Prove installation and lifecycle | Fresh Compose install and fresh-namespace Helm install, authorized telemetry to ledger/dashboard, upgrades with retained state, recover into fresh storage | Core smoke is narrower; full profile and cross-version evidence remain pending |
@@ -46,6 +46,20 @@ Steps 1–2 can proceed while step 3 is recovered. Step 5 research/configuration
 can proceed before publication, but its dependencies cannot be described as
 supported until their exact locked packages and runtime combination pass.
 Do not rebuild already-signed application images merely to ship a chart fix.
+
+The `v0.84.2` recovery found an actual application dependency rejection, not a
+chart or signature-only retry. All six critical/high findings are in PyJWT
+`2.13.0`; upstream identifies `2.14.0` as fixed. A dependency change requires a
+new immutable application candidate and fresh exact-image qualification.
+Keep the old tag and rejected evidence intact. The
+[recovery runbook](../operations/release-recovery.md) records reusable local
+checkpoints and the remaining protected publication work.
+
+The source and existing verification/provider locks now pin PyJWT `2.14.0`
+without changing other resolved dependency versions. The normal release
+workflow evaluates vulnerabilities before loading registry credentials or
+publishing. These source changes still need a new image build and passing
+exact-artifact scan; they do not repair the existing Docker Hub images.
 
 ## Dependency integration design
 

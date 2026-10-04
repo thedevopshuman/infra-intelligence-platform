@@ -4,7 +4,7 @@ jsonschema[format-nongpl]==4.25.1
 psycopg[binary]==3.3.4
 # Production OIDC/JWKS signature verification.
 cryptography==50.0.1
-PyJWT==2.13.0
+PyJWT==2.14.0
 # Stable runtime OpenTelemetry metrics SDK, OTLP/HTTP exporter, and receiver protobufs.
 googleapis-common-protos==1.75.1
 opentelemetry-proto==1.44.0

@@ -43,16 +43,16 @@ class ReleaseWorkflowTests(unittest.TestCase):
         ordered = (
             "make verify-workflows",
             "validate-github-context",
-            "Authenticate the publication boundary",
             "Set up ARM64 emulation",
             "Set up release OCI builder",
             "Verify release builder platforms",
             "\n          make verify\n",
             "make release-bundle",
+            "make qualify-release-vulnerabilities",
+            "Authenticate the publication boundary",
             "release_publication.py publish",
             "cosign_container.sh sign --yes",
             "make qualify-release-signatures",
-            "make qualify-release-vulnerabilities",
             "cosign_container.sh sign-blob --yes",
             "gh release create",
         )
@@ -63,6 +63,28 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("release-publication-report.json", workflow)
         self.assertIn("release-signature-verification-report.json", workflow)
         self.assertIn("release-vulnerability-qualification-report.json", workflow)
+
+    def test_vulnerability_gate_precedes_registry_authority_and_mutation(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        step_names = re.findall(r"(?m)^      - name: (.+)$", workflow)
+        build = step_names.index("Verify and build the clean candidate")
+        self.assertEqual(step_names[build + 1], "Qualify release vulnerabilities")
+        self.assertEqual(workflow.count("make qualify-release-vulnerabilities"), 1)
+        vulnerability = workflow.index("make qualify-release-vulnerabilities")
+        for later in (
+            "DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}",
+            "docker login docker.io",
+            "release_publication.py publish",
+            "cosign_container.sh sign --yes",
+        ):
+            with self.subTest(later=later):
+                self.assertLess(vulnerability, workflow.index(later))
+        self.assertGreater(vulnerability, workflow.index("make release-bundle"))
+        self.assertIn(
+            "IIP_RELEASE_VULNERABILITY_REPORT: "
+            "dist/release-vulnerability-qualification-report.json",
+            workflow,
+        )
 
     def test_multiarch_builder_is_explicit_and_immutable(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")

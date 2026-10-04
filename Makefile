@@ -397,7 +397,7 @@ verify-charts: validate
 		tests.test_helm_values tests.test_helm_deployment \
 		tests.test_deployment_preflight tests.test_release_licenses \
 		tests.test_ci_selection tests.test_helm_release \
-		tests.test_helm_chart_smoke -v
+		tests.test_helm_chart_smoke_safety -v
 	$(MAKE) helm-lint
 
 test:
@@ -1674,6 +1674,13 @@ test-release-signatures:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \
 		tests.test_release_signature_verification -v
 	IIP_DOCKER_BIN=$(DOCKER) scripts/test_release_signatures.sh
+
+.PHONY: test-release-recovery
+test-release-recovery:
+	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_recover_oci_layout tests.test_recover_source_assets \
+		tests.test_cosign_recovery_adapter tests.test_recovery_docker_readonly \
+		tests.test_assemble_recovered_release -v
 
 test-release-publication:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \

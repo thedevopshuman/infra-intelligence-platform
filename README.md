@@ -11,6 +11,13 @@ Docker Compose first, then a separate full-stack Helm installation for
 Kubernetes**. Compare [installation options](docs/operations/installation-options.md)
 for dependencies, login, integration enablement and current limitations.
 
+The [installation and release delivery plan](docs/roadmap/installation-release-delivery-plan.md)
+orders the remaining work: independent application/chart releases, optional
+upstream services, local Kind testing and public documentation. Its
+[coverage ledger](docs/roadmap/release-test-coverage.md) keeps deferred tests
+visible. Developers can use `make verify-charts` for the fast Helm/docs loop;
+this does not build images or claim release qualification.
+
 Use the [installation and user guide](docs/README.md#install-and-use-iip) as the
 documentation entry point: it links the persistent installer, configuration,
 token/Grafana login, application telemetry, integrations and recovery steps.

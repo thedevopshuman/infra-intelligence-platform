@@ -169,3 +169,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0163](0163-digest-selected-community-images.md) | Accepted implementation boundary | Check and start a community installation from five exact local image digests without implicit pull or build fallback |
 | [0164](0164-docker-hub-release-destinations.md) | Accepted release configuration | Publish exact signed indexes to the approved short Docker Hub names and expose a separately signed Compose kit |
 | [0165](0165-exact-docker-hub-signature-alias.md) | Accepted compatibility correction | Recognize only the exact Docker Hub claim hostname alias and keep manual signature rechecks separate from release promotion |
+| [0166](0166-independent-chart-release-and-targeted-validation.md) | Accepted implementation boundary | Separate chart publication from image builds and use conservative targeted CI with explicit deferred coverage |

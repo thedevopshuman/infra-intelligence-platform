@@ -99,6 +99,9 @@ publication, supported-installation and production gates.
 
 - [Architecture decision records](decisions/README.md)
 - [Initial roadmap](roadmap/initial-roadmap.md)
+- [Installation and release delivery plan](roadmap/installation-release-delivery-plan.md)
+- [Release test coverage ledger](roadmap/release-test-coverage.md)
+- [Fast Helm development and independent releases](operations/helm-development-and-release.md)
 - [AI FinOps roadmap](roadmap/ai-finops-roadmap.md)
 - [Local development](operations/local-development.md)
 - [Persistent community installation](operations/community-installation.md)

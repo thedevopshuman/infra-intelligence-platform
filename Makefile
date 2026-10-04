@@ -2,6 +2,7 @@
 
 .PHONY: test-postgres-tls
 .PHONY: verify-workflows
+.PHONY: verify-charts
 
 PYTHON ?= python3
 GO ?= go
@@ -223,6 +224,7 @@ IIP_AWS_BEDROCK_PRICE_CATALOG ?= dist/aws-bedrock-price-catalog.json
 IIP_AWS_BEDROCK_PRICE_IMPORT_REPORT ?= dist/aws-bedrock-price-import-report.json
 
 help:
+	@echo "verify-charts Fast chart/docs validation without image builds or cluster changes"
 	@echo "install-verify-deps Install pinned verification-only Python dependencies"
 	@echo "validate      Validate contracts, links, and package boundaries"
 	@echo "validate-schemas Validate contract examples against JSON Schemas"
@@ -389,6 +391,14 @@ validate-schemas:
 verify-workflows:
 	$(GO) run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 \
 		-shellcheck= -pyflakes= .github/workflows/*.yml
+
+verify-charts: validate
+	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \
+		tests.test_helm_values tests.test_helm_deployment \
+		tests.test_deployment_preflight tests.test_release_licenses \
+		tests.test_ci_selection tests.test_helm_release \
+		tests.test_helm_chart_smoke -v
+	$(MAKE) helm-lint
 
 test:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest discover -s tests -v

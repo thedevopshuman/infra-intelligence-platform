@@ -16,6 +16,13 @@ order. This plan complements the [infrastructure roadmap](initial-roadmap.md)
 and [AI FinOps roadmap](ai-finops-roadmap.md); it does not replace their
 unfinished outcomes or certify the current repository as production-ready.
 
+The [installation and release delivery plan](installation-release-delivery-plan.md)
+now supplies the execution order and ownership boundaries: independent core
+chart releases, optional pinned upstream services, safe local Kind smoke tests,
+application publication recovery and a versioned website/wiki walkthrough.
+The [coverage ledger](release-test-coverage.md) records deferred tests with
+owners and triggers. Fast development checks do not waive publication gates.
+
 ## User outcome
 
 A new user can install a released artifact, connect supported infrastructure
@@ -100,8 +107,9 @@ not constitute a live deployment, DNS cutover, or IIP release.
 
 Apache-2.0 and learning-preview contribution/security reporting policies are
 now present. The learning tag is a separate source-only prerelease channel;
-there is still no production release, organizationally signed public artifact,
-or production supported-version policy.
+there is still no production release, completed qualified public artifact
+distribution, or production supported-version policy. Both `v0.84.2` registry
+images are signed; that narrower fact does not complete the distribution.
 The live customer reports needed for private-pilot admission are also absent.
 Examples and implemented qualification scripts are not evidence of completed
 external runs.
@@ -202,8 +210,11 @@ experimental. A product milestone name alone does not stabilize contracts.
    upgrade on each selected fresh host. An inbound-only AI telemetry profile
    must not require provider credentials or the external broker unless an
    enabled feature actually performs those reads.
-2. **Separate full-stack Kubernetes Helm profile.** Define and implement the
-   second installation path with its own closed values and dependency boundary,
+2. **Independent core chart and optional upstream stack.** Finish the separate
+   chart-only publication path and prove the core chart on local Kind using an
+   existing application digest. Then define and implement the second
+   installation path with its own closed values and pinned upstream dependency
+   boundary,
    durable storage, generated or referenced credentials, installation,
    upgrade and recovery tests, and fresh-cluster evidence. Keep the existing
    bring-your-own production chart intact. Do not infer HA, production PKI,
@@ -231,9 +242,10 @@ artifacts before promotion. A passed source test suite alone is insufficient.
   Docker Hub image namespaces are now selected and created:
   `thedevopshuman/iip` and `thedevopshuman/iip-bridge`. The workflow targets
   those canonical repositories with its exact GitHub OIDC signing identity
-  and a separately signed Compose-kit asset (ADR 0164). Publishing credentials,
-  live signing and anonymous install evidence still need completion; namespace
-  creation is not image publication. Docker Hub version-tag immutability,
+  and a separately signed Compose-kit asset (ADR 0164). Publishing credentials
+  are configured in the protected release environment. Download signing and
+  anonymous install evidence still need completion; registry-image signing
+  has passed its separate diagnostic. Docker Hub version-tag immutability,
   GitHub version-tag update/deletion protection and main-history protection are
   configured. Main still permits fast-forward development; review live rules
   and exact-revision CI before authorizing a release.

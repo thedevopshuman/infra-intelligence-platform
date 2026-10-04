@@ -470,7 +470,9 @@ it observes a conflicting tag. The workflow does not turn local Kind, fixture,
 or offline-provider evidence into customer-environment qualification.
 
 The `release` environment was created with `thedevopshuman` as its required
-reviewer, administrator bypass disabled and a `v*` tag deployment policy. The
+reviewer, administrator bypass disabled and tag deployment policies for `v*`
+and `helm-v*`. The latter was added for the
+[independent core chart workflow](helm-development-and-release.md). The
 single maintainer may approve their own triggered run; this is explicit human
 approval, not independent two-person review. Review these live settings before
 each release. Environment tag filtering does not itself protect Git tags from
@@ -479,7 +481,9 @@ updates or deletions. No token is required for ordinary anonymous public pulls.
 The initial registry/repository protection setup is now applied:
 
 - GitHub ruleset `Immutable IIP release tags` rejects updates and deletion of
-  `refs/tags/v*`, without bypass actors. New version tags are still permitted.
+  `refs/tags/v*` and `refs/tags/helm-v*`, without bypass actors. New version tags
+  are still permitted. The chart preparer additionally requires the exact
+  fetched `origin/main` commit; a tag filter is not a semantic-version validator.
 - GitHub ruleset `Preserve main history` rejects force-pushes and deletion of
   `refs/heads/main`; ordinary fast-forward development remains permitted. This
   does not enforce a PR review or make a passing CI run optional for release.

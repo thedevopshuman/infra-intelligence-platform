@@ -53,7 +53,14 @@ make verify
 
 Behavioral changes also require tests at the owning boundary. Documentation is part of the change, not follow-up work.
 
+During development, use owning-boundary tests first and run `make verify` once
+the integrated change is complete. `make verify-charts` is the lightweight
+documentation/Helm check; it does not build images or qualify a release.
+Use expensive Docker/Kind gates when their boundary changes or a release needs
+their evidence, not after every documentation edit. Record deferred coverage,
+its owner and trigger in `docs/roadmap/release-test-coverage.md`; never replace a
+required release gate with a deferred note.
+
 ## Naming
 
 `Infrastructure Intelligence Platform`, `IIP`, `iip`, and `infra-intelligence-platform` are neutral placeholders. Do not invent a product/company name in implementation work. Add naming research only under `docs/research/brand/`.
-

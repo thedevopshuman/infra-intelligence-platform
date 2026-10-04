@@ -23,6 +23,12 @@ repository. Candidate identities are alternatives for a controlled signing
 transition; accepting any candidate still requires the exact identity and
 issuer pair.
 
+Cosign's exact Docker Hub hostname alias `index.docker.io` is equivalent to
+`docker.io` only in the verified repository claim comparison. Namespace,
+repository, digest and signer/issuer constraints are unchanged; tags, ports
+and other registry hostnames are not aliases. See
+[ADR 0165](../decisions/0165-exact-docker-hub-signature-alias.md).
+
 The checked example deliberately uses `replace-me` values. It is schema-valid
 documentation but the production command rejects placeholder repositories and
 identities. The accepted organization must commit a new policy generation with

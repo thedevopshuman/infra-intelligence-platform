@@ -31,6 +31,11 @@ public-key profile while transparency was intentionally not run. Any failed
 check produces `rejected`. Only `verified` may pass the production promotion
 gate, and that gate additionally requires a clean current checkout.
 
+When the promotion gate rejects a written report, the CLI prints only the
+failed check IDs and stable error codes before `report.not-promotable`.
+The manual signature-only recheck emits no report of this kind: it has no
+verified bundle and cannot supply promotion evidence.
+
 The report does not retain repository names, certificate identities, OIDC
 issuers, public-key paths, credentials, raw Cosign output, or provider error
 text. It proves the stated signature observation at one point in time; registry

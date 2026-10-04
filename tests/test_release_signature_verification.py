@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import copy
+from contextlib import redirect_stderr
 import hashlib
+import io
 import json
 import subprocess
 import tempfile
@@ -133,6 +135,35 @@ class ReleaseSignaturePolicyTests(unittest.TestCase):
 
 
 class ReleaseSignatureReportTests(unittest.TestCase):
+    def test_nonpromotable_cli_reports_only_stable_failed_checks_and_keeps_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            release = manifest()
+            (directory / "release-manifest.json").write_text(json.dumps(release), encoding="utf-8")
+            output = directory / "report.json"
+            errors = io.StringIO()
+            runner = RecordingRunner(fail_role="plugin-mediation-bridge")
+            with (
+                patch.object(signatures.release_bundle, "verify_bundle", return_value=release),
+                patch.object(signatures, "load_policy", return_value=policy()),
+                patch.object(signatures, "source_identity", return_value=(release["metadata"]["revision"], False)),
+                patch.object(signatures, "SubprocessCosignRunner", return_value=runner),
+                patch("sys.argv", ["release_signature_verification.py", "run",
+                                   "--bundle", str(directory), "--policy", str(directory / "policy.json"),
+                                   "--output", str(output), "--require-clean", "--require-promotable"]),
+                redirect_stderr(errors),
+            ):
+                self.assertEqual(signatures.main(), 2)
+            self.assertEqual(errors.getvalue().splitlines(), [
+                "bridge-signature: release-signature.signature.rejected",
+                "exact-trust: release-signature.trust.rejected",
+                "transparency-verification: release-signature.transparency.rejected",
+                "release-signature.report.not-promotable",
+            ])
+            recorded = json.loads(output.read_text(encoding="utf-8"))
+            signatures.validate_report_document(recorded)
+            self.assertEqual(recorded["spec"]["status"], "rejected")
+
     def test_exact_manifest_digests_are_verified_and_output_is_minimized(self) -> None:
         runner = RecordingRunner()
         document = report(runner)
@@ -236,6 +267,52 @@ class ReleaseSignatureReportTests(unittest.TestCase):
 
 
 class SubprocessCosignRunnerTests(unittest.TestCase):
+    def test_docker_hub_claim_accepts_only_exact_host_alias_with_repository_or_digest(self) -> None:
+        digest = "sha256:" + "a" * 64
+        for expected_host in ("docker.io", "index.docker.io"):
+            repository = expected_host + "/thedevopshuman/iip"
+            for observed_host in ("docker.io", "index.docker.io"):
+                for suffix in ("", "@" + digest):
+                    claim = observed_host + "/thedevopshuman/iip" + suffix
+                    document = [{"critical": {
+                        "identity": {"docker-reference": claim},
+                        "image": {"docker-manifest-digest": digest},
+                        "type": signatures.SIGNATURE_TYPE,
+                    }}]
+                    with self.subTest(expected=repository, observed=claim):
+                        self.assertEqual(signatures._validated_cosign_output(
+                            json.dumps(document).encode(), repository=repository,
+                            reference=repository + "@" + digest, digest=digest,
+                        ), 1)
+
+    def test_docker_hub_claim_does_not_relax_repository_reference_or_registry_checks(self) -> None:
+        repository = "docker.io/thedevopshuman/iip"
+        digest = "sha256:" + "a" * 64
+        invalid_claims = (
+            "index.docker.io/other-owner/iip", "index.docker.io/thedevopshuman/iip-bridge",
+            "registry-1.docker.io/thedevopshuman/iip", "index.docker.io.evil.example/thedevopshuman/iip",
+            "index.docker.io:443/thedevopshuman/iip", "docker.io:443/thedevopshuman/iip",
+            "INDEX.DOCKER.IO/thedevopshuman/iip", "https://index.docker.io/thedevopshuman/iip",
+            "index.docker.io/thedevopshuman/iip:latest", "index.docker.io/thedevopshuman/iip:tag@" + digest,
+            "index.docker.io/thedevopshuman/iip@sha256:" + "b" * 64,
+            "index.docker.io//thedevopshuman/iip", "index.docker.io/thedevopshuman/./iip",
+            "index.docker.io/thedevopshuman/iip/", "index.docker.io/thedevopshuman/%69ip",
+            "index.docker.io/thedevopshuman/iip?tag=latest", "index.docker.io/thedevopshuman/iip#fragment",
+        )
+        for claim in invalid_claims:
+            document = [{"critical": {
+                "identity": {"docker-reference": claim},
+                "image": {"docker-manifest-digest": digest},
+                "type": signatures.SIGNATURE_TYPE,
+            }}]
+            with self.subTest(claim=claim), self.assertRaisesRegex(
+                signatures.ReleaseSignatureError, "release-signature.tool.output-invalid",
+            ):
+                signatures._validated_cosign_output(
+                    json.dumps(document).encode(), repository=repository,
+                    reference=repository + "@" + digest, digest=digest,
+                )
+
     def test_keyless_command_preserves_claim_checks_and_exact_identity(self) -> None:
         selected_policy = policy()
         artifact = selected_policy["spec"]["artifacts"][0]  # type: ignore[index]

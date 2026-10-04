@@ -179,6 +179,15 @@ class SubprocessCosignRunner:
             raise ReleaseSignatureError("release-signature.tool.unavailable") from None
 
 
+def _canonical_docker_hub_claim(value: object) -> str | None:
+    """Permit only Docker Hub's exact public hostname alias in signed claims."""
+    if not isinstance(value, str):
+        return None
+    if value.startswith("index.docker.io/"):
+        return "docker.io/" + value.removeprefix("index.docker.io/")
+    return value
+
+
 def _validated_cosign_output(
     encoded: bytes,
     *,
@@ -202,7 +211,10 @@ def _validated_cosign_output(
         image = critical.get("image") if isinstance(critical, dict) else None
         if (
             not isinstance(identity, dict)
-            or identity.get("docker-reference") not in (repository, reference)
+            or _canonical_docker_hub_claim(identity.get("docker-reference")) not in (
+                _canonical_docker_hub_claim(repository),
+                _canonical_docker_hub_claim(reference),
+            )
             or not isinstance(image, dict)
             or image.get("docker-manifest-digest") != digest
             or critical.get("type") != SIGNATURE_TYPE
@@ -713,6 +725,11 @@ def qualify(
     )
     _write_report(output, report)
     if require_promotable and report["spec"]["status"] != "verified":  # type: ignore[index]
+        # The already validated report has nine closed check IDs and bounded
+        # stable error codes. Never surface captured Cosign output or policy.
+        for check in report["spec"]["checks"]:  # type: ignore[index]
+            if check["status"] == "failed":
+                print(f"{check['id']}: {check['errorCode']}", file=sys.stderr)
         raise ReleaseSignatureError("release-signature.report.not-promotable")
     return report
 

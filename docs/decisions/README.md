@@ -168,3 +168,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0162](0162-versioned-community-installation-kit.md) | Accepted implementation boundary | Package committed persistent Compose installation sources without operator state or implicit image builds |
 | [0163](0163-digest-selected-community-images.md) | Accepted implementation boundary | Check and start a community installation from five exact local image digests without implicit pull or build fallback |
 | [0164](0164-docker-hub-release-destinations.md) | Accepted release configuration | Publish exact signed indexes to the approved short Docker Hub names and expose a separately signed Compose kit |
+| [0165](0165-exact-docker-hub-signature-alias.md) | Accepted compatibility correction | Recognize only the exact Docker Hub claim hostname alias and keep manual signature rechecks separate from release promotion |

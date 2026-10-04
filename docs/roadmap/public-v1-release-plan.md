@@ -81,9 +81,14 @@ The initial `v0.84.0` publishing tag failed workflow validation before jobs or
 image pushes. The `v0.84.1` attempt passed build and publication, then failed
 before signatures when Cosign tried to create its trust cache on a read-only
 path. Its unsigned registry tags are not an accepted release. Both Git tags
-remain immutable; the corrected candidate is `v0.84.2` with chart `0.87.2`.
-Normal CI now checks actual GitHub Actions syntax and expression contexts.
-Successful signed publication and fresh-host installation remain pending, not
+remain immutable. `v0.84.2` with chart `0.87.2` uploaded and signed both images,
+then qualification rejected Cosign's `index.docker.io` claim alias for the
+policy's `docker.io` name. The adapter correction preserves exact trust and
+adds a manual signature-only recheck without builds or full-suite tests.
+The failed job saved no bundle checkpoint; remaining vulnerability, customer
+asset signing and GitHub publication work is not completed by that diagnostic.
+Normal CI checks actual GitHub Actions syntax and expression contexts.
+Successful qualified publication and fresh-host installation remain pending, not
 inferred from a passing local test suite. The optional extra local installation
 smoke check is manual and was deferred for this publishing attempt; that does
 not remove the signature or vulnerability promotion gates.

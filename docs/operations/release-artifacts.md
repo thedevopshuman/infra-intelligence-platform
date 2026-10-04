@@ -370,10 +370,48 @@ signing failed when Cosign tried to create `/.sigstore` on its read-only root.
 No signed GitHub release was created. Do not use those unsigned registry tags
 as accepted installation artifacts, and do not move or overwrite them.
 `v0.84.2` carries the signer-cache correction and chart `0.87.2`
-(`appVersion: 0.84.2`). SDK and Bedrock instrumentation versions are unchanged
-because their public behavior is unchanged. Passing syntax or build checks
-does not itself prove signing, publication qualification or anonymous
-installation; the protected release must complete.
+(`appVersion: 0.84.2`). It uploaded and signed both indexes, then failed
+qualification because its parser rejected Cosign's equivalent `index.docker.io`
+claim for the policy's `docker.io` repository. The adapter correction recognizes
+only those exact hostnames, without changing the path, digest, identity,
+issuer or transparency checks. SDK and Bedrock instrumentation versions are
+unchanged. Passing image signatures alone does not prove full publication
+qualification or anonymous installation; the protected release must complete.
+
+### Recheck only existing image signatures
+
+Use the manual **release signature recheck** workflow with the original release
+tag and both exact published index digests, or run:
+
+```bash
+.venv/bin/python scripts/recheck_release_signatures.py \
+  --tag v0.84.2 \
+  --control-plane-digest sha256:13d15527b3ed7c65ba34ed2b102f15bfbe29a33106ef0ec6953d9bad3361bcfc \
+  --bridge-digest sha256:57fad1274d105348fd9ee2ec9ff8177b62ddc5d56688943d31c56b940e2b5565 \
+  --cosign scripts/cosign_container.sh
+```
+
+These are the already-published `v0.84.2` indexes, not approved install
+instructions. The diagnostic requires pinned Cosign 3.1.2, the exact original
+tag-workflow identity, GitHub's issuer and transparency verification. Its
+GitHub job runs anonymously with read-only permissions and no environment
+secrets. It performs no full test suite, image build, image push, signing,
+installation, vulnerability scan or GitHub release creation. It does not
+produce a `ReleaseSignatureVerificationReport` because it has no verified
+bundle; a green recheck is not promotion evidence.
+
+GitHub reruns jobs, not individual steps. The failed release used one job and
+uploaded no intermediate bundle/checkpoint. Rerunning it would repeat its
+tests and builds and use its unchanged old verifier. Do not use that route
+when only a failed-step diagnostic is requested. Completing this release
+without rebuilding images requires recovering both complete OCI graphs,
+repackaging the original tag's non-image assets and generating a new verified
+bundle before the still-required vulnerability and asset-signing steps.
+Neither old archive checksums nor original blob-signing identity may be
+invented for reconstructed artifacts. See
+[ADR 0165](../decisions/0165-exact-docker-hub-signature-alias.md).
+
+### Publication credentials
 
 The job is restricted to `thedevopshuman/infra-intelligence-platform`. In that
 repository, open **Settings → Environments → release → Environment secrets**

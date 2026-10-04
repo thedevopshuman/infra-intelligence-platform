@@ -54,7 +54,9 @@ existing output. This is a local packaging command, not a public download URL.
 Authenticated public kit and runtime-image distribution is still pending. The
 approved application destination is `docker.io/thedevopshuman/iip`.
 `v0.84.1` images were uploaded but their signing failed; their existence is not
-release approval. Use only a completed release with verified signatures. Do
+release approval. `v0.84.2` signed its images but has no completed customer-kit
+publication; a signature-only recheck cannot create it. Use only a completed
+release with verified signatures. Do
 not substitute the `learning-v0.84.0` archive for this profile or guess an
 image tag/digest.
 

@@ -4,6 +4,10 @@
 
 **Date:** 2026-09-06
 
+The owner now prioritizes [public open-source v1](../roadmap/public-v1-release-plan.md)
+first, as recorded in ADR 0155. This document continues to define optional
+private-pilot scope and admission; it is no longer the first distribution target.
+
 The `v1` in this document names the first usable product slice. Its current
 admission contract uses the stricter
 `customer-ai-finops-design-partner-v2` evidence semantics from ADR 0152; those

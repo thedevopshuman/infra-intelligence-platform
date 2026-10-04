@@ -1,7 +1,12 @@
 # Initial implementation roadmap
 
 **Status:** Working plan  
-**Planning horizon:** Foundation through first design partner
+**Planning horizon:** Foundation through public v1 and design-partner adoption
+
+**Release sequencing (2026-10-04):** The owner selected public open-source v1
+first. Follow the [public v1 release plan](public-v1-release-plan.md) for that
+launch; the phase outcomes and optional private-pilot admission gates below
+remain in force for their own scopes.
 
 **Implementation note (2026-08-17):** The repository contains one executable local reference slice through every phase: live reconciliation collection and checkpoint ingestion (Phase 1), durable evidence and deterministic investigations (Phase 2), repeated-run scoring (Phase 3), separation-of-duties one-shot actions plus an opt-in verified Kubernetes restart (Phase 4), and bounded plugin handshake metadata (Phase 5). These are implementation units, not completed phase exit gates. Remaining gate work is listed below and external pilot/legal/brand outcomes cannot be completed by repository code alone.
 

@@ -158,3 +158,4 @@ Decision records are numbered, dated, and append-only after acceptance. A new de
 | [0152](0152-require-operational-alert-qualification-before-private-pilot.md) | Accepted | Advance pilot readiness to v2 and require exact AI FinOps alert-route evidence as the tenth admission input |
 | [0153](0153-source-bound-sustained-ai-finops-load-qualification.md) | Accepted | Qualify bounded fixed-rate synthetic AI economics throughput on one local Docker host without making a customer-capacity claim |
 | [0154](0154-verified-postgresql-transport-security.md) | Accepted | Require explicit hostname-verified PostgreSQL TLS for every packaged database client and reserve plaintext for named local fixtures |
+| [0155](0155-public-open-source-v1-first.md) | Accepted sequencing | Prioritize public open-source v1 while preserving qualification boundaries and explicit ownership/licensing decisions |

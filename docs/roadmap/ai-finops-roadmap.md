@@ -8,6 +8,10 @@ intelligence roadmap. Each phase must preserve the product constitution,
 tenant isolation, metadata-only default, asynchronous failure behavior, and
 provider-neutral package boundaries.
 
+The first distribution target is now [public open-source v1](public-v1-release-plan.md).
+This changes release sequencing, not the metadata-only collection principles,
+live-provider evidence requirements, or the longer-term AI economics phases.
+
 ## Phase A — Bedrock vertical slice
 
 **Outcome:** A local, executable metadata-only path shows Bedrock usage,

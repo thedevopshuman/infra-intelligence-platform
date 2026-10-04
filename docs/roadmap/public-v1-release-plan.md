@@ -111,10 +111,15 @@ delivery state. It does not remove immutable events, audit records, or
 unpublished/quarantined work. In particular, the community publisher is
 disabled, so this is not a remedy for its growing undelivered backlog. A
 privacy-safe customer-owned event destination and operating policy remain
-necessary. AI-ledger retention also remains open: historical allocation reads,
-exact invocation observations, future repricing/reattribution, and cited
-findings need explicit retained/retired semantics before payload retirement can
-be enabled. Silently omitting historical usage is not an acceptable lifecycle.
+necessary. AI-ledger retention also remains open. The separate
+[history-availability boundary](../operations/ai-history-availability.md) now
+distinguishes recorded retirement from missing/pending input and prevents
+partial allocation, invocation, and savings-cohort reads. It adds no physical
+payload deletion or production marker writer. Cited-finding pins, atomic
+retirement/audit, exact retry identity, foreign keys, replay, future
+repricing/reattribution limits, and backup/restore still require explicit
+lifecycle implementation and proof before cleanup can be enabled. Silently
+omitting historical usage is not an acceptable lifecycle.
 
 The release plan must name which features are supported and which remain
 experimental before assigning a completion percentage or delivery date. A

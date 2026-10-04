@@ -86,6 +86,7 @@ transport is runtime-specific.
 `AiPriceCatalogImportReport`, `AiPriceCatalogQualificationPolicy`,
 `AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`,
 `AiSavingsFindingPage`, `AiModelSuitabilityReport`, `AiAllocationReport`,
+`AiHistoryAvailabilityReport`,
 `AiEconomicsInvocationObservationRequest`,
 `AiEconomicsInvocationObservation`,
 `AiFinopsSustainedLoadProfile`,
@@ -99,6 +100,11 @@ describe the
 metadata-only AI economics ledger. The SDK does not instrument or
 proxy model calls; applications continue using standard OpenTelemetry
 instrumentation and a customer-controlled Collector.
+
+`getAiHistoryAvailability()` returns exact retained and retired usage counts for
+one bounded interval. Existing allocation and exact-invocation reads reject with
+`PlatformApiError(410, "ai.history.retired")` when their complete source history
+has been retired; the client never substitutes an empty or partial success.
 
 `CustomerSustainedWorkloadProfile` and
 `CustomerSustainedWorkloadQualificationReport` type the separately operated

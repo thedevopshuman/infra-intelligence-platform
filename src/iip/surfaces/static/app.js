@@ -647,6 +647,10 @@ function renderAiAllocationReport() {
       chip.textContent = "Connect to inspect";
       title.textContent = "Connect to inspect AI economics";
       copy.textContent = "Load a bounded report from the tenant's normalized usage and calculated-cost ledger.";
+    } else if (error === "ai.history.retired") {
+      chip.textContent = "Source data retired";
+      title.textContent = "Historical report unavailable";
+      copy.textContent = "One or more source records needed for this interval were retired under the tenant's retention policy. No totals are shown because a complete report can no longer be reconstructed. Choose a newer interval or contact an administrator.";
     } else if (error === "ai.allocation.not-configured") {
       chip.textContent = "Not configured";
       title.textContent = "AI economics is not configured";

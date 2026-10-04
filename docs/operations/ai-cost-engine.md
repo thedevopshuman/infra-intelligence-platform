@@ -203,6 +203,13 @@ facts; it never mutates or deletes earlier calculations. The current service
 records calculated estimates only and makes no invoice, discount, commitment,
 tax, or billing-reconciliation claim.
 
+Recalculation requires retained source usage. The separate
+[history-availability read boundary](ai-history-availability.md) distinguishes
+recorded retirement from absent or pending history; its aggregate counts and
+markers cannot reconstruct input for future repricing. This unit enables no
+AI payload cleanup or production marker writer. Do not remove usage, derived
+records, or their foreign keys to simulate retention.
+
 ## Operations and recovery
 
 The worker emits only aggregate pass counts: processed, priced, unpriced,

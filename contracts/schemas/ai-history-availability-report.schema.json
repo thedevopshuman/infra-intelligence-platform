@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:iip:contracts:ai-history-availability-report:v1alpha1",
+  "title": "AI History Availability Report",
+  "description": "Read-only tenant-scoped availability of locally committed AI usage history; not a traffic-capture, processing-completion, or retention-policy report.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "iip.platform/v1alpha1"},
+    "kind": {"const": "AiHistoryAvailabilityReport"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId", "generatedAt"],
+      "properties": {
+        "tenantId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+        "generatedAt": {"$ref": "#/$defs/timestamp"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "status", "coverage"],
+      "properties": {
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end"],
+          "properties": {
+            "start": {"$ref": "#/$defs/timestamp"},
+            "end": {"$ref": "#/$defs/timestamp"}
+          }
+        },
+        "status": {"type": "string", "enum": ["available", "history-retired"]},
+        "coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["retainedUsageRecords", "retiredUsageRecords"],
+          "properties": {
+            "retainedUsageRecords": {"$ref": "#/$defs/count"},
+            "retiredUsageRecords": {"$ref": "#/$defs/count"}
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "available"}}, "required": ["status"]},
+          "then": {"properties": {"coverage": {"properties": {"retiredUsageRecords": {"const": 0}}}}},
+          "else": {"properties": {"coverage": {"properties": {"retiredUsageRecords": {"minimum": 1}}}}}
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.](?!000000)[0-9]{6})?Z$"
+    }
+  }
+}

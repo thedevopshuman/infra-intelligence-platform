@@ -262,6 +262,7 @@ SCHEMA_EXAMPLES: Mapping[str, Tuple[str, ...]] = {
         "ai-usage-attribution-record.json",
     ),
     "ai-allocation-report.schema.json": ("ai-allocation-report.json",),
+    "ai-history-availability-report.schema.json": ("ai-history-availability-report.json",),
     "ai-economics-invocation-observation-request.schema.json": (
         "ai-economics-invocation-observation-request.json",
     ),

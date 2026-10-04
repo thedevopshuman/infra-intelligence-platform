@@ -380,6 +380,15 @@ and appends aggregate audit. The entire supported publication-SLO window,
 immutable event log, deduplication identity, and undelivered work remain intact.
 AI-ledger payload retirement is not implied by that separate lifecycle.
 
+[ADR 0161](../decisions/0161-explicit-ai-history-availability.md) adds a
+separate read-only AI history-availability report and per-invocation marker
+storage prerequisite. Allocation, exact-invocation, and savings-cohort reads
+distinguish recorded retirement from absent/pending input and reject partial
+history in their own consistent storage snapshots. No AI payload deletion,
+marker-writing production port, or cleanup scheduler is enabled. The
+[AI economics architecture](ai-economics.md#history-availability-before-retirement)
+keeps future pins, idempotency, replay, and recovery gates explicit.
+
 The logical boundaries remain product-neutral. [ADR 0004](../decisions/0004-postgresql-observation-store-and-outbox.md) selects PostgreSQL for the initial resource/observation, event-log, checkpoint, and outbox substrate while leaving other stores and later transport specialization open:
 
 | Store | Responsibility | Required semantics |

@@ -20,6 +20,10 @@ from iip.adapters.postgres.connection import (
     validate_connection_environment,
 )
 from iip.adapters.event_outbox_retention import retention_audit, retention_cutoff
+from iip.adapters.ai_history import (
+    ai_invocation_correlation_digest,
+    validate_ai_history_availability_query,
+)
 from iip.adapters.ai_cost_store import (
     prepare_ai_cost_writes,
     prepare_ai_price_catalog,
@@ -50,6 +54,9 @@ from iip.application.attribute_ai_usage import (
 from iip.application.ports import (
     ActorContext,
     AiAllocationLedgerQuery,
+    AiHistoryAvailabilityQuery,
+    AiHistoryAvailabilityState,
+    AiHistoryRetiredError,
     AiInvocationEconomicsQuery,
     AiSavingsCohortQuery,
     AiSavingsFindingLedgerQuery,
@@ -109,6 +116,7 @@ SCHEMA_MIGRATIONS = (
     "0023_ai_model_suitability.sql",
     "0024_ai_invocation_correlation.sql",
     "0025_delivered_outbox_retention.sql",
+    "0026_ai_history_availability.sql",
 )
 
 
@@ -1094,6 +1102,57 @@ class PostgresResourceStore:
             )
 
     @_translate_database_errors
+    def get_ai_history_availability(
+        self,
+        actor: ActorContext,
+        query: AiHistoryAvailabilityQuery,
+    ) -> AiHistoryAvailabilityState:
+        """Count retained and known-retired usage for one exact interval."""
+
+        validate_ai_history_availability_query(actor, query)
+        with self._connect() as connection:
+            self._lock_ai_history(connection, actor.tenant_id)
+            row = connection.execute(
+                """
+                SELECT
+                    (
+                        SELECT count(*)
+                        FROM iip.ai_usage_records AS usage
+                        WHERE usage.tenant_id = %s
+                          AND usage.invocation_started_at >= %s
+                          AND usage.invocation_started_at < %s
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM iip.ai_retired_invocation_markers AS retired
+                              WHERE retired.tenant_id = usage.tenant_id
+                                AND retired.usage_record_id = usage.usage_record_id
+                          )
+                    ) AS retained_usage_records,
+                    (
+                        SELECT count(*)
+                        FROM iip.ai_retired_invocation_markers AS retired
+                        WHERE retired.tenant_id = %s
+                          AND retired.invocation_started_at >= %s
+                          AND retired.invocation_started_at < %s
+                    ) AS retired_usage_records
+                """,
+                (
+                    actor.tenant_id,
+                    query.start,
+                    query.end,
+                    actor.tenant_id,
+                    query.start,
+                    query.end,
+                ),
+            ).fetchone()
+            if row is None:
+                raise PersistenceError("storage.state.invalid")
+            return AiHistoryAvailabilityState(
+                retained_usage_records=int(row["retained_usage_records"]),
+                retired_usage_records=int(row["retired_usage_records"]),
+            )
+
+    @_translate_database_errors
     def list_ai_savings_cohort(
         self,
         actor: ActorContext,
@@ -1103,6 +1162,13 @@ class PostgresResourceStore:
 
         validate_ai_savings_query(actor, query)
         with self._connect() as connection:
+            self._lock_ai_history(connection, actor.tenant_id)
+            self._raise_if_ai_history_retired(
+                connection,
+                actor.tenant_id,
+                query.start,
+                query.end,
+            )
             rows = connection.execute(
                 """
                 SELECT usage.document AS usage_document,
@@ -1231,6 +1297,13 @@ class PostgresResourceStore:
 
         validate_ai_allocation_ledger_query(actor, query)
         with self._connect() as connection:
+            self._lock_ai_history(connection, actor.tenant_id)
+            self._raise_if_ai_history_retired(
+                connection,
+                actor.tenant_id,
+                query.start,
+                query.end,
+            )
             rows = connection.execute(
                 """
                 SELECT usage.document AS usage_document,
@@ -1287,6 +1360,25 @@ class PostgresResourceStore:
 
         validate_ai_invocation_query(actor, query)
         with self._connect() as connection:
+            self._lock_ai_history(connection, actor.tenant_id)
+            retired = connection.execute(
+                """
+                SELECT 1
+                FROM iip.ai_retired_invocation_markers
+                WHERE tenant_id = %s AND correlation_digest = %s
+                LIMIT 1
+                """,
+                (
+                    actor.tenant_id,
+                    ai_invocation_correlation_digest(
+                        actor.tenant_id,
+                        query.trace_id,
+                        query.span_id,
+                    ),
+                ),
+            ).fetchone()
+            if retired is not None:
+                raise AiHistoryRetiredError()
             rows = connection.execute(
                 """
                 SELECT usage.document AS usage_document,
@@ -2367,6 +2459,43 @@ class PostgresResourceStore:
     def _connect(self) -> Any:
         validate_connection_environment(self._database_configuration)
         return psycopg.connect(self._database_url, row_factory=dict_row)
+
+    @staticmethod
+    def _lock_ai_history(connection: Any, tenant_id: str) -> None:
+        """Fence availability reads from a future exclusive lifecycle writer."""
+
+        connection.execute(
+            "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+        )
+        connection.execute("SET LOCAL lock_timeout = '2s'")
+        connection.execute("SET LOCAL statement_timeout = '10s'")
+        connection.execute(
+            "SELECT pg_advisory_xact_lock_shared(hashtextextended(%s, 0))",
+            (f"iip.ai-history\x1f{tenant_id}",),
+        )
+
+    @staticmethod
+    def _raise_if_ai_history_retired(
+        connection: Any,
+        tenant_id: str,
+        start: str,
+        end: str,
+    ) -> None:
+        """Reject a whole interval when any authoritative marker overlaps it."""
+
+        retired = connection.execute(
+            """
+            SELECT 1
+            FROM iip.ai_retired_invocation_markers
+            WHERE tenant_id = %s
+              AND invocation_started_at >= %s
+              AND invocation_started_at < %s
+            LIMIT 1
+            """,
+            (tenant_id, start, end),
+        ).fetchone()
+        if retired is not None:
+            raise AiHistoryRetiredError()
 
     @classmethod
     def _reconciliation_from_row(cls, row: Mapping[str, Any]) -> ReconciliationSnapshot:

@@ -185,6 +185,15 @@ identity, tenant data, or provider detail.
 
 ## Placement decisions
 
+AI history availability follows the same serving dependency direction:
+`application/query_ai_history.py` owns tenant authorization, interval validation,
+and aggregate report semantics. Application-owned ports express the read-only
+availability state and retired-history failure; adapters own marker lookup and
+consistent snapshots around guarded allocation, invocation, and savings reads.
+The HTTP surface maps retired history to the stable protocol error, and SDKs
+consume only the public report. No deletion policy, production marker writer,
+or operational filesystem authority is introduced into these boundaries.
+
 Delivered-outbox retention follows normal serving boundaries:
 `application/event_outbox_retention.py` owns authorization, policy binding, and
 aggregate report semantics; the resource adapters own terminal-row selection,

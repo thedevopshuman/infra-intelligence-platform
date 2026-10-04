@@ -392,6 +392,7 @@ test-console-javascript:
 test-typescript:
 	cd sdks/typescript && $(NPM) ci --ignore-scripts --no-audit --no-fund
 	cd sdks/typescript && $(NPM) run check
+	cd sdks/typescript && $(NPM) run test:runtime
 
 test-evidence-redaction:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest \

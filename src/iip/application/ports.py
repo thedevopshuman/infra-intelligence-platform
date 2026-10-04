@@ -17,6 +17,13 @@ class PersistenceError(RuntimeError):
     """Provider-neutral durable-store failure with a stable external code."""
 
 
+class AiHistoryRetiredError(PersistenceError):
+    """Requested AI history includes source data known to be retired."""
+
+    def __init__(self) -> None:
+        super().__init__("ai.history.retired")
+
+
 class ReadinessError(RuntimeError):
     """A required runtime dependency cannot safely serve requests."""
 
@@ -808,6 +815,22 @@ class AiInvocationEconomicsQuery:
 
 
 @dataclass(frozen=True)
+class AiHistoryAvailabilityQuery:
+    """Exact tenant half-open interval used to inspect AI history availability."""
+
+    start: str
+    end: str
+
+
+@dataclass(frozen=True)
+class AiHistoryAvailabilityState:
+    """Aggregate live and retired usage counts for one exact tenant interval."""
+
+    retained_usage_records: int
+    retired_usage_records: int
+
+
+@dataclass(frozen=True)
 class AiSavingsFindingLedgerQuery:
     """Bounded newest-first finding interval with an optional exclusive position."""
 
@@ -818,7 +841,16 @@ class AiSavingsFindingLedgerQuery:
     limit: int
 
 
-class AiEconomicsLedger(AiAttributionLedger, Protocol):
+class AiHistoryAvailabilityStore(Protocol):
+    def get_ai_history_availability(
+        self,
+        actor: ActorContext,
+        query: AiHistoryAvailabilityQuery,
+    ) -> AiHistoryAvailabilityState:
+        """Return aggregate live and retired usage coverage for one interval."""
+
+
+class AiEconomicsLedger(AiAttributionLedger, AiHistoryAvailabilityStore, Protocol):
     def register_price_catalog(
         self,
         actor: ActorContext,

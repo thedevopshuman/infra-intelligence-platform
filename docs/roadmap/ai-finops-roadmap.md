@@ -218,6 +218,16 @@ service/resource identity is insufficient.
 Exit gate: every allocation is traceable to an effective-time mapping, and
 unallocated usage remains visible rather than guessed.
 
+The read-only [history-availability boundary](../operations/ai-history-availability.md)
+now distinguishes recorded whole-invocation retirement from missing or pending
+usage. Existing allocation and exact-invocation success shapes remain unchanged;
+retired input fails explicitly instead of producing partial historical totals.
+Savings-cohort reads also fail closed for a retired interval. This is a
+lifecycle prerequisite only: no AI payload deletion, production marker writer,
+retention policy, or cleanup scheduler is enabled. Reference pins, atomic
+retirement/audit, exact retry identity, foreign keys, replay, repricing limits,
+and compatible backup/restore remain required before enabling retirement.
+
 ## Phase C — additional providers
 
 **Outcome:** The same public ledger and cost contracts work across qualified

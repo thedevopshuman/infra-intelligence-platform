@@ -27,9 +27,19 @@ returns a stable input error. Storage failure returns `storage.unavailable`;
 policy denial returns `policy.denied`; neither response exposes provider or SQL
 details.
 
+Recorded retirement is distinct from missing downstream processing. If any
+same-tenant whole-invocation retirement marker falls within the requested
+interval, the owning storage snapshot rejects the read with
+`410 ai.history.retired` before the source-row limit or aggregation. It never
+returns surviving usage as a complete historical total. Successful v1alpha1
+reports retain the same closed shape. The separate read-only
+[history availability report](ai-history-availability-contract.md) exposes
+retained/retired counts but cannot guarantee availability of a later read.
+
 ## Coverage before totals
 
-Every usage row belongs to exactly one group:
+For an interval without recorded retirement, every usage row belongs to exactly
+one group:
 
 - `allocated`, grouped by the immutable application or team ID and display
   name stored on the attribution record;

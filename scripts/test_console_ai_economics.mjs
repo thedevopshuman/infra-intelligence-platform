@@ -21,11 +21,30 @@ const selections = {
   "#ai-report-window": { value: "24" },
   "#ai-report-group": { value: "application" },
 };
+const elements = new Map();
+
+function element() {
+  const descendants = new Map();
+  return {
+    className: "",
+    firstChild: null,
+    hidden: false,
+    textContent: "",
+    querySelector(selector) {
+      if (!descendants.has(selector)) descendants.set(selector, element());
+      return descendants.get(selector);
+    },
+    removeChild() {},
+  };
+}
+
 const context = {
   console,
   document: {
     querySelector(selector) {
-      return selections[selector];
+      if (selections[selector]) return selections[selector];
+      if (!elements.has(selector)) elements.set(selector, element());
+      return elements.get(selector);
     },
   },
 };
@@ -38,6 +57,7 @@ globalThis.consoleContractTest = {
   validateAiSavingsFindingPage,
   formatCalculatedCost,
   formatPotentialSaving,
+  renderAiAllocationReport,
   selectedAiScope,
 };`,
   context,
@@ -69,6 +89,28 @@ assert.equal(subject.formatPotentialSaving({ status: "unpriced" }), "Unpriced");
 assert.equal(
   subject.formatPotentialSaving({ status: "unresolved" }),
   "Billing unresolved",
+);
+
+if (!elements.has("#ai-metric-cost")) {
+  elements.set("#ai-metric-cost", element());
+}
+elements.get("#ai-metric-cost").textContent = "USD 99.00 est.";
+subject.state.aiAllocationReport = null;
+subject.state.aiAllocationError = "ai.history.retired";
+subject.renderAiAllocationReport();
+assert.equal(elements.get("#ai-report-state").textContent, "Source data retired");
+assert.equal(
+  elements.get("#ai-allocation-empty").querySelector("h3").textContent,
+  "Historical report unavailable",
+);
+assert.equal(
+  elements.get("#ai-allocation-empty").querySelector("p").textContent,
+  "One or more source records needed for this interval were retired under the tenant's retention policy. No totals are shown because a complete report can no longer be reconstructed. Choose a newer interval or contact an administrator.",
+);
+assert.equal(elements.get("#ai-metric-cost").textContent, "—");
+assert.notEqual(
+  elements.get("#ai-allocation-empty").querySelector("h3").textContent,
+  "No AI usage in this window",
 );
 
 const selectedScope = subject.selectedAiScope();

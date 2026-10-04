@@ -12,6 +12,9 @@ from typing import Dict, Iterable, Mapping, Optional
 from iip.application.ports import (
     ActorContext,
     AiAllocationLedgerQuery,
+    AiHistoryAvailabilityQuery,
+    AiHistoryAvailabilityState,
+    AiHistoryRetiredError,
     AiInvocationEconomicsQuery,
     AiSavingsCohortQuery,
     AiSavingsFindingLedgerQuery,
@@ -28,6 +31,11 @@ from iip.application.ports import (
     SourceCheckpoint,
     SourceIngestionState,
     StoredEvent,
+)
+from iip.adapters.ai_history import (
+    ai_invocation_correlation_digest,
+    parse_ai_history_interval,
+    validate_ai_history_availability_query,
 )
 from iip.application.query_ai_allocations import validate_ai_allocation_ledger_query
 from iip.adapters.event_outbox_retention import retention_audit, retention_cutoff
@@ -102,6 +110,9 @@ class InMemoryResourceStore:
             tuple[str, str], tuple[str, Mapping[str, object]]
         ] = {}
         self._ai_usage_ids: Dict[tuple[str, str], str] = {}
+        self._ai_retired_invocation_markers: Dict[
+            tuple[str, str], tuple[str, datetime]
+        ] = {}
         self._ai_attribution_policies: Dict[
             tuple[str, str], tuple[str, Mapping[str, object]]
         ] = {}
@@ -685,6 +696,59 @@ class InMemoryResourceStore:
                 results.append(self._json_copy(copied))
             return tuple(results)
 
+    def get_ai_history_availability(
+        self,
+        actor: ActorContext,
+        query: AiHistoryAvailabilityQuery,
+    ) -> AiHistoryAvailabilityState:
+        """Count retained and known-retired usage for one exact interval."""
+
+        start, end = validate_ai_history_availability_query(actor, query)
+        with self._lock:
+            retired_usage_records = sum(
+                1
+                for (tenant_id, _usage_id), (_digest, invocation_started_at)
+                in self._ai_retired_invocation_markers.items()
+                if tenant_id == actor.tenant_id
+                and start <= invocation_started_at < end
+            )
+            retained_usage_records = 0
+            for (tenant_id, _deduplication), (_digest, usage) in self._ai_usage.items():
+                if tenant_id != actor.tenant_id:
+                    continue
+                try:
+                    metadata = usage["metadata"]
+                    spec = usage["spec"]
+                    assert isinstance(metadata, Mapping) and isinstance(spec, Mapping)
+                    invocation = spec["invocation"]
+                    assert isinstance(invocation, Mapping)
+                    usage_id = metadata["id"]
+                    started_text = invocation["startedAt"]
+                    if not isinstance(usage_id, str) or not isinstance(
+                        started_text, str
+                    ):
+                        raise ValueError
+                    invocation_started_at = datetime.fromisoformat(
+                        started_text.replace("Z", "+00:00")
+                    )
+                    if (
+                        invocation_started_at.tzinfo is None
+                        or invocation_started_at.utcoffset() is None
+                    ):
+                        raise ValueError
+                except (AssertionError, KeyError, TypeError, ValueError, OverflowError):
+                    raise PersistenceError("storage.state.invalid") from None
+                if (
+                    start <= invocation_started_at < end
+                    and (tenant_id, usage_id)
+                    not in self._ai_retired_invocation_markers
+                ):
+                    retained_usage_records += 1
+            return AiHistoryAvailabilityState(
+                retained_usage_records=retained_usage_records,
+                retired_usage_records=retired_usage_records,
+            )
+
     def list_ai_savings_cohort(
         self,
         actor: ActorContext,
@@ -693,7 +757,9 @@ class InMemoryResourceStore:
         """Read a bounded exact-scope usage/cost cohort."""
 
         validate_ai_savings_query(actor, query)
+        start, end = parse_ai_history_interval(query.start, query.end)
         with self._lock:
+            self._raise_if_ai_history_retired(actor.tenant_id, start, end)
             candidates: list[
                 tuple[str, str, Mapping[str, object], Mapping[str, object] | None]
             ] = []
@@ -777,6 +843,7 @@ class InMemoryResourceStore:
 
         start, end = validate_ai_allocation_ledger_query(actor, query)
         with self._lock:
+            self._raise_if_ai_history_retired(actor.tenant_id, start, end)
             candidates: list[
                 tuple[
                     str,
@@ -861,6 +928,17 @@ class InMemoryResourceStore:
 
         validate_ai_invocation_query(actor, query)
         with self._lock:
+            correlation_digest = ai_invocation_correlation_digest(
+                actor.tenant_id,
+                query.trace_id,
+                query.span_id,
+            )
+            if any(
+                tenant_id == actor.tenant_id and marker[0] == correlation_digest
+                for (tenant_id, _usage_id), marker
+                in self._ai_retired_invocation_markers.items()
+            ):
+                raise AiHistoryRetiredError()
             matches: list[Mapping[str, object]] = []
             for (tenant_id, _deduplication), (_digest, usage) in self._ai_usage.items():
                 if tenant_id != actor.tenant_id:
@@ -1737,6 +1815,19 @@ class InMemoryResourceStore:
             r"[a-z][a-z0-9_.-]{2,127}", error_code
         ):
             raise ValueError("error_code must be stable and non-sensitive")
+
+    def _raise_if_ai_history_retired(
+        self,
+        tenant_id: str,
+        start: datetime,
+        end: datetime,
+    ) -> None:
+        if any(
+            marker_tenant == tenant_id and start <= marker[1] < end
+            for (marker_tenant, _usage_id), marker
+            in self._ai_retired_invocation_markers.items()
+        ):
+            raise AiHistoryRetiredError()
 
     @staticmethod
     def _json_copy(value: Mapping[str, object]) -> Mapping[str, object]:

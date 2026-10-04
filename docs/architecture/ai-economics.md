@@ -59,7 +59,7 @@ wait for IIP, the Collector, or Grafana.
 | Provider adapter | Translate accepted provider attributes into the canonical usage input without granting authority. |
 | Application service | Enforce deduplication, usage invariants, tenant scope, protected effective-time attribution, pricing selection, and deterministic rule evaluation. |
 | PostgreSQL adapter | Atomically persist immutable usage/attribution/cost/finding records and their outbox events. |
-| Read API | Authorize bounded tenant allocation and newest-first finding reads, plus privileged exact-invocation qualification; bind scope and revalidate stored results. |
+| Read API | Authorize bounded tenant allocation, history availability, and newest-first finding reads, plus privileged exact-invocation qualification; bind scope and revalidate stored results. |
 | OTLP exporter | Publish bounded aggregates and finding summaries without making serving readiness depend on delivery. |
 | Grafana | Query a configured telemetry backend; it is not an accounting store or query authority. |
 
@@ -172,7 +172,41 @@ and version registration plus cost identity are concurrency-safe and
 idempotent. A replacement catalog creates a new calculation lineage without
 mutating prior facts.
 
+## History availability before retirement
+
+[ADR 0161](../decisions/0161-explicit-ai-history-availability.md) separates
+recorded retirement from missing traffic and incomplete downstream processing.
+The read-only [availability report](../specifications/ai-history-availability-contract.md)
+counts locally retained usage and whole-invocation retirement markers over an
+authenticated tenant's exact half-open interval. `available` means no recorded
+retirements, not complete collection, pricing, or invoice agreement. A marker
+takes precedence over any still-present payload and is excluded from retained
+counts. Per-invocation markers allow historical retained holes; there is no
+inferred global retention cutoff. These counts are per normalized usage
+identity, not necessarily distinct physical provider calls across channels.
+
+Allocation and exact-invocation reads return `410 ai.history.retired` before
+partial data when their required history is retired. The allocation guard
+covers the whole interval before the source limit; exact lookup checks the
+tenant-bound correlation digest first. Guard and live data share one storage
+snapshot, and successful v1alpha1 envelopes remain unchanged. The same
+allocation boundary protects the worker's derived metric projection.
+
+This unit provides only the read contract and marker-storage prerequisite.
+It adds no physical payload deletion, production marker writer, AI retention
+configuration, or cleanup scheduler. A future lifecycle must atomically bind
+retirement to reference pins, immutable retry/conflict identity, all derived
+generations and foreign keys, audit, replay, and backup/restore. Markers cannot
+reconstruct retired usage for future repricing or reattribution. See the
+[read-only runbook](../operations/ai-history-availability.md).
+
 ## Finding semantics
+
+Historical input is guarded before rule evaluation: any recorded same-tenant
+whole-invocation retirement within a requested cohort interval rejects the
+read before narrower provider/model filtering. This conservative rule avoids
+evaluating partial history as a complete cohort. It does not change immutable
+finding-page responses or implement future finding-reference pin retention.
 
 `AiSavingsFinding` is the output of a versioned deterministic rule, not an AI
 agent. It freezes current and baseline windows, attribution scope, observations,

@@ -119,6 +119,7 @@ from iip.application.plugin_invocations import (
     ReconcilePluginInvocationCommand,
 )
 from iip.application.ports import (
+    AiHistoryRetiredError,
     ActorContext,
     AuthenticationError,
     PersistenceError,
@@ -136,6 +137,10 @@ from iip.application.query_actions import (
 from iip.application.query_ai_allocations import (
     AiAllocationAuthorizationError,
     AiAllocationQueryError,
+)
+from iip.application.query_ai_history import (
+    AiHistoryAuthorizationError,
+    AiHistoryQueryError,
 )
 from iip.application.query_ai_savings import (
     AiSavingsFindingAuthorizationError,
@@ -381,6 +386,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path == "/v1/ai/economics/allocation":
             self._query_ai_allocation(actor, parsed.query)
             return
+        if path == "/v1/ai/economics/history-availability":
+            self._query_ai_history_availability(actor, parsed.query)
+            return
         if path == "/v1/ai/economics/savings-findings":
             self._query_ai_savings_findings(actor, parsed.query)
             return
@@ -539,6 +547,24 @@ class ApiHandler(BaseHTTPRequestHandler):
                 {"error": {"code": "storage.unavailable"}},
             )
 
+    def _query_ai_history_availability(self, actor: ActorContext, query: str) -> None:
+        try:
+            parameters = parse_qs(query, keep_blank_values=True)
+            if set(parameters) != {"start", "end"}:
+                raise AiHistoryQueryError("request.invalid")
+            start = self._single(parameters, "start")
+            end = self._single(parameters, "end")
+            if start is None or end is None:
+                raise AiHistoryQueryError("request.invalid")
+            report = self.runtime.ai_history_availability.get(actor, start=start, end=end)
+            self._json(HTTPStatus.OK, dict(report))
+        except (AiHistoryQueryError, InvalidQueryError):
+            self._json(HTTPStatus.BAD_REQUEST, {"error": {"code": "request.invalid"}})
+        except AiHistoryAuthorizationError:
+            self._json(HTTPStatus.FORBIDDEN, {"error": {"code": "policy.denied"}})
+        except PersistenceError:
+            self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": {"code": "storage.unavailable"}})
+
     def _query_ai_allocation(self, actor: ActorContext, query: str) -> None:
         try:
             parameters = parse_qs(query, keep_blank_values=True)
@@ -568,7 +594,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                 HTTPStatus.FORBIDDEN,
                 {"error": {"code": "policy.denied"}},
             )
-        except AiAllocationQueryError as exc:
+        except AiHistoryRetiredError:
+            self._json(HTTPStatus.GONE, {"error": {"code": "ai.history.retired"}})
+        except (AiAllocationQueryError, InvalidQueryError) as exc:
             code = str(exc)
             status = (
                 HTTPStatus.UNPROCESSABLE_ENTITY
@@ -1281,6 +1309,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 {"error": {"code": "ai.invocation-observation.not-configured"}},
             )
+        except AiHistoryRetiredError:
+            self._json(HTTPStatus.GONE, {"error": {"code": "ai.history.retired"}})
         except PersistenceError:
             self._json(
                 HTTPStatus.SERVICE_UNAVAILABLE,
@@ -1908,6 +1938,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             "/v1/operations/evidence/retention": "evidence-retention",
             "/v1/operations/events/retention": "event-outbox-retention",
             "/v1/ai/economics/allocation": "ai-allocation-report",
+            "/v1/ai/economics/history-availability": "ai-history-availability",
             "/v1/ai/economics/savings-findings": "ai-savings-findings",
             "/v1/actions": "actions-list",
         }

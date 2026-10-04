@@ -37,7 +37,7 @@ Stage semantics are:
 
 | Overall status | Meaning |
 | --- | --- |
-| `not-observed` | No matching usage record exists in the authenticated tenant. Attribution and cost remain pending. |
+| `not-observed` | Neither matching live usage nor a retirement marker exists in the authenticated tenant. Attribution and cost remain pending. |
 | `processing` | Usage exists, but one or both active downstream records are not committed yet. |
 | `complete` | Usage and both downstream stages are terminal. Attribution may be `allocated` or `unallocated`; cost may be `priced`, `unpriced`, or `ambiguous`. |
 
@@ -46,6 +46,16 @@ digest. A priced result contains integer subunits under the selected currency,
 scale, and fixed `calculated-estimate` basis. It is never an invoice amount.
 Stored facts are revalidated against the authenticated tenant, usage record,
 engine version, and active source identity before they are returned.
+
+A recorded whole-invocation retirement takes precedence over any still-present
+payload. The same storage snapshot checks the canonical tenant-bound
+trace/span correlation digest before reading live stages. A matching marker
+returns `410 ai.history.retired`, never `not-observed`, `processing`, or a
+partial `complete` result. Successful v1alpha1 envelopes remain unchanged.
+The separate [history availability report](ai-history-availability-contract.md)
+reports interval-level counts; it neither grants exact-invocation authority
+nor authorizes a later read. This boundary adds no physical payload deletion
+or production marker writer.
 
 Unknown fields, crossed contract kinds, malformed identifiers, caller-supplied
 source generations, duplicate trace/span records, or invalid stored joins fail

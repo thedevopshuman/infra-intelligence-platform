@@ -19,6 +19,7 @@ from .models import (
     AiAllocationReport,
     AiEconomicsInvocationObservation,
     AiEconomicsInvocationObservationRequest,
+    AiHistoryAvailabilityReport,
     AiSavingsFindingPage,
     CollectorQueueLossReport,
     ConsoleAuthenticationConfiguration,
@@ -494,6 +495,19 @@ class Client:
         query = urlencode({"start": start, "end": end, "groupBy": group_by})
         return AiAllocationReport.from_dict(
             self._get(f"/v1/ai/economics/allocation?{query}")
+        )
+
+    def get_ai_history_availability(
+        self,
+        *,
+        start: str,
+        end: str,
+    ) -> AiHistoryAvailabilityReport:
+        """Read complete-history availability for one bounded tenant interval."""
+
+        query = urlencode({"start": start, "end": end})
+        return AiHistoryAvailabilityReport.from_dict(
+            self._get(f"/v1/ai/economics/history-availability?{query}")
         )
 
     def list_ai_savings_findings(

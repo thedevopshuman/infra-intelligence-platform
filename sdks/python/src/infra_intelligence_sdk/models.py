@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 import math
 import re
 from dataclasses import dataclass
@@ -11,6 +12,25 @@ from urllib.parse import urlsplit
 
 API_VERSION = "iip.platform/v1alpha1"
 PILOT_READINESS_API_VERSION = "iip.platform/v1alpha2"
+_AI_HISTORY_TENANT_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+_AI_HISTORY_TIMESTAMP = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
+    r"(?:[.](?!000000)[0-9]{6})?Z"
+)
+
+
+def _ai_history_timestamp(value: object) -> datetime:
+    if not isinstance(value, str) or _AI_HISTORY_TIMESTAMP.fullmatch(value) is None:
+        raise ValueError("AI history availability report is invalid")
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError:
+        raise ValueError("AI history availability report is invalid") from None
+    canonical = parsed.isoformat(timespec="microseconds").replace("+00:00", "Z")
+    canonical = canonical.replace(".000000Z", "Z")
+    if canonical != value:
+        raise ValueError("AI history availability report is invalid")
+    return parsed
 
 
 @dataclass(frozen=True)
@@ -4605,6 +4625,82 @@ class AiAllocationReport:
         ):
             raise ValueError("AI allocation report groups are invalid")
         return tuple(dict(item) for item in groups)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.payload)
+
+
+@dataclass(frozen=True)
+class AiHistoryAvailabilityReport:
+    """Availability of locally committed usage, not capture completeness."""
+
+    payload: Mapping[str, Any]
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "AiHistoryAvailabilityReport":
+        document = _validate_envelope(
+            payload,
+            kind="AiHistoryAvailabilityReport",
+            label="AI history availability report",
+        )
+        metadata = document.get("metadata")
+        spec = document.get("spec")
+        if (
+            set(document) != {"apiVersion", "kind", "metadata", "spec"}
+            or not isinstance(metadata, Mapping)
+            or set(metadata) != {"tenantId", "generatedAt"}
+            or not isinstance(metadata.get("tenantId"), str)
+            or _AI_HISTORY_TENANT_ID.fullmatch(metadata["tenantId"]) is None
+            or not isinstance(spec, Mapping)
+            or set(spec) != {"scope", "status", "coverage"}
+        ):
+            raise ValueError("AI history availability report is invalid")
+        scope = spec["scope"]
+        coverage = spec["coverage"]
+        if (
+            not isinstance(scope, Mapping)
+            or set(scope) != {"start", "end"}
+            or not all(isinstance(scope.get(field), str) for field in ("start", "end"))
+            or not isinstance(coverage, Mapping)
+            or set(coverage) != {"retainedUsageRecords", "retiredUsageRecords"}
+            or spec.get("status") not in ("available", "history-retired")
+        ):
+            raise ValueError("AI history availability report is invalid")
+        _ai_history_timestamp(metadata["generatedAt"])
+        start = _ai_history_timestamp(scope["start"])
+        end = _ai_history_timestamp(scope["end"])
+        if not timedelta(0) < end - start <= timedelta(days=31):
+            raise ValueError("AI history availability report is invalid")
+        retained = coverage["retainedUsageRecords"]
+        retired = coverage["retiredUsageRecords"]
+        if (
+            isinstance(retained, bool)
+            or not isinstance(retained, int)
+            or not 0 <= retained <= 9_007_199_254_740_991
+            or isinstance(retired, bool)
+            or not isinstance(retired, int)
+            or not 0 <= retired <= 9_007_199_254_740_991
+            or (spec["status"] == "available") != (retired == 0)
+        ):
+            raise ValueError("AI history availability report is invalid")
+        return cls(document)
+
+    @property
+    def status(self) -> str:
+        spec = self.payload["spec"]
+        assert isinstance(spec, Mapping)
+        return str(spec["status"])
+
+    @property
+    def coverage(self) -> Mapping[str, int]:
+        spec = self.payload["spec"]
+        assert isinstance(spec, Mapping)
+        coverage = spec["coverage"]
+        assert isinstance(coverage, Mapping)
+        return {
+            "retainedUsageRecords": int(coverage["retainedUsageRecords"]),
+            "retiredUsageRecords": int(coverage["retiredUsageRecords"]),
+        }
 
     def to_dict(self) -> Dict[str, Any]:
         return dict(self.payload)

@@ -153,6 +153,7 @@ from iip.application.query_ai_allocations import (
 )
 from iip.application.query_ai_savings import AiSavingsFindingQueryService
 from iip.application.query_ai_invocation import AiInvocationObservationService
+from iip.application.query_ai_history import AiHistoryAvailabilityService
 from iip.application.query_event_delivery_health import EventDeliveryHealthService
 from iip.application.query_event_delivery_slo import (
     EventDeliverySloObjectives,
@@ -246,6 +247,7 @@ class Runtime:
     ai_cost_calculation: AiCostCalculationService | None
     ai_savings_evaluation: AiSavingsEvaluationService | None
     ai_savings_findings: AiSavingsFindingQueryService
+    ai_history_availability: AiHistoryAvailabilityService
     ai_allocation_reports: AiAllocationReportService | None
     ai_invocation_observation: AiInvocationObservationService | None
     ai_allocation_projection: AiAllocationProjectionService | None
@@ -723,6 +725,7 @@ def _compose_runtime(
             else None
         ),
         ai_savings_findings=AiSavingsFindingQueryService(store, policy, clock),
+        ai_history_availability=AiHistoryAvailabilityService(store, policy, clock),
         ai_allocation_reports=(
             AiAllocationReportService(
                 store,

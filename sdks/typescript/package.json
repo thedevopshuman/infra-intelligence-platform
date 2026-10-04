@@ -10,7 +10,8 @@
   "files": ["dist", "LICENSE", "NOTICE"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "check": "tsc -p tsconfig.json --noEmit"
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test:runtime": "npm run build && node tests/ai-history.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"

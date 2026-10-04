@@ -1,0 +1,19 @@
+{
+  "apiVersion": "iip.platform/v1alpha1",
+  "kind": "AiHistoryAvailabilityReport",
+  "metadata": {
+    "tenantId": "tenant-a",
+    "generatedAt": "2026-10-04T12:00:00Z"
+  },
+  "spec": {
+    "scope": {
+      "start": "2026-10-01T00:00:00Z",
+      "end": "2026-10-04T00:00:00Z"
+    },
+    "status": "history-retired",
+    "coverage": {
+      "retainedUsageRecords": 12,
+      "retiredUsageRecords": 3
+    }
+  }
+}

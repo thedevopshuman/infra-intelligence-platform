@@ -283,6 +283,20 @@ export interface AiAllocationReport {
   };
 }
 
+export interface AiHistoryAvailabilityReport {
+  apiVersion: "iip.platform/v1alpha1";
+  kind: "AiHistoryAvailabilityReport";
+  metadata: { tenantId: string; generatedAt: string };
+  spec: {
+    scope: { start: string; end: string };
+    status: "available" | "history-retired";
+    coverage: {
+      retainedUsageRecords: number;
+      retiredUsageRecords: number;
+    };
+  };
+}
+
 export interface AiEconomicsInvocationObservationRequest {
   apiVersion: "iip.platform/v1alpha1";
   kind: "AiEconomicsInvocationObservationRequest";

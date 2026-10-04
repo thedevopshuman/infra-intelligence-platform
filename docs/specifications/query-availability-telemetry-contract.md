@@ -23,7 +23,7 @@ Every query counter and duration observation has exactly these bounded attribute
 | `iip.query.objective.minimum_availability_basis_points` | integer | deployment-configured target |
 | `iip.query.objective.minimum_eligible_requests` | integer | deployment-configured sample floor |
 
-The closed operations are `console-authentication`, `session`, `runtime-version`, `resources-list`, `resource-neighborhood`, `resource-timeline`, `ingestion-freshness`, `telemetry-export-health`, `telemetry-deployment-export-health`, `telemetry-export-slo`, `telemetry-export-burn-rate`, `collector-queue-loss`, `event-delivery-health`, `event-delivery-slo`, `investigation-completion-slo`, `evidence-retention`, `ai-allocation-report`, `ai-savings-findings`, `evidence-get`, `investigation-get`, `investigation-status`, `investigation-job-get`, `actions-list`, `action-get`, `action-workflow-get`, `plugin-session-get`, and `plugin-invocation-status`.
+The closed operations are `console-authentication`, `session`, `runtime-version`, `resources-list`, `resource-neighborhood`, `resource-timeline`, `ingestion-freshness`, `telemetry-export-health`, `telemetry-deployment-export-health`, `telemetry-export-slo`, `telemetry-export-burn-rate`, `collector-queue-loss`, `event-delivery-health`, `event-delivery-slo`, `investigation-completion-slo`, `evidence-retention`, `ai-allocation-report`, `ai-history-availability`, `ai-savings-findings`, `evidence-get`, `investigation-get`, `investigation-status`, `investigation-job-get`, `actions-list`, `action-get`, `action-workflow-get`, `plugin-session-get`, and `plugin-invocation-status`.
 
 ## Eligibility and arithmetic
 
@@ -31,6 +31,14 @@ The closed operations are `console-authentication`, `session`, `runtime-version`
 - `success`, `not-found`, and `conflict` outcomes are `available`.
 - dependency/service failures are `unavailable`; an uncaught handler failure is `internal-error` and `unavailable`.
 - unknown routes and non-query surfaces emit no observation.
+
+The history-availability report is a successful query even when its body says
+`history-retired`. A guarded allocation query returning
+`410 ai.history.retired` retains the existing generic client-error
+classification, `invalid` and `excluded`; it is not a storage outage or a new
+telemetry outcome. The privileged exact-invocation POST is not a GET query and
+does not enter this signal. No retired count, time interval, tenant, or
+correlation value becomes an attribute.
 
 For a configured window, the eligible denominator is the sum of `available` and `unavailable` request counts. Availability basis points are `floor(available * 10000 / eligible)`. A backend reports insufficient data until the eligible count reaches `minimum_eligible_requests`, then compares the result with `minimum_availability_basis_points`.
 

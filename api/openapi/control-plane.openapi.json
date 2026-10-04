@@ -603,6 +603,7 @@
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/ai-economics-invocation-observation-request.schema.json"}}}},
         "responses": {
           "200": {"description": "Exact invocation is absent, processing, or source-bound through attribution and cost", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/ai-economics-invocation-observation.schema.json"}}}},
+          "410": {"$ref": "#/components/responses/AiHistoryRetired"},
           "400": {"$ref": "#/components/responses/InvalidRequest"},
           "401": {"$ref": "#/components/responses/Unauthorized"},
           "403": {"$ref": "#/components/responses/PolicyDenied"},
@@ -621,10 +622,28 @@
         ],
         "responses": {
           "200": {"description": "Complete allocation and pricing-coverage report", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/ai-allocation-report.schema.json"}}}},
+          "410": {"$ref": "#/components/responses/AiHistoryRetired"},
           "400": {"$ref": "#/components/responses/InvalidRequest"},
           "401": {"$ref": "#/components/responses/Unauthorized"},
           "403": {"$ref": "#/components/responses/PolicyDenied"},
           "422": {"description": "The source-record ceiling was exceeded; no partial aggregate is returned", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "503": {"$ref": "#/components/responses/StorageUnavailable"}
+        }
+      }
+    },
+    "/v1/ai/economics/history-availability": {
+      "get": {
+        "operationId": "getAiHistoryAvailability",
+        "description": "Observe retained and retired locally committed usage counts for one tenant interval under ai-economics:read. This is not capture completeness, cost completion, or a guarantee for a later read. No cleanup authority is granted.",
+        "parameters": [
+          {"name": "start", "in": "query", "required": true, "schema": {"type": "string", "format": "date-time"}, "description": "Inclusive canonical UTC start; interval at most 31 days."},
+          {"name": "end", "in": "query", "required": true, "schema": {"type": "string", "format": "date-time"}, "description": "Exclusive canonical UTC end."}
+        ],
+        "responses": {
+          "200": {"description": "Point-in-time history availability, including retirement when present", "content": {"application/json": {"schema": {"$ref": "../../contracts/schemas/ai-history-availability-report.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/PolicyDenied"},
           "503": {"$ref": "#/components/responses/StorageUnavailable"}
         }
       }
@@ -899,6 +918,7 @@
       "ActionWorkflow": {"$ref": "../../contracts/schemas/action-workflow.schema.json"},
       "ActionWorkflowPage": {"$ref": "../../contracts/schemas/action-workflow-page.schema.json"},
       "AiAllocationReport": {"$ref": "../../contracts/schemas/ai-allocation-report.schema.json"},
+      "AiHistoryAvailabilityReport": {"$ref": "../../contracts/schemas/ai-history-availability-report.schema.json"},
       "AiEconomicsInvocationObservationRequest": {"$ref": "../../contracts/schemas/ai-economics-invocation-observation-request.schema.json"},
       "AiEconomicsInvocationObservation": {"$ref": "../../contracts/schemas/ai-economics-invocation-observation.schema.json"},
       "AiSavingsFindingPage": {"$ref": "../../contracts/schemas/ai-savings-finding-page.schema.json"},
@@ -939,6 +959,10 @@
             "example": {"error": {"code": "resource.not_found"}}
           }
         }
+      },
+      "AiHistoryRetired": {
+        "description": "Required AI history has a retirement marker; no partial totals or not-observed state is returned",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}, "example": {"error": {"code": "ai.history.retired"}}}}
       },
       "StorageUnavailable": {
         "description": "The authoritative store is temporarily unavailable",

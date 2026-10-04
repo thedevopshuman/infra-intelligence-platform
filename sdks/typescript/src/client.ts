@@ -9,6 +9,7 @@ import type {
   AiAllocationReport,
   AiEconomicsInvocationObservation,
   AiEconomicsInvocationObservationRequest,
+  AiHistoryAvailabilityReport,
   AiSavingsFindingPage,
   ApiErrorBody,
   ContextEvidenceRequest,
@@ -521,6 +522,19 @@ export class InfrastructureIntelligenceClient {
     });
     return this.get<AiAllocationReport>(
       `/v1/ai/economics/allocation?${query}`,
+    );
+  }
+
+  async getAiHistoryAvailability(options: {
+    start: string;
+    end: string;
+  }): Promise<AiHistoryAvailabilityReport> {
+    const query = new URLSearchParams({
+      start: options.start,
+      end: options.end,
+    });
+    return this.get<AiHistoryAvailabilityReport>(
+      `/v1/ai/economics/history-availability?${query}`,
     );
   }
 

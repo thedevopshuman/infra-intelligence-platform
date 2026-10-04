@@ -89,7 +89,7 @@ host-created failures for plugin handling; it is not a control-plane HTTP client
 `AiPriceCatalog`, `AwsBedrockPriceCatalogImportPolicy`,
 `AiPriceCatalogImportReport`, `AiPriceCatalogQualificationPolicy`,
 `AiPriceCatalogQualificationReport`, `AiCostRecord`, `AiSavingsFinding`,
-`AiSavingsFindingPage`, `AiAllocationReport`,
+`AiSavingsFindingPage`, `AiAllocationReport`, `AiHistoryAvailabilityReport`,
 `AiEconomicsInvocationObservationRequest`,
 `AiEconomicsInvocationObservation`,
 `AiFinopsSustainedLoadProfile`,
@@ -103,6 +103,11 @@ expose the AI economics
 records as public metadata-only envelopes. They do not
 instrument provider calls, send OTLP, or import an AWS SDK. Standard
 OpenTelemetry instrumentation remains the collection boundary.
+
+`Client.get_ai_history_availability()` returns exact retained and retired usage
+counts for one bounded interval. Existing allocation and exact-invocation reads
+raise `ApiError(410, "ai.history.retired")` when their complete source history
+has been retired; the SDK never substitutes an empty or partial success model.
 
 `CustomerSustainedWorkloadProfile` and
 `CustomerSustainedWorkloadQualificationReport` expose the separately operated

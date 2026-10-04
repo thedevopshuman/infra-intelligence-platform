@@ -13,11 +13,13 @@ The minimal PostgreSQL-backed production handoff is
 It is included in the packaged Helm chart so an operator does not need the
 source checkout.
 It expects an operator-owned `ClusterSecretStore` named
-`iip-production-secret-store` and maps only the provider property `url` into:
+`iip-production-secret-store` and maps only the provider properties `url` and
+`ca` into two least-purpose targets:
 
 | Kubernetes Secret | Required key | Consumer |
 | --- | --- | --- |
 | `iip-database` | `database-url` | API, worker, receiver, migration and backup jobs when enabled |
+| `iip-database-ca` | `ca.crt` | Read-only PostgreSQL server trust for the same database clients |
 
 Change the remote key and store name for the customer environment. Do not add a
 provider credential, database URL, token, certificate private key, or populated
@@ -38,6 +40,7 @@ anything.
 | --- | --- | --- |
 | `imagePullSecrets` | registry-specific `.dockerconfigjson` | Private image-registry pull authority |
 | `database.existingSecret` | `database-url` | PostgreSQL connection URL |
+| `database.transportSecurity.caExistingSecret` | `ca.crt` | PostgreSQL server CA selected by `verify-full`; certificate bytes remain customer-managed |
 | `auth.existingSecret` | `identities-json` | Controlled-evaluation hashed identities; do not use as production OIDC storage |
 | `auth.oidc.caBundleExistingSecret` | `ca.crt` | Optional private OIDC issuer trust anchor |
 | `ingress.tls.existingSecret` | Kubernetes TLS Secret (`tls.crt`, `tls.key`) | Customer ingress certificate and private key |
@@ -83,6 +86,8 @@ the target Secret, then install IIP with:
 helm upgrade --install iip deploy/helm/infra-intelligence \
   --namespace iip-system \
   --set database.existingSecret=iip-database \
+  --set database.transportSecurity.mode=verify-full \
+  --set database.transportSecurity.caExistingSecret=iip-database-ca \
   --set auth.mode=oidc
 ```
 

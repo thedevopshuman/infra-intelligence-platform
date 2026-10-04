@@ -26,6 +26,7 @@ class LocalReleaseQualificationTests(unittest.TestCase):
 
         for required in (
             "verify",
+            "test-postgres-tls",
             "test-capacity",
             "test-credential-broker",
             "test-oidc",

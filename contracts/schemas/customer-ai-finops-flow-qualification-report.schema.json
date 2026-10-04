@@ -71,7 +71,7 @@
       "additionalProperties": false,
       "required": ["deploymentProfile", "applicationVersion", "chartVersion", "contractsApiVersion", "sourceRevision", "imageDigest"],
       "properties": {
-        "deploymentProfile": {"const": "production-ai-finops-v0"},
+        "deploymentProfile": {"enum": ["production-ai-finops-v0", "production-ai-finops-v1"]},
         "applicationVersion": {"$ref": "#/$defs/semver"},
         "chartVersion": {"$ref": "#/$defs/semver"},
         "contractsApiVersion": {"const": "iip.platform/v1alpha1"},

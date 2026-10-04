@@ -21,7 +21,10 @@ CHART = ROOT / "deploy" / "helm" / "infra-intelligence"
 PROFILE_TEMPLATE = "templates/deployment-profile.yaml"
 API_VERSION = "iip.platform/v1alpha1"
 KIND = "CustomerDeploymentPreflightReport"
-PROFILES = ("production-core-v1", "production-ai-finops-v0")
+HISTORICAL_PROFILES = ("production-core-v1", "production-ai-finops-v0")
+CURRENT_PROFILES = ("production-core-v2", "production-ai-finops-v1")
+KNOWN_PROFILES = HISTORICAL_PROFILES + CURRENT_PROFILES
+AI_PROFILES = frozenset(("production-ai-finops-v0", "production-ai-finops-v1"))
 COMMON_CHECKS = (
     "helm-render",
     "immutable-image",
@@ -30,6 +33,7 @@ COMMON_CHECKS = (
     "worker-enrollment",
     "worker-redundancy",
     "external-database",
+    "database-transport-security",
     "controlled-migrations",
     "oidc-authentication",
     "external-policy",
@@ -45,6 +49,9 @@ COMMON_CHECKS = (
     "evidence-backends",
     "service-account-isolation",
     "test-fixtures-denied",
+)
+HISTORICAL_COMMON_CHECKS = tuple(
+    check_id for check_id in COMMON_CHECKS if check_id != "database-transport-security"
 )
 AI_CHECKS = (
     "ai-usage-intake",
@@ -68,6 +75,7 @@ FAILURE_ERROR_CODES = {
     "worker-enrollment": "preflight.worker.enrollment-required",
     "worker-redundancy": "preflight.worker.replicas-insufficient",
     "external-database": "preflight.database.secret-required",
+    "database-transport-security": "preflight.database.transport-security-required",
     "controlled-migrations": "preflight.database.migrations-required",
     "oidc-authentication": "preflight.auth.oidc-required",
     "external-policy": "preflight.policy.external-required",
@@ -364,8 +372,21 @@ def _validate_rendered_profile(profile: Mapping[str, Any]) -> None:
     _boolean(worker, "enabled")
     _integer(worker, "replicaCount")
     _integer(worker, "tenantCount")
+    database = _object(profile, "database")
+    if set(database) != {
+        "existingSecretConfigured",
+        "migrationsEnabled",
+        "transportSecurity",
+    }:
+        _fail("preflight.profile.invalid")
+    _boolean(database, "existingSecretConfigured")
+    _boolean(database, "migrationsEnabled")
+    transport_security = _object(database, "transportSecurity")
+    if set(transport_security) != {"mode", "caExistingSecret", "caKey"}:
+        _fail("preflight.profile.invalid")
+    for key in ("mode", "caExistingSecret", "caKey"):
+        _string(transport_security, key)
     for section, booleans in (
-        ("database", ("existingSecretConfigured", "migrationsEnabled")),
         ("ingress", ("enabled", "classConfigured", "hostConfigured", "tlsConfigured", "redirectConfigured")),
         ("backup", ("enabled", "destinationConfigured")),
         ("evidenceRetention", ("enabled",)),
@@ -505,6 +526,7 @@ def _static_checks(
     api = _object(profile, "api")
     worker = _object(profile, "worker")
     database = _object(profile, "database")
+    transport_security = _object(database, "transportSecurity")
     auth = _object(profile, "authentication")
     policy = _object(profile, "policy")
     broker = _object(profile, "credentialBroker")
@@ -520,6 +542,22 @@ def _static_checks(
     security = _object(profile, "security")
     ai = _object(profile, "aiEconomics")
     receivers = _object(profile, "receivers")
+    dependencies = _dependencies(profile)
+    database_transport_ready = (
+        transport_security["mode"] == "verify-full"
+        and bool(transport_security["caExistingSecret"])
+        and bool(transport_security["caKey"])
+        and any(
+            dependency
+            == {
+                "purpose": "database-ca",
+                "kind": "Secret",
+                "name": transport_security["caExistingSecret"],
+                "keys": [transport_security["caKey"]],
+            }
+            for dependency in dependencies
+        )
+    )
     receiver_active = any(
         receivers[key] is True
         for key in ("metricsEnabled", "logsEnabled", "aiUsageEnabled")
@@ -593,7 +631,16 @@ def _static_checks(
         _check("service-account-isolation", security == {"serviceAccountTokenAutomount": False, "runAsNonRoot": True, "readOnlyRootFilesystem": True, "allowPrivilegeEscalation": False}, "preflight.security.workload-isolation-required"),
         _check("test-fixtures-denied", all(ai[key] is False for key in ("attributionTestFixtures", "priceTestFixtures", "savingsTestFixtures")), "preflight.test-fixtures.forbidden"),
     ]
-    if profile_name == "production-ai-finops-v0":
+    if profile_name in CURRENT_PROFILES:
+        checks.insert(
+            7,
+            _check(
+                "database-transport-security",
+                database_transport_ready,
+                "preflight.database.transport-security-required",
+            ),
+        )
+    if profile_name in AI_PROFILES:
         checks.extend(
             (
                 _check("ai-usage-intake", receivers["aiUsageEnabled"] is True and network["otlpReceiverIngress"] is True, "preflight.ai.receiver-required"),
@@ -907,12 +954,17 @@ def _dependency_measurement(
 
 
 def _expected_checks(profile_name: str) -> tuple[str, ...]:
-    return COMMON_CHECKS + (AI_CHECKS if profile_name == "production-ai-finops-v0" else ()) + LIVE_CHECKS
+    common_checks = (
+        COMMON_CHECKS
+        if profile_name in CURRENT_PROFILES
+        else HISTORICAL_COMMON_CHECKS
+    )
+    return common_checks + (AI_CHECKS if profile_name in AI_PROFILES else ()) + LIVE_CHECKS
 
 
 def _expected_customer_requirements(profile_name: str) -> tuple[str, ...]:
     return COMMON_CUSTOMER_REQUIREMENTS + (
-        AI_CUSTOMER_REQUIREMENTS if profile_name == "production-ai-finops-v0" else ()
+        AI_CUSTOMER_REQUIREMENTS if profile_name in AI_PROFILES else ()
     )
 
 
@@ -970,7 +1022,7 @@ def generate_report(
     context: str | None = None,
     live: bool = False,
 ) -> Mapping[str, Any]:
-    if profile_name not in PROFILES:
+    if profile_name not in CURRENT_PROFILES:
         _fail("preflight.profile-name.invalid")
     if NAME.fullmatch(namespace) is None or NAME.fullmatch(release_name) is None:
         _fail("preflight.release-binding.invalid")
@@ -1125,7 +1177,7 @@ def validate_report_document(report: Mapping[str, Any]) -> None:
     if set(profile) != {"name", "chartVersion", "applicationVersion", "valuesDigest", "configurationDigest"}:
         _fail("preflight.report.invalid")
     profile_name = profile.get("name")
-    if profile_name not in PROFILES:
+    if profile_name not in KNOWN_PROFILES:
         _fail("preflight.report.invalid")
     for key in ("chartVersion", "applicationVersion"):
         if not isinstance(profile.get(key), str) or SEMVER.fullmatch(profile[key]) is None:
@@ -1308,7 +1360,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     generate = subparsers.add_parser("generate")
-    generate.add_argument("--profile", choices=PROFILES, required=True)
+    generate.add_argument("--profile", choices=CURRENT_PROFILES, required=True)
     generate.add_argument("--values", type=Path, action="append", required=True)
     generate.add_argument("--output", type=Path, required=True)
     generate.add_argument("--namespace", default="iip-system")

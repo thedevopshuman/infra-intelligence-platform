@@ -33,6 +33,8 @@ An apply run requires an explicitly constructed `platform-admin` actor and polic
 
 ```bash
 export IIP_DATABASE_URL='postgresql://...'
+export IIP_DATABASE_TRANSPORT_MODE=verify-full
+export IIP_DATABASE_CA_PATH='/protected/path/database-ca.pem'
 PYTHONPATH=src python3 -m iip.surfaces.maintenance \
   rebuild-projections --tenant local --actor local-operator
 
@@ -131,7 +133,8 @@ Checkpoint age remains measurable after a complete empty reconciliation. A sourc
 - Projection maintenance requires one explicit tenant, a bounded resource count, the `platform-admin` role, and policy authorization.
 - Psycopg and SQL exceptions are translated at the adapter boundary; public HTTP responses expose only the stable `storage.unavailable` code.
 - Migrations are packaged with the adapter and serialized by a database advisory lock.
-- `IIP_DATABASE_URL` selects the PostgreSQL profile. `IIP_DATABASE_AUTO_MIGRATE` exists for local Compose only and defaults to false in Helm. The opt-in isolated migration hook documented in [ADR 0045](../decisions/0045-controlled-helm-schema-migrations.md) owns chart-driven schema mutation.
+- `IIP_DATABASE_URL` selects the PostgreSQL profile. Packaged composition defaults `IIP_DATABASE_TRANSPORT_MODE` to `verify-full`, requires `IIP_DATABASE_CA_PATH`, rejects URL-supplied transport policy and Unix-socket targets, and applies the same validated connection policy to every client. Plaintext development requires an explicit `insecure-local` mode. See [ADR 0154](../decisions/0154-verified-postgresql-transport-security.md) and the [transport-security runbook](../operations/postgresql-transport-security.md).
+- `IIP_DATABASE_AUTO_MIGRATE` exists for local Compose only and defaults to false in Helm. The opt-in isolated migration hook documented in [ADR 0045](../decisions/0045-controlled-helm-schema-migrations.md) owns chart-driven schema mutation.
 - Production credentials come from an existing Kubernetes Secret or an external secret provider, never chart values committed to this repository.
 
 ## Backup and restore verification

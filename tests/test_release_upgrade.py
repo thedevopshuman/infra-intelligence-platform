@@ -24,6 +24,11 @@ class ReleaseUpgradeGateTests(unittest.TestCase):
         self.assertIn('IIP_IMAGE_REVISION=$IIP_BASE_REVISION', script)
         self.assertIn('"$IIP_DOCKER_BIN" load --input', script)
         self.assertIn("ctr -n k8s.io images tag --force", script)
+        self.assertIn('"$IIP_HELM_BIN" show values "$chart"', script)
+        self.assertIn(
+            "--set database.transportSecurity.mode=insecure-local",
+            script,
+        )
         self.assertEqual(script.count('install_revision "$IIP_TARGET_CHART"'), 2)
         self.assertIn('"$IIP_HELM_BIN" rollback iip 1', script)
         self.assertGreaterEqual(script.count("assert_seed_resource"), 4)

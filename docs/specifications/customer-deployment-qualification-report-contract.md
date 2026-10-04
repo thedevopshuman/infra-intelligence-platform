@@ -10,7 +10,8 @@ profile anticipated by ADR 0120 and extended by ADRs 0129, 0130, 0131, 0132,
 one exact application, chart, source revision, immutable image digest, and
 explicitly selected Kubernetes cluster:
 
-1. a cluster-mode `CustomerDeploymentPreflightReport`;
+1. a current cluster-mode `CustomerDeploymentPreflightReport` using
+   `production-core-v2` or `production-ai-finops-v1`;
 2. a post-install `DeploymentDiagnosticReport`;
 3. a customer-profile `IngressAvailabilityQualificationReport`;
 4. a `CustomerOidcQualificationReport` that binds one customer issuer's
@@ -87,3 +88,10 @@ This operational evidence is not an API resource and is not added to the
 control-plane OpenAPI surface. Python and TypeScript SDKs expose its transport
 shape so release tooling can exchange it without importing implementation
 classes.
+
+The report schema and SDK transport type also recognize the historical
+`production-core-v1` and `production-ai-finops-v0` subject values so retained
+artifacts remain readable. The current qualifier will not generate or reverify
+a qualification from either historical preflight: a fresh current profile,
+including the `database-transport-security` check and exact CA dependency, is
+required.

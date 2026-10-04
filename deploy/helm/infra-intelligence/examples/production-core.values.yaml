@@ -18,6 +18,10 @@ worker:
 
 database:
   existingSecret: iip-database
+  transportSecurity:
+    mode: verify-full
+    caExistingSecret: iip-database-ca
+    caKey: ca.crt
   migrations:
     enabled: true
 

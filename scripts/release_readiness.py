@@ -266,7 +266,7 @@ REQUIREMENTS = (
         "configuration-ready",
         (
             (("spec", "qualificationBoundary"), "pre-install-only"),
-            (("spec", "profile", "name"), "production-core-v1"),
+            (("spec", "profile", "name"), "production-core-v2"),
             (("spec", "environment", "mode"), "static"),
         ),
     ),
@@ -281,7 +281,7 @@ REQUIREMENTS = (
         "configuration-ready",
         (
             (("spec", "qualificationBoundary"), "pre-install-only"),
-            (("spec", "profile", "name"), "production-ai-finops-v0"),
+            (("spec", "profile", "name"), "production-ai-finops-v1"),
             (("spec", "environment", "mode"), "static"),
         ),
     ),

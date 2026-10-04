@@ -409,6 +409,8 @@ def _validate_prerequisites(
         != _digest(prerequisite_profile.document)
         or report_spec.get("status") != "prerequisites-ready"
         or report_spec.get("qualificationBoundary") != "prerequisite-aggregation-only"
+        or report_subject.get("deploymentProfile")
+        != prerequisite.CURRENT_DEPLOYMENT_PROFILE
         or generated > now + timedelta(seconds=maximum_skew)
         or (now - generated).total_seconds() > maximum_age
         or now > valid_until
@@ -644,7 +646,7 @@ def build_report(
         "qualificationLevel": QUALIFICATION_LEVEL,
         "qualificationBoundary": QUALIFICATION_BOUNDARY,
         "subject": {
-            "deploymentProfile": "production-ai-finops-v0",
+            "deploymentProfile": prerequisite.CURRENT_DEPLOYMENT_PROFILE,
             "applicationVersion": release["applicationVersion"],
             "chartVersion": release["chartVersion"],
             "contractsApiVersion": API_VERSION,

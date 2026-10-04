@@ -14,6 +14,148 @@ data:
     cd "$IIP_BACKUP_DIRECTORY"
     database_url="$IIP_DATABASE_URL"
     unset IIP_DATABASE_URL
+    export LC_ALL=C
+    valid_percent_encoding() {
+      percent_value=$1
+      while :; do
+        case "$percent_value" in
+          *%*) percent_tail=${percent_value#*%} ;;
+          *) return 0 ;;
+        esac
+        case "$percent_tail" in
+          [0-9A-Fa-f][0-9A-Fa-f]*) percent_value=${percent_tail#??} ;;
+          *) return 1 ;;
+        esac
+      done
+    }
+    valid_backup_host_target() {
+      host_target=$1
+      host_port=
+      host_port_present=false
+      case "$host_target" in
+        \[*\]*)
+          host_address=${host_target#\[}
+          host_address=${host_address%%\]*}
+          host_suffix=${host_target#*\]}
+          case "$host_address" in
+            ''|*[!0-9A-Fa-f:.]*) return 1 ;;
+          esac
+          case "$host_suffix" in
+            '') return 0 ;;
+            :*)
+              host_port=${host_suffix#:}
+              host_port_present=true
+              ;;
+            *) return 1 ;;
+          esac
+          ;;
+        *)
+          case "$host_target" in
+            *\[*|*\]*|*:*:*) return 1 ;;
+            *:*)
+              host_address=${host_target%%:*}
+              host_port=${host_target#*:}
+              host_port_present=true
+              ;;
+            *)
+              host_address=$host_target
+              host_port=
+              ;;
+          esac
+          case "$host_address" in
+            ''|*[!A-Za-z0-9.-]*) return 1 ;;
+          esac
+          case "$host_address" in
+            *[A-Za-z0-9]*) ;;
+            *) return 1 ;;
+          esac
+          ;;
+      esac
+      if [ "$host_port_present" = true ]; then
+        case "$host_port" in
+          ''|*[!0-9]*) return 1 ;;
+        esac
+      fi
+      return 0
+    }
+    reject_dsn_transport_overrides() {
+      database_uri=$1
+      case "$database_uri" in
+        ''|*[![:print:]]*|*[[:space:]]*|*\\*|*\?*|*\#*) return 1 ;;
+        postgresql://*) uri_remainder=${database_uri#postgresql://} ;;
+        postgres://*) uri_remainder=${database_uri#postgres://} ;;
+        *) return 1 ;;
+      esac
+
+      case "$uri_remainder" in
+        */*)
+          uri_authority=${uri_remainder%%/*}
+          database_path=${uri_remainder#*/}
+          ;;
+        *) return 1 ;;
+      esac
+      case "$uri_authority" in
+        '') return 1 ;;
+        *@*)
+          uri_userinfo=${uri_authority%@*}
+          host_targets=${uri_authority##*@}
+          case "$uri_userinfo" in
+            ''|*@*) return 1 ;;
+          esac
+          valid_percent_encoding "$uri_userinfo" || return 1
+          ;;
+        *) host_targets=$uri_authority ;;
+      esac
+      case "$database_path" in
+        ''|*/*) return 1 ;;
+      esac
+      valid_percent_encoding "$database_path" || return 1
+      case "$host_targets" in
+        ''|*%*|*/*|*\\*|*@*) return 1 ;;
+      esac
+
+      remaining_hosts=$host_targets
+      while :; do
+        host_target=${remaining_hosts%%,*}
+        [ -n "$host_target" ] || return 1
+        valid_backup_host_target "$host_target" || return 1
+        case "$remaining_hosts" in
+          *,*) remaining_hosts=${remaining_hosts#*,} ;;
+          *) break ;;
+        esac
+      done
+      return 0
+    }
+    if ! reject_dsn_transport_overrides "$database_url"; then
+      printf '%s\n' 'database DSN must not set transport policy' >&2
+      exit 1
+    fi
+    unset PGCHANNELBINDING PGGSSENCMODE PGHOST PGHOSTADDR PGREQUIREPEER PGREQUIRESSL PGSERVICE PGSERVICEFILE PGSSLCERT PGSSLCERTMODE PGSSLCOMPRESSION PGSSLCRL PGSSLCRLDIR PGSSLKEY PGSSLKEYLOGFILE PGSSLMAXPROTOCOLVERSION PGSSLMINPROTOCOLVERSION PGSSLMODE PGSSLNEGOTIATION PGSSLPASSWORD PGSSLROOTCERT PGSSLSNI
+    case "${IIP_DATABASE_TRANSPORT_MODE:-}" in
+      verify-full)
+        if [ "${IIP_DATABASE_CA_PATH:-}" != '/var/run/iip/database-ca/ca.crt' ] || [ ! -r '/var/run/iip/database-ca/ca.crt' ]; then
+          printf '%s\n' 'database CA is unavailable at the required path' >&2
+          exit 1
+        fi
+        export PGSSLMODE=verify-full
+        export PGSSLROOTCERT=/var/run/iip/database-ca/ca.crt
+        export PGGSSENCMODE=disable
+        export PGHOST=iip-database-host-required.invalid
+        ;;
+      insecure-local)
+        if [ -n "${IIP_DATABASE_CA_PATH:-}" ]; then
+          printf '%s\n' 'database CA path is not allowed in insecure-local mode' >&2
+          exit 1
+        fi
+        export PGSSLMODE=disable
+        export PGGSSENCMODE=disable
+        ;;
+      *)
+        printf '%s\n' 'database transport mode is invalid' >&2
+        exit 1
+        ;;
+    esac
+    unset IIP_DATABASE_TRANSPORT_MODE IIP_DATABASE_CA_PATH
     timestamp=$(date -u +%Y%m%dT%H%M%SZ)
     base="${IIP_BACKUP_PREFIX}-${timestamp}-${HOSTNAME}.dump"
     partial=".${base}.partial"
@@ -22,7 +164,11 @@ data:
       rm -f "$partial" ".${checksum}.partial"
     }
     trap cleanup EXIT INT TERM
-    pg_dump --dbname="$database_url" --format=custom --compress=gzip:6 --no-owner --no-acl --file="$partial"
+    if ! pg_dump --dbname="$database_url" --format=custom --compress=gzip:6 --no-owner --no-acl --file="$partial" >/dev/null 2>&1; then
+      unset database_url
+      printf '%s\n' 'database backup failed' >&2
+      exit 1
+    fi
     unset database_url
     pg_restore --list "$partial" >/dev/null
     digest=$(sha256sum "$partial" | awk '{print $1}')

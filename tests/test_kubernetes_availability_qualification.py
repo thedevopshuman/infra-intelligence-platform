@@ -390,6 +390,10 @@ class KubernetesAvailabilityQualificationTests(unittest.TestCase):
         )
         self.assertNotIn("kind-iip-dev", source)
         self.assertNotIn("--force --grace-period=0", source)
+        self.assertIn(
+            "--set database.transportSecurity.mode=insecure-local",
+            source,
+        )
         self.assertIn("run_workflow_phase disruption", source)
         self.assertIn("body=_metric_payload()", (ROOT / "scripts/kubernetes_availability_probe.py").read_text(encoding="utf-8"))
 

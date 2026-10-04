@@ -79,6 +79,12 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.database.existingSecret | quote }}
                   key: {{ .Values.database.secretKey | quote }}
+            - name: IIP_DATABASE_TRANSPORT_MODE
+              value: {{ .Values.database.transportSecurity.mode | quote }}
+            {{- if eq .Values.database.transportSecurity.mode "verify-full" }}
+            - name: IIP_DATABASE_CA_PATH
+              value: "/var/run/iip/database-ca/ca.crt"
+            {{- end }}
             - name: IIP_DATABASE_AUTO_MIGRATE
               value: "false"
             {{- if .Values.evidenceRedaction.policiesExistingSecret }}
@@ -227,6 +233,12 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if eq .Values.database.transportSecurity.mode "verify-full" }}
+            - name: database-ca
+              mountPath: /var/run/iip/database-ca/ca.crt
+              subPath: ca.crt
+              readOnly: true
+            {{- end }}
             {{- if ne .Values.otlpIngest.tls.mode "disabled" }}
             - name: otlp-server-tls
               mountPath: {{ .Values.otlpIngest.tls.serverMountPath | quote }}
@@ -257,6 +269,14 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if eq .Values.database.transportSecurity.mode "verify-full" }}
+        - name: database-ca
+          secret:
+            secretName: {{ .Values.database.transportSecurity.caExistingSecret | quote }}
+            items:
+              - key: {{ .Values.database.transportSecurity.caKey | quote }}
+                path: ca.crt
+        {{- end }}
         {{- if ne .Values.otlpIngest.tls.mode "disabled" }}
         - name: otlp-server-tls
           secret:

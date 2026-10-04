@@ -34,6 +34,9 @@ SCHEMA = ROOT / "contracts/schemas/customer-deployment-qualification-report.sche
 API_VERSION = "iip.platform/v1alpha1"
 KIND = "CustomerDeploymentQualificationReport"
 QUALIFICATION_LEVEL = "single-cluster-database-identity-policy-broker-receiver-prerequisites-v7"
+CURRENT_DEPLOYMENT_PROFILES = frozenset(
+    ("production-core-v2", "production-ai-finops-v1")
+)
 REPORT_ID = re.compile(r"^cdq_[a-f0-9]{32}$")
 DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 MAX_DOCUMENT_BYTES = 16 * 1024 * 1024
@@ -631,7 +634,11 @@ def _subject_and_bindings(
 
     profile_name = preflight_profile.get("name")
     required_migration = continuity_subject.get("requiredMigration")
-    if not isinstance(profile_name, str) or not isinstance(required_migration, str):
+    if (
+        not isinstance(profile_name, str)
+        or profile_name not in CURRENT_DEPLOYMENT_PROFILES
+        or not isinstance(required_migration, str)
+    ):
         _fail("customer-deployment-qualification.profile.invalid")
     subject = {
         "profile": profile_name,

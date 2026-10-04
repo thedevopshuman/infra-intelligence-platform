@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerAiFinopsFlowQualificationReport",
   "metadata": {
-    "id": "caff_3e42cee4e08125ddd6d1ed650829e43c",
+    "id": "caff_1b762d38d50717b64fbbfaa561401187",
     "generatedAt": "2026-09-08T10:05:30Z",
     "validUntil": "2026-09-09T10:05:30Z",
     "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -13,7 +13,7 @@
     "qualificationLevel": "customer-ai-finops-flow-v1",
     "qualificationBoundary": "same-invocation-customer-runtime",
     "subject": {
-      "deploymentProfile": "production-ai-finops-v0",
+      "deploymentProfile": "production-ai-finops-v1",
       "applicationVersion": "0.84.0",
       "chartVersion": "0.87.0",
       "contractsApiVersion": "iip.platform/v1alpha1",
@@ -21,10 +21,10 @@
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "bindings": {
-      "profileDigest": "sha256:0ccf9ac66343bf63da617eca80de0fe585a630d80644ca5981b63a8bd9db0980",
+      "profileDigest": "sha256:251f358c6cc8ed0c8f7256561537adcaf9c412c8b71bab2cef4e325488dbc922",
       "environmentBindingDigest": "sha256:ebbaf6050b9190c0b9688b96de6c442e6239a02cedd056974af01ff8286610a2",
       "prerequisiteProfileDigest": "sha256:392a664010f4c3cadec2bbef57110e59dba1e639a1657851858f2a4402295554",
-      "prerequisiteReportDigest": "sha256:641876d7222b05c87dc1ee9c8a1eccef0fb881b8cd16180f9b85fa84898dbdd3",
+      "prerequisiteReportDigest": "sha256:ae59e23280cc47d0d9eb9478d1a8d05f407bd67c2624cdd4ab57f0cf48f07aad",
       "bedrockProfileDigest": "sha256:f2b8bd7fbe44cc952a8500d832408bf56c35b725bee647523f91f338ebba6f9d",
       "controlPlaneTargetDigest": "sha256:67f7aaa3a40b5a2a295d84c806d41b6a1f226a432f8ebe6742019f464f6f4c1f",
       "otlpTargetDigest": "sha256:b3956e5d002e9b854d61c4fa71e026e3106e55decfdcee6dfb01f8a777898679",

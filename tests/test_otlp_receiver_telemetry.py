@@ -231,6 +231,7 @@ class OtlpReceiverTelemetryCompositionTests(unittest.TestCase):
                 "os.environ",
                 {
                     "IIP_DATABASE_URL": "postgresql://receiver.example/iip",
+                    "IIP_DATABASE_TRANSPORT_MODE": "insecure-local",
                     "IIP_OTLP_RECEIVER_ENABLED": "true",
                     "IIP_OTLP_RECEIVER_CHANNELS_JSON": receiver_config(),
                     "IIP_OTEL_METRICS_ENABLED": "true",
@@ -276,6 +277,7 @@ class OtlpReceiverTelemetryCompositionTests(unittest.TestCase):
                 "os.environ",
                 {
                     "IIP_DATABASE_URL": "postgresql://receiver.example/iip",
+                    "IIP_DATABASE_TRANSPORT_MODE": "insecure-local",
                     "IIP_OTLP_RECEIVER_ENABLED": "true",
                     "IIP_OTLP_RECEIVER_CHANNELS_JSON": receiver_config(),
                 },

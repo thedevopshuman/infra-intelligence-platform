@@ -613,7 +613,7 @@ def _release_and_environment_bindings(
         "pluginMediationBridgeImageDigest": bridge_digest,
     }
     expected_customer_subject = {
-        "deploymentProfile": "production-ai-finops-v0",
+        "deploymentProfile": ai_prerequisite.CURRENT_DEPLOYMENT_PROFILE,
         "applicationVersion": exact_release["applicationVersion"],
         "chartVersion": exact_release["chartVersion"],
         "contractsApiVersion": SOURCE_API_VERSION,
@@ -642,7 +642,8 @@ def _release_and_environment_bindings(
         }
         or tuple(item.get("indexDigest") for item in signature_artifacts)
         != (control_digest, bridge_digest)
-        or deployment_subject.get("profile") != "production-ai-finops-v0"
+        or deployment_subject.get("profile")
+        != ai_prerequisite.CURRENT_DEPLOYMENT_PROFILE
         or {
             key: deployment_subject.get(key)
             for key in (

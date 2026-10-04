@@ -61,6 +61,12 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.database.existingSecret | quote }}
                   key: {{ .Values.database.secretKey | quote }}
+            - name: IIP_DATABASE_TRANSPORT_MODE
+              value: {{ .Values.database.transportSecurity.mode | quote }}
+            {{- if eq .Values.database.transportSecurity.mode "verify-full" }}
+            - name: IIP_DATABASE_CA_PATH
+              value: "/var/run/iip/database-ca/ca.crt"
+            {{- end }}
             {{- end }}
             {{- if .Values.auth.existingSecret }}
             - name: IIP_AUTH_IDENTITIES_JSON
@@ -178,6 +184,12 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if and .Values.database.existingSecret (eq .Values.database.transportSecurity.mode "verify-full") }}
+            - name: database-ca
+              mountPath: /var/run/iip/database-ca/ca.crt
+              subPath: ca.crt
+              readOnly: true
+            {{- end }}
             {{- if eq .Values.credentialBroker.mode "external-http" }}
             - name: credential-broker-identity
               mountPath: {{ .Values.credentialBroker.externalHttp.identityMountPath | quote }}
@@ -228,6 +240,14 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if and .Values.database.existingSecret (eq .Values.database.transportSecurity.mode "verify-full") }}
+        - name: database-ca
+          secret:
+            secretName: {{ .Values.database.transportSecurity.caExistingSecret | quote }}
+            items:
+              - key: {{ .Values.database.transportSecurity.caKey | quote }}
+                path: ca.crt
+        {{- end }}
         {{- if eq .Values.credentialBroker.mode "external-http" }}
         - name: credential-broker-identity
           projected:

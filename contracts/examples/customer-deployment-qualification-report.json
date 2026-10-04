@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerDeploymentQualificationReport",
   "metadata": {
-    "id": "cdq_8cfd6d1cfee732611d5915466e536356",
+    "id": "cdq_e5b1a756a1b4d7dd68a7b0aa26439ef7",
     "generatedAt": "2026-09-06T12:38:00Z",
     "sourceRevision": "0123456789abcdef0123456789abcdef01234567",
     "sourceDirty": false
@@ -11,7 +11,7 @@
     "status": "qualified",
     "qualificationLevel": "single-cluster-database-identity-policy-broker-receiver-prerequisites-v7",
     "subject": {
-      "profile": "production-core-v1",
+      "profile": "production-core-v2",
       "applicationVersion": "0.84.0",
       "chartVersion": "0.87.0",
       "contractsApiVersion": "iip.platform/v1alpha1",

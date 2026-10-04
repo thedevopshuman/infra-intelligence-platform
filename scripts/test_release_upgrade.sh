@@ -263,6 +263,11 @@ install_revision() {
     repository=$2
     version=$3
     digest=$4
+    if "$IIP_HELM_BIN" show values "$chart" | rg -q '^  transportSecurity:$'; then
+        set -- --set database.transportSecurity.mode=insecure-local
+    else
+        set --
+    fi
     "$IIP_HELM_BIN" upgrade --install iip "$chart" \
         --kube-context "$IIP_KUBE_CONTEXT" \
         --namespace "$IIP_TEST_NAMESPACE" \
@@ -272,6 +277,7 @@ install_revision() {
         --set image.pullPolicy=Never \
         --set replicaCount=2 \
         --set database.existingSecret=iip-database \
+        "$@" \
         --set database.migrations.enabled=true \
         --set auth.existingSecret=iip-auth \
         --wait --timeout 180s >/dev/null

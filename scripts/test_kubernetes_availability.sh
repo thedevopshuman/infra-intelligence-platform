@@ -233,6 +233,7 @@ EOF
     --set image.pullPolicy=IfNotPresent \
     --set replicaCount=2 \
     --set database.existingSecret=iip-database \
+    --set database.transportSecurity.mode=insecure-local \
     --set database.migrations.enabled=true \
     --set auth.mode=local-hashed \
     --set auth.existingSecret=iip-auth \

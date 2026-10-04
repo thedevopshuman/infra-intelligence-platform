@@ -60,6 +60,23 @@ class HelmValuesContractTests(unittest.TestCase):
             ],
             "sha256",
         )
+        database_transport = properties["database"]["properties"][
+            "transportSecurity"
+        ]
+        self.assertFalse(database_transport["additionalProperties"])
+        self.assertEqual(
+            set(database_transport["required"]),
+            {"mode", "caExistingSecret", "caKey"},
+        )
+        self.assertEqual(
+            database_transport["properties"]["mode"]["enum"],
+            ["verify-full", "insecure-local"],
+        )
+        self.assertIn(
+            "transportSecurity:\n    mode: verify-full\n"
+            '    caExistingSecret: ""\n    caKey: ca.crt',
+            self.values,
+        )
         self.assertIn("existingSecret: iip-auth", self.values)
         self.assertIn('digest: ""', self.values)
         worker = properties["worker"]["properties"]
@@ -87,6 +104,8 @@ class HelmValuesContractTests(unittest.TestCase):
             "worker.heartbeatSeconds must be less than worker.leaseSeconds",
             "apiTermination.endpointDrainSeconds must be less than",
             "otlpIngest.endpointDrainSeconds must be less than",
+            "database.transportSecurity.caExistingSecret is required for verify-full PostgreSQL transport",
+            "database.transportSecurity.caExistingSecret must be empty in insecure-local mode",
             "worker.enabled must be true when worker.podDisruptionBudget.enabled=true",
             "an OTLP receiver must be enabled when otlpIngest.podDisruptionBudget.enabled=true",
             "podDisruptionBudget.minAvailable must be less than replicaCount",

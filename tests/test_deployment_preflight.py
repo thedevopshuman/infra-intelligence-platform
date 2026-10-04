@@ -6,7 +6,10 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import get_args
 from unittest.mock import patch
+
+from jsonschema import Draft202012Validator
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,7 +27,11 @@ from deployment_preflight import (  # noqa: E402
     validate_report_document,
     verify_report,
 )
-from infra_intelligence_sdk import CustomerDeploymentPreflightReport  # noqa: E402
+from infra_intelligence_sdk import (  # noqa: E402
+    CustomerDeploymentPreflightCheckId,
+    CustomerDeploymentPreflightProfileName,
+    CustomerDeploymentPreflightReport,
+)
 
 
 REVISION = "a" * 40
@@ -47,6 +54,11 @@ def rendered_profile() -> dict[str, object]:
         "database": {
             "existingSecretConfigured": True,
             "migrationsEnabled": True,
+            "transportSecurity": {
+                "mode": "verify-full",
+                "caExistingSecret": "customer-database-ca-private",
+                "caKey": "ca.crt",
+            },
         },
         "authentication": {"mode": "oidc", "oidcConfigurationReviewed": True},
         "policy": {"mode": "external-http", "configurationReviewed": True},
@@ -143,6 +155,12 @@ def rendered_profile() -> dict[str, object]:
                 "keys": ["database-url"],
             },
             {
+                "purpose": "database-ca",
+                "kind": "Secret",
+                "name": "customer-database-ca-private",
+                "keys": ["ca.crt"],
+            },
+            {
                 "purpose": "backup-destination",
                 "kind": "PersistentVolumeClaim",
                 "name": "customer-backup-private",
@@ -150,6 +168,17 @@ def rendered_profile() -> dict[str, object]:
             },
         ],
     }
+
+
+def report_schema() -> dict[str, object]:
+    return json.loads(
+        (
+            ROOT
+            / "contracts"
+            / "schemas"
+            / "customer-deployment-preflight-report.schema.json"
+        ).read_text(encoding="utf-8")
+    )
 
 
 class CustomerDeploymentPreflightTests(unittest.TestCase):
@@ -169,7 +198,7 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
         self,
         profile: dict[str, object] | None = None,
         *,
-        profile_name: str = "production-core-v1",
+        profile_name: str = "production-core-v2",
         live: bool = False,
         dependency_status: str = "observed",
         cluster_available: bool = True,
@@ -290,12 +319,104 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
             "customer-private-context",
             "iip-private",
             "customer-database-private",
+            "customer-database-ca-private",
             "customer-backup-private",
             "database-url",
+            "ca.crt",
         ):
             self.assertNotIn(forbidden, serialized)
         self.assertEqual(
             CustomerDeploymentPreflightReport.from_dict(report).to_dict(), report
+        )
+
+    def test_current_profiles_require_verified_database_transport_in_exact_order(
+        self,
+    ) -> None:
+        report = self.generate()
+        check_ids = [check["id"] for check in report["spec"]["checks"]]
+
+        self.assertEqual(report["spec"]["summary"]["totalChecks"], 27)
+        self.assertEqual(
+            check_ids[check_ids.index("external-database") + 1],
+            "database-transport-security",
+        )
+        self.assertEqual(
+            next(
+                check
+                for check in report["spec"]["checks"]
+                if check["id"] == "database-transport-security"
+            ),
+            {"id": "database-transport-security", "status": "passed"},
+        )
+
+    def test_database_transport_requires_verify_full_and_exact_ca_dependency(
+        self,
+    ) -> None:
+        for mutation in ("insecure-mode", "missing-dependency", "wrong-key"):
+            with self.subTest(mutation=mutation):
+                profile = rendered_profile()
+                if mutation == "insecure-mode":
+                    profile["database"]["transportSecurity"]["mode"] = (  # type: ignore[index]
+                        "insecure-local"
+                    )
+                elif mutation == "missing-dependency":
+                    profile["dependencies"] = [
+                        dependency
+                        for dependency in profile["dependencies"]  # type: ignore[union-attr]
+                        if dependency["purpose"] != "database-ca"
+                    ]
+                else:
+                    profile["database"]["transportSecurity"]["caKey"] = (  # type: ignore[index]
+                        "other.crt"
+                    )
+
+                report = self.generate(profile)
+
+                self.assertEqual(report["spec"]["status"], "blocked")
+                self.assertEqual(
+                    next(
+                        check
+                        for check in report["spec"]["checks"]
+                        if check["id"] == "database-transport-security"
+                    ),
+                    {
+                        "id": "database-transport-security",
+                        "status": "failed",
+                        "errorCode": (
+                            "preflight.database.transport-security-required"
+                        ),
+                    },
+                )
+
+    def test_generation_rejects_historical_profile_names(self) -> None:
+        with self.assertRaisesRegex(
+            DeploymentPreflightError, "preflight.profile-name.invalid"
+        ):
+            self.generate(profile_name="production-core-v1")
+
+    def test_offline_validation_preserves_historical_report_shape(self) -> None:
+        report = self.generate()
+        report["spec"]["profile"]["name"] = "production-core-v1"
+        del report["spec"]["checks"][7]
+        report["spec"]["summary"] = {
+            "totalChecks": 26,
+            "passedChecks": 22,
+            "failedChecks": 0,
+            "notRunChecks": 4,
+            "overallStatus": "configuration-ready",
+        }
+        report["metadata"]["id"] = _report_identifier(
+            source_revision=report["metadata"]["sourceRevision"],
+            source_dirty=report["metadata"]["sourceDirty"],
+            profile=report["spec"]["profile"],
+            environment=report["spec"]["environment"],
+            dependencies=report["spec"]["dependencies"],
+            checks=report["spec"]["checks"],
+        )
+
+        validate_report_document(report)
+        self.assertEqual(
+            list(Draft202012Validator(report_schema()).iter_errors(report)), []
         )
 
     def test_live_profile_is_install_ready_only_after_exact_dependencies(self) -> None:
@@ -303,7 +424,7 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
 
         self.assertEqual(report["spec"]["status"], "install-ready")
         self.assertEqual(report["spec"]["environment"]["mode"], "cluster")
-        self.assertEqual(report["spec"]["dependencies"]["observedCount"], 2)
+        self.assertEqual(report["spec"]["dependencies"]["observedCount"], 3)
         self.assertEqual(report["spec"]["dependencies"]["unavailableCount"], 0)
         self.assertEqual(
             report["spec"]["dependencies"]["verificationStatus"], "passed"
@@ -314,7 +435,7 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
         report = self.generate(live=True, dependency_status="missing")
 
         self.assertEqual(report["spec"]["status"], "blocked")
-        self.assertEqual(report["spec"]["dependencies"]["missingCount"], 2)
+        self.assertEqual(report["spec"]["dependencies"]["missingCount"], 3)
         self.assertEqual(
             report["spec"]["checks"][-1],
             {
@@ -329,7 +450,7 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
 
         self.assertEqual(report["spec"]["status"], "blocked")
         self.assertEqual(report["spec"]["dependencies"]["missingCount"], 0)
-        self.assertEqual(report["spec"]["dependencies"]["unavailableCount"], 2)
+        self.assertEqual(report["spec"]["dependencies"]["unavailableCount"], 3)
         self.assertEqual(report["spec"]["dependencies"]["observedCount"], 0)
 
     def test_unavailable_cluster_writes_a_valid_minimized_blocked_report(self) -> None:
@@ -380,10 +501,13 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
         profile["telemetry"]["collectorQueueLossConfigured"] = True  # type: ignore[index]
         profile["networkPolicy"]["otlpReceiverIngress"] = True  # type: ignore[index]
 
-        report = self.generate(profile, profile_name="production-ai-finops-v0")
+        report = self.generate(profile, profile_name="production-ai-finops-v1")
 
         self.assertEqual(report["spec"]["status"], "configuration-ready")
-        self.assertEqual(report["spec"]["summary"]["totalChecks"], 32)
+        self.assertEqual(report["spec"]["summary"]["totalChecks"], 33)
+        self.assertEqual(
+            list(Draft202012Validator(report_schema()).iter_errors(report)), []
+        )
         self.assertEqual(
             report["spec"]["customerQualificationRequired"][-3:],
             [
@@ -432,6 +556,20 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
     def test_rendered_alert_profile_enforces_selector_label_limit(self) -> None:
         profile = rendered_profile()
         profile["operationalAlerts"]["selectorLabelCount"] = 33  # type: ignore[index]
+
+        with self.assertRaisesRegex(
+            DeploymentPreflightError, "preflight.profile.invalid"
+        ):
+            _validate_rendered_profile(profile)
+
+    def test_rendered_profile_requires_nested_database_transport_shape(self) -> None:
+        profile = rendered_profile()
+        profile["database"] = {
+            "existingSecretConfigured": True,
+            "migrationsEnabled": True,
+            "transportMode": "verify-full",
+            "caConfigured": True,
+        }
 
         with self.assertRaisesRegex(
             DeploymentPreflightError, "preflight.profile.invalid"
@@ -575,8 +713,8 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
         }
         forged["spec"]["status"] = "configuration-ready"
         forged["spec"]["summary"] = {
-            "totalChecks": 26,
-            "passedChecks": 22,
+            "totalChecks": 27,
+            "passedChecks": 23,
             "failedChecks": 0,
             "notRunChecks": 4,
             "overallStatus": "configuration-ready",
@@ -752,6 +890,21 @@ class CustomerDeploymentPreflightTests(unittest.TestCase):
             ).read_text(encoding="utf-8")
         )
         validate_report_document(report)
+
+    def test_python_sdk_exposes_current_and_historical_preflight_types(self) -> None:
+        self.assertEqual(
+            get_args(CustomerDeploymentPreflightProfileName),
+            (
+                "production-core-v1",
+                "production-ai-finops-v0",
+                "production-core-v2",
+                "production-ai-finops-v1",
+            ),
+        )
+        self.assertIn(
+            "database-transport-security",
+            get_args(CustomerDeploymentPreflightCheckId),
+        )
 
 
 if __name__ == "__main__":

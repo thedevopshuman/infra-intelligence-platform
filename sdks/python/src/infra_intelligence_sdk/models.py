@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Literal, Mapping, Optional, TypeAlias
 from urllib.parse import urlsplit
 
 
@@ -638,6 +638,50 @@ class DeploymentDiagnosticReport:
 
     def to_dict(self) -> Dict[str, Any]:
         return dict(self.payload)
+
+
+CustomerDeploymentPreflightProfileName: TypeAlias = Literal[
+    "production-core-v1",
+    "production-ai-finops-v0",
+    "production-core-v2",
+    "production-ai-finops-v1",
+]
+
+CustomerDeploymentPreflightCheckId: TypeAlias = Literal[
+    "helm-render",
+    "immutable-image",
+    "published-image-repository",
+    "api-redundancy",
+    "worker-enrollment",
+    "worker-redundancy",
+    "external-database",
+    "database-transport-security",
+    "controlled-migrations",
+    "oidc-authentication",
+    "external-policy",
+    "workload-identity-broker",
+    "tls-ingress",
+    "network-isolation",
+    "pod-disruption-budget",
+    "hard-topology-spread",
+    "scheduled-backup",
+    "evidence-retention",
+    "platform-telemetry",
+    "operational-alert-policy",
+    "evidence-backends",
+    "service-account-isolation",
+    "test-fixtures-denied",
+    "ai-usage-intake",
+    "ai-receiver-mtls",
+    "ai-receiver-redundancy",
+    "ai-cost-allocation-savings",
+    "ai-price-catalog-qualification",
+    "collector-loss-objective",
+    "cluster-api",
+    "operational-alert-api",
+    "operational-alert-namespace",
+    "referenced-dependencies",
+]
 
 
 @dataclass(frozen=True)

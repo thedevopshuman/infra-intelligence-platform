@@ -3,7 +3,7 @@
   "kind": "CustomerDeploymentPreflightReport",
   "metadata": {
     "generatedAt": "2026-09-05T15:26:40Z",
-    "id": "cdp_a0ab582855c1c8361ab9612ee9891197",
+    "id": "cdp_f159b7648499a2f6915362319468a0ee",
     "sourceDirty": false,
     "sourceRevision": "afd2ce4e600094fb481bc1da2789a35de00c8828"
   },
@@ -16,6 +16,7 @@
       {"id": "worker-enrollment", "status": "passed"},
       {"id": "worker-redundancy", "status": "passed"},
       {"id": "external-database", "status": "passed"},
+      {"id": "database-transport-security", "status": "passed"},
       {"id": "controlled-migrations", "status": "passed"},
       {"id": "oidc-authentication", "status": "passed"},
       {"id": "external-policy", "status": "passed"},
@@ -48,8 +49,8 @@
       "customer-workload-slo"
     ],
     "dependencies": {
-      "bindingDigest": "sha256:7b1dace137e4851b1ed3feeccc1698639c7c485deb39d115256446c27275be15",
-      "configuredCount": 12,
+      "bindingDigest": "sha256:016d8a9ea045371ae02f65b29bc4bcd688d61bcc8af42f6e5599b6a7ceedd6d2",
+      "configuredCount": 13,
       "invalidCount": 0,
       "missingCount": 0,
       "observedCount": 0,
@@ -65,9 +66,9 @@
     "profile": {
       "applicationVersion": "0.84.0",
       "chartVersion": "0.87.0",
-      "configurationDigest": "sha256:a4fdec3b341df69fba314407f0301aa1239f1383e9f30c3c4d21743c61b1fb5a",
-      "name": "production-core-v1",
-      "valuesDigest": "sha256:b7903095301e6c3d2e6a6927a69d0521f5994a6c25bd26311ea8e4ad3dd526e7"
+      "configurationDigest": "sha256:266541ec62c59b0c8d5481cfae2b1d7c243e50c952ce3f065e8148c4df5379b7",
+      "name": "production-core-v2",
+      "valuesDigest": "sha256:0eee3660b83b840c5286faa828dc349fab55f9b4d24539e6db52b4bfa86559ee"
     },
     "qualificationBoundary": "pre-install-only",
     "status": "configuration-ready",
@@ -75,8 +76,8 @@
       "failedChecks": 0,
       "notRunChecks": 4,
       "overallStatus": "configuration-ready",
-      "passedChecks": 22,
-      "totalChecks": 26
+      "passedChecks": 23,
+      "totalChecks": 27
     }
   }
 }

@@ -40,9 +40,15 @@ PostgreSQL integration tests skip when no database URL is supplied. With Docker 
 
 ```bash
 make test-postgres
+make test-postgres-tls
 ```
 
 This starts an ephemeral PostgreSQL 18.4 container bound to `127.0.0.1:55432`, runs only the PostgreSQL integration suite, and removes its container and volume on exit.
+
+The TLS gate separately uses disposable servers on `127.0.0.1:55434` and
+`127.0.0.1:55435` to verify server identity and reject wrong trust, wrong host,
+and plaintext fallback. It removes its containers, volumes, and temporary
+certificates afterward; see [PostgreSQL transport security](postgresql-transport-security.md).
 
 Exercise the external credential-broker client over a real local TLS socket with:
 
@@ -254,6 +260,7 @@ The PostgreSQL maintenance command verifies one explicit tenant against immutabl
 
 ```bash
 export IIP_DATABASE_URL='postgresql://postgres:<local-password>@127.0.0.1:5432/iip'
+export IIP_DATABASE_TRANSPORT_MODE=insecure-local
 PYTHONPATH=src python3 -m iip.surfaces.maintenance \
   rebuild-projections --tenant local --actor local-operator
 ```
@@ -291,6 +298,8 @@ The default image reference is a placeholder until an image pipeline exists. Do 
 | `IIP_CREDENTIAL_BROKER_MODE` | `static` | Provider credential resolution: provider-specific local `static` brokers or shared `external-http` client |
 | `IIP_CREDENTIAL_BROKER_CONFIG_JSON` | unset | Required non-secret HTTPS/trust/workload-token-path/lease bounds when external mode is selected |
 | `IIP_DATABASE_URL` | unset | Select the PostgreSQL profile when set |
+| `IIP_DATABASE_TRANSPORT_MODE` | `verify-full` | PostgreSQL transport policy: hostname-verified TLS by default; `insecure-local` is only for explicit disposable plaintext environments |
+| `IIP_DATABASE_CA_PATH` | required by `verify-full` | Readable PEM CA file selected for PostgreSQL server identity verification |
 | `IIP_DATABASE_AUTO_MIGRATE` | `false` | Apply packaged migrations at startup; local Compose only |
 | `IIP_WORKER_TENANTS` | unset | Required comma-separated exact tenant enrollment for the workflow worker; wildcard is invalid |
 | `IIP_WORKER_ID` | pod/host name | Stable workflow-worker identity |

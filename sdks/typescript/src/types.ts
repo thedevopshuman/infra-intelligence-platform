@@ -1324,6 +1324,7 @@ export type CustomerDeploymentPreflightCoreCheckId =
   | "worker-enrollment"
   | "worker-redundancy"
   | "external-database"
+  | "database-transport-security"
   | "controlled-migrations"
   | "oidc-authentication"
   | "external-policy"
@@ -1370,6 +1371,12 @@ export type CustomerDeploymentPreflightRequirement =
   | "authoritative-ai-price-catalog"
   | "ai-workload-saving-validation";
 
+export type CustomerDeploymentPreflightProfileName =
+  | "production-core-v1"
+  | "production-ai-finops-v0"
+  | "production-core-v2"
+  | "production-ai-finops-v1";
+
 export interface CustomerDeploymentPreflightReport {
   apiVersion: "iip.platform/v1alpha1";
   kind: "CustomerDeploymentPreflightReport";
@@ -1383,7 +1390,7 @@ export interface CustomerDeploymentPreflightReport {
     status: "blocked" | "configuration-ready" | "install-ready";
     qualificationBoundary: "pre-install-only";
     profile: {
-      name: "production-core-v1" | "production-ai-finops-v0";
+      name: CustomerDeploymentPreflightProfileName;
       chartVersion: string;
       applicationVersion: string;
       valuesDigest: Sha256Digest;
@@ -1426,7 +1433,7 @@ export interface CustomerDeploymentPreflightReport {
     >;
     customerQualificationRequired: CustomerDeploymentPreflightRequirement[];
     summary: {
-      totalChecks: 26 | 32;
+      totalChecks: 26 | 27 | 32 | 33;
       passedChecks: number;
       failedChecks: number;
       notRunChecks: number;
@@ -2666,7 +2673,7 @@ export interface CustomerAiFinopsPrerequisiteReport {
     qualificationLevel: "customer-ai-finops-prerequisites-v1";
     qualificationBoundary: "prerequisite-aggregation-only";
     subject: {
-      deploymentProfile: "production-ai-finops-v0";
+      deploymentProfile: "production-ai-finops-v0" | "production-ai-finops-v1";
       applicationVersion: string;
       chartVersion: string;
       contractsApiVersion: "iip.platform/v1alpha1";
@@ -2843,7 +2850,7 @@ export interface CustomerAiFinopsFlowQualificationReport {
     qualificationLevel: "customer-ai-finops-flow-v1";
     qualificationBoundary: "same-invocation-customer-runtime";
     subject: {
-      deploymentProfile: "production-ai-finops-v0";
+      deploymentProfile: "production-ai-finops-v0" | "production-ai-finops-v1";
       applicationVersion: string;
       chartVersion: string;
       contractsApiVersion: "iip.platform/v1alpha1";
@@ -3960,7 +3967,7 @@ export interface CustomerDeploymentQualificationReport {
     status: "qualified" | "not-qualified";
     qualificationLevel: "single-cluster-database-identity-policy-broker-receiver-prerequisites-v7";
     subject: {
-      profile: "production-core-v1" | "production-ai-finops-v0";
+      profile: CustomerDeploymentPreflightProfileName;
       applicationVersion: string;
       chartVersion: string;
       contractsApiVersion: "iip.platform/v1alpha1";

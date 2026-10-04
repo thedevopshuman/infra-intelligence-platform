@@ -122,6 +122,8 @@ source-bound retry finding:
 
 ```bash
 export IIP_DATABASE_URL=postgresql://...
+export IIP_DATABASE_TRANSPORT_MODE=verify-full
+export IIP_DATABASE_CA_PATH=/protected/database-ca/ca.crt
 export IIP_AI_USAGE_RECEIVER_ENABLED=true
 export IIP_AI_USAGE_RECEIVER_CHANNELS_JSON="$(tr -d '\n' < /protected/ai-usage-channels.json)"
 export IIP_OTLP_TLS_MODE=mutual-spiffe
@@ -147,6 +149,10 @@ Set:
 ```yaml
 database:
   existingSecret: iip-database
+  transportSecurity:
+    mode: verify-full
+    caExistingSecret: iip-database-ca
+    caKey: ca.crt
 aiUsageReceiver:
   enabled: true
   channelsExistingSecret: iip-ai-usage-channels

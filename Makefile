@@ -1,5 +1,7 @@
 .PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-oidc-qualification qualify-customer-oidc verify-customer-oidc-qualification-report test-customer-operational-alert-qualification qualify-customer-operational-alerts verify-customer-operational-alert-qualification-report test-customer-policy-qualification qualify-customer-policy verify-customer-policy-qualification-report test-customer-credential-broker-qualification qualify-customer-credential-broker verify-customer-credential-broker-qualification-report test-customer-github-context-qualification qualify-customer-github-context verify-customer-github-context-qualification-report test-customer-bedrock-qualification qualify-customer-bedrock verify-customer-bedrock-qualification-report test-customer-ai-finops-prerequisites qualify-customer-ai-finops-prerequisites verify-customer-ai-finops-prerequisite-report test-customer-ai-finops-flow qualify-customer-ai-finops-flow verify-customer-ai-finops-flow-report test-customer-pilot-readiness assess-customer-pilot-readiness verify-customer-pilot-readiness-report test-customer-failure-overlap assess-customer-failure-overlap verify-customer-failure-overlap-report test-customer-otlp-receiver-qualification qualify-customer-otlp-receiver verify-customer-otlp-receiver-qualification-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-sustained-workload qualify-customer-sustained-workload verify-customer-sustained-workload-report test-customer-postgresql-continuity qualify-customer-postgresql-continuity verify-customer-postgresql-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-operational-alerts test-otlp-receiver test-ai-finops verify-ai-finops-runtime-report test-ai-finops-sustained-load verify-ai-finops-sustained-load-report test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
+.PHONY: test-postgres-tls
+
 PYTHON ?= python3
 HELM ?= helm
 KUBECTL ?= kubectl
@@ -13,7 +15,7 @@ IIP_AI_FINOPS_SUSTAINED_LOAD_PROFILE ?= contracts/examples/ai-finops-sustained-l
 IIP_AI_FINOPS_SUSTAINED_LOAD_REPORT ?= dist/ai-finops-sustained-load-qualification-report.json
 IIP_DATABASE_CONTINUITY_REPORT ?= dist/postgresql-continuity-qualification-report.json
 IIP_DEPLOYMENT_PREFLIGHT_REPORT ?= dist/customer-deployment-preflight-report.json
-IIP_DEPLOYMENT_PROFILE ?= production-core-v1
+IIP_DEPLOYMENT_PROFILE ?= production-core-v2
 IIP_DEPLOYMENT_VALUES ?= deploy/helm/infra-intelligence/examples/production-core.values.yaml
 IIP_DEPLOYMENT_NAMESPACE ?= iip-system
 IIP_KUBERNETES_CONTEXT ?=
@@ -288,6 +290,7 @@ help:
 	@echo "qualify-kubernetes-availability Prove API, durable OTLP intake, and worker completion during an owned Kind drain"
 	@echo "verify-kubernetes-availability-report Verify clean current planned-disruption evidence"
 	@echo "test-postgres Run PostgreSQL integration tests with Docker Desktop"
+	@echo "test-postgres-tls Verify PostgreSQL TLS identity and downgrade rejection with Docker Desktop"
 	@echo "test-capacity Certify large-tenant investigation dispatch capacity with PostgreSQL"
 	@echo "test-credential-broker Certify the external broker client over local TLS"
 	@echo "test-oidc     Certify OIDC/JWKS and browser PKCE boundaries over local TLS"
@@ -388,14 +391,14 @@ test-evidence-redaction:
 
 test-deployment-preflight:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/deployment_preflight.py generate \
-		--profile production-core-v1 \
+		--profile production-core-v2 \
 		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml \
 		--output dist/customer-deployment-preflight-report.json
 	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/deployment_preflight.py verify \
 		--report dist/customer-deployment-preflight-report.json \
 		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml
 	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/deployment_preflight.py generate \
-		--profile production-ai-finops-v0 \
+		--profile production-ai-finops-v1 \
 		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml \
 		--values deploy/helm/infra-intelligence/examples/production-ai-finops.values.yaml \
 		--output dist/customer-ai-finops-preflight-report.json
@@ -404,7 +407,7 @@ test-deployment-preflight:
 		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml \
 		--values deploy/helm/infra-intelligence/examples/production-ai-finops.values.yaml
 	PYTHONPATH=src:sdks/python/src $(PYTHON) scripts/deployment_preflight.py generate \
-		--profile production-core-v1 \
+		--profile production-core-v2 \
 		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml \
 		--values deploy/helm/infra-intelligence/examples/production-github-context.values.yaml \
 		--output dist/customer-github-context-preflight-report.json
@@ -1424,6 +1427,9 @@ verify-kubernetes-availability-report:
 test-postgres:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_postgres.sh
 
+test-postgres-tls:
+	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_postgres_tls.sh
+
 test-capacity:
 	IIP_DOCKER_BIN=$(DOCKER) IIP_TEST_PYTHON=$(PYTHON) scripts/test_capacity.sh
 
@@ -1739,7 +1745,10 @@ helm-lint:
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set-string image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--values deploy/helm/infra-intelligence/examples/production-core.values.yaml >/dev/null
+	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
 		--set otlpReceiver.enabled=true \
 		--set otlpReceiver.channelsExistingSecret=iip-otlp-metrics \
 		--set otlpLogsReceiver.enabled=true \
@@ -1751,6 +1760,7 @@ helm-lint:
 		--set networkPolicy.otlpReceiverIngress.enabled=true >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
 		--set otlpReceiver.enabled=true \
 		--set otlpReceiver.channelsExistingSecret=iip-otlp-metrics \
 		--set telemetry.metricsEnabled=true \
@@ -1761,6 +1771,7 @@ helm-lint:
 		--set networkPolicy.otlpEgress.enabled=true >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
 		--set otlpReceiver.enabled=true \
 		--set otlpReceiver.channelsExistingSecret=iip-otlp-metrics \
 		--set otlpIngest.tls.mode=mutual-spiffe \
@@ -1769,17 +1780,20 @@ helm-lint:
 		--set otlpIngest.tls.identitiesExistingSecret=iip-otlp-identities >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
 		--set worker.enabled=true \
 		--set 'worker.tenants[0]=tenant-a' \
 		--set 'worker.ingestionMonitorTargets[0].tenantId=tenant-a' \
 		--set 'worker.ingestionMonitorTargets[0].sourceId=kubernetes-a' >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
 		--set worker.enabled=true \
 		--set 'worker.tenants[0]=tenant-a' \
 		--set evidenceRetention.enabled=true >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
 		--set worker.enabled=true \
 		--set 'worker.tenants[0]=tenant-a' \
 		--set aiAttribution.enabled=true \
@@ -1793,6 +1807,7 @@ helm-lint:
 		--set telemetry.otlpEndpoint=http://otel-collector.observability:4318 >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
 		--set worker.enabled=true \
 		--set 'worker.tenants[0]=tenant-a' \
 		--set eventPublisher.mode=https-webhook \
@@ -1803,11 +1818,13 @@ helm-lint:
 		--set networkPolicy.eventPublisherEgress.enabled=true >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
 		--set database.migrations.enabled=true \
 		--set networkPolicy.enabled=true \
 		--set networkPolicy.databaseEgress.enabled=true >/dev/null
 	$(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
 		--set backup.enabled=true \
 		--set backup.destination.existingClaim=iip-backups \
 		--set networkPolicy.enabled=true \
@@ -1835,7 +1852,18 @@ helm-lint:
 		echo "Helm values schema accepted an invalid replica count" >&2; exit 1; \
 	fi
 	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set database.existingSecret=iip-database >/dev/null 2>&1; then \
+		echo "Helm validation accepted verify-full database transport without its CA Secret" >&2; exit 1; \
+	fi
+	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
+		--set database.transportSecurity.caExistingSecret=iip-database-ca >/dev/null 2>&1; then \
+		echo "Helm validation accepted a CA Secret in insecure-local database mode" >&2; exit 1; \
+	fi
+	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
+		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
 		--set otlpReceiver.enabled=true \
 		--set otlpReceiver.channelsExistingSecret=iip-otlp-metrics \
 		--set telemetry.metricsEnabled=true \
@@ -1854,6 +1882,7 @@ helm-lint:
 	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set worker.enabled=true \
 		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
 		--set 'worker.tenants[0]=tenant-a' \
 		--set worker.heartbeatSeconds=30 \
 		--set worker.leaseSeconds=30 >/dev/null 2>&1; then \
@@ -1896,6 +1925,7 @@ helm-lint:
 	fi
 	@if $(HELM) template iip deploy/helm/infra-intelligence --namespace iip-system \
 		--set database.existingSecret=iip-database \
+		--set database.transportSecurity.mode=insecure-local \
 		--set backup.enabled=true \
 		--set backup.destination.existingClaim=iip-backups >/dev/null 2>&1; then \
 		echo "Helm validation accepted backup without database-only NetworkPolicy" >&2; exit 1; \

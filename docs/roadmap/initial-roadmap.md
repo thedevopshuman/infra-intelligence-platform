@@ -65,6 +65,14 @@ reports match and always keeps the eight customer, organizational, live
 provider, design-partner, and legal/brand gates explicit. It is a local
 candidate inventory, not a production promotion decision.
 
+Packaged PostgreSQL transport now has an explicit fail-closed policy rather
+than inheriting security from an opaque Secret URL. Current production
+preflight profiles require hostname-verified libpq TLS and a separately
+referenced CA for every API, worker, receiver, migration, maintenance, and
+backup path; plaintext remains a named local-fixture exception. Database PKI
+lifecycle, private networking, automatic failover, fencing, RPO/PITR, and
+regional recovery remain customer qualification work.
+
 Customer AI FinOps prerequisites also have a separate minimized aggregate. It
 binds the exact local candidate/runtime, customer deployment/receiver, live
 Bedrock streaming, and production catalog reports under one protected profile.

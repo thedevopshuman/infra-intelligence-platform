@@ -147,6 +147,7 @@ class DedicatedOtlpCompositionTests(unittest.TestCase):
                 os.environ,
                 {
                     "IIP_DATABASE_URL": "postgresql://receiver.example/iip",
+                    "IIP_DATABASE_TRANSPORT_MODE": "insecure-local",
                     "IIP_OTLP_RECEIVER_ENABLED": "true",
                     "IIP_OTLP_RECEIVER_CHANNELS_JSON": receiver_config(),
                 },

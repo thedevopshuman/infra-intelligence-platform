@@ -57,7 +57,7 @@ IDs; display names remain API data and never become metric labels.
 Before installation, provide:
 
 - an immutable platform image available to the cluster;
-- a PostgreSQL database and an existing Secret whose `database-url` key is a complete connection URL;
+- a PostgreSQL database, an existing Secret whose `database-url` key is a complete connection URL without libpq transport options, and a separate existing Secret containing the server CA under `ca.crt`;
 - authentication configuration through an existing Secret or the documented OIDC mode;
 - reviewed tenant, policy, network, telemetry, backup, and retention settings.
 
@@ -65,6 +65,20 @@ The chart never creates credential-bearing Secrets. The
 [external-secret-controller runbook](external-secrets.md) provides the packaged
 database handoff example, inventories all optional Secret names and keys, and
 defines the local exact-key/rotation compatibility gate.
+
+Scheduled backups require a TCP PostgreSQL URI without query parameters or
+fragments; keyword conninfo is not accepted by the backup utility. Migrate the
+Secret before enabling or upgrading backups as described in the
+[database transport runbook](postgresql-transport-security.md).
+
+Production database transport is fail-closed. The chart defaults to
+`database.transportSecurity.mode: verify-full`; set
+`database.transportSecurity.caExistingSecret` to the CA Secret and keep its
+default `caKey: ca.crt`. The API, worker, receiver, migrator, and backup client
+all receive the same read-only trust file and verified-hostname policy. The
+only alternative, `insecure-local`, is reserved for disposable local fixtures
+and is rejected by current production preflight profiles. See the
+[PostgreSQL transport-security runbook](postgresql-transport-security.md).
 
 The optional `operationalAlerts` profile renders a Prometheus Operator rule
 resource for privacy-bounded IIP signals, including an always-on OTel component
@@ -204,6 +218,10 @@ representative values fragment is:
 ```yaml
 database:
   existingSecret: iip-database
+  transportSecurity:
+    mode: verify-full
+    caExistingSecret: iip-database-ca
+    caKey: ca.crt
 
 otlpReceiver:
   enabled: true

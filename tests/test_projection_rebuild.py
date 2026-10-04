@@ -133,9 +133,15 @@ class MaintenanceCliTests(unittest.TestCase):
         )
         output = io.StringIO()
         with (
-            patch.dict(os.environ, {"IIP_DATABASE_URL": "postgresql://unused"}),
+            patch.dict(
+                os.environ,
+                {
+                    "IIP_DATABASE_URL": "postgresql://unused",
+                    "IIP_DATABASE_TRANSPORT_MODE": "insecure-local",
+                },
+            ),
             patch(
-                "iip.surfaces.maintenance.build_projection_maintenance",
+                "iip.surfaces.maintenance.build_projection_maintenance_from_env",
                 return_value=service,
             ),
             redirect_stdout(output),
@@ -150,9 +156,15 @@ class MaintenanceCliTests(unittest.TestCase):
 
         output = io.StringIO()
         with (
-            patch.dict(os.environ, {"IIP_DATABASE_URL": "postgresql://unused"}),
+            patch.dict(
+                os.environ,
+                {
+                    "IIP_DATABASE_URL": "postgresql://unused",
+                    "IIP_DATABASE_TRANSPORT_MODE": "insecure-local",
+                },
+            ),
             patch(
-                "iip.surfaces.maintenance.build_projection_maintenance",
+                "iip.surfaces.maintenance.build_projection_maintenance_from_env",
                 return_value=service,
             ),
             redirect_stdout(output),

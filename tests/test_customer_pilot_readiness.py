@@ -126,7 +126,7 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
         },
     ]
     customer_subject = {
-        "deploymentProfile": "production-ai-finops-v0",
+        "deploymentProfile": "production-ai-finops-v1",
         "applicationVersion": "0.84.0",
         "chartVersion": "0.87.0",
         "contractsApiVersion": pilot.SOURCE_API_VERSION,
@@ -134,7 +134,7 @@ def _sources(now: datetime) -> tuple[dict, dict[str, pilot.EvidenceDocument]]:
         "imageDigest": CONTROL_IMAGE,
     }
     deployment_subject = {
-        "profile": "production-ai-finops-v0",
+        "profile": "production-ai-finops-v1",
         "applicationVersion": "0.84.0",
         "chartVersion": "0.87.0",
         "contractsApiVersion": pilot.SOURCE_API_VERSION,

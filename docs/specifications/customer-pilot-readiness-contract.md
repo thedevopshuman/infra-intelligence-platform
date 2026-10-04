@@ -63,6 +63,11 @@ review timestamps and complete specification. Its required
     the exact protected alert profile, and the complete `ai-finops-v0` rule
     set.
 
+The deployment, prerequisite, and same-invocation subjects must all bind the
+current `production-ai-finops-v1` deployment profile. Historical v0 artifacts
+remain readable at their owning transport boundaries but cannot satisfy this
+current v2 pilot admission profile.
+
 The release manifest, source, versions, published index digests, signed index
 digests, installed image, target identity, customer environment, sustained
 workload/overlap profiles, API/OTLP targets, alert cluster and namespace,

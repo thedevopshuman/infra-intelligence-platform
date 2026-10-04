@@ -2616,7 +2616,7 @@ def validate_customer_ai_finops_prerequisite_examples(
             != _digest_value(_catalog_binding(pricing))
             or subject
             != {
-                "deploymentProfile": "production-ai-finops-v0",
+                "deploymentProfile": "production-ai-finops-v1",
                 "applicationVersion": release["applicationVersion"],
                 "chartVersion": release["chartVersion"],
                 "contractsApiVersion": "iip.platform/v1alpha1",
@@ -2789,6 +2789,8 @@ def validate_customer_ai_finops_flow_examples(
             != observation_spec["cost"]["recordDigest"]
             or run_spec["cost"]["sourceDocumentDigest"]
             != observation_sources["pricing"]["documentDigest"]
+            or report_spec["subject"]["deploymentProfile"]
+            != "production-ai-finops-v1"
             or bindings != expected_bindings
             or report_spec["measurements"] != expected_measurements
         ):

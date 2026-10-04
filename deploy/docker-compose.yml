@@ -24,6 +24,7 @@ services:
         IIP_IMAGE_REVISION: development
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_TRANSPORT_MODE: insecure-local
       IIP_DATABASE_AUTO_MIGRATE: "true"
       IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
       IIP_EVENT_DELIVERY_SLO_WINDOW_SECONDS: ${IIP_EVENT_DELIVERY_SLO_WINDOW_SECONDS:-3600}
@@ -119,6 +120,7 @@ services:
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_TRANSPORT_MODE: insecure-local
       IIP_DATABASE_AUTO_MIGRATE: "false"
       IIP_WORKER_ID: local-workflow-worker
       IIP_WORKER_HEALTH_PORT: "8081"

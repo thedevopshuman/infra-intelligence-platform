@@ -7,6 +7,12 @@
 {{- if ge (int .Values.otlpIngest.endpointDrainSeconds) (int .Values.otlpIngest.terminationGracePeriodSeconds) }}
 {{- fail "otlpIngest.endpointDrainSeconds must be less than otlpIngest.terminationGracePeriodSeconds" }}
 {{- end }}
+{{- if and .Values.database.existingSecret (eq .Values.database.transportSecurity.mode "verify-full") (not .Values.database.transportSecurity.caExistingSecret) }}
+{{- fail "database.transportSecurity.caExistingSecret is required for verify-full PostgreSQL transport" }}
+{{- end }}
+{{- if and (eq .Values.database.transportSecurity.mode "insecure-local") .Values.database.transportSecurity.caExistingSecret }}
+{{- fail "database.transportSecurity.caExistingSecret must be empty in insecure-local mode" }}
+{{- end }}
 {{- if and .Values.worker.podDisruptionBudget.enabled (not .Values.worker.enabled) }}
 {{- fail "worker.enabled must be true when worker.podDisruptionBudget.enabled=true" }}
 {{- end }}

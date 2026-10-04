@@ -1,0 +1,46 @@
+services:
+  postgres-tls-test:
+    image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    environment:
+      POSTGRES_DB: iip_tls_test
+      POSTGRES_HOST_AUTH_METHOD: trust
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          PGSSLMODE=verify-full
+          PGSSLROOTCERT=$$PGDATA/ca.crt
+          pg_isready -h localhost -U postgres -d iip_tls_test
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    ports:
+      - "127.0.0.1:${IIP_TEST_POSTGRES_TLS_PORT:-55434}:5432"
+    volumes:
+      - type: bind
+        source: ${IIP_TEST_POSTGRES_TLS_FIXTURE_DIR:?fixture directory is required}
+        target: /fixture
+        read_only: true
+      - type: bind
+        source: ${IIP_REPOSITORY_ROOT:?repository root is required}/tests/fixtures/postgres_tls/initialize.sh
+        target: /docker-entrypoint-initdb.d/initialize-postgres-tls.sh
+        read_only: true
+
+  postgres-plaintext-test:
+    image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    environment:
+      POSTGRES_DB: iip_plaintext_test
+      POSTGRES_HOST_AUTH_METHOD: trust
+    command:
+      - postgres
+      - -c
+      - ssl=off
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -h localhost -U postgres -d iip_plaintext_test
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    ports:
+      - "127.0.0.1:${IIP_TEST_POSTGRES_PLAINTEXT_PORT:-55435}:5432"

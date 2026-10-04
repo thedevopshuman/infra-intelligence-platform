@@ -7,6 +7,11 @@ Platform administrators can query `GET /v1/operations/investigations/completion-
 ## Required configuration
 
 - `IIP_DATABASE_URL`: the same migrated PostgreSQL database as the API.
+- `IIP_DATABASE_TRANSPORT_MODE`: `verify-full` for every shared or customer
+  database; only a repository-controlled plaintext fixture may select
+  `insecure-local`.
+- `IIP_DATABASE_CA_PATH`: the explicit PostgreSQL server CA required by
+  `verify-full`.
 - `IIP_WORKER_TENANTS`: comma-separated exact tenant IDs. There is no wildcard or implicit all-tenant mode.
 - `IIP_WORKER_ID`: stable process identity, normally the pod name.
 - `IIP_WORKER_LEASE_SECONDS`: 10–300, default 30.

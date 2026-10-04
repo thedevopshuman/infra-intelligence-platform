@@ -12,6 +12,11 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from iip.adapters.postgres.connection import (
+    PostgresConnectionConfiguration,
+    connection_string_for,
+    validate_connection_environment,
+)
 from iip.application.investigate import canonical_digest
 from iip.application.ports import (
     ActionExecutionTransition,
@@ -32,12 +37,15 @@ from iip.application.ports import (
 class PostgresOperationalStore:
     """Durable tenant-scoped operational documents behind application ports."""
 
-    def __init__(self, database_url: str) -> None:
-        if not isinstance(database_url, str) or not database_url.strip():
-            raise ValueError("database_url must be a non-empty PostgreSQL connection string")
-        self._database_url = database_url
+    def __init__(
+        self,
+        database_url: str | PostgresConnectionConfiguration,
+    ) -> None:
+        self._database_url = connection_string_for(database_url)
+        self._database_configuration = database_url
 
     def _connect(self):
+        validate_connection_environment(self._database_configuration)
         return psycopg.connect(self._database_url, row_factory=dict_row)
 
     def record_telemetry_export_health(

@@ -61,6 +61,8 @@ from .models import (
     CustomerSustainedWorkloadQualificationReport,
     CustomerPostgreSQLContinuityProfile,
     CustomerPostgreSQLContinuityQualificationReport,
+    CustomerDeploymentPreflightCheckId,
+    CustomerDeploymentPreflightProfileName,
     CustomerDeploymentPreflightReport,
     DeploymentDiagnosticReport,
     ContextEvidenceRequest,
@@ -207,6 +209,8 @@ __all__ = [
     "CustomerSustainedWorkloadQualificationReport",
     "CustomerPostgreSQLContinuityProfile",
     "CustomerPostgreSQLContinuityQualificationReport",
+    "CustomerDeploymentPreflightCheckId",
+    "CustomerDeploymentPreflightProfileName",
     "CustomerDeploymentPreflightReport",
     "DeploymentDiagnosticReport",
     "ContextEvidenceRequest",
@@ -295,4 +299,4 @@ __all__ = [
     "TelemetryExportBurnRateReport",
     "discover_console_authentication",
 ]
-__version__ = "0.83.0"
+__version__ = "0.84.0"

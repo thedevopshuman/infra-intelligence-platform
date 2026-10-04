@@ -64,7 +64,7 @@ class CustomerAiFinopsPrerequisiteTests(unittest.TestCase):
             sourceDirty=False,
         )
         deployment["spec"]["subject"].update(
-            profile="production-ai-finops-v0",
+            profile="production-ai-finops-v1",
             applicationVersion="0.84.0",
             chartVersion="0.87.0",
             sourceRevision=REVISION,

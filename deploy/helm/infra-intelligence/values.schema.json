@@ -526,10 +526,20 @@
     "database": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["existingSecret", "secretKey", "migrations"],
+      "required": ["existingSecret", "secretKey", "transportSecurity", "migrations"],
       "properties": {
         "existingSecret": { "$ref": "#/definitions/optionalName" },
         "secretKey": { "$ref": "#/definitions/nonEmptyString" },
+        "transportSecurity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "caExistingSecret", "caKey"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["verify-full", "insecure-local"] },
+            "caExistingSecret": { "$ref": "#/definitions/optionalName" },
+            "caKey": { "$ref": "#/definitions/nonEmptyString" }
+          }
+        },
         "migrations": {
           "type": "object",
           "additionalProperties": false,

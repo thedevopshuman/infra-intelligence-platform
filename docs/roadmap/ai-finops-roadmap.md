@@ -162,7 +162,7 @@ workload-specific quality, latency, safety, and compliance gates before it can
 compare candidate/reference cost per request. Its calculated scenario cites
 the report and complete usage/cost cohorts and remains advisory.
 
-A closed `production-ai-finops-v0` Helm overlay and minimized deployment
+A closed `production-ai-finops-v1` Helm overlay and minimized deployment
 preflight are also executable. Static mode proves the complete non-secret
 configuration shape; explicit-context cluster mode additionally proves that
 every referenced Secret key, ConfigMap, and backup claim exists. This remains

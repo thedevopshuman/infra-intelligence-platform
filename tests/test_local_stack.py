@@ -148,6 +148,22 @@ class LocalStackConfigurationTests(unittest.TestCase):
         )
         self.assertIn("IIP_AI_SAVINGS_PROFILES_JSON", worker)
 
+    def test_every_plaintext_compose_database_client_opts_in_explicitly(self) -> None:
+        for relative in (
+            "deploy/docker-compose.yml",
+            "deploy/docker-compose.ai-finops.yml",
+            "deploy/docker-compose.otlp-receiver.yml",
+        ):
+            with self.subTest(compose=relative):
+                compose = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertGreater(compose.count("IIP_DATABASE_URL:"), 0)
+                self.assertEqual(
+                    compose.count("IIP_DATABASE_URL:"),
+                    compose.count(
+                        "IIP_DATABASE_TRANSPORT_MODE: insecure-local"
+                    ),
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

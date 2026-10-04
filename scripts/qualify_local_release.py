@@ -61,6 +61,7 @@ SOURCE_QUALITY_TARGETS = (
 )
 
 ENVIRONMENT_EVIDENCE_TARGETS = (
+    "test-postgres-tls",
     "test-capacity",
     "test-credential-broker",
     "test-oidc",

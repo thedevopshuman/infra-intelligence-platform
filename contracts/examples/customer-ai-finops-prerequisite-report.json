@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerAiFinopsPrerequisiteReport",
   "metadata": {
-    "id": "cafp_ad3d3fdcfdbf7e5b7c62bb5ef07ef69b",
+    "id": "cafp_7923031fd5b4222eda04dfd7e3c21af3",
     "generatedAt": "2026-09-08T10:10:00Z",
     "validUntil": "2026-09-09T10:10:00Z",
     "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -13,7 +13,7 @@
     "qualificationLevel": "customer-ai-finops-prerequisites-v1",
     "qualificationBoundary": "prerequisite-aggregation-only",
     "subject": {
-      "deploymentProfile": "production-ai-finops-v0",
+      "deploymentProfile": "production-ai-finops-v1",
       "applicationVersion": "0.84.0",
       "chartVersion": "0.87.0",
       "contractsApiVersion": "iip.platform/v1alpha1",

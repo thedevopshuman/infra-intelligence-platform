@@ -14,6 +14,11 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from iip.adapters.postgres.connection import (
+    PostgresConnectionConfiguration,
+    connection_string_for,
+    validate_connection_environment,
+)
 from iip.adapters.ai_cost_store import (
     prepare_ai_cost_writes,
     prepare_ai_price_catalog,
@@ -120,10 +125,12 @@ def _translate_database_errors(operation: Any) -> Any:
 class PostgresResourceStore:
     """Tenant-scoped PostgreSQL adapter with transactional outbox guarantees."""
 
-    def __init__(self, database_url: str) -> None:
-        if not isinstance(database_url, str) or not database_url.strip():
-            raise ValueError("database_url must be a non-empty PostgreSQL connection string")
-        self._database_url = database_url
+    def __init__(
+        self,
+        database_url: str | PostgresConnectionConfiguration,
+    ) -> None:
+        self._database_url = connection_string_for(database_url)
+        self._database_configuration = database_url
 
     @_translate_database_errors
     def migrate(self) -> None:
@@ -2268,6 +2275,7 @@ class PostgresResourceStore:
             )
 
     def _connect(self) -> Any:
+        validate_connection_environment(self._database_configuration)
         return psycopg.connect(self._database_url, row_factory=dict_row)
 
     @classmethod

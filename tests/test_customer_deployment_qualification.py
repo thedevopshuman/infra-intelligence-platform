@@ -111,8 +111,8 @@ def live_preflight() -> dict[str, object]:
         check.pop("errorCode", None)
     spec["status"] = "install-ready"
     spec["summary"] = {
-        "totalChecks": 26,
-        "passedChecks": 26,
+        "totalChecks": 27,
+        "passedChecks": 27,
         "failedChecks": 0,
         "notRunChecks": 0,
         "overallStatus": "install-ready",

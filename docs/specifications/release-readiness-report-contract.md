@@ -38,8 +38,10 @@ The `local-candidate-only` profile has 19 ordered requirements:
     intake, and workflow completion;
 16. protected GitHub context compatibility;
 17. plugin runtime compatibility;
-18. production-core static configuration preflight; and
-19. production AI FinOps static configuration preflight.
+18. current `production-core-v2` static configuration preflight, including
+    verified PostgreSQL transport; and
+19. current `production-ai-finops-v1` static configuration preflight, including
+    verified PostgreSQL transport.
 
 Missing evidence is `missing`. Malformed, dirty, unsuccessful, wrong-profile,
 wrong-version, or wrong-revision evidence is `rejected`. Only 19 passed entries
@@ -51,6 +53,11 @@ application version. Deployment preflight reports must bind the candidate
 application and chart versions. Offline provider evidence remains visibly
 `offline-provider`; static Helm evidence remains visibly
 `configuration-only`.
+
+The historical `production-core-v1` and `production-ai-finops-v0` preflight
+shapes remain independently readable under their owning contract, but they are
+rejected as wrong-profile evidence by current local release readiness. This
+prevents a pre-transport-security report from qualifying a new candidate.
 
 ## External gates
 

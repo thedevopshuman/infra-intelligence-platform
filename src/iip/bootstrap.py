@@ -7,9 +7,12 @@ import json
 import os
 import secrets
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from . import __version__
+
+if TYPE_CHECKING:
+    from iip.adapters.postgres import PostgresConnectionConfiguration
 
 from iip.adapters.actions import (
     ActionExecutorRouter,
@@ -810,7 +813,7 @@ def _runtime_version_identity_from_env() -> RuntimeVersionIdentity:
 
 
 def build_postgres_runtime(
-    database_url: str,
+    database_url: str | PostgresConnectionConfiguration,
     *,
     authenticator: Authenticator | None = None,
     migrate: bool = False,
@@ -933,12 +936,39 @@ def build_postgres_runtime(
     )
 
 
-def build_projection_maintenance(database_url: str) -> ProjectionRebuildService:
+def build_projection_maintenance(
+    database_url: str | PostgresConnectionConfiguration,
+) -> ProjectionRebuildService:
     """Compose the privileged PostgreSQL projection-recovery use case."""
 
     from iip.adapters.postgres import PostgresResourceStore
 
     return ProjectionRebuildService(PostgresResourceStore(database_url), AllowTenantPolicy())
+
+
+def build_projection_maintenance_from_env() -> ProjectionRebuildService:
+    """Compose privileged maintenance through protected process configuration."""
+
+    from iip.adapters.postgres import PostgresConnectionConfigurationError
+
+    database_url = os.environ.get("IIP_DATABASE_URL")
+    if not database_url:
+        raise SystemExit("IIP_DATABASE_URL is required")
+    try:
+        connection = _postgres_connection_configuration_from_env(database_url)
+    except PostgresConnectionConfigurationError as error:
+        raise SystemExit(str(error)) from None
+    return build_projection_maintenance(connection)
+
+
+def _postgres_connection_configuration_from_env(
+    database_url: str,
+) -> PostgresConnectionConfiguration:
+    """Resolve protected database transport once for every packaged consumer."""
+
+    from iip.adapters.postgres import PostgresConnectionConfiguration
+
+    return PostgresConnectionConfiguration.from_environment(database_url, os.environ)
 
 
 def _console_authentication_for(
@@ -1206,8 +1236,9 @@ def _build_runtime_from_env(
             os.environ.get("IIP_DATABASE_AUTO_MIGRATE", "false").lower()
             == "true"
         )
+        database_connection = _postgres_connection_configuration_from_env(database_url)
         return build_postgres_runtime(
-            database_url,
+            database_connection,
             authenticator=authenticator,
             migrate=auto_migrate,
             ingestion_objectives=objectives,
@@ -1314,6 +1345,7 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
     )
     metrics_runtime = _otel_metrics_runtime_from_env()
     try:
+        database_connection = _postgres_connection_configuration_from_env(database_url)
         telemetry_export_slo_objectives = _telemetry_export_slo_objectives_from_env()
         telemetry_export_burn_rate_objectives = (
             _telemetry_export_burn_rate_objectives_from_env()
@@ -1328,7 +1360,7 @@ def build_otlp_receiver_runtime_from_env() -> Runtime:
             else None
         )
         return build_postgres_runtime(
-            database_url,
+            database_connection,
             authenticator=DenyAllAuthenticator(),
             migrate=auto_migrate,
             ingestion_objectives=_ingestion_objectives_from_env(),

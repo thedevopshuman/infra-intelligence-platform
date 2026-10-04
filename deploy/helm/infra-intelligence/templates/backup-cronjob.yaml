@@ -53,6 +53,12 @@ spec:
                     secretKeyRef:
                       name: {{ $databaseSecret | quote }}
                       key: {{ .Values.database.secretKey | quote }}
+                - name: IIP_DATABASE_TRANSPORT_MODE
+                  value: {{ .Values.database.transportSecurity.mode | quote }}
+                {{- if eq .Values.database.transportSecurity.mode "verify-full" }}
+                - name: IIP_DATABASE_CA_PATH
+                  value: "/var/run/iip/database-ca/ca.crt"
+                {{- end }}
                 - name: IIP_BACKUP_DIRECTORY
                   value: {{ .Values.backup.destination.mountPath | quote }}
                 - name: IIP_BACKUP_PREFIX
@@ -63,6 +69,12 @@ spec:
                 - name: script
                   mountPath: /opt/iip-backup
                   readOnly: true
+                {{- if eq .Values.database.transportSecurity.mode "verify-full" }}
+                - name: database-ca
+                  mountPath: /var/run/iip/database-ca/ca.crt
+                  subPath: ca.crt
+                  readOnly: true
+                {{- end }}
                 - name: backup
                   mountPath: {{ .Values.backup.destination.mountPath | quote }}
                 - name: tmp
@@ -72,6 +84,14 @@ spec:
               configMap:
                 name: {{ include "infra-intelligence.fullname" . }}-backup
                 defaultMode: 0555
+            {{- if eq .Values.database.transportSecurity.mode "verify-full" }}
+            - name: database-ca
+              secret:
+                secretName: {{ .Values.database.transportSecurity.caExistingSecret | quote }}
+                items:
+                  - key: {{ .Values.database.transportSecurity.caKey | quote }}
+                    path: ca.crt
+            {{- end }}
             - name: backup
               persistentVolumeClaim:
                 claimName: {{ $backupClaim | quote }}

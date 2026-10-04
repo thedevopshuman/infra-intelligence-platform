@@ -27,6 +27,7 @@ PROFILE_KIND = "CustomerAiFinopsPrerequisiteProfile"
 REPORT_KIND = "CustomerAiFinopsPrerequisiteReport"
 QUALIFICATION_LEVEL = "customer-ai-finops-prerequisites-v1"
 QUALIFICATION_BOUNDARY = "prerequisite-aggregation-only"
+CURRENT_DEPLOYMENT_PROFILE = "production-ai-finops-v1"
 REPORT_ID = re.compile(r"^cafp_[a-f0-9]{32}$")
 REVISION = re.compile(r"^[a-f0-9]{40,64}$")
 
@@ -649,7 +650,7 @@ def build_report(
     )
     deployment_profile = (
         _path(deployment, ("spec", "subject", "profile"))
-        == "production-ai-finops-v0"
+        == CURRENT_DEPLOYMENT_PROFILE
     )
     catalog = _mapping(_path(price, ("spec", "catalog")))
     policy = _mapping(_path(price, ("spec", "policy")))
@@ -720,7 +721,7 @@ def build_report(
         "qualificationLevel": QUALIFICATION_LEVEL,
         "qualificationBoundary": QUALIFICATION_BOUNDARY,
         "subject": {
-            "deploymentProfile": "production-ai-finops-v0",
+            "deploymentProfile": CURRENT_DEPLOYMENT_PROFILE,
             "applicationVersion": release["applicationVersion"],
             "chartVersion": release["chartVersion"],
             "contractsApiVersion": API_VERSION,

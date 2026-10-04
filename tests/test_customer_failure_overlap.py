@@ -79,7 +79,7 @@ def _source(
         metadata["validUntil"] = _stamp(valid_until)
     subject = _release()
     if identifier == "customer-deployment":
-        subject = {"profile": "production-ai-finops-v0", **subject}
+        subject = {"profile": "production-ai-finops-v1", **subject}
     document = {
         "apiVersion": overlap.API_VERSION,
         "kind": next(

@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from typing import Sequence
 
 from iip.application.ports import ActorContext
 from iip.application.rebuild_projections import RebuildProjectionsCommand
-from iip.bootstrap import build_projection_maintenance
+from iip.bootstrap import build_projection_maintenance_from_env
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -32,11 +31,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    database_url = os.environ.get("IIP_DATABASE_URL")
-    if not database_url:
-        raise SystemExit("IIP_DATABASE_URL is required")
-
-    service = build_projection_maintenance(database_url)
+    service = build_projection_maintenance_from_env()
     result = service.execute(
         RebuildProjectionsCommand(
             actor=ActorContext(

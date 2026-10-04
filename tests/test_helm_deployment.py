@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -9,6 +13,15 @@ CHART = ROOT / "deploy" / "helm" / "infra-intelligence"
 
 
 class HelmMigrationBoundaryTests(unittest.TestCase):
+    @staticmethod
+    def _backup_script() -> str:
+        template = (CHART / "templates" / "backup-configmap.yaml").read_text(
+            encoding="utf-8"
+        )
+        body = template.split("  backup.sh: |\n", 1)[1]
+        body = body.rsplit("{{- end }}", 1)[0]
+        return textwrap.dedent(body)
+
     def test_api_rollout_drains_endpoints_and_active_requests(self) -> None:
         deployment = (CHART / "templates" / "deployment.yaml").read_text(
             encoding="utf-8"
@@ -208,6 +221,16 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
                 self.assertNotIn(forbidden, cronjob)
         self.assertIn("umask 077", script)
         self.assertIn("unset IIP_DATABASE_URL", script)
+        self.assertIn("reject_dsn_transport_overrides", script)
+        self.assertIn("database DSN must not set transport policy", script)
+        self.assertIn("export PGSSLMODE=verify-full", script)
+        self.assertIn("export PGSSLMODE=disable", script)
+        self.assertIn(
+            "export PGSSLROOTCERT=/var/run/iip/database-ca/ca.crt",
+            script,
+        )
+        self.assertIn("export PGGSSENCMODE=disable", script)
+        self.assertNotIn('printf \'%s\\n\' "$database_url"', script)
         self.assertIn('pg_dump --dbname="$database_url" --format=custom', script)
         self.assertIn("pg_restore --list", script)
         self.assertLess(
@@ -216,6 +239,196 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         )
         self.assertIn("ingress: []", network_policy)
         self.assertIn("networkPolicy.databaseEgress", network_policy)
+
+    def test_backup_rejects_dsn_transport_overrides_without_disclosing_dsn(self) -> None:
+        script = self._backup_script()
+        override_dsns = (
+            "postgresql://iip:do-not-log@database.test/iip?sslmode=disable",
+            "postgresql://iip:do-not-log@database.test/iip?ssl%6dode=disable",
+            "host=database.test user=iip password=do-not-log sslmode=disable",
+            "service=unreviewed-service dbname=iip password=do-not-log",
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            for dsn in override_dsns:
+                with self.subTest(dsn_kind=dsn.split(":", 1)[0]):
+                    env = {
+                        **os.environ,
+                        "IIP_BACKUP_DIRECTORY": directory,
+                        "IIP_BACKUP_PREFIX": "transport-test",
+                        "IIP_DATABASE_URL": dsn,
+                        "IIP_DATABASE_TRANSPORT_MODE": "insecure-local",
+                        "HOSTNAME": "test-host",
+                    }
+                    completed = subprocess.run(
+                        ["/bin/sh"],
+                        input=script,
+                        text=True,
+                        capture_output=True,
+                        env=env,
+                        check=False,
+                    )
+
+                    self.assertNotEqual(completed.returncode, 0)
+                    self.assertIn(
+                        "database DSN must not set transport policy",
+                        completed.stderr,
+                    )
+                    self.assertNotIn("do-not-log", completed.stderr)
+                    self.assertNotIn("database.test", completed.stderr)
+
+    def test_backup_forces_plaintext_only_for_explicit_insecure_local_mode(self) -> None:
+        script = self._backup_script()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binaries = root / "bin"
+            binaries.mkdir()
+            capture = root / "transport.txt"
+            pg_dump = binaries / "pg_dump"
+            pg_dump.write_text(
+                "#!/bin/sh\n"
+                "set -eu\n"
+                "[ -z \"${IIP_DATABASE_URL:-}\" ]\n"
+                "printf '%s|%s|%s\\n' \"$PGSSLMODE\" \"$PGGSSENCMODE\" "
+                "\"${PGSSLROOTCERT:-}\" >\"$IIP_TEST_CAPTURE\"\n"
+                "for argument in \"$@\"; do\n"
+                "  case \"$argument\" in\n"
+                "    --file=*) printf '%s\\n' dump >\"${argument#--file=}\" ;;\n"
+                "  esac\n"
+                "done\n",
+                encoding="utf-8",
+            )
+            pg_restore = binaries / "pg_restore"
+            pg_restore.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            pg_dump.chmod(0o755)
+            pg_restore.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{binaries}:{os.environ['PATH']}",
+                "IIP_BACKUP_DIRECTORY": directory,
+                "IIP_BACKUP_PREFIX": "transport-test",
+                "IIP_DATABASE_URL": "postgresql://iip:do-not-log@database.test/iip",
+                "IIP_DATABASE_TRANSPORT_MODE": "insecure-local",
+                "IIP_TEST_CAPTURE": str(capture),
+                "HOSTNAME": "test-host",
+                "PGGSSENCMODE": "prefer",
+                "PGSSLMODE": "verify-full",
+                "PGSSLROOTCERT": "/untrusted/ca.crt",
+                "PGSERVICE": "untrusted-service",
+            }
+
+            completed = subprocess.run(
+                ["/bin/sh"],
+                input=script,
+                text=True,
+                capture_output=True,
+                env=env,
+                check=False,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(capture.read_text(encoding="utf-8"), "disable|disable|\n")
+            self.assertNotIn("do-not-log", completed.stdout + completed.stderr)
+            self.assertNotIn("database.test", completed.stdout + completed.stderr)
+
+    def test_backup_suppresses_provider_errors_that_can_disclose_connection_fields(
+        self,
+    ) -> None:
+        script = self._backup_script()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pg_dump = root / "pg_dump"
+            pg_dump.write_text(
+                "#!/bin/sh\n"
+                "printf '%s\\n' \"provider disclosed: $*\" >&2\n"
+                "exit 2\n",
+                encoding="utf-8",
+            )
+            pg_dump.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{root}:{os.environ['PATH']}",
+                "IIP_BACKUP_DIRECTORY": directory,
+                "IIP_BACKUP_PREFIX": "transport-test",
+                "IIP_DATABASE_URL": "postgresql://iip:do-not-log@database.test/iip",
+                "IIP_DATABASE_TRANSPORT_MODE": "insecure-local",
+                "HOSTNAME": "test-host",
+            }
+
+            completed = subprocess.run(
+                ["/bin/sh"],
+                input=script,
+                text=True,
+                capture_output=True,
+                env=env,
+                check=False,
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertEqual(completed.stderr, "database backup failed\n")
+            self.assertNotIn("do-not-log", completed.stdout + completed.stderr)
+            self.assertNotIn("database.test", completed.stdout + completed.stderr)
+
+    def test_postgresql_transport_is_fail_closed_for_every_packaged_workload(self) -> None:
+        values = (CHART / "values.yaml").read_text(encoding="utf-8")
+        validation = (CHART / "templates" / "validation.yaml").read_text(
+            encoding="utf-8"
+        )
+        profile = (
+            CHART / "templates" / "deployment-profile.yaml"
+        ).read_text(encoding="utf-8")
+        production = (
+            CHART / "examples" / "production-core.values.yaml"
+        ).read_text(encoding="utf-8")
+        workloads = (
+            "deployment.yaml",
+            "worker-deployment.yaml",
+            "otlp-receiver-deployment.yaml",
+            "migration-job.yaml",
+            "backup-cronjob.yaml",
+        )
+
+        self.assertIn("transportSecurity:\n    mode: verify-full", values)
+        self.assertIn(
+            "database.transportSecurity.caExistingSecret is required for verify-full PostgreSQL transport",
+            validation,
+        )
+        self.assertIn(
+            "database.transportSecurity.caExistingSecret must be empty in insecure-local mode",
+            validation,
+        )
+        self.assertIn(
+            '"transportSecurity" (dict "mode" .Values.database.transportSecurity.mode '
+            '"caExistingSecret" .Values.database.transportSecurity.caExistingSecret '
+            '"caKey" .Values.database.transportSecurity.caKey)',
+            profile,
+        )
+        self.assertIn('"purpose" "database-ca"', profile)
+        self.assertIn("mode: verify-full", production)
+        self.assertIn("caExistingSecret: iip-database-ca", production)
+
+        for name in workloads:
+            with self.subTest(workload=name):
+                template = (CHART / "templates" / name).read_text(
+                    encoding="utf-8"
+                )
+                self.assertIn("IIP_DATABASE_TRANSPORT_MODE", template)
+                self.assertIn("IIP_DATABASE_CA_PATH", template)
+                self.assertIn(
+                    "mountPath: /var/run/iip/database-ca/ca.crt",
+                    template,
+                )
+                self.assertIn("subPath: ca.crt", template)
+                self.assertIn("readOnly: true", template)
+                self.assertIn("name: database-ca", template)
+                self.assertIn(
+                    ".Values.database.transportSecurity.caExistingSecret",
+                    template,
+                )
+                self.assertIn(
+                    ".Values.database.transportSecurity.caKey",
+                    template,
+                )
 
     def test_ingress_requires_tls_redirect_and_exact_controller_ingress(self) -> None:
         ingress = (CHART / "templates" / "ingress.yaml").read_text(encoding="utf-8")
@@ -704,6 +917,43 @@ class HelmMigrationBoundaryTests(unittest.TestCase):
         self.assertIn('printf \'%s\' "$IIP_AUTH_BEARER_TOKEN"', script)
         self.assertIn('"helmChartVersion":chart,"imageDigest":digest', script)
         self.assertEqual(script.count('"$IIP_HELM_BIN" upgrade --install iip'), 2)
+        self.assertNotIn(
+            "--set database.transportSecurity.mode=insecure-local",
+            script,
+        )
+        self.assertEqual(
+            script.count("--set database.transportSecurity.mode=verify-full"),
+            2,
+        )
+        self.assertEqual(
+            script.count(
+                "--set database.transportSecurity.caExistingSecret=iip-database-ca"
+            ),
+            2,
+        )
+        self.assertEqual(
+            script.count("--set database.transportSecurity.caKey=ca.crt"),
+            2,
+        )
+        self.assertIn(
+            "from scripts.compatibility_tls import write_tls_material",
+            script,
+        )
+        self.assertIn('common_name="iip-postgres"', script)
+        self.assertIn('dns_name="iip-postgres"', script)
+        self.assertIn("create secret generic iip-database-ca", script)
+        self.assertIn("create secret generic iip-postgres-server-tls", script)
+        self.assertIn("create configmap iip-postgres-tls-init", script)
+        self.assertIn("PGSSLMODE=verify-full", script)
+        self.assertIn(
+            "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()",
+            script,
+        )
+        self.assertIn('assert row == {"ssl":True}', script)
+        self.assertIn(
+            "mountPath: /var/run/iip/database-ca/ca.crt",
+            script,
+        )
         self.assertIn("--set replicaCount=2", script)
         self.assertEqual(script.count('--set-string "image.digest=$IIP_TEST_IMAGE_DIGEST"'), 2)
         self.assertIn(

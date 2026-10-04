@@ -22,6 +22,7 @@ services:
       dockerfile: Dockerfile
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_TRANSPORT_MODE: insecure-local
       IIP_DATABASE_AUTO_MIGRATE: "true"
       IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
       IIP_AUTH_IDENTITIES_JSON: >-
@@ -58,6 +59,7 @@ services:
     command: ["python", "-m", "iip.surfaces.otlp_receiver"]
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_TRANSPORT_MODE: insecure-local
       IIP_DATABASE_AUTO_MIGRATE: "false"
       IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
       IIP_OTLP_HTTP_PORT: "4318"
@@ -93,6 +95,7 @@ services:
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_TRANSPORT_MODE: insecure-local
       IIP_DATABASE_AUTO_MIGRATE: "false"
       IIP_AUTH_IDENTITIES_JSON: >-
         {"identities":[{"tokenSha256":"sha256:d52e86d5eeda090d11d9c961632390e6da1356df217d662abde728312befb25d","actorId":"ai-finops-local-operator","tenantId":"local","roles":["developer","platform-admin"]}]}

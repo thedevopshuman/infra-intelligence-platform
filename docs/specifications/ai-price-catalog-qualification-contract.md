@@ -73,6 +73,6 @@ missing tenants, duplicates, or unused evidence.
 Every cost pass recalculates the report before catalog registration and requires
 the worker clock to fall in `[generatedAt, validUntil)`. A stale or altered
 report therefore stops new pricing work without requiring a restart. This gate
-is required by the `production-ai-finops-v0` Helm profile; disabling it is a
+is required by the current `production-ai-finops-v1` Helm profile; disabling it is a
 development-only posture and cannot pass that preflight. See
 [ADR 0113](../decisions/0113-runtime-ai-price-catalog-promotion.md).

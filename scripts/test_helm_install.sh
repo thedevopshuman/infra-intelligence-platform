@@ -12,6 +12,7 @@ IIP_KEEP_TEST_NAMESPACE=${IIP_KEEP_TEST_NAMESPACE:-false}
 IIP_RELEASE_BUNDLE=${IIP_RELEASE_BUNDLE:-}
 IIP_RELEASE_QUALIFICATION_REPORT=${IIP_RELEASE_QUALIFICATION_REPORT:-}
 IIP_TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/iip-helm-install.XXXXXX")
+IIP_DATABASE_TLS_DIR="$IIP_TEST_TEMP_DIR/database-tls"
 
 case "$IIP_KUBE_CONTEXT" in
     kind-*) ;;
@@ -43,6 +44,12 @@ cleanup_namespace() {
 cleanup() {
     cleanup_namespace
     rm -f "$IIP_TEST_TEMP_DIR/tls.crt" "$IIP_TEST_TEMP_DIR/tls.key"
+    rm -f \
+        "$IIP_DATABASE_TLS_DIR/ca.crt" \
+        "$IIP_DATABASE_TLS_DIR/client-ca.crt" \
+        "$IIP_DATABASE_TLS_DIR/server.crt" \
+        "$IIP_DATABASE_TLS_DIR/server.key"
+    rmdir "$IIP_DATABASE_TLS_DIR" >/dev/null 2>&1 || true
     rmdir "$IIP_TEST_TEMP_DIR" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
@@ -65,6 +72,13 @@ IIP_AUTH_BEARER_TOKEN=$(openssl rand -hex 32)
 IIP_AUTH_VERIFIER="sha256:$(printf '%s' "$IIP_AUTH_BEARER_TOKEN" | openssl dgst -sha256 -hex | awk '{print $NF}')"
 IIP_AUTH_IDENTITIES_JSON=$(printf '%s' \
     "{\"identities\":[{\"tokenSha256\":\"$IIP_AUTH_VERIFIER\",\"actorId\":\"helm-test-operator\",\"tenantId\":\"helm-test\",\"roles\":[\"developer\",\"platform-admin\"]}]}"
+)
+mkdir "$IIP_DATABASE_TLS_DIR"
+PYTHONPATH=. "$IIP_TEST_PYTHON" -c \
+    'import sys; from pathlib import Path; from scripts.compatibility_tls import write_tls_material; write_tls_material(Path(sys.argv[1]), common_name="iip-postgres", dns_name="iip-postgres")' \
+    "$IIP_DATABASE_TLS_DIR"
+IIP_DATABASE_CA_SHA256=$(
+    openssl dgst -sha256 -hex "$IIP_DATABASE_TLS_DIR/ca.crt" | awk '{print $NF}'
 )
 
 IIP_EXPECTED_BUILD_MODE=development
@@ -161,6 +175,18 @@ done
     --from-literal="password=$IIP_DB_PASSWORD" \
     >/dev/null
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    create secret generic iip-database-ca \
+    --from-file="ca.crt=$IIP_DATABASE_TLS_DIR/ca.crt" >/dev/null
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    create secret generic iip-postgres-server-tls \
+    --from-file="ca.crt=$IIP_DATABASE_TLS_DIR/ca.crt" \
+    --from-file="server.crt=$IIP_DATABASE_TLS_DIR/server.crt" \
+    --from-file="server.key=$IIP_DATABASE_TLS_DIR/server.key" >/dev/null
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    create configmap iip-postgres-tls-init \
+    --from-file="initialize-postgres-tls.sh=tests/fixtures/postgres_tls/initialize.sh" \
+    >/dev/null
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
     create secret generic iip-auth \
     --from-literal="identities-json=$IIP_AUTH_IDENTITIES_JSON" >/dev/null
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
@@ -208,8 +234,31 @@ spec:
               containerPort: 5432
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "iip", "-d", "iip"]
+              command:
+                - /bin/sh
+                - -ec
+                - >-
+                  PGSSLMODE=verify-full
+                  PGSSLROOTCERT="\$PGDATA/ca.crt"
+                  PGGSSENCMODE=disable
+                  pg_isready -h 127.0.0.1 -U iip -d iip
             periodSeconds: 2
+          volumeMounts:
+            - name: postgres-server-tls
+              mountPath: /fixture
+              readOnly: true
+            - name: postgres-tls-init
+              mountPath: /docker-entrypoint-initdb.d/initialize-postgres-tls.sh
+              subPath: initialize-postgres-tls.sh
+              readOnly: true
+      volumes:
+        - name: postgres-server-tls
+          secret:
+            secretName: iip-postgres-server-tls
+        - name: postgres-tls-init
+          configMap:
+            name: iip-postgres-tls-init
+            defaultMode: 0555
 ---
 apiVersion: v1
 kind: Service
@@ -245,6 +294,9 @@ EOF
     --set-string "image.digest=$IIP_TEST_IMAGE_DIGEST" \
     --set image.pullPolicy=Never \
     --set database.existingSecret=iip-database \
+    --set database.transportSecurity.mode=verify-full \
+    --set database.transportSecurity.caExistingSecret=iip-database-ca \
+    --set database.transportSecurity.caKey=ca.crt \
     --set database.migrations.enabled=true \
     --set auth.existingSecret=iip-auth \
     --set investigationSignalCatalog.existingSecret=iip-investigation-signal-catalog \
@@ -261,6 +313,10 @@ EOF
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
     exec deployment/iip-infra-intelligence -- python -c \
     'import json,urllib.request; result=json.load(urllib.request.urlopen("http://127.0.0.1:8080/readyz", timeout=5)); assert result == {"status":"ok"}'
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
+    exec deployment/iip-infra-intelligence -- python -c \
+    'import hashlib,os,sys,psycopg; from iip.adapters.postgres import PostgresConnectionConfiguration; from psycopg.rows import dict_row; ca_path=os.environ["IIP_DATABASE_CA_PATH"]; assert hashlib.sha256(open(ca_path,"rb").read()).hexdigest() == sys.argv[1]; configuration=PostgresConnectionConfiguration.from_environment(os.environ["IIP_DATABASE_URL"]); connection=psycopg.connect(configuration.connection_string,row_factory=dict_row); row=connection.execute("SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()").fetchone(); connection.close(); assert row == {"ssl":True}' \
+    "$IIP_DATABASE_CA_SHA256"
 
 IIP_CONSOLE_AUTHENTICATION_JSON=$(
     "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
@@ -371,6 +427,9 @@ IIP_EXPECTED_MIGRATION_COUNT=$(
     --set image.pullPolicy=Never \
     --set replicaCount=2 \
     --set database.existingSecret=iip-database \
+    --set database.transportSecurity.mode=verify-full \
+    --set database.transportSecurity.caExistingSecret=iip-database-ca \
+    --set database.transportSecurity.caKey=ca.crt \
     --set database.migrations.enabled=true \
     --set auth.existingSecret=iip-auth \
     --set investigationSignalCatalog.existingSecret=iip-investigation-signal-catalog \
@@ -503,6 +562,12 @@ spec:
                 secretKeyRef:
                   name: iip-database
                   key: password
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /var/run/iip/database-ca/ca.crt
+            - name: PGGSSENCMODE
+              value: disable
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -514,12 +579,22 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+            - name: database-ca
+              mountPath: /var/run/iip/database-ca/ca.crt
+              subPath: ca.crt
+              readOnly: true
       volumes:
         - name: backup
           persistentVolumeClaim:
             claimName: iip-backups
         - name: tmp
           emptyDir: {}
+        - name: database-ca
+          secret:
+            secretName: iip-database-ca
+            items:
+              - key: ca.crt
+                path: ca.crt
 EOF
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" --namespace "$IIP_TEST_NAMESPACE" \
     wait --for=condition=complete job/iip-backup-restore-conformance \
@@ -560,7 +635,7 @@ if [ "$IIP_EXPECTED_BUILD_MODE" = "release" ]; then
         --container-runtime-version "$IIP_QUALIFICATION_DOCKER_VERSION"
     "$IIP_TEST_PYTHON" scripts/release_qualification.py verify \
         "$IIP_RELEASE_BUNDLE" "$IIP_RELEASE_QUALIFICATION_REPORT"
-    echo "Packaged release install/upgrade test passed: verified bundle -> immutable image -> release identity -> migrations -> TLS ingress -> backup/restore -> qualification evidence=$IIP_RELEASE_QUALIFICATION_REPORT"
+    echo "Packaged release install/upgrade test passed: verified bundle -> immutable image -> release identity -> verified PostgreSQL TLS -> migrations -> TLS ingress -> backup/restore -> qualification evidence=$IIP_RELEASE_QUALIFICATION_REPORT"
 else
-    echo "Helm install/upgrade test passed: immutable image -> runtime identity -> delivery/SLO/retention operations -> migrations -> TLS ingress -> backup/restore"
+    echo "Helm install/upgrade test passed: immutable image -> runtime identity -> verified PostgreSQL TLS -> delivery/SLO/retention operations -> migrations -> TLS ingress -> backup/restore"
 fi

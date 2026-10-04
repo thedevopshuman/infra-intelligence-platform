@@ -32,7 +32,7 @@
           "additionalProperties": false,
           "required": ["name", "chartVersion", "applicationVersion", "valuesDigest", "configurationDigest"],
           "properties": {
-            "name": {"enum": ["production-core-v1", "production-ai-finops-v0"]},
+            "name": {"enum": ["production-core-v1", "production-ai-finops-v0", "production-core-v2", "production-ai-finops-v1"]},
             "chartVersion": {"$ref": "#/$defs/semver"},
             "applicationVersion": {"$ref": "#/$defs/semver"},
             "valuesDigest": {"$ref": "#/$defs/digest"},
@@ -48,8 +48,10 @@
         "dependencies": {"$ref": "#/$defs/dependencies"},
         "checks": {
           "oneOf": [
-            {"$ref": "#/$defs/coreChecks"},
-            {"$ref": "#/$defs/aiChecks"}
+            {"$ref": "#/$defs/historicalCoreChecks"},
+            {"$ref": "#/$defs/historicalAiChecks"},
+            {"$ref": "#/$defs/currentCoreChecks"},
+            {"$ref": "#/$defs/currentAiChecks"}
           ]
         },
         "customerQualificationRequired": {
@@ -63,14 +65,52 @@
           "additionalProperties": false,
           "required": ["totalChecks", "passedChecks", "failedChecks", "notRunChecks", "overallStatus"],
           "properties": {
-            "totalChecks": {"enum": [26, 32]},
-            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 32},
-            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 32},
+            "totalChecks": {"enum": [26, 27, 32, 33]},
+            "passedChecks": {"type": "integer", "minimum": 0, "maximum": 33},
+            "failedChecks": {"type": "integer", "minimum": 0, "maximum": 33},
             "notRunChecks": {"type": "integer", "minimum": 0, "maximum": 4},
             "overallStatus": {"enum": ["blocked", "configuration-ready", "install-ready"]}
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "profile": {"properties": {"name": {"const": "production-core-v1"}}},
+                "checks": {"$ref": "#/$defs/historicalCoreChecks"},
+                "customerQualificationRequired": {"$ref": "#/$defs/coreCustomerRequirements"},
+                "summary": {"properties": {"totalChecks": {"const": 26}}}
+              }
+            },
+            {
+              "properties": {
+                "profile": {"properties": {"name": {"const": "production-ai-finops-v0"}}},
+                "checks": {"$ref": "#/$defs/historicalAiChecks"},
+                "customerQualificationRequired": {"$ref": "#/$defs/aiCustomerRequirements"},
+                "summary": {"properties": {"totalChecks": {"const": 32}}}
+              }
+            },
+            {
+              "properties": {
+                "profile": {"properties": {"name": {"const": "production-core-v2"}}},
+                "checks": {"$ref": "#/$defs/currentCoreChecks"},
+                "customerQualificationRequired": {"$ref": "#/$defs/coreCustomerRequirements"},
+                "summary": {"properties": {"totalChecks": {"const": 27}}}
+              }
+            },
+            {
+              "properties": {
+                "profile": {"properties": {"name": {"const": "production-ai-finops-v1"}}},
+                "checks": {"$ref": "#/$defs/currentAiChecks"},
+                "customerQualificationRequired": {"$ref": "#/$defs/aiCustomerRequirements"},
+                "summary": {"properties": {"totalChecks": {"const": 33}}}
+              }
+            }
+          ]
+        }
+      ]
     }
   },
   "$defs": {
@@ -163,7 +203,7 @@
         {"required": ["errorCode"], "properties": {"status": {"enum": ["failed", "not-run"]}}}
       ]
     },
-    "commonCheckPrefix": {
+    "historicalCommonCheckPrefix": {
       "prefixItems": [
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "helm-render"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "immutable-image"}}},
@@ -189,11 +229,38 @@
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "test-fixtures-denied"}}}
       ]
     },
-    "coreChecks": {
+    "currentCommonCheckPrefix": {
+      "prefixItems": [
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "helm-render"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "immutable-image"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "published-image-repository"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "api-redundancy"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "worker-enrollment"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "worker-redundancy"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "external-database"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "database-transport-security"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "controlled-migrations"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "oidc-authentication"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "external-policy"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "workload-identity-broker"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "tls-ingress"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "network-isolation"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "pod-disruption-budget"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "hard-topology-spread"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "scheduled-backup"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "evidence-retention"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "platform-telemetry"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "operational-alert-policy"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "evidence-backends"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "service-account-isolation"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "test-fixtures-denied"}}}
+      ]
+    },
+    "historicalCoreChecks": {
       "type": "array",
       "minItems": 26,
       "maxItems": 26,
-      "allOf": [{"$ref": "#/$defs/commonCheckPrefix"}],
+      "allOf": [{"$ref": "#/$defs/historicalCommonCheckPrefix"}],
       "prefixItems": [
         {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "cluster-api"}}},
@@ -203,13 +270,47 @@
       ],
       "items": false
     },
-    "aiChecks": {
+    "historicalAiChecks": {
       "type": "array",
       "minItems": 32,
       "maxItems": 32,
-      "allOf": [{"$ref": "#/$defs/commonCheckPrefix"}],
+      "allOf": [{"$ref": "#/$defs/historicalCommonCheckPrefix"}],
       "prefixItems": [
         {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-usage-intake"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-receiver-mtls"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-receiver-redundancy"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-cost-allocation-savings"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-price-catalog-qualification"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "collector-loss-objective"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "cluster-api"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "operational-alert-api"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "operational-alert-namespace"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "referenced-dependencies"}}}
+      ],
+      "items": false
+    },
+    "currentCoreChecks": {
+      "type": "array",
+      "minItems": 27,
+      "maxItems": 27,
+      "allOf": [{"$ref": "#/$defs/currentCommonCheckPrefix"}],
+      "prefixItems": [
+        {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "cluster-api"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "operational-alert-api"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "operational-alert-namespace"}}},
+        {"$ref": "#/$defs/check", "properties": {"id": {"const": "referenced-dependencies"}}}
+      ],
+      "items": false
+    },
+    "currentAiChecks": {
+      "type": "array",
+      "minItems": 33,
+      "maxItems": 33,
+      "allOf": [{"$ref": "#/$defs/currentCommonCheckPrefix"}],
+      "prefixItems": [
+        {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-usage-intake"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-receiver-mtls"}}},
         {"$ref": "#/$defs/check", "properties": {"id": {"const": "ai-receiver-redundancy"}}},

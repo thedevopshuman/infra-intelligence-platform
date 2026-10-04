@@ -68,6 +68,11 @@ digests. A priced result is still `calculated-estimate`. It does not establish
 AWS invoice agreement or the effect of private rates, discounts, commitments,
 tax, or credits.
 
+Current reports bind `deploymentProfile` to `production-ai-finops-v1`. The
+transport schema and SDK type keep the historical v0 value readable, but the
+live qualifier requires a current v1 prerequisite report and will not admit a
+v0 report into a new run.
+
 ## Digest rules
 
 Canonical document digests use SHA-256 over UTF-8 JSON with object keys sorted,

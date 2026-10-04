@@ -2,6 +2,9 @@
 {{- if .Values.database.existingSecret -}}
 {{- $dependencies = append $dependencies (dict "purpose" "database" "kind" "Secret" "name" .Values.database.existingSecret "keys" (list .Values.database.secretKey)) -}}
 {{- end -}}
+{{- if and .Values.database.existingSecret (eq .Values.database.transportSecurity.mode "verify-full") .Values.database.transportSecurity.caExistingSecret -}}
+{{- $dependencies = append $dependencies (dict "purpose" "database-ca" "kind" "Secret" "name" .Values.database.transportSecurity.caExistingSecret "keys" (list .Values.database.transportSecurity.caKey)) -}}
+{{- end -}}
 {{- if and (eq .Values.auth.mode "local-hashed") .Values.auth.existingSecret -}}
 {{- $dependencies = append $dependencies (dict "purpose" "authentication-identities" "kind" "Secret" "name" .Values.auth.existingSecret "keys" (list .Values.auth.secretKey)) -}}
 {{- end -}}
@@ -110,7 +113,7 @@
   "image" (dict "repository" .Values.image.repository "digest" .Values.image.digest)
   "api" (dict "replicaCount" .Values.replicaCount)
   "worker" (dict "enabled" .Values.worker.enabled "replicaCount" .Values.worker.replicaCount "tenantCount" (len .Values.worker.tenants))
-  "database" (dict "existingSecretConfigured" (not (empty .Values.database.existingSecret)) "migrationsEnabled" .Values.database.migrations.enabled)
+  "database" (dict "existingSecretConfigured" (not (empty .Values.database.existingSecret)) "migrationsEnabled" .Values.database.migrations.enabled "transportSecurity" (dict "mode" .Values.database.transportSecurity.mode "caExistingSecret" .Values.database.transportSecurity.caExistingSecret "caKey" .Values.database.transportSecurity.caKey))
   "authentication" (dict "mode" .Values.auth.mode "oidcConfigurationReviewed" (ne .Values.auth.oidc.configJson "{}"))
   "policy" (dict "mode" .Values.policy.mode "configurationReviewed" (ne .Values.policy.externalHttp.configJson "{}"))
   "credentialBroker" (dict "mode" .Values.credentialBroker.mode "configurationReviewed" (ne .Values.credentialBroker.externalHttp.configJson "{}"))

@@ -29,6 +29,8 @@ state:
 
 ```bash
 export IIP_DATABASE_URL=postgresql://...
+export IIP_DATABASE_TRANSPORT_MODE=verify-full
+export IIP_DATABASE_CA_PATH=/protected/database-ca/ca.crt
 export IIP_OTLP_TLS_MODE=mutual-spiffe
 export IIP_OTLP_TLS_CERTIFICATE_PATH=/protected/server/tls.crt
 export IIP_OTLP_TLS_PRIVATE_KEY_PATH=/protected/server/tls.key
@@ -152,7 +154,9 @@ Successful non-empty exports produce an `OtlpMetricsEvidence` JSON artifact behi
 
 The Docker integration starts PostgreSQL, the control API, and the receiver as separate containers. It passes `IIP_OTLP_RECEIVER_ENABLED` and `IIP_OTLP_RECEIVER_CHANNELS_JSON` only to the receiver. Keep the latter in shell/secret-manager state; do not commit a populated document.
 
-For Helm, set `otlpReceiver.enabled: true`, `database.existingSecret`, and
+For Helm, set `otlpReceiver.enabled: true`, `database.existingSecret`,
+`database.transportSecurity.mode: verify-full`, the exact
+`database.transportSecurity.caExistingSecret`, and
 `otlpReceiver.channelsExistingSecret`. Then select
 `otlpIngest.tls.mode: mutual-spiffe` and reference existing Secrets through
 `serverExistingSecret`, `clientCaExistingSecret`, and

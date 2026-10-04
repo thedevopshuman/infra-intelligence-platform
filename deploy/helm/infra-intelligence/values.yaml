@@ -169,6 +169,10 @@ config:
 database:
   existingSecret: ""
   secretKey: database-url
+  transportSecurity:
+    mode: verify-full
+    caExistingSecret: ""
+    caKey: ca.crt
   migrations:
     enabled: false
     backoffLimit: 2

@@ -20,6 +20,7 @@ services:
       dockerfile: Dockerfile
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_TRANSPORT_MODE: insecure-local
       IIP_DATABASE_AUTO_MIGRATE: "true"
       IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
       IIP_AUTH_IDENTITIES_JSON: ${IIP_AUTH_IDENTITIES_JSON:?set IIP_AUTH_IDENTITIES_JSON}
@@ -48,6 +49,7 @@ services:
     command: ["python", "-m", "iip.surfaces.otlp_receiver"]
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_TRANSPORT_MODE: insecure-local
       IIP_DATABASE_AUTO_MIGRATE: "false"
       IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
       IIP_OTLP_HTTP_PORT: "4318"
@@ -99,6 +101,7 @@ services:
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:
       IIP_DATABASE_URL: postgresql://iip@postgres:5432/iip
+      IIP_DATABASE_TRANSPORT_MODE: insecure-local
       IIP_DATABASE_AUTO_MIGRATE: "false"
       IIP_WORKER_ID: otlp-cost-worker
       IIP_WORKER_HEALTH_PORT: "8081"

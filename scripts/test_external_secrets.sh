@@ -18,12 +18,12 @@ IIP_ESO_CHART=$IIP_TEST_TEMP_DIR/external-secrets-2.10.0.tgz
 cleanup_resources() {
     # Let the controller remove its exact finalizers before uninstalling it.
     # If a previous interrupted run already removed the controller, clear only
-    # the two disposable objects so the dedicated test namespace can terminate.
+    # the three disposable objects so the dedicated test namespace can terminate.
     "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
         --namespace "$IIP_ESO_TARGET_NAMESPACE" delete externalsecret \
-        iip-database iip-auth --ignore-not-found --wait=true \
+        iip-database iip-database-ca iip-auth --ignore-not-found --wait=true \
         --timeout=30s >/dev/null 2>&1 || true
-    for external_secret in iip-database iip-auth; do
+    for external_secret in iip-database iip-database-ca iip-auth; do
         "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
             --namespace "$IIP_ESO_TARGET_NAMESPACE" patch externalsecret \
             "$external_secret" --type=merge \
@@ -50,7 +50,7 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-for binary in "$IIP_KUBECTL_BIN" "$IIP_HELM_BIN" "$IIP_CURL_BIN" jq openssl shasum; do
+for binary in "$IIP_KUBECTL_BIN" "$IIP_HELM_BIN" "$IIP_CURL_BIN" base64 jq openssl shasum; do
     if ! command -v "$binary" >/dev/null 2>&1; then
         echo "Required executable not found: $binary" >&2
         exit 127
@@ -176,9 +176,16 @@ EOF
 IIP_DATABASE_PASSWORD=$(openssl rand -hex 24)
 IIP_AUTH_TOKEN=$(openssl rand -hex 32)
 IIP_AUTH_DIGEST=$(printf '%s' "$IIP_AUTH_TOKEN" | shasum -a 256 | awk '{print $1}')
-IIP_DATABASE_URL="postgresql://iip:$IIP_DATABASE_PASSWORD@postgresql.database.svc:5432/iip?sslmode=require"
+IIP_DATABASE_CA_FILE="$IIP_TEST_TEMP_DIR/database-ca.crt"
+IIP_DATABASE_CA_KEY_FILE="$IIP_TEST_TEMP_DIR/database-ca.key"
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+    -subj /CN=iip-external-secrets-test-database-ca \
+    -keyout "$IIP_DATABASE_CA_KEY_FILE" -out "$IIP_DATABASE_CA_FILE" \
+    >/dev/null 2>&1
+IIP_DATABASE_URL="postgresql://iip:$IIP_DATABASE_PASSWORD@postgresql.database.svc:5432/iip"
 IIP_AUTH_DOCUMENT="{\"verifiers\":[{\"tokenSha256\":\"sha256:$IIP_AUTH_DIGEST\",\"actorId\":\"local-secret-test\",\"tenantId\":\"local-secret-test\",\"roles\":[\"developer\"]}]}"
 IIP_DATABASE_URL_B64=$(printf '%s' "$IIP_DATABASE_URL" | base64 | tr -d '\n')
+IIP_DATABASE_CA_B64=$(base64 < "$IIP_DATABASE_CA_FILE" | tr -d '\n')
 IIP_AUTH_DOCUMENT_B64=$(printf '%s' "$IIP_AUTH_DOCUMENT" | base64 | tr -d '\n')
 
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
@@ -190,6 +197,7 @@ metadata:
 type: Opaque
 data:
   database-url: $IIP_DATABASE_URL_B64
+  ca: $IIP_DATABASE_CA_B64
   identities-json: $IIP_AUTH_DOCUMENT_B64
 EOF
 
@@ -235,6 +243,26 @@ spec:
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
+  name: iip-database-ca
+spec:
+  refreshPolicy: Periodic
+  refreshInterval: 5s
+  secretStoreRef:
+    kind: SecretStore
+    name: iip-source-store
+  target:
+    name: iip-database-ca
+    creationPolicy: Owner
+    deletionPolicy: Retain
+  data:
+    - secretKey: ca.crt
+      remoteRef:
+        key: iip-upstream-core
+        property: ca
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
   name: iip-auth
 spec:
   refreshPolicy: Periodic
@@ -259,7 +287,8 @@ EOF
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
     --namespace "$IIP_ESO_TARGET_NAMESPACE" wait \
     --for=condition=Ready externalsecret/iip-database \
-    externalsecret/iip-auth --timeout=90s >/dev/null
+    externalsecret/iip-database-ca externalsecret/iip-auth \
+    --timeout=90s >/dev/null
 
 IIP_SERVICE_ACCOUNT="system:serviceaccount:$IIP_ESO_TARGET_NAMESPACE:iip-external-secret-reader"
 if [ "$("$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" auth can-i \
@@ -287,7 +316,11 @@ IIP_TARGET_DATABASE_KEYS=$("$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
 IIP_TARGET_AUTH_KEYS=$("$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
     --namespace "$IIP_ESO_TARGET_NAMESPACE" get secret iip-auth -o json | \
     jq -r '.data | keys | join(",")')
+IIP_TARGET_DATABASE_CA_KEYS=$("$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+    --namespace "$IIP_ESO_TARGET_NAMESPACE" get secret iip-database-ca -o json | \
+    jq -r '.data | keys | join(",")')
 if [ "$IIP_TARGET_DATABASE_KEYS" != database-url ] \
+    || [ "$IIP_TARGET_DATABASE_CA_KEYS" != ca.crt ] \
     || [ "$IIP_TARGET_AUTH_KEYS" != identities-json ]; then
     echo "External-secret target contains unexpected keys" >&2
     exit 1
@@ -296,11 +329,21 @@ fi
 IIP_INITIAL_TARGET_AUTH=$("$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
     --namespace "$IIP_ESO_TARGET_NAMESPACE" get secret iip-auth \
     -o jsonpath='{.data.identities-json}')
+IIP_INITIAL_TARGET_DATABASE_CA=$("$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+    --namespace "$IIP_ESO_TARGET_NAMESPACE" get secret iip-database-ca \
+    -o jsonpath='{.data.ca\.crt}')
 IIP_ROTATED_AUTH_TOKEN=$(openssl rand -hex 32)
 IIP_ROTATED_AUTH_DIGEST=$(printf '%s' "$IIP_ROTATED_AUTH_TOKEN" | \
     shasum -a 256 | awk '{print $1}')
 IIP_ROTATED_AUTH_DOCUMENT="{\"verifiers\":[{\"tokenSha256\":\"sha256:$IIP_ROTATED_AUTH_DIGEST\",\"actorId\":\"local-secret-test\",\"tenantId\":\"local-secret-test\",\"roles\":[\"developer\"]}]}"
 IIP_ROTATED_AUTH_B64=$(printf '%s' "$IIP_ROTATED_AUTH_DOCUMENT" | base64 | tr -d '\n')
+IIP_ROTATED_DATABASE_CA_FILE="$IIP_TEST_TEMP_DIR/rotated-database-ca.crt"
+IIP_ROTATED_DATABASE_CA_KEY_FILE="$IIP_TEST_TEMP_DIR/rotated-database-ca.key"
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+    -subj /CN=iip-external-secrets-test-rotated-database-ca \
+    -keyout "$IIP_ROTATED_DATABASE_CA_KEY_FILE" \
+    -out "$IIP_ROTATED_DATABASE_CA_FILE" >/dev/null 2>&1
+IIP_ROTATED_DATABASE_CA_B64=$(base64 < "$IIP_ROTATED_DATABASE_CA_FILE" | tr -d '\n')
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
     --namespace "$IIP_ESO_SOURCE_NAMESPACE" apply -f - >/dev/null <<EOF
 apiVersion: v1
@@ -310,18 +353,27 @@ metadata:
 type: Opaque
 data:
   database-url: $IIP_DATABASE_URL_B64
+  ca: $IIP_ROTATED_DATABASE_CA_B64
   identities-json: $IIP_ROTATED_AUTH_B64
 EOF
 "$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
     --namespace "$IIP_ESO_TARGET_NAMESPACE" annotate externalsecret iip-auth \
     force-sync="$(date +%s)" --overwrite >/dev/null
+"$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+    --namespace "$IIP_ESO_TARGET_NAMESPACE" annotate externalsecret \
+    iip-database-ca force-sync="$(date +%s)" --overwrite >/dev/null
 
 for attempt in $(seq 1 60); do
     IIP_ROTATED_TARGET_AUTH=$("$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
         --namespace "$IIP_ESO_TARGET_NAMESPACE" get secret iip-auth \
         -o jsonpath='{.data.identities-json}')
+    IIP_ROTATED_TARGET_DATABASE_CA=$("$IIP_KUBECTL_BIN" --context "$IIP_KUBE_CONTEXT" \
+        --namespace "$IIP_ESO_TARGET_NAMESPACE" get secret iip-database-ca \
+        -o jsonpath='{.data.ca\.crt}')
     if [ "$IIP_ROTATED_TARGET_AUTH" = "$IIP_ROTATED_AUTH_B64" ] \
-        && [ "$IIP_ROTATED_TARGET_AUTH" != "$IIP_INITIAL_TARGET_AUTH" ]; then
+        && [ "$IIP_ROTATED_TARGET_AUTH" != "$IIP_INITIAL_TARGET_AUTH" ] \
+        && [ "$IIP_ROTATED_TARGET_DATABASE_CA" = "$IIP_ROTATED_DATABASE_CA_B64" ] \
+        && [ "$IIP_ROTATED_TARGET_DATABASE_CA" != "$IIP_INITIAL_TARGET_DATABASE_CA" ]; then
         break
     fi
     if [ "$attempt" -eq 60 ]; then
@@ -334,6 +386,7 @@ done
 "$IIP_HELM_BIN" template iip deploy/helm/infra-intelligence \
     --namespace "$IIP_ESO_TARGET_NAMESPACE" \
     --set database.existingSecret=iip-database \
+    --set database.transportSecurity.caExistingSecret=iip-database-ca \
     --set auth.existingSecret=iip-auth >/dev/null
 
 echo "External Secrets Operator compatibility passed: verified chart -> pinned controller -> exact-key materialization -> least authority -> rotation -> IIP render"

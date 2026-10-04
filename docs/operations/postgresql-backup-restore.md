@@ -69,11 +69,23 @@ guardrails, not production SLO claims.
 
 ## Scheduled Helm backup baseline
 
+The backup `database-url` Secret must contain an explicit `postgres://` or
+`postgresql://` URI with TCP hostname/IP authority and a nonempty database path,
+without query parameters or fragments. Keyword conninfo and Unix sockets are
+rejected. Before enabling or upgrading the CronJob, rotate an existing Secret
+that uses keyword syntax or URL query options to this form; transport settings
+belong in Helm values and the separate CA Secret. See the complete
+[database transport requirements](postgresql-transport-security.md).
+
 The chart can schedule the same logical format into a pre-created protected PersistentVolumeClaim. It never creates storage because encryption, replication, immutability, retention, and access controls belong to the customer's storage operating model. A minimal values fragment is:
 
 ```yaml
 database:
   existingSecret: iip-database
+  transportSecurity:
+    mode: verify-full
+    caExistingSecret: iip-database-ca
+    caKey: ca.crt
 
 backup:
   enabled: true

@@ -8,6 +8,11 @@ Helm applies a workload. It supports the read-only core, protected GitHub
 context, and AI FinOps V0 profiles. A pass is necessary for a customer
 installation but is not production certification.
 
+The current closed names are `production-core-v2` and
+`production-ai-finops-v1`. Historical v1/v0 report shapes remain readable for
+offline compatibility, but new evidence cannot be generated under them and
+they do not satisfy the current install preflight.
+
 ## Start from the non-secret profiles
 
 The chart ships four composable examples:
@@ -59,6 +64,13 @@ intended cluster has at least two eligible nodes for the configured topology
 key; otherwise the correct result is Pending redundant replicas rather than
 silently co-locating them.
 
+Both current profiles also require PostgreSQL `verify-full`, a separate exact
+CA Secret/key reference, and the corresponding `database-ca` dependency in the
+sanitized Helm profile. Preflight never reads the connection URL or CA bytes;
+cluster mode checks only that both exact Secret keys exist. This is static
+transport configuration evidence, not a database handshake, certificate-
+rotation, or availability claim.
+
 ## Run against the intended cluster
 
 Select an exact context; the live command never uses an implicit current
@@ -77,15 +89,15 @@ Kubernetes `get` on each named Secret even though `kubectl` output is projected
 before it crosses into the Python process.
 
 ```bash
-IIP_DEPLOYMENT_PROFILE=production-core-v1 \
+IIP_DEPLOYMENT_PROFILE=production-core-v2 \
 IIP_DEPLOYMENT_VALUES=/absolute/protected/customer.values.yaml \
 IIP_DEPLOYMENT_NAMESPACE=iip-system \
 IIP_KUBERNETES_CONTEXT=customer-production \
 make preflight-deployment-live PYTHON=.venv/bin/python
 ```
 
-For `production-ai-finops-v0`, merge the core and AI overlay. For protected
-repository context, use `production-core-v1` with the GitHub overlay. Pass the
+For `production-ai-finops-v1`, merge the core and AI overlay. For protected
+repository context, use `production-core-v2` with the GitHub overlay. Pass the
 selected combination as the one protected values file through
 `IIP_DEPLOYMENT_VALUES`. A successful cluster run writes
 `dist/customer-deployment-preflight-report.json` with `install-ready`. Any

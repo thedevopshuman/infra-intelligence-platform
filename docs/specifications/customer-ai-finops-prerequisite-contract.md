@@ -53,7 +53,8 @@ visible with stable error codes.
 
 Ten content and binding digests make the report reproducible without retaining
 customer values. Sixteen ordered checks cover source cleanliness, profile age,
-release identity, the production AI FinOps deployment profile, all six source
+release identity, the current `production-ai-finops-v1` deployment profile,
+including its verified PostgreSQL transport requirement, all six source
 statuses, release-to-runtime and deployment-to-receiver chains, catalog
 selection, metadata-only direct collection, freshness, and output
 minimization.
@@ -76,3 +77,9 @@ ordered limitations are mandatory and cannot be removed by configuration.
 
 The profile and report are offline operational artifacts and are not served by
 the control-plane API, so this additive contract does not change OpenAPI.
+
+The transport schema and SDK type continue to recognize retained
+`production-ai-finops-v0` reports for offline inspection. Current generation
+always emits `production-ai-finops-v1`; a v0 customer deployment fails the
+deployment-profile check and a v0 prerequisite report cannot enter the current
+same-invocation or pilot admission chains.

@@ -18,11 +18,15 @@ class ExternalSecretHandoffTests(unittest.TestCase):
 
         self.assertIn("apiVersion: external-secrets.io/v1", manifest)
         self.assertIn("name: iip-database", manifest)
+        self.assertIn("name: iip-database-ca", manifest)
         self.assertIn("secretKey: database-url", manifest)
+        self.assertIn("secretKey: ca.crt", manifest)
+        self.assertIn("property: ca", manifest)
         self.assertIn("name: iip-production-secret-store", manifest)
         self.assertNotIn("stringData:", manifest)
         self.assertNotIn("data:\n  database-url:", manifest)
         self.assertNotIn("postgresql://", manifest)
+        self.assertNotIn("BEGIN CERTIFICATE", manifest)
         self.assertNotIn("accessKey", manifest)
         self.assertNotIn("clientSecret", manifest)
 
@@ -63,7 +67,7 @@ class ExternalSecretHandoffTests(unittest.TestCase):
             if not value or value.lstrip().startswith("#"):
                 stack.append((indent, key))
 
-        self.assertEqual(34, len(boundaries))
+        self.assertEqual(35, len(boundaries))
         for boundary in sorted(boundaries):
             with self.subTest(boundary=boundary):
                 self.assertIn(f"`{boundary}`", runbook)
@@ -78,7 +82,14 @@ class ExternalSecretHandoffTests(unittest.TestCase):
         self.assertIn("get secret/not-authorized", script)
         self.assertIn("force-sync=", script)
         self.assertIn("IIP_ROTATED_TARGET_AUTH", script)
+        self.assertIn("IIP_ROTATED_TARGET_DATABASE_CA", script)
         self.assertIn("--timeout 600s", script)
+        self.assertIn("secretKey: ca.crt", script)
+        self.assertIn("property: ca", script)
+        self.assertIn(
+            "--set database.transportSecurity.caExistingSecret=iip-database-ca",
+            script,
+        )
         self.assertIn("secretKey: identities-json", script)
         self.assertIn("property: identities-json", script)
         self.assertIn('--context "$IIP_KUBE_CONTEXT" cluster-info', script)

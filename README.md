@@ -278,6 +278,14 @@ archived WAL, and recovery to a named pre-change boundary. Neither report
 claims automatic failover, protected customer storage, regional recovery, or a
 customer RPO/RTO.
 
+Every packaged PostgreSQL client now uses one declared transport policy.
+Current production Helm profiles require libpq `verify-full`, an explicit
+customer CA Secret/key, hostname verification, and no TLS policy embedded in
+the database URL. API, worker, receiver, readiness, migration, maintenance, and
+backup paths share that posture. Plaintext is available only through the
+explicit `insecure-local` mode used by disposable development profiles; see
+the [PostgreSQL transport-security runbook](docs/operations/postgresql-transport-security.md).
+
 The packaged chart includes a value-free External Secrets Operator handoff for
 the required database Secret. A local Kind gate proves the verified,
 digest-pinned controller creates exact target keys with named-secret-only source
@@ -286,8 +294,9 @@ authority and propagates a source rotation. The
 optional chart Secret boundary and keeps customer store credentials outside IIP.
 
 The chart also emits a sanitized deployment profile and ships composable
-production-core and AI FinOps values examples. A source-bound preflight renders
-the complete chart, evaluates closed production checks, and can use one
+production-core and AI FinOps values examples. Current v2/v1 profiles add an
+ordered database-transport-security check and the exact CA dependency. A
+source-bound preflight renders the complete chart, evaluates closed production checks, and can use one
 explicit Kubernetes context to verify referenced Secret keys, ConfigMaps, and
 a bound backup claim before installation. Its retained report contains only
 counts and digests and remains explicitly `pre-install-only`; customer
@@ -438,6 +447,7 @@ python3 -m pip install --requirement requirements/verify.txt
 make verify
 # With Docker Desktop running:
 make test-postgres
+make test-postgres-tls
 make test-capacity
 make test-credential-broker
 make test-oidc
@@ -485,7 +495,7 @@ Before a customer Helm installation, merge the non-secret production examples
 into a protected values file and run the live gate with an explicit context:
 
 ```bash
-IIP_DEPLOYMENT_PROFILE=production-core-v1 \
+IIP_DEPLOYMENT_PROFILE=production-core-v2 \
 IIP_DEPLOYMENT_VALUES=/absolute/protected/customer.values.yaml \
 IIP_DEPLOYMENT_NAMESPACE=iip-system \
 IIP_KUBERNETES_CONTEXT=customer-production \

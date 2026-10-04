@@ -135,12 +135,16 @@ def healthy_diagnostic() -> dict[str, object]:
             ROOT / "contracts/examples/deployment-diagnostic-report.json"
         ).read_text(encoding="utf-8")
     )
-    binding, identity = diagnostics._target(
-        context=CONTEXT,
-        namespace=NAMESPACE,
-        release_name=RELEASE,
-        image_digest=IMAGE_DIGEST,
-    )
+    # This aggregate joins historical synthetic reports, not the live checkout.
+    with patch.object(diagnostics, "_repository_identity", return_value={
+        key: REPOSITORY[key] for key in ("applicationVersion", "chartVersion")
+    }):
+        binding, identity = diagnostics._target(
+            context=CONTEXT,
+            namespace=NAMESPACE,
+            release_name=RELEASE,
+            image_digest=IMAGE_DIGEST,
+        )
     report["metadata"].update(
         {
             "generatedAt": "2026-09-06T12:37:00Z",
@@ -233,6 +237,7 @@ def oidc_report() -> dict[str, object]:
     )
 
 
+@patch.object(customer_policy, "APPLICATION_VERSION", REPOSITORY["applicationVersion"])
 def policy_report() -> dict[str, object]:
     profile = json.loads(
         (
@@ -251,6 +256,7 @@ def policy_report() -> dict[str, object]:
     )
 
 
+@patch.object(customer_credential_broker, "APPLICATION_VERSION", REPOSITORY["applicationVersion"])
 def credential_broker_report() -> dict[str, object]:
     profile = json.loads(
         (
@@ -465,6 +471,13 @@ def build(
 
 
 class CustomerDeploymentQualificationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Keep historical synthetic inputs independent of the checkout version.
+        identity = {key: REPOSITORY[key] for key in ("applicationVersion", "chartVersion")}
+        source = patch.object(diagnostics, "_repository_identity", return_value=identity)
+        source.start()
+        self.addCleanup(source.stop)
+
     def test_contract_example_is_schema_semantic_and_sdk_valid(self) -> None:
         schema = json.loads(
             (

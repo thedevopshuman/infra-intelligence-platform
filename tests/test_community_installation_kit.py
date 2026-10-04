@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import installation_kit as kit
 
 
-VERSION = "0.84.0"
+VERSION = "0.84.1"
 PREFIX = f"infra-intelligence-community-{VERSION}"
 
 

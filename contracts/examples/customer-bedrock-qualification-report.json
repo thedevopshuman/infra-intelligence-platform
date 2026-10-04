@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerBedrockQualificationReport",
   "metadata": {
-    "id": "cbq_dadfd6db886d68aeeb075ec278057e85",
+    "id": "cbq_d3b828de1a4ac2d82731857ffd82dc7c",
     "generatedAt": "2026-09-08T09:05:00Z",
     "validUntil": "2026-09-09T09:05:00Z",
     "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -12,13 +12,13 @@
     "status": "qualified",
     "qualification": "customer-bedrock-live-interoperability-v1",
     "subject": {
-      "applicationVersion": "0.84.0",
+      "applicationVersion": "0.84.1",
       "contractsApiVersion": "iip.platform/v1alpha1",
       "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "bindings": {
-      "profileDigest": "sha256:f2b8bd7fbe44cc952a8500d832408bf56c35b725bee647523f91f338ebba6f9d",
+      "profileDigest": "sha256:fd431c6e2d3b7cc7ce14c353de7206d1e8144afac18d55708dbcf4a214bf6e02",
       "environmentBindingDigest": "sha256:ebbaf6050b9190c0b9688b96de6c442e6239a02cedd056974af01ff8286610a2",
       "targetBindingDigest": "sha256:68f3b4f2afb5ea8140bd49ae8e65ffd632abd08c9888d030f7019515fad4426b",
       "liveCompatibilityReportDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"

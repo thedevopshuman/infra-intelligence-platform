@@ -74,6 +74,7 @@ class CustomerAiFinopsFlowTests(unittest.TestCase):
             sourceDirty=False,
         )
         live_report["spec"]["qualificationLevel"] = "live-provider-interoperability"
+        live_report["spec"]["environment"]["applicationVersion"] = self.profile["spec"]["release"]["applicationVersion"]
         live_report["spec"]["profile"].update(
             modelId=self.bedrock_profile["spec"]["target"]["modelId"],
             region=self.bedrock_profile["spec"]["target"]["region"],

@@ -82,12 +82,12 @@ case "$1" in
             exit 2
         fi
         echo 'Building the learning preview. First startup downloads images and Python dependencies.'
-        docker_local build --target learning --tag iip-learning:0.84.0 .
+        docker_local build --target learning --tag iip-learning:0.84.1 .
         IIP_LEARN_TEMP=$(mktemp .iip/learning/fixture.XXXXXX)
         docker_local run --rm --network none --read-only --cap-drop ALL \
             -e HTTP_PROXY= -e HTTPS_PROXY= -e ALL_PROXY= -e FTP_PROXY= -e NO_PROXY='*' \
             -e http_proxy= -e https_proxy= -e all_proxy= -e ftp_proxy= -e no_proxy='*' \
-            --security-opt no-new-privileges:true iip-learning:0.84.0 \
+            --security-opt no-new-privileges:true iip-learning:0.84.1 \
             python scripts/learning_fixture.py configuration > "$IIP_LEARN_TEMP"
         mv "$IIP_LEARN_TEMP" .iip/learning/fixture.env
         IIP_LEARN_TEMP=''

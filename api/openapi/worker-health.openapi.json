@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Infrastructure Intelligence Workflow Worker Health API",
-    "version": "0.84.0",
+    "version": "0.84.1",
     "description": "Private process health listener for the workflow worker. The chart creates no Service or ingress for this listener, and it exposes no control-plane, tenant, workflow, provider, or credential operations."
   },
   "servers": [

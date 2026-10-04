@@ -36,11 +36,11 @@ npm, Helm, a registry or provider calls:
 
 ```bash
 .venv/bin/python scripts/installation_kit.py build \
-  --output /absolute/new-output/infra-intelligence-community-0.84.0.tar.gz \
-  --version 0.84.0
+  --output /absolute/new-output/infra-intelligence-community-0.84.1.tar.gz \
+  --version 0.84.1
 .venv/bin/python scripts/installation_kit.py inspect \
-  /absolute/new-output/infra-intelligence-community-0.84.0.tar.gz \
-  --version 0.84.0
+  /absolute/new-output/infra-intelligence-community-0.84.1.tar.gz \
+  --version 0.84.1
 ```
 
 Use the candidate's actual application version; do not overwrite an old release
@@ -65,13 +65,13 @@ authenticate its kit before extraction using the exact accepted version:
 cosign verify-blob \
   --bundle community-kit.sigstore.json \
   --certificate-identity \
-    https://github.com/thedevopshuman/infra-intelligence-platform/.github/workflows/release.yml@refs/tags/v0.84.0 \
+    https://github.com/thedevopshuman/infra-intelligence-platform/.github/workflows/release.yml@refs/tags/v0.84.1 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  infra-intelligence-community-0.84.0.tar.gz
+  infra-intelligence-community-0.84.1.tar.gz
 ```
 
 Use the release's actual version in both the filename and signer identity;
-this example does not assert that `v0.84.0` is published. A checksum alone is
+this example does not assert that `v0.84.1` is published. A checksum alone is
 not publisher authentication. Follow the [release procedure](release-artifacts.md)
 for the matching image signature policy and immutable application reference.
 

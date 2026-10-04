@@ -16,7 +16,7 @@ services:
       - /var/lib/postgresql
 
   api:
-    image: ${IIP_AI_FINOPS_IMAGE:-iip-ai-finops:0.84.0}
+    image: ${IIP_AI_FINOPS_IMAGE:-iip-ai-finops:0.84.1}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -54,7 +54,7 @@ services:
       - no-new-privileges:true
 
   ai-usage-receiver:
-    image: ${IIP_AI_FINOPS_IMAGE:-iip-ai-finops:0.84.0}
+    image: ${IIP_AI_FINOPS_IMAGE:-iip-ai-finops:0.84.1}
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.otlp_receiver"]
     environment:
@@ -90,7 +90,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: ${IIP_AI_FINOPS_IMAGE:-iip-ai-finops:0.84.0}
+    image: ${IIP_AI_FINOPS_IMAGE:-iip-ai-finops:0.84.1}
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:

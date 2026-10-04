@@ -15,7 +15,7 @@
       "credentialsProfile": "iip-bedrock-qualification"
     },
     "release": {
-      "applicationVersion": "0.84.0",
+      "applicationVersion": "0.84.1",
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "objective": {

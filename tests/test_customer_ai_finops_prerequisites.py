@@ -51,8 +51,13 @@ class CustomerAiFinopsPrerequisiteTests(unittest.TestCase):
         receiver = _example("customer-otlp-receiver-qualification-report.json")
         bedrock = _example("customer-bedrock-qualification-report.json")
         price = _example("ai-price-catalog-qualification-report.json")
+        release = self.profile["spec"]["release"]
 
         readiness["metadata"]["generatedAt"] = "2026-09-08T10:06:00Z"
+        readiness["spec"]["release"].update(
+            version=release["applicationVersion"], chartVersion=release["chartVersion"],
+        )
+        runtime["spec"]["environment"]["applicationVersion"] = release["applicationVersion"]
         runtime["metadata"].update(
             generatedAt="2026-09-08T10:05:00Z",
             sourceRevision=REVISION,
@@ -65,8 +70,8 @@ class CustomerAiFinopsPrerequisiteTests(unittest.TestCase):
         )
         deployment["spec"]["subject"].update(
             profile="production-ai-finops-v1",
-            applicationVersion="0.84.0",
-            chartVersion="0.87.0",
+            applicationVersion=release["applicationVersion"],
+            chartVersion=release["chartVersion"],
             sourceRevision=REVISION,
             imageDigest=IMAGE,
         )
@@ -76,8 +81,8 @@ class CustomerAiFinopsPrerequisiteTests(unittest.TestCase):
             sourceDirty=False,
         )
         receiver["spec"]["subject"].update(
-            applicationVersion="0.84.0",
-            chartVersion="0.87.0",
+            applicationVersion=release["applicationVersion"],
+            chartVersion=release["chartVersion"],
             sourceRevision=REVISION,
             imageDigest=IMAGE,
         )
@@ -88,7 +93,7 @@ class CustomerAiFinopsPrerequisiteTests(unittest.TestCase):
             sourceDirty=False,
         )
         bedrock["spec"]["subject"].update(
-            applicationVersion="0.84.0",
+            applicationVersion=release["applicationVersion"],
             sourceRevision=REVISION,
             imageDigest=IMAGE,
         )

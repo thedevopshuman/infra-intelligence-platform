@@ -333,13 +333,17 @@ class CustomerCredentialBrokerBoundaryTests(unittest.TestCase):
             directory = Path(temporary)
             profile_path, _, ca_path = self.protected_inputs(directory)
             report_path = directory / "report.json"
-            report_path.write_text(
+            report = json.loads(
                 (
                     EXAMPLES
                     / "customer-credential-broker-qualification-report.json"
-                ).read_text(encoding="utf-8"),
-                encoding="utf-8",
+                ).read_text(encoding="utf-8")
             )
+            report["spec"]["subject"]["applicationVersion"] = qualification.APPLICATION_VERSION
+            metadata = dict(report["metadata"])
+            metadata.pop("id")
+            report["metadata"]["id"] = qualification._report_identifier(metadata, report["spec"])
+            report_path.write_text(json.dumps(report), encoding="utf-8")
             with patch.object(
                 qualification, "_source_identity", return_value=(REVISION, False)
             ):

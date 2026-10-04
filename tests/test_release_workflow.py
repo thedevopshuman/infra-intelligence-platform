@@ -41,12 +41,13 @@ class ReleaseWorkflowTests(unittest.TestCase):
     def test_release_orders_closed_gates_before_external_release(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
         ordered = (
+            "make verify-workflows",
             "validate-github-context",
             "Authenticate the publication boundary",
             "Set up ARM64 emulation",
             "Set up release OCI builder",
             "Verify release builder platforms",
-            "make verify",
+            "\n          make verify\n",
             "make release-bundle",
             "release_publication.py publish",
             "cosign_container.sh sign --yes",
@@ -97,7 +98,10 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("BUILDER_PLATFORMS: ${{ steps.buildx.outputs.platforms }}", validation)
         self.assertIn("docker buildx inspect --bootstrap", validation)
         self.assertIn("IIP_RELEASE_PLATFORMS: linux/amd64,linux/arm64", build)
-        self.assertIn("DOCKER_CONFIG: ${{ runner.temp }}/iip-release-docker", workflow)
+        self.assertIn(
+            "DOCKER_CONFIG: /tmp/iip-release-docker-${{ github.run_id }}-${{ github.run_attempt }}",
+            workflow,
+        )
 
     def test_builder_platform_check_rejects_missing_architectures(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -135,12 +139,31 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertNotIn("control_repository=ghcr.io/", workflow)
         self.assertNotIn("bridge_repository=ghcr.io/", workflow)
         self.assertIn("github.repository == 'thedevopshuman/infra-intelligence-platform'", workflow)
-        self.assertIn("DOCKER_CONFIG: ${{ runner.temp }}/iip-release-docker", workflow)
+        self.assertIn(
+            "DOCKER_CONFIG: /tmp/iip-release-docker-${{ github.run_id }}-${{ github.run_attempt }}",
+            workflow,
+        )
+        self.assertNotIn("${{ runner.temp }}", workflow)
         cleanup = [step for step in re.split(r"(?m)^      - name: ", workflow)
                    if "docker logout docker.io" in step]
         self.assertEqual(len(cleanup), 1)
         self.assertRegex(cleanup[0], r"(?m)^\s+if:\s+(?:\$\{\{\s*)?always\(\)")
         self.assertGreater(workflow.index("docker logout docker.io"), workflow.index("gh release create"))
+
+    def test_real_workflow_validation_runs_before_ci_verification_and_release_authentication(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        verify_job = ci.split("\n  verify:\n", 1)[1].split("\n  plugin-compatibility:\n", 1)[0]
+        self.assertLess(verify_job.index("make verify-workflows"), verify_job.index("run: make verify\n"))
+        self.assertLess(workflow.index("make verify-workflows"), workflow.index("Authenticate the publication boundary"))
+        completed = subprocess.run(
+            ["make", "--no-print-directory", "-n", "verify-workflows", "GO=go"],
+            cwd=ROOT, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12", completed.stdout)
+        self.assertIn("-shellcheck= -pyflakes= .github/workflows/*.yml", completed.stdout)
+        self.assertNotIn("go install", completed.stdout)
 
     def test_docker_hub_login_requires_both_secrets_and_uses_stdin(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")

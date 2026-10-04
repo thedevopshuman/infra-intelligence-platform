@@ -38,6 +38,7 @@ def live_report(profile: dict[str, object]) -> dict[str, object]:
     report["metadata"]["sourceRevision"] = REVISION
     report["metadata"]["sourceDirty"] = False
     report["spec"]["qualificationLevel"] = "live-provider-interoperability"
+    report["spec"]["environment"]["applicationVersion"] = profile["spec"]["release"]["applicationVersion"]
     report["spec"]["profile"]["modelId"] = target["modelId"]
     report["spec"]["profile"]["region"] = target["region"]
     report["spec"]["profile"]["operation"] = target["operation"]
@@ -76,6 +77,9 @@ class CustomerBedrockQualificationTests(unittest.TestCase):
     def test_examples_are_closed_current_and_minimized(self) -> None:
         qualification.validate_profile(self.profile)
         qualification.validate_report_document(self.report)
+        self.assertEqual(self.profile["spec"]["release"]["applicationVersion"], qualification.APPLICATION_VERSION)
+        self.assertEqual(self.report["spec"]["subject"]["applicationVersion"], qualification.APPLICATION_VERSION)
+        self.assertEqual(self.report["spec"]["bindings"]["profileDigest"], qualification._digest_value(self.profile))
         serialized = json.dumps(self.report)
         for forbidden in (
             "amazon.nova",
@@ -87,6 +91,22 @@ class CustomerBedrockQualificationTests(unittest.TestCase):
             "response",
         ):
             self.assertNotIn(forbidden, serialized)
+
+    def test_previous_application_version_is_still_rejected(self) -> None:
+        profile = copy.deepcopy(self.profile)
+        profile["spec"]["release"]["applicationVersion"] = "0.84.0"
+        with self.assertRaisesRegex(
+            qualification.CustomerBedrockQualificationError, "profile.version-mismatch",
+        ):
+            qualification.validate_profile(profile)
+        report = copy.deepcopy(self.report)
+        report["spec"]["subject"]["applicationVersion"] = "0.84.0"
+        metadata = {key: value for key, value in report["metadata"].items() if key != "id"}
+        report["metadata"]["id"] = qualification._report_id(metadata, report["spec"])
+        with self.assertRaisesRegex(
+            qualification.CustomerBedrockQualificationError, "report.invalid",
+        ):
+            qualification.validate_report_document(report)
 
     def test_report_identity_summary_and_validity_are_recomputed(self) -> None:
         changed = copy.deepcopy(self.report)

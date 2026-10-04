@@ -1,8 +1,10 @@
 .PHONY: help install-verify-deps validate validate-schemas test test-console-javascript test-typescript test-evidence-redaction test-deployment-preflight preflight-deployment-live verify-deployment-preflight-report test-deployment-diagnostics diagnose-deployment verify-deployment-diagnostic-report test-ingress-availability qualify-ingress-availability verify-ingress-availability-report test-customer-oidc-qualification qualify-customer-oidc verify-customer-oidc-qualification-report test-customer-operational-alert-qualification qualify-customer-operational-alerts verify-customer-operational-alert-qualification-report test-customer-policy-qualification qualify-customer-policy verify-customer-policy-qualification-report test-customer-credential-broker-qualification qualify-customer-credential-broker verify-customer-credential-broker-qualification-report test-customer-github-context-qualification qualify-customer-github-context verify-customer-github-context-qualification-report test-customer-bedrock-qualification qualify-customer-bedrock verify-customer-bedrock-qualification-report test-customer-ai-finops-prerequisites qualify-customer-ai-finops-prerequisites verify-customer-ai-finops-prerequisite-report test-customer-ai-finops-flow qualify-customer-ai-finops-flow verify-customer-ai-finops-flow-report test-customer-pilot-readiness assess-customer-pilot-readiness verify-customer-pilot-readiness-report test-customer-failure-overlap assess-customer-failure-overlap verify-customer-failure-overlap-report test-customer-otlp-receiver-qualification qualify-customer-otlp-receiver verify-customer-otlp-receiver-qualification-report test-customer-continuity qualify-customer-continuity verify-customer-continuity-report test-customer-processing-continuity qualify-customer-processing-continuity verify-customer-processing-continuity-report test-customer-sustained-workload qualify-customer-sustained-workload verify-customer-sustained-workload-report test-customer-postgresql-continuity qualify-customer-postgresql-continuity verify-customer-postgresql-continuity-report test-customer-deployment-qualification qualify-customer-deployment verify-customer-deployment-qualification-report test-control-plane-load qualify-control-plane-load verify-control-plane-load-report test-kubernetes-availability qualify-kubernetes-availability verify-kubernetes-availability-report test-postgres test-capacity test-credential-broker test-oidc test-oidc-verifier test-oidc-browser test-policy-engine test-github-context qualify-github-context verify-github-context-report test-external-secrets test-backup-restore verify-backup-restore-report test-postgres-continuity verify-postgres-continuity-report test-otel test-operational-alerts test-otlp-receiver test-ai-finops verify-ai-finops-runtime-report test-ai-finops-sustained-load verify-ai-finops-sustained-load-report test-aws-bedrock-price-import import-aws-bedrock-price-catalog verify-aws-bedrock-price-import test-ai-price-catalog-qualification qualify-ai-price-catalog verify-ai-price-catalog-report test-bedrock-instrumentation test-bedrock-live test-openai-instrumentation test-openai-live test-prometheus test-collector-queue-loss test-loki test-opensearch test-kubernetes-events test-kubernetes-actions test-kubernetes-live test-plugin-runner test-plugin-compatibility test-local-product test-helm-install test-release-install test-release-upgrade qualify-release test-release-publication test-release-signatures qualify-release-signatures verify-release-signature-report test-release-vulnerabilities qualify-release-vulnerabilities verify-release-vulnerability-report test-release-readiness assess-release-readiness verify-release-readiness-report qualify-local-release db-migrate helm-lint verify run package-chart release-bundle verify-release-bundle verify-release-qualification dev-init dev-up dev-status dev-credentials dev-down ai-finops-up ai-finops-status ai-finops-down
 
 .PHONY: test-postgres-tls
+.PHONY: verify-workflows
 
 PYTHON ?= python3
+GO ?= go
 
 .PHONY: community-check community-up community-status community-down test-community test-community-images test-community-recovery test-community-trust
 HELM ?= helm
@@ -351,6 +353,7 @@ help:
 	@echo "qualify-local-release Build and qualify one exact local candidate through every retained gate"
 	@echo "db-migrate    Apply PostgreSQL migrations using IIP_DATABASE_URL"
 	@echo "helm-lint     Lint and render the Helm chart"
+	@echo "verify-workflows Validate GitHub workflow syntax/contexts with pinned actionlint (Go required)"
 	@echo "verify        Run all local quality gates"
 	@echo "run           Start the reference HTTP API on port 8080"
 	@echo "dev-up        Start the durable local product stack in Docker Desktop"
@@ -382,6 +385,10 @@ validate:
 
 validate-schemas:
 	$(PYTHON) scripts/validate_schemas.py
+
+verify-workflows:
+	$(GO) run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 \
+		-shellcheck= -pyflakes= .github/workflows/*.yml
 
 test:
 	PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest discover -s tests -v

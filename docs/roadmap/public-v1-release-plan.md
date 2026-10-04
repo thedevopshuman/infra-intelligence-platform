@@ -77,6 +77,11 @@ is public and the Apache-2.0
 [learning-v0.84.0 source prerelease](https://github.com/thedevopshuman/infra-intelligence-platform/releases/tag/learning-v0.84.0)
 has been published. That source-only milestone is not signed runtime-artifact
 publication or a production-v1 qualification.
+The initial `v0.84.0` publishing tag failed workflow validation before jobs or
+image pushes. It remains immutable. The corrected candidate is `v0.84.1` with
+chart `0.87.1`; normal CI now checks actual GitHub Actions syntax and expression
+contexts before release. Successful protected publication and fresh-host
+installation remain pending, not inferred from a passing local test suite.
 The existing [website repository](https://github.com/thedevopshuman/website)
 remains separate. `thedevopshuman.com` is the selected informational site/docs
 domain: The DevOps Human is the umbrella site, with IIP as one product, not a

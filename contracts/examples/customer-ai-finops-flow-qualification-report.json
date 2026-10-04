@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerAiFinopsFlowQualificationReport",
   "metadata": {
-    "id": "caff_1b762d38d50717b64fbbfaa561401187",
+    "id": "caff_c952160e75f819264e8e46ffadc9c9c3",
     "generatedAt": "2026-09-08T10:05:30Z",
     "validUntil": "2026-09-09T10:05:30Z",
     "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -14,18 +14,18 @@
     "qualificationBoundary": "same-invocation-customer-runtime",
     "subject": {
       "deploymentProfile": "production-ai-finops-v1",
-      "applicationVersion": "0.84.0",
-      "chartVersion": "0.87.0",
+      "applicationVersion": "0.84.1",
+      "chartVersion": "0.87.1",
       "contractsApiVersion": "iip.platform/v1alpha1",
       "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "bindings": {
-      "profileDigest": "sha256:251f358c6cc8ed0c8f7256561537adcaf9c412c8b71bab2cef4e325488dbc922",
+      "profileDigest": "sha256:6255ae2afc7d2b33276d46a011ef2fde90a658c6b874ff8c65947e66f86de251",
       "environmentBindingDigest": "sha256:ebbaf6050b9190c0b9688b96de6c442e6239a02cedd056974af01ff8286610a2",
-      "prerequisiteProfileDigest": "sha256:392a664010f4c3cadec2bbef57110e59dba1e639a1657851858f2a4402295554",
-      "prerequisiteReportDigest": "sha256:ae59e23280cc47d0d9eb9478d1a8d05f407bd67c2624cdd4ab57f0cf48f07aad",
-      "bedrockProfileDigest": "sha256:f2b8bd7fbe44cc952a8500d832408bf56c35b725bee647523f91f338ebba6f9d",
+      "prerequisiteProfileDigest": "sha256:db695c5234469ff6535092b4d3272ba60d360526f9ec60b8c9e1a73b8d9cbf05",
+      "prerequisiteReportDigest": "sha256:1ba0631775e0418206b74e60bdc26885536e4de56110e38c52634e5ad856ef81",
+      "bedrockProfileDigest": "sha256:fd431c6e2d3b7cc7ce14c353de7206d1e8144afac18d55708dbcf4a214bf6e02",
       "controlPlaneTargetDigest": "sha256:67f7aaa3a40b5a2a295d84c806d41b6a1f226a432f8ebe6742019f464f6f4c1f",
       "otlpTargetDigest": "sha256:b3956e5d002e9b854d61c4fa71e026e3106e55decfdcee6dfb01f8a777898679",
       "prometheusTargetDigest": "sha256:b384c694b7821d68fb0844a94ef803bbb9540bc6bd600c11a93ed1dc1a98817f",

@@ -17,7 +17,7 @@ def configuration(anchor: datetime | None = None) -> dict[str, str]:
     anchor = anchor or datetime.now(timezone.utc).replace(second=0, microsecond=0)
     compact = lambda value: json.dumps(value, sort_keys=True, separators=(",", ":"))
     return {
-        "IIP_AI_FINOPS_IMAGE": "iip-learning:0.84.1",
+        "IIP_AI_FINOPS_IMAGE": "iip-learning:0.84.2",
         "IIP_AI_FINOPS_ANCHOR": fixture.format_timestamp(anchor),
         "IIP_AI_USAGE_CHANNEL_TOKEN": fixture.CHANNEL_TOKEN,
         "IIP_OPENAI_USAGE_CHANNEL_TOKEN": fixture.OPENAI_CHANNEL_TOKEN,

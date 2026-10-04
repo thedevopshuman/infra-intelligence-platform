@@ -305,7 +305,7 @@ class GithubContextBackendTests(unittest.TestCase):
             {
                 "Accept": "application/vnd.github+json",
                 "Authorization": f"Bearer {TOKEN}",
-                "User-Agent": "iip-github-context-adapter/0.84.1",
+                "User-Agent": "iip-github-context-adapter/0.84.2",
                 "X-GitHub-Api-Version": "2026-03-10",
             },
         )

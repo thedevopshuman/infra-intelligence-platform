@@ -577,7 +577,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     for selected in (init, config):
         for name in INPUT_FILES:
             selected.add_argument(f"--{name}", type=Path, required=name != "savings")
-    init.add_argument("--image", default="iip-community:0.84.1")
+    init.add_argument("--image", default="iip-community:0.84.2")
     subparsers.add_parser("check", help="revalidate protected inputs without Docker or provider calls")
     images = subparsers.add_parser("images", help="check exact selected image digests in the local daemon; not publisher verification")
     images.add_argument("--pull", action="store_true", help="explicitly download the five selected image digests without installation credentials")

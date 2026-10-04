@@ -22,6 +22,7 @@ run_cosign() {
         --memory-swap 256m \
         --cpus 1 \
         --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m \
+        -e TUF_ROOT=/tmp/sigstore \
         --network bridge \
         --user "$(id -u):$(id -g)" \
         --workdir /workspace \

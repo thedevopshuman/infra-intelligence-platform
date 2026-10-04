@@ -433,7 +433,7 @@ class GithubContextDocumentsBackend:
         headers = {
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {lease.secret}",
-            "User-Agent": "iip-github-context-adapter/0.84.1",
+            "User-Agent": "iip-github-context-adapter/0.84.2",
             "X-GitHub-Api-Version": integration.api_version,
         }
         documents: list[ContextDocument] = []

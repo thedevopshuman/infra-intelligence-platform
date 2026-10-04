@@ -14,7 +14,7 @@ services:
       - "127.0.0.1:15434:5432"
 
   api:
-    image: iip-otlp-receiver-test:0.84.1
+    image: iip-otlp-receiver-test:0.84.2
     build:
       context: ..
       dockerfile: Dockerfile
@@ -44,7 +44,7 @@ services:
       - no-new-privileges:true
 
   receiver:
-    image: iip-otlp-receiver-test:0.84.1
+    image: iip-otlp-receiver-test:0.84.2
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.otlp_receiver"]
     environment:
@@ -96,7 +96,7 @@ services:
       - no-new-privileges:true
 
   workflow-worker:
-    image: iip-otlp-receiver-test:0.84.1
+    image: iip-otlp-receiver-test:0.84.2
     pull_policy: never
     command: ["python", "-m", "iip.surfaces.worker"]
     environment:

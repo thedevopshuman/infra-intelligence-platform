@@ -5,7 +5,7 @@ replicaCount: 2
 
 image:
   repository: registry.example.test/iip/control-plane
-  tag: "0.84.1"
+  tag: "0.84.2"
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 worker:

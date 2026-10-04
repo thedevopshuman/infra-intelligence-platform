@@ -101,7 +101,7 @@ elif args[0] == 'inspect':
     print(str(root/'deploy') if mode == 'existing' else '/another/checkout/deploy')
 elif args[0] == 'build':
     if mode == 'build-failed': sys.exit(1)
-elif args[0] == 'run': print("IIP_AI_FINOPS_IMAGE='iip-learning:0.84.1'")
+elif args[0] == 'run': print("IIP_AI_FINOPS_IMAGE='iip-learning:0.84.2'")
 ''')
         self.fake.chmod(0o700)
 

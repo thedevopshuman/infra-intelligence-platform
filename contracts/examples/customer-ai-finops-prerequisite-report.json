@@ -2,7 +2,7 @@
   "apiVersion": "iip.platform/v1alpha1",
   "kind": "CustomerAiFinopsPrerequisiteReport",
   "metadata": {
-    "id": "cafp_ed769a630016343fa88a61e2f3f90fd0",
+    "id": "cafp_4d920a28cdbd805e4a246efac1efda5f",
     "generatedAt": "2026-09-08T10:10:00Z",
     "validUntil": "2026-09-09T10:10:00Z",
     "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -14,14 +14,14 @@
     "qualificationBoundary": "prerequisite-aggregation-only",
     "subject": {
       "deploymentProfile": "production-ai-finops-v1",
-      "applicationVersion": "0.84.1",
-      "chartVersion": "0.87.1",
+      "applicationVersion": "0.84.2",
+      "chartVersion": "0.87.2",
       "contractsApiVersion": "iip.platform/v1alpha1",
       "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "bindings": {
-      "profileDigest": "sha256:db695c5234469ff6535092b4d3272ba60d360526f9ec60b8c9e1a73b8d9cbf05",
+      "profileDigest": "sha256:91bd7c3e48a22e22585bb96bc44fd7240f8b31017b5f28b2489eceb4de802e47",
       "environmentBindingDigest": "sha256:ebbaf6050b9190c0b9688b96de6c442e6239a02cedd056974af01ff8286610a2",
       "priceTenantBindingDigest": "sha256:a76348a61bdfd71d7273e73fc1beb807d144119c30de5d2d81583c78a4c955e3",
       "catalogBindingDigest": "sha256:4a133556a703b3ced5faddedb3ab8a0496533c00f84c4c8a98cc93fc54d4b38b",

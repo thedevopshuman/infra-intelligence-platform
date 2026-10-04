@@ -158,7 +158,7 @@ For a quick local development exercise only, `IIP_RELEASE_PLATFORMS=linux/arm64`
 Run the repository verifier against an unpacked bundle:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.1-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.2-0123456789ab \
   make verify-release-bundle PYTHON=.venv/bin/python
 ```
 
@@ -184,7 +184,7 @@ After verification, prove that the packaged chart and OCI image—not checkout
 copies—install on the explicit local Kind cluster:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.1-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.2-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -204,7 +204,7 @@ selected supported prior revision. The target may retain the same latest
 migration or add a newer one; migration regression is rejected:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.1-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.2-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```
@@ -233,7 +233,7 @@ Run both packaged profiles in sequence and require their machine-readable
 evidence to agree on the candidate and local environment:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.1-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.2-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=<supported-ancestor> \
   make qualify-release PYTHON=.venv/bin/python
 ```
@@ -246,7 +246,7 @@ platform, Kubernetes, and Docker identity match. Verify a transported report
 and bundle with:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.1-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.2-0123456789ab \
 IIP_RELEASE_QUALIFICATION_REPORT=/absolute/path/to/report.json \
   make verify-release-qualification PYTHON=.venv/bin/python
 ```
@@ -266,7 +266,7 @@ After generating the complete clean-revision evidence set listed at the start
 of this runbook, create one minimized readiness inventory:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.1-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.2-0123456789ab \
 IIP_RELEASE_QUALIFICATION_REPORT=/absolute/path/to/release-qualification.json \
 IIP_RELEASE_VULNERABILITY_REPORT=/absolute/path/to/release-vulnerabilities.json \
 IIP_RELEASE_EVIDENCE_DIR=/absolute/path/to/evidence \
@@ -317,10 +317,10 @@ transport:
 
 ```bash
 PYTHONPATH=src:sdks/python/src python scripts/release_publication.py publish \
-  /absolute/path/to/iip-0.84.1-0123456789ab \
+  /absolute/path/to/iip-0.84.2-0123456789ab \
   --control-plane-repository registry.example.test/team/control-plane \
   --bridge-repository registry.example.test/team/plugin-mediation-bridge \
-  --tag v0.84.1 \
+  --tag v0.84.2 \
   --report /absolute/path/to/release-publication.json
 ```
 
@@ -348,6 +348,14 @@ checksums, Helm chart, and minimized qualification reports. The small
 asset, independently signed with `community-kit.sigstore.json`. It is the same
 kit already contained in the verified bundle, not a second build.
 
+The pinned Cosign wrapper sets `TUF_ROOT=/tmp/sigstore`, using Cosign's
+[supported TUF cache setting](https://github.com/sigstore/cosign/blob/v3.1.2/pkg/cosign/env/env.go).
+This keeps trust-metadata writes inside the container's bounded ephemeral
+`/tmp` mount while preserving its read-only root filesystem. It does not
+replace the embedded trust root, select another mirror, disable signature or
+transparency verification, change `HOME`, or mount the operator's home directory.
+Each invocation bootstraps its own cache; no host trust cache is reused.
+
 `make verify-workflows` runs the official pinned `actionlint v1.7.12` through
 Go and validates every checked workflow, including expression contexts. Go
 and access to its public module distribution are maintainer/CI prerequisites,
@@ -357,12 +365,15 @@ Optional ShellCheck/Pyflakes integrations are disabled in this syntax gate.
 
 The immutable `v0.84.0` tag points to the failed initial publishing attempt:
 GitHub rejected job-level `runner.temp` before any release job or image push.
-`v0.84.1` corrects that context with an isolated run/attempt-specific temporary
-Docker configuration and carries chart `0.87.1` (`appVersion: 0.84.1`). The SDK
-and Bedrock instrumentation versions are unchanged because their public
-behavior is unchanged. The old tag is not moved or reused. Passing the new
-syntax gate does not itself prove publication, signature verification or
-anonymous installation; those require the protected release to complete.
+`v0.84.1` corrected that context and uploaded both exact image indexes, but
+signing failed when Cosign tried to create `/.sigstore` on its read-only root.
+No signed GitHub release was created. Do not use those unsigned registry tags
+as accepted installation artifacts, and do not move or overwrite them.
+`v0.84.2` carries the signer-cache correction and chart `0.87.2`
+(`appVersion: 0.84.2`). SDK and Bedrock instrumentation versions are unchanged
+because their public behavior is unchanged. Passing syntax or build checks
+does not itself prove signing, publication qualification or anonymous
+installation; the protected release must complete.
 
 The job is restricted to `thedevopshuman/infra-intelligence-platform`. In that
 repository, open **Settings → Environments → release → Environment secrets**
@@ -448,11 +459,11 @@ repository and version in the certificate identity:
 
 ```bash
 cosign verify-blob \
-  --bundle iip-0.84.1-0123456789ab.tar.gz.sigstore.json \
+  --bundle iip-0.84.2-0123456789ab.tar.gz.sigstore.json \
   --certificate-identity \
-    https://github.com/OWNER/REPOSITORY/.github/workflows/release.yml@refs/tags/v0.84.1 \
+    https://github.com/OWNER/REPOSITORY/.github/workflows/release.yml@refs/tags/v0.84.2 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  iip-0.84.1-0123456789ab.tar.gz
+  iip-0.84.2-0123456789ab.tar.gz
 ```
 
 Then verify `SHA256SUMS` inside the extracted directory and install the chart
@@ -467,7 +478,7 @@ increment its generation when trust changes, and run from the same clean
 release checkout:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.1-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.2-0123456789ab \
 IIP_RELEASE_SIGNATURE_POLICY=/absolute/protected/release-signature-policy.json \
 IIP_RELEASE_SIGNATURE_REPORT=/absolute/path/to/release-signatures.json \
 COSIGN=/absolute/path/to/cosign \
@@ -505,7 +516,7 @@ fetches the policy-pinned scanner database with constrained network authority,
 and then scans offline:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.1-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.2-0123456789ab \
 IIP_RELEASE_VULNERABILITY_POLICY=/absolute/protected/release-vulnerability-policy.json \
 IIP_RELEASE_VULNERABILITY_REPORT=/absolute/path/to/release-vulnerabilities.json \
   make qualify-release-vulnerabilities PYTHON=.venv/bin/python

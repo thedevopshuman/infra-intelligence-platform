@@ -8,8 +8,8 @@
   },
   "spec": {
     "release": {
-      "applicationVersion": "0.84.1",
-      "chartVersion": "0.87.1",
+      "applicationVersion": "0.84.2",
+      "chartVersion": "0.87.2",
       "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },

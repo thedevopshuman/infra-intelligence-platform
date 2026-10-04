@@ -288,7 +288,7 @@ Create the database and identity Secrets through the cluster's secret-management
 ```yaml
 image:
   repository: registry.example.test/iip/control-plane
-  tag: 0.84.1
+  tag: 0.84.2
   digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 database:
@@ -451,7 +451,7 @@ To test the actual packaged release chart and attested OCI archive instead of
 checkout artifacts, first build the release bundle and then run:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.1-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.2-0123456789ab \
   make test-release-install PYTHON=.venv/bin/python
 ```
 
@@ -460,7 +460,7 @@ and the explicit prior release revision. Equal latest migrations are allowed;
 a migration regression is not:
 
 ```bash
-IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.1-0123456789ab \
+IIP_RELEASE_BUNDLE=/absolute/path/to/iip-0.84.2-0123456789ab \
 IIP_UPGRADE_FROM_REVISION=48f2168 \
   make test-release-upgrade PYTHON=.venv/bin/python
 ```

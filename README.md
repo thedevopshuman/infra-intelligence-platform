@@ -352,8 +352,10 @@ GitHub OIDC, qualifies signatures and every attached SPDX SBOM, signs the
 customer archive and Compose kit, and only then creates a GitHub release.
 The public repositories, required-review `release` environment and immutable
 version-tag protections are configured. The `v0.84.0` attempt failed workflow
-validation before publication; `v0.84.1` is the corrected candidate, not yet a
-published or production-qualified release. See the
+validation before publication. `v0.84.1` uploaded the images but failed signing
+because its trust-cache path was read-only; those unsigned tags are not an
+accepted release. `v0.84.2` is the next corrected candidate, not yet a published
+or production-qualified release. Neither earlier tag is moved or overwritten. See the
 [release procedure](docs/operations/release-artifacts.md).
 
 The Docker recovery gates retain separate source-bound logical

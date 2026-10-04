@@ -78,10 +78,15 @@ is public and the Apache-2.0
 has been published. That source-only milestone is not signed runtime-artifact
 publication or a production-v1 qualification.
 The initial `v0.84.0` publishing tag failed workflow validation before jobs or
-image pushes. It remains immutable. The corrected candidate is `v0.84.1` with
-chart `0.87.1`; normal CI now checks actual GitHub Actions syntax and expression
-contexts before release. Successful protected publication and fresh-host
-installation remain pending, not inferred from a passing local test suite.
+image pushes. The `v0.84.1` attempt passed build and publication, then failed
+before signatures when Cosign tried to create its trust cache on a read-only
+path. Its unsigned registry tags are not an accepted release. Both Git tags
+remain immutable; the corrected candidate is `v0.84.2` with chart `0.87.2`.
+Normal CI now checks actual GitHub Actions syntax and expression contexts.
+Successful signed publication and fresh-host installation remain pending, not
+inferred from a passing local test suite. The optional extra local installation
+smoke check is manual and was deferred for this publishing attempt; that does
+not remove the signature or vulnerability promotion gates.
 The existing [website repository](https://github.com/thedevopshuman/website)
 remains separate. `thedevopshuman.com` is the selected informational site/docs
 domain: The DevOps Human is the umbrella site, with IIP as one product, not a

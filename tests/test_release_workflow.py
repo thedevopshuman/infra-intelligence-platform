@@ -267,6 +267,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "--memory 256m",
             "--memory-swap 256m",
             "--pids-limit 128",
+            "TUF_ROOT=/tmp/sigstore",
             'IIP_COSIGN_ROOT/dist:/workspace/dist:rw',
             'IIP_COSIGN_CONFIG:/docker-config:ro',
             "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
@@ -277,6 +278,57 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertNotIn("--privileged", wrapper)
         self.assertNotIn("/var/run/docker.sock", wrapper)
         self.assertNotIn('IIP_COSIGN_ROOT:$IIP_COSIGN_ROOT', wrapper)
+
+    def test_cosign_wrapper_uses_private_ephemeral_tuf_cache_without_host_authority(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="iip-cosign-wrapper-") as temporary:
+            directory = Path(temporary).resolve()
+            scripts = directory / "scripts"
+            scripts.mkdir()
+            wrapper = scripts / "cosign_container.sh"
+            wrapper.write_text(COSIGN_WRAPPER.read_text(encoding="utf-8"), encoding="utf-8")
+            fake_docker = directory / "docker"
+            fake_docker.write_text('#!/bin/sh\nprintf "%s\\0" "$@"\n', encoding="utf-8")
+            fake_docker.chmod(0o700)
+            config = directory / "anonymous-docker"
+            for configured in (False, True):
+                with self.subTest(configured=configured):
+                    if configured:
+                        config.mkdir(mode=0o700)
+                    completed = subprocess.run(
+                        ["/bin/sh", str(wrapper), "initialize", "--timeout=60s"],
+                        env={
+                            "PATH": "/usr/bin:/bin",
+                            "IIP_COSIGN_DOCKER_BIN": str(fake_docker),
+                            "DOCKER_CONFIG": str(config),
+                            "TUF_ROOT": "/host-cache-must-not-be-used",
+                            "TUF_MIRROR": "https://untrusted.example.invalid",
+                            "GITHUB_TOKEN": "synthetic-token-must-not-be-forwarded",
+                            "AWS_ACCESS_KEY_ID": "synthetic-key-must-not-be-forwarded",
+                        },
+                        check=True, capture_output=True, timeout=10,
+                    )
+                    arguments = completed.stdout.decode().rstrip("\0").split("\0")
+                    self.assertEqual(arguments[:3], ["run", "--rm", "--read-only"])
+                    self.assertEqual(arguments[-2:], ["initialize", "--timeout=60s"])
+                    self.assertRegex(arguments[-3], r"^ghcr\.io/sigstore/cosign/cosign@sha256:[a-f0-9]{64}$")
+                    self.assertEqual(arguments[arguments.index("--tmpfs") + 1],
+                                     "/tmp:rw,noexec,nosuid,nodev,size=32m")
+                    variables = [arguments[index + 1] for index, value in enumerate(arguments) if value == "-e"]
+                    self.assertEqual(variables, [
+                        "TUF_ROOT=/tmp/sigstore", "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+                        "ACTIONS_ID_TOKEN_REQUEST_URL", "GITHUB_ACTIONS",
+                        *(["DOCKER_CONFIG=/docker-config"] if configured else []),
+                    ])
+                    mounts = [arguments[index + 1] for index, value in enumerate(arguments) if value == "--volume"]
+                    self.assertEqual(mounts, [
+                        f"{directory}/dist:/workspace/dist:rw",
+                        *([f"{config}:/docker-config:ro"] if configured else []),
+                    ])
+                    for forbidden in ("--privileged", "--env-file", "--insecure-ignore-tlog",
+                                      "--insecure-ignore-sct", "--check-claims=false"):
+                        self.assertNotIn(forbidden, arguments)
+                    self.assertFalse(any("HOME=" in value or "must-not" in value for value in arguments))
+                    self.assertFalse((directory / "sigstore").exists())
 
 
 if __name__ == "__main__":

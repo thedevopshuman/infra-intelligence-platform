@@ -243,7 +243,7 @@ class HttpsCloudEventsPublisher:
                     "Authorization": f"Bearer {token}",
                     "Content-Type": "application/cloudevents+json",
                     "Idempotency-Key": event.event_id,
-                    "User-Agent": "iip-event-publisher/0.84.1",
+                    "User-Agent": "iip-event-publisher/0.84.2",
                 },
                 self._ssl_context,
                 self._configuration.timeout_seconds,

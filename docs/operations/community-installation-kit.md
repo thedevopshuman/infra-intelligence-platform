@@ -36,11 +36,11 @@ npm, Helm, a registry or provider calls:
 
 ```bash
 .venv/bin/python scripts/installation_kit.py build \
-  --output /absolute/new-output/infra-intelligence-community-0.84.1.tar.gz \
-  --version 0.84.1
+  --output /absolute/new-output/infra-intelligence-community-0.84.2.tar.gz \
+  --version 0.84.2
 .venv/bin/python scripts/installation_kit.py inspect \
-  /absolute/new-output/infra-intelligence-community-0.84.1.tar.gz \
-  --version 0.84.1
+  /absolute/new-output/infra-intelligence-community-0.84.2.tar.gz \
+  --version 0.84.2
 ```
 
 Use the candidate's actual application version; do not overwrite an old release
@@ -51,10 +51,12 @@ existing output. This is a local packaging command, not a public download URL.
 
 ## Operator installation from an authenticated release
 
-Public kit and runtime-image publication is still pending. The approved
-application destination is `docker.io/thedevopshuman/iip`; an empty Docker Hub
-repository is not an installable image. Do not substitute the `learning-v0.84.0`
-archive for this profile or guess an image tag/digest.
+Authenticated public kit and runtime-image distribution is still pending. The
+approved application destination is `docker.io/thedevopshuman/iip`.
+`v0.84.1` images were uploaded but their signing failed; their existence is not
+release approval. Use only a completed release with verified signatures. Do
+not substitute the `learning-v0.84.0` archive for this profile or guess an
+image tag/digest.
 
 The release workflow publishes this kit directly with a separate
 `community-kit.sigstore.json`, so the full OCI-image archive is unnecessary
@@ -65,13 +67,13 @@ authenticate its kit before extraction using the exact accepted version:
 cosign verify-blob \
   --bundle community-kit.sigstore.json \
   --certificate-identity \
-    https://github.com/thedevopshuman/infra-intelligence-platform/.github/workflows/release.yml@refs/tags/v0.84.1 \
+    https://github.com/thedevopshuman/infra-intelligence-platform/.github/workflows/release.yml@refs/tags/v0.84.2 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  infra-intelligence-community-0.84.1.tar.gz
+  infra-intelligence-community-0.84.2.tar.gz
 ```
 
 Use the release's actual version in both the filename and signer identity;
-this example does not assert that `v0.84.1` is published. A checksum alone is
+this example does not assert that `v0.84.2` is published. A checksum alone is
 not publisher authentication. Follow the [release procedure](release-artifacts.md)
 for the matching image signature policy and immutable application reference.
 

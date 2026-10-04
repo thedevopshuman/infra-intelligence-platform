@@ -1,0 +1,593 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Single-tenant community view over the last successful rolling 24-hour ledger allocation projection. Usage, cost, and coverage update independently of savings evaluation; this runtime does not export projection-age telemetry, so backend freshness alone does not prove a new projection succeeded. Change and potential-saving panels use optional completed fixed-window evaluations and may have no data. Currency: __IIP_CURRENCY__; scale: __IIP_CURRENCY_SCALE__.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Observed invocations in the worker's rolling 24-hour allocation projection. The application dimension is selected so application and team projections are not counted twice.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "No projection data",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(iip_ai_allocation_requests{iip_ai_allocation_dimension=\"application\",job=\"iip-ai-economics\"})",
+          "instant": true,
+          "legendFormat": "observed requests",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Observed requests — rolling 24h",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Known input-token total. Use the token-meter coverage panel to see how many requests supplied this meter.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "No projection data",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(iip_ai_allocation_input_tokens{iip_ai_allocation_dimension=\"application\",job=\"iip-ai-economics\"})",
+          "instant": true,
+          "legendFormat": "known input tokens",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Known input tokens — rolling 24h",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Known output-token total. Missing usage meters remain visible through coverage rather than becoming zero.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "No projection data",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(iip_ai_allocation_output_tokens{iip_ai_allocation_dimension=\"application\",job=\"iip-ai-economics\"})",
+          "instant": true,
+          "legendFormat": "known output tokens",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Known output tokens — rolling 24h",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "__IIP_CURRENCY__ calculated estimate for the priced subset in the rolling allocation projection. This is not provider billing or invoice cost.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 6,
+          "noValue": "No priced data",
+          "unit": "currency__IIP_CURRENCY__"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "__IIP_COMMUNITY_ROLLING_COST_TOTAL__",
+          "instant": true,
+          "legendFormat": "__IIP_CURRENCY__ calculated estimate",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Calculated cost — rolling 24h",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Every observed request appears once as priced, unpriced, ambiguous, or pending. Unresolved records never become zero cost.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "No projection data",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 6
+      },
+      "id": 5,
+      "options": {
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (iip_ai_cost_status) (iip_ai_allocation_cost_requests{iip_ai_allocation_dimension=\"application\",job=\"iip-ai-economics\"})",
+          "instant": true,
+          "legendFormat": "{{iip_ai_cost_status}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Price coverage — rolling 24h",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Request counts with a known input or output meter. Compare these counts with observed requests; absence is not converted to zero tokens.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "No projection data",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 6
+      },
+      "id": 6,
+      "options": {
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (iip_ai_usage_meter) (iip_ai_allocation_metered_requests{iip_ai_allocation_dimension=\"application\",job=\"iip-ai-economics\"})",
+          "instant": true,
+          "legendFormat": "known {{iip_ai_usage_meter}} meter",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Token-meter coverage — rolling 24h",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Observed requests split by protected ownership state. Pending and unallocated usage remain visible and are not assigned to a guessed owner.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "No projection data",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 6
+      },
+      "id": 7,
+      "options": {
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (iip_ai_allocation_status) (iip_ai_allocation_requests{iip_ai_allocation_dimension=\"application\",job=\"iip-ai-economics\"})",
+          "instant": true,
+          "legendFormat": "{{iip_ai_allocation_status}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Ownership coverage — rolling 24h",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Calculated priced cost grouped by stable application IDs from protected effective-time attribution. Blank IDs retain unallocated or pending coverage rather than inventing ownership.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 6,
+          "noValue": "No priced application data",
+          "unit": "currency__IIP_CURRENCY__"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "id": 8,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "__IIP_COMMUNITY_APPLICATION_COST__",
+          "instant": true,
+          "legendFormat": "{{iip_ai_application_id}} · {{iip_ai_allocation_status}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Calculated cost by protected application",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Calculated priced cost grouped by stable team IDs from protected attribution. Telemetry cannot self-assert these ownership labels.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 6,
+          "noValue": "No priced team data",
+          "unit": "currency__IIP_CURRENCY__"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "id": 9,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "__IIP_COMMUNITY_TEAM_COST__",
+          "instant": true,
+          "legendFormat": "{{iip_ai_team_id}} · {{iip_ai_allocation_status}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Calculated cost by protected team",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Fixed-window rule results are optional snapshots, not continuously rolling totals.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 10,
+      "options": {
+        "content": "### Optional evaluated windows\n\nThe panels below appear only after a configured savings profile's fixed current window and grace period have ended. **No data means no evaluated window or finding; it does not mean zero change or zero savings.** Each series is shown by profile and is not summed into the rolling totals above.",
+        "mode": "markdown"
+      },
+      "targets": [],
+      "title": "How to read change and savings",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Signed current-versus-baseline input-token change for each completed context-growth profile. This is not a rolling usage total.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "noValue": "No evaluated window",
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "id": 11,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "iip_ai_context_growth_change{job=\"iip-ai-economics\"} / 100",
+          "instant": true,
+          "legendFormat": "{{iip_ai_profile_id}} · {{service_name}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Input-token change by evaluated fixed window",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "iip-prometheus"
+      },
+      "description": "Evidence-backed potential saving for each completed profile that produced a finding. No series is emitted when there is no finding.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 6,
+          "noValue": "No evaluated finding",
+          "unit": "currency__IIP_CURRENCY__"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "id": 12,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "__IIP_COMMUNITY_FIXED_SAVING__",
+          "instant": true,
+          "legendFormat": "{{iip_ai_profile_id}} · {{iip_ai_savings_rule_id}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Potential saving by evaluated fixed window",
+      "type": "bargauge"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["iip", "ai-finops", "community", "opentelemetry", "metadata-only"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "IIP Community AI FinOps",
+  "uid": "iip-community-ai-finops",
+  "version": 1,
+  "weekStart": ""
+}

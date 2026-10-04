@@ -1,0 +1,307 @@
+x-iip: &iip
+  image: ${IIP_COMMUNITY_IMAGE:?initialize the community installation first}
+  user: "10001:10001"
+  init: true
+  read_only: true
+  tmpfs: ["/tmp:mode=1777"]
+  cap_drop: ["ALL"]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+  networks: [community]
+
+x-database: &database
+  IIP_DATABASE_URL: ${IIP_DATABASE_URL:?initialize the community installation first}
+  IIP_DATABASE_TRANSPORT_MODE: verify-full
+  IIP_DATABASE_CA_PATH: /run/iip/ca.crt
+  IIP_DATABASE_AUTO_MIGRATE: "false"
+  IIP_READINESS_DATABASE_TIMEOUT_SECONDS: "2"
+
+x-economics: &economics
+  IIP_AI_ATTRIBUTION_POLICIES_JSON: ${IIP_AI_ATTRIBUTION_POLICIES_JSON:?review attribution configuration first}
+  IIP_AI_PRICE_CATALOGS_JSON: ${IIP_AI_PRICE_CATALOGS_JSON:?review pricing configuration first}
+  IIP_AI_PRICE_CATALOG_ALLOW_TEST_FIXTURES: "false"
+  IIP_AI_ATTRIBUTION_ALLOW_TEST_FIXTURES: "false"
+  IIP_AI_ALLOCATION_REPORTING_ENABLED: "true"
+  IIP_AI_ALLOCATION_SOURCE_RECORD_LIMIT: "10000"
+  IIP_AI_ALLOCATION_WINDOW_SECONDS: "86400"
+
+services:
+  initialize:
+    image: ${IIP_COMMUNITY_IMAGE:?initialize the community installation first}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    user: "0:0"
+    command: ["python", "/configuration/initialize.py"]
+    network_mode: none
+    read_only: true
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN", "DAC_OVERRIDE", "FOWNER"]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      IIP_COMMUNITY_POSTGRES_PASSWORD: ${IIP_COMMUNITY_POSTGRES_PASSWORD:?initialize credentials first}
+      IIP_COMMUNITY_GRAFANA_PASSWORD: ${IIP_COMMUNITY_GRAFANA_PASSWORD:?initialize credentials first}
+    volumes:
+      - type: bind
+        source: ${IIP_COMMUNITY_STATE:?initialize the community installation first}/transport
+        target: /transport
+        read_only: true
+      - ./community:/configuration:ro
+      - type: bind
+        source: ${IIP_COMMUNITY_DASHBOARD:?initialize the community dashboard first}
+        target: /dashboard.json
+        read_only: true
+      - type: bind
+        source: ${IIP_COMMUNITY_COLLECTOR_CONFIG:?initialize protected Collector configuration first}
+        target: /collector.yaml
+        read_only: true
+      - database-secrets:/volumes/database
+      - database-trust:/volumes/trust
+      - receiver-secrets:/volumes/receiver
+      - collector-secrets:/volumes/collector
+      - postgres-data:/volumes/database-data
+      - collector-queue:/volumes/queue
+      - prometheus-data:/volumes/prometheus-data
+      - prometheus-config:/volumes/prometheus
+      - grafana-data:/volumes/grafana-data
+      - grafana-config:/volumes/grafana
+
+  postgres:
+    image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    user: "70:70"
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/run/iip/postgres.crt
+      - -c
+      - ssl_key_file=/run/iip/postgres.key
+      - -c
+      - hba_file=/run/iip/pg_hba.conf
+      - -c
+      - password_encryption=scram-sha-256
+    environment:
+      POSTGRES_DB: iip
+      POSTGRES_USER: iip
+      POSTGRES_PASSWORD_FILE: /run/iip/password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=trust
+    depends_on:
+      initialize:
+        condition: service_completed_successfully
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - database-secrets:/run/iip:ro
+    healthcheck:
+      test: ["CMD-SHELL", "PGSSLMODE=verify-full PGSSLROOTCERT=/run/iip/ca.crt pg_isready -h localhost -U iip -d iip"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    read_only: true
+    tmpfs: ["/tmp:mode=1777", "/var/run/postgresql:uid=70,gid=70,mode=0700"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    networks: [community]
+
+  migrate:
+    <<: *iip
+    command: ["python", "-m", "iip.adapters.postgres"]
+    environment: *database
+    volumes: ["database-trust:/run/iip:ro"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *iip
+    networks: [community, host-access]
+    environment:
+      <<: [*database, *economics]
+      IIP_AUTH_IDENTITIES_JSON: ${IIP_AUTH_IDENTITIES_JSON:?initialize credentials first}
+      IIP_OTLP_RECEIVER_MODE: disabled
+    volumes: ["database-trust:/run/iip:ro"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports: ["127.0.0.1:18083:8080"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 30
+
+  ai-usage-receiver:
+    <<: *iip
+    command: ["python", "-m", "iip.surfaces.otlp_receiver"]
+    environment:
+      <<: *database
+      IIP_OTLP_HTTP_PORT: "4318"
+      IIP_OTLP_TLS_MODE: mutual-spiffe
+      IIP_OTLP_TLS_CERTIFICATE_PATH: /run/iip/receiver.crt
+      IIP_OTLP_TLS_PRIVATE_KEY_PATH: /run/iip/receiver.key
+      IIP_OTLP_TLS_CLIENT_CA_PATH: /run/iip/ca.crt
+      IIP_OTLP_MTLS_IDENTITIES_JSON: ${IIP_OTLP_MTLS_IDENTITIES_JSON:?initialize transport first}
+      IIP_OTLP_MAX_REQUESTS_PER_SECOND: "50"
+      IIP_OTLP_REQUEST_BURST: "100"
+      IIP_OTLP_RECEIVER_ENABLED: "false"
+      IIP_OTLP_LOGS_RECEIVER_ENABLED: "false"
+      IIP_AI_USAGE_RECEIVER_ENABLED: "true"
+      IIP_AI_USAGE_RECEIVER_CHANNELS_JSON: ${IIP_AI_USAGE_RECEIVER_CHANNELS_JSON:?review receiver configuration first}
+      IIP_OTEL_METRICS_ENABLED: "false"
+    volumes: ["receiver-secrets:/run/iip:ro"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import ssl,urllib.request; c=ssl.create_default_context(cafile='/run/iip/ca.crt'); c.load_cert_chain('/run/iip/receiver-health.crt','/run/iip/receiver-health.key'); urllib.request.urlopen('https://localhost:4318/readyz',context=c,timeout=3)"
+      interval: 5s
+      timeout: 4s
+      retries: 30
+
+  workflow-worker:
+    <<: *iip
+    command: ["python", "-m", "iip.surfaces.worker"]
+    environment:
+      <<: [*database, *economics]
+      IIP_WORKER_ID: community-worker
+      IIP_WORKER_HEALTH_PORT: "8081"
+      IIP_WORKER_TENANTS: ${IIP_COMMUNITY_TENANT_ID:?review tenant scope first}
+      IIP_AI_ATTRIBUTION_ENABLED: "true"
+      IIP_AI_ATTRIBUTION_BATCH_SIZE: "100"
+      IIP_AI_ATTRIBUTION_INTERVAL_SECONDS: "5"
+      IIP_AI_COST_ENGINE_ENABLED: "true"
+      IIP_AI_PRICE_CATALOG_QUALIFICATIONS_JSON: ${IIP_AI_PRICE_CATALOG_QUALIFICATIONS_JSON:?qualify the selected catalog first}
+      IIP_AI_PRICE_CATALOG_REQUIRE_QUALIFICATION: "true"
+      IIP_AI_COST_BATCH_SIZE: "100"
+      IIP_AI_COST_INTERVAL_SECONDS: "5"
+      IIP_AI_SAVINGS_ENGINE_ENABLED: ${IIP_AI_SAVINGS_ENGINE_ENABLED:?review savings configuration first}
+      IIP_AI_SAVINGS_PROFILES_JSON: ${IIP_AI_SAVINGS_PROFILES_JSON:?review savings configuration first}
+      IIP_AI_SAVINGS_ALLOW_TEST_FIXTURES: "false"
+      IIP_AI_SAVINGS_INTERVAL_SECONDS: "30"
+      IIP_AI_ALLOCATION_INTERVAL_SECONDS: "10"
+      IIP_EVENT_PUBLISHER_MODE: disabled
+      IIP_OTEL_METRICS_ENABLED: "true"
+      IIP_OTEL_TRACES_ENABLED: "false"
+      IIP_OTEL_INGESTION_ATTRIBUTE_MODE: none
+      IIP_OTEL_AI_ECONOMICS_ATTRIBUTE_MODE: scope
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4319
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRIC_EXPORT_INTERVAL: "10000"
+      OTEL_METRIC_EXPORT_TIMEOUT: "1000"
+      OTEL_SERVICE_NAME: infra-intelligence-community-worker
+    volumes: ["database-trust:/run/iip:ro"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/readyz', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 30
+      start_period: 10s
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib@sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5
+    user: "10001:10001"
+    command: ["--config=/run/iip/collector.yaml"]
+    environment:
+      IIP_COMMUNITY_COLLECTOR_TOKEN: ${IIP_COMMUNITY_COLLECTOR_TOKEN:?initialize credentials first}
+      IIP_COMMUNITY_RECEIVER_TOKEN: ${IIP_COMMUNITY_RECEIVER_TOKEN:?initialize credentials first}
+    volumes: ["collector-secrets:/run/iip:ro", "collector-queue:/queue"]
+    depends_on:
+      ai-usage-receiver:
+        condition: service_healthy
+    ports: ["127.0.0.1:14322:4318"]
+    read_only: true
+    tmpfs: ["/tmp:mode=1777"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    networks: [community, host-access]
+
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    user: "65534:65534"
+    command:
+      - --config.file=/run/iip/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --storage.tsdb.retention.size=2GB
+    volumes: ["prometheus-config:/run/iip:ro", "prometheus-data:/prometheus"]
+    depends_on:
+      initialize:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+    ports: ["127.0.0.1:19092:9090"]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9090/-/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    read_only: true
+    tmpfs: ["/tmp:mode=1777"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    networks: [community, host-access]
+
+  grafana:
+    image: grafana/grafana@sha256:e932bd6ed0e026595b08483cd0141e5103e1ab7ff8604839ff899b8dc54cabcb
+    user: "472:472"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/iip/admin-password
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_PATHS_PROVISIONING: /run/iip
+    volumes: ["grafana-config:/run/iip:ro", "grafana-config:/etc/iip-dashboard:ro", "grafana-data:/var/lib/grafana"]
+    depends_on:
+      initialize:
+        condition: service_completed_successfully
+      prometheus:
+        condition: service_healthy
+    ports: ["127.0.0.1:13001:3000"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    read_only: true
+    tmpfs: ["/tmp:uid=472,gid=472,mode=1777"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    networks: [community, host-access]
+
+networks:
+  community:
+    internal: true
+  # Docker Engine 29 does not publish ports on an internal-only network.
+  # Only the explicitly loopback-published surfaces join this bridge.
+  host-access: {}
+
+volumes:
+  postgres-data:
+  database-secrets:
+  database-trust:
+  receiver-secrets:
+  collector-secrets:
+  collector-queue:
+  prometheus-config:
+  prometheus-data:
+  grafana-config:
+  grafana-data:

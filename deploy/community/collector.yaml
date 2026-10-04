@@ -1,0 +1,141 @@
+# Customer applications use only HTTPS 4318 with an install-specific credential.
+# Private worker metrics use 4319 on the isolated Compose network.
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  bearertokenauth/input:
+    token: ${env:IIP_COMMUNITY_COLLECTOR_TOKEN}
+  file_storage:
+    directory: /queue
+    timeout: 1s
+    create_directory: false
+
+receivers:
+  otlp/customer:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: bearertokenauth/input
+        tls:
+          cert_file: /run/iip/collector-input.crt
+          key_file: /run/iip/collector-input.key
+          min_version: "1.2"
+        max_request_body_size: 4194304
+  otlp/internal:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4319
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 128
+    spike_limit_mib: 32
+  filter/metadata_only:
+    error_mode: propagate
+    traces:
+      span:
+        - 'instrumentation_scope.name != "opentelemetry.instrumentation.botocore.bedrock-runtime"'
+        - 'kind != SPAN_KIND_CLIENT'
+        - 'Len(events) > 0 or Len(links) > 0'
+        - 'dropped_attributes_count > 0 or dropped_events_count > 0 or dropped_links_count > 0 or resource.dropped_attributes_count > 0 or instrumentation_scope.dropped_attributes_count > 0'
+        - 'IsMatch(Keys(attributes), "(?i)prompt|completion|message|instruction|document|embedding|tool|body|authorization|password|passwd|secret|api.?key|access.?key|private.?key")'
+        - 'IsMatch(Keys(resource.attributes), "(?i)prompt|completion|message|instruction|document|embedding|tool|body|authorization|password|passwd|secret|api.?key|access.?key|private.?key")'
+        - 'IsMatch(Keys(instrumentation_scope.attributes), "(?i)prompt|completion|message|instruction|document|embedding|tool|body|authorization|password|passwd|secret|api.?key|access.?key|private.?key")'
+        # Permitted names cannot smuggle nested content into the persistent queue.
+        - 'attributes["gen_ai.provider.name"] != nil and not IsString(attributes["gen_ai.provider.name"])'
+        - 'attributes["gen_ai.system"] != nil and not IsString(attributes["gen_ai.system"])'
+        - 'attributes["gen_ai.operation.name"] != nil and not IsString(attributes["gen_ai.operation.name"])'
+        - 'attributes["gen_ai.request.model"] != nil and not IsString(attributes["gen_ai.request.model"])'
+        - 'attributes["gen_ai.response.model"] != nil and not IsString(attributes["gen_ai.response.model"])'
+        - 'attributes["cloud.region"] != nil and not IsString(attributes["cloud.region"])'
+        - 'attributes["aws.request_id"] != nil and not IsString(attributes["aws.request_id"])'
+        - 'attributes["error.type"] != nil and not IsString(attributes["error.type"])'
+        - 'attributes["gen_ai.usage.input_tokens"] != nil and not IsInt(attributes["gen_ai.usage.input_tokens"])'
+        - 'attributes["gen_ai.usage.output_tokens"] != nil and not IsInt(attributes["gen_ai.usage.output_tokens"])'
+        - 'attributes["gen_ai.usage.cache_read.input_tokens"] != nil and not IsInt(attributes["gen_ai.usage.cache_read.input_tokens"])'
+        - 'attributes["gen_ai.usage.cache_creation.input_tokens"] != nil and not IsInt(attributes["gen_ai.usage.cache_creation.input_tokens"])'
+        - 'attributes["gen_ai.usage.reasoning.output_tokens"] != nil and not IsInt(attributes["gen_ai.usage.reasoning.output_tokens"])'
+        - 'attributes["aws.retry_count"] != nil and not IsInt(attributes["aws.retry_count"])'
+        - 'resource.attributes["service.name"] != nil and not IsString(resource.attributes["service.name"])'
+        - 'resource.attributes["service.namespace"] != nil and not IsString(resource.attributes["service.namespace"])'
+        - 'resource.attributes["deployment.environment.name"] != nil and not IsString(resource.attributes["deployment.environment.name"])'
+        - 'resource.attributes["cloud.region"] != nil and not IsString(resource.attributes["cloud.region"])'
+        - 'instrumentation_scope.attributes["cloud.region"] != nil and not IsString(instrumentation_scope.attributes["cloud.region"])'
+        # Installer replaces this fail-closed rule with exact protected values.
+        - 'true' # INSTALLER_ADMISSION_FILTERS
+  transform/metadata_only:
+    error_mode: propagate
+    trace_statements:
+      - context: span
+        statements:
+          - 'keep_keys(attributes, ["gen_ai.provider.name", "gen_ai.system", "gen_ai.operation.name", "gen_ai.request.model", "gen_ai.response.model", "gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens", "gen_ai.usage.cache_read.input_tokens", "gen_ai.usage.cache_creation.input_tokens", "gen_ai.usage.reasoning.output_tokens", "cloud.region", "aws.request_id", "aws.retry_count"])'
+          - 'set(attributes["aws.request_id"], SHA256(attributes["aws.request_id"])) where attributes["aws.request_id"] != nil'
+          - 'keep_keys(resource.attributes, ["service.name", "service.namespace", "deployment.environment.name", "cloud.region"])'
+          - 'set(attributes["cloud.region"], instrumentation_scope.attributes["cloud.region"]) where instrumentation_scope.attributes["cloud.region"] != nil'
+          - 'keep_keys(instrumentation_scope.attributes, ["cloud.region"])'
+          - 'set(name, "")'
+          - 'set(status.message, "")'
+          - 'set(instrumentation_scope.version, "")'
+          - 'set(resource.schema_url, "")'
+          - 'set(instrumentation_scope.schema_url, "")'
+          - 'set(trace_state, "")'
+  # Separate pass: every span must receive its scope region before that shared
+  # scope is cleared, including multiple spans inside a single ScopeSpans.
+  transform/scope_cleanup:
+    error_mode: propagate
+    trace_statements:
+      - context: scope
+        statements:
+          - 'delete_matching_keys(attributes, ".*")'
+  # Pinned groupbyattrs rebuilds Resource from its already-sanitized attributes.
+  # OTTL cannot address Resource.entity_refs in this Collector version, so a
+  # plain attribute scrub alone would leave those arbitrary strings on disk.
+  # Scope attributes are empty first; compaction cannot merge distinct regions.
+  groupbyattrs/metadata_resource:
+    keys: []
+  batch:
+    send_batch_size: 256
+    timeout: 1s
+
+exporters:
+  otlp_http/iip:
+    endpoint: https://ai-usage-receiver:4318
+    headers:
+      Authorization: Bearer ${env:IIP_COMMUNITY_RECEIVER_TOKEN}
+    tls:
+      ca_file: /run/iip/ca.crt
+      cert_file: /run/iip/collector.crt
+      key_file: /run/iip/collector.key
+      min_version: "1.2"
+    timeout: 5s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      num_consumers: 2
+      queue_size: 1024
+      storage: file_storage
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    enable_open_metrics: true
+    translation_strategy: UnderscoreEscapingWithoutSuffixes
+
+service:
+  extensions: [health_check, bearertokenauth/input, file_storage]
+  telemetry:
+    logs:
+      level: error
+  pipelines:
+    traces/bedrock:
+      receivers: [otlp/customer]
+      processors: [memory_limiter, filter/metadata_only, transform/metadata_only, transform/scope_cleanup, groupbyattrs/metadata_resource, batch]
+      exporters: [otlp_http/iip]
+    metrics:
+      receivers: [otlp/internal]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]

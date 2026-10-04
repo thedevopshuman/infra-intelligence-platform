@@ -185,6 +185,15 @@ identity, tenant data, or provider detail.
 
 ## Placement decisions
 
+The community installation helpers under `scripts/community_*.py` are
+operational composition tooling. They validate existing public configuration
+through the owning application/adapter boundaries, generate protected local
+transport/configuration files, and invoke Docker Compose. They do not add
+domain/application dependencies, import provider SDKs, grant inference access,
+or become a new customer SDK. Generated Collector and Grafana configuration
+remain replaceable deployment assets under `deploy/community` and
+`deploy/grafana`; no authoritative ledger moves into those backends.
+
 - A provider-specific API call belongs in `adapters/<provider>` or a plugin.
 - A capability selected by an agent is a tool contract; the implementation delegates to a provider port.
 - A use-case sequence belongs in `application`, not an HTTP handler or queue consumer.

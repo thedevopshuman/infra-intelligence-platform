@@ -235,6 +235,15 @@ The receiver availability signal value is also `traces` for the isolated
 metadata-only GenAI intake route; it retains the same closed attributes and
 excludes provider content and customer identity.
 
+[ADR 0156](../decisions/0156-persistent-single-host-community-onboarding.md)
+composes those existing boundaries into a separate empty, persistent
+single-host preview. It requires operator-owned pricing/attribution, projects
+generated least-scope credentials and verified local transport, filters exact
+metadata before Collector disk buffering, and uses the existing rolling
+allocation projection for its primary dashboard. The installer has no provider,
+production-promotion, or server application authority; local lifecycle limits
+remain explicit in the [runbook](../operations/community-installation.md).
+
 [ADR 0134](../decisions/0134-customer-otlp-receiver-interoperability-qualification.md)
 adds a host-side customer gate that uses a digest-pinned official Collector and
 its exporter self-metrics to prove metrics, logs, and metadata-only GenAI spans

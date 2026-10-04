@@ -44,6 +44,16 @@ external runs.
 
 ## Remaining release work
 
+The [persistent community preview](../operations/community-installation.md)
+implements an initial source-checkout installation path: empty startup,
+generated protected credentials, verified database/telemetry transport,
+operator-reviewed catalogs/attribution, durable state and Collector buffering,
+safe configuration generations, and a savings-independent rolling dashboard.
+It does not close the public-install gate: published artifacts and a fresh-host
+walkthrough, supported upgrade/backup and certificate lifecycle, database/outbox
+retention, and real provider evidence remain outstanding. Its operational
+limitations must not be presented as a fully supported public-v1 deployment.
+
 | Workstream | Required result | Evidence to close it |
 | --- | --- | --- |
 | Installation and first value | Versioned public images/chart, complete prerequisites, a guided route from empty installation to real resources and AI cost views, useful empty/error states | A fresh-machine install using published artifacts and public instructions, followed by an end-to-end user walkthrough |

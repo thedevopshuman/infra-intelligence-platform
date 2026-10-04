@@ -3,6 +3,8 @@
 .PHONY: test-postgres-tls
 
 PYTHON ?= python3
+
+.PHONY: community-check community-up community-status community-down test-community
 HELM ?= helm
 KUBECTL ?= kubectl
 DOCKER ?= docker
@@ -358,6 +360,11 @@ help:
 	@echo "ai-finops-up  Start and seed the disposable multi-provider AI economics slice"
 	@echo "ai-finops-status Show the local AI FinOps containers"
 	@echo "ai-finops-down Stop and remove the disposable AI FinOps slice"
+	@echo "community-check Validate protected non-fixture single-host configuration"
+	@echo "community-up  Build/start the persistent community preview without demo data"
+	@echo "community-status Show the community preview containers"
+	@echo "community-down Stop the community preview while preserving data and credentials"
+	@echo "test-community Test encrypted intake and persistent community lifecycle in Docker"
 	@echo "package-chart Package the Helm chart under dist/"
 	@echo "release-bundle Build an unsigned multi-platform release bundle with SBOM/provenance"
 	@echo "verify-release-bundle Verify IIP_RELEASE_BUNDLE checksums and OCI attestations"
@@ -1982,6 +1989,21 @@ ai-finops-status:
 
 ai-finops-down:
 	$(PYTHON) scripts/ai_finops_stack.py down
+
+community-check:
+	$(PYTHON) scripts/community_stack.py check
+
+community-up:
+	$(PYTHON) scripts/community_stack.py up --build
+
+community-status:
+	$(PYTHON) scripts/community_stack.py status
+
+community-down:
+	$(PYTHON) scripts/community_stack.py down
+
+test-community:
+	IIP_TEST_COMMUNITY_RUNTIME=true PYTHONPATH=src:sdks/python/src $(PYTHON) -m unittest discover -s tests -p test_community_runtime.py -v
 
 package-chart:
 	mkdir -p dist

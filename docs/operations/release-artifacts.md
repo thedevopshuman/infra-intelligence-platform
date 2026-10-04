@@ -337,11 +337,34 @@ client-side preflight can eliminate a remote race.
 into a release without rebuilding during registry publication. It requires the
 tag commit to equal both the clean checkout and fetched `main` tip, runs
 `make verify`, builds the attested bundle, publishes both exact OCI indexes to
-separate GHCR repositories, signs their immutable references with GitHub OIDC,
+`docker.io/thedevopshuman/iip` and `docker.io/thedevopshuman/iip-bridge`,
+signs their immutable references with GitHub OIDC,
 generates the matching exact-identity policy, and then runs the signature and
 fresh-database vulnerability gates. Only after those gates pass does it sign
 the complete customer archive and create the GitHub release with the manifest,
-checksums, Helm chart, and minimized qualification reports.
+checksums, Helm chart, and minimized qualification reports. The small
+`infra-intelligence-community-<version>.tar.gz` kit is also a direct release
+asset, independently signed with `community-kit.sigstore.json`. It is the same
+kit already contained in the verified bundle, not a second build.
+
+The job is restricted to `thedevopshuman/infra-intelligence-platform`. In that
+repository, open **Settings → Environments → release → Environment secrets**
+and configure:
+
+| Secret | Value |
+| --- | --- |
+| `DOCKERHUB_USERNAME` | `thedevopshuman` |
+| `DOCKERHUB_TOKEN` | An expiring Docker Hub Read & Write personal access token, without Delete permission |
+
+Create the token through Docker Account settings → Personal access tokens;
+use a 30-day initial expiry and rotate before expiry. A personal token follows
+the account's permissions; it is not restricted to just these two repositories.
+Enter it directly in GitHub, never in chat, source, a local `.env`, logs or
+release assets. See [Docker's PAT instructions](https://docs.docker.com/security/access-tokens/personal-access-tokens/).
+The workflow rejects a missing token or wrong username before the build,
+authenticates over stdin, isolates Docker configuration in the runner's private
+temporary directory and always attempts logout. It does not need GitHub
+Packages write permission or a paid Docker plan.
 
 Before pushing the first release tag, repository owners must:
 
@@ -349,8 +372,8 @@ Before pushing the first release tag, repository owners must:
    protected tags;
 2. require an exact-version tag ruleset and ensure releases originate at the
    current protected `main` tip;
-3. configure both GHCR packages as immutable for released version tags and set
-   the intended package visibility;
+3. configure both approved Docker Hub repositories as public with immutable
+   released version tags and verify the publishing token's scope and expiry;
 4. review the checked vulnerability policy, the generated GitHub workflow
    identity, retention, and release-asset visibility; and
 5. require the ordinary CI and applicable customer qualification evidence
@@ -360,6 +383,13 @@ The release job intentionally has no manual-dispatch path. A retry is
 idempotent when both version tags still name the verified digests and fails if
 it observes a conflicting tag. The workflow does not turn local Kind, fixture,
 or offline-provider evidence into customer-environment qualification.
+
+The `release` environment was created with `thedevopshuman` as its required
+reviewer, administrator bypass disabled and a `v*` tag deployment policy. The
+single maintainer may approve their own triggered run; this is explicit human
+approval, not independent two-person review. Review these live settings before
+each release. Environment tag filtering does not itself protect Git tags from
+updates or deletions. No token is required for ordinary anonymous public pulls.
 
 Verify the downloaded archive before extracting it. Substitute the accepted
 repository and version in the certificate identity:

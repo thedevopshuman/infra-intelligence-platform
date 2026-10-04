@@ -14,12 +14,14 @@ concurrency:
 
 jobs:
   release:
+    if: github.repository == 'thedevopshuman/infra-intelligence-platform'
     environment: release
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    env:
+      DOCKER_CONFIG: ${{ runner.temp }}/iip-release-docker
     permissions:
       contents: write
-      packages: write
       id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -54,28 +56,34 @@ jobs:
       - name: Derive exact release destinations
         id: release
         env:
-          RELEASE_REPOSITORY: ${{ github.repository }}
           RELEASE_REVISION: ${{ github.sha }}
         run: |
           version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
           chart_version=$(awk '$1 == "version:" {print $2; exit}' deploy/helm/infra-intelligence/Chart.yaml)
-          repository=$(printf '%s' "$RELEASE_REPOSITORY" | tr '[:upper:]' '[:lower:]')
           short_revision=$(printf '%s' "$RELEASE_REVISION" | cut -c1-12)
           printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
           printf 'chart_version=%s\n' "$chart_version" >> "$GITHUB_OUTPUT"
           printf 'bundle=dist/iip-%s-%s\n' "$version" "$short_revision" >> "$GITHUB_OUTPUT"
-          printf 'control_repository=ghcr.io/%s\n' "$repository" >> "$GITHUB_OUTPUT"
-          printf 'bridge_repository=ghcr.io/%s-plugin-mediation-bridge\n' "$repository" >> "$GITHUB_OUTPUT"
+          printf 'control_repository=docker.io/thedevopshuman/iip\n' >> "$GITHUB_OUTPUT"
+          printf 'bridge_repository=docker.io/thedevopshuman/iip-bridge\n' >> "$GITHUB_OUTPUT"
+      - name: Authenticate the publication boundary
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -eu
+          if [ "$DOCKERHUB_USERNAME" != "thedevopshuman" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo '::error::Configure the approved Docker Hub username and publishing token in the release environment.'
+            exit 1
+          fi
+          umask 077
+          mkdir -p "$DOCKER_CONFIG"
+          printf '%s' "$DOCKERHUB_TOKEN" | docker login docker.io \
+            --username "$DOCKERHUB_USERNAME" --password-stdin
       - name: Verify and build the clean candidate
         run: |
           make verify
           make release-bundle
-      - name: Authenticate the publication boundary
-        env:
-          GHCR_PASSWORD: ${{ github.token }}
-        run: |
-          printf '%s' "$GHCR_PASSWORD" | docker login ghcr.io \
-            --username "$GITHUB_ACTOR" --password-stdin
       - name: Publish exact verified OCI indexes
         env:
           RELEASE_BUNDLE: ${{ steps.release.outputs.bundle }}
@@ -125,11 +133,16 @@ jobs:
           sha256sum "$archive" > "$archive.sha256"
           scripts/cosign_container.sh sign-blob --yes \
             --bundle "$archive.sigstore.json" "$archive"
+          kit="$RELEASE_BUNDLE/infra-intelligence-community-$RELEASE_VERSION.tar.gz"
+          scripts/cosign_container.sh sign-blob --yes \
+            --bundle dist/community-kit.sigstore.json "$kit"
           printf 'archive=%s\n' "$archive" >> "$GITHUB_OUTPUT"
+          printf 'kit=%s\n' "$kit" >> "$GITHUB_OUTPUT"
       - name: Publish verified GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_ARCHIVE: ${{ steps.assets.outputs.archive }}
+          RELEASE_KIT: ${{ steps.assets.outputs.kit }}
           RELEASE_BUNDLE: ${{ steps.release.outputs.bundle }}
           RELEASE_CHART_VERSION: ${{ steps.release.outputs.chart_version }}
           RELEASE_TAG: ${{ github.ref_name }}
@@ -142,6 +155,8 @@ jobs:
             "$RELEASE_ARCHIVE#Verified release bundle" \
             "$RELEASE_ARCHIVE.sha256#Release bundle checksum" \
             "$RELEASE_ARCHIVE.sigstore.json#Release bundle Sigstore evidence" \
+            "$RELEASE_KIT#Persistent Compose installation kit" \
+            "dist/community-kit.sigstore.json#Compose kit Sigstore evidence" \
             "$RELEASE_BUNDLE/release-manifest.json#Release manifest" \
             "$RELEASE_BUNDLE/SHA256SUMS#Bundle checksums" \
             "$RELEASE_BUNDLE/infra-intelligence-$RELEASE_CHART_VERSION.tgz#Helm chart" \
@@ -151,3 +166,6 @@ jobs:
             "dist/release-vulnerability-qualification-report.json#Vulnerability evidence" \
             --verify-tag --title "IIP $RELEASE_TAG" \
             --notes-file dist/release-notes.md
+      - name: Clear publication credentials
+        if: always()
+        run: docker logout docker.io

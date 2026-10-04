@@ -213,8 +213,12 @@ artifacts before promotion. A passed source test suite alone is insufficient.
   repositories, and `thedevopshuman.com` for the umbrella site/product details
   and documentation. Platform source and the learning prerelease are public;
   the separate website repository has its own publication lifecycle.
-  Image/package namespace ownership and
-  release-signing identities still need to be finalized.
+  Docker Hub image namespaces are now selected and created:
+  `thedevopshuman/iip` and `thedevopshuman/iip-bridge`. The workflow targets
+  those canonical repositories with its exact GitHub OIDC signing identity
+  and a separately signed Compose-kit asset (ADR 0164). Publishing credentials,
+  immutable-tag/main protections, live signing and anonymous install evidence
+  still need completion; namespace creation is not image publication.
 - **Selected:** Apache-2.0 for original project material, with contribution
   rules and retained third-party obligations. Dependency compliance and
   production maintenance commitments remain release work.

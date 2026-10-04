@@ -203,6 +203,49 @@ class ReleasePublicationTests(unittest.TestCase):
             )
         self.assertFalse(output.exists())
 
+    def test_canonical_docker_hub_destinations_keep_exact_digests_and_github_signer(self) -> None:
+        selected = {
+            publication.ROLES[0]: "docker.io/thedevopshuman/iip",
+            publication.ROLES[1]: "docker.io/thedevopshuman/iip-bridge",
+        }
+        publisher = RecordingPublisher()
+        report = publication.publish_candidate(
+            bundle=self.bundle, repositories=selected, tag=f"v{VERSION}",
+            output=self.root / "docker-hub-publication.json", publisher=publisher,
+        )
+        publication.validate_report(report)
+        self.assertEqual(report["spec"]["channel"]["registryHost"], "docker.io")
+        self.assertEqual(report["spec"]["status"], "published-unsigned")
+        manifest = json.loads((self.bundle / "release-manifest.json").read_text(encoding="utf-8"))
+        expected_digests = (
+            manifest["spec"]["image"]["indexDigest"],
+            manifest["spec"]["pluginMediationBridgeImage"]["indexDigest"],
+        )
+        self.assertEqual(len(publisher.calls), 2)
+        for role, digest, target, call in zip(
+            publication.ROLES, expected_digests, report["spec"]["targets"], publisher.calls,
+        ):
+            self.assertEqual(target["repository"], selected[role])
+            self.assertEqual(target["immutableReference"], f"{selected[role]}@{digest}")
+            self.assertEqual(target["tagReference"], f"{selected[role]}:v{VERSION}")
+            self.assertEqual(call["repository"], selected[role])
+            self.assertEqual(call["digest"], digest)
+        policy = publication.github_signature_policy(
+            report, github_repository="thedevopshuman/infra-intelligence-platform",
+            generation=17, effective_at="2026-09-07T08:00:00Z",
+        )
+        signatures.validate_policy_document(policy, promotion=True)
+        self.assertEqual(
+            [artifact["repository"] for artifact in policy["spec"]["artifacts"]],
+            list(selected.values()),
+        )
+        for artifact in policy["spec"]["artifacts"]:
+            identity = artifact["trust"]["identities"][0]
+            self.assertEqual(identity["certificateIdentity"],
+                "https://github.com/thedevopshuman/infra-intelligence-platform/"
+                f".github/workflows/release.yml@refs/tags/v{VERSION}")
+            self.assertEqual(identity["certificateOidcIssuer"], "https://token.actions.githubusercontent.com")
+
     def test_report_relationships_and_content_identity_fail_closed(self) -> None:
         report, _ = self.publish()
         mutations = (

@@ -51,12 +51,29 @@ existing output. This is a local packaging command, not a public download URL.
 
 ## Operator installation from an authenticated release
 
-Public kit and runtime-image publication is still pending. Do not substitute
-the `learning-v0.84.0` archive for this profile or infer a registry image name.
-When the candidate is published, use its authenticated artifact/signature
-instructions and verify exact checksums before extracting into a fresh
-directory. A checksum downloaded from the same untrusted source is not proof
-of the publisher. Follow the [release procedure](release-artifacts.md).
+Public kit and runtime-image publication is still pending. The approved
+application destination is `docker.io/thedevopshuman/iip`; an empty Docker Hub
+repository is not an installable image. Do not substitute the `learning-v0.84.0`
+archive for this profile or guess an image tag/digest.
+
+The release workflow publishes this kit directly with a separate
+`community-kit.sigstore.json`, so the full OCI-image archive is unnecessary
+when downloading only the Compose installer. Once a release is published,
+authenticate its kit before extraction using the exact accepted version:
+
+```bash
+cosign verify-blob \
+  --bundle community-kit.sigstore.json \
+  --certificate-identity \
+    https://github.com/thedevopshuman/infra-intelligence-platform/.github/workflows/release.yml@refs/tags/v0.84.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  infra-intelligence-community-0.84.0.tar.gz
+```
+
+Use the release's actual version in both the filename and signer identity;
+this example does not assert that `v0.84.0` is published. A checksum alone is
+not publisher authentication. Follow the [release procedure](release-artifacts.md)
+for the matching image signature policy and immutable application reference.
 
 Prerequisites remain Python 3.11 or newer and one trusted local Docker Engine
 or Docker Desktop daemon with Compose v2 and a Unix socket. Windows-native and

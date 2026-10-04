@@ -21,6 +21,7 @@ available; this onboarding unit focuses on inbound Bedrock telemetry.
 | Ownership | One reviewed attribution policy; unmatched observations remain unallocated |
 | Savings | Optional reviewed fixed-window profiles; no fabricated opportunity or monetary saving |
 | Persistence | Named PostgreSQL, Collector queue, Prometheus, and Grafana volumes survive `down` |
+| Recovery | Explicit encrypted offline whole-installation copy to fresh stopped state; exact deployment/images and source fencing required; not an upgrade or recovery objective |
 | Interfaces | API/console, authenticated Grafana, and Prometheus on loopback; HTTPS/Bearer Collector intake on loopback; database and mTLS receiver have no host ports |
 
 The source host needs Python with the repository dependencies, Docker, and
@@ -92,6 +93,12 @@ and seven non-root long-running services. Serving processes never migrate the
 schema. It waits for component health and verifies that the TLS Collector
 rejects an unauthenticated empty export. This is **not** proof that a real
 invocation has arrived or been priced.
+
+Successful startup now records actual container image IDs and their
+OS/architecture in protected `runtime-images.json`, bound to the operational
+deployment files. Preserve that record for offline backup; version strings or
+mutable tags cannot reconstruct it. Recovered startup instead requires those
+exact images locally and refuses build/pull fallback.
 
 For an existing selected image, pass `--image` to `init`, then run
 `scripts/community_stack.py up` without `--build`. Prefer a verified digest
@@ -177,6 +184,15 @@ Never use `docker compose down --volumes` for a real installation. No destructiv
 purge command is provided. Protect backups and the configuration/credentials
 together. Named volumes are persistence, not a backup or disaster-recovery plan.
 
+The [offline encrypted recovery runbook](community-recovery.md) covers the
+four data volumes together with protected configuration, credentials, and
+transport material. It requires a clean shutdown and all containers removed,
+a separately protected key, and a fresh destination that remains stopped.
+It never stops a source, fences another host automatically, uploads data, or
+restores over an existing installation. Do not use `make community-up` on
+recovered state: its implicit `--build` is intentionally rejected; follow the
+runbook's explicit validated no-build startup.
+
 ## Known release work
 
 This preview is deliberately not a replacement for the current production
@@ -200,9 +216,11 @@ outbox also grows until an explicit downstream-delivery/retention policy is
 configured. Monitor disk; this is not an unattended long-term deployment.
 
 The configuration source/owner remains responsible for valid pricing and
-attribution; static qualification is not organizational approval. Public
-repository/license/signing, supported-version promises, live Bedrock evidence,
-backup/restore and upgrade proof remain in the
+attribution; static qualification is not organizational approval. The source
+repository and Apache-2.0 learning prerelease are public; that release is a
+separate disposable profile. Signed public runtime artifacts, supported-version
+promises, live Bedrock evidence, recovery qualification, and upgrade proof
+remain in the
 [public v1 plan](../roadmap/public-v1-release-plan.md).
 
 ## Verification
@@ -216,3 +234,9 @@ asynchronous pricing/attribution, deduplication, pre-queue privacy, queue and
 database survival across `down`/`up`, rolling Prometheus output without savings,
 and authenticated Grafana provisioning. Only that test's volumes are removed.
 It proves local mechanics, not real provider or price correctness.
+
+`make test-community-recovery PYTHON=.venv/bin/python` is a separate opt-in
+owned Docker recovery gate. Its harness must be run for the exact candidate;
+the [recovery runbook](community-recovery.md) records the exercised local
+roundtrip and its limits. Archive/crypto and recovered-startup unit tests run
+in ordinary `make verify`.

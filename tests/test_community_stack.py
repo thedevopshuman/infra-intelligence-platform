@@ -141,7 +141,11 @@ class CommunityStackTests(unittest.TestCase):
     def test_build_happens_before_start_only_when_explicit(self) -> None:
         self.install()
         with patch.object(stack, "run_compose", return_value="") as run:
-            with redirect_stdout(io.StringIO()), patch.object(stack, "wait_for_collector"):
+            with (
+                redirect_stdout(io.StringIO()),
+                patch.object(stack, "wait_for_collector"),
+                patch("community_recovery.record_runtime"),
+            ):
                 self.assertEqual(stack.main(["--state", str(self.state), "up", "--build"]), 0)
             self.assertEqual(run.call_args_list[0].args[1], ["build", "initialize"])
             self.assertEqual(run.call_args_list[1].args[1][0], "up")

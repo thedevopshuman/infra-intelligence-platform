@@ -42,9 +42,12 @@ wiring has composition/render tests but has not yet been exercised by that
 live Helm gate. Full release evidence must be regenerated for the selected
 clean candidate.
 
-The owner has selected `thedevopshuman` on GitHub. The verified source through
-`3e2df75` is pushed to the private
-[platform repository](https://github.com/thedevopshuman/infra-intelligence-platform).
+The owner has selected `thedevopshuman` on GitHub. The
+[platform repository](https://github.com/thedevopshuman/infra-intelligence-platform)
+is public and the Apache-2.0
+[learning-v0.84.0 source prerelease](https://github.com/thedevopshuman/infra-intelligence-platform/releases/tag/learning-v0.84.0)
+has been published. That source-only milestone is not signed runtime-artifact
+publication or a production-v1 qualification.
 The existing [website repository](https://github.com/thedevopshuman/website)
 remains separate. `thedevopshuman.com` is the selected informational site/docs
 domain: The DevOps Human is the umbrella site, with IIP as one product, not a
@@ -67,9 +70,19 @@ generated protected credentials, verified database/telemetry transport,
 operator-reviewed catalogs/attribution, durable state and Collector buffering,
 safe configuration generations, and a savings-independent rolling dashboard.
 It does not close the public-install gate: published artifacts and a fresh-host
-walkthrough, supported upgrade/backup and certificate lifecycle, database/outbox
+walkthrough, supported upgrade/recovery and certificate lifecycle, database/outbox
 retention, and real provider evidence remain outstanding. Its operational
 limitations must not be presented as a fully supported public-v1 deployment.
+
+An [offline encrypted community recovery implementation](../operations/community-recovery.md)
+now joins stopped database/queue/backend data and protected state, verifies
+exact operational deployment and image identities, and restores into fresh
+stopped state with explicit source fencing. The owned local Docker roundtrip
+has passed with synthetic persisted/queued usage, deduplication, retained
+Grafana/Prometheus data, exact images, and unchanged credentials/trust. That
+result is not a customer recovery drill, measured RPO/RTO, cross-version
+upgrade, or off-host key/archive custody. Those evidence and lifecycle
+obligations remain open, and the gate must be rerun for the release candidate.
 
 | Workstream | Required result | Evidence to close it |
 | --- | --- | --- |
@@ -123,8 +136,9 @@ artifacts before promotion. A passed source test suite alone is insufficient.
 
 - **Selected:** GitHub owner `thedevopshuman`, separate platform and website
   repositories, and `thedevopshuman.com` for the umbrella site/product details
-  and documentation. Current repository privacy is a staging state, not a
-  change to the public-first target. Image/package namespace ownership and
+  and documentation. Platform source and the learning prerelease are public;
+  the separate website repository has its own publication lifecycle.
+  Image/package namespace ownership and
   release-signing identities still need to be finalized.
 - **Selected:** Apache-2.0 for original project material, with contribution
   rules and retained third-party obligations. Dependency compliance and
@@ -135,6 +149,7 @@ artifacts before promotion. A passed source test suite alone is insufficient.
   real integration qualification.
 
 Credentials and private environment configuration stay outside the repository.
-Missing publication decisions do not block local engineering. Publication,
-license application, and live billable calls wait for the applicable choices
-and authority.
+Missing publication decisions do not block local engineering. Apache-2.0 has
+been applied and the source learning prerelease published. Additional artifact
+publication destinations, production commitments, and live billable calls
+still require their applicable choices and authority.

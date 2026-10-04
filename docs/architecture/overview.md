@@ -244,6 +244,15 @@ allocation projection for its primary dashboard. The installer has no provider,
 production-promotion, or server application authority; local lifecycle limits
 remain explicit in the [runbook](../operations/community-installation.md).
 
+[ADR 0158](../decisions/0158-offline-encrypted-community-recovery.md) adds a
+separate host-side cold-recovery boundary for that installation. It joins the
+four stopped data volumes and protected configuration/credentials in one
+authenticated encrypted archive, binds exact runtime images and operational
+deployment files, and restores only into fresh stopped state with explicit
+source fencing. Recovery changes neither serving authority nor tenant identity
+and does not implement migration, certificate renewal, HA, or a production
+recovery objective; see the [recovery runbook](../operations/community-recovery.md).
+
 [ADR 0134](../decisions/0134-customer-otlp-receiver-interoperability-qualification.md)
 adds a host-side customer gate that uses a digest-pinned official Collector and
 its exporter self-metrics to prove metrics, logs, and metadata-only GenAI spans

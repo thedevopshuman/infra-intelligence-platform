@@ -64,6 +64,13 @@ class InstallationError(ValueError):
     """Stable errors deliberately exclude protected configuration and tool output."""
 
 
+def require_complete_recovery(state: Path) -> None:
+    """An interrupted restore may only be inspected or stopped, never started."""
+    marker = state / ".recovery-incomplete"
+    if marker.exists() or marker.is_symlink():
+        raise InstallationError("community.recovery.incomplete")
+
+
 def compact(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
@@ -291,6 +298,8 @@ def initialize(state: Path, inputs: Mapping[str, dict], *, image: str) -> Path:
 def installed_environment(state: Path, *, validate_contracts: bool = True) -> tuple[dict[str, str], str]:
     state = state.absolute()
     _private_directory(state)
+    if validate_contracts:
+        require_complete_recovery(state)
     installation = read_protected(state / "installation.json")
     credentials = read_protected(state / "credentials.json")
     if (
@@ -344,6 +353,13 @@ def installed_environment(state: Path, *, validate_contracts: bool = True) -> tu
     if validate_contracts:
         validate_transport(state)
     environment.update(transport)
+    if validate_contracts:
+        from community_recovery import recovered_environment
+
+        # Restored startup must preserve the images that actually held these
+        # volumes, not re-resolve the original mutable tags. Rescue ps/down
+        # intentionally skip this deployment check and cannot create services.
+        environment.update(recovered_environment(state))
     return environment, installation["project"]
 
 
@@ -369,6 +385,7 @@ def run_compose(state: Path, arguments: Sequence[str], *, validate_contracts: bo
 def configure(state: Path, inputs: Mapping[str, dict]) -> None:
     """Switch an offline installation to a complete immutable configuration set."""
     state = state.absolute()
+    require_complete_recovery(state)
     if run_compose(state, ["ps", "--all", "--quiet"], validate_contracts=False).strip():
         raise InstallationError("community.configuration.stop-required")
     installation = read_protected(state / "installation.json")
@@ -426,11 +443,23 @@ def execute(arguments: argparse.Namespace) -> int:
         installed_environment(arguments.state)
         print("Protected configuration is valid; live telemetry and release readiness are not certified.")
     elif arguments.command == "up":
+        from community_recovery import RecoveryDocker, record_runtime
+
+        environment, _ = installed_environment(arguments.state)
+        recovered = "IIP_COMMUNITY_POSTGRES_IMAGE" in environment
         options = ["up", "--detach", "--wait", "--wait-timeout", "240"]
+        if recovered:
+            if arguments.build:
+                raise InstallationError("community.recovery.build-prohibited")
+            RecoveryDocker(arguments.state).require_images(
+                read_protected(arguments.state / "recovery-images.json")
+            )
+            options.extend(("--no-build", "--pull", "never"))
         if arguments.build:
             run_compose(arguments.state, ["build", "initialize"])
         run_compose(arguments.state, options)
         wait_for_collector(arguments.state)
+        record_runtime(arguments.state)
         print("Persistent single-host preview started without demo data.")
         print("Console: http://127.0.0.1:18083/console")
         print("Grafana: http://127.0.0.1:13001/d/iip-community-ai-finops (user: admin)")

@@ -14,7 +14,7 @@ class CiSupplyChainTests(unittest.TestCase):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         action_references = re.findall(r"^\s*- uses: ([^\s#]+)", workflow, re.M)
 
-        self.assertEqual(len(action_references), 14)
+        self.assertEqual(len(action_references), 16)
         for reference in action_references:
             with self.subTest(reference=reference):
                 self.assertRegex(reference, r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[a-f0-9]{40}$")
@@ -34,6 +34,7 @@ class CiSupplyChainTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: true", workflow)
         self.assertIn("version: v4.1.3", workflow)
         self.assertIn("make test-postgres-continuity", workflow)
+        self.assertIn("make test-community-recovery", workflow)
         self.assertIn("make test-release-signatures", workflow)
         self.assertIn("make test-release-vulnerabilities", workflow)
 

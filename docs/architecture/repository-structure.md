@@ -194,6 +194,18 @@ or become a new customer SDK. Generated Collector and Grafana configuration
 remain replaceable deployment assets under `deploy/community` and
 `deploy/grafana`; no authoritative ledger moves into those backends.
 
+Community recovery follows the same operational boundary.
+`scripts/community_recovery.py` owns offline orchestration, exact image and
+daemon/volume binding, whole-installation manifest validation, fresh target
+reservation, and startup fencing. `scripts/community_backup_crypto.py` owns
+bounded authenticated encryption and protected no-overwrite publication;
+`deploy/community/recovery_volume.py` is the networkless strict volume
+transport. Their internal archive format is not a public resource contract or
+an SDK capability. No recovery file access, Docker authority, key custody, or
+archive parsing enters the server domain/application packages. The separately
+invoked Docker test remains an owned operational experiment, not a customer
+recovery guarantee.
+
 - A provider-specific API call belongs in `adapters/<provider>` or a plugin.
 - A capability selected by an agent is a tool contract; the implementation delegates to a provider port.
 - A use-case sequence belongs in `application`, not an HTTP handler or queue consumer.

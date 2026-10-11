@@ -187,7 +187,7 @@ jobs:
           cache-dependency-path: requirements/verify.txt
       - run: python -m pip install --requirement requirements/verify.txt
       - name: Download exact build checkpoint
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.build.outputs.artifact_id }}
           path: dist/checkpoints/build
@@ -272,13 +272,13 @@ jobs:
           cleanup: true
       - run: python -m pip install --requirement requirements/verify.txt
       - name: Download exact build checkpoint
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.build.outputs.artifact_id }}
           path: dist/checkpoints/build
           digest-mismatch: error
       - name: Download exact vulnerability evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.vulnerabilities.outputs.artifact_id }}
           path: dist/checkpoints/vulnerabilities
@@ -400,19 +400,19 @@ jobs:
           cache-dependency-path: requirements/verify.txt
       - run: python -m pip install --requirement requirements/verify.txt
       - name: Download exact build checkpoint
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.build.outputs.artifact_id }}
           path: dist/checkpoints/build
           digest-mismatch: error
       - name: Download exact vulnerability evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.vulnerabilities.outputs.artifact_id }}
           path: dist/checkpoints/vulnerabilities
           digest-mismatch: error
       - name: Download exact publication evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.publish-images.outputs.artifact_id }}
           path: dist/checkpoints/publication
@@ -513,25 +513,25 @@ jobs:
           cache-dependency-path: requirements/verify.txt
       - run: python -m pip install --requirement requirements/verify.txt
       - name: Download exact build checkpoint
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.build.outputs.artifact_id }}
           path: dist/checkpoints/build
           digest-mismatch: error
       - name: Download exact vulnerability evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.vulnerabilities.outputs.artifact_id }}
           path: dist/checkpoints/vulnerabilities
           digest-mismatch: error
       - name: Download exact publication evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.publish-images.outputs.artifact_id }}
           path: dist/checkpoints/publication
           digest-mismatch: error
       - name: Download exact signature evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.signatures.outputs.artifact_id }}
           path: dist/checkpoints/signatures
@@ -635,31 +635,31 @@ jobs:
           cache-dependency-path: requirements/verify.txt
       - run: python -m pip install --requirement requirements/verify.txt
       - name: Download exact build checkpoint
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.build.outputs.artifact_id }}
           path: dist/checkpoints/build
           digest-mismatch: error
       - name: Download exact vulnerability evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.vulnerabilities.outputs.artifact_id }}
           path: dist/checkpoints/vulnerabilities
           digest-mismatch: error
       - name: Download exact publication evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.publish-images.outputs.artifact_id }}
           path: dist/checkpoints/publication
           digest-mismatch: error
       - name: Download exact signature evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.signatures.outputs.artifact_id }}
           path: dist/checkpoints/signatures
           digest-mismatch: error
       - name: Download exact customer-download signatures
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.sign-downloads.outputs.artifact_id }}
           path: dist/checkpoints/download-signatures
